@@ -334,87 +334,87 @@ class BookController extends Controller
                 }
             }
         }
-
-        private function createBook($genre, $author, $series, $title, $directoryPath)
-        {
-            $authorModel = Author::firstOrCreate(['name' => $author]);
-             // Check for audio files in the directory
-            $audioFiles = Storage::files('public/'.$directoryPath);
-            $audioFiles = array_filter($audioFiles, function ($file) {
-                $extension = pathinfo($file, PATHINFO_EXTENSION);
-                return in_array(strtolower($extension), ['mp3', 'm4b']);
-            });
-
-            $tagData = null;
-
-            if (!empty($audioFiles)) {
-                $tagData = $this->extractTagData(Storage::path($audioFiles[0])); // Use the first audio file
-            }
-
-            // Create book record in the database
-            $genreModel = Genre::firstOrCreate(['name' => $genre]);
-            Book::create([
-                'title' => $title,
-                'author_id' => $authorModel->id,
-                'series' => $series,
-                'genre_id' => $genreModel->id, //ID instead of the value
-                'directory_path' => $directoryPath, // relative path from storage folder
-                'type' => 'audiobook',  // You can auto-detect file types later, or have a config option.
-                'description' => $tagData['description'] ?? null,
-            ]);
-        }
-
-        private function extractTagData($filePath)
-        {
-            $process = new Process([
-                'ffmpeg',
-                '-i',
-                $filePath,
-                '-f',
-                'ffmetadata',
-                'pipe:1'  // Output to standard output
-            ]);
-
-            $process->run();
-
-            if (!$process->isSuccessful()) {
-                return []; // Return empty array if FFmpeg fails
-            }
-
-            $output = $process->getOutput();
-            $lines = explode("\n", $output);
-
-            $tags = [];
-            foreach ($lines as $line) {
-                if (strpos($line, '=') !== false) {
-                    list($key, $value) = explode('=', $line, 2); // Limit to 2 parts in case value also contains '='
-                    $tags[trim($key)] = trim($value);
-                }
-            }
-
-            $title = $tags['title'] ?? null;
-            $artist = $tags['artist'] ?? null;
-            $album = $tags['album'] ?? null;
-            $comment = $tags['comment'] ?? $tags['description'] ?? null;
-
-            // Check if tags match the directory structure
-            $directoryPath = dirname($filePath);
-            $tagMatch = true;
-
-             if($artist && !str_contains(strtolower($directoryPath), strtolower($artist))){
-                $tagMatch = false;
-            }
-
-            if($album && !str_contains(strtolower($directoryPath), strtolower($album))){
-                $tagMatch = false;
-            }
-
-            return [
-                'title' => $title,
-                'artist' => $artist,
-                'album' => $album,
-                'description' => $comment,
-                'tagMatch' => $tagMatch,
-            ];
-        }
     }
+    private function createBook($genre, $author, $series, $title, $directoryPath)
+    {
+        $authorModel = Author::firstOrCreate(['name' => $author]);
+        // Check for audio files in the directory
+        $audioFiles = Storage::files('public/' . $directoryPath);
+        $audioFiles = array_filter($audioFiles, function ($file) {
+            $extension = pathinfo($file, PATHINFO_EXTENSION);
+            return in_array(strtolower($extension), ['mp3', 'm4b']);
+        });
+
+        $tagData = null;
+
+        if (!empty($audioFiles)) {
+            $tagData = $this->extractTagData(Storage::path($audioFiles[0])); // Use the first audio file
+        }
+
+        // Create book record in the database
+        $genreModel = Genre::firstOrCreate(['name' => $genre]);
+        Book::create([
+            'title' => $title,
+            'author_id' => $authorModel->id,
+            'series' => $series,
+            'genre_id' => $genreModel->id, //ID instead of the value
+            'directory_path' => $directoryPath, // relative path from storage folder
+            'type' => 'audiobook',  // You can auto-detect file types later, or have a config option.
+            'description' => $tagData['description'] ?? null,
+        ]);
+    }
+
+    private function extractTagData($filePath)
+    {
+        $process = new Process([
+            'ffmpeg',
+            '-i',
+            $filePath,
+            '-f',
+            'ffmetadata',
+            'pipe:1'  // Output to standard output
+        ]);
+
+        $process->run();
+
+        if (!$process->isSuccessful()) {
+            return []; // Return empty array if FFmpeg fails
+        }
+
+        $output = $process->getOutput();
+        $lines = explode("\n", $output);
+
+        $tags = [];
+        foreach ($lines as $line) {
+            if (strpos($line, '=') !== false) {
+                list($key, $value) = explode('=', $line, 2); // Limit to 2 parts in case value also contains '='
+                $tags[trim($key)] = trim($value);
+            }
+        }
+
+        $title = $tags['title'] ?? null;
+        $artist = $tags['artist'] ?? null;
+        $album = $tags['album'] ?? null;
+        $comment = $tags['comment'] ?? $tags['description'] ?? null;
+
+        // Check if tags match the directory structure
+        $directoryPath = dirname($filePath);
+        $tagMatch = true;
+
+        if ($artist && !str_contains(strtolower($directoryPath), strtolower($artist))) {
+            $tagMatch = false;
+        }
+
+        if ($album && !str_contains(strtolower($directoryPath), strtolower($album))) {
+            $tagMatch = false;
+        }
+
+        return [
+            'title' => $title,
+            'artist' => $artist,
+            'album' => $album,
+            'description' => $comment,
+            'tagMatch' => $tagMatch,
+        ];
+    }
+}
