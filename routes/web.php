@@ -53,6 +53,9 @@ Route::prefix('admin')->middleware(['auth', 'admin'])->group(function () {
     Route::post('/books/import-from-google-books', [Admin\BookController::class, 'importFromGoogleBooks'])->name('admin.books.importFromGoogleBooks');
     Route::post('/books/processImport', [Admin\BookController::class, 'processImport'])->name('admin.books.processImport');
 
+    //Admin acknowledge button for user message
+    Route::post('/messages/{message}/acknowledge', [Admin\MessageController::class, 'acknowledge'])->name('admin.messages.acknowledge');
+
     Route::post('/send-notification', [AdminNotificationController::class, 'sendNotification'])->name('admin.sendNotification');
     Route::post('/messages', [MessageController::class, 'storeAdmin'])->name('admin.messages.store');
     Route::get('/admin', [Admin\AdminController::class, 'index'])->name('admin.index');

@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Process;
 use ZipArchive;
+use getID3;
 
 class BookController extends Controller
 {
@@ -20,6 +21,8 @@ class BookController extends Controller
     {
         $this->googleBooksApiService = $googleBooksApiService;
     }
+
+    //... Other methods...
 
     public function index(Request $request)
     {
@@ -37,13 +40,26 @@ class BookController extends Controller
             $query->where('series', 'like', "%{$request->series}%");
         }
 
-        if ($request->has('title')) {
-            $query->where('title', 'like', "%{$request->title}%");
+        if ($request->has('search')) {
+            $searchTerm = $request->search;
+            $query->where(function ($q) use ($searchTerm) {
+                $q->where('title', 'like', "%{$searchTerm}%")
+                    ->orWhereHas('author', function ($authorQuery) use ($searchTerm) {
+                        $authorQuery->where('name', 'like', "%{$searchTerm}%");
+                    })
+                    ->orWhere('series', 'like', "%{$searchTerm}%");
+            });
         }
+
+        $genres = Genre::all();
+        $authors = Author::all();
 
         $books = $query->paginate(12); // You can adjust the pagination size
 
-        return view('books.index', compact('books'));
+        // Fetch recently added books for the landing page
+        $recentBooks = Book::orderBy('created_at', 'desc')->take(5)->get();
+
+        return view('books.index', compact('books', 'genres', 'authors', 'recentBooks'));
     }
 
     public function show(Book $book)

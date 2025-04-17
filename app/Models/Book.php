@@ -17,7 +17,9 @@ class Book extends Model
         'cover_image',
         'description',
         'directory_path',
-        'type'
+        'type',
+        'date_added',
+        'publication_date'
     ];
 
     public function reviews()

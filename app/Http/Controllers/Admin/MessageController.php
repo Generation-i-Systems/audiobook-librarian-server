@@ -14,7 +14,15 @@ class MessageController extends Controller
     {
         $messages = Message::with('user')->orderBy('created_at', 'desc')->get();
         $users = User::all();
-        return view('admin.messages.index', compact('messages', 'users'));
+        $admin_permissions = User::where('admin_permissions', true)->get();
+        return view('admin.messages.index', compact('messages', 'users', 'admin_permissions'));
     }
 
+    public function acknowledge(Message $message)
+    {
+        $message->acknowledged_at = now();
+        $message->save();
+
+        return back()->with('success', 'Message acknowledged.');
+    }
 }

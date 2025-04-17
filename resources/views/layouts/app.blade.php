@@ -53,6 +53,7 @@
                                     <a class="nav-link" style="color:white"
                                         href="{{ route('admin.messages.index') }}">{{ __('Messages') }}</a>
                                 </li>
+
                             @else
                                 <!-- Public Links (Show on public pages) -->
                                 <li class="nav-item">
@@ -92,6 +93,10 @@
                                 </a>
 
                                 <div class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
+                                    <a class="dropdown-item" href="{{ route('profile.index') }}">
+                                        {{ __('Profile') }}
+                                    </a>
+
                                     <a class="dropdown-item" href="{{ route('logout') }}" onclick="event.preventDefault();
                                                          document.getElementById('logout-form').submit();">
                                         {{ __('Logout') }}
