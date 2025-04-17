@@ -19,10 +19,7 @@ Auth::routes();
 
 Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
 
-Route::resource('books', BookController::class);
-Route::get('/books/import-from-title', [BookController::class, 'importFromTitle'])->name('books.importFromTitle');
-Route::post('/books/search-google-books', [BookController::class, 'searchGoogleBooks'])->name('books.searchGoogleBooks');
-Route::post('/books/import-from-google-books', [BookController::class, 'importFromGoogleBooks'])->name('books.importFromGoogleBooks');
+Route::resource('books', BookController::class)->only(['index', 'show', 'download']); //Only public calls
 
 Route::post('/books/{book}/reviews', [ReviewController::class, 'store'])->name('reviews.store');
 Route::delete('/reviews/{review}', [ReviewController::class, 'destroy'])->name('reviews.destroy');
@@ -45,11 +42,18 @@ Route::get('/reading-progress/{book}', [ReadingProgressController::class, 'get']
 Route::post('/messages', [MessageController::class, 'store'])->name('messages.store');
 
 //Admin Routes
-Route::prefix('admin')->middleware('auth')->group(function () {
+Route::prefix('admin')->middleware(['auth', 'admin'])->group(function () {
     Route::resource('genres', Admin\GenreController::class);
     Route::resource('authors', Admin\AuthorController::class);
+    Route::resource('books', Admin\BookController::class)->except(['index', 'show', 'download']);
     Route::resource('messages', Admin\MessageController::class);
+
+    Route::get('/books/import-from-title', [Admin\BookController::class, 'importFromTitle'])->name('admin.books.importFromTitle');
+    Route::post('/books/search-google-books', [Admin\BookController::class, 'searchGoogleBooks'])->name('admin.books.searchGoogleBooks');
+    Route::post('/books/import-from-google-books', [Admin\BookController::class, 'importFromGoogleBooks'])->name('admin.books.importFromGoogleBooks');
+    Route::post('/books/processImport', [Admin\BookController::class, 'processImport'])->name('admin.books.processImport');
 
     Route::post('/send-notification', [AdminNotificationController::class, 'sendNotification'])->name('admin.sendNotification');
     Route::post('/messages', [MessageController::class, 'storeAdmin'])->name('admin.messages.store');
+    Route::get('/admin', [Admin\AdminController::class, 'index'])->name('admin.index');
 });

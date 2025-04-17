@@ -6,3 +6,19 @@
 
 // Bootstrap
 @import 'bootstrap/scss/bootstrap';
+
+.navbar-custom {
+    background-color: #007bff;
+    /* Your desired blue color */
+    color: white;
+}
+
+.navbar-custom .navbar-brand,
+.navbar-custom .nav-link {
+    color: white;
+}
+
+.navbar-custom .nav-link:hover {
+    color: #f8f9fa;
+    /* Lighten on hover */
+}

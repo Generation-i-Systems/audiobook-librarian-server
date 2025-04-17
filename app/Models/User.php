@@ -21,6 +21,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'role',
         'device_token',
     ];
 
@@ -64,7 +65,7 @@ class User extends Authenticatable
         return $this->hasMany(Follow::class);
     }
 
-     public function readingProgresses()
+    public function readingProgresses()
     {
         return $this->hasMany(ReadingProgress::class);
     }
