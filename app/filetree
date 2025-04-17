@@ -1,0 +1,169 @@
+ebook-archive/  (Root directory)
+├── app/
+│   ├── Console/
+│   │   └── Kernel.php
+│   ├── Exceptions/
+│   │   └── Handler.php
+│   ├── Http/
+        │   │   ├── Controllers/
+        │   │   │   ├── Admin/
+        │   │   │   │   └── GenreController.php  (Admin functions for genres)
+        │   │   │   ├── Api/
+        │   │   │   │   ├── AuthController.php (API for Auth)
+        │   │   │   │   ├── BookRequestApiController.php (Handles book requests via API)
+        │   │   │   │   ├── FollowApiController.php  (Handles follow/unfollow actions via API)
+        │   │   │   │   └── ReadingProgressApiController.php (Handles reading progress via API)
+        │   │   │   ├── AuthController.php (Handles registration)
+        │   │   │   ├── BookController.php (Handles books: import, search, download)
+        │   │   │   ├── BookQueueController.php (Handles the book queue)
+        │   │   │   ├── FollowController.php (Handles follow/unfollow actions)
+        │   │   │   ├── ReadingProgressController.php (Handles reading progress)
+        │   │   │   └── ReviewController.php (Handles book reviews)
+        │   │   ├── Middleware/
+        │   │   │   ├── Authenticate.php
+        │   │   │   ├── EncryptCookies.php
+        │   │   │   ├── PreventRequestsDuringMaintenance.php
+        │   │   │   ├── RedirectIfAuthenticated.php
+        │   │   │   ├── TrimStrings.php
+        │   │   │   └── TrustProxies.php
+        │   │   └── Kernel.php
+│   ├── Models/
+        │   │   ├── AccountRequest.php (Represents account requests)
+        │   │   ├── Author.php (Represent authors)
+        │   │   ├── Book.php (Represents a book)
+        │   │   ├── BookQueue.php (Represents an entry in the book queue)
+        │   │   ├── Follow.php (Represents a user following an author/series)
+        │   │   ├── Genre.php (Represents a book genre)
+        │   │   ├── ReadingProgress.php (Represents a user's reading progress)
+        │   │   ├── Review.php (Represents a book review)
+        │   │   ├── Series.php (Represent a series)
+        │   │   └── User.php (Represents a user)
+│   ├── Providers/
+        │   │   ├── AppServiceProvider.php
+        │   │   ├── AuthServiceProvider.php
+        │   │   ├── BroadcastServiceProvider.php
+        │   │   ├── EventServiceProvider.php  (Registers events and listeners)
+        │   │   └── RouteServiceProvider.php
+│   ├── Events/
+│   │   └── NewBookAdded.php (Event for when a new book is added)
+│   ├── Listeners/
+│   │   └── SendNewBookNotification.php  (Listener to send push notifications)
+│   ├── Services/
+│   │   └── GoogleBooksApiService.php  (Handles interaction with Google Books API)
+│   └── Policies/
+├── config/
+        │   ├── app.php
+        │   ├── auth.php
+        │   ├── broadcasting.php
+        │   ├── cache.php
+        │   ├── cors.php
+        │   ├── database.php
+        │   ├── filesystems.php
+        │   ├── hashing.php
+        │   ├── logging.php
+        │   ├── mail.php
+        │   ├── queue.php
+        │   ├── services.php  (Configuration for Google Books API key)
+        │   ├── session.php
+        │   ├── view.php
+├── database/
+│   ├── factories/
+        │   │   ├── AccountRequestFactory.php
+        │   │   ├── AuthorFactory.php
+        │   │   ├── BookFactory.php
+        │   │   ├── BookQueueFactory.php
+        │   │   ├── FollowFactory.php
+        │   │   ├── GenreFactory.php
+        │   │   ├── ReadingProgressFactory.php
+        │   │   ├── ReviewFactory.php
+        │   │   ├── SeriesFactory.php
+        │   │   └── UserFactory.php
+│   ├── migrations/
+        │   │   ├── xxxx_xx_00_create_users_table.php (Users table)
+        │   │   ├── xxxx_xx_04_create_account_requests_table.php  (Account request table)
+        │   │   ├── xxxx_xx_05_create_genres_table.php  (Genres table)
+            │   ├── xxxx_xx_07_create_books_table.php (Book table)
+        │   │   ├── xxxx_xx_08_create_reviews_table.php (Review table)
+        │   │   ├── xxxx_xx_09_create_book_queues_table.php  (Book queue table)
+        │   │   ├── xxxx_xx_10_create_book_requests_table.php  (Book request table)
+        │   │   ├── xxxx_xx_11_create_follows_table.php  (User follows table)
+        │   │   ├── xxxx_xx_12_create_reading_progresses_table.php (Reading progress table)
+
+        │   │   ├── xxxx_xx_14_create_series_table.php (Series table)
+        │   │   └── xxxx_xx_??_update_books_table.php
+│   ├── seeders/
+│   │   └── DatabaseSeeder.php
+├── public/
+│   ├── css/
+│   │   └── app.css
+│   ├── js/
+│   │   └── app.js
+│   ├── images/
+│   │   └── audiobook_icon.png (Optional - icon used on welcome screen)
+│   ├── .htaccess
+│   └── index.php
+├── resources/
+│   ├── css/
+│   │   └── app.css
+│   ├── js/
+│   │   └── app.js
+│   ├── lang/
+│   │   └── en/
+│   │       └── auth.php
+│   ├── views/
+│   │   ├── admin/
+    │   │   │   ├── account_requests/
+    │   │   │   │   └── index.blade.php (View for admin account requests)
+    │   │   │   ├── genres/
+    │   │   │   │   ├── create.blade.php (Admin view for creating a genre)
+    │   │   │   │   ├── edit.blade.php (Admin view for editing a genre)
+    │   │   │   │   └── index.blade.php (Admin view listing genres)
+│   │   ├── auth/
+        │   │   │   ├── login.blade.php
+        │   │   │   ├── passwords/
+        │   │   │   │   ├── confirm.blade.php
+        │   │   │   │   ├── email.blade.php
+        │   │   │   │   ├── reset.blade.php
+        │   │   │   └── register.blade.php
+│   │   ├── books/
+        │   │   │   ├── create.blade.php (Form to create a book)
+        │   │   │   ├── edit.blade.php (Form to edit a book)
+        │   │   │   ├── import.blade.php (View for importing from directory)
+        │   │   │   ├── import_from_title.blade.php (View to import books from google by title)
+        │   │   │   ├── index.blade.php (View that shows a list of the available books)
+        │   │   │   ├── search_results.blade.php (View showing search results from google books API)
+        │   │   │   └── show.blade.php (View showing details of a single book)
+│   │   ├── components/
+        │   │   │   └── layout.blade.php
+        │   │   ├── home.blade.php
+│   │   ├── layouts/
+        │   │   │   └── app.blade.php  (Main layout file)
+│   │   ├── queue/
+        │   │   │   └── index.blade.php (Displays book queue)
+        │   │   └── welcome.blade.php (The welcome screen)
+├── routes/
+│   ├── api.php  (API routes for mobile apps)
+│   └── web.php (Web routes for the web app)
+├── storage/
+│   ├── app/
+│   │   ├── public/
+│   │   │   ├── books/  (Where books will be stored)
+│   │   │   └── covers/ (Where cover images will be stored)
+│   │   └── temp/ (Temporary zip files)
+│   └── framework/
+│       ├── cache/
+│       └── sessions/
+├── tests/
+│   ├── Browser/
+│   │   └── LoginTest.php (Browser test)
+│   ├── Feature/
+│   │   └── BookDownloadTest.php (Feature test)
+│   └── Unit/
+│       └── Models/
+│           └── BookTest.php  (Unit test)
+├── composer.json
+├── composer.lock
+├── package.json
+├── phpunit.xml
+├── webpack.mix.js
+└── .env
