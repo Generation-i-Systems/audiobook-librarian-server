@@ -14,6 +14,14 @@
     <link rel="dns-prefetch" href="//fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=Nunito" rel="stylesheet">
 
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+        integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
     <!-- Scripts -->
     @vite(['resources/sass/app.scss', 'resources/js/app.js'])
 </head>
@@ -23,7 +31,8 @@
         <nav class="navbar navbar-expand-md navbar-dark bg-primary shadow-sm">
             <div class="container">
                 <a class="navbar-brand" href="{{ url('/') }}">
-                    {{ config('app.name', 'Audiobook Librarian') }}
+                    <img src="{{ asset('images/ablibrarian_logo_horizontal_white.svg') }}" alt="Audiobook Librarian"
+                        height="30">
                 </a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
                     data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent"
@@ -96,6 +105,20 @@
                                     <a class="dropdown-item" href="{{ route('profile.index') }}">
                                         {{ __('Profile') }}
                                     </a>
+
+                                    @if (Auth::user()->role === 'admin')
+                                        @if(request()->is('admin/*'))
+                                            <a class="dropdown-item" href="{{ route('books.index') }}"
+                                                onclick="event.preventDefault(); document.getElementById('user-mode-form').submit();">Switch
+                                                to User Mode</a>
+
+                                        @else
+                                            <a class="dropdown-item" href="{{ route('admin.index') }}"
+                                                onclick="event.preventDefault(); document.getElementById('admin-mode-form').submit();">Switch
+                                                to Admin Mode</a>
+
+                                        @endif
+                                    @endif
 
                                     <a class="dropdown-item" href="{{ route('logout') }}" onclick="event.preventDefault();
                                                          document.getElementById('logout-form').submit();">

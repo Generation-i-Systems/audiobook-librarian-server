@@ -8,10 +8,17 @@ use Illuminate\Http\Request;
 
 class AuthorController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $authors = Author::all();
-        return view('admin.authors.index', compact('authors'));
+        $search = $request->input('search');
+        $query = Author::query();
+
+        if ($search) {
+            $query->where('name', 'like', "%{$search}%");
+        }
+
+        $authors = $query->orderBy('name')->paginate(20);
+        return view('admin.authors.index', compact('authors', 'search'));
     }
 
     public function create()

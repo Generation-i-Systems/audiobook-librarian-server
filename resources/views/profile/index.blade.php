@@ -10,7 +10,7 @@
             </div>
         @endif
 
-        @if(Auth::user()->admin_permissions == false)
+        @if(Auth::user()->role === 'regular' && Auth::user()->admin_permissions == false)
             <form action="{{ route('profile.requestAdminPermissions') }}" method="POST">
                 @csrf
                 <div class="form-group">

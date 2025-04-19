@@ -2,35 +2,41 @@
 
 @section('content')
     <div class="container">
-        <h1>Manage Authors</h1>
+        <h1>Manage Books</h1>
 
-        <form action="{{ route('admin.authors.index') }}" method="GET">
+        <form action="{{ route('admin.books.index') }}" method="GET">
             <div class="input-group mb-3">
-                <input type="text" class="form-control" placeholder="Search author name" name="search"
+                <input type="text" class="form-control" placeholder="Search title, author, or series" name="search"
                     value="{{ request('search') }}">
                 <button class="btn btn-outline-secondary" type="submit">Search</button>
             </div>
         </form>
 
-        <a href="{{ route('admin.authors.create') }}" class="btn btn-primary mb-3">Add New Author</a>
+        <a href="{{ route('admin.books.create') }}" class="btn btn-primary mb-3">Add New Book</a>
 
         <table class="table">
             <thead>
                 <tr>
-                    <th>Name</th>
+                    <th>Title</th>
+                    <th>Author</th>
+                    <th>Series</th>
+                    <th>Genre</th>
+                    <th>Type</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach($authors as $author)
+                @foreach($books as $book)
                     <tr class="{{ $loop->iteration % 2 == 0 ? 'table-secondary' : '' }}">
-                        <td>{{ $author->name }}</td>
+                        <td>{{ $book->title }}</td>
+                        <td>{{ $book->author->name }}</td>
+                        <td>{{ $book->series }}</td>
+                        <td>{{ $book->genre->name }}</td>
+                        <td>{{ $book->type }}</td>
                         <td>
-                            <a href="{{ route('admin.books.create') }}?author_id={{$author->id}}"
-                                class="btn btn-sm btn-outline-success" title="Add Book"><i class="fas fa-plus-circle"></i></a>
-                            <a href="{{ route('admin.authors.edit', $author) }}" class="btn btn-sm btn-outline-primary"
+                            <a href="{{ route('admin.books.edit', $book) }}" class="btn btn-sm btn-outline-primary"
                                 title="Edit"><i class="fas fa-pencil-alt"></i></a>
-                            <form action="{{ route('admin.authors.destroy', $author) }}" method="POST" style="display: inline;">
+                            <form action="{{ route('admin.books.destroy', $book) }}" method="POST" style="display: inline;">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"
@@ -42,7 +48,7 @@
             </tbody>
         </table>
 
-        {{ $authors->links() }}
+        {{ $books->links() }}
 
     </div>
 @endsection

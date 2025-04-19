@@ -14,6 +14,7 @@ use Symfony\Component\Process\Process;
 use ZipArchive;
 use getID3;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class BookController extends Controller
 {
@@ -24,7 +25,22 @@ class BookController extends Controller
         $this->googleBooksApiService = $googleBooksApiService;
     }
 
-    //... Other methods...
+    public function index(Request $request)
+    {
+        $search = $request->input('search');
+        $query = Book::query();
+
+        if ($search) {
+            $query->where('title', 'like', "%{$search}%")
+                ->orWhereHas('author', function ($authorQuery) use ($search) {
+                    $authorQuery->where('name', 'like', "%{$searchTerm}%");
+                })
+                ->orWhere('series', 'like', "%{$searchTerm}%");
+        }
+
+        $books = $query->orderBy('title')->paginate(20);
+        return view('admin.books.index', compact('books', 'search'));
+    }
 
     public function create()
     {
@@ -71,20 +87,28 @@ class BookController extends Controller
 
         // Handle Book File Uploads and directory creation
         $bookDirectory = 'books/' . $book->id;
-        Storage::makeDirectory('public/' . $bookDirectory); // Creates a directory in storage/app/public/books/{book_id}
+        $storagePath = env('BOOK_STORAGE_PATH');
+
+        if (!$storagePath) {
+            // Handle the case where BOOK_STORAGE_PATH is not defined
+            Log::error('BOOK_STORAGE_PATH is not defined in the .env file.');
+            return back()->withErrors(['error' => 'Configuration error: BOOK_STORAGE_PATH is not defined.']);
+        }
+        $bookDirectory = 'books/' . $book->id;
+        Storage::makeDirectory($storagePath . '/' . $bookDirectory); // Creates a directory in storage/app/public/books/{book_id}
         $book->directory_path = $bookDirectory;  //relative path to the book directory
 
         if ($request->hasFile('book_files')) {
             $files = $request->file('book_files');
             foreach ($files as $file) {
                 $filename = $file->getClientOriginalName();
-                $file->storeAs('public/' . $bookDirectory, $filename);
+                $file->storeAs($storagePath . '/' . $bookDirectory, $filename);
             }
         }
 
         $book->save();
 
-        return redirect()->route('books.show', $book)->with('success', 'Book created successfully!');
+        return redirect()->route('admin.books.show', $book)->with('success', 'Book created successfully!');
     }
 
     public function edit(Book $book)
@@ -119,7 +143,7 @@ class BookController extends Controller
         //Updates existing book record with all non null entries.
         $book->update($request->except(['cover_image']));
 
-        return redirect()->route('books.show', $book)->with('success', 'Book updated successfully!');
+        return redirect()->route('admin.books.show', $book)->with('success', 'Book updated successfully!');
     }
 
     public function importFromTitle()
@@ -205,79 +229,114 @@ class BookController extends Controller
 
         $this->importBooksFromDirectory($libraryPath);
 
-        return redirect()->route('books.index')->with('success', 'Books imported successfully.');
+        return redirect()->route('admin.books.index')->with('success', 'Books imported successfully.');
     }
 
     private function importBooksFromDirectory($libraryPath)
     {
-        $genres = scandir($libraryPath);
+        $this->processGenres($libraryPath);
+    }
+
+    private function processGenres($libraryPath)
+    {
+        $genres = $this->scanDirectory($libraryPath);
         foreach ($genres as $genre) {
             if ($genre === '.' || $genre === '..')
                 continue;
             $genrePath = $libraryPath . '/' . $genre;
 
             if (is_dir($genrePath)) {
-                $authors = scandir($genrePath);
-                foreach ($authors as $author) {
-                    if ($author === '.' || $author === '..')
-                        continue;
-                    $authorPath = $genrePath . '/' . $author;
-
-                    if (is_dir($authorPath)) {
-                        $seriesOrBooks = scandir($authorPath);
-
-                        foreach ($seriesOrBooks as $seriesOrBook) {
-                            if ($seriesOrBook === '.' || $seriesOrBook === '..')
-                                continue;
-                            $seriesOrBookPath = $authorPath . '/' . $seriesOrBook;
-
-                            if (is_dir($seriesOrBookPath)) { //Could be series or Book
-                                $bookPath = $seriesOrBookPath;
-                                $series = null;
-                                $bookDirName = $seriesOrBook;
-
-                                $files = scandir($seriesOrBookPath);
-                                $bookTitle = null;
-                                foreach ($files as $file) {
-                                    if ($file === '.' || $file === '..')
-                                        continue;
-                                    if (is_dir($seriesOrBookPath . '/' . $file)) {
-                                        $series = $seriesOrBook;
-                                        $bookDirName = $file;
-                                        $bookPath = $seriesOrBookPath . '/' . $file;
-                                        break;
-                                    } else {
-                                        $bookTitle = $seriesOrBook;
-                                    }
-                                }
-
-                                if (!$bookTitle)
-                                    $bookTitle = $bookDirName;
-
-                                $this->createBook($genre, $author, $series, $bookTitle, $bookPath);
-
-                            }
-                        }
-                    }
-                }
+                $this->processAuthors($genrePath, $genre);
             }
         }
+    }
+
+    private function processAuthors($genrePath, $genre)
+    {
+        $authors = $this->scanDirectory($genrePath);
+        foreach ($authors as $author) {
+            if ($author === '.' || $author === '..')
+                continue;
+            $authorPath = $genrePath . '/' . $author;
+
+            if (is_dir($authorPath)) {
+                $this->processSeriesOrBooks($authorPath, $genre, $author);
+            }
+        }
+    }
+
+    private function processSeriesOrBooks($authorPath, $genre, $author)
+    {
+        $seriesOrBooks = $this->scanDirectory($authorPath);
+        foreach ($seriesOrBooks as $seriesOrBook) {
+            if ($seriesOrBook === '.' || $seriesOrBook === '..')
+                continue;
+            $seriesOrBookPath = $authorPath . '/' . $seriesOrBook;
+
+            if (is_dir($seriesOrBookPath)) { //Could be series or Book
+                $bookPath = $seriesOrBookPath;
+                $series = null;
+                $bookDirName = $seriesOrBook;
+
+                $files = $this->scanDirectory($seriesOrBookPath);
+                $bookTitle = null;
+                foreach ($files as $file) {
+                    if ($file === '.' || $file === '..')
+                        continue;
+                    if (is_dir($seriesOrBookPath . '/' . $file)) {
+                        $series = $seriesOrBook;
+                        $bookDirName = $file;
+                        $bookPath = $seriesOrBookPath . '/' . $file;
+                        break;
+                    } else {
+                        $bookTitle = $seriesOrBook;
+                    }
+                }
+
+                if (!$bookTitle)
+                    $bookTitle = $bookDirName;
+
+                $this->createBook($genre, $author, $series, $bookTitle, $bookPath);
+            }
+        }
+    }
+
+    private function scanDirectory($path)
+    {
+        if (!is_dir($path)) {
+            Log::error("Invalid directory in scanDirectory: $path");
+            return []; //Return an empty array
+        }
+
+        $files = scandir($path);
+
+        if ($files === false) {
+            Log::error("Failed to scan directory: $path");
+            return [];  // Return an empty array on failure
+        }
+
+        return $files;
     }
 
     private function createBook($genre, $author, $series, $title, $directoryPath)
     {
         $authorModel = Author::firstOrCreate(['name' => $author]);
         // Check for audio files in the directory
-        $audioFiles = Storage::files('public/' . $directoryPath);
+        $storagePath = env('BOOK_STORAGE_PATH');
+        if (!$storagePath) {
+            Log::error('BOOK_STORAGE_PATH is not defined in the .env file.');
+            return back()->withErrors(['error' => 'Configuration error: BOOK_STORAGE_PATH is not defined.']);
+        }
+        $audioFiles = Storage::files($directoryPath);
         $audioFiles = array_filter($audioFiles, function ($file) {
             $extension = pathinfo($file, PATHINFO_EXTENSION);
-            return in_array(strtolower($extension), ['mp3', 'm4b']);
+            return in_array(strtolower($extension), ['mp3', 'm4b', 'm4a']);
         });
 
         $tagData = null;
 
         if (!empty($audioFiles)) {
-            $tagData = $this->extractTagData(Storage::path($audioFiles[0])); // Use the first audio file
+            $tagData = $this->extractTagData($audioFiles[0]); // Use the first audio file
         }
 
         // Create book record in the database
@@ -290,11 +349,18 @@ class BookController extends Controller
             'directory_path' => $directoryPath, // relative path from storage folder
             'type' => 'audiobook',  // You can auto-detect file types later, or have a config option.
             'description' => $tagData['description'] ?? null,
+            'date_added' => Carbon::now(),  //Set to todays date.
         ]);
     }
 
     private function extractTagData($filePath)
     {
+        $storagePath = env('BOOK_STORAGE_PATH');
+        if (!$storagePath) {
+            Log::error('BOOK_STORAGE_PATH is not defined in the .env file.');
+            return back()->withErrors(['error' => 'Configuration error: BOOK_STORAGE_PATH is not defined.']);
+        }
+        $directoryPath = dirname($filePath);
         $process = new Process([
             'ffmpeg',
             '-i',
@@ -327,7 +393,6 @@ class BookController extends Controller
         $comment = $tags['comment'] ?? $tags['description'] ?? null;
 
         // Check if tags match the directory structure
-        $directoryPath = dirname($filePath);
         $tagMatch = true;
 
         if ($artist && !str_contains(strtolower($directoryPath), strtolower($artist))) {
@@ -363,5 +428,73 @@ class BookController extends Controller
         } catch (\Exception $e) {
             return null;
         }
+    }
+
+    public function destroy(Book $book)
+    {
+        // Delete the book
+        $book->delete();
+
+        // Redirect to the admin index page
+        return redirect()->route('admin.books.index')->with('success', 'Book deleted successfully.');
+    }
+    public function directoryBrowser(Request $request)
+    {
+        $storagePath = env('BOOK_STORAGE_PATH');
+
+        if (!$storagePath) {
+            Log::error('BOOK_STORAGE_PATH is not defined in the .env file.');
+            return response()->json(['error' => 'The book store path is invalid. Verify the .env exists and the value is valid.'], 400);
+        }
+        if (!is_dir($storagePath)) {
+            Log::error('BOOK_STORAGE_PATH is not a directory');
+            return response()->json(['error' => 'The book store path is invalid. Verify is_dir is not conflicting with an existing function.'], 400);
+        }
+
+        $path = $request->input('path', $storagePath);
+        if (!is_dir($path)) {
+            Log::error('Requested Directory path in BOOK_STORAGE_PATH is invalid.');
+            return response()->json(['error' => ' The path directory requested is not valid.'], 400);
+        }
+
+        $files = scandir($path);
+        if ($files === false) {
+            Log::error('Attempt to perform a scandir but failed to get value.');
+            return response()->json(['error' => 'The scan for all files has been invalid to be done.'], 400);
+        }
+        $data = [];
+
+        foreach ($files as $file) {
+            if ($file === '.' || $file === '..')
+                continue;
+
+            $filePath = $path . '/' . $file;
+
+            if (is_dir($filePath)) {
+                $data[] = [
+                    'type' => 'directory',
+                    'name' => $file,
+                    'path' => $filePath,
+                ];
+            } else {
+                $extension = pathinfo($file, PATHINFO_EXTENSION);
+                //Show the file if this is the valid one.
+                if (in_array(strtolower($extension), ['mp3', 'm4b', 'm4a'])) {
+                    $data[] = [
+                        'type' => 'file',
+                        'name' => $file,
+                        'path' => $filePath,
+                    ];
+                }
+
+            }
+        }
+
+        return response()->json($data);
+    }
+
+    private function checkStoragePermissions(): bool
+    {
+        return true;
     }
 }

@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Admin;
+use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BookController;
@@ -9,7 +11,6 @@ use App\Http\Controllers\FollowController;
 use App\Http\Controllers\ReadingProgressController;
 use App\Http\Controllers\AdminNotificationController;
 use App\Http\Controllers\MessageController;
-use App\Http\Controllers\Admin;
 
 Route::get('/', function () {
     return view('welcome');
@@ -19,7 +20,7 @@ Auth::routes();
 
 Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
 
-Route::resource('books', BookController::class)->only(['index', 'show', 'download']); //Only public calls
+Route::resource('books', BookController::class)->only(['index', 'show', 'download']);
 
 Route::post('/books/{book}/reviews', [ReviewController::class, 'store'])->name('reviews.store');
 Route::delete('/reviews/{review}', [ReviewController::class, 'destroy'])->name('reviews.destroy');
@@ -41,22 +42,29 @@ Route::get('/reading-progress/{book}', [ReadingProgressController::class, 'get']
 // Message Routes
 Route::post('/messages', [MessageController::class, 'store'])->name('messages.store');
 
-//Admin Routes
-Route::prefix('admin')->middleware(['auth', 'admin'])->group(function () {
+Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
+Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
+Route::put('/profile/change-password', [ProfileController::class, 'changePassword'])->name('profile.changePassword');
+Route::post('/profile/request-admin', [ProfileController::class, 'requestAdminPermissions'])->name('profile.requestAdminPermissions');
+
+Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(function () {
+    Route::get('/', [Admin\AdminController::class, 'index'])->name('index');
+    Route::post('/users/{user}/update-role', [Admin\AdminController::class, 'updateRole'])->name('users.updateRole');
     Route::resource('genres', Admin\GenreController::class);
     Route::resource('authors', Admin\AuthorController::class);
-    Route::resource('books', Admin\BookController::class)->except(['index', 'show', 'download']);
+    Route::resource('books', Admin\BookController::class);
     Route::resource('messages', Admin\MessageController::class);
 
-    Route::get('/books/import-from-title', [Admin\BookController::class, 'importFromTitle'])->name('admin.books.importFromTitle');
-    Route::post('/books/search-google-books', [Admin\BookController::class, 'searchGoogleBooks'])->name('admin.books.searchGoogleBooks');
-    Route::post('/books/import-from-google-books', [Admin\BookController::class, 'importFromGoogleBooks'])->name('admin.books.importFromGoogleBooks');
-    Route::post('/books/processImport', [Admin\BookController::class, 'processImport'])->name('admin.books.processImport');
+    // Account Request Routes -Added
+    Route::resource('account_requests', Admin\AccountRequestController::class);
 
-    //Admin acknowledge button for user message
-    Route::post('/messages/{message}/acknowledge', [Admin\MessageController::class, 'acknowledge'])->name('admin.messages.acknowledge');
+    Route::get('/books/import-from-title', [Admin\BookController::class, 'importFromTitle'])->name('books.importFromTitle');
+    Route::post('/books/search-google-books', [Admin\BookController::class, 'searchGoogleBooks'])->name('books.searchGoogleBooks');
+    Route::post('/books/import-from-google-books', [Admin\BookController::class, 'importFromGoogleBooks'])->name('books.importFromGoogleBooks');
+    Route::post('/books/processImport', [Admin\BookController::class, 'processImport'])->name('books.processImport');
+    Route::get('/directory-browser', [Admin\BookController::class, 'directoryBrowser'])->name('directoryBrowser');
 
-    Route::post('/send-notification', [AdminNotificationController::class, 'sendNotification'])->name('admin.sendNotification');
-    Route::post('/messages', [MessageController::class, 'storeAdmin'])->name('admin.messages.store');
-    Route::get('/admin', [Admin\AdminController::class, 'index'])->name('admin.index');
+    Route::post('/send-notification', [AdminNotificationController::class, 'sendNotification'])->name('sendNotification');
+    Route::post('/messages', [MessageController::class, 'storeAdmin'])->name('messages.storeAdmin');
+    Route::post('/messages/{message}/acknowledge', [Admin\MessageController::class, 'acknowledge'])->name('messages.acknowledge');
 });
