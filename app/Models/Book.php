@@ -12,14 +12,15 @@ class Book extends Model
     protected $fillable = [
         'title',
         'author_id',
-        'series',
+        'series_id',
         'genre_id',
         'cover_image',
         'description',
         'directory_path',
         'type',
         'date_added',
-        'publication_date'
+        'publication_date',
+        'series_number'
     ];
 
     public function reviews()
@@ -40,5 +41,10 @@ class Book extends Model
     public function author()
     {
         return $this->belongsTo(Author::class);
+    }
+
+    public function series()
+    {
+        return $this->belongsTo(Series::class);
     }
 }

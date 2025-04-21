@@ -23,8 +23,18 @@
             </div>
 
             <div class="form-group">
-                <label for="series">Series (Optional):</label>
-                <input type="text" class="form-control" id="series" name="series" value="{{ $book->series }}">
+                <label for="series_id">Series (Optional):</label>
+                <select class="form-control" id="series_id" name="series_id">
+                    <option value="">Select Series</option>
+                    @foreach($seriesList as $series)
+                        <option value="{{ $series->id }}" {{ $book->series_id == $series->id ? 'selected' : '' }}>{{ $series->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="series_number">Series Number (Optional):</label>
+                <input type="number" class="form-control" id="series_number" name="series_number" value="{{ $book->series_number }}">
             </div>
 
             <div class="form-group">

@@ -12,7 +12,10 @@
             </div>
         </form>
 
-        <a href="{{ route('admin.books.create') }}" class="btn btn-primary mb-3">Add New Book</a>
+        <div class="mb-3">
+            <a href="{{ route('admin.books.create') }}" class="btn btn-primary">Add New Book</a>
+            <a href="{{ route('admin.books.import') }}" class="btn btn-info">Import Book(s)</a>
+        </div>
 
         <table class="table">
             <thead>
@@ -30,7 +33,7 @@
                     <tr class="{{ $loop->iteration % 2 == 0 ? 'table-secondary' : '' }}">
                         <td>{{ $book->title }}</td>
                         <td>{{ $book->author->name }}</td>
-                        <td>{{ $book->series }}</td>
+                        <td>{{--Display new values--}}</td>
                         <td>{{ $book->genre->name }}</td>
                         <td>{{ $book->type }}</td>
                         <td>
