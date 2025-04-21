@@ -423,6 +423,42 @@ class BookController extends Controller
         ]);
     }
 
+    /**
+     * Recursively queue import jobs for all book directories under a given path.
+     */
+    public function bulkImportBooks(Request $request)
+    {
+        $root = $request->input('dir');
+        $storagePath = env('BOOK_STORAGE_PATH');
+        $absRoot = rtrim($storagePath, '/') . '/' . ltrim($root, '/');
+        if (!is_dir($absRoot)) {
+            return response()->json(['error' => 'Directory not found.'], 404);
+        }
+        $bookDirs = $this->findBookDirectories($absRoot);
+        foreach ($bookDirs as $dir) {
+            $relDir = ltrim(str_replace($storagePath, '', $dir), '/');
+            \App\Jobs\ImportBookFromDirectoryJob::dispatch($relDir);
+        }
+        return response()->json(['message' => 'Queued ' . count($bookDirs) . ' book directories for import.'], 200);
+    }
+
+    /**
+     * Recursively find book directories (heuristic: contains m4b or metadata.abs or image file).
+     */
+    private function findBookDirectories($root)
+    {
+        $bookDirs = [];
+        $rii = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root));
+        foreach ($rii as $file) {
+            if ($file->isDir()) continue;
+            $ext = strtolower($file->getExtension());
+            if (in_array($ext, ['m4b', 'jpg', 'jpeg', 'png', 'gif', 'webp']) || $file->getFilename() === 'metadata.abs') {
+                $bookDirs[] = $file->getPath();
+            }
+        }
+        return array_unique($bookDirs);
+    }
+
     private function processGenres(Book &$book)
     {
         $parts = explode("/", $book->directory_path);

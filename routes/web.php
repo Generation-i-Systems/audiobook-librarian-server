@@ -92,6 +92,9 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         [Admin\DirectoryBrowserController::class, 'browse']
     )->name('directoryBrowser');
 
+    // Bulk import books from directory (recursive, queued)
+    Route::post('/books/bulk-import', [Admin\BookController::class, 'bulkImportBooks'])->name('books.bulkImport');
+
     Route::post(
         '/send-notification',
         [AdminNotificationController::class, 'sendNotification']
