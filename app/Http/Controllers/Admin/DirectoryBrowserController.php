@@ -47,8 +47,7 @@ class DirectoryBrowserController extends Controller
 
             if (is_dir($basePath . $filePath)) {
                 $book = Book::where('directory_path', $filePath)->first();
-                $bookId = $book ? $book->id : null;
-
+                $bookId = $book?->id;
                 if ($this->isPotentialBookDirectory($basePath . $filePath)) {
                     if ($book) {
                         $data[] = [

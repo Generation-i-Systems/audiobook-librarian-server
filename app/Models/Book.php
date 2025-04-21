@@ -19,7 +19,7 @@ class Book extends Model
         'directory_path',
         'type',
         'date_added',
-        'publication_date',
+        'published_year',
         'series_number'
     ];
 

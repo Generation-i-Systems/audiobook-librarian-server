@@ -11,6 +11,7 @@ use App\Http\Controllers\FollowController;
 use App\Http\Controllers\ReadingProgressController;
 use App\Http\Controllers\AdminNotificationController;
 use App\Http\Controllers\MessageController;
+use App\Http\Controllers\ImageProxyController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -66,6 +67,9 @@ Route::post(
     [ProfileController::class, 'requestAdminPermissions']
 )->name('profile.requestAdminPermissions');
 
+// General image proxy for covers and previews
+Route::get('/image-proxy', [ImageProxyController::class, 'show'])->name('image.proxy');
+
 Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(function () {
     Route::get('/', [Admin\AdminController::class, 'index'])->name('index');
     Route::post(
@@ -76,6 +80,7 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::resource('genres', Admin\GenreController::class);
     Route::resource('authors', Admin\AuthorController::class);
     Route::resource('books', Admin\BookController::class);
+    Route::post('/books/autofill', [Admin\BookController::class, 'autofillFromGoogleBooks'])->name('books.autofill');
     Route::resource('messages', Admin\MessageController::class);
     Route::resource('account_requests', Admin\AccountRequestController::class);
     Route::get('/books/import-from-title', [Admin\BookController::class, 'importFromTitle'])->name('books.importFromTitle');
@@ -96,5 +101,4 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         '/messages/{message}/acknowledge',
         [Admin\MessageController::class, 'acknowledge']
     )->name('messages.acknowledge');
-
 });

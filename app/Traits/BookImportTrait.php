@@ -154,4 +154,62 @@ trait BookImportTrait
             'tagMatch' => $tagMatch,
         ];
     }
+
+    /**
+     * Extract cover image from m4b file using ffmpeg.
+     * Returns filename (relative, e.g. 'cover.jpg') or null.
+     */
+    private function extractCoverFromM4B($m4bPath, $outputDir)
+    {
+        $outputImage = rtrim($outputDir, '/').'/cover.jpg';
+        $process = new \Symfony\Component\Process\Process([
+            'ffmpeg', '-y', '-i', $m4bPath, '-an', '-vcodec', 'copy', $outputImage
+        ]);
+        $process->run();
+        if ($process->isSuccessful() && file_exists($outputImage)) {
+            return basename($outputImage);
+        }
+        return null;
+    }
+
+    /**
+     * Extract description and year from metadata.abs file in directory.
+     * Returns ['description' => ..., 'year' => ...]
+     */
+    private function extractMetadataAbs($dir)
+    {
+        $file = rtrim($dir, '/') . '/metadata.abs';
+        $result = [];
+        if (!file_exists($file)) {
+            return $result;
+        }
+        $lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        $inDescriptionSection = false;
+        $descriptionLines = [];
+        foreach ($lines as $line) {
+            $trim = trim($line);
+            if (preg_match('/^\[DESCRIPTION\]/i', $trim)) {
+                $inDescriptionSection = true;
+                continue;
+            }
+            if ($inDescriptionSection) {
+                if (preg_match('/^\[.*\]/', $trim)) {
+                    // New section starts, stop capturing
+                    break;
+                }
+                $descriptionLines[] = $trim;
+                continue;
+            }
+            if (preg_match('/^description\s*[:=]\s*(.+)$/i', $trim, $m)) {
+                $result['description'] = trim($m[1]);
+            }
+            if (preg_match('/^(year|published|publication_year)\s*[:=]\s*(\d{4})$/i', $trim, $m)) {
+                $result['year'] = trim($m[2]);
+            }
+        }
+        if ($inDescriptionSection && $descriptionLines) {
+            $result['description'] = implode("\n", $descriptionLines);
+        }
+        return $result;
+    }
 }
