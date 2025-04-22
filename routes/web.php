@@ -24,14 +24,11 @@ Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name
 Route::resource('books', BookController::class)->only(['index', 'show', 'download', 'create']);
 Route::get('/books/create', [App\Http\Controllers\Admin\BookController::class, 'showCreateForm'])->name('books.create');
 
+// Book download route for users
+Route::get('/books/{book}/download', [BookController::class, 'download'])->name('books.download');
+
 Route::post('/books/{book}/reviews', [ReviewController::class, 'store'])->name('reviews.store');
 Route::delete('/reviews/{review}', [ReviewController::class, 'destroy'])->name('reviews.destroy');
-
-// Book Queue Routes
-Route::get('/queue', [BookQueueController::class, 'index'])->name('queue.index');
-Route::post('/queue/add/{book}', [BookQueueController::class, 'add'])->name('queue.add');
-Route::delete('/queue/remove/{book}', [BookQueueController::class, 'remove'])->name('queue.remove');
-Route::post('/queue/update-order', [BookQueueController::class, 'updateOrder'])->name('queue.updateOrder');
 
 //Follow and Unfollow routes
 Route::post(
@@ -71,16 +68,18 @@ Route::post(
 Route::get('/image-proxy', [ImageProxyController::class, 'show'])->name('image.proxy');
 
 Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(function () {
-    Route::get('/', [Admin\AdminController::class, 'index'])->name('index');
+    Route::get('/', function () {
+        return redirect()->route('admin.books.index');
+    });
     Route::post(
         '/users/{user}/update-role',
         [Admin\AdminController::class, 'updateRole']
     )->name('users.updateRole');
     Route::get('/books/import', [Admin\BookController::class, 'import'])->name('books.import');
+    Route::get('/books/googleBooks', action: [Admin\BookController::class, 'googleBooks'])->name('books.googleBooks');
     Route::resource('genres', Admin\GenreController::class);
     Route::resource('authors', Admin\AuthorController::class);
     Route::resource('books', Admin\BookController::class);
-    Route::post('/books/autofill', [Admin\BookController::class, 'autofillFromGoogleBooks'])->name('books.autofill');
     Route::resource('messages', Admin\MessageController::class);
     Route::resource('account_requests', Admin\AccountRequestController::class);
     Route::get('/books/import-from-title', [Admin\BookController::class, 'importFromTitle'])->name('books.importFromTitle');
@@ -94,6 +93,15 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
 
     // Bulk import books from directory (recursive, queued)
     Route::post('/books/bulk-import', [Admin\BookController::class, 'bulkImportBooks'])->name('books.bulkImport');
+
+    // Queue management (admin only)
+    Route::middleware(['auth', 'admin'])->group(function () {
+        Route::get('/queue', [Admin\QueueController::class, 'index'])->name('queue.index');
+        Route::get('/queue/list', [Admin\QueueController::class, 'list']);
+        Route::post('/queue/remove/{id}', [Admin\QueueController::class, 'remove']);
+        Route::get('/queue/status', [Admin\QueueController::class, 'status']);
+        Route::post('/queue/start', [Admin\QueueController::class, 'startWorker']);
+    });
 
     Route::post(
         '/send-notification',

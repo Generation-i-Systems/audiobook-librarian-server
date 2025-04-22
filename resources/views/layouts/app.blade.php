@@ -27,6 +27,15 @@
 
     <!-- Scripts -->
     @vite(['resources/sass/app.scss', 'resources/js/app.js'])
+
+    <link rel="stylesheet" href="/css/pagination-fix.css">
+
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+    @stack('styles')
 </head>
 
 <body>
@@ -72,12 +81,25 @@
                                     <a class="nav-link" style="color:white"
                                         href="{{ route('books.index') }}">{{ __('Books') }}</a>
                                 </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" style="color:white"
-                                        href="{{ route('queue.index') }}">{{ __('Book Queue') }}</a>
-                                </li>
                             @endif
                         @endauth
+                        @if (Auth::check() && Auth::user()->role === 'admin')
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button"
+                                    data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false"
+                                    style="color:white">
+                                    Admin Dashboard
+                                </a>
+                                <div class="dropdown-menu" aria-labelledby="adminDropdown">
+                                    <a class="dropdown-item" href="{{ route('admin.books.index') }}">Admin Home</a>
+                                    <a class="dropdown-item" href="{{ route('admin.books.index') }}">Manage Books</a>
+                                    <a class="dropdown-item" href="{{ route('admin.authors.index') }}">Manage Authors</a>
+                                    <a class="dropdown-item" href="{{ route('admin.genres.index') }}">Manage Genres</a>
+                                    <a class="dropdown-item" href="{{ route('admin.messages.index') }}">Manage Messages</a>
+                                    <a class="dropdown-item" href="{{ route('admin.queue.index') }}">Manage Queue</a>
+                                </div>
+                            </li>
+                        @endif
                     </ul>
 
                     <!-- Right Side Of Navbar -->
@@ -111,20 +133,22 @@
 
                                     @if (Auth::user()->role === 'admin')
                                         @if(request()->is('admin/*'))
+                                            <form id="user-mode-form" action="{{ route('books.index') }}" method="GET"
+                                                class="d-none"></form>
                                             <a class="dropdown-item" href="{{ route('books.index') }}"
                                                 onclick="event.preventDefault(); document.getElementById('user-mode-form').submit();">Switch
                                                 to User Mode</a>
-
                                         @else
-                                            <a class="dropdown-item" href="{{ route('admin.index') }}"
+                                            <form id="admin-mode-form" action="{{ route('admin.books.index') }}" method="GET"
+                                                class="d-none"></form>
+                                            <a class="dropdown-item" href="{{ route('admin.books.index') }}"
                                                 onclick="event.preventDefault(); document.getElementById('admin-mode-form').submit();">Switch
                                                 to Admin Mode</a>
-
                                         @endif
                                     @endif
 
                                     <a class="dropdown-item" href="{{ route('logout') }}" onclick="event.preventDefault();
-                                                             document.getElementById('logout-form').submit();">
+                                                                     document.getElementById('logout-form').submit();">
                                         {{ __('Logout') }}
                                     </a>
 

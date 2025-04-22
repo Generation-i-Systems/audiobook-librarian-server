@@ -32,7 +32,7 @@
             @endif
         </p>
         @if (Auth::user()->role === 'admin')
-            <a class="nav-link" href="{{ route('admin.index') }}">{{ __('Admin Section') }}</a>
+            <a class="nav-link" href="{{ route('admin.books.index') }}">{{ __('Admin Section') }}</a>
         @endif
 
 

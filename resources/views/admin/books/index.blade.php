@@ -51,7 +51,9 @@
             </tbody>
         </table>
 
-        {{ $books->links() }}
+        <div class="pagination">
+            {{ $books->links() }}
+        </div>
 
     </div>
 @endsection

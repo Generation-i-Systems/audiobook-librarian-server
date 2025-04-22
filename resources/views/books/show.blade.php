@@ -6,20 +6,35 @@
 
         <div class="row">
             <div class="col-md-4">
-                <img src="{{ Storage::url($book->cover_image) }}" alt="{{ $book->title }}" class="img-fluid">
+                <img src="{{ route('image.proxy', ['url' => Storage::url($book->cover_image)]) }}" alt="{{ $book->title }}" class="img-fluid">
             </div>
             <div class="col-md-8">
                 <p><strong>Author:</strong> {{ $book->author->name }}</p>
-                <p><strong>Series:</strong> {{ $book->series ?? 'N/A' }}</p>
+                @php
+                    $hasSeries = false;
+                    if ($book->series && is_object($book->series) && !empty($book->series->name)) {
+                        $hasSeries = true;
+                    } elseif ($book->series && is_array($book->series) && isset($book->series['name']) && !empty($book->series['name'])) {
+                        $hasSeries = true;
+                    } elseif ($book->series && is_string($book->series) && trim($book->series) !== '') {
+                        $hasSeries = true;
+                    }
+                @endphp
+                @if($hasSeries)
+                <p><strong>Series:</strong> 
+                    @if(is_object($book->series))
+                        {{ $book->series->name }}@if($book->series_number) (Book {{ $book->series_number }})@endif
+                    @elseif(is_array($book->series) && isset($book->series['name']))
+                        {{ $book->series['name'] }}@if($book->series_number) (Book {{ $book->series_number }})@endif
+                    @else
+                        {{ $book->series }}@if($book->series_number) (Book {{ $book->series_number }})@endif
+                    @endif
+                </p>
+                @endif
                 <p><strong>Genre:</strong> {{ $book->genre->name }}</p>
                 <p>{{ $book->description }}</p>
 
                 <a href="{{ route('books.download', $book) }}" class="btn btn-primary">Download</a>
-
-                <form action="{{ route('queue.add', $book) }}" method="POST">
-                    @csrf
-                    <button type="submit" class="btn btn-success">Add to Queue</button>
-                </form>
 
                 <hr>
 

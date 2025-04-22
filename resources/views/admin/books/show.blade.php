@@ -4,7 +4,7 @@
 <div class="container">
     @if($book->cover_image)
         <div class="mb-3">
-            <img src="{{ Storage::url($book->cover_image) }}" alt="Book Cover" style="max-height: 200px; border:1px solid #ccc;">
+            <img src="{{ route('image.proxy', ['dir' => $book->directory_path, 'file' => basename($book->cover_image)]) }}" alt="Book Cover" style="max-height: 200px; border:1px solid #ccc;">
         </div>
     @endif
     <h1>{{ $book->title }}</h1>

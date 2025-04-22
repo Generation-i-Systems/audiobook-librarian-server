@@ -11,6 +11,13 @@
 
         <div id="directory-path-breadcrumbs" class="breadcrumb-container mb-3"></div>
 
+        <div class="mb-3">
+            <button id="bulk-import-btn" class="btn btn-primary">
+                <i class="fas fa-cloud-upload-alt"></i> Bulk Import Books Here
+            </button>
+            <span id="bulk-import-status" class="ms-3"></span>
+        </div>
+
         <div class="table-responsive">
             <table class="table table-bordered table-hover align-middle" id="directory-browser-table">
                 <thead>
@@ -110,6 +117,7 @@
         <script>
             $(document).ready(function () {
                 const directoryBrowser = $('#directory-browser');
+                let currentPath = '';
 
                 function escapeHtml(text) {
                     var map = {
@@ -141,6 +149,7 @@
                     $('#directory-path-breadcrumbs').html(html);
                 }
                 function loadDirectory(path) {
+                    currentPath = path;
                     // Update the URL so reload stays on the same directory
                     if (window.location.pathname + window.location.search !== updateUrlForPath(path)) {
                         window.history.replaceState({ path: path }, '', updateUrlForPath(path));
@@ -251,6 +260,22 @@
                         modal.show();
                         $.get(url, function(data) {
                             $('#edit-book-modal-body').html(data);
+                        });
+                    });
+                    $(document).on('click', '#bulk-import-btn', function(e) {
+                        e.preventDefault();
+                        $('#bulk-import-status').text('Starting bulk import...');
+                        $.ajax({
+                            url: '{{ route("admin.books.bulkImport") }}',
+                            type: 'POST',
+                            data: { dir: currentPath, _token: '{{ csrf_token() }}' },
+                            success: function (data) {
+                                $('#bulk-import-status').text(data.message);
+                            },
+                            error: function (xhr) {
+                                let msg = 'Error: ' + (xhr.responseJSON?.error || xhr.statusText);
+                                $('#bulk-import-status').text(msg);
+                            }
                         });
                     });
                 }

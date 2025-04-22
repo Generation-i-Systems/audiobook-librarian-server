@@ -15,14 +15,14 @@
                 @foreach($recentBooks as $book)
                     <div class="col-md-4 mb-4">
                         <div class="card">
-                            <img src="{{ Storage::url($book->cover_image) }}" class="card-img-top" alt="{{ $book->title }}"
+                            <img src="{{ route('image.proxy', ['url' => Storage::url($book->cover_image)]) }}" class="card-img-top" alt="{{ $book->title }}"
                                 style="max-height: 200px; object-fit: cover;">
                             <div class="card-body">
                                 <h5 class="card-title">{{ $book->title }}</h5>
-                                <p class="card-text">By {{ $book->author->name }}</p>
-                                <p class="card-text"><strong>Date Added:</strong> {{ $book->date_added->format('Y-m-d') }}</p>
+                                <p class="card-text">By {{ $book->author && $book->author->name ? $book->author->name : 'Unknown' }}</p>
+                                <p class="card-text"><strong>Date Added:</strong> {{ ($book->date_added instanceof \Carbon\Carbon) ? $book->date_added->format('Y-m-d') : ($book->date_added ? $book->date_added : 'N/A') }}</p>
                                 <p class="card-text"><strong>Publication Date:</strong>
-                                    {{ $book->publication_date ? $book->publication_date->format('Y-m-d') : 'N/A' }}</p>
+                                    {{ ($book->publication_date instanceof \Carbon\Carbon) ? $book->publication_date->format('Y-m-d') : ($book->publication_date ? $book->publication_date : 'N/A') }}</p>
                                 <a href="{{ route('books.show', $book) }}" class="btn btn-primary">View Details</a>
                             </div>
                         </div>
@@ -68,11 +68,11 @@
             @foreach ($books as $book)
                 <div class="col-md-4 mb-4">
                     <div class="card">
-                        <img src="{{ Storage::url($book->cover_image) }}" class="card-img-top" alt="{{ $book->title }}"
+                        <img src="{{ route('image.proxy', ['url' => Storage::url($book->cover_image)]) }}" class="card-img-top" alt="{{ $book->title }}"
                             style="max-height: 200px; object-fit: cover;">
                         <div class="card-body">
                             <h5 class="card-title">{{ $book->title }}</h5>
-                            <p class="card-text">By {{ $book->author->name }}</p>
+                            <p class="card-text">By {{ $book->author && $book->author->name ? $book->author->name : 'Unknown' }}</p>
                             <a href="{{ route('books.show', $book) }}" class="btn btn-primary">View Details</a>
                         </div>
                     </div>
@@ -80,7 +80,15 @@
             @endforeach
         </div>
 
-        {{ $books->links() }} <!-- Pagination links -->
+        <div class="d-flex justify-content-center">
+            <div class="pagination">
+                {{ $books->links() }}
+            </div>
+        </div>
 
     </div>
 @endsection
+
+@push('styles')
+    <link rel="stylesheet" href="/css/pagination-fix.css">
+@endpush

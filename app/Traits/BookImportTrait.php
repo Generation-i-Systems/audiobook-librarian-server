@@ -3,82 +3,14 @@
 namespace App\Traits;
 
 use App\Models\Book;
+use App\Models\Author;
 use App\Models\Genre;
-use Illuminate\Support\Facades\Storage;
+use App\Models\Series;
 use Symfony\Component\Process\Process;
 use Illuminate\Support\Facades\Log;
 
 trait BookImportTrait
 {
-    private function importBooksFromDirectory($libraryPath)
-    {
-        $this->processGenres($libraryPath);
-    }
-
-    private function processGenres($libraryPath)
-    {
-        $genres = $this->scanDirectory($libraryPath);
-        foreach ($genres as $genre) {
-            if ($genre === '.' || $genre === '..')
-                continue;
-            $genrePath = $libraryPath . '/' . $genre;
-
-            if (is_dir($genrePath)) {
-                $this->processAuthors($genrePath, $genre);
-            }
-        }
-    }
-
-    private function processAuthors($genrePath, $genre)
-    {
-        $authors = $this->scanDirectory($genrePath);
-        foreach ($authors as $author) {
-            if ($author === '.' || $author === '..')
-                continue;
-            $authorPath = $genrePath . '/' . $author;
-
-            if (is_dir($authorPath)) {
-                $this->processSeriesOrBooks($authorPath, $genre, $author);
-            }
-        }
-    }
-
-    private function processSeriesOrBooks($authorPath, $genre, $author)
-    {
-        $seriesOrBooks = $this->scanDirectory($authorPath);
-        foreach ($seriesOrBooks as $seriesOrBook) {
-            if ($seriesOrBook === '.' || $seriesOrBook === '..')
-                continue;
-            $seriesOrBookPath = $authorPath . '/' . $seriesOrBook;
-
-            if (is_dir($seriesOrBookPath)) { //Could be series or Book
-                $bookPath = $seriesOrBookPath;
-                $series = null;
-                $bookDirName = $seriesOrBook;
-
-                $files = $this->scanDirectory($seriesOrBookPath);
-                $bookTitle = null;
-                foreach ($files as $file) {
-                    if ($file === '.' || $file === '..')
-                        continue;
-                    if (is_dir($seriesOrBookPath . '/' . $file)) {
-                        $series = $seriesOrBook;
-                        $bookDirName = $file;
-                        $bookPath = $seriesOrBookPath . '/' . $file;
-                        break;
-                    } else {
-                        $bookTitle = $seriesOrBook;
-                    }
-                }
-
-                if (!$bookTitle)
-                    $bookTitle = $bookDirName;
-
-                $this->createBook($genre, $author, $series, $bookTitle, $bookPath);
-            }
-        }
-    }
-
     private function scanDirectory($path)
     {
         $storagePath = env('BOOK_STORAGE_PATH');
@@ -161,9 +93,16 @@ trait BookImportTrait
      */
     private function extractCoverFromM4B($m4bPath, $outputDir)
     {
-        $outputImage = rtrim($outputDir, '/').'/cover.jpg';
-        $process = new \Symfony\Component\Process\Process([
-            'ffmpeg', '-y', '-i', $m4bPath, '-an', '-vcodec', 'copy', $outputImage
+        $outputImage = rtrim($outputDir, '/') . '/cover.jpg';
+        $process = new Process([
+            'ffmpeg',
+            '-y',
+            '-i',
+            $m4bPath,
+            '-an',
+            '-vcodec',
+            'copy',
+            $outputImage
         ]);
         $process->run();
         if ($process->isSuccessful() && file_exists($outputImage)) {
@@ -211,5 +150,221 @@ trait BookImportTrait
             $result['description'] = implode("\n", $descriptionLines);
         }
         return $result;
+    }
+
+    /**
+     * Scan directory for images, prefer one with 'cover' in the name.
+     * Returns [selected, candidates[]]
+     */
+    protected function findCoverImageCandidate($directoryPath)
+    {
+        $storagePath = env('BOOK_STORAGE_PATH');
+        $dir = rtrim($storagePath, '/') . '/' . ltrim($directoryPath, '/');
+        if (!is_dir($dir))
+            return [null, []];
+        $images = [];
+        $selected = null;
+        foreach (scandir($dir) as $file) {
+            if ($file === '.' || $file === '..')
+                continue;
+            $full = $dir . '/' . $file;
+            if (!is_file($full))
+                continue;
+            $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+            if (!in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp']))
+                continue;
+            $images[] = $file;
+            if (!$selected && stripos($file, 'cover') !== false) {
+                $selected = $file;
+            }
+        }
+        // If no 'cover' found, leave $selected null
+        return [$selected, $images];
+    }
+
+
+    /**
+     * Recursively find book directories (heuristic: contains m4b or metadata.abs or image file).
+     */
+    private function findBookDirectories($root)
+    {
+        $bookDirs = [];
+        $rii = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root));
+        foreach ($rii as $file) {
+            if ($file->isDir())
+                continue;
+            $ext = strtolower($file->getExtension());
+            if (in_array($ext, ['m4b', 'jpg', 'jpeg', 'png', 'gif', 'webp']) || $file->getFilename() === 'metadata.abs') {
+                $bookDirs[] = $file->getPath();
+            }
+        }
+        return array_unique($bookDirs);
+    }
+
+    private function processDirPath($directoryPath)
+    {
+        $book = new Book();
+        $book->directory_path = $directoryPath;
+        if (preg_match('#/(.*?)/(.*?)/(.*?)/(\d+) (.*)#', $directoryPath, $matches)) {
+            $genre = $matches[1];
+            $author = $matches[2];
+            $series = $matches[3];
+            $seriesNumber = $matches[4];
+            $title = $matches[5];
+        } elseif (preg_match('#/(.*?)/(.*?)/(.*?)/(.*)#', $directoryPath, $matches)) {
+            $genre = $matches[1];
+            $author = $matches[2];
+            $series = $matches[3];
+            $title = $matches[4];
+        } elseif (preg_match('#/(.*?)/(.*?)/(.*)#', $directoryPath, $matches)) {
+            $genre = $matches[1];
+            $author = $matches[2];
+            $title = $matches[3];
+        } else {
+            Log::error('Invalid directory path: ' . $directoryPath);
+            return $book;
+        }
+
+        $genreRec = Genre::where('name', 'like', "%{$genre}%")->first();
+        $book->genre_id = $genreRec?->id;
+        $book->genre = $genreRec ?: Genre::create(['name' => $genre]);
+
+        $authorRec = Author::where('name', 'like', "%{$author}%")->first();
+        $book->author = $authorRec ?: Author::create(["name" => $author]);
+        $book->author_id = $authorRec?->id;
+
+        if (!empty($series)) {
+            $seriesRec = Series::where('name', 'like', "%{$series}%")->first();
+            $book->series = $seriesRec ? $seriesRec : Series::create(["name" => $series]);
+            $book->series_id = $seriesRec?->id;
+        }
+
+        if (!empty($seriesNumber)) {
+            $book->seriesNumber = $seriesNumber;
+        }
+        $book->title = $title;
+
+        return $book;
+    }
+
+    /**
+     * Download and store a remote cover image, return the local path for storage in DB.
+     */
+    private function importCoverImageFromUrl($url, $directoryPath = null)
+    {
+        if (!$url)
+            return null;
+        try {
+            $storagePath = env('BOOK_STORAGE_PATH'); // absolute path
+            if (!$storagePath) {
+                \Log::error('BOOK_STORAGE_PATH is not defined.');
+                return null;
+            }
+            $fullDir = rtrim($storagePath, '/') . '/' . ltrim($directoryPath, '/');
+            if (!is_dir($fullDir)) {
+                if (!mkdir($fullDir, 0775, true) && !is_dir($fullDir)) {
+                    \Log::error("importCoverImageFromUrl error: Unable to create directory at $fullDir");
+                    return null;
+                }
+            }
+
+            // Use cURL with a browser User-Agent
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3');
+            $contents = curl_exec($ch);
+            $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+            curl_close($ch);
+
+            if ($contents === false || !$contents)
+                return null;
+
+            // Determine extension
+            $ext = 'jpg';
+            if (strpos($contentType, 'png') !== false)
+                $ext = 'png';
+            elseif (strpos($contentType, 'gif') !== false)
+                $ext = 'gif';
+            elseif (strpos($contentType, 'jpeg') !== false)
+                $ext = 'jpg';
+
+            $filename = 'cover.' . $ext;
+            $fullPath = $fullDir . '/' . $filename;
+            if (file_put_contents($fullPath, $contents) === false) {
+                \Log::error("importCoverImageFromUrl error: Unable to write file $fullPath");
+                return null;
+            }
+            // Return only the path relative to BOOK_STORAGE_PATH
+            return (ltrim($directoryPath, '/') . '/' . $filename);
+        } catch (\Exception $e) {
+            \Log::error('importCoverImageFromUrl error: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    // --- Google Books integration ---
+    protected $googleBooksApiService;
+
+    public function setGoogleBooksApiService($service)
+    {
+        $this->googleBooksApiService = $service;
+    }
+
+    public function searchGoogleBooks($query)
+    {
+        return $this->googleBooksApiService->searchBooks($query, 30);
+    }
+
+    public function getBookDetails($volumeId)
+    {
+        return $this->googleBooksApiService->getBookDetails($volumeId);
+    }
+
+    /**
+     * Search Google Books and return matches sorted by similarity to title, author, series, and number.
+     * Returns [matches (sorted), close_match (or null)]
+     */
+    public function searchGoogleBooksWithSimilarity($title, $author, $series = '', $seriesNumber = '')
+    {
+        $query = trim($title . ' ' . $author . ' ' . $series . ' ' . $seriesNumber);
+        $results = $this->googleBooksApiService->searchBooks($query, 30);
+        if (empty($results['items'])) {
+            return [[], null];
+        }
+        // Compute similarity for each item
+        $matches = [];
+        $bestScore = 0;
+        $bestMatch = null;
+        foreach ($results['items'] as $item) {
+            $info = $item['volumeInfo'];
+            $itemTitle = $info['title'] ?? '';
+            $itemAuthors = isset($info['authors']) ? implode(' ', $info['authors']) : '';
+            $itemSeries = $info['series'] ?? ($info['subtitle'] ?? '');
+            $itemSeriesNumber = $info['seriesNumber'] ?? '';
+            $score = 0;
+            // Title similarity (Levenshtein, case-insensitive)
+            $score += 100 - min(levenshtein(mb_strtolower($title), mb_strtolower($itemTitle)), 100);
+            // Author similarity (partial match)
+            if ($author && stripos($itemAuthors, $author) !== false) $score += 20;
+            // Series similarity
+            if ($series && stripos($itemSeries, $series) !== false) $score += 10;
+            // Series number
+            if ($seriesNumber && $itemSeriesNumber == $seriesNumber) $score += 5;
+            $matches[] = [
+                'score' => $score,
+                'item' => $item,
+            ];
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $bestMatch = $item;
+            }
+        }
+        usort($matches, function($a, $b) {
+            return $b['score'] <=> $a['score'];
+        });
+        // Only consider a close match if score is reasonably high
+        $closeMatch = ($bestScore > 110) ? $bestMatch : null;
+        return [$matches, $closeMatch];
     }
 }
