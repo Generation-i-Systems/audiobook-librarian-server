@@ -11,6 +11,21 @@
 
         <div id="directory-path-breadcrumbs" class="breadcrumb-container mb-3"></div>
 
+        <div class="mb-3 d-flex align-items-center gap-3">
+            <div>
+                <label>Filter by first letter:</label>
+                <div id="letter-filter" class="btn-group btn-group-sm" role="group">
+                    <button type="button" class="btn btn-outline-secondary" data-letter="">All</button>
+                    @foreach(range('A','Z') as $letter)
+                        <button type="button" class="btn btn-outline-secondary" data-letter="{{ $letter }}">{{ $letter }}</button>
+                    @endforeach
+                </div>
+            </div>
+            <div>
+                <input type="text" id="search-filter" class="form-control form-control-sm" placeholder="Search directories..." style="width: 200px; display: inline-block;" />
+            </div>
+        </div>
+
         <div class="mb-3">
             <button id="bulk-import-btn" class="btn btn-primary">
                 <i class="fas fa-cloud-upload-alt"></i> Bulk Import Books Here
@@ -76,6 +91,12 @@
                 margin-right: 0.2rem;
                 color: #888;
             }
+
+            .btn-primary { background-color: #007bff !important; color: #fff !important; }
+            .btn-success { background-color: #28a745 !important; color: #fff !important; }
+            .btn-danger { background-color: #dc3545 !important; color: #fff !important; }
+            .open-add-book-modal { background-color: #28a745 !important; color: #fff !important; border: none !important; }
+            .open-edit-book-modal { background-color: #007bff !important; color: #fff !important; border: none !important; }
         </style>
         <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
@@ -118,6 +139,8 @@
             $(document).ready(function () {
                 const directoryBrowser = $('#directory-browser');
                 let currentPath = '';
+                let filterLetter = '';
+                let searchString = '';
 
                 function escapeHtml(text) {
                     var map = {
@@ -135,19 +158,127 @@
                     var html = '<ul class="breadcrumb">';
                     if (path !== '') {
                         html += '<li class="breadcrumb-item"><a href="#" class="breadcrumb-link" data-path="">Root</a></li>';
-                    }
-                    for (let i = 0; i < pathParts.length; i++) {
-                        if (pathParts[i] === "" || pathParts[i] === null || pathParts[i] === undefined || pathParts[i] == '/') continue;
-                        let crumbPath = '';
-                        for (let j = 0; j <= i; j++) {
-                            if (pathParts[j] === "" || pathParts[j] === null || pathParts[j] === undefined || pathParts[j] == '/') continue;
-                            crumbPath += "/" + pathParts[j];
+                        let current = '';
+                        for (let i = 0; i < pathParts.length; i++) {
+                            if (pathParts[i] === '') continue;
+                            current += '/' + pathParts[i];
+                            html += '<li class="breadcrumb-item"><a href="#" class="breadcrumb-link" data-path="' + current + '">' + escapeHtml(pathParts[i]) + '</a></li>';
                         }
-                        html += '<li class="breadcrumb-item"><a href="#" class="breadcrumb-link" data-path="' + crumbPath + '">' + pathParts[i] + '</a></li>';
+                    } else {
+                        html += '<li class="breadcrumb-item active">Root</li>';
                     }
                     html += '</ul>';
                     $('#directory-path-breadcrumbs').html(html);
                 }
+
+                function renderDirectoryBrowser(data, path) {
+                    let html = '';
+                    // Previous row: go up one directory
+                    if (path !== '') {
+                        let parentPath = path.split('/').slice(0, -1).join('/');
+                        if (parentPath === undefined) parentPath = '';
+                        html += '<tr><td colspan="3"><a href="#" class="previous-link" data-path="' + escapeHtml(parentPath) + '"><i class="fas fa-arrow-left"></i> Previous</a></td></tr>';
+                    }
+                    data.forEach(function (item) {
+                        html += '<tr>';
+                        // Directory name: clickable for directories
+                        if (item.type === 'directory') {
+                            html += '<td><a href="#" class="directory-link" data-path="' + escapeHtml(item.path) + '">' + escapeHtml(item.name) + '</a></td>';
+                        } else {
+                            html += '<td>' + escapeHtml(item.name) + '</td>';
+                        }
+                        // Type column
+                        if (item.type === 'book') {
+                            html += '<td>Book</td>';
+                        } else if (item.type === 'directory') {
+                            html += '<td>Directory</td>';
+                        } else {
+                            html += '<td>' + escapeHtml(item.type.charAt(0).toUpperCase() + item.type.slice(1)) + '</td>';
+                        }
+                        // Actions column
+                        html += '<td>';
+                        if (item.type === 'book') {
+                            html += '<button class="btn btn-sm btn-primary me-1 open-edit-book-modal" data-url="' + item.edit + '"><i class="fas fa-edit"></i> Edit</button>';
+                        } else if (item.type === 'directory') {
+                            if (item.create) {
+                                html += '<button class="btn btn-sm btn-success me-1 open-add-book-modal" data-url="' + item.create + '"><i class="fas fa-plus"></i> Create</button>';
+                            }
+                            // Inline rename field
+                            html += '<button class="btn btn-sm btn-secondary rename-dir-btn me-1" data-path="' + escapeHtml(item.path) + '" data-name="' + escapeHtml(item.name) + '"><i class="fas fa-edit"></i> Rename</button>';
+                            html += '<span class="rename-inline-field d-none ms-1"><input type="text" class="form-control form-control-sm d-inline-block rename-input" style="width:120px;" value="' + escapeHtml(item.name) + '"><button class="btn btn-sm btn-success confirm-rename-btn ms-1"><i class="fas fa-check"></i></button><button class="btn btn-sm btn-danger cancel-rename-btn ms-1"><i class="fas fa-times"></i></button></span>';
+                        }
+                        if (item.bulk_import) {
+                            html += '<button class="btn btn-sm btn-warning bulk-import-dir-btn ms-1" data-dir="' + escapeHtml(item.path) + '"><i class="fas fa-cloud-upload-alt"></i> Bulk Import</button>';
+                        }
+                        html += '</td>';
+                        html += '</tr>';
+                    });
+                    directoryBrowser.html(html);
+                    updateBreadcrumbs(path);
+                }
+
+                // Previous link click: go up one directory
+                $(document).on('click', '.previous-link', function (e) {
+                    e.preventDefault();
+                    const parentPath = $(this).data('path') ?? '';
+                    loadDirectory(parentPath);
+                });
+
+                // Breadcrumb navigation
+                $(document).on('click', '.breadcrumb-link', function(e) {
+                    e.preventDefault();
+                    const path = $(this).data('path') ?? '';
+                    loadDirectory(path);
+                });
+
+                // Directory click navigation
+                $(document).on('click', '.directory-link', function (e) {
+                    e.preventDefault();
+                    const path = $(this).data('path');
+                    loadDirectory(path);
+                });
+
+                // Inline rename button event
+                $(document).on('click', '.rename-dir-btn', function(e) {
+                    e.preventDefault();
+                    const $row = $(this).closest('tr');
+                    $row.find('.rename-dir-btn').addClass('d-none');
+                    $row.find('.rename-inline-field').removeClass('d-none');
+                    $row.find('.rename-input').focus().select();
+                });
+                // Confirm inline rename
+                $(document).on('click', '.confirm-rename-btn', function(e) {
+                    e.preventDefault();
+                    const $row = $(this).closest('tr');
+                    const path = $row.find('.rename-dir-btn').data('path');
+                    const oldName = $row.find('.rename-dir-btn').data('name');
+                    const newName = $row.find('.rename-input').val();
+                    if (newName && newName !== oldName) {
+                        $.ajax({
+                            url: '{{ route("admin.import.rename") }}',
+                            type: 'POST',
+                            data: { path: path, new_name: newName, _token: '{{ csrf_token() }}' },
+                            success: function (resp) {
+                                loadDirectory(currentPath);
+                            },
+                            error: function (xhr) {
+                                alert('Rename failed: ' + (xhr.responseJSON?.error || xhr.statusText));
+                                loadDirectory(currentPath);
+                            }
+                        });
+                    } else {
+                        $row.find('.rename-dir-btn').removeClass('d-none');
+                        $row.find('.rename-inline-field').addClass('d-none');
+                    }
+                });
+                // Cancel inline rename
+                $(document).on('click', '.cancel-rename-btn', function(e) {
+                    e.preventDefault();
+                    const $row = $(this).closest('tr');
+                    $row.find('.rename-dir-btn').removeClass('d-none');
+                    $row.find('.rename-inline-field').addClass('d-none');
+                });
+
                 function loadDirectory(path) {
                     currentPath = path;
                     // Update the URL so reload stays on the same directory
@@ -157,131 +288,107 @@
                     $.ajax({
                         url: '{{ route("admin.directoryBrowser") }}',
                         type: 'GET',
-                        data: { path: path },
-                        success: function (data) {
-                            let html = '';
-                            if (path !== '') {
-                                html += '<tr><td colspan="3"><a href="#" class="previous-link"><i class="fas fa-arrow-left"></i> Previous</a></td></tr>';
-                            }
-                            $.each(data, function (index, item) {
-                                html += '<tr>';
-                                html += '<td>';
-                                if (item.type === 'directory') {
-                                    html += '<a href="#" class="directory-link" data-path="' + item.path + '">' + escapeHtml(item.name) + '</a>';
-                                } else {
-                                    html += escapeHtml(item.name);
-                                }
-                                html += '</td>';
-                                html += '<td>' + escapeHtml(item.type.charAt(0).toUpperCase() + item.type.slice(1)) + '</td>';
-                                html += '<td>';
-                                if (item.type === 'directory') {
-                                    let encodedPath = encodeURIComponent(item.path);
-                                    let addBookUrl = '{{ route("admin.books.create") }}?path=' + encodedPath;
-                                    if (item.edit) {
-                                        html += '<a href="#" class="btn btn-sm btn-outline-primary me-1 open-edit-book-modal" data-url="' + item.edit + '?modal=1' + '">Edit Book</a>';
-                                    } else if (item.create) {
-                                        html += '<a href="#" class="btn btn-sm btn-outline-success open-add-book-modal" data-url="' + addBookUrl + '">Add Book</a>';
-                                    }
-                                }
-                                html += '</td>';
-                                html += '</tr>';
-                            });
-                            updateBreadcrumbs(path);
-                            $('#directory-browser').html(html);
-                            attachDirectoryLinkHandlers(path)
+                        data: {
+                            path: path,
+                            filter_letter: filterLetter,
+                            search: searchString
                         },
-                        error: function (xhr, status, error) {
-                            $('#directory-browser').html('<p>Error loading directory: ' + error + '</p>');
+                        success: function (data) {
+                            renderDirectoryBrowser(data, path);
                         }
                     });
                 }
+
+                // Fix: define updateUrlForPath if missing
                 function updateUrlForPath(path) {
-                    let url = window.location.pathname.split('?')[0];
-                    if (path && path !== '') {
-                        url += '?path=' + encodeURIComponent(path);
-                    }
-                    return url;
-                }
-                function attachDirectoryLinkHandlers(path) {
-                    $(".directory-link").on("click", function (e) {
-                        e.preventDefault();
-                        const newPath = $(this).data('path');
-                        history.pushState({ path: newPath }, null, null);
-                        loadDirectory(newPath);
-                    });
-                    $(".breadcrumb-link").on("click", function (e) {
-                        e.preventDefault();
-                        const newPath = $(this).data('path');
-                        history.pushState({ path: newPath }, null, null);
-                        loadDirectory(newPath);
-                    });
-                    $(".previous-link").on("click", function (e) {
-                        e.preventDefault();
-                        history.back();
-                    });
-                    $(".open-add-book-modal").on("click", function (e) {
-                        e.preventDefault();
-                        const url = $(this).data('url');
-                        const modal = new bootstrap.Modal(document.getElementById('addBookModal'));
-                        $('#addBookModalBody').html('<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>');
-                        $.get(url, function (response) {
-                            $('#addBookModalBody').html(response);
-                            // Unbind any previous submit handlers first, then bind
-                            $('#addBookModalBody form').off('submit').on('submit', function (ev) {
-                                ev.preventDefault();
-                                var formData = new FormData(this);
-                                var action = $(this).attr('action');
-                                var method = $(this).find('input[name="_method"]').val() || $(this).attr('method');
-                                $.ajax({
-                                    url: action,
-                                    type: method || 'POST',
-                                    data: formData,
-                                    processData: false,
-                                    contentType: false,
-                                    success: function (data) {
-                                        var modalEl = document.getElementById('addBookModal');
-                                        var bsModal = bootstrap.Modal.getInstance(modalEl);
-                                        bsModal.hide();
-                                        loadDirectory(path);
-                                    },
-                                    error: function (xhr) {
-                                        $('#addBookModalBody').html(xhr.responseText);
-                                    }
-                                });
-                            });
-                        });
-                        modal.show();
-                    });
-                    $(document).on('click', '.open-edit-book-modal', function(e) {
-                        e.preventDefault();
-                        var url = $(this).data('url');
-                        $('#edit-book-modal-body').html('<div class="text-center p-4"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>');
-                        var modal = new bootstrap.Modal(document.getElementById('editBookModal'));
-                        modal.show();
-                        $.get(url, function(data) {
-                            $('#edit-book-modal-body').html(data);
-                        });
-                    });
-                    $(document).on('click', '#bulk-import-btn', function(e) {
-                        e.preventDefault();
-                        $('#bulk-import-status').text('Starting bulk import...');
-                        $.ajax({
-                            url: '{{ route("admin.books.bulkImport") }}',
-                            type: 'POST',
-                            data: { dir: currentPath, _token: '{{ csrf_token() }}' },
-                            success: function (data) {
-                                $('#bulk-import-status').text(data.message);
-                            },
-                            error: function (xhr) {
-                                let msg = 'Error: ' + (xhr.responseJSON?.error || xhr.statusText);
-                                $('#bulk-import-status').text(msg);
-                            }
-                        });
-                    });
+                    // Retain filter/search params if present
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('path', path);
+                    return url.pathname + url.search;
                 }
 
+                // Modal dialog for Create/Edit
+                $(document).on('click', '.open-add-book-modal, .open-edit-book-modal', function(e) {
+                    e.preventDefault();
+                    const url = $(this).data('url');
+                    const isEdit = $(this).hasClass('open-edit-book-modal');
+                    const modal = isEdit ? $('#editBookModal') : $('#addBookModal');
+                    const body = isEdit ? $('#edit-book-modal-body') : $('#addBookModalBody');
+                    body.html('<div class="text-center p-4"><i class="fas fa-spinner fa-spin fa-2x"></i></div>');
+                    modal.modal('show');
+                    $.get(url, function(html) {
+                        body.html(html);
+                    });
+                });
+
+                // Filter UI events
+                $('#letter-filter').on('click', 'button', function () {
+                    filterLetter = $(this).data('letter');
+                    $('#letter-filter button').removeClass('active');
+                    $(this).addClass('active');
+                    loadDirectory(currentPath);
+                });
+                $('#search-filter').on('input', function () {
+                    searchString = $(this).val();
+                    loadDirectory(currentPath);
+                });
+
+                // Letter filter: start with All active
+                $('#letter-filter button[data-letter=""]').addClass('active');
+
+                // Bulk import for filtered list
+                $('#bulk-import-btn').off('click').on('click', function () {
+                    // Get visible directories
+                    $.ajax({
+                        url: '{{ route("admin.directoryBrowser") }}',
+                        type: 'GET',
+                        data: {
+                            path: currentPath,
+                            filter_letter: filterLetter,
+                            search: searchString
+                        },
+                        success: function (data) {
+                            let dirs = data.filter(item => item.type === 'directory' || item.type === 'book');
+                            if (dirs.length === 0) {
+                                $('#bulk-import-status').text('No directories to import.');
+                                return;
+                            }
+                            $('#bulk-import-status').text('Starting bulk import...');
+                            $.ajax({
+                                url: '{{ route("admin.books.bulkImport") }}',
+                                type: 'POST',
+                                data: { dirs: dirs.map(d => d.path), _token: '{{ csrf_token() }}' },
+                                success: function (data) {
+                                    $('#bulk-import-status').text(data.message);
+                                },
+                                error: function (xhr) {
+                                    let msg = 'Error: ' + (xhr.responseJSON?.error || xhr.statusText);
+                                    $('#bulk-import-status').text(msg);
+                                }
+                            });
+                        }
+                    });
+                });
+
+                // Per-directory bulk import
+                $(document).on('click', '.bulk-import-dir-btn', function () {
+                    const dir = $(this).data('dir');
+                    $('#bulk-import-status').text('Starting bulk import for ' + dir + ' ...');
+                    $.ajax({
+                        url: '{{ route("admin.books.bulkImportDir") }}',
+                        type: 'POST',
+                        data: { dir: dir, _token: '{{ csrf_token() }}' },
+                        success: function (data) {
+                            $('#bulk-import-status').text(data.message);
+                        },
+                        error: function (xhr) {
+                            let msg = 'Error: ' + (xhr.responseJSON?.error || xhr.statusText);
+                            $('#bulk-import-status').text(msg);
+                        }
+                    });
+                });
+
                 // Initial Load
-                // Check for ?path= in the URL
                 const urlParams = new URLSearchParams(window.location.search);
                 const initialPath = urlParams.get('path') || '';
                 loadDirectory(initialPath);
@@ -290,7 +397,6 @@
                     loadDirectory(event.state ? event.state.path : (new URLSearchParams(window.location.search).get('path') || ''));
                 });
             });
-
         </script>
     </div>
 @endsection

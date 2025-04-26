@@ -28,16 +28,20 @@ class BookController extends Controller
     {
         $query = Book::query();
 
-        if ($request->has('genre_id')) {
+        // Only filter by genre_id if it is set and not empty
+        if ($request->filled('genre_id')) {
             $query->where('genre_id', $request->genre_id);
         }
 
-        if ($request->has('author_id')) {
+        // Only filter by author_id if it is set and not empty
+        if ($request->filled('author_id')) {
             $query->where('author_id', $request->author_id);
         }
 
         if ($request->has('series')) {
-            $query->where('series', 'like', "%{$request->series}%");
+            $query->whereHas('series', function ($q) use ($request) {
+                $q->where('name', 'like', "%{$request->series}%");
+            });
         }
 
         if ($request->has('search')) {
@@ -47,7 +51,9 @@ class BookController extends Controller
                     ->orWhereHas('author', function ($authorQuery) use ($searchTerm) {
                         $authorQuery->where('name', 'like', "%{$searchTerm}%");
                     })
-                    ->orWhere('series', 'like', "%{$searchTerm}%");
+                    ->orWhereHas('series', function ($seriesQuery) use ($searchTerm) {
+                        $seriesQuery->where('name', 'like', "%{$searchTerm}%");
+                    });
             });
         }
 
@@ -71,11 +77,11 @@ class BookController extends Controller
     {
         $directoryPath = $book->directory_path;
 
-        if (!$directoryPath || !Storage::exists($directoryPath)) {
+        if (!$directoryPath || !Storage::disk('books')->exists($directoryPath)) {
             abort(404, 'Book directory not found.');
         }
 
-        $files = Storage::files($directoryPath);
+        $files = Storage::disk('books')->files($directoryPath);
 
         if (empty($files)) {
             abort(404, 'No files found for this book.');
@@ -91,7 +97,7 @@ class BookController extends Controller
         }
 
         foreach ($files as $file) {
-            $zip->addFile(Storage::path($file), basename($file));
+            $zip->addFile(Storage::disk('books')->path($file), basename($file));
         }
 
         $zip->close();

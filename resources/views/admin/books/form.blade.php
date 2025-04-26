@@ -27,37 +27,34 @@
             @if(isset($book))
                 @method('PUT')
             @endif
-            <button type="button" class="btn btn-info mb-3" id="autofill-btn">Autofill from Google Books</button>
-            <div class="form-group">
+            @if(isset($book) && $book->directory_path)
+                <input type="hidden" name="original_directory_path" value="{{ $book->directory_path }}">
+            @elseif(old('directory_path'))
+                <input type="hidden" name="original_directory_path" value="{{ old('directory_path') }}">
+            @endif
+            <button type="button" class="btn btn-info mb-3" id="autofill-btn"><i class="fas fa-search"></i> Autofill from Google Books</button>
+            <div class="mb-3">
                 <label for="title">Title:</label>
                 <input type="text" class="form-control @error('title') is-invalid @enderror" id="title" name="title" value="{{ old('title', isset($book) ? $book->title : ($initial['title'] ?? null)) }}" required>
                 @error('title')
                     <span class="invalid-feedback d-block">{{ $message }}</span>
                 @enderror
             </div>
-            <div class="form-group">
-                <label for="author_id">Author:</label>
-                <select class="form-control @error('author_id') is-invalid @enderror" id="author_id" name="author_id" required>
-                    <option value="">Select Author</option>
-                    @foreach($authorList as $author)
-                        <option value="{{ $author->id }}" @if(old('author_id', isset($book) ? $book->author_id : (request('author_id', $initial->author_id ?? null))) == $author->id) selected @endif>{{ $author->name }}</option>
-                    @endforeach
+            <div class="mb-3">
+                <label for="author-select" class="form-label">Author</label>
+                <select id="author-select" name="author_id" class="form-control" data-url="{{ route('admin.authors.ajax') }}" data-selected="{{ old('author_id', $book->author_id ?? ($initial['author_id'] ?? '')) }}" data-selected-name="{{ old('author_name', $book->author->name ?? ($initial['author_name'] ?? '')) }}">
+                    @if(old('author_id', $book->author_id ?? ($initial['author_id'] ?? '')))
+                        <option value="{{ old('author_id', $book->author_id ?? ($initial['author_id'] ?? '')) }}" selected>{{ old('author_name', $book->author->name ?? ($initial['author_name'] ?? '')) }}</option>
+                    @endif
                 </select>
-                @error('author_id')
-                    <span class="invalid-feedback d-block">{{ $message }}</span>
-                @enderror
             </div>
-            <div class="form-group">
-                <label for="series_id">Series (Optional):</label>
-                <select class="form-control @error('series_id') is-invalid @enderror" id="series_id" name="series_id">
-                    <option value="">Select Series</option>
-                    @foreach($seriesList as $series)
-                        <option value="{{ $series->id }}" @if(old('series_id', isset($book) ? $book->series_id : ($initial->series_id ?? null)) == $series->id) selected @endif>{{ $series->name }}</option>
-                    @endforeach
+            <div class="mb-3">
+                <label for="series-select" class="form-label">Series</label>
+                <select id="series-select" name="series_id" class="form-control" data-url="{{ route('admin.series.ajax') }}" data-selected="{{ old('series_id', $book->series_id ?? ($initial['series_id'] ?? '')) }}" data-selected-name="{{ old('series_name', $book->series->name ?? ($initial['series_name'] ?? '')) }}">
+                    @if(old('series_id', $book->series_id ?? ($initial['series_id'] ?? '')))
+                        <option value="{{ old('series_id', $book->series_id ?? ($initial['series_id'] ?? '')) }}" selected>{{ old('series_name', $book->series->name ?? ($initial['series_name'] ?? '')) }}</option>
+                    @endif
                 </select>
-                @error('series_id')
-                    <span class="invalid-feedback d-block">{{ $message }}</span>
-                @enderror
             </div>
             <div class="form-group">
                 <label for="series_number">Series Number (Optional):</label>
@@ -71,7 +68,7 @@
                 <select class="form-control @error('genre_id') is-invalid @enderror" id="genre_id" name="genre_id" required>
                     <option value="">Select Genre</option>
                     @foreach($genreList as $genre)
-                        <option value="{{ $genre->id }}" @if(old('genre_id', isset($book) ? $book->genre_id : ($initial->genre_id ?? null)) == $genre->id) selected @endif>{{ $genre->name }}</option>
+                        <option value="{{ $genre->id }}" @if(old('genre_id', isset($book) ? $book->genre_id : ($initial['genre_id'] ?? null)) == $genre->id) selected @endif>{{ $genre->name }}</option>
                     @endforeach
                 </select>
                 @error('genre_id')
@@ -85,32 +82,77 @@
                     <span class="invalid-feedback d-block">{{ $message }}</span>
                 @enderror
             </div>
+            <div class="form-group mb-3">
+                <label>Directory Files</label>
+                <div class="d-flex align-items-center mb-2">
+                    <input type="checkbox" id="show-all-files-checkbox" class="form-check-input me-2">
+                    <label for="show-all-files-checkbox" class="form-check-label me-3">Show all files</label>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="show-files-btn">Show Files</button>
+                </div>
+                <div id="directory-files-list" style="max-width:400px; max-height:220px; overflow-y:auto; border:1px solid #ccc; border-radius:4px; background:#fafbfc; padding:8px; display:none;">
+                    <span class="text-muted">No files loaded yet.</span>
+                </div>
+            </div>
             @php
                 $dirPath = isset($book) ? $book->directory_path : ($directory_path ?? $initial->directory_path ?? null);
                 $coverImg = isset($book) ? $book->cover_image : ($initial->cover_image ?? null);
+                $coverAuto = $coverAuto ?? null;
+                $coverCandidates = $coverCandidates ?? [];
+                $coverOptions = [];
+                $addedCovers = [];
+                // Add current cover if available
+                if (!empty($coverImg) && !in_array($coverImg, $addedCovers)) {
+                    $coverOptions[] = [
+                        'type' => 'current',
+                        'value' => $coverImg,
+                        'src' => route('image.proxy', ['dir' => '.', 'file' => $coverImg]),
+                        'label' => 'Current Cover',
+                    ];
+                    $addedCovers[] = $coverImg;
+                }
+                // Add Google Books cover if available
+                if (!empty($coverAuto) && !in_array($coverAuto, $addedCovers)) {
+                    $coverOptions[] = [
+                        'type' => 'google',
+                        'value' => $coverAuto,
+                        'src' => route('image.proxy', ['dir' => $dirPath, 'file' => $coverAuto]),
+                        'label' => 'Google Books',
+                    ];
+                    $addedCovers[] = $coverAuto;
+                }
+                // Add other candidates
+                if (!empty($coverCandidates)) {
+                    foreach ($coverCandidates as $candidate) {
+                        if (!in_array($candidate, $addedCovers)) {
+                            $coverOptions[] = [
+                                'type' => 'candidate',
+                                'value' => $candidate,
+                                'src' => route('image.proxy', ['dir' => $dirPath, 'file' => $candidate]),
+                                'label' => 'Candidate',
+                            ];
+                            $addedCovers[] = $candidate;
+                        }
+                    }
+                }
             @endphp
-            @if (!empty($coverAuto))
-                <label>Current Cover:</label><br>
-                <img src="{{ route('image.proxy', ['dir' => $dirPath, 'file' => $coverAuto]) }}" alt="Current Cover"
-                    style="max-height: 120px; border:1px solid #ccc; margin-bottom: 10px;">
-            @endif
-            @if(empty($coverImg) && !empty($coverCandidates) && empty($coverAuto))
+
+            @if (!empty($coverOptions))
                 <div class="mb-3" id="cover-candidates-group">
                     <label class="form-label">Select Cover Image:</label>
                     <div class="d-flex flex-wrap gap-3" id="cover-candidates-list">
-                        @foreach($coverCandidates as $candidate)
+                        @foreach($coverOptions as $option)
                             <div class="text-center">
                                 <label>
-                                    <input type="radio" name="cover_image_candidate" value="{{ $candidate }}" @if(isset($biggestCover) && $biggestCover === $candidate) checked @endif>
+                                    <input type="radio" name="cover_image_candidate" value="{{ $option['value'] }}"
+                                        @if((isset($biggestCover) && $biggestCover === $option['value']) || (empty($biggestCover) && isset($coverImg) && $coverImg === $option['value'])) checked @endif>
                                     <br>
-                                    <img src="{{ route('image.proxy', ['dir' => $dirPath ?? $book->directory_path ?? '', 'file' => $candidate]) }}"
-                                        alt="{{ $candidate }}"
+                                    <img src="{{ $option['src'] }}"
+                                        alt="{{ $option['label'] }}"
                                         style="max-width:100px;max-height:140px;border:1px solid #ccc;margin-top:4px;">
                                 </label>
-                                <div style="font-size:12px;word-break:break-all;">{{ $candidate }}</div>
+                                <div style="font-size:12px;word-break:break-all;">{{ $option['label'] }}<br>{{ $option['value'] }}</div>
                             </div>
                         @endforeach
-                        <!-- Google Books cover candidate will be injected here by JS -->
                     </div>
                 </div>
             @endif
@@ -131,22 +173,12 @@
                 </table>
             </div>
 
-            @if ($coverImg)
-                <label>Current Cover:</label><br>
-                <img src="{{ route('image.proxy', ['dir' => dirname($coverImg), 'file' => basename($coverImg)]) }}"
-                    alt="Current Cover" style="max-height: 120px; border:1px solid #ccc; margin-bottom: 10px;">
-                <input type="hidden" name="cover_image_path" value="{{ $coverImg }}">
-            @endif
             <div class="form-group">
                 <label for="cover_image">Cover Image (Optional):</label>
                 <input type="file" class="form-control-file @error('cover_image') is-invalid @enderror" id="cover_image" name="cover_image">
                 @error('cover_image')
                     <span class="invalid-feedback d-block">{{ $message }}</span>
                 @enderror
-            </div>
-            <div id="cover-preview-group" style="display:none;">
-                <label>Google Books Cover Preview:</label><br>
-                <img id="cover-preview-img" src="" alt="Google Books Cover" style="max-height:120px; border:1px solid #ccc; margin-bottom:10px;">
             </div>
             <div class="form-group">
                 <label for="description">Description (Optional):</label>
@@ -188,24 +220,48 @@
 
 @section('scripts')
     <script>
-        function initSelect2Dropdowns() {
-            if ($.fn.select2) {
-                if ($('#author_id').length) {
-                    $('#author_id').select2({
-                        placeholder: 'Select Author',
-                        allowClear: true,
-                        width: '100%'
-                    });
+        window.googleBooksMoreMatches = false;
+        window.googleBooksMatchLimit = 10;
+
+        function initTomSelect(selector) {
+            let el = document.querySelector(selector);
+            if (!el) return;
+            let ajaxUrl = el.getAttribute('data-url');
+            let selected = el.getAttribute('data-selected');
+            let selectedName = el.getAttribute('data-selected-name');
+            new TomSelect(selector, {
+                create: true,
+                persist: false,
+                valueField: 'id',
+                labelField: 'name',
+                searchField: 'name',
+                maxOptions: 20,
+                loadThrottle: 300,
+                load: function(query, callback) {
+                    let url = ajaxUrl + '?q=' + encodeURIComponent(query || '');
+                    fetch(url)
+                        .then(response => response.json())
+                        .then(json => {
+                            callback(json.data || []);
+                        })
+                        .catch(() => {
+                            callback();
+                        });
+                },
+                onFocus: function() {
+                    this.refreshOptions(false);
+                },
+                onInitialize: function() {
+                    if (selected && selectedName) {
+                        this.addOption({ id: selected, name: selectedName });
+                        this.setValue(selected, true);
+                    }
                 }
-                if ($('#series_id').length) {
-                    $('#series_id').select2({
-                        placeholder: 'Select Series',
-                        allowClear: true,
-                        width: '100%'
-                    });
-                }
-            }
+            });
         }
+        initTomSelect('#author-select');
+        initTomSelect('#series-select');
+
         $(document).off('submit.bookModalAjax').on('submit.bookModalAjax', 'form[id^="book-"]', function(e) {
             var $form = $(this);
             var $modal = $form.closest('.modal');
@@ -242,25 +298,19 @@
                 return false;
             }
         });
-        $(document).off('shown.bs.modal.bookSelect2').on('shown.bs.modal.bookSelect2', '.modal', function() {
-            initSelect2Dropdowns();
-        });
-        $(function() {
-            initSelect2Dropdowns();
-        });
 
-        $('#autofill-btn').on('click', function () {
+        $('#autofill-btn').off('click').on('click', function () {
             const title = $('#title').val();
-            const authorSelect = $('#author_id');
-            const authorName = authorSelect.length ? authorSelect.find('option:selected').text() : '';
-            const series = $('#series_id option:selected').text() || '';
+            const authorName = $('#author-select option:selected').text() || '';
+            const series = $('#series-select option:selected').text() || '';
             const seriesNumber = $('#series_number').val() || '';
-            if (!title || !authorName || authorName === 'Select Author') {
+            if (!title || !authorName || authorName === '') {
                 $('#title').addClass('is-invalid');
                 $('#title').after('<span class="invalid-feedback d-block">Title and author are required.</span>');
                 return;
             }
-            fetch(`{{ route('admin.books.googleBooks') }}?title=${encodeURIComponent(title)}&author=${encodeURIComponent(authorName)}&series=${encodeURIComponent(series)}&series_number=${encodeURIComponent(seriesNumber)}`)
+            $('#autofill-btn').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Searching...');
+            fetch(`{{ route('admin.books.googleBooks') }}?title=${encodeURIComponent(title)}&author=${encodeURIComponent(authorName)}&series=${encodeURIComponent(series)}&series_number=${encodeURIComponent(seriesNumber)}&limit=${window.googleBooksMatchLimit}${window.googleBooksMoreMatches ? '&more=1' : ''}`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.match_type === 'close') {
@@ -271,25 +321,8 @@
                             $('#description').val(data.description);
                         }
                         if (data.cover_image_url) {
-                            $('#google-books-candidate').remove();
-                            const candidateHtml = `
-                                <div class="text-center" id="google-books-candidate">
-                                    <label>
-                                        <input type="radio" name="cover_image_candidate" value="${data.cover_image_url}">
-                                        <br>
-                                        <img src="${data.cover_image_url}"
-                                            alt="Google Books Cover"
-                                            style="max-width:100px;max-height:140px;border:1px solid #ccc;margin-top:4px;">
-                                    </label>
-                                    <div style="font-size:12px;word-break:break-all;">Google Books</div>
-                                </div>
-                            `;
-                            if ($('#cover-candidates-list').length) {
-                                $('#cover-candidates-list').append(candidateHtml);
-                            } else {
-                                $('#cover-preview-img').attr('src', data.cover_image_url);
-                                $('#cover-preview-group').show();
-                            }
+                            $('#cover-preview-img').attr('src', data.cover_image_url);
+                            $('#cover-preview-group').show();
                         }
                         let hidden = $('#cover_image_url');
                         if (!hidden.length) {
@@ -298,7 +331,12 @@
                         }
                         hidden.val(data.cover_image_url || '');
                         $('#google-books-matches-table-wrapper').hide();
+                        // Change button to get more matches
+                        $('#autofill-btn').prop('disabled', false).html('<i class="fas fa-search"></i> Get More Matches');
+                        window.googleBooksMoreMatches = true;
+                        window.googleBooksMatchLimit = 10;
                     } else if (data.match_type === 'list' && data.matches && data.matches.length > 0) {
+                        // Show table of matches
                         const $tbody = $('#google-books-matches-table tbody');
                         $tbody.empty();
                         data.matches.forEach((match, idx) => {
@@ -323,18 +361,14 @@
                             }
                             if (match.cover_image_url) {
                                 $('#google-books-candidate').remove();
-                                const candidateHtml = `
-                                    <div class="text-center" id="google-books-candidate">
-                                        <label>
-                                            <input type="radio" name="cover_image_candidate" value="${match.cover_image_url}">
-                                            <br>
-                                            <img src="${match.cover_image_url}"
-                                                alt="Google Books Cover"
-                                                style="max-width:100px;max-height:140px;border:1px solid #ccc;margin-top:4px;">
-                                        </label>
-                                        <div style="font-size:12px;word-break:break-all;">Google Books</div>
-                                    </div>
-                                `;
+                                var candidateHtml = '<div class="text-center" id="google-books-candidate">' +
+                                    '<label>' +
+                                        '<input type="radio" name="cover_image_candidate" value="' + match.cover_image_url + '">' +
+                                        '<br>' +
+                                        '<img src="' + match.cover_image_url + '" alt="Google Books Cover" style="max-width:100px;max-height:140px;border:1px solid #ccc;margin-top:4px;">' +
+                                    '</label>' +
+                                    '<div style="font-size:12px;word-break:break-all;">Google Books</div>' +
+                                '</div>';
                                 if ($('#cover-candidates-list').length) {
                                     $('#cover-candidates-list').append(candidateHtml);
                                 } else {
@@ -349,11 +383,23 @@
                             }
                             hidden.val(match.cover_image_url || '');
                         });
+                        // Handle button for more matches
+                        if (data.maxed || window.googleBooksMatchLimit >= 40) {
+                            $('#autofill-btn').prop('disabled', true).html('<i class="fas fa-check"></i> All Results Shown');
+                        } else {
+                            $('#autofill-btn').prop('disabled', false).html('<i class="fas fa-search"></i> Get More Matches');
+                            window.googleBooksMoreMatches = true;
+                            window.googleBooksMatchLimit += 10;
+                        }
                     } else {
                         $('#google-books-matches-table-wrapper').hide();
+                        $('#autofill-btn').prop('disabled', false).html('<i class="fas fa-search"></i> Autofill from Google Books');
+                        window.googleBooksMoreMatches = false;
+                        window.googleBooksMatchLimit = 10;
                     }
                 })
                 .catch(() => {
+                    $('#autofill-btn').prop('disabled', false).html('<i class="fas fa-search"></i> Autofill from Google Books');
                     $('#title').addClass('is-invalid');
                     $('#title').after('<span class="invalid-feedback d-block">Failed to fetch book info.</span>');
                 });
@@ -373,7 +419,7 @@
             let hasError = false;
             const requiredFields = [
                 { id: '#title', name: 'title', label: 'Title' },
-                { id: '#author_id', name: 'author_id', label: 'Author' },
+                { id: '#author-select', name: 'author_id', label: 'Author' },
                 { id: '#genre_id', name: 'genre_id', label: 'Genre' },
                 { name: 'type', label: 'Type', radio: true }
             ];
@@ -402,6 +448,83 @@
                 }
                 return false;
             }
+        });
+
+        $(document).on('change', 'input[name="google_books_match_select"]', function() {
+            const idx = $(this).val();
+            let matches = window.googleBooksMatches || [];
+            if (!matches.length && window.lastGoogleBooksAjaxData && window.lastGoogleBooksAjaxData.matches) {
+                matches = window.lastGoogleBooksAjaxData.matches;
+            }
+            const match = matches[idx];
+            if (match) {
+                if (match.title) {
+                    $('#title').val(match.title);
+                }
+                if (match.authors) {
+                    let authorSelect = $('#author-select')[0].tomselect;
+                    if (authorSelect) {
+                        let authorName = match.authors.split(',')[0].trim();
+                        authorSelect.addOption({ id: authorName, name: authorName });
+                        authorSelect.setValue(authorName, true);
+                    } else {
+                        $('#author-select').val(match.authors.split(',')[0].trim());
+                    }
+                }
+            }
+        });
+        console.log('Scripts loaded');
+
+        function setGoogleBooksMatches(matches) {
+            window.googleBooksMatches = matches;
+        }
+
+        function fetchDirectoryFiles() {
+            const dirPath = $("#directory_path").val() || $("input[name='directory_path']").val() || $("input[name='original_directory_path']").val();
+            const showAll = $("#show-all-files-checkbox").is(":checked") ? 1 : 0;
+            if (!dirPath) {
+                $('#directory-files-list').html('<span class="text-muted">-- No directory selected --</span>');
+                return;
+            }
+            $('#show-files-btn').prop('disabled', true).text('Loading...');
+            $.ajax({
+                url: "{{ route('admin.books.filesAjax') }}",
+                data: {directory: dirPath, show_all: showAll},
+                success: function(res) {
+                    let html = '';
+                    if (res.files && res.files.length) {
+                        html += '<ul class="list-unstyled mb-0">';
+                        res.files.forEach(function(file) {
+                            html += `<li style=\"word-break:break-all;padding:2px 0;\">${file}</li>`;
+                        });
+                        html += '</ul>';
+                    } else {
+                        html = '<span class="text-muted">(No files found)</span>';
+                    }
+                    $('#directory-files-list').html(html);
+                },
+                complete: function() {
+                    $('#show-files-btn').prop('disabled', false).text('Hide Files');
+                }
+            });
+        }
+        let filesBoxVisible = false;
+        $('#show-files-btn').on('click', function() {
+            filesBoxVisible = !filesBoxVisible;
+            if (filesBoxVisible) {
+                $('#directory-files-list').slideDown(120);
+                $(this).text('Hide Files');
+                fetchDirectoryFiles();
+            } else {
+                $('#directory-files-list').slideUp(120);
+                $(this).text('Show Files');
+            }
+        });
+        $('#show-all-files-checkbox').on('change', function() {
+            if (filesBoxVisible) fetchDirectoryFiles();
+        });
+        $('#directory_path, input[name="directory_path"], input[name="original_directory_path"]').on('change', function() {
+            if (filesBoxVisible) fetchDirectoryFiles();
         });
     </script>
 @endsection

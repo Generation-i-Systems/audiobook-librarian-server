@@ -205,7 +205,7 @@ trait BookImportTrait
     {
         $book = new Book();
         $book->directory_path = $directoryPath;
-        if (preg_match('#/(.*?)/(.*?)/(.*?)/(\d+) (.*)#', $directoryPath, $matches)) {
+        if (preg_match('#/(.*?)/(.*?)/(.*?)/([0-9.]+) (.*)#', $directoryPath, $matches)) {
             $genre = $matches[1];
             $author = $matches[2];
             $series = $matches[3];
@@ -232,11 +232,13 @@ trait BookImportTrait
         $authorRec = Author::where('name', 'like', "%{$author}%")->first();
         $book->author = $authorRec ?: Author::create(["name" => $author]);
         $book->author_id = $authorRec?->id;
+        $book->author_name = $authorRec?->name;
 
         if (!empty($series)) {
             $seriesRec = Series::where('name', 'like', "%{$series}%")->first();
             $book->series = $seriesRec ? $seriesRec : Series::create(["name" => $series]);
             $book->series_id = $seriesRec?->id;
+            $book->series_name = $seriesRec?->name;
         }
 
         if (!empty($seriesNumber)) {
@@ -257,13 +259,13 @@ trait BookImportTrait
         try {
             $storagePath = env('BOOK_STORAGE_PATH'); // absolute path
             if (!$storagePath) {
-                \Log::error('BOOK_STORAGE_PATH is not defined.');
+                Log::error('BOOK_STORAGE_PATH is not defined.');
                 return null;
             }
             $fullDir = rtrim($storagePath, '/') . '/' . ltrim($directoryPath, '/');
             if (!is_dir($fullDir)) {
                 if (!mkdir($fullDir, 0775, true) && !is_dir($fullDir)) {
-                    \Log::error("importCoverImageFromUrl error: Unable to create directory at $fullDir");
+                    Log::error("importCoverImageFromUrl error: Unable to create directory at $fullDir");
                     return null;
                 }
             }
@@ -292,13 +294,13 @@ trait BookImportTrait
             $filename = 'cover.' . $ext;
             $fullPath = $fullDir . '/' . $filename;
             if (file_put_contents($fullPath, $contents) === false) {
-                \Log::error("importCoverImageFromUrl error: Unable to write file $fullPath");
+                Log::error("importCoverImageFromUrl error: Unable to write file $fullPath");
                 return null;
             }
             // Return only the path relative to BOOK_STORAGE_PATH
             return (ltrim($directoryPath, '/') . '/' . $filename);
         } catch (\Exception $e) {
-            \Log::error('importCoverImageFromUrl error: ' . $e->getMessage());
+            Log::error('importCoverImageFromUrl error: ' . $e->getMessage());
             return null;
         }
     }
@@ -327,7 +329,7 @@ trait BookImportTrait
      */
     public function searchGoogleBooksWithSimilarity($title, $author, $series = '', $seriesNumber = '')
     {
-        $query = trim($title . ' ' . $author . ' ' . $series . ' ' . $seriesNumber);
+        $query = trim("intitle:{$title} inauthor:{$author}");
         $results = $this->googleBooksApiService->searchBooks($query, 30);
         if (empty($results['items'])) {
             return [[], null];
@@ -336,6 +338,13 @@ trait BookImportTrait
         $matches = [];
         $bestScore = 0;
         $bestMatch = null;
+        $maxScore = 120;
+        if ($series) {
+            $maxScore += 10;
+        }
+        if ($seriesNumber) {
+            $maxScore += 5;
+        }
         foreach ($results['items'] as $item) {
             $info = $item['volumeInfo'];
             $itemTitle = $info['title'] ?? '';
@@ -344,27 +353,34 @@ trait BookImportTrait
             $itemSeriesNumber = $info['seriesNumber'] ?? '';
             $score = 0;
             // Title similarity (Levenshtein, case-insensitive)
-            $score += 100 - min(levenshtein(mb_strtolower($title), mb_strtolower($itemTitle)), 100);
-            // Author similarity (partial match)
-            if ($author && stripos($itemAuthors, $author) !== false) $score += 20;
+            $titleLev = 100 - min(levenshtein(mb_strtolower($title), mb_strtolower($itemTitle)), 100);
+            $score += $titleLev;
+            // Author similarity (Levenshtein, case-insensitive)
+            $authorLev = 100 - min(levenshtein(mb_strtolower($author), mb_strtolower($itemAuthors)), 100);
+            $score += $authorLev;
             // Series similarity
-            if ($series && stripos($itemSeries, $series) !== false) $score += 10;
+            if ($series && stripos($itemSeries, $series) !== false) {
+                $score += 10;
+            }
             // Series number
-            if ($seriesNumber && $itemSeriesNumber == $seriesNumber) $score += 5;
+            if ($seriesNumber && $itemSeriesNumber == $seriesNumber) {
+                $score += 5;
+            }
             $matches[] = [
                 'score' => $score,
                 'item' => $item,
             ];
             if ($score > $bestScore) {
                 $bestScore = $score;
+                $item['score'] = $score;
                 $bestMatch = $item;
             }
         }
         usort($matches, function($a, $b) {
             return $b['score'] <=> $a['score'];
         });
-        // Only consider a close match if score is reasonably high
-        $closeMatch = ($bestScore > 110) ? $bestMatch : null;
+        // Only consider a close match if score is very high (stricter)
+        $closeMatch = ($bestScore > 160) ? $bestMatch : null;
         return [$matches, $closeMatch];
     }
 }

@@ -6,7 +6,7 @@
 
         <div class="row">
             <div class="col-md-4">
-                <img src="{{ route('image.proxy', ['url' => Storage::url($book->cover_image)]) }}" alt="{{ $book->title }}" class="img-fluid">
+                <img src="{{ route('image.proxy', ['file' => $book->cover_image]) }}" alt="{{ $book->title }}" class="img-fluid">
             </div>
             <div class="col-md-8">
                 <p><strong>Author:</strong> {{ $book->author->name }}</p>
@@ -21,7 +21,7 @@
                     }
                 @endphp
                 @if($hasSeries)
-                <p><strong>Series:</strong> 
+                <p><strong>Series:</strong>
                     @if(is_object($book->series))
                         {{ $book->series->name }}@if($book->series_number) (Book {{ $book->series_number }})@endif
                     @elseif(is_array($book->series) && isset($book->series['name']))

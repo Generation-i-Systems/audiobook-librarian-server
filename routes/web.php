@@ -77,10 +77,18 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     )->name('users.updateRole');
     Route::get('/books/import', [Admin\BookController::class, 'import'])->name('books.import');
     Route::get('/books/googleBooks', action: [Admin\BookController::class, 'googleBooks'])->name('books.googleBooks');
+
+    // AJAX endpoints for Tom Select
+    Route::get('/authors/ajax', [Admin\AuthorController::class, 'ajax'])->name('authors.ajax');
+    Route::get('/series/ajax', [Admin\BookController::class, 'seriesAjax'])->name('series.ajax');
+    Route::post('/import/rename', [Admin\BookController::class, 'books.renameImportItem'])->name('import.rename');
+
+    // AJAX: List files in book directory
+    Route::get('books/files-ajax', [Admin\BookController::class, 'filesAjax'])->name('books.filesAjax');
+
     Route::resource('genres', Admin\GenreController::class);
     Route::resource('authors', Admin\AuthorController::class);
     Route::resource('books', Admin\BookController::class);
-    Route::resource('messages', Admin\MessageController::class);
     Route::resource('account_requests', Admin\AccountRequestController::class);
     Route::get('/books/import-from-title', [Admin\BookController::class, 'importFromTitle'])->name('books.importFromTitle');
     Route::post('/books/search-google-books', [Admin\BookController::class, 'searchGoogleBooks'])->name('books.searchGoogleBooks');
@@ -93,6 +101,10 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
 
     // Bulk import books from directory (recursive, queued)
     Route::post('/books/bulk-import', [Admin\BookController::class, 'bulkImportBooks'])->name('books.bulkImport');
+    // Bulk import from a specific directory (recursive)
+    Route::post('/books/bulk-import-dir', [Admin\BookController::class, 'bulkImportBooksFromDir'])->name('books.bulkImportDir');
+
+    Route::resource('users', Admin\UserController::class);
 
     // Queue management (admin only)
     Route::middleware(['auth', 'admin'])->group(function () {
@@ -101,7 +113,16 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         Route::post('/queue/remove/{id}', [Admin\QueueController::class, 'remove']);
         Route::get('/queue/status', [Admin\QueueController::class, 'status']);
         Route::post('/queue/start', [Admin\QueueController::class, 'startWorker']);
+        Route::post('/queue/clear', [Admin\QueueController::class, 'clear'])->name('queue.clear');
     });
+
+    Route::resource('messages', Admin\MessageController::class);
+    // Admin messaging system
+    Route::get('messages', [Admin\MessagesController::class, 'index'])->name('messages.index');
+    Route::get('messages/create', [Admin\MessagesController::class, 'create'])->name('messages.create');
+    Route::post('messages', [Admin\MessagesController::class, 'store'])->name('messages.store');
+    // Route::get('messages/{id}', [Admin\MessagesController::class, 'show'])->name('messages.show');
+    Route::post('messages/{id}/mark-as-read', [Admin\MessagesController::class, 'markAsRead'])->name('messages.markAsRead');
 
     Route::post(
         '/send-notification',

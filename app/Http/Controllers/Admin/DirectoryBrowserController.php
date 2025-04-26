@@ -27,6 +27,8 @@ class DirectoryBrowserController extends Controller
         }
 
         $path = $request->input('path', $basePath);
+        $filterLetter = $request->input('filter_letter');
+        $search = $request->input('search');
         if (!is_dir($basePath . $path)) {
             return response()->json(['error' => 'Invalid directory.'], 400);
         }
@@ -42,6 +44,15 @@ class DirectoryBrowserController extends Controller
             if ($file === '.' || $file === '..')
                 continue;
 
+            // Filtering by letter
+            if ($filterLetter && stripos($file, $filterLetter) !== 0) {
+                continue;
+            }
+            // Filtering by search string
+            if ($search && stripos($file, $search) === false) {
+                continue;
+            }
+
             $filePath = $path . '/' . $file;
             $isPotentialBookDirectory = $this->isPotentialBookDirectory($basePath . $filePath);
 
@@ -51,28 +62,29 @@ class DirectoryBrowserController extends Controller
                 if ($this->isPotentialBookDirectory($basePath . $filePath)) {
                     if ($book) {
                         $data[] = [
-                            'type' => 'directory',
+                            'type' => 'book',
                             'name' => $file,
                             'path' => $filePath,
-                            'edit' => route('admin.books.edit', ['book' => $book->id])
+                            'edit' => route('admin.books.edit', ['book' => $book->id]),
+                            'bulk_import' => route('admin.books.bulkImportDir', ['dir' => $filePath]),
                         ];
                     } else {
                         $data[] = [
                             'type' => 'directory',
                             'name' => $file,
                             'path' => $filePath,
-                            'create' => route('admin.books.create') . '?path=' . urlencode($filePath)
+                            'create' => route('admin.books.create') . '?path=' . urlencode($filePath),
+                            'bulk_import' => route('admin.books.bulkImportDir', ['dir' => $filePath]),
                         ];
                     }
-
                 } else {
                     $data[] = [
                         'type' => 'directory',
                         'name' => $file,
                         'path' => $filePath,
+                        'bulk_import' => route('admin.books.bulkImportDir', ['dir' => $filePath]),
                     ];
                 }
-
             } else {
                 $extension = pathinfo($basePath . $filePath, PATHINFO_EXTENSION);
                 if (in_array(strtolower($extension), ['mp3', 'm4b', 'm4a'])) {
@@ -86,7 +98,6 @@ class DirectoryBrowserController extends Controller
         }
 
         return response()->json($data, 200, [], JSON_PRETTY_PRINT);
-
     }
     private function isPotentialBookDirectory($directoryPath): bool
     {

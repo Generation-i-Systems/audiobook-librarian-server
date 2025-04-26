@@ -31,7 +31,7 @@ class ReadingProgressApiController extends Controller
         $user = Auth::user();
 
         $progress = ReadingProgress::where('user_id', $user->id)
-            ->where('book_id' => $book->id)
+            ->where('book_id', $book->id)
             ->first();
 
         if ($progress) {

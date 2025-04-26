@@ -10,24 +10,36 @@
 
         <!-- Show Recently Added Books Only If There Are No Filters And There Are Recent Books -->
         @if (!$showFilters && count($recentBooks) > 0)
-            <h2>Recently Added Books</h2>
-            <div class="row">
-                @foreach($recentBooks as $book)
-                    <div class="col-md-4 mb-4">
-                        <div class="card">
-                            <img src="{{ route('image.proxy', ['url' => Storage::url($book->cover_image)]) }}" class="card-img-top" alt="{{ $book->title }}"
-                                style="max-height: 200px; object-fit: cover;">
-                            <div class="card-body">
-                                <h5 class="card-title">{{ $book->title }}</h5>
-                                <p class="card-text">By {{ $book->author && $book->author->name ? $book->author->name : 'Unknown' }}</p>
-                                <p class="card-text"><strong>Date Added:</strong> {{ ($book->date_added instanceof \Carbon\Carbon) ? $book->date_added->format('Y-m-d') : ($book->date_added ? $book->date_added : 'N/A') }}</p>
-                                <p class="card-text"><strong>Publication Date:</strong>
-                                    {{ ($book->publication_date instanceof \Carbon\Carbon) ? $book->publication_date->format('Y-m-d') : ($book->publication_date ? $book->publication_date : 'N/A') }}</p>
-                                <a href="{{ route('books.show', $book) }}" class="btn btn-primary">View Details</a>
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Recently Added Books</span>
+                    <button class="btn btn-link text-decoration-none" id="toggle-recent-books" type="button" tabindex="0">
+                        <span id="recent-books-toggle-text">Hide</span>
+                    </button>
+                </div>
+                <div class="card-body p-0" id="recent-books-block">
+                    <div class="row m-0">
+                        @foreach($recentBooks as $book)
+                            <div class="col-md-4 mb-4">
+                                <a href="{{ route('books.show', $book) }}" class="text-decoration-none card-link" style="color:inherit">
+                                    <div class="card h-100 book-card-hover" style="cursor:pointer;">
+                                        <img src="{{ route('image.proxy', ['file' => $book->cover_image]) }}"
+                                             class="card-img-top book-cover-thumb" alt="{{ $book->title }}"
+                                             style="height: 200px; width: auto; max-width: 100%; object-fit: contain; background: #f8f9fa; display: block; margin-left: auto; margin-right: auto;">
+                                        <div class="card-body">
+                                            <h5 class="card-title">{{ $book->title }}</h5>
+                                            <p class="card-text">By {{ $book->author && $book->author->name ? $book->author->name : 'Unknown' }}</p>
+                                            <p class="card-text"><strong>Date Added:</strong> {{ ($book->date_added instanceof \Carbon\Carbon) ? $book->date_added->format('Y-m-d') : ($book->date_added ? $book->date_added : 'N/A') }}</p>
+                                            <p class="card-text"><strong>Publication Date:</strong>
+                                                {{ ($book->publication_date instanceof \Carbon\Carbon) ? $book->publication_date->format('Y-m-d') : ($book->publication_date ? $book->publication_date : 'N/A') }}</p>
+                                            <a href="{{ route('books.show', $book) }}" class="btn btn-primary d-none d-md-inline">View Details</a>
+                                        </div>
+                                    </div>
+                                </a>
                             </div>
-                        </div>
+                        @endforeach
                     </div>
-                @endforeach
+                </div>
             </div>
             <hr />
         @endif
@@ -67,15 +79,18 @@
         <div class="row">
             @foreach ($books as $book)
                 <div class="col-md-4 mb-4">
-                    <div class="card">
-                        <img src="{{ route('image.proxy', ['url' => Storage::url($book->cover_image)]) }}" class="card-img-top" alt="{{ $book->title }}"
-                            style="max-height: 200px; object-fit: cover;">
-                        <div class="card-body">
-                            <h5 class="card-title">{{ $book->title }}</h5>
-                            <p class="card-text">By {{ $book->author && $book->author->name ? $book->author->name : 'Unknown' }}</p>
-                            <a href="{{ route('books.show', $book) }}" class="btn btn-primary">View Details</a>
+                    <a href="{{ route('books.show', $book) }}" class="text-decoration-none card-link" style="color:inherit">
+                        <div class="card h-100 book-card-hover" style="cursor:pointer;">
+                            <img src="{{ route('image.proxy', ['file' => $book->cover_image]) }}"
+                                 class="card-img-top book-cover-thumb" alt="{{ $book->title }}"
+                                 style="height: 200px; width: auto; max-width: 100%; object-fit: contain; background: #f8f9fa; display: block; margin-left: auto; margin-right: auto;">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ $book->title }}</h5>
+                                <p class="card-text">By {{ $book->author && $book->author->name ? $book->author->name : 'Unknown' }}</p>
+                                <a href="{{ route('books.show', $book) }}" class="btn btn-primary d-none d-md-inline">View Details</a>
+                            </div>
                         </div>
-                    </div>
+                    </a>
                 </div>
             @endforeach
         </div>
@@ -91,4 +106,36 @@
 
 @push('styles')
     <link rel="stylesheet" href="/css/pagination-fix.css">
+@endpush
+
+@push('scripts')
+<script>
+    $(function() {
+        var toggleBtns = $('#toggle-recent-books');
+        var blocks = $('#recent-books-block');
+        function setRecentBooksCollapsed(collapsed) {
+            document.cookie = 'recentBooksCollapsed=' + (collapsed ? '1' : '0') + ';path=/;max-age=31536000';
+        }
+        function getRecentBooksCollapsed() {
+            var match = document.cookie.match(/(?:^|; )recentBooksCollapsed=([^;]*)/);
+            return match ? match[1] === '1' : false;
+        }
+        function updateRecentBooksBlock() {
+            var collapsed = getRecentBooksCollapsed();
+            var block = $('#recent-books-block');
+            var toggleText = $('#recent-books-toggle-text');
+            if (block.length && toggleText.length) {
+                block.css('display', collapsed ? 'none' : '');
+                toggleText.text(collapsed ? 'Show' : 'Hide');
+            }
+        }
+        updateRecentBooksBlock();
+        toggleBtns.on('click', function(e) {
+            e.preventDefault();
+            var collapsed = !getRecentBooksCollapsed();
+            setRecentBooksCollapsed(collapsed);
+            updateRecentBooksBlock();
+        });
+    });
+</script>
 @endpush

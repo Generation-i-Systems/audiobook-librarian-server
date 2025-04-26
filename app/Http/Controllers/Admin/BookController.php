@@ -10,12 +10,13 @@ use App\Models\Series;
 use App\Services\GoogleBooksApiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\Process\Process;
 use ZipArchive;
 use getID3;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Log;
 use App\Traits\BookImportTrait;
 
 class BookController extends Controller
@@ -34,21 +35,31 @@ class BookController extends Controller
 
     public function index(Request $request)
     {
-        $search = $request->input('search');
         $query = Book::query();
 
-        if ($search) {
-            $query->where('title', 'like', "%{$search}%")
-                ->orWhereHas('author', function ($authorQuery) use ($search) {
-                    $authorQuery->where('name', 'like', "%{$search}%");
-                })
-                ->orWhereHas('series', function ($seriesQuery) use ($search) {
-                    $seriesQuery->where('name', 'like', "%{$search}%");
-                });
+        // Filter by title (search)
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(function($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                  ->orWhereHas('author', function ($authorQuery) use ($search) {
+                      $authorQuery->where('name', 'like', "%{$search}%");
+                  });
+            });
         }
 
-        $books = $query->orderBy('title')->paginate(20);
-        return view('admin.books.index', compact('books', 'search'));
+        // Filter by author if set
+        if ($request->filled('author_id')) {
+            $query->where('author_id', $request->input('author_id'));
+        }
+
+        // Filter by genre if set
+        if ($request->filled('genre_id')) {
+            $query->where('genre_id', $request->input('genre_id'));
+        }
+
+        $books = $query->with(['author', 'genre', 'series'])->orderBy('title')->paginate(20);
+        return view('admin.books.index', compact('books'));
     }
 
     public function create(Request $request)
@@ -65,7 +76,7 @@ class BookController extends Controller
         $biggestSize = 0;
         $directory_path = $request->old('directory_path') ?? $initial->directory_path ?? '';
         if ($directory_path) {
-            list($coverAuto, $coverCandidates) = $this->findCoverImageCandidate($directory_path);
+            [$coverAuto, $coverCandidates] = $this->findCoverImageCandidate($directory_path);
             // If no cover and no images, try m4b extraction
             if (empty($coverAuto) && empty($coverCandidates)) {
                 $dir = rtrim($this->storagePath, '/') . '/' . ltrim($directory_path, '/');
@@ -95,13 +106,13 @@ class BookController extends Controller
                 }
             }
         }
-        if ($directory_path && \Storage::disk('books')->exists($directory_path)) {
-            $files = \Storage::disk('books')->files($directory_path);
+        if ($directory_path && Storage::disk('books')->exists($directory_path)) {
+            $files = Storage::disk('books')->files($directory_path);
             foreach ($files as $file) {
                 if (preg_match('/\.(jpe?g|png|gif|svg)$/i', $file)) {
                     $candidate = basename($file);
                     $coverCandidates[] = $candidate;
-                    $size = \Storage::disk('books')->size($file);
+                    $size = Storage::disk('books')->size($file);
                     if ($size > $biggestSize) {
                         $biggestSize = $size;
                         $biggestCover = $candidate;
@@ -140,13 +151,35 @@ class BookController extends Controller
             'published_year' => 'nullable|digits:4',
         ]);
 
+        // Handle author_id: create if not numeric
+        if (!is_numeric($validated['author_id'])) {
+            $author = Author::firstOrCreate(['name' => $validated['author_id']]);
+            $validated['author_id'] = $author->id;
+        }
+        // Handle series_id: create if not numeric and not empty
+        if (!empty($validated['series_id']) && !is_numeric($validated['series_id'])) {
+            $series = Series::firstOrCreate(['name' => $validated['series_id']]);
+            $validated['series_id'] = $series->id;
+        }
+
+        $originalDirectoryPath = $request->input('original_directory_path');
+        $newDirectoryPath = $validated['directory_path'] ?? null;
+        if ($originalDirectoryPath && $newDirectoryPath && $originalDirectoryPath !== $newDirectoryPath) {
+            $oldAbs = $this->storagePath . '/' . ltrim($originalDirectoryPath, '/');
+            $newAbs = $this->storagePath . '/' . ltrim($newDirectoryPath, '/');
+            if (is_dir($oldAbs) && !is_dir($newAbs)) {
+                if (!@rename($oldAbs, $newAbs)) {
+                    return back()->withErrors(['directory_path' => 'Failed to rename directory from ' . $originalDirectoryPath . ' to ' . $newDirectoryPath]);
+                }
+            }
+        }
         $book = new Book($validated);
 
         // Handle cover image upload or import from autofill
         if ($request->hasFile('cover_image')) {
             $ext = $request->file('cover_image')->getClientOriginalExtension();
             $coverPath = ($book->directory_path ? trim($book->directory_path, '/') . '/' : '') . 'cover.' . $ext;
-            \Storage::disk('books')->put($coverPath, file_get_contents($request->file('cover_image')->getRealPath()));
+            Storage::disk('books')->put($coverPath, file_get_contents($request->file('cover_image')->getRealPath()));
             $book->cover_image = $coverPath;
         } elseif ($request->input('cover_image_url')) {
             // Ensure the book's directory exists before importing
@@ -157,18 +190,18 @@ class BookController extends Controller
                     $dirPath = $request->directory_path;
                 } else {
                     if (!empty($book->series_id)) {
-                        $series = \App\Models\Series::find($book->series_id);
+                        $series = Series::find($book->series_id);
                         $seriesName = $series ? $series->name : '';
                         $bookDirectory = '/' . implode('/', [
-                            $book->genre_id ? \App\Models\Genre::find($book->genre_id)->name : '',
-                            $book->author_id ? \App\Models\Author::find($book->author_id)->name : '',
+                            $book->genre_id ? Genre::find($book->genre_id)->name : '',
+                            $book->author_id ? Author::find($book->author_id)->name : '',
                             $seriesName,
                             ($book->series_number ? $book->series_number . ' ' : '') . $book->title
                         ]);
                     } else {
                         $bookDirectory = '/' . implode('/', [
-                            $book->genre_id ? \App\Models\Genre::find($book->genre_id)->name : '',
-                            $book->author_id ? \App\Models\Author::find($book->author_id)->name : '',
+                            $book->genre_id ? Genre::find($book->genre_id)->name : '',
+                            $book->author_id ? Author::find($book->author_id)->name : '',
                             $book->title
                         ]);
                     }
@@ -176,7 +209,7 @@ class BookController extends Controller
                 }
             }
             if ($this->storagePath && $dirPath) {
-                \Storage::makeDirectory($this->storagePath . '/' . ltrim($dirPath, '/'));
+                Storage::makeDirectory($this->storagePath . '/' . ltrim($dirPath, '/'));
             }
             $coverPath = $this->importCoverImageFromUrl($request->input('cover_image_url'), $dirPath);
             if ($coverPath) {
@@ -272,13 +305,13 @@ class BookController extends Controller
                 }
             }
         }
-        if ($book->directory_path && \Storage::disk('books')->exists($book->directory_path)) {
-            $files = \Storage::disk('books')->files($book->directory_path);
+        if ($book->directory_path && Storage::disk('books')->exists($book->directory_path)) {
+            $files = Storage::disk('books')->files($book->directory_path);
             foreach ($files as $file) {
                 if (preg_match('/\.(jpe?g|png|gif|svg)$/i', $file)) {
                     $candidate = basename($file);
                     $coverCandidates[] = $candidate;
-                    $size = \Storage::disk('books')->size($file);
+                    $size = Storage::disk('books')->size($file);
                     if ($size > $biggestSize) {
                         $biggestSize = $size;
                         $biggestCover = $candidate;
@@ -293,22 +326,22 @@ class BookController extends Controller
         if ($request->hasFile('cover_image')) {
             $ext = $request->file('cover_image')->getClientOriginalExtension();
             $coverPath = ($book->directory_path ? trim($book->directory_path, '/') . '/' : '') . 'cover.' . $ext;
-            \Storage::disk('books')->put($coverPath, file_get_contents($request->file('cover_image')->getRealPath()));
+            Storage::disk('books')->put($coverPath, file_get_contents($request->file('cover_image')->getRealPath()));
             $book->cover_image = $coverPath;
-            \Log::info('Book Edit: cover_image uploaded via file to ' . $coverPath);
+            Log::info('Book Edit: cover_image uploaded via file to ' . $coverPath);
             $coverCandidatesForDefault[] = [
                 'path' => $coverPath,
-                'size' => \Storage::disk('books')->size($coverPath)
+                'size' => Storage::disk('books')->size($coverPath)
             ];
         } elseif ($request->input('cover_image_path')) {
             $book->cover_image = $request->input('cover_image_path');
-            \Log::info('Book Edit: cover_image_path = ' . $request->input('cover_image_path'));
+            Log::info('Book Edit: cover_image_path = ' . $request->input('cover_image_path'));
             $coverCandidatesForDefault[] = [
                 'path' => $request->input('cover_image_path'),
-                'size' => \Storage::disk('books')->exists($request->input('cover_image_path')) ? \Storage::disk('books')->size($request->input('cover_image_path')) : 0
+                'size' => Storage::disk('books')->exists($request->input('cover_image_path')) ? Storage::disk('books')->size($request->input('cover_image_path')) : 0
             ];
         } elseif ($request->input('cover_image_url')) {
-            \Log::info('Book Edit: Importing cover image from URL: ' . $request->input('cover_image_url'));
+            Log::info('Book Edit: Importing cover image from URL: ' . $request->input('cover_image_url'));
             // Ensure the book's directory exists before importing
             $dirPath = $book->directory_path;
             if (!$dirPath) {
@@ -328,15 +361,15 @@ class BookController extends Controller
                 }
             }
             if ($this->storagePath && $dirPath) {
-                \Storage::makeDirectory($this->storagePath . '/' . ltrim($dirPath, '/'));
+                Storage::makeDirectory($this->storagePath . '/' . ltrim($dirPath, '/'));
             }
             $coverPath = $this->importCoverImageFromUrl($request->input('cover_image_url'), $dirPath);
-            \Log::info('Book Edit: importCoverImageFromUrl returned: ' . ($coverPath ?: 'null'));
+            Log::info('Book Edit: importCoverImageFromUrl returned: ' . ($coverPath ?: 'null'));
             if ($coverPath) {
                 $book->cover_image = $coverPath;
                 $coverCandidatesForDefault[] = [
                     'path' => $coverPath,
-                    'size' => \Storage::disk('books')->exists($coverPath) ? \Storage::disk('books')->size($coverPath) : 0
+                    'size' => Storage::disk('books')->exists($coverPath) ? Storage::disk('books')->size($coverPath) : 0
                 ];
             }
         } elseif ($request->filled('cover_image_candidate')) {
@@ -346,7 +379,7 @@ class BookController extends Controller
             $book->cover_image = $candidatePath;
             $coverCandidatesForDefault[] = [
                 'path' => $candidatePath,
-                'size' => \Storage::disk('books')->exists($candidatePath) ? \Storage::disk('books')->size($candidatePath) : 0
+                'size' => Storage::disk('books')->exists($candidatePath) ? Storage::disk('books')->size($candidatePath) : 0
             ];
         }
         // If there are multiple candidates (including Google Books), pick the largest as default
@@ -379,13 +412,35 @@ class BookController extends Controller
             'published_year' => 'nullable|digits:4',
         ]);
 
+        // Handle author_id: create if not numeric
+        if (!is_numeric($validated['author_id'])) {
+            $author = Author::firstOrCreate(['name' => $validated['author_id']]);
+            $validated['author_id'] = $author->id;
+        }
+        // Handle series_id: create if not numeric and not empty
+        if (!empty($validated['series_id']) && !is_numeric($validated['series_id'])) {
+            $series = Series::firstOrCreate(['name' => $validated['series_id']]);
+            $validated['series_id'] = $series->id;
+        }
+
+        $oldDirectoryPath = $book->directory_path;
+        $newDirectoryPath = $validated['directory_path'] ?? $oldDirectoryPath;
+        if ($oldDirectoryPath && $newDirectoryPath && $oldDirectoryPath !== $newDirectoryPath) {
+            $oldAbs = $this->storagePath . '/' . ltrim($oldDirectoryPath, '/');
+            $newAbs = $this->storagePath . '/' . ltrim($newDirectoryPath, '/');
+            if (is_dir($oldAbs) && !is_dir($newAbs)) {
+                if (!@rename($oldAbs, $newAbs)) {
+                    return back()->withErrors(['directory_path' => 'Failed to rename directory from ' . $oldDirectoryPath . ' to ' . $newDirectoryPath]);
+                }
+            }
+        }
         $book->fill($validated);
 
         // Handle cover image upload or import from autofill
         if ($request->hasFile('cover_image')) {
             $ext = $request->file('cover_image')->getClientOriginalExtension();
             $coverPath = ($book->directory_path ? trim($book->directory_path, '/') . '/' : '') . 'cover.' . $ext;
-            \Storage::disk($storagePath)->put($coverPath, file_get_contents($request->file('cover_image')->getRealPath()));
+            Storage::disk($storagePath)->put($coverPath, file_get_contents($request->file('cover_image')->getRealPath()));
             $book->cover_image = $coverPath;
         } elseif ($request->input('cover_image_path')) {
             $book->cover_image = $request->input('cover_image_path');
@@ -418,7 +473,7 @@ class BookController extends Controller
             }
             $storagePath = env('BOOK_STORAGE_PATH');
             if ($storagePath && $dirPath) {
-                \Storage::makeDirectory($storagePath . '/' . ltrim($dirPath, '/'));
+                Storage::makeDirectory($storagePath . '/' . ltrim($dirPath, '/'));
             }
             $coverPath = $this->importCoverImageFromUrl($request->input('cover_image_url'), $dirPath);
             if ($coverPath) {
@@ -435,15 +490,24 @@ class BookController extends Controller
         return redirect()->route('admin.books.show', $book)->with('success', 'Book updated successfully!');
     }
 
+    /**
+     * Remove the specified book from storage.
+     */
+    public function destroy(Book $book)
+    {
+        $book->delete();
+        return redirect()->route('admin.books.index')->with('success', 'Book deleted successfully.');
+    }
+
     public function download(Book $book)
     {
         $directoryPath = $book->directory_path;
 
-        if (!$directoryPath || !Storage::exists($directoryPath)) {
+        if (!$directoryPath || !Storage::disk('books')->exists($directoryPath)) {
             abort(404, 'Book directory not found.');
         }
 
-        $files = Storage::files($directoryPath);
+        $files = Storage::disk('books')->files($directoryPath);
 
         if (empty($files)) {
             abort(404, 'No files found for this book.');
@@ -459,7 +523,7 @@ class BookController extends Controller
         }
 
         foreach ($files as $file) {
-            $zip->addFile(Storage::path($file), basename($file));
+            $zip->addFile(Storage::disk('books')->path($file), basename($file));
         }
 
         $zip->close();
@@ -479,20 +543,28 @@ class BookController extends Controller
         }
         // Use trait method for similarity
         [$matches, $closeMatch] = $this->searchGoogleBooksWithSimilarity($title, $author, $series, $seriesNumber);
-        if ($closeMatch) {
+        $more = $request->query('more');
+        $limit = min((int)$request->query('limit', 10), 40); // Default 10, max 40
+        if ($closeMatch && !$more) {
             $info = $closeMatch['volumeInfo'];
             $autofill = [
+                'title' => $info['title'] ?? '',
+                'authors' => isset($info['authors']) ? implode(', ', $info['authors']) : '',
                 'published_year' => isset($info['publishedDate']) ? substr($info['publishedDate'], 0, 4) : '',
                 'description' => $info['description'] ?? '',
                 'cover_image_url' => $info['imageLinks']['thumbnail'] ?? '',
+                'id' => $closeMatch['item']['id'] ?? '',
+                'series' => $info['series'] ?? '',
+                'seriesNumber' => $info['seriesNumber'] ?? '',
+                'score' => $closeMatch['score'],
                 'match_type' => 'close',
                 'matches' => [],
             ];
             return response()->json($autofill);
         } else {
-            // Prepare a list of possible matches for user selection
+            // Prepare a list of up to $limit possible matches for user selection
             $tableMatches = [];
-            foreach (array_slice($matches, 0, 10) as $m) {
+            foreach (array_slice($matches, 0, $limit) as $m) {
                 $info = $m['item']['volumeInfo'];
                 $tableMatches[] = [
                     'title' => $info['title'] ?? '',
@@ -501,12 +573,16 @@ class BookController extends Controller
                     'description' => $info['description'] ?? '',
                     'cover_image_url' => $info['imageLinks']['thumbnail'] ?? '',
                     'id' => $m['item']['id'] ?? '',
+                    'series' => $info['series'] ?? '',
+                    'seriesNumber' => $info['seriesNumber'] ?? '',
+                    'score' => $m['score']
                 ];
             }
             return response()->json([
                 'error' => 'No close match found.',
                 'match_type' => 'list',
-                'matches' => $tableMatches
+                'matches' => $tableMatches,
+                'maxed' => count($matches) <= $limit // true if all results are shown
             ], 200);
         }
     }
@@ -541,10 +617,143 @@ class BookController extends Controller
             return response()->json(['error' => 'Directory not found.'], 404);
         }
         $bookDirs = $this->findBookDirectories($absRoot);
+        $queued = [];
         foreach ($bookDirs as $dir) {
             $relDir = ltrim(str_replace($storagePath, '', $dir), '/');
-            \App\Jobs\ImportBookFromDirectoryJob::dispatch($relDir);
+            // Check for duplicate queued jobs and database entries
+            $alreadyQueued = false;
+            // Check jobs table for queued jobs with this directory
+            $pendingJobs = DB::table('jobs')->get();
+            foreach ($pendingJobs as $job) {
+                $payload = json_decode($job->payload, true);
+                if (
+                    isset($payload['data']['command']) &&
+                    preg_match('/directoryPath";s:\\d+:"([^"]+)"/', $payload['data']['command'], $matches) &&
+                    $matches[1] === $relDir
+                ) {
+                    $alreadyQueued = true;
+                    break;
+                }
+            }
+            // Check for existing book record
+            if (Book::where('directory_path', $relDir)->exists()) {
+                $alreadyQueued = true;
+            }
+            if (!$alreadyQueued) {
+                \App\Jobs\ImportBookFromDirectoryJob::dispatch($relDir);
+                $queued[] = $relDir;
+            }
         }
-        return response()->json(['message' => 'Queued ' . count($bookDirs) . ' book directories for import.'], 200);
+        return response()->json([
+            'message' => 'Queued ' . count($queued) . ' book directories for import.',
+            'skipped' => count($bookDirs) - count($queued),
+            'queued_dirs' => $queued
+        ], 200);
+    }
+
+    /**
+     * Bulk import all book directories from a specific directory (recursive, queued)
+     */
+    public function bulkImportBooksFromDir(Request $request)
+    {
+        $dir = $request->input('dir');
+        // Dispatch a single job that will queue all the import jobs
+        \App\Jobs\CreateImportJobsForDirectory::dispatch($dir);
+        return response()->json([
+            'message' => 'Queued job to scan and import all book directories.',
+        ], 200);
+    }
+
+    /**
+     * AJAX endpoint for Tom Select: returns series matching query string, or all if no query.
+     */
+    public function seriesAjax(Request $request)
+    {
+        $q = $request->input('q', '');
+        $series = Series::query()
+            ->when($q, function ($query, $q) {
+                $query->where('name', 'like', "%{$q}%");
+            })
+            ->orderBy('name')
+            ->limit(20)
+            ->get(['id', 'name']);
+        return response()->json(['data' => $series]);
+    }
+
+    /**
+     * AJAX: Rename a file or folder in the import directory browser.
+     */
+    public function renameImportItem(Request $request)
+    {
+        Log::info($request->all());
+        $request->validate([
+            'path' => 'required|string', // relative path to file/folder
+            'new_name' => 'required|string', // new name only, not path
+        ]);
+        $relPath = trim($request->input('path'), '/');
+        $path = $this->storagePath . '/' . $relPath;
+        $newName = $request->input('new_name');
+
+        $dir = dirname($path);
+        $newPath = $dir . DIRECTORY_SEPARATOR . $newName;
+
+        Log::info("{$path} -> {$newPath}");
+
+        $oldRel = str_replace($this->storagePath, '', $path);
+        $newRel = str_replace($this->storagePath, '', $newPath);
+        Log::info("({$this->storagePath}) {$oldRel} -> {$newRel}");
+
+        if (!file_exists($path)) {
+            return response()->json(['error' => 'Original file/folder does not exist.'], 404);
+        }
+        if (file_exists($newPath)) {
+            return response()->json(['error' => 'A file/folder with the new name already exists.'], 409);
+        }
+        Log::info("{$path} -> {$newPath}");
+        // Try to rename
+        $success = @rename($path, $newPath);
+        if ($success) {
+            // If it's a directory, update any Book records using this directory_path
+            if (is_dir($newPath)) {
+                $oldRel = str_replace($this->storagePath, '', $path);
+                $newRel = str_replace($this->storagePath, '', $newPath);
+                Log::info("({$this->storagePath}) {$oldRel} -> {$newRel}");
+                Book::where('directory_path', $oldRel)->update(['directory_path' => $newRel]);
+            }
+            // Always return relative paths to the frontend!
+            return response()->json([
+                'success' => true,
+                'new_path' => ltrim($newRel, '/'),
+                'new_name' => $newName
+            ]);
+        } else {
+            return response()->json(['error' => 'Rename failed. Check permissions.'], 500);
+        }
+    }
+
+    /**
+     * AJAX: List files in a book directory, filtered by audiobook extensions or all files.
+     */
+    public function filesAjax(Request $request)
+    {
+        $directory = $request->input('directory');
+        $showAll = $request->boolean('show_all', false);
+        $storagePath = env('BOOK_STORAGE_PATH');
+        $dir = rtrim($storagePath, '/') . '/' . ltrim($directory, '/');
+        $files = [];
+        if (is_dir($dir)) {
+            $allFiles = scandir($dir);
+            $audioExts = ['mp3', 'm4b', 'm4a', 'aac', 'flac', 'ogg', 'wav'];
+            foreach ($allFiles as $file) {
+                if ($file === '.' || $file === '..') continue;
+                $path = $dir . '/' . $file;
+                if (!is_file($path)) continue;
+                $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+                if ($showAll || in_array($ext, $audioExts)) {
+                    $files[] = $file;
+                }
+            }
+        }
+        return response()->json(['files' => $files]);
     }
 }

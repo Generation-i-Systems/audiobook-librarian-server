@@ -13,7 +13,7 @@ class ImageProxyController extends Controller
      */
     public function show(Request $request)
     {
-        $directory = $request->query('dir');
+        $directory = $request->query('dir', '.');
         $filename = $request->query('file');
         if (!$directory || !$filename) {
             abort(404);

@@ -55,4 +55,20 @@ class AuthorController extends Controller
 
         return redirect()->route('admin.authors.index')->with('success', 'Author deleted!');
     }
+
+    /**
+     * AJAX endpoint for Tom Select: returns authors matching query string, or all if no query.
+     */
+    public function ajax(Request $request)
+    {
+        $q = $request->input('q', '');
+        $authors = Author::query()
+            ->when($q, function ($query, $q) {
+                $query->where('name', 'like', "%{$q}%");
+            })
+            ->orderBy('name')
+            ->limit(20)
+            ->get(['id', 'name']);
+        return response()->json(['data' => $authors]);
+    }
 }

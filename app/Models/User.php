@@ -19,11 +19,13 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name',
+        'username',
         'email',
         'password',
         'role',
         "admin_permissions",
         'device_token',
+        'download_id',
     ];
 
     /**
@@ -45,6 +47,20 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
     ];
+
+    protected static function booted()
+    {
+        static::creating(function ($user) {
+            if (empty($user->download_id)) {
+                $user->download_id = (string) \Illuminate\Support\Str::uuid();
+            }
+        });
+        static::updating(function ($user) {
+            if (empty($user->download_id)) {
+                $user->download_id = (string) \Illuminate\Support\Str::uuid();
+            }
+        });
+    }
 
     public function reviews()
     {

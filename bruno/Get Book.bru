@@ -1,0 +1,15 @@
+meta {
+  name: Get Book
+  type: http
+  seq: 5
+}
+
+get {
+  url: https://books.thelin.org/api/v1/books/234
+  body: none
+  auth: none
+}
+
+headers {
+  Authorization: Bearer {{token}}
+}

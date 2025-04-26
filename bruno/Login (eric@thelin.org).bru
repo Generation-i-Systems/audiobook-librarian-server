@@ -1,0 +1,23 @@
+meta {
+  name: Login (eric@thelin.org)
+  type: http
+  seq: 3
+}
+
+post {
+  url: https://books.thelin.org/api/v1/login
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {"email":"eric@thelin.org", "password":"skragrot"}
+}
+
+vars:post-response {
+  token: res.body.token
+}

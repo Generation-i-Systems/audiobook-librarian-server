@@ -17,6 +17,7 @@ class AuthController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
+            'username' => 'required|string|max:255|unique:users,username',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8',
         ]);
@@ -31,6 +32,7 @@ class AuthController extends Controller
         // Create an account request instead of a user
         AccountRequest::create([
             'name' => $request->name,
+            'username' => $request->username,
             'email' => $request->email,
             'password' => $password,
         ]);
@@ -42,7 +44,8 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'email' => 'required|string|email|max:255',
+            'email' => 'sometimes|required_without:username|string|email|max:255',
+            'username' => 'sometimes|required_without:email|string|max:255',
             'password' => 'required|string',
         ]);
 
@@ -50,7 +53,11 @@ class AuthController extends Controller
             return response()->json($validator->errors(), 400); // Bad Request
         }
 
-        $user = User::where('email', $request->email)->first();
+        $loginField = $request->input('email') ?? $request->input('username');
+
+        $user = User::where('email', $loginField)
+            ->orWhere('username', $loginField)
+            ->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json(['message' => 'Invalid credentials'], 401); // Unauthorized
@@ -58,7 +65,12 @@ class AuthController extends Controller
 
         $token = $user->createToken('mobile_app_token')->plainTextToken;
 
-        return response()->json(['token' => $token]);
+        $userArr = $user->toArray();
+        return response()->json(array_merge($userArr, [
+            'authToken' => $token,
+            'refreshToken' => $token,
+            'token' => $token
+        ]));
     }
 
      public function logout(Request $request)
