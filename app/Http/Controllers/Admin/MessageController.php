@@ -14,8 +14,7 @@ class MessageController extends Controller
     {
         $messages = Message::with('user')->orderBy('created_at', 'desc')->get();
         $users = User::all();
-        $admin_permissions = User::where('admin_permissions', true)->get();
-        return view('admin.messages.index', compact('messages', 'users', 'admin_permissions'));
+        return view('admin.messages.index', compact('messages', 'users'));
     }
 
     public function acknowledge(Message $message)

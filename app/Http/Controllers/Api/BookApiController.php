@@ -62,7 +62,7 @@ class BookApiController extends Controller
         }
 
         $perPage = $request->input('per_page', 100);
-        $withCover = $request->boolean('with_cover', false);
+        $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
         $books = $query->paginate($perPage);
 
@@ -243,8 +243,12 @@ class BookApiController extends Controller
                     'type' => 'url',
                     'url' => url('/api/book/' . $book->id . '/cover'),
                 ];
+                $arr['cover_url'] = url('/api/book/' . $book->id . '/cover');
             }
         } else {
+            if ($withCover && $book->cover_image) {
+                Log::info('Cover image not found for book: ' . $book->title . ' (' . $book->cover_image . ')');
+            }
             $arr['cover'] = null;
         }
         unset($arr['cover_image_content']);
@@ -254,7 +258,7 @@ class BookApiController extends Controller
     public function cover(Book $book)
     {
         if ($book->cover_image && Storage::disk('books')->exists($book->cover_image)) {
-            $mime = Storage::disk('books')->getMimeType($book->cover_image);
+            $mime = Storage::disk('books')->mimeType($book->cover_image);
             return response(Storage::disk('books')->get($book->cover_image), 200)->header('Content-Type', $mime);
         }
         return response()->json(['error' => 'Cover image not found.'], 404);

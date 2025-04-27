@@ -17,7 +17,6 @@ class Book extends Model
         'cover_image',
         'description',
         'directory_path',
-        'type',
         'date_added',
         'published_year',
         'series_number'

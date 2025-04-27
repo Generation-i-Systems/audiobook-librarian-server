@@ -4,7 +4,7 @@
 <div class="container">
     @if($book->cover_image)
         <div class="mb-3">
-            <img src="{{ route('image.proxy', ['dir' => $book->directory_path, 'file' => basename($book->cover_image)]) }}" alt="Book Cover" style="max-height: 200px; border:1px solid #ccc;">
+            <img src="{{ url('cover/' . $book->cover_image) }}" alt="Book Cover" style="max-height: 200px; border:1px solid #ccc;">
         </div>
     @endif
     <h1>{{ $book->title }}</h1>
@@ -14,7 +14,6 @@
         <li class="list-group-item"><strong>Series:</strong> {{ $book->series ? $book->series->name : 'N/A' }}</li>
         <li class="list-group-item"><strong>Series Number:</strong> {{ $book->series_number ?? 'N/A' }}</li>
         <li class="list-group-item"><strong>Description:</strong> {{ $book->description }}</li>
-        <li class="list-group-item"><strong>Type:</strong> {{ ucfirst($book->type) }}</li>
         <li class="list-group-item"><strong>Published Year:</strong> {{ $book->published_year }}</li>
         <li class="list-group-item"><strong>Date Added:</strong> {{ $book->date_added }}</li>
         <li class="list-group-item"><strong>Directory Path:</strong> {{ $book->directory_path }}</li>

@@ -194,20 +194,6 @@
                     <span class="invalid-feedback d-block">{{ $message }}</span>
                 @enderror
             </div>
-            <div class="form-group">
-                <label>Type:</label><br>
-                <div class="form-check form-check-inline">
-                    <input class="form-check-input @error('type') is-invalid @enderror" type="radio" name="type" id="ebook" value="ebook" @if(old('type', isset($book) ? $book->type : null) == 'ebook') checked @endif>
-                    <label class="form-check-label" for="ebook">Ebook</label>
-                </div>
-                <div class="form-check form-check-inline">
-                    <input class="form-check-input @error('type') is-invalid @enderror" type="radio" name="type" id="audiobook" value="audiobook" @if(old('type', isset($book) ? $book->type : null) == null || old('type', isset($book) ? $book->type : null) == 'audiobook') checked @endif required>
-                    <label class="form-check-label" for="audiobook">Audiobook</label>
-                </div>
-                @error('type')
-                    <span class="invalid-feedback d-block">{{ $message }}</span>
-                @enderror
-            </div>
             <button type="submit" class="btn btn-primary" id="modal-{{ isset($book) ? 'update' : 'create' }}-btn">{{ isset($book) ? 'Update' : 'Create' }}</button>
             @if(!empty($isModal))
                 <button type="button" class="btn btn-secondary" id="modal-cancel-btn">Cancel</button>
@@ -218,7 +204,7 @@
     </div>
 @endsection
 
-@section('scripts')
+@push('scripts')
     <script>
         window.googleBooksMoreMatches = false;
         window.googleBooksMatchLimit = 10;
@@ -262,6 +248,132 @@
         initTomSelect('#author-select');
         initTomSelect('#series-select');
 
+        // Autofill handler - ensure it is always bound after TomSelect
+        function bindAutofillBtn() {
+            $('#autofill-btn').off('click').on('click', function () {
+                const title = $('#title').val();
+                // Robust author name detection: TomSelect or fallback
+                let authorName = '';
+                const authorSelectEl = $('#author-select')[0];
+                if (authorSelectEl && authorSelectEl.tomselect) {
+                    const authorId = authorSelectEl.tomselect.getValue();
+                    // Try to get the label from TomSelect's options
+                    const tomSelect = authorSelectEl.tomselect;
+                    let option = tomSelect.options[authorId];
+                    authorName = option ? option.name : authorId;
+                } else {
+                    authorName = $('#author-select option:selected').text() || '';
+                }
+                const series = $('#series-select option:selected').text() || '';
+                const seriesNumber = $('#series_number').val() || '';
+                if (!title || !authorName || authorName === '') {
+                    $('#title').addClass('is-invalid');
+                    $('#title').after('<span class="invalid-feedback d-block">Title and author are required.</span>');
+                    return;
+                }
+                $('#autofill-btn').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Searching...');
+                fetch(`{{ route('admin.books.googleBooks') }}?title=${encodeURIComponent(title)}&author=${encodeURIComponent(authorName)}&series=${encodeURIComponent(series)}&series_number=${encodeURIComponent(seriesNumber)}&limit=${window.googleBooksMatchLimit}${window.googleBooksMoreMatches ? '&more=1' : ''}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.match_type === 'close') {
+                            if (data.published_year) {
+                                $('#published_year').val(data.published_year);
+                            }
+                            if (data.description) {
+                                $('#description').val(data.description);
+                            }
+                            if (data.cover_image_url) {
+                                const proxiedUrl = googleBooksProxyUrl(data.cover_image_url);
+                                $('#cover-preview-img').attr('src', proxiedUrl);
+                                $('#cover-preview-group').show();
+                            }
+                            let hidden = $('#cover_image_url');
+                            if (!hidden.length) {
+                                $('<input>').attr({ type: 'hidden', id: 'cover_image_url', name: 'cover_image_url' }).appendTo('#book-{{ isset($book) ? 'edit' : 'form' }}');
+                                hidden = $('#cover_image_url');
+                            }
+                            hidden.val(data.cover_image_url || '');
+                            $('#google-books-matches-table-wrapper').hide();
+                            // Change button to get more matches
+                            $('#autofill-btn').prop('disabled', false).html('<i class="fas fa-search"></i> Get More Matches');
+                            window.googleBooksMoreMatches = true;
+                            window.googleBooksMatchLimit = 10;
+                        } else if (data.match_type === 'list' && data.matches && data.matches.length > 0) {
+                            // Show table of matches
+                            const $tbody = $('#google-books-matches-table tbody');
+                            $tbody.empty();
+                            data.matches.forEach((match, idx) => {
+                                const row = `<tr>
+                                    <td><input type="radio" name="google_books_match_select" value="${idx}"></td>
+                                    <td>${match.title}</td>
+                                    <td>${match.authors}</td>
+                                    <td>${match.published_year}</td>
+                                    <td>${match.cover_image_url ? `<img src='${googleBooksProxyUrl(match.cover_image_url)}' style='max-height:60px;'>` : ''}</td>
+                                </tr>`;
+                                $tbody.append(row);
+                            });
+                            $('#google-books-matches-table-wrapper').show();
+                            $('input[name="google_books_match_select"]').off('change').on('change', function() {
+                                const idx = $(this).val();
+                                const match = data.matches[idx];
+                                if (match.published_year) {
+                                    $('#published_year').val(match.published_year);
+                                }
+                                if (match.description) {
+                                    $('#description').val(match.description);
+                                }
+                                if (match.cover_image_url) {
+                                    const proxiedUrl = googleBooksProxyUrl(match.cover_image_url);
+                                    $('#google-books-candidate').remove();
+                                    var candidateHtml = '<div class="text-center" id="google-books-candidate">' +
+                                        '<label>' +
+                                            '<input type="radio" name="cover_image_candidate" value="' + match.cover_image_url + '">' +
+                                            '<br>' +
+                                            '<img src="' + proxiedUrl + '" alt="Google Books Cover" style="max-width:100px;max-height:140px;border:1px solid #ccc;margin-top:4px;">' +
+                                        '</label>' +
+                                        '<div style="font-size:12px;word-break:break-all;">Google Books</div>' +
+                                    '</div>';
+
+                                    if ($('#cover-candidates-list').length) {
+                                        $('#cover-candidates-list').append(candidateHtml);
+                                    } else {
+                                        $('#cover-preview-img').attr('src', proxiedUrl);
+                                        $('#cover-preview-group').show();
+                                    }
+                                }
+                                let hidden = $('#cover_image_url');
+                                if (!hidden.length) {
+                                    $('<input>').attr({ type: 'hidden', id: 'cover_image_url', name: 'cover_image_url' }).appendTo('#book-{{ isset($book) ? 'edit' : 'form' }}');
+                                    hidden = $('#cover_image_url');
+                                }
+                                hidden.val(match.cover_image_url || '');
+                            });
+                            // Handle button for more matches
+                            if (data.maxed || window.googleBooksMatchLimit >= 40) {
+                                $('#autofill-btn').prop('disabled', true).html('<i class="fas fa-check"></i> All Results Shown');
+                            } else {
+                                $('#autofill-btn').prop('disabled', false).html('<i class="fas fa-search"></i> Get More Matches');
+                                window.googleBooksMoreMatches = true;
+                                window.googleBooksMatchLimit += 10;
+                            }
+                        } else {
+                            $('#google-books-matches-table-wrapper').hide();
+                            $('#autofill-btn').prop('disabled', false).html('<i class="fas fa-search"></i> Autofill from Google Books');
+                            window.googleBooksMoreMatches = false;
+                            window.googleBooksMatchLimit = 10;
+                        }
+                    })
+                    .catch(() => {
+                        $('#autofill-btn').prop('disabled', false).html('<i class="fas fa-search"></i> Autofill from Google Books');
+                        $('#title').addClass('is-invalid');
+                        $('#title').after('<span class="invalid-feedback d-block">Failed to fetch book info.</span>');
+                    });
+            });
+        }
+        // Bind after TomSelect initialized
+        bindAutofillBtn();
+        // If TomSelect is re-initialized dynamically, you must re-bind this as well.
+
         $(document).off('submit.bookModalAjax').on('submit.bookModalAjax', 'form[id^="book-"]', function(e) {
             var $form = $(this);
             var $modal = $form.closest('.modal');
@@ -299,112 +411,6 @@
             }
         });
 
-        $('#autofill-btn').off('click').on('click', function () {
-            const title = $('#title').val();
-            const authorName = $('#author-select option:selected').text() || '';
-            const series = $('#series-select option:selected').text() || '';
-            const seriesNumber = $('#series_number').val() || '';
-            if (!title || !authorName || authorName === '') {
-                $('#title').addClass('is-invalid');
-                $('#title').after('<span class="invalid-feedback d-block">Title and author are required.</span>');
-                return;
-            }
-            $('#autofill-btn').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Searching...');
-            fetch(`{{ route('admin.books.googleBooks') }}?title=${encodeURIComponent(title)}&author=${encodeURIComponent(authorName)}&series=${encodeURIComponent(series)}&series_number=${encodeURIComponent(seriesNumber)}&limit=${window.googleBooksMatchLimit}${window.googleBooksMoreMatches ? '&more=1' : ''}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.match_type === 'close') {
-                        if (data.published_year) {
-                            $('#published_year').val(data.published_year);
-                        }
-                        if (data.description) {
-                            $('#description').val(data.description);
-                        }
-                        if (data.cover_image_url) {
-                            $('#cover-preview-img').attr('src', data.cover_image_url);
-                            $('#cover-preview-group').show();
-                        }
-                        let hidden = $('#cover_image_url');
-                        if (!hidden.length) {
-                            $('<input>').attr({ type: 'hidden', id: 'cover_image_url', name: 'cover_image_url' }).appendTo('#book-{{ isset($book) ? 'edit' : 'form' }}');
-                            hidden = $('#cover_image_url');
-                        }
-                        hidden.val(data.cover_image_url || '');
-                        $('#google-books-matches-table-wrapper').hide();
-                        // Change button to get more matches
-                        $('#autofill-btn').prop('disabled', false).html('<i class="fas fa-search"></i> Get More Matches');
-                        window.googleBooksMoreMatches = true;
-                        window.googleBooksMatchLimit = 10;
-                    } else if (data.match_type === 'list' && data.matches && data.matches.length > 0) {
-                        // Show table of matches
-                        const $tbody = $('#google-books-matches-table tbody');
-                        $tbody.empty();
-                        data.matches.forEach((match, idx) => {
-                            const row = `<tr>
-                                <td><input type="radio" name="google_books_match_select" value="${idx}"></td>
-                                <td>${match.title}</td>
-                                <td>${match.authors}</td>
-                                <td>${match.published_year}</td>
-                                <td>${match.cover_image_url ? `<img src='${match.cover_image_url}' style='max-height:60px;'>` : ''}</td>
-                            </tr>`;
-                            $tbody.append(row);
-                        });
-                        $('#google-books-matches-table-wrapper').show();
-                        $('input[name="google_books_match_select"]').off('change').on('change', function() {
-                            const idx = $(this).val();
-                            const match = data.matches[idx];
-                            if (match.published_year) {
-                                $('#published_year').val(match.published_year);
-                            }
-                            if (match.description) {
-                                $('#description').val(match.description);
-                            }
-                            if (match.cover_image_url) {
-                                $('#google-books-candidate').remove();
-                                var candidateHtml = '<div class="text-center" id="google-books-candidate">' +
-                                    '<label>' +
-                                        '<input type="radio" name="cover_image_candidate" value="' + match.cover_image_url + '">' +
-                                        '<br>' +
-                                        '<img src="' + match.cover_image_url + '" alt="Google Books Cover" style="max-width:100px;max-height:140px;border:1px solid #ccc;margin-top:4px;">' +
-                                    '</label>' +
-                                    '<div style="font-size:12px;word-break:break-all;">Google Books</div>' +
-                                '</div>';
-                                if ($('#cover-candidates-list').length) {
-                                    $('#cover-candidates-list').append(candidateHtml);
-                                } else {
-                                    $('#cover-preview-img').attr('src', match.cover_image_url);
-                                    $('#cover-preview-group').show();
-                                }
-                            }
-                            let hidden = $('#cover_image_url');
-                            if (!hidden.length) {
-                                $('<input>').attr({ type: 'hidden', id: 'cover_image_url', name: 'cover_image_url' }).appendTo('#book-{{ isset($book) ? 'edit' : 'form' }}');
-                                hidden = $('#cover_image_url');
-                            }
-                            hidden.val(match.cover_image_url || '');
-                        });
-                        // Handle button for more matches
-                        if (data.maxed || window.googleBooksMatchLimit >= 40) {
-                            $('#autofill-btn').prop('disabled', true).html('<i class="fas fa-check"></i> All Results Shown');
-                        } else {
-                            $('#autofill-btn').prop('disabled', false).html('<i class="fas fa-search"></i> Get More Matches');
-                            window.googleBooksMoreMatches = true;
-                            window.googleBooksMatchLimit += 10;
-                        }
-                    } else {
-                        $('#google-books-matches-table-wrapper').hide();
-                        $('#autofill-btn').prop('disabled', false).html('<i class="fas fa-search"></i> Autofill from Google Books');
-                        window.googleBooksMoreMatches = false;
-                        window.googleBooksMatchLimit = 10;
-                    }
-                })
-                .catch(() => {
-                    $('#autofill-btn').prop('disabled', false).html('<i class="fas fa-search"></i> Autofill from Google Books');
-                    $('#title').addClass('is-invalid');
-                    $('#title').after('<span class="invalid-feedback d-block">Failed to fetch book info.</span>');
-                });
-        });
-
         if (typeof window.bootstrap !== 'undefined' && ($('#modal-cancel-btn').length)) {
             $('#modal-cancel-btn').on('click', function () {
                 var modalEl = $(this).closest('.modal')[0];
@@ -421,23 +427,14 @@
                 { id: '#title', name: 'title', label: 'Title' },
                 { id: '#author-select', name: 'author_id', label: 'Author' },
                 { id: '#genre_id', name: 'genre_id', label: 'Genre' },
-                { name: 'type', label: 'Type', radio: true }
             ];
             requiredFields.forEach(field => {
-                if (field.radio) {
-                    if (!$('input[name="type"]:checked').length) {
-                        $('input[name="type"]').addClass('is-invalid');
-                        $('input[name="type"]').last().parent().after('<span class="invalid-feedback d-block">Type is required.</span>');
-                        hasError = true;
-                    }
-                } else {
-                    const $el = $(field.id);
-                    let value = $el.val();
-                    if (!value || value === '' || value === 'Select ' + field.label) {
-                        $el.addClass('is-invalid');
-                        $el.after('<span class="invalid-feedback d-block">' + field.label + ' is required.</span>');
-                        hasError = true;
-                    }
+                const $el = $(field.id);
+                let value = $el.val();
+                if (!value || value === '' || value === 'Select ' + field.label) {
+                    $el.addClass('is-invalid');
+                    $el.after('<span class="invalid-feedback d-block">' + field.label + ' is required.</span>');
+                    hasError = true;
                 }
             });
             if (hasError) {
@@ -526,5 +523,13 @@
         $('#directory_path, input[name="directory_path"], input[name="original_directory_path"]').on('change', function() {
             if (filesBoxVisible) fetchDirectoryFiles();
         });
+
+        // Helper for proxying Google Books cover images
+        function googleBooksProxyUrl(url) {
+            if (url && url.match(/^https?:\/\/books\.google\.com\//)) {
+                return '/google-books-cover/' + btoa(url);
+            }
+            return url;
+        }
     </script>
-@endsection
+@endpush

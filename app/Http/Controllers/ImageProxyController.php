@@ -4,31 +4,80 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use GuzzleHttp\Client;
+use Illuminate\Support\Facades\Log;
+
 
 class ImageProxyController extends Controller
 {
     /**
      * Serve an image from BOOK_STORAGE_PATH for preview or display.
-     * Usage: /image-proxy?dir=...&file=...
+     * Usage: /image-proxy?file=...
+     *        /cover/{path}
      */
     public function show(Request $request)
     {
-        $directory = $request->query('dir', '.');
-        $filename = $request->query('file');
-        if (!$directory || !$filename) {
+        $storagePath = env('BOOK_STORAGE_PATH');
+
+        $dir = $request->query('dir') ?? '.';
+        $file = $request->query('file');
+        if (!$file) {
             abort(404);
         }
-        $storagePath = env('BOOK_STORAGE_PATH');
-        $fullPath = rtrim($storagePath, '/') . '/' . ltrim($directory, '/') . '/' . ltrim($filename, '/');
+        if ($dir !== '.' && is_dir(rtrim($storagePath, '/') . '/' . ltrim($dir, '/'))) {
+            $file = rtrim($dir, '/') . '/' . $file;
+        }
+
+        if ($dir !== '.' && !is_dir(rtrim($storagePath, '/') . '/' . ltrim($dir, '/'))) {
+            abort(404);
+        }
+        $fullPath = rtrim($storagePath, '/') . '/' . ltrim($file, '/');
         if (!file_exists($fullPath)) {
             abort(404);
         }
-        // Optional: Add access control here, e.g.:
-        // if (!Auth::check()) abort(403);
         $mime = mime_content_type($fullPath);
         return response()->file($fullPath, [
             'Content-Type' => $mime,
-            'Cache-Control' => 'no-store',
         ]);
+    }
+
+    /**
+     * Pretty route: /cover/{path}
+     * Supports slashes in {path}
+     */
+    public function cover($path)
+    {
+        $storagePath = env('BOOK_STORAGE_PATH');
+        $fullPath = rtrim($storagePath, '/') . '/' . ltrim($path, '/');
+        if (!file_exists($fullPath)) {
+            abort(404);
+        }
+        $mime = mime_content_type($fullPath);
+        return response()->file($fullPath, [
+            'Content-Type' => $mime,
+        ]);
+    }
+
+    /**
+     * Proxy Google Books cover images to avoid mixed content errors.
+     * Accepts a base64-encoded URL as the path.
+     * Example: /google-books-cover/{base64url}
+     */
+    public function googleBooksCover($encodedUrl)
+    {
+        $url = base64_decode($encodedUrl);
+        // Only allow books.google.com URLs
+        if (!preg_match('#^https?://books\\.google\\.com/#', $url)) {
+            abort(403, 'Invalid Google Books cover URL.');
+        }
+        $client = new Client(['verify' => false, 'timeout' => 10]);
+        try {
+            $response = $client->get($url, ['stream' => true]);
+            return response($response->getBody(), 200)
+                ->header('Content-Type', $response->getHeaderLine('Content-Type'))
+                ->header('Cache-Control', 'public, max-age=86400');
+        } catch (\Exception $e) {
+            abort(404, 'Could not fetch Google Books cover image.');
+        }
     }
 }

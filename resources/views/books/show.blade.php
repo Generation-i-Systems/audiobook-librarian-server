@@ -6,7 +6,10 @@
 
         <div class="row">
             <div class="col-md-4">
-                <img src="{{ route('image.proxy', ['file' => $book->cover_image]) }}" alt="{{ $book->title }}" class="img-fluid">
+                @php
+                    $cover = $book->cover_image ? url('cover/' . $book->cover_image) : url('images/placeholder.png');
+                @endphp
+                <img src="{{ $cover }}" alt="{{ $book->title }}" class="img-fluid">
             </div>
             <div class="col-md-8">
                 <p><strong>Author:</strong> {{ $book->author->name }}</p>

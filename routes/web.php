@@ -66,6 +66,9 @@ Route::post(
 
 // General image proxy for covers and previews
 Route::get('/image-proxy', [ImageProxyController::class, 'show'])->name('image.proxy');
+// Pretty URL for covers, supports slashes in path
+Route::get('/cover/{path}', [ImageProxyController::class, 'cover'])->where('path', '.*')->name('cover.proxy');
+Route::get('/google-books-cover/{encodedUrl}', [ImageProxyController::class, 'googleBooksCover'])->where('encodedUrl', '.+')->name('google.books.cover.proxy');
 
 Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(function () {
     Route::get('/', function () {

@@ -57,7 +57,7 @@ class ProfileController extends Controller
         ]);
 
         $user = Auth::user();
-        $user->admin_permissions = true;
+        //$user->admin_permissions = true;
         $user->save();
 
         Message::create([

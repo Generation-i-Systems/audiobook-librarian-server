@@ -23,7 +23,6 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
-        "admin_permissions",
         'device_token',
         'download_id',
     ];

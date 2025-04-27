@@ -254,8 +254,10 @@ trait BookImportTrait
      */
     private function importCoverImageFromUrl($url, $directoryPath = null)
     {
-        if (!$url)
+        if (!$url) {
+            Log::error("Invalid URL: {$url}");
             return null;
+        }
         try {
             $storagePath = env('BOOK_STORAGE_PATH'); // absolute path
             if (!$storagePath) {
@@ -279,7 +281,8 @@ trait BookImportTrait
             $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
             curl_close($ch);
 
-            if ($contents === false || !$contents)
+            if ($contents === false || !$contents) {
+                Log::error("importCoverImageFromUrl error: Unable to fetch image from {$url}");
                 return null;
 
             // Determine extension
@@ -365,6 +368,9 @@ trait BookImportTrait
             // Series number
             if ($seriesNumber && $itemSeriesNumber == $seriesNumber) {
                 $score += 5;
+            }
+            if (empty($info['description'])) {
+                $score -= 40;
             }
             $matches[] = [
                 'score' => $score,

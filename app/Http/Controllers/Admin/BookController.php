@@ -58,8 +58,43 @@ class BookController extends Controller
             $query->where('genre_id', $request->input('genre_id'));
         }
 
-        $books = $query->with(['author', 'genre', 'series'])->orderBy('title')->paginate(20);
-        return view('admin.books.index', compact('books'));
+        // Sorting logic
+        $sort = $request->input('sort', 'recent_desc');
+        switch ($sort) {
+            case 'recent_desc':
+                $query->orderBy('created_at', 'desc');
+                break;
+            case 'recent_asc':
+                $query->orderBy('created_at', 'asc');
+                break;
+            case 'author_asc':
+                $query->join('authors', 'books.author_id', '=', 'authors.id')
+                      ->orderBy('authors.name', 'asc')
+                      ->select('books.*');
+                break;
+            case 'author_desc':
+                $query->join('authors', 'books.author_id', '=', 'authors.id')
+                      ->orderBy('authors.name', 'desc')
+                      ->select('books.*');
+                break;
+            case 'title_asc':
+                $query->orderBy('title', 'asc');
+                break;
+            case 'title_desc':
+                $query->orderBy('title', 'desc');
+                break;
+            case 'year_asc':
+                $query->orderBy('published_year', 'asc');
+                break;
+            case 'year_desc':
+                $query->orderBy('published_year', 'desc');
+                break;
+            default:
+                $query->orderBy('created_at', 'desc');
+        }
+
+        $books = $query->with(['author', 'genre', 'series'])->paginate(20)->appends($request->except('page'));
+        return view('admin.books.index', compact('books', 'sort'));
     }
 
     public function create(Request $request)
@@ -147,7 +182,6 @@ class BookController extends Controller
             'cover_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
             'description' => 'nullable|string',
             'directory_path' => 'nullable|string|max:255',
-            'type' => 'required|in:ebook,audiobook',
             'published_year' => 'nullable|digits:4',
         ]);
 
@@ -408,7 +442,6 @@ class BookController extends Controller
             'cover_image' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
             'description' => 'nullable|string',
             'directory_path' => 'nullable|string|max:255',
-            'type' => 'required|in:ebook,audiobook',
             'published_year' => 'nullable|digits:4',
         ]);
 
@@ -482,7 +515,12 @@ class BookController extends Controller
         } elseif ($request->filled('cover_image_candidate')) {
             // Use selected candidate from directory
             $candidate = $request->input('cover_image_candidate');
-            $book->cover_image = ltrim($book->directory_path, '/') . '/' . $candidate;
+            $dir = ltrim($book->directory_path, '/');
+            if (strpos($candidate, $dir . '/') === 0) {
+                $book->cover_image = $candidate;
+            } else {
+                $book->cover_image = $dir . '/' . $candidate;
+            }
         }
 
         $book->save();

@@ -23,7 +23,10 @@
                             <div class="col-md-4 mb-4">
                                 <a href="{{ route('books.show', $book) }}" class="text-decoration-none card-link" style="color:inherit">
                                     <div class="card h-100 book-card-hover" style="cursor:pointer;">
-                                        <img src="{{ route('image.proxy', ['file' => $book->cover_image]) }}"
+                                        @php
+                                            $cover = $book->cover_image ? route('image.proxy', ['file' => $book->cover_image]) : url('images/placeholder.png');
+                                        @endphp
+                                        <img src="{{ $cover }}"
                                              class="card-img-top book-cover-thumb" alt="{{ $book->title }}"
                                              style="height: 200px; width: auto; max-width: 100%; object-fit: contain; background: #f8f9fa; display: block; margin-left: auto; margin-right: auto;">
                                         <div class="card-body">
@@ -81,7 +84,10 @@
                 <div class="col-md-4 mb-4">
                     <a href="{{ route('books.show', $book) }}" class="text-decoration-none card-link" style="color:inherit">
                         <div class="card h-100 book-card-hover" style="cursor:pointer;">
-                            <img src="{{ route('image.proxy', ['file' => $book->cover_image]) }}"
+                            @php
+                                $cover = $book->cover_image ? route('image.proxy', ['file' => $book->cover_image]) : url('images/placeholder.png');
+                            @endphp
+                            <img src="{{ $cover }}"
                                  class="card-img-top book-cover-thumb" alt="{{ $book->title }}"
                                  style="height: 200px; width: auto; max-width: 100%; object-fit: contain; background: #f8f9fa; display: block; margin-left: auto; margin-right: auto;">
                             <div class="card-body">

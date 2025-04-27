@@ -17,21 +17,15 @@
 
         <div class="tab-content" id="bookCreateTabsContent">
             <div class="tab-pane fade show active" id="regular" role="tabpanel" aria-labelledby="regular-tab">
-                <!-- Regular Form (unchanged) -->
-                <form action="{{ route('admin.books.store') }}" method="POST" enctype="multipart/form-data" class="mt-3">
-                    @csrf
-
-                    <div class="form-group">
-                        <label for="title">Title:</label>
-                        <input type="text" class="form-control" id="title" name="title" value="{{ old('title') }}" required>
-                        @error('title')
-                            <span class="text-danger">{{ $message }}</span>
-                        @enderror
-                    </div>
-
-                    <button type="submit" class="btn btn-primary">Create</button>
-                    <a href="{{ route('admin.books.index') }}" class="btn btn-secondary">Cancel</a>
-                </form>
+                @include('admin.books.form', [
+                    'authorList' => $authorList ?? [],
+                    'seriesList' => $seriesList ?? [],
+                    'genreList' => $genreList ?? [],
+                    'coverCandidates' => $coverCandidates ?? [],
+                    'coverAuto' => $coverAuto ?? null,
+                    'directory_path' => $directory_path ?? null,
+                    'isModal' => $isModal ?? false
+                ])
             </div>
 
             <div class="tab-pane fade" id="import" role="tabpanel" aria-labelledby="import-tab">

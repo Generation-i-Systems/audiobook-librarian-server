@@ -10,19 +10,6 @@
             </div>
         @endif
 
-        @if(Auth::user()->role === 'regular' && Auth::user()->admin_permissions == false)
-            <form action="{{ route('profile.requestAdminPermissions') }}" method="POST">
-                @csrf
-                <div class="form-group">
-                    <label for="request_content">Write a description</label>
-                    <textarea class="form-control" id="content" name="content" rows="3" required></textarea>
-                </div>
-                <button type="submit" class="btn btn-warning">Request Admin Permissions</button>
-                <small id="request_content" class="form-text text-muted">By requesting permissions, an Admin user will have the
-                    ability to review your account and change it accordingly.</small>
-            </form>
-        @endif
-
         <p>
             <strong>Role:</strong>
             @if (Auth::user()->role === 'admin')
