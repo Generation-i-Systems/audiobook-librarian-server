@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use GuzzleHttp\Client;
+use Illuminate\Support\Facades\Cache;
 
 class GoogleBooksApiService
 {
@@ -21,27 +22,35 @@ class GoogleBooksApiService
 
     public function searchBooks(string $query, int $maxResults = 5)
     {
-        $response = $this->client->request('GET', 'volumes', [
-            'query' => [
-                'q' => $query,
-                'maxResults' => $maxResults,
-                'key' => $this->apiKey
-            ],
-        ]);
+        $cacheKey = 'google_books_search_' . md5($query . '_' . $maxResults);
+        // 3 months TTL in minutes: 3 * 30 * 24 * 60 = 129600
+        return Cache::remember($cacheKey, 129600, function () use ($query, $maxResults) {
+            $response = $this->client->request('GET', 'volumes', [
+                'query' => [
+                    'q' => $query,
+                    'maxResults' => $maxResults,
+                    'key' => $this->apiKey
+                ],
+            ]);
 
-        $body = $response->getBody()->getContents();
-        return json_decode($body, true); // Decode as associative array
+            $body = $response->getBody()->getContents();
+            return json_decode($body, true); // Decode as associative array
+        });
     }
 
     public function getBookDetails(string $volumeId)
     {
-        $response = $this->client->request('GET', "volumes/{$volumeId}", [
-             'query' => [
-                'key' => $this->apiKey
-            ],
-        ]);
+        $cacheKey = 'google_books_details_' . md5($volumeId);
+        // 3 months TTL in minutes: 129600
+        return Cache::remember($cacheKey, 129600, function () use ($volumeId) {
+            $response = $this->client->request('GET', "volumes/{$volumeId}", [
+                 'query' => [
+                    'key' => $this->apiKey
+                ],
+            ]);
 
-        $body = $response->getBody()->getContents();
-        return json_decode($body, true);
+            $body = $response->getBody()->getContents();
+            return json_decode($body, true);
+        });
     }
 }
