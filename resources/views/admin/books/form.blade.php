@@ -202,10 +202,8 @@
             @endif
         </form>
     </div>
-@endsection
-
-@push('scripts')
     <script>
+        (function() {
         window.googleBooksMoreMatches = false;
         window.googleBooksMatchLimit = 10;
 
@@ -470,7 +468,6 @@
                 }
             }
         });
-        console.log('Scripts loaded');
 
         function setGoogleBooksMatches(matches) {
             window.googleBooksMatches = matches;
@@ -531,5 +528,6 @@
             }
             return url;
         }
+    })();
     </script>
-@endpush
+@endsection

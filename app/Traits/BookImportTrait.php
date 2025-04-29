@@ -284,7 +284,7 @@ trait BookImportTrait
             if ($contents === false || !$contents) {
                 Log::error("importCoverImageFromUrl error: Unable to fetch image from {$url}");
                 return null;
-
+            }
             // Determine extension
             $ext = 'jpg';
             if (strpos($contentType, 'png') !== false)
@@ -300,6 +300,7 @@ trait BookImportTrait
                 Log::error("importCoverImageFromUrl error: Unable to write file $fullPath");
                 return null;
             }
+
             // Return only the path relative to BOOK_STORAGE_PATH
             return (ltrim($directoryPath, '/') . '/' . $filename);
         } catch (\Exception $e) {
