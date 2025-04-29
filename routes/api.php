@@ -10,6 +10,8 @@ use App\Http\Controllers\Api\ReadingProgressApiController;
 use App\Http\Controllers\Api\MessageApiController;
 
 Route::prefix('v1')->group(function () {
+    Route::get('/books/{book}/cover', [BookApiController::class, 'cover']);
+
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/user', function (Request $request) {
             return $request->user();
@@ -28,7 +30,6 @@ Route::prefix('v1')->group(function () {
         Route::post('/books/queue/download', [BookApiController::class, 'queueDownload']);
         Route::get('/books/queue/download/{zipId}', [BookApiController::class, 'downloadQueuedZip']);
         Route::post('/books/queue/download/{zipId}/mark-downloaded', [BookApiController::class, 'markZipDownloaded']);
-        Route::get('/books/{book}/cover', [BookApiController::class, 'cover']);
 
         // Book Request Route
         Route::post('/book-requests', [BookRequestApiController::class, 'store']);

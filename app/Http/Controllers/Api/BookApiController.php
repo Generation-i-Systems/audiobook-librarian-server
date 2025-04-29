@@ -78,7 +78,7 @@ class BookApiController extends Controller
 
     public function show(Book $book, Request $request)
     {
-        $withCover = $request->boolean('with_cover', false);
+        $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
         return response()->json($this->getBookWithCover($book, $withCover, $inlineCovers));
     }
@@ -129,7 +129,7 @@ class BookApiController extends Controller
             $query->whereDate('date_added', $request->date_added);
         }
         $perPage = $request->input('per_page', 100);
-        $withCover = $request->boolean('with_cover', false);
+        $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
         $books = $query->paginate($perPage);
         $books->getCollection()->transform(function ($book) use ($withCover, $inlineCovers) {
@@ -238,25 +238,27 @@ class BookApiController extends Controller
                     'data' => base64_encode(Storage::disk('books')->get($book->cover_image)),
                 ];
             } else {
-                // Proxy URL (assuming /api/book/{id}/cover is the proxy endpoint)
-                $arr['cover'] = [
-                    'type' => 'url',
-                    'url' => url('/api/book/' . $book->id . '/cover'),
-                ];
-                $arr['cover_url'] = url('/api/book/' . $book->id . '/cover');
+                // Proxy URL (assuming /api/v1/books/{id}/cover is the proxy endpoint)
+                // $arr['cover'] = [
+                //     'type' => 'url',
+                //     'url' => url('/api/v1/books/' . $book->id . '/cover'),
+                // ];
+                $arr['cover_url'] = url('/api/v1/books/' . $book->id . '/cover');
             }
         } else {
             if ($withCover && $book->cover_image) {
                 Log::info('Cover image not found for book: ' . $book->title . ' (' . $book->cover_image . ')');
             }
-            $arr['cover'] = null;
+            $arr['cover_url'] = null;
         }
         unset($arr['cover_image_content']);
+        // Log::info('getBookWithCover completed for book: ' . $book->title . ' (' . $book->cover_image . ')'));
         return $arr;
     }
 
     public function cover(Book $book)
     {
+        Log::info('Cover image requested for book: ' . $book->title . ' (' . $book->cover_image . ')');
         if ($book->cover_image && Storage::disk('books')->exists($book->cover_image)) {
             $mime = Storage::disk('books')->mimeType($book->cover_image);
             return response(Storage::disk('books')->get($book->cover_image), 200)->header('Content-Type', $mime);
