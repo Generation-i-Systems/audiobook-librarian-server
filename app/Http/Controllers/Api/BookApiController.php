@@ -223,8 +223,36 @@ class BookApiController extends Controller
         return response()->json(['error' => 'Zip file not found.'], 404);
     }
 
+    /**
+     * Get a list of all genres.
+     */
+    public function listGenres(Request $request)
+    {
+        $genres = \App\Models\Genre::orderBy('name')->get(['id', 'name']);
+        return response()->json($genres);
+    }
+
+    /**
+     * Get a paginated, filterable list of authors in a genre.
+     */
+    public function authorsByGenre(Request $request, $genreId)
+    {
+        $perPage = $request->input('per_page', 20);
+        $search = $request->input('search');
+        $genre = \App\Models\Genre::findOrFail($genreId);
+        $authorsQuery = \App\Models\Author::whereHas('books', function($q) use ($genreId) {
+            $q->where('genre_id', $genreId);
+        });
+        if ($search) {
+            $authorsQuery->where('name', 'like', '%' . $search . '%');
+        }
+        $authors = $authorsQuery->orderBy('name')->paginate($perPage);
+        return response()->json($authors);
+    }
+
     private function getBookWithCover($book, $withCover = false, $inlineCovers = false)
     {
+        Log::info('getBookWithCover called for book: ' . $book->title);
         $arr = $book->toArray();
         $arr['genre'] = $book?->genre->name;
         $arr['author_name'] = $book->author?->name;
