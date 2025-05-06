@@ -68,7 +68,6 @@ class BookApiController extends Controller
 
         $books->getCollection()->transform(function ($book) use ($withCover, $inlineCovers) {
             $arr = $this->getBookWithCover($book, $withCover, $inlineCovers);
-            $arr['description'] = 'foo'; // TEMPORARY: override all descriptions for index
             return $arr;
         });
         Log::info('Books retrieved successfully');
@@ -228,7 +227,7 @@ class BookApiController extends Controller
      */
     public function listGenres(Request $request)
     {
-        $genres = \App\Models\Genre::orderBy('name')->get(['id', 'name']);
+        $genres = Genre::orderBy('name')->get(['id', 'name']);
         return response()->json($genres);
     }
 
@@ -239,8 +238,8 @@ class BookApiController extends Controller
     {
         $perPage = $request->input('per_page', 20);
         $search = $request->input('search');
-        $genre = \App\Models\Genre::findOrFail($genreId);
-        $authorsQuery = \App\Models\Author::whereHas('books', function($q) use ($genreId) {
+        $genre = Genre::findOrFail($genreId);
+        $authorsQuery = Author::whereHas('books', function($q) use ($genreId) {
             $q->where('genre_id', $genreId);
         });
         if ($search) {
