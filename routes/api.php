@@ -31,9 +31,21 @@ Route::prefix('v1')->group(function () {
         Route::get('/books/queue/download/{zipId}', [BookApiController::class, 'downloadQueuedZip']);
         Route::post('/books/queue/download/{zipId}/mark-downloaded', [BookApiController::class, 'markZipDownloaded']);
 
+        // Series Books Route
+        Route::get('/series/{seriesId}/books', [BookApiController::class, 'booksBySeries']);
+
+        // Author Books Route
+        Route::get('/authors/{authorId}/books', [BookApiController::class, 'booksByAuthor']);
+        // Author Books by Genre Route
+        Route::get('/authors/{authorId}/genres/{genreId}/books', [BookApiController::class, 'booksByAuthorAndGenre']);
+
+        // Author Series Route
+        Route::get('/authors/{authorId}/series', [BookApiController::class, 'seriesByAuthor']);
+
         // Genre Routes
         Route::get('/genres', [BookApiController::class, 'listGenres']);
         Route::get('/genres/{genre}/authors', [BookApiController::class, 'authorsByGenre']);
+        Route::get('/genres/{genreId}/authors', [BookApiController::class, 'authorsByGenreSimple']);
 
         // Book Request Route
         Route::post('/book-requests', [BookRequestApiController::class, 'store']);

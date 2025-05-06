@@ -249,6 +249,107 @@ class BookApiController extends Controller
         return response()->json($authors);
     }
 
+    /**
+     * Get all authors with books in a given genre.
+     */
+    public function authorsByGenreSimple($genreId, Request $request)
+    {
+        $genre = Genre::findOrFail($genreId);
+        $authors = Author::whereHas('books', function($q) use ($genreId) {
+                $q->where('genre_id', $genreId);
+            })
+            ->orderBy('name')
+            ->get(['id', 'name']);
+        return response()->json([
+            'genre' => $genre->only(['id', 'name']),
+            'authors' => $authors
+        ]);
+    }
+
+    /**
+     * Get all books for a given series.
+     */
+    public function booksBySeries($seriesId, Request $request)
+    {
+        $perPage = $request->input('per_page', 100);
+        $withCover = $request->boolean('with_cover', true);
+        $inlineCovers = $request->boolean('inlineCovers', false);
+        $series = Series::findOrFail($seriesId);
+        $books = Book::with(['genre', 'author', 'series'])
+            ->where('series_id', $seriesId)
+            ->paginate($perPage);
+        $books->getCollection()->transform(function ($book) use ($withCover, $inlineCovers) {
+            return $this->getBookWithCover($book, $withCover, $inlineCovers);
+        });
+        return response()->json([
+            'series' => $series->only(['id', 'name']),
+            'books' => $books
+        ]);
+    }
+
+    /**
+     * Get all books for a given author.
+     */
+    public function booksByAuthor($authorId, Request $request)
+    {
+        $perPage = $request->input('per_page', 100);
+        $withCover = $request->boolean('with_cover', true);
+        $inlineCovers = $request->boolean('inlineCovers', false);
+        $author = Author::findOrFail($authorId);
+        $books = Book::with(['genre', 'author', 'series'])
+            ->where('author_id', $authorId)
+            ->paginate($perPage);
+        $books->getCollection()->transform(function ($book) use ($withCover, $inlineCovers) {
+            return $this->getBookWithCover($book, $withCover, $inlineCovers);
+        });
+        return response()->json([
+            'author' => $author->only(['id', 'name']),
+            'books' => $books
+        ]);
+    }
+
+    /**
+     * Get all series for a given author.
+     */
+    public function seriesByAuthor($authorId, Request $request)
+    {
+        $author = Author::findOrFail($authorId);
+        // Find series that have at least one book by this author
+        $series = Series::whereHas('books', function ($q) use ($authorId) {
+            $q->where('author_id', $authorId);
+        })
+        ->orderBy('name')
+        ->get(['id', 'name']);
+        return response()->json([
+            'author' => $author->only(['id', 'name']),
+            'series' => $series
+        ]);
+    }
+
+    /**
+     * Get all books for a given author within a specific genre.
+     */
+    public function booksByAuthorAndGenre($authorId, $genreId, Request $request)
+    {
+        $perPage = $request->input('per_page', 100);
+        $withCover = $request->boolean('with_cover', true);
+        $inlineCovers = $request->boolean('inlineCovers', false);
+        $author = Author::findOrFail($authorId);
+        $genre = Genre::findOrFail($genreId);
+        $books = Book::with(['genre', 'author', 'series'])
+            ->where('author_id', $authorId)
+            ->where('genre_id', $genreId)
+            ->paginate($perPage);
+        $books->getCollection()->transform(function ($book) use ($withCover, $inlineCovers) {
+            return $this->getBookWithCover($book, $withCover, $inlineCovers);
+        });
+        return response()->json([
+            'author' => $author->only(['id', 'name']),
+            'genre' => $genre->only(['id', 'name']),
+            'books' => $books
+        ]);
+    }
+
     private function getBookWithCover($book, $withCover = false, $inlineCovers = false)
     {
         Log::info('getBookWithCover called for book: ' . $book->title);
