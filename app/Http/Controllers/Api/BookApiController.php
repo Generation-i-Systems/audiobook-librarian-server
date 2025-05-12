@@ -64,6 +64,13 @@ class BookApiController extends Controller
         $perPage = $request->input('per_page', 100);
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
+        // If filtering by author, sort by series then series_number
+        if ($request->filled('author')) {
+            $query->leftJoin('series', 'books.series_id', '=', 'series.id')
+                ->orderBy('series.name')
+                ->orderBy('books.series_number')
+                ->select('books.*');
+        }
         $books = $query->paginate($perPage);
 
         $books->getCollection()->transform(function ($book) use ($withCover, $inlineCovers) {
@@ -130,6 +137,15 @@ class BookApiController extends Controller
         $perPage = $request->input('per_page', 100);
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
+
+
+        // If filtering by author, sort by series then series_number
+        if ($request->filled('author')) {
+            $query->leftJoin('series', 'books.series_id', '=', 'series.id')
+                ->orderBy('series.name')
+                ->orderBy('books.series_number')
+                ->select('books.*');
+        }
         $books = $query->paginate($perPage);
         $books->getCollection()->transform(function ($book) use ($withCover, $inlineCovers) {
             return $this->getBookWithCover($book, $withCover, $inlineCovers);
@@ -334,12 +350,22 @@ class BookApiController extends Controller
         $perPage = $request->input('per_page', 100);
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
+        Log::info('booksByAuthorAndGenre called for author: ' . $authorId . ' and genre: ' . $genreId);
+        Log::info('booksByAuthorAndGenre ' . json_encode($_POST));
+        Log::info('booksByAuthorAndGenre ' . json_encode($_GET));
+
+
         $author = Author::findOrFail($authorId);
         $genre = Genre::findOrFail($genreId);
         $books = Book::with(['genre', 'author', 'series'])
-            ->where('author_id', $authorId)
-            ->where('genre_id', $genreId)
-            ->paginate($perPage);
+        ->leftJoin('series', 'books.series_id', '=', 'series.id')
+        ->where('author_id', $authorId)
+        ->where('genre_id', $genreId)
+        ->orderBy('series.name')
+        ->orderBy('books.series_number')
+        ->orderBy('books.title')
+        ->select('books.*')
+        ->paginate($perPage);
         $books->getCollection()->transform(function ($book) use ($withCover, $inlineCovers) {
             return $this->getBookWithCover($book, $withCover, $inlineCovers);
         });
@@ -352,7 +378,7 @@ class BookApiController extends Controller
 
     private function getBookWithCover($book, $withCover = false, $inlineCovers = false)
     {
-        Log::info('getBookWithCover called for book: ' . $book->title);
+        // Log::info('getBookWithCover called for book: ' . $book->title);
         $arr = $book->toArray();
         $arr['genre'] = $book?->genre->name;
         $arr['author_name'] = $book->author?->name;

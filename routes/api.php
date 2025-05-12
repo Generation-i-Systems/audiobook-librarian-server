@@ -12,7 +12,7 @@ use App\Http\Controllers\Api\MessageApiController;
 Route::prefix('v1')->group(function () {
     Route::get('/books/{book}/cover', [BookApiController::class, 'cover']);
 
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', 'standard'])->group(function () {
         Route::get('/user', function (Request $request) {
             return $request->user();
         });

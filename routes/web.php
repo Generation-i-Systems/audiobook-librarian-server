@@ -21,36 +21,30 @@ Auth::routes();
 
 Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
 
-Route::resource('books', BookController::class)->only(['index', 'show', 'download', 'create']);
-Route::get('/books/create', [App\Http\Controllers\Admin\BookController::class, 'showCreateForm'])->name('books.create');
+Route::middleware(['auth', 'standard'])->group(function () {
+    Route::resource('books', BookController::class)->only(['index', 'show', 'download', 'create']);
+    Route::get('/books/create', [App\Http\Controllers\Admin\BookController::class, 'showCreateForm'])->name('books.create');
+    Route::get('/books/{book}/download', [BookController::class, 'download'])->name('books.download');
+    Route::post('/books/{book}/reviews', [ReviewController::class, 'store'])->name('reviews.store');
+    Route::delete('/reviews/{review}', [ReviewController::class, 'destroy'])->name('reviews.destroy');
+    Route::post(
+        '/follow/{followableType}/{followableId}',
+        [FollowController::class, 'follow']
+    )->name('follow');
+    Route::delete(
+        '/unfollow/{followableType}/{followableId}',
+        [FollowController::class, 'unfollow']
+    )->name('unfollow');
+    Route::post(
+        '/reading-progress/{book}',
+        [ReadingProgressController::class, 'update']
+    )->name('reading_progress.update');
+    Route::get(
+        '/reading-progress/{book}',
+        [ReadingProgressController::class, 'get']
+    )->name('reading_progress.get');
+});
 
-// Book download route for users
-Route::get('/books/{book}/download', [BookController::class, 'download'])->name('books.download');
-
-Route::post('/books/{book}/reviews', [ReviewController::class, 'store'])->name('reviews.store');
-Route::delete('/reviews/{review}', [ReviewController::class, 'destroy'])->name('reviews.destroy');
-
-//Follow and Unfollow routes
-Route::post(
-    '/follow/{followableType}/{followableId}',
-    [FollowController::class, 'follow']
-)->name('follow');
-Route::delete(
-    '/unfollow/{followableType}/{followableId}',
-    [FollowController::class, 'unfollow']
-)->name('unfollow');
-
-// Reading Progress Routes
-Route::post(
-    '/reading-progress/{book}',
-    [ReadingProgressController::class, 'update']
-)->name('reading_progress.update');
-Route::get(
-    '/reading-progress/{book}',
-    [ReadingProgressController::class, 'get']
-)->name('reading_progress.get');
-
-// Message Routes
 Route::post('/messages', [MessageController::class, 'store'])->name('messages.store');
 
 Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\AccountRequest;
+use App\Models\Message;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -29,15 +30,26 @@ class AuthController extends Controller
         // Hash password here
         $password = Hash::make($request->password);
 
-        // Create an account request instead of a user
-        AccountRequest::create([
+        // Create the user with 'unverified' role
+        $user = User::create([
             'name' => $request->name,
             'username' => $request->username,
             'email' => $request->email,
             'password' => $password,
+            'role' => 'unverified',
         ]);
 
-        return response()->json(['message' => 'Account request submitted. Please wait for approval.'], 201); // Created
+        // Notify all admins about the new user
+        $adminUsers = User::where('role', 'admin')->get();
+        foreach ($adminUsers as $admin) {
+            Message::create([
+                'user_id' => $admin->id,
+                'content' => 'New user registered: ' . $user->name . ' (' . $user->email . '). <a href="' . url('/admin/users/' . $user->id . '/edit') . '">Edit User</a>',
+                'is_from_admin' => false,
+            ]);
+        }
+
+        return response()->json(['message' => 'Account created. Waiting for admin approval.'], 201); // Created
     }
 
 
