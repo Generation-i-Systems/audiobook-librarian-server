@@ -4,6 +4,9 @@ namespace Tests\Unit\Models;
 
 use App\Models\Book;
 use App\Models\Review;
+use App\Models\Genre;
+
+
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
