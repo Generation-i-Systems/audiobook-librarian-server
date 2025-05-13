@@ -9,7 +9,7 @@ class Series extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name']; // Columns that can be mass-assigned
+    protected $fillable = ['name', 'parent_name'];
 
     public function books()
     {

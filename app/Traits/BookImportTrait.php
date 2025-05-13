@@ -201,28 +201,59 @@ trait BookImportTrait
         return array_unique($bookDirs);
     }
 
-    private function processDirPath($directoryPath)
+    public function processDirPath($directoryPath)
     {
         $book = new Book();
         $book->directory_path = $directoryPath;
-        if (preg_match('#/(.*?)/(.*?)/(.*?)/([0-9.]+) (.*)#', $directoryPath, $matches)) {
-            $genre = $matches[1];
-            $author = $matches[2];
-            $series = $matches[3];
-            $seriesNumber = $matches[4];
-            $title = $matches[5];
-        } elseif (preg_match('#/(.*?)/(.*?)/(.*?)/(.*)#', $directoryPath, $matches)) {
-            $genre = $matches[1];
-            $author = $matches[2];
-            $series = $matches[3];
-            $title = $matches[4];
-        } elseif (preg_match('#/(.*?)/(.*?)/(.*)#', $directoryPath, $matches)) {
-            $genre = $matches[1];
-            $author = $matches[2];
-            $title = $matches[3];
+        $seriesNumber = null;
+        $series = null;
+        $seriesParent = null;
+
+        $parts = explode('/', trim($directoryPath, '/'));
+        dump($parts);
+
+        $genre = array_shift($parts);
+        if (count($parts) > 0 && $parts[0] == 'R') {
+            array_shift($parts);
+        } else if (count($parts) > 0 && $parts[0] == 'VA') {
+            Log::error("Skipping VA: {$directoryPath}");
+            return null;
+        }
+        $author = array_shift($parts);
+
+        if (count($parts) > 2) {
+            $title = array_pop($parts);
+            $series = array_pop($parts);
+            $seriesParent = implode('/', $parts);
+        } elseif (count($parts) == 2) {
+            $series = array_shift($parts);
+            $title = array_shift($parts);
+        } elseif (count($parts) == 1) {
+            $title = array_shift($parts);
         } else {
-            Log::error('Invalid directory path: ' . $directoryPath);
+            Log::error("Invalid directory path: {$directoryPath}");
             return $book;
+        }
+
+        if (!empty($series)) {
+            if (preg_match('#^([0-9.]+)\s?(.*)$#', $title, $matches)) {
+                // Series number at start should be removed from title unlike other places where it belongs in the title
+                $seriesNumber = $matches[1];
+                $title = $matches[2];
+            } else {
+                // 1. book [num], volume [num], vol [num], vol. [num] (case-insensitive, anywhere)
+                if (preg_match('/(?:book|volume|vol\.?)[ _-]*(\d{1,3}(\.\d{1,2})?)/i', $title, $m)) {
+                    $seriesNumber = $m[1];
+                }
+                // 2. number at end
+                elseif (preg_match('/(\d{1,3}(\.\d{1,2})?)$/', $title, $m)) {
+                    $seriesNumber = $m[1];
+                }
+                // 3. number in parens, braces or brackets
+                elseif (preg_match('/\s*[\[\{\(](\d{1,3}(\.\d{1,2})?)[\]\}\)](?:\s|$)/', $title, $m)) {
+                    $seriesNumber = $m[1];
+                }
+            }
         }
 
         $genreRec = Genre::where('name', 'like', "%{$genre}%")->first();
@@ -235,15 +266,25 @@ trait BookImportTrait
         $book->author_name = $authorRec?->name;
 
         if (!empty($series)) {
-            $seriesRec = Series::where('name', 'like', "%{$series}%")->first();
-            $book->series = $seriesRec ? $seriesRec : Series::create(["name" => $series]);
+            $seriesRec = Series::where('name', 'like', "%{$series}%");
+            Log::info("Series sql: {$seriesRec->toRawSql()}");
+            // Log::info("Series: {$series}, Series Rec: {$seriesRec}");
+            $seriesRec = $seriesRec->first();
+            if ($seriesRec && $seriesParent && empty($seriesRec->parent_name)) {
+                $seriesRec->update(['parent_name' => $seriesParent, 'name' => $series]);
+                print "Updated series: {$seriesRec->name}\tSeries parent: {$seriesRec->parent_name}\n";
+            }
+            $book->series = $seriesRec ?: Series::create(["name" => $series, 'parent_name' => $seriesParent]);
             $book->series_id = $seriesRec?->id;
             $book->series_name = $seriesRec?->name;
+            Log::info("Series: {$series}, Series ID: {$seriesRec?->id}");
         }
 
         if (!empty($seriesNumber)) {
-            $book->seriesNumber = $seriesNumber;
+            print "Series number: {$seriesNumber}\n";
+            $book->series_number = $seriesNumber;
         }
+        print "Book Series Number: {$book->series_number}\n";
         $book->title = $title;
 
         return $book;

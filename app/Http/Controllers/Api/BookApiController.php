@@ -400,13 +400,9 @@ class BookApiController extends Controller
                 $arr['cover_url'] = url('/api/v1/books/' . $book->id . '/cover');
             }
         } else {
-            if ($withCover && $book->cover_image) {
-                Log::info('Cover image not found for book: ' . $book->title . ' (' . $book->cover_image . ')');
-            }
             $arr['cover_url'] = null;
         }
         unset($arr['cover_image_content']);
-        // Log::info('getBookWithCover completed for book: ' . $book->title . ' (' . $book->cover_image . ')'));
         return $arr;
     }
 
