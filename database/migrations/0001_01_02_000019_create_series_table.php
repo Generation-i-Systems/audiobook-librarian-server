@@ -11,8 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('books', function (Blueprint $table) {
-            $table->integer('series_number')->nullable()->after('author_id');
+        Schema::create('series', function (Blueprint $table) {
+            $table->id();
+            $table->string('name')->unique(); // Ensure no duplicate series names
+            $table->string('parent_name')->nullable();
+            $table->timestamps();
         });
     }
 
@@ -21,8 +24,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('books', function (Blueprint $table) {
-            $table->dropColumn('series_number');
-        });
+        Schema::dropIfExists('series');
     }
 };

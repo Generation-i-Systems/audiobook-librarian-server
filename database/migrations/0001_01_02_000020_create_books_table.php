@@ -15,12 +15,15 @@ return new class extends Migration
             $table->id();
             $table->string('title');
             $table->foreignId('author_id')->constrained()->onDelete('cascade');
-            $table->string('series')->nullable();
+            $table->foreignId('series_id')->nullable()->constrained('series')->onDelete('set null');
+            $table->decimal('series_number', 5, 2)->nullable();
             $table->foreignId('genre_id')->constrained()->onDelete('cascade');
             $table->string('cover_image')->nullable(); // Path to cover image
             $table->text('description')->nullable();
             $table->string('directory_path')->nullable();  // Store path to the book's directory
-            $table->string('type'); // 'ebook' or 'audiobook'
+            $table->integer('published_year')->nullable();
+            $table->timestamp('date_added')->nullable();
+            $table->date('publication_date')->nullable();
             $table->timestamps();
         });
     }

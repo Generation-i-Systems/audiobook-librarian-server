@@ -18,6 +18,7 @@ return new class extends Migration
             $table->text('comment');
             $table->integer('age_rating'); //  Example: 1-5, 1 being very young age appropriate
             $table->string('content_rating'); //  Example: "PG", "PG-13", "R"
+            $table->timestamp('acknowledged_at')->nullable();
             $table->timestamps();
         });
     }

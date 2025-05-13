@@ -15,7 +15,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->nullable()->constrained()->onDelete('cascade'); // Nullable for messages from mobile apps
             $table->text('content');
-            $table->boolean('is_from_admin')->default(false); // To differentiate messages from admin or user
+            $table->boolean('is_from_admin')->default(false);
+            $table->timestamp('acknowledged_at')->nullable(); // To differentiate messages from admin or user
             $table->timestamps();
         });
     }
