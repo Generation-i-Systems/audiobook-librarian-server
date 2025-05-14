@@ -201,7 +201,13 @@ trait BookImportTrait
         return array_unique($bookDirs);
     }
 
-    public function processDirPath($directoryPath)
+    /**
+     * Processes a directory path and returns a Book instance populated with extracted metadata.
+     *
+     * @param string $directoryPath The path to the directory to process.
+     * @return Book|null The populated Book object or null if skipped/invalid.
+     */
+    public function processDirPath($directoryPath): ?Book
     {
         $book = new Book();
         $book->directory_path = $directoryPath;
@@ -256,14 +262,24 @@ trait BookImportTrait
             }
         }
 
+        print "Processing directory path: {$directoryPath}\n";
+        print "Genre: {$genre}\n";
+        print "Author: {$author}\n";
+        print "Series: {$series}\n";
+        print "Series Number: {$seriesNumber}\n";
+        print "Title: {$title}\n";
+
         $genreRec = Genre::where('name', 'like', "%{$genre}%")->first();
-        $book->genre_id = $genreRec?->id;
-        $book->genre = $genreRec ?: Genre::create(['name' => $genre]);
+        if (!$genreRec) {
+            $genreRec = Genre::create(["name" => $genre]);
+        }
+        $book->genre_id = $genreRec->id;
 
         $authorRec = Author::where('name', 'like', "%{$author}%")->first();
-        $book->author = $authorRec ?: Author::create(["name" => $author]);
-        $book->author_id = $authorRec?->id;
-        $book->author_name = $authorRec?->name;
+        if (!$authorRec) {
+            $authorRec = Author::create(["name" => $author]);
+        }
+        $book->author_id = $authorRec->id;
 
         if (!empty($series)) {
             $seriesRec = Series::where('name', 'like', "%{$series}%");
@@ -273,27 +289,34 @@ trait BookImportTrait
             if ($seriesRec && $seriesParent && empty($seriesRec->parent_name)) {
                 $seriesRec->update(['parent_name' => $seriesParent, 'name' => $series]);
                 print "Updated series: {$seriesRec->name}\tSeries parent: {$seriesRec->parent_name}\n";
+            } else {
+                $seriesRec = Series::create(["name" => $series, 'parent_name' => $seriesParent]);
             }
-            $book->series = $seriesRec ?: Series::create(["name" => $series, 'parent_name' => $seriesParent]);
-            $book->series_id = $seriesRec?->id;
-            $book->series_name = $seriesRec?->name;
-            Log::info("Series: {$series}, Series ID: {$seriesRec?->id}");
+            $book->series_id = $seriesRec->id;
+            Log::info("Series: {$series}, Series ID: {$seriesRec->id}");
         }
 
         if (!empty($seriesNumber)) {
             print "Series number: {$seriesNumber}\n";
-            $book->series_number = $seriesNumber;
+            $book->series_number = $seriesNumber +0;
         }
         print "Book Series Number: {$book->series_number}\n";
         $book->title = $title;
+
+        print "Book: " . json_encode($book) . "\n";
+        print "\n";
 
         return $book;
     }
 
     /**
      * Download and store a remote cover image, return the local path for storage in DB.
+     *
+     * @param string $url The URL to import the cover image from.
+     * @param string|null $directoryPath The directory path to store the cover image, or null for default.
+     * @return string|null The relative path for storage in DB, or null on failure.
      */
-    private function importCoverImageFromUrl($url, $directoryPath = null)
+    private function importCoverImageFromUrl($url, $directoryPath = null): ?string
     {
         if (!$url) {
             Log::error("Invalid URL: {$url}");

@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('series', function (Blueprint $table) {
             $table->id();
-            $table->string('name')->unique(); // Ensure no duplicate series names
+            $table->string('name'); // Series names do not need to be unique
             $table->string('parent_name')->nullable();
             $table->timestamps();
         });

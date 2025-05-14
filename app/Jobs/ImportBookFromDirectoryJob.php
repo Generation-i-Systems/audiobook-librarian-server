@@ -41,15 +41,19 @@ class ImportBookFromDirectoryJob implements ShouldQueue
             return;
         }
         $book = new Book();
-        $book->directory_path = $dirPath;
         $bookTmp = $this->processDirPath($dirPath);
-        Log::info("[BulkImport] Found book: " . json_encode($bookTmp));
+        $book->directory_path = $dirPath;
+        Log::info("[BulkImport] Found book: " . json_encode($book));
         $book->author_id = $bookTmp->author->id;
         $book->genre_id = $bookTmp->genre->id;
         if ($bookTmp->series) {
             $book->series_id = $bookTmp->series->id;
+            $book->series_number = $bookTmp->series_number;
         }
         $book->title = $bookTmp->title;
+        // Do NOT assign or save temporary/relationship fields like genre, series, author, or series_name_author_name here.
+        // Only assign attributes that are actual columns in the books table.
+
         list($coverAuto, $coverCandidates) = $this->findCoverImageCandidate($dirPath);
         Log::info("[BulkImport] Found cover candidates: " . json_encode($coverCandidates));
         $m4bs = is_dir($fullPath) ? array_values(array_filter(scandir($fullPath), function ($f) use ($fullPath) {
@@ -90,8 +94,9 @@ class ImportBookFromDirectoryJob implements ShouldQueue
                     $book->published_year = isset($info['publishedDate']) ? substr($info['publishedDate'], 0, 4) : '';
                     $book->description = $info['description'] ?? '';
                     $cover_image = $info['imageLinks']['thumbnail'] ?? '';
-                    Log::info("[BulkImport] Cover image: " . $cover_image);
-                    $book->cover_image = $this->importCoverImageFromUrl($cover_image);
+                    Log::info("[BulkImport] Cover image from Google Books: " . $cover_image);
+                    $book->cover_image = $this->importCoverImageFromUrl($cover_image, $book->directory_path);
+
                 } else {
                     Log::error("[BulkImport] No close match found for: " . $book->title . ' ' . $book->author->name);
                 }
@@ -124,11 +129,11 @@ class ImportBookFromDirectoryJob implements ShouldQueue
         }
 
         Log::info("[BulkImport] Cover image: " . $book->cover_image);
-        Log::info("[BulkImport] Description: " . $book->description);
         Log::info("[BulkImport] Published year: " . $book->published_year);
-        $book->type = 'audiobook';
+        Log::info("--------------------------[BulkImport] Series number: " . $book->series_number);
         $book->date_added = now();
         $book->save();
+        Log::info("--------------------------[BulkImport] Series number: " . $book->series_number);
         $dirPath = $book->directory_path;
         $storagePath = env('BOOK_STORAGE_PATH');
         $candidates = [];
@@ -153,6 +158,9 @@ class ImportBookFromDirectoryJob implements ShouldQueue
         Log::info("[BulkImport] Book imported: {$book->title} ({$book->id}) {$book->directory_path}");
     }
 
+    /**
+     * Notify admin of Google Books API quota failure.
+     */
     protected function notifyAdminQuotaFailure($book, $msg, $attempts)
     {
         // Send message to all admins (or first admin)

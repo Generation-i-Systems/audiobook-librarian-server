@@ -13,13 +13,13 @@ class Book extends Model
         'title',
         'author_id',
         'series_id',
+        'series_number',
         'genre_id',
         'cover_image',
         'description',
         'directory_path',
         'date_added',
         'published_year',
-        'series_number'
     ];
 
     public function reviews()

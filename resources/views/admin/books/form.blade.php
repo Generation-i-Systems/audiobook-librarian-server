@@ -380,7 +380,7 @@
                 var url = $form.attr('action');
                 var method = 'POST';
                 var formData = new FormData(this);
-                formData.set('_method', 'PUT');
+                formData.set('_method', 'POST');
                 var csrfToken = $form.find('input[name="_token"]').val();
                 if (csrfToken) formData.append('_token', csrfToken);
                 $.ajax({
