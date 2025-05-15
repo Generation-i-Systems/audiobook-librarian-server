@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Process;
@@ -20,7 +20,7 @@ class QueueController extends Controller
     public function list(Request $request)
     {
         $typeFilter = $request->query('type');
-        $jobs = DB::table('jobs')->orderBy('id')->get();
+        $jobs = (new \App\Services\FirestoreService())->db->collection('jobs')->orderBy('id')->get();
         $jobTypeCounts = [];
         $jobTypes = [];
         $jobs = $jobs->map(function ($job) use (&$jobTypeCounts, &$jobTypes) {
@@ -74,7 +74,7 @@ class QueueController extends Controller
 
     public function remove($id)
     {
-        DB::table('jobs')->where('id', $id)->delete();
+        (new \App\Services\FirestoreService())->db->collection('jobs')->where('id', $id)->delete();
         return response()->json(['success' => true]);
     }
 
@@ -82,7 +82,7 @@ class QueueController extends Controller
     {
         // Check for running worker (simple: look for process, or use a cache heartbeat)
         $running = Cache::get('queue_worker_heartbeat') ? true : false;
-        $pending = DB::table('jobs')->count();
+        $pending = (new \App\Services\FirestoreService())->db->collection('jobs')->count();
         return response()->json(['worker_running' => $running, 'pending_jobs' => $pending]);
     }
 
@@ -99,7 +99,7 @@ class QueueController extends Controller
 
     public function clear()
     {
-        DB::table('jobs')->truncate();
+        (new \App\Services\FirestoreService())->db->collection('jobs')->documents()->each(function($doc) { $doc->reference()->delete(); });
         return response()->json(['success' => true]);
     }
 }

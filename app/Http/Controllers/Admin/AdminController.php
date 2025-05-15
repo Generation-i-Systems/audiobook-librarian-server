@@ -3,24 +3,28 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Author;
-use App\Models\Book;
-use App\Models\Genre;
-use App\Models\User;
+
+
+
+
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class AdminController extends Controller
 {
-    public function updateRole(Request $request, User $user)
+    public function updateRole(Request $request)
     {
         $request->validate([
+            'user_id' => 'required|string',
             'role' => 'required|in:regular,admin',
         ]);
-
-        $user->role = $request->input('role');
-        $user->save();
-
+        $firestore = new \App\Services\FirestoreService();
+        $userId = $request->input('user_id');
+        $role = $request->input('role');
+        // Assuming users are stored in a 'users' collection
+        $firestore->db->collection('users')->document($userId)->set([
+            'role' => $role
+        ], ['merge' => true]);
         return back()->with('success', 'User role updated successfully!');
     }
 

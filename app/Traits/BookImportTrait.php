@@ -2,10 +2,7 @@
 
 namespace App\Traits;
 
-use App\Models\Book;
-use App\Models\Author;
-use App\Models\Genre;
-use App\Models\Series;
+use App\Services\FirestoreService;
 use Symfony\Component\Process\Process;
 use Illuminate\Support\Facades\Log;
 
@@ -205,12 +202,13 @@ trait BookImportTrait
      * Processes a directory path and returns a Book instance populated with extracted metadata.
      *
      * @param string $directoryPath The path to the directory to process.
-     * @return Book|null The populated Book object or null if skipped/invalid.
+     * @return array|null The populated Book array or null if skipped/invalid.
      */
-    public function processDirPath($directoryPath): ?Book
+    public function processDirPath($directoryPath)
     {
-        $book = new Book();
-        $book->directory_path = $directoryPath;
+        $firestore = new FirestoreService();
+        $book = [];
+        $book['directory_path'] = $directoryPath;
         $seriesNumber = null;
         $series = null;
         $seriesParent = null;
@@ -271,37 +269,49 @@ trait BookImportTrait
 
         $genreRec = Genre::where('name', 'like', "%{$genre}%")->first();
         if (!$genreRec) {
-            $genreRec = Genre::create(["name" => $genre]);
+            $genreId = $firestore->createGenre(["name" => $genre]);
+            $genreRec = $firestore->getGenre($genreId);
         }
-        $book->genre_id = $genreRec->id;
+        $book['genre_id'] = $genreRec['id'];
 
-        $authorRec = Author::where('name', 'like', "%{$author}%")->first();
-        if (!$authorRec) {
-            $authorRec = Author::create(["name" => $author]);
+        // Firestore author lookup or create
+        $authorRec = null;
+        foreach ($firestore->listAuthors() as $a) {
+            if (stripos($a['name'], $author) !== false) {
+                $authorRec = $a;
+                break;
+            }
         }
-        $book->author_id = $authorRec->id;
+        if (!$authorRec) {
+            $authorId = $firestore->createAuthor(["name" => $author]);
+            $authorRec = $firestore->getAuthor($authorId);
+        }
+        $book['author_id'] = $authorRec['id'];
 
         if (!empty($series)) {
-            $seriesRec = Series::where('name', 'like', "%{$series}%");
-            Log::info("Series sql: {$seriesRec->toRawSql()}");
-            // Log::info("Series: {$series}, Series Rec: {$seriesRec}");
-            $seriesRec = $seriesRec->first();
-            if ($seriesRec && $seriesParent && empty($seriesRec->parent_name)) {
-                $seriesRec->update(['parent_name' => $seriesParent, 'name' => $series]);
-                print "Updated series: {$seriesRec->name}\tSeries parent: {$seriesRec->parent_name}\n";
-            } else {
-                $seriesRec = Series::create(["name" => $series, 'parent_name' => $seriesParent]);
+            // Firestore series lookup or create
+            $seriesRec = null;
+            foreach ($firestore->listSeries() as $s) {
+                if (stripos($s['name'], $series) !== false) {
+                    $seriesRec = $s;
+                    break;
+                }
             }
-            $book->series_id = $seriesRec->id;
-            Log::info("Series: {$series}, Series ID: {$seriesRec->id}");
+            // Skipping updateSeries as FirestoreService::updateSeries does not exist yet
+            if (!$seriesRec) {
+                $seriesId = $firestore->createSeries(["name" => $series, 'parent_name' => $seriesParent]);
+                $seriesRec = $firestore->getSeries($seriesId);
+            }
+            $book['series_id'] = $seriesRec['id'];
+            Log::info("Series: {$series}, Series ID: {$seriesRec['id']}");
         }
 
         if (!empty($seriesNumber)) {
             print "Series number: {$seriesNumber}\n";
-            $book->series_number = $seriesNumber +0;
+            $book['series_number'] = $seriesNumber + 0;
         }
-        print "Book Series Number: {$book->series_number}\n";
-        $book->title = $title;
+        print "Book Series Number: {$book['series_number']}\n";
+        $book['title'] = $title;
 
         print "Book: " . json_encode($book) . "\n";
         print "\n";

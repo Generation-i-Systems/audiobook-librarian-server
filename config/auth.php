@@ -38,7 +38,7 @@ return [
     'guards' => [
         'web' => [
             'driver' => 'session',
-            'provider' => 'users',
+            'provider' => 'firestore',
         ],
         'sanctum' => [
             'driver' => 'sanctum',
@@ -64,9 +64,10 @@ return [
     */
 
     'providers' => [
-        'users' => [
-            'driver' => 'eloquent',
-            'model' => env('AUTH_MODEL', App\Models\User::class),
+        // Custom Firestore user provider
+        'firestore' => [
+            'driver' => 'firestore',
+            // 'model' => env('AUTH_MODEL', App\Models\User::class), // No longer needed
         ],
 
         // 'users' => [

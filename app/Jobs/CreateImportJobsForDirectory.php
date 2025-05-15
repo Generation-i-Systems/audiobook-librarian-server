@@ -9,7 +9,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use App\Jobs\ImportBookFromDirectoryJob;
-use App\Models\Book;
+use App\Services\FirestoreService;
 
 class CreateImportJobsForDirectory implements ShouldQueue
 {
@@ -42,9 +42,18 @@ class CreateImportJobsForDirectory implements ShouldQueue
         }
         $bookDirs = $this->findBookDirectories($absDir);
         $queued = [];
+        $firestore = new FirestoreService();
         foreach ($bookDirs as $dirPath) {
             $relDir = ltrim(str_replace($storagePath, '', $dirPath), '/');
-            if (Book::where('directory_path', $relDir)->exists()) {
+            $exists = false;
+            $books = $firestore->listBooks();
+            foreach ($books as $book) {
+                if (($book['directory_path'] ?? null) === $relDir) {
+                    $exists = true;
+                    break;
+                }
+            }
+            if ($exists) {
                 continue;
             }
             ImportBookFromDirectoryJob::dispatch($relDir);

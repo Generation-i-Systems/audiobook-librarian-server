@@ -2,41 +2,70 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Book;
-use App\Models\ReadingProgress;
+
+
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class ReadingProgressController extends Controller
 {
-    public function update(Request $request, Book $book)
+    public function update(Request $request)
     {
         $request->validate([
+            'book_id' => 'required|string',
             'current_position' => 'required|integer|min:0',
         ]);
-
         $user = Auth::user();
-
-        $progress = ReadingProgress::updateOrCreate(
-            ['user_id' => $user->id, 'book_id' => $book->id],
-            ['current_position' => $request->current_position]
-        );
-
+        $firestore = new \App\Services\FirestoreService();
+        $userId = $user->id;
+        $bookId = $request->book_id;
+        // Find or create reading progress document
+        $progressQuery = $firestore->db->collection('reading_progress')
+            ->where('user_id', '=', $userId)
+            ->where('book_id', '=', $bookId)
+            ->documents();
+        $progressDoc = null;
+        foreach ($progressQuery as $doc) {
+            if ($doc->exists()) {
+                $progressDoc = $doc;
+                break;
+            }
+        }
+        if ($progressDoc) {
+            $progressDoc->reference()->set([
+                'current_position' => $request->current_position
+            ], ['merge' => true]);
+        } else {
+            $firestore->db->collection('reading_progress')->add([
+                'user_id' => $userId,
+                'book_id' => $bookId,
+                'current_position' => $request->current_position
+            ]);
+        }
         return response()->json(['success' => true]);
     }
 
-    public function get(Book $book)
+    public function get(Request $request)
     {
+        $request->validate([
+            'book_id' => 'required|string',
+        ]);
         $user = Auth::user();
-
-        $progress = ReadingProgress::where('user_id', $user->id)
-            ->where('book_id', $book->id)
-            ->first();
-
-        if ($progress) {
-            return response()->json(['current_position' => $progress->current_position]);
-        } else {
-            return response()->json(['current_position' => 0]);
+        $firestore = new \App\Services\FirestoreService();
+        $userId = $user->id;
+        $bookId = $request->book_id;
+        $progressQuery = $firestore->db->collection('reading_progress')
+            ->where('user_id', '=', $userId)
+            ->where('book_id', '=', $bookId)
+            ->documents();
+        $currentPosition = 0;
+        foreach ($progressQuery as $doc) {
+            if ($doc->exists()) {
+                $data = $doc->data();
+                $currentPosition = $data['current_position'] ?? 0;
+                break;
+            }
         }
+        return response()->json(['current_position' => $currentPosition]);
     }
 }

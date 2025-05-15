@@ -6,9 +6,9 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use App\Models\Book;
-use App\Models\Genre;
-use App\Models\Author;
+
+
+
 
 class DirectoryBrowserController extends Controller
 {
@@ -57,7 +57,14 @@ class DirectoryBrowserController extends Controller
             $isPotentialBookDirectory = $this->isPotentialBookDirectory($basePath . $filePath);
 
             if (is_dir($basePath . $filePath)) {
-                $book = Book::where('directory_path', $filePath)->first();
+                $book = null;
+$firestore = new \App\Services\FirestoreService();
+foreach ($firestore->listBooks() as $b) {
+    if (!empty($b['directory_path']) && $b['directory_path'] === $filePath) {
+        $book = $b;
+        break;
+    }
+}
                 $bookId = $book?->id;
                 if ($this->isPotentialBookDirectory($basePath . $filePath)) {
                     if ($book) {

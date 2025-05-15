@@ -3,9 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Author;
-use App\Models\Series;
-use App\Models\Follow;
+use App\Services\FirestoreService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -19,42 +17,47 @@ class FollowApiController extends Controller
             'followable_id' => 'required|integer',
         ]);
 
-        //Check type
-        if($request->followable_type == 'author'){
-            $followable = Author::findOrFail($request->followable_id);
-        } else {
-            $followable = Series::findOrFail($request->followable_id);
+        $firestore = new FirestoreService();
+        $userId = Auth::id();
+        $followableId = $followableId;
+        if ($userId === $followableId) {
+            return response()->json(['error' => 'You cannot follow yourself.'], 400);
         }
-
-        Follow::create([
-            'user_id' => Auth::id(),
+        $existing = $firestore->db->collection('follows')
+            ->where('user_id', '=', $userId)
+            ->where('followable_type', '=', $followableType)
+            ->where('followable_id', '=', $followableId)
+            ->documents();
+        foreach ($existing as $doc) {
+            if ($doc->exists()) {
+                return response()->json(['error' => 'Already following.'], 400);
+            }
+        }
+        $firestore->db->collection('follows')->add([
+            'user_id' => $userId,
             'followable_type' => $followableType,
             'followable_id' => $followableId,
         ]);
-
-        return response()->json(['message' => 'Successfully followed!'], 201);
+        return response()->json(['message' => 'Followed successfully.'], 201);
     }
 
     public function unfollow(Request $request, $followableType, $followableId)
     {
-         //Validate input
+        //Validate input
         $request->validate([
             'followable_type' => 'required|in:author,series',
             'followable_id' => 'required|integer',
         ]);
-        //Check type
-        if($request->followable_type == 'author'){
-            $followable = Author::findOrFail($request->followable_id);
-        } else {
-            $followable = Series::findOrFail($request->followable_id);
+
+        $firestore = new FirestoreService();
+        $follows = $firestore->db->collection('follows')
+            ->where('user_id', '=', Auth::id())
+            ->where('followable_type', '=', $followableType)
+            ->where('followable_id', '=', $followableId)
+            ->documents();
+        foreach ($follows as $follow) {
+            $follow->reference()->delete();
         }
-
-        Follow::where([
-            'user_id' => Auth::id(),
-            'followable_type' => $followableType,
-            'followable_id' => $followableId,
-        ])->delete();
-
         return response()->json(['message' => 'Successfully unfollowed!'], 200);
     }
 }

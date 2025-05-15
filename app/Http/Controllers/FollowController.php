@@ -2,9 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Author;
-use App\Models\Series;
-use App\Models\Follow;
+use App\Services\FirestoreService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -12,20 +10,15 @@ class FollowController extends Controller
 {
     public function follow(Request $request, $followableType, $followableId)
     {
-       //Validate input
+        //Validate input
         $request->validate([
             'followable_type' => 'required|in:author,series',
             'followable_id' => 'required|integer',
         ]);
 
-        //Check type
-        if($request->followable_type == 'author'){
-            $followable = Author::findOrFail($request->followable_id);
-        } else {
-            $followable = Series::findOrFail($request->followable_id);
-        }
-
-        Follow::create([
+        // No need to fetch author/series from Eloquent, just trust input (validated above)
+        $firestore = new \App\Services\FirestoreService();
+        $firestore->db->collection('follows')->add([
             'user_id' => Auth::id(),
             'followable_type' => $followableType,
             'followable_id' => $followableId,
@@ -36,24 +29,21 @@ class FollowController extends Controller
 
     public function unfollow(Request $request, $followableType, $followableId)
     {
-         //Validate input
+        //Validate input
         $request->validate([
             'followable_type' => 'required|in:author,series',
             'followable_id' => 'required|integer',
         ]);
-        //Check type
-        if($request->followable_type == 'author'){
-            $followable = Author::findOrFail($request->followable_id);
-        } else {
-            $followable = Series::findOrFail($request->followable_id);
+        // No need to fetch author/series from Eloquent, just trust input (validated above)
+        $firestore = new \App\Services\FirestoreService();
+        $follows = $firestore->db->collection('follows')
+            ->where('user_id', '=', Auth::id())
+            ->where('followable_type', '=', $followableType)
+            ->where('followable_id', '=', $followableId)
+            ->documents();
+        foreach ($follows as $follow) {
+            $follow->reference()->delete();
         }
-
-
-        Follow::where([
-            'user_id' => Auth::id(),
-            'followable_type' => $followableType,
-            'followable_id' => $followableId,
-        ])->delete();
 
         return back()->with('success', 'Successfully unfollowed!');
     }

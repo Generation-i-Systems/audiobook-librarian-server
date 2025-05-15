@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
-use App\Models\Book;
+use App\Services\FirestoreService;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 

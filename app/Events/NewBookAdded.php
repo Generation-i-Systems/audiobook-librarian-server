@@ -2,7 +2,7 @@
 
 namespace App\Events;
 
-use App\Models\Book;
+use App\Services\FirestoreService;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;

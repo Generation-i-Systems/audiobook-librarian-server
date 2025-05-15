@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Book;
-use App\Models\Genre;
-use App\Models\Author;
+use App\Services\FirestoreService;
+
+
 use App\Services\GoogleBooksApiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -26,83 +26,45 @@ class BookController extends Controller
 
     public function index(Request $request)
     {
-        $query = Book::query();
-
-        // Only filter by genre_id if it is set and not empty
-        if ($request->filled('genre_id')) {
-            $query->where('genre_id', $request->genre_id);
-        }
-
-        // Only filter by author_id if it is set and not empty
-        if ($request->filled('author_id')) {
-            $query->where('author_id', $request->author_id);
-        }
-
-        if ($request->has('series')) {
-            $query->whereHas('series', function ($q) use ($request) {
-                $q->where('name', 'like', "%{$request->series}%");
-            });
-        }
-
-        if ($request->has('search')) {
-            $searchTerm = $request->search;
-            $query->where(function ($q) use ($searchTerm) {
-                $q->where('title', 'like', "%{$searchTerm}%")
-                    ->orWhereHas('author', function ($authorQuery) use ($searchTerm) {
-                        $authorQuery->where('name', 'like', "%{$searchTerm}%");
-                    })
-                    ->orWhereHas('series', function ($seriesQuery) use ($searchTerm) {
-                        $seriesQuery->where('name', 'like', "%{$searchTerm}%");
-                    });
-            });
-        }
-
-        $genres = Genre::all();
-        $authors = Author::all();
-
-        $books = $query->paginate(12); // You can adjust the pagination size
-
-        // Fetch recently added books for the landing page
-        $recentBooks = Book::orderBy('created_at', 'desc')->take(5)->get();
-
+        $firestore = new FirestoreService();
+        $books = $firestore->listBooks();
+        $genres = $firestore->listGenres();
+        $authors = $firestore->listAuthors();
+        $recentBooks = array_slice(array_reverse($books), 0, 5);
         return view('books.index', compact('books', 'genres', 'authors', 'recentBooks'));
     }
 
-    public function show(Book $book)
+    public function show($id)
     {
+        $firestore = new FirestoreService();
+        $book = $firestore->getBook($id);
+        if (!$book) abort(404);
         return view('books.show', compact('book'));
     }
 
-    public function download(Book $book)
+    public function download($id)
     {
-        $directoryPath = $book->directory_path;
-
-        if (!$directoryPath || !Storage::disk('books')->exists($directoryPath)) {
+        $firestore = new FirestoreService();
+        $book = $firestore->getBook($id);
+        if (!$book) abort(404);
+        $directoryPath = $book['directory_path'] ?? null;
+        if (!$directoryPath || !\Storage::disk('books')->exists($directoryPath)) {
             abort(404, 'Book directory not found.');
         }
-
-        $files = Storage::disk('books')->files($directoryPath);
-
+        $files = \Storage::disk('books')->files($directoryPath);
         if (empty($files)) {
             abort(404, 'No files found for this book.');
         }
-
-        $zipFileName = str_replace(' ', '_', $book->title) . '.zip';  //Sanitize filename
-        $zipPath = storage_path('app/public/temp/' . $zipFileName);  //Temporary storage
-
-        $zip = new ZipArchive();
-
-        if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== TRUE) {
+        $zipFileName = str_replace(' ', '_', $book['title']) . '.zip';
+        $zipPath = storage_path('app/public/temp/' . $zipFileName);
+        $zip = new \ZipArchive();
+        if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== TRUE) {
             abort(500, 'Failed to create zip archive.');
         }
-
         foreach ($files as $file) {
-            $zip->addFile(Storage::disk('books')->path($file), basename($file));
+            $zip->addFile(\Storage::disk('books')->path($file), basename($file));
         }
-
         $zip->close();
-
-        // Return the zip file as a download
-        return response()->download($zipPath, $zipFileName)->deleteFileAfterSend(true); // Delete the temp zip file after sending.
+        return response()->download($zipPath, $zipFileName)->deleteFileAfterSend(true);
     }
 }

@@ -3,13 +3,19 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Message;
-use App\Models\User;
+use App\Services\FirestoreService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class MessageController extends Controller
 {
+    private $firestoreService;
+
+    public function __construct(FirestoreService $firestoreService)
+    {
+        $this->firestoreService = $firestoreService;
+    }
+
     public function index()
     {
         $messages = Message::with('user')->orderBy('created_at', 'desc')->get();

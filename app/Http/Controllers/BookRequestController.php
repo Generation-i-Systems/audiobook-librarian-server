@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\BookRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Services\FirestoreService;
 
 class BookRequestController extends Controller
 {
@@ -17,7 +17,8 @@ class BookRequestController extends Controller
             'description' => 'nullable|string',
         ]);
 
-        BookRequest::create([
+        $firestore = new \App\Services\FirestoreService();
+    $firestore->db->collection('book_requests')->add([
             'user_id' => Auth::id(),
             'title' => $request->title,
             'author' => $request->author,

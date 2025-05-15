@@ -2,17 +2,22 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
+use App\Services\FirestoreService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use App\Models\Message;
 
 class ProfileController extends Controller
 {
     public function index()
     {
-        $user = Auth::user();
+        $firestore = new FirestoreService();
+        $userId = Auth::id();
+        $userDoc = $firestore->db->collection('users')->document($userId)->snapshot();
+        $user = $userDoc->exists() ? $userDoc->data() : null;
+        if ($user) {
+            $user['id'] = $userId;
+        }
         return view('profile.index', compact('user'));
     }
 
@@ -23,11 +28,12 @@ class ProfileController extends Controller
             'email' => 'required|string|email|max:255|unique:users,email,' . Auth::id(),
         ]);
 
-        $user = Auth::user();
-        $user->name = $request->name;
-        $user->email = $request->email;
-        $user->save();
-
+        $firestore = new FirestoreService();
+        $userId = Auth::id();
+        $firestore->db->collection('users')->document($userId)->set([
+            'name' => $request->name,
+            'email' => $request->email
+        ], ['merge' => true]);
         return back()->with('success', 'Profile updated successfully!');
     }
 
@@ -38,15 +44,16 @@ class ProfileController extends Controller
             'password' => 'required|string|min:8|confirmed',
         ]);
 
-        $user = Auth::user();
-
-        if (!Hash::check($request->current_password, $user->password)) {
+        $firestore = new FirestoreService();
+        $userId = Auth::id();
+        $userDoc = $firestore->db->collection('users')->document($userId)->snapshot();
+        $user = $userDoc->exists() ? $userDoc->data() : null;
+        if (!$user || !Hash::check($request->current_password, $user['password'])) {
             return back()->withErrors(['current_password' => 'Incorrect current password.']);
         }
-
-        $user->password = Hash::make($request->password);
-        $user->save();
-
+        $firestore->db->collection('users')->document($userId)->set([
+            'password' => Hash::make($request->password)
+        ], ['merge' => true]);
         return back()->with('success', 'Password changed successfully!');
     }
 
@@ -56,15 +63,13 @@ class ProfileController extends Controller
             'content' => 'required|string',
         ]);
 
-        $user = Auth::user();
-        $user->save();
-
-        Message::create([
-            'user_id' => Auth::id(),
+        $firestore = new FirestoreService();
+        $userId = Auth::id();
+        $firestore->db->collection('messages')->add([
+            'user_id' => $userId,
             'content' => $request->input('content'),
             'is_from_admin' => false,
         ]);
-
         return back()->with('success', 'Admin permission request sent!');
     }
 }

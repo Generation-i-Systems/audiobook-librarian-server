@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Message;
+use App\Services\FirestoreService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -14,14 +14,24 @@ class MessageApiController extends Controller
         $request->validate(['content' => 'required|string']);
 
         // Messages from mobile apps will not have an authenticated user
-        $userId = Auth::check() ? Auth::id() : null;
+        $userId = auth()->check() ? auth()->id() : null;
 
-        $message = Message::create([
+        $firestore = new FirestoreService();
+        $firestore->db->collection('messages')->add([
             'user_id' => $userId,
             'content' => $request->input('content'),
             'is_from_admin' => false, // All messages via API are from users
         ]);
 
-        return response()->json($message, 201); // Created
+        $messagesDocs = $firestore->db->collection('messages')->where('user_id', '=', $userId)->documents();
+        $messages = [];
+        foreach ($messagesDocs as $doc) {
+            if ($doc->exists()) {
+                $data = $doc->data();
+                $data['id'] = $doc->id();
+                $messages[] = $data;
+            }
+        }
+        return response()->json($messages, 201); // Created
     }
 }

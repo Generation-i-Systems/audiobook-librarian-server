@@ -3,11 +3,10 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
-use App\Models\Message;
-use Illuminate\Foundation\Auth\RegistersUsers;
+use App\Services\FirestoreService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Foundation\Auth\RegistersUsers;
 
 class RegisterController extends Controller
 {
@@ -51,8 +50,8 @@ class RegisterController extends Controller
     {
         return Validator::make($data, [
             'name' => ['required', 'string', 'max:255'],
-            'username' => ['required', 'string', 'max:255', 'unique:users'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
+            'username' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
     }
@@ -61,27 +60,41 @@ class RegisterController extends Controller
      * Create a new user instance after a valid registration.
      *
      * @param  array  $data
-     * @return \App\Models\User
+     * @return array
      */
     protected function create(array $data)
     {
-        $user = User::create([
-            'name' => $data['name'],
-            'username' => $data['username'],
-            'email' => $data['email'],
-            'password' => Hash::make($data['password']),
-            'role' => 'unverified',
-        ]);
-
-        // Notify all admins about the new user
-        $adminUsers = User::where('role', 'admin')->get();
-        foreach ($adminUsers as $admin) {
-            Message::create([
-                'user_id' => $admin->id,
-                'content' => 'New user registered: ' . $user->name . ' (' . $user->email . '). <a href="' . url('/admin/users/' . $user->id . '/edit') . '">Edit User</a>',
-                'is_from_admin' => false,
-            ]);
+        $firestore = new \App\Services\FirestoreService();
+        // Check for existing username/email (Firestore doesn't have unique validation)
+        try {
+            $existingUsers = $firestore->getUserByCredentials(['username' => $data['username']]);
+            if ($existingUsers) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'username' => ['Username already exists.'],
+                ]);
+            }
+            $existingEmails = $firestore->getUserByCredentials(['email' => $data['email']]);
+            if ($existingEmails) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'email' => ['Email already exists.'],
+                ]);
+            }
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            \Log::error('Firestore user existence check failed: ' . $e->getMessage());
+            throw new \Exception('Could not validate user uniqueness: ' . $e->getMessage());
         }
-        return $user;
+
+        // Hash the password before storing
+        $data['password'] = \Illuminate\Support\Facades\Hash::make($data['password']);
+        // Optionally set other fields, e.g. created_at
+        $data['created_at'] = now();
+        $userId = $firestore->createUser($data);
+        if (!$userId) {
+            throw new \Exception('Failed to create user in Firestore.');
+        }
+        $data['id'] = $userId;
+        return new \App\Auth\FirestoreUser($data);
     }
 }

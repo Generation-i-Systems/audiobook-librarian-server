@@ -3,10 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Book;
-use App\Models\Genre;
-use App\Models\Author;
-use App\Models\Series;
+use App\Services\FirestoreService;
 use App\Services\GoogleBooksApiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -35,81 +32,78 @@ class BookController extends Controller
 
     public function index(Request $request)
     {
-        $query = Book::query();
+        $firestore = new FirestoreService();
+        $books = $firestore->listBooks();
 
-        // Filter by title (search)
+        // Filtering
         if ($request->filled('search')) {
-            $search = $request->input('search');
-            $query->where(function($q) use ($search) {
-                $q->where('title', 'like', "%{$search}%")
-                  ->orWhereHas('author', function ($authorQuery) use ($search) {
-                      $authorQuery->where('name', 'like', "%{$search}%");
-                  });
+            $search = strtolower($request->input('search'));
+            $books = array_filter($books, function($book) use ($search) {
+                return (isset($book['title']) && stripos($book['title'], $search) !== false)
+                    || (isset($book['author_name']) && stripos($book['author_name'], $search) !== false);
             });
         }
-
-        // Filter by author if set
         if ($request->filled('author_id')) {
-            $query->where('author_id', $request->input('author_id'));
+            $books = array_filter($books, function($book) use ($request) {
+                return isset($book['author_id']) && $book['author_id'] == $request->input('author_id');
+            });
         }
-
-        // Filter by genre if set
         if ($request->filled('genre_id')) {
-            $query->where('genre_id', $request->input('genre_id'));
+            $books = array_filter($books, function($book) use ($request) {
+                return isset($book['genre_id']) && $book['genre_id'] == $request->input('genre_id');
+            });
         }
-
-        // Sorting logic
+        // Sorting
         $sort = $request->input('sort', 'recent_desc');
-        switch ($sort) {
-            case 'recent_desc':
-                $query->orderBy('created_at', 'desc');
-                break;
-            case 'recent_asc':
-                $query->orderBy('created_at', 'asc');
-                break;
-            case 'author_asc':
-                $query->join('authors', 'books.author_id', '=', 'authors.id')
-                      ->orderBy('authors.name', 'asc')
-                      ->select('books.*');
-                break;
-            case 'author_desc':
-                $query->join('authors', 'books.author_id', '=', 'authors.id')
-                      ->orderBy('authors.name', 'desc')
-                      ->select('books.*');
-                break;
-            case 'title_asc':
-                $query->orderBy('title', 'asc');
-                break;
-            case 'title_desc':
-                $query->orderBy('title', 'desc');
-                break;
-            case 'year_asc':
-                $query->orderBy('published_year', 'asc');
-                break;
-            case 'year_desc':
-                $query->orderBy('published_year', 'desc');
-                break;
-            default:
-                $query->orderBy('created_at', 'desc');
-        }
-
-        $books = $query->with(['author', 'genre', 'series'])->paginate(20)->appends($request->except('page'));
-        return view('admin.books.index', compact('books', 'sort'));
+        $books = array_values($books);
+        usort($books, function($a, $b) use ($sort) {
+            switch ($sort) {
+                case 'recent_desc':
+                    return strtotime($b['created_at'] ?? 0) <=> strtotime($a['created_at'] ?? 0);
+                case 'recent_asc':
+                    return strtotime($a['created_at'] ?? 0) <=> strtotime($b['created_at'] ?? 0);
+                case 'author_asc':
+                    return strcmp($a['author_name'] ?? '', $b['author_name'] ?? '');
+                case 'author_desc':
+                    return strcmp($b['author_name'] ?? '', $a['author_name'] ?? '');
+                case 'title_asc':
+                    return strcmp($a['title'] ?? '', $b['title'] ?? '');
+                case 'title_desc':
+                    return strcmp($b['title'] ?? '', $a['title'] ?? '');
+                case 'year_asc':
+                    return ($a['published_year'] ?? 0) <=> ($b['published_year'] ?? 0);
+                case 'year_desc':
+                    return ($b['published_year'] ?? 0) <=> ($a['published_year'] ?? 0);
+                default:
+                    return strtotime($b['created_at'] ?? 0) <=> strtotime($a['created_at'] ?? 0);
+            }
+        });
+        // Pagination
+        $page = max(1, (int)$request->input('page', 1));
+        $perPage = 20;
+        $total = count($books);
+        $books = array_slice($books, ($page - 1) * $perPage, $perPage);
+        // Return view (update as needed for array pagination)
+        return view('admin.books.index', [
+            'books' => $books,
+            'sort' => $sort,
+            'total' => $total,
+            'perPage' => $perPage,
+            'currentPage' => $page
+        ]);
     }
 
     public function create(Request $request)
     {
-        if ($request->path) {
-            $initial = $this->processDirPath($request->path);
-        } else {
-            $initial = new Book();
-            $initial->directory_path = $request->path;
-        }
+        $firestore = new FirestoreService();
+        $initial = [
+            'directory_path' => $request->path
+        ];
         $coverCandidates = [];
         $coverAuto = null;
         $biggestCover = null;
         $biggestSize = 0;
-        $directory_path = $request->old('directory_path') ?? $initial->directory_path ?? '';
+        $directory_path = $request->old('directory_path') ?? $initial['directory_path'] ?? '';
         if ($directory_path) {
             [$coverAuto, $coverCandidates] = $this->findCoverImageCandidate($directory_path);
             // If no cover and no images, try m4b extraction
@@ -127,16 +121,16 @@ class BookController extends Controller
                         }
                         $tags = $this->extractTagData($firstM4b);
                         if (!empty($tags['description'])) {
-                            $initial->description = $tags['description'];
+                            $initial['description'] = $tags['description'];
                         }
                     }
                     // Also check metadata.abs for description and year
                     $meta = $this->extractMetadataAbs($dir);
-                    if (!empty($meta['description']) && empty($initial->description)) {
-                        $initial->description = $meta['description'];
+                    if (!empty($meta['description']) && empty($initial['description'])) {
+                        $initial['description'] = $meta['description'];
                     }
-                    if (!empty($meta['year']) && empty($initial->published_year)) {
-                        $initial->published_year = $meta['year'];
+                    if (!empty($meta['year']) && empty($initial['published_year'])) {
+                        $initial['published_year'] = $meta['year'];
                     }
                 }
             }
@@ -155,9 +149,10 @@ class BookController extends Controller
                 }
             }
         }
-        $genreList = Genre::all();
-        $authorList = Author::all();
-        $seriesList = Series::all();
+        $firestore = new FirestoreService();
+        $genreList = $firestore->listGenres();
+        $authorList = $firestore->listAuthors();
+        $seriesList = $firestore->listSeries();
         if ($request->ajax()) {
             return view('admin.books.create_form', compact('genreList', 'authorList', 'seriesList', 'initial', 'coverCandidates', 'coverAuto', 'biggestCover', 'directory_path'))
                 ->with('isModal', true)
@@ -173,6 +168,8 @@ class BookController extends Controller
 
     public function store(Request $request)
     {
+        $firestore = new FirestoreService();
+
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'author_id' => 'required|string|max:255',
@@ -187,13 +184,13 @@ class BookController extends Controller
 
         // Handle author_id: create if not numeric
         if (!is_numeric($validated['author_id'])) {
-            $author = Author::firstOrCreate(['name' => $validated['author_id']]);
-            $validated['author_id'] = $author->id;
+            $author = $firestore->findOrCreateAuthorByName($validated['author_id']);
+            $validated['author_id'] = $author['id'];
         }
         // Handle series_id: create if not numeric and not empty
         if (!empty($validated['series_id']) && !is_numeric($validated['series_id'])) {
-            $series = Series::firstOrCreate(['name' => $validated['series_id']]);
-            $validated['series_id'] = $series->id;
+            $series = $firestore->findOrCreateSeriesByName($validated['series_id']);
+            $validated['series_id'] = $series['id'];
         }
 
         $originalDirectoryPath = $request->input('original_directory_path');
@@ -207,55 +204,51 @@ class BookController extends Controller
                 }
             }
         }
-        $book = new Book($validated);
-
-        // Handle cover image upload or import from autofill
+        // Handle cover image upload or import from autofill/candidate
+        $coverImagePath = null;
         if ($request->hasFile('cover_image')) {
             $ext = $request->file('cover_image')->getClientOriginalExtension();
-            $coverPath = ($book->directory_path ? trim($book->directory_path, '/') . '/' : '') . 'cover.' . $ext;
-            Storage::disk('books')->put($coverPath, file_get_contents($request->file('cover_image')->getRealPath()));
-            $book->cover_image = $coverPath;
+            $coverImagePath = ($validated['directory_path'] ? trim($validated['directory_path'], '/') . '/' : '') . 'cover.' . $ext;
+            Storage::disk('books')->put($coverImagePath, file_get_contents($request->file('cover_image')->getRealPath()));
+            $validated['cover_image'] = $coverImagePath;
         } elseif ($request->input('cover_image_url')) {
-            // Ensure the book's directory exists before importing
-            $dirPath = $book->directory_path;
+            // Generate dirPath if not provided
+            $dirPath = $validated['directory_path'] ?? null;
             if (!$dirPath) {
-                // Predict the directory as it will be set below
-                if ($request->directory_path) {
-                    $dirPath = $request->directory_path;
+                if (!empty($validated['series_id'])) {
+                    $series = $firestore->getSeries($validated['series_id']);
+                    $seriesName = $series ? $series->name : '';
+                    $genreName = !empty($validated['genre_id']) ? (($g = $firestore->getGenre($validated['genre_id'])) ? $g['name'] : '') : '';
+                    $authorName = !empty($validated['author_id']) ? (($a = $firestore->getAuthor($validated['author_id'])) ? $a['name'] : '') : '';
+                    $dirPath = '/' . implode('/', [
+                        $genreName,
+                        $authorName,
+                        $seriesName,
+                        ($validated['series_number'] ? $validated['series_number'] . ' ' : '') . $validated['title']
+                    ]);
                 } else {
-                    if (!empty($book->series_id)) {
-                        $series = Series::find($book->series_id);
-                        $seriesName = $series ? $series->name : '';
-                        $bookDirectory = '/' . implode('/', [
-                            $book->genre_id ? Genre::find($book->genre_id)->name : '',
-                            $book->author_id ? Author::find($book->author_id)->name : '',
-                            $seriesName,
-                            ($book->series_number ? $book->series_number . ' ' : '') . $book->title
-                        ]);
-                    } else {
-                        $bookDirectory = '/' . implode('/', [
-                            $book->genre_id ? Genre::find($book->genre_id)->name : '',
-                            $book->author_id ? Author::find($book->author_id)->name : '',
-                            $book->title
-                        ]);
-                    }
-                    $dirPath = $bookDirectory;
+                    $genreName = !empty($validated['genre_id']) ? (($g = $firestore->getGenre($validated['genre_id'])) ? $g['name'] : '') : '';
+                    $authorName = !empty($validated['author_id']) ? (($a = $firestore->getAuthor($validated['author_id'])) ? $a['name'] : '') : '';
+                    $dirPath = '/' . implode('/', [
+                        $genreName,
+                        $authorName,
+                        $validated['title']
+                    ]);
                 }
             }
             if ($this->storagePath && $dirPath) {
                 Storage::makeDirectory($this->storagePath . '/' . ltrim($dirPath, '/'));
             }
-            $coverPath = $this->importCoverImageFromUrl($request->input('cover_image_url'), $dirPath);
-            if ($coverPath) {
-                $book->cover_image = $coverPath;
+            $coverImagePath = $this->importCoverImageFromUrl($request->input('cover_image_url'), $dirPath);
+            if ($coverImagePath) {
+                $validated['cover_image'] = $coverImagePath;
             }
         } elseif ($request->filled('cover_image_candidate')) {
-            // Use selected candidate from directory
             $candidate = $request->input('cover_image_candidate');
-            $book->cover_image = ltrim($book->directory_path, '/') . '/' . $candidate;
+            $validated['cover_image'] = ltrim($validated['directory_path'], '/') . '/' . $candidate;
         }
-
-        $book->save();
+        // Create book in Firestore with correct cover_image
+        $bookId = $firestore->createBook($validated);
 
         // Handle Book File Uploads and directory creation
         if (!$this->storagePath) {
@@ -266,15 +259,29 @@ class BookController extends Controller
         if ($request->directory_path) {
             $bookDirectory = $request->directory_path;
         } else {
-            if ($book->series) {
-                $bookDirectory = '/' . implode('/', [$book->genre->name, $book->author->name, $book->series->name, $book->series_number . ' ' . $book->title]);
+            $firestore = new FirestoreService();
+            if (!empty($validated['series_id'])) {
+                $series = $firestore->getSeries($validated['series_id']);
+                $seriesName = $series ? $series['name'] : '';
+                $genreName = !empty($validated['genre_id']) ? (($g = $firestore->getGenre($validated['genre_id'])) ? $g['name'] : '') : '';
+                $authorName = !empty($validated['author_id']) ? (($a = $firestore->getAuthor($validated['author_id'])) ? $a['name'] : '') : '';
+                $bookDirectory = '/' . implode('/', [
+                    $genreName,
+                    $authorName,
+                    $seriesName,
+                    ($validated['series_number'] ? $validated['series_number'] . ' ' : '') . $validated['title']
+                ]);
             } else {
-                $bookDirectory = '/' . implode('/', [$book->genre->name, $book->author->name, $book->title]);
+                $genreName = !empty($validated['genre_id']) ? (($g = $firestore->getGenre($validated['genre_id'])) ? $g['name'] : '') : '';
+                $authorName = !empty($validated['author_id']) ? (($a = $firestore->getAuthor($validated['author_id'])) ? $a['name'] : '') : '';
+                $bookDirectory = '/' . implode('/', [
+                    $genreName,
+                    $authorName,
+                    $validated['title']
+                ]);
             }
         }
         Storage::makeDirectory($this->storagePath . '/' . $bookDirectory); // Creates a directory in storage/app/public/books/{book_id}
-
-        $book->directory_path = $bookDirectory;  //relative path to the book directory
 
         if ($request->hasFile('book_files')) {
             $files = $request->file('book_files');
@@ -284,32 +291,38 @@ class BookController extends Controller
             }
         }
 
-        $book->save();
-
-        return redirect()->route('admin.books.show', $book)->with('success', 'Book created successfully!');
+        // TODO: Replace with appropriate FirestoreService logic to get the new book's ID, or redirect to the book list if not available
+        return redirect()->route('admin.books.index')->with('success', 'Book created successfully!');
     }
 
-    public function show(Book $book)
+    public function show($id)
     {
+        $firestore = new FirestoreService();
+        $book = $firestore->getBook($id);
+        if (!$book) abort(404);
         return view('admin.books.show', compact('book'));
     }
 
-    public function edit(Book $book, Request $request)
+    public function edit($id, Request $request)
     {
-        $authorList = Author::all();
-        $genreList = Genre::all();
-        $seriesList = Series::all();
+        $firestore = new FirestoreService();
+        $book = $firestore->getBook($id);
+        if (!$book) abort(404);
+        $firestore = new FirestoreService();
+        $authorList = $firestore->listAuthors();
+        $genreList = $firestore->listGenres();
+        $seriesList = $firestore->listSeries();
 
         // If no cover image, find image candidates in directory
         $coverCandidates = [];
         $coverAuto = null;
         $biggestCover = null;
         $biggestSize = 0;
-        if (empty($book->cover_image) && $book->directory_path) {
-            list($coverAuto, $coverCandidates) = $this->findCoverImageCandidate($book->directory_path);
+        if (empty($book['cover_image']) && !empty($book['directory_path'])) {
+            list($coverAuto, $coverCandidates) = $this->findCoverImageCandidate($book['directory_path']);
             // If no cover and no images, try m4b extraction
             if (empty($coverAuto) && empty($coverCandidates)) {
-                $dir = rtrim($this->storagePath, '/') . '/' . ltrim($book->directory_path, '/');
+                $dir = rtrim($this->storagePath, '/') . '/' . ltrim($book['directory_path'], '/');
                 if (is_dir($dir)) {
                     $m4bs = array_values(array_filter(scandir($dir), function ($f) use ($dir) {
                         return is_file($dir . '/' . $f) && strtolower(pathinfo($f, PATHINFO_EXTENSION)) === 'm4b';
@@ -319,28 +332,28 @@ class BookController extends Controller
                         $coverFile = $this->extractCoverFromM4B($firstM4b, $dir);
                         if ($coverFile) {
                             $coverAuto = $coverFile;
-                            $book->cover_image = ltrim($book->directory_path, '/') . '/' . $coverFile;
+                            $book['cover_image'] = ltrim($book['directory_path'], '/') . '/' . $coverFile;
                         }
-                        if (empty($book->description)) {
+                        if (empty($book['description'])) {
                             $tags = $this->extractTagData($firstM4b);
                             if (!empty($tags['description'])) {
-                                $book->description = $tags['description'];
+                                $book['description'] = $tags['description'];
                             }
                         }
                     }
                     // Also check metadata.abs for description and year
                     $meta = $this->extractMetadataAbs($dir);
-                    if (!empty($meta['description']) && empty($book->description)) {
-                        $book->description = $meta['description'];
+                    if (!empty($meta['description']) && empty($book['description'])) {
+                        $book['description'] = $meta['description'];
                     }
-                    if (!empty($meta['year']) && empty($book->published_year)) {
-                        $book->published_year = $meta['year'];
+                    if (!empty($meta['year']) && empty($book['published_year'])) {
+                        $book['published_year'] = $meta['year'];
                     }
                 }
             }
         }
-        if ($book->directory_path && Storage::disk('books')->exists($book->directory_path)) {
-            $files = Storage::disk('books')->files($book->directory_path);
+        if ($book['directory_path'] && Storage::disk('books')->exists($book['directory_path'])) {
+            $files = Storage::disk('books')->files($book['directory_path']);
             foreach ($files as $file) {
                 if (preg_match('/\.(jpe?g|png|gif|svg)$/i', $file)) {
                     $candidate = basename($file);
@@ -359,16 +372,16 @@ class BookController extends Controller
         $coverCandidatesForDefault = [];
         if ($request->hasFile('cover_image')) {
             $ext = $request->file('cover_image')->getClientOriginalExtension();
-            $coverPath = ($book->directory_path ? trim($book->directory_path, '/') . '/' : '') . 'cover.' . $ext;
+            $coverPath = ($book['directory_path'] ? trim($book['directory_path'], '/') . '/' : '') . 'cover.' . $ext;
             Storage::disk('books')->put($coverPath, file_get_contents($request->file('cover_image')->getRealPath()));
-            $book->cover_image = $coverPath;
+            $book['cover_image'] = $coverPath;
             Log::info('Book Edit: cover_image uploaded via file to ' . $coverPath);
             $coverCandidatesForDefault[] = [
                 'path' => $coverPath,
                 'size' => Storage::disk('books')->size($coverPath)
             ];
         } elseif ($request->input('cover_image_path')) {
-            $book->cover_image = $request->input('cover_image_path');
+            $book['cover_image'] = $request->input('cover_image_path');
             Log::info('Book Edit: cover_image_path = ' . $request->input('cover_image_path'));
             $coverCandidatesForDefault[] = [
                 'path' => $request->input('cover_image_path'),
@@ -377,21 +390,33 @@ class BookController extends Controller
         } elseif ($request->input('cover_image_url')) {
             Log::info('Book Edit: Importing cover image from URL: ' . $request->input('cover_image_url'));
             // Ensure the book's directory exists before importing
-            $dirPath = $book->directory_path;
+            $dirPath = $book['directory_path'];
             if (!$dirPath) {
                 // Predict the directory as it will be set below
                 if ($request->directory_path) {
                     $dirPath = $request->directory_path;
                 } else {
-                    if (!empty($book->series_id)) {
-                        $series = Series::find($book->series_id);
-                        $bookDirectory = join('_', [
-                            $book->genre_id ? Genre::find($book->genre_id)->name : '',
-                            $book->author_id ? Author::find($book->author_id)->name : '',
-                            $book->title
+                    $firestore = new \App\Services\FirestoreService();
+                    if (!empty($book['series_id'])) {
+                        $series = $firestore->getSeries($book['series_id']);
+                        $seriesName = $series ? $series['name'] : '';
+                        $genreName = !empty($book['genre_id']) ? (($g = $firestore->getGenre($book['genre_id'])) ? $g['name'] : '') : '';
+                        $authorName = !empty($book['author_id']) ? (($a = $firestore->getAuthor($book['author_id'])) ? $a['name'] : '') : '';
+                        $dirPath = '/' . implode('/', [
+                            $genreName,
+                            $authorName,
+                            $seriesName,
+                            ($book['series_number'] ? $book['series_number'] . ' ' : '') . $book['title']
+                        ]);
+                    } else {
+                        $genreName = !empty($book['genre_id']) ? (($g = $firestore->getGenre($book['genre_id'])) ? $g['name'] : '') : '';
+                        $authorName = !empty($book['author_id']) ? (($a = $firestore->getAuthor($book['author_id'])) ? $a['name'] : '') : '';
+                        $dirPath = '/' . implode('/', [
+                            $genreName,
+                            $authorName,
+                            $book['title']
                         ]);
                     }
-                    $dirPath = $bookDirectory;
                 }
             }
             if ($this->storagePath && $dirPath) {
@@ -400,7 +425,7 @@ class BookController extends Controller
             $coverPath = $this->importCoverImageFromUrl($request->input('cover_image_url'), $dirPath);
             Log::info('Book Edit: importCoverImageFromUrl returned: ' . ($coverPath ?: 'null'));
             if ($coverPath) {
-                $book->cover_image = $coverPath;
+                $book['cover_image'] = $coverPath;
                 $coverCandidatesForDefault[] = [
                     'path' => $coverPath,
                     'size' => Storage::disk('books')->exists($coverPath) ? Storage::disk('books')->size($coverPath) : 0
@@ -409,8 +434,8 @@ class BookController extends Controller
         } elseif ($request->filled('cover_image_candidate')) {
             // Use selected candidate from directory
             $candidate = $request->input('cover_image_candidate');
-            $candidatePath = ltrim($book->directory_path, '/') . '/' . $candidate;
-            $book->cover_image = $candidatePath;
+            $candidatePath = ltrim($book['directory_path'], '/') . '/' . $candidate;
+            $book['cover_image'] = $candidatePath;
             $coverCandidatesForDefault[] = [
                 'path' => $candidatePath,
                 'size' => Storage::disk('books')->exists($candidatePath) ? Storage::disk('books')->size($candidatePath) : 0
@@ -421,7 +446,7 @@ class BookController extends Controller
             usort($coverCandidatesForDefault, function ($a, $b) {
                 return $b['size'] <=> $a['size'];
             });
-            $book->cover_image = $coverCandidatesForDefault[0]['path'];
+            $book['cover_image'] = $coverCandidatesForDefault[0]['path'];
         }
 
         return view(
@@ -430,9 +455,11 @@ class BookController extends Controller
         );
     }
 
-    public function update(Request $request, Book $book)
+    public function update(Request $request, $id)
     {
-        $storagePath = env('BOOK_STORAGE_PATH');
+        $firestore = new FirestoreService();
+        $book = $firestore->getBook($id);
+        if (!$book) abort(404);
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'author_id' => 'required|string|max:255',
@@ -447,16 +474,16 @@ class BookController extends Controller
 
         // Handle author_id: create if not numeric
         if (!is_numeric($validated['author_id'])) {
-            $author = Author::firstOrCreate(['name' => $validated['author_id']]);
-            $validated['author_id'] = $author->id;
+            $author = $firestore->findOrCreateAuthorByName($validated['author_id']);
+            $validated['author_id'] = $author['id'];
         }
         // Handle series_id: create if not numeric and not empty
         if (!empty($validated['series_id']) && !is_numeric($validated['series_id'])) {
-            $series = Series::firstOrCreate(['name' => $validated['series_id']]);
-            $validated['series_id'] = $series->id;
+            $series = $firestore->findOrCreateSeriesByName($validated['series_id']);
+            $validated['series_id'] = $series['id'];
         }
 
-        $oldDirectoryPath = $book->directory_path;
+        $oldDirectoryPath = $book['directory_path'];
         $newDirectoryPath = $validated['directory_path'] ?? $oldDirectoryPath;
         if ($oldDirectoryPath && $newDirectoryPath && $oldDirectoryPath !== $newDirectoryPath) {
             $oldAbs = $this->storagePath . '/' . ltrim($oldDirectoryPath, '/');
@@ -467,79 +494,72 @@ class BookController extends Controller
                 }
             }
         }
-        $book->fill($validated);
-
-        // Handle cover image upload or import from autofill
+        // Handle cover image upload or import from autofill/candidate (same as store)
+        $coverImagePath = null;
         if ($request->hasFile('cover_image')) {
             $ext = $request->file('cover_image')->getClientOriginalExtension();
-            $coverPath = ($book->directory_path ? trim($book->directory_path, '/') . '/' : '') . 'cover.' . $ext;
-            Storage::disk($storagePath)->put($coverPath, file_get_contents($request->file('cover_image')->getRealPath()));
-            $book->cover_image = $coverPath;
-        } elseif ($request->input('cover_image_path')) {
-            $book->cover_image = $request->input('cover_image_path');
+            $coverImagePath = ($newDirectoryPath ? trim($newDirectoryPath, '/') . '/' : '') . 'cover.' . $ext;
+            Storage::disk('books')->put($coverImagePath, file_get_contents($request->file('cover_image')->getRealPath()));
+            $validated['cover_image'] = $coverImagePath;
         } elseif ($request->input('cover_image_url')) {
-            // Ensure the book's directory exists before importing
-            $dirPath = $book->directory_path;
+            // Generate dirPath if not provided
+            $dirPath = $validated['directory_path'] ?? $book['directory_path'] ?? null;
             if (!$dirPath) {
-                // Predict the directory as it will be set below
-                if ($request->directory_path) {
-                    $dirPath = $request->directory_path;
+                $firestore = new \App\Services\FirestoreService();
+                if (!empty($validated['series_id'])) {
+                    $series = $firestore->getSeries($validated['series_id']);
+                    $seriesName = $series ? $series['name'] : '';
+                    $genreName = !empty($validated['genre_id']) ? (($g = $firestore->getGenre($validated['genre_id'])) ? $g['name'] : '') : '';
+                    $authorName = !empty($validated['author_id']) ? (($a = $firestore->getAuthor($validated['author_id'])) ? $a['name'] : '') : '';
+                    $dirPath = '/' . implode('/', [
+                        $genreName,
+                        $authorName,
+                        $seriesName,
+                        ($validated['series_number'] ? $validated['series_number'] . ' ' : '') . $validated['title']
+                    ]);
                 } else {
-                    if (!empty($book->series_id)) {
-                        $series = Series::find($book->series_id);
-                        $seriesName = $series ? $series->name : '';
-                        $bookDirectory = '/' . implode('/', [
-                            $book->genre_id ? Genre::find($book->genre_id)->name : '',
-                            $book->author_id ? Author::find($book->author_id)->name : '',
-                            $seriesName,
-                            ($book->series_number ? $book->series_number . ' ' : '') . $book->title
-                        ]);
-                    } else {
-                        $bookDirectory = '/' . implode('/', [
-                            $book->genre_id ? Genre::find($book->genre_id)->name : '',
-                            $book->author_id ? Author::find($book->author_id)->name : '',
-                            $book->title
-                        ]);
-                    }
-                    $dirPath = $bookDirectory;
+                    $genreName = !empty($validated['genre_id']) ? (($g = $firestore->getGenre($validated['genre_id'])) ? $g['name'] : '') : '';
+                    $authorName = !empty($validated['author_id']) ? (($a = $firestore->getAuthor($validated['author_id'])) ? $a['name'] : '') : '';
+                    $dirPath = '/' . implode('/', [
+                        $genreName,
+                        $authorName,
+                        $validated['title']
+                    ]);
                 }
             }
-            $storagePath = env('BOOK_STORAGE_PATH');
-            if ($storagePath && $dirPath) {
-                Storage::makeDirectory($storagePath . '/' . ltrim($dirPath, '/'));
+            if ($this->storagePath && $dirPath) {
+                Storage::makeDirectory($this->storagePath . '/' . ltrim($dirPath, '/'));
             }
-            $coverPath = $this->importCoverImageFromUrl($request->input('cover_image_url'), $dirPath);
-            if ($coverPath) {
-                $book->cover_image = $coverPath;
+            $coverImagePath = $this->importCoverImageFromUrl($request->input('cover_image_url'), $dirPath);
+            if ($coverImagePath) {
+                $validated['cover_image'] = $coverImagePath;
             }
         } elseif ($request->filled('cover_image_candidate')) {
-            // Use selected candidate from directory
             $candidate = $request->input('cover_image_candidate');
-            $dir = ltrim($book->directory_path, '/');
-            if (strpos($candidate, $dir . '/') === 0) {
-                $book->cover_image = $candidate;
-            } else {
-                $book->cover_image = $dir . '/' . $candidate;
-            }
+            $dir = ltrim($validated['directory_path'] ?? $book['directory_path'], '/');
+            $validated['cover_image'] = $dir ? ($dir . '/' . ltrim($candidate, '/')) : $candidate;
         }
 
-        $book->save();
+        $firestore->updateBook($id, $validated);
 
-        return redirect()->route('admin.books.show', $book)->with('success', 'Book updated successfully!');
+        return redirect()->route('admin.books.show', $id)->with('success', 'Book updated successfully!');
     }
 
     /**
      * Remove the specified book from storage.
      */
-    public function destroy(Book $book)
+    public function destroy($id)
     {
-        $book->delete();
+        $firestore = new FirestoreService();
+        $firestore->deleteBook($id);
         return redirect()->route('admin.books.index')->with('success', 'Book deleted successfully.');
     }
 
-    public function download(Book $book)
+    public function download($id)
     {
-        $directoryPath = $book->directory_path;
+        $firestore = new FirestoreService();
+        $book = $firestore->getBook($id);
+        $directoryPath = $book['directory_path'];
 
         if (!$directoryPath || !Storage::disk('books')->exists($directoryPath)) {
             abort(404, 'Book directory not found.');
@@ -708,14 +728,18 @@ class BookController extends Controller
     public function seriesAjax(Request $request)
     {
         $q = $request->input('q', '');
-        $series = Series::query()
-            ->when($q, function ($query, $q) {
-                $query->where('name', 'like', "%{$q}%");
-            })
-            ->orderBy('name')
-            ->limit(20)
-            ->get(['id', 'name']);
-        return response()->json(['data' => $series]);
+        $firestore = new \App\Services\FirestoreService();
+        $series = $firestore->listSeries();
+        if ($q) {
+            $series = array_filter($series, function($item) use ($q) {
+                return stripos($item['name'], $q) !== false;
+            });
+        }
+        usort($series, function($a, $b) {
+            return strcmp($a['name'], $b['name']);
+        });
+        $series = array_slice($series, 0, 20);
+        return response()->json(['data' => array_values($series)]);
     }
 
     /**
@@ -756,7 +780,14 @@ class BookController extends Controller
                 $oldRel = str_replace($this->storagePath, '', $path);
                 $newRel = str_replace($this->storagePath, '', $newPath);
                 Log::info("({$this->storagePath}) {$oldRel} -> {$newRel}");
-                Book::where('directory_path', $oldRel)->update(['directory_path' => $newRel]);
+                // Update Firestore books whose directory_path matches $oldRel
+                $firestore = new \App\Services\FirestoreService();
+                $booksToUpdate = array_filter($firestore->listBooks(), function($book) use ($oldRel) {
+                    return isset($book['directory_path']) && $book['directory_path'] === $oldRel;
+                });
+                foreach ($booksToUpdate as $book) {
+                    $firestore->updateBook($book['id'], ['directory_path' => $newRel]);
+                }
             }
             // Always return relative paths to the frontend!
             return response()->json([

@@ -2,12 +2,18 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Message;
+use App\Services\FirestoreService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 class MessageController extends Controller
 {
+    private $firestoreService;
+
+    public function __construct(FirestoreService $firestoreService)
+    {
+        $this->firestoreService = $firestoreService;
+    }
+
     public function store(Request $request)
     {
         $request->validate(['content' => 'required|string']);

@@ -17,6 +17,12 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+// TEMPORARY DEBUG: Dump all Firestore users
+Route::get('/firestore-users-dump', function () {
+    $result = \App\Services\FirestoreService::dumpAllUsers();
+    return response()->json($result);
+});
+
 Auth::routes();
 
 Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');

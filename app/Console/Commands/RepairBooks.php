@@ -5,7 +5,7 @@ namespace App\Console\Commands;
 use Illuminate\Support\Facades\Log;
 
 use Illuminate\Console\Command;
-use App\Models\Book;
+use App\Services\FirestoreService;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use App\Traits\BookImportTrait;

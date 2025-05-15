@@ -21,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
             'admin' => \App\Http\Middleware\CheckAdminRole::class,
             'standard' => \App\Http\Middleware\RequireStandardRole::class,
+            'firebase.auth' => \App\Http\Middleware\FirebaseAuth::class,
         ]);
         //
     })
