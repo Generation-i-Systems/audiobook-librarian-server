@@ -13,6 +13,66 @@ use App\Http\Controllers\AdminNotificationController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\ImageProxyController;
 
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Session;
+
+// --- DEBUG AUTH/SESSION ROUTES (local only) ---
+if (app()->environment('local')) {
+    Route::get('/debug/middleware', function (\Illuminate\Http\Request $request) {
+        return [
+            'route_middleware' => $request->route()->gatherMiddleware(),
+            'web_group' => \Illuminate\Support\Facades\Route::getMiddlewareGroups()['web'] ?? null,
+        ];
+    });
+
+    Route::get('/debug/auth', function () {
+        \App\Auth\FirestoreUserProvider::logAuthState(); // Log detailed state
+        return [
+            'auth_user' => Auth::user(),
+            'auth_id' => Auth::id(),
+            'session_id' => session()->getId(),
+            'session_data' => session()->all(),
+            'user_class' => Auth::user() ? get_class(Auth::user()) : null,
+            'guard' => Auth::getDefaultDriver(),
+            'provider' => config('auth.guards.' . Auth::getDefaultDriver() . '.provider'),
+            'session_driver' => config('session.driver'),
+            'session_cookie' => config('session.cookie'),
+            'session_cookie_value' => request()->cookie(config('session.cookie')),
+        ];
+    });
+    Route::get('/debug/session', function () {
+        return [
+            'session_id' => session()->getId(),
+            'session_data' => session()->all(),
+        ];
+    });
+    Route::get('/debug/sessiondb', function () {
+        $sessionId = session()->getId();
+        $row = null;
+        try {
+            $row = \DB::table('sessions')->where('id', $sessionId)->first();
+        } catch (\Exception $e) {
+            $row = $e->getMessage();
+        }
+        return [
+            'session_id' => $sessionId,
+            'db_row' => $row,
+        ];
+    });
+
+    Route::get('/debug/logout', function () {
+        Auth::logout();
+        session()->invalidate();
+        return ['status' => 'logged out'];
+    });
+
+    Route::get('/debug/session-write', function () {
+        session(['foo' => 'bar']);
+        return ['session_id' => session()->getId(), 'session_data' => session()->all()];
+    });
+}
+
 Route::get('/', function () {
     return view('welcome');
 });

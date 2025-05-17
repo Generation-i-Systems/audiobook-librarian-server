@@ -40,10 +40,10 @@ return [
             'driver' => 'session',
             'provider' => 'firestore',
         ],
-        'sanctum' => [
-            'driver' => 'sanctum',
-            'provider' => null,
-        ],
+        // 'sanctum' => [
+        //     'driver' => 'sanctum',
+        //     'provider' => null,
+        // ],
     ],
 
     /*
@@ -67,6 +67,7 @@ return [
         // Custom Firestore user provider
         'firestore' => [
             'driver' => 'firestore',
+            'model' => App\Auth\FirestoreUser::class,
             // 'model' => env('AUTH_MODEL', App\Models\User::class), // No longer needed
         ],
 

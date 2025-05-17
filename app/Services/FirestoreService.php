@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use Google\Cloud\Firestore\FirestoreClient;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 
 class FirestoreService
 {
@@ -19,18 +21,28 @@ class FirestoreService
 
     public function getUserById($identifier)
     {
-        error_log('getUserById: inProviderCall=' . (self::$inProviderCall ? 'true' : 'false'));
-        if (self::$inProviderCall) return null;
+        \Log::debug('getUserById: inProviderCall=' . (self::$inProviderCall ? 'true' : 'false'));
+        if (self::$inProviderCall) {
+            \Log::warning('getUserById: Recursion guard triggered, returning null');
+            return null;
+        }
         self::$inProviderCall = true;
         try {
-            if (!$this->db) return null;
+            if (!$this->db) {
+                \Log::error('getUserById: Firestore client not initialized');
+                return null;
+            }
             $snap = $this->db->collection('users')->document($identifier)->snapshot();
-            if (!$snap->exists()) return null;
+            if (!$snap->exists()) {
+                \Log::warning('getUserById: No user document found for id ' . $identifier);
+                return null;
+            }
             $user = $snap->data();
             $user['id'] = $identifier;
+            \Log::debug('getUserById: User found', ['user' => $user]);
             return $user;
         } catch (\Throwable $e) {
-            \Log::error('Firestore getUserById failed: ' . $e->getMessage());
+            Log::error('Firestore getUserById failed: ' . $e->getMessage());
             return null;
         } finally {
             self::$inProviderCall = false;
@@ -45,11 +57,9 @@ class FirestoreService
      */
     public function getUserByRememberToken($identifier, $token)
     {
-        error_log('getUserByRememberToken: inProviderCall=' . (self::$inProviderCall ? 'true' : 'false'));
-        if (self::$inProviderCall) return null;
-        self::$inProviderCall = true;
         try {
             if (!$this->db) return null;
+            Log::debug('getUserByRememberToken', ['identifier' => $identifier, 'token' => $token]);
             $snap = $this->db->collection('users')->document($identifier)->snapshot();
             if (!$snap->exists()) return null;
             $user = $snap->data();
@@ -59,7 +69,7 @@ class FirestoreService
             }
             return null;
         } catch (\Throwable $e) {
-            \Log::error('Firestore getUserByRememberToken failed: ' . $e->getMessage());
+            Log::error('Firestore getUserByRememberToken failed: ' . $e->getMessage());
             return null;
         } finally {
             self::$inProviderCall = false;
@@ -86,13 +96,17 @@ class FirestoreService
      */
     public function getUserByCredentials($credentials)
     {
-        error_log('getUserByCredentials: inProviderCall=' . (self::$inProviderCall ? 'true' : 'false'));
-        if (self::$inProviderCall) return null;
-        self::$inProviderCall = true;
         try {
-        if (!$this->db) return null;
+            // Only log which keys are being used, not values
+            Log::debug('getUserByCredentials', ['credential_keys' => array_keys($credentials)]);
+        if (!$this->db) {
+            Log::error('getUserByCredentials: db not initialized');
+            return null;
+        }
             $query = $this->db->collection('users');
             foreach ($credentials as $key => $value) {
+                if ($key === 'password') continue; // Never filter by password
+                Log::debug('getUserByCredentials: adding filter: ' . $key);
                 $query = $query->where($key, '=', $value);
             }
             $documents = $query->documents();
@@ -101,7 +115,7 @@ class FirestoreService
             $user['id'] = $documents->rows()[0]->id();
             return $user;
         } catch (\Throwable $e) {
-            \Log::error('Firestore getUserByCredentials failed: ' . $e->getMessage());
+            Log::error('Firestore getUserByCredentials failed: ' . $e->getMessage());
             return null;
         } finally {
             self::$inProviderCall = false;
@@ -117,24 +131,28 @@ class FirestoreService
      */
     public function validateUserCredentials($user, array $credentials)
     {
+        Log::debug('validateUserCredentials', ['user' => $user, 'credentials' => $credentials]);
         try {
             // FirestoreUser may be an object, so handle both
             $userArr = is_array($user) ? $user : (method_exists($user, 'getRawUser') ? $user->getRawUser() : []);
             if (!isset($userArr['password']) || !isset($credentials['password'])) {
-                \Log::debug('Missing password field', ['userArr' => $userArr, 'credentials' => $credentials]);
+                Log::debug('Missing password field', ['userArr' => $userArr, 'credentials' => $credentials]);
                 return false;
             }
             $plain = $credentials['password'];
             $hash = $userArr['password'];
-            $result = \Illuminate\Support\Facades\Hash::check($plain, $hash);
-            \Log::debug('Checking password', [
+            $result = Hash::check($plain, $hash);
+            Log::debug('validateUserCredentials: plain: ' . $plain);
+            Log::debug('validateUserCredentials: hash: ' . $hash);
+                Log::debug('Checking password', [
                 'plain' => $plain,
                 'hash' => $hash,
                 'result' => $result,
             ]);
+            Log::debug('validateUserCredentials result: ' . ($result ? 'true' : 'false'));
             return $result;
         } catch (\Throwable $e) {
-            \Log::error('Firestore validateUserCredentials failed: ' . $e->getMessage());
+            Log::error('Firestore validateUserCredentials failed: ' . $e->getMessage());
             return false;
         }
     }

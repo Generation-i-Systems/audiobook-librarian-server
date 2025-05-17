@@ -5,6 +5,7 @@ namespace App\Auth;
 use Illuminate\Contracts\Auth\UserProvider;
 use Illuminate\Contracts\Auth\Authenticatable;
 use App\Services\FirestoreService;
+use Illuminate\Support\Facades\Log;
 
 class FirestoreUserProvider implements UserProvider
 {
@@ -25,6 +26,7 @@ class FirestoreUserProvider implements UserProvider
      */
     public function rehashPasswordIfRequired(\Illuminate\Contracts\Auth\Authenticatable $user, array $credentials, bool $force = false): string
     {
+        \Log::debug('FirestoreUserProvider::rehashPasswordIfRequired called with user=' . print_r($user, true) . ', credentials=' . print_r($credentials, true) . ', force=' . $force);
         // Get the plain password from credentials
         $plain = $credentials['password'] ?? null;
         $currentHash = $user->getAuthPassword();
@@ -43,14 +45,12 @@ class FirestoreUserProvider implements UserProvider
 
     public function retrieveById($identifier)
     {
-        // Retrieve user by their unique identifier from Firestore
         $user = $this->firestore->getUserById($identifier);
         return $user ? new FirestoreUser($user) : null;
     }
 
     public function retrieveByToken($identifier, $token)
     {
-        // Retrieve user by their unique identifier and "remember me" token
         $user = $this->firestore->getUserByRememberToken($identifier, $token);
         return $user ? new FirestoreUser($user) : null;
     }
@@ -63,7 +63,6 @@ class FirestoreUserProvider implements UserProvider
 
     public function retrieveByCredentials(array $credentials)
     {
-        // Retrieve user by credentials (e.g., email)
         if (empty($credentials)) {
             return null;
         }
@@ -76,4 +75,6 @@ class FirestoreUserProvider implements UserProvider
         // Validate user credentials (e.g., password)
         return $this->firestore->validateUserCredentials($user, $credentials);
     }
+
+
 }

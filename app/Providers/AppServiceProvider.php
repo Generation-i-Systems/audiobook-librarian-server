@@ -21,6 +21,8 @@ class AppServiceProvider extends ServiceProvider
     {
         // Register custom Firestore user provider
         \Auth::provider('firestore', function ($app, array $config) {
+            \Log::info('Registered FirestoreUserProvider');
+
             return new \App\Auth\FirestoreUserProvider();
         });
     }

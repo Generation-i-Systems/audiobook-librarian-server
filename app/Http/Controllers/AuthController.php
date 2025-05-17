@@ -28,15 +28,12 @@ class AuthController extends Controller
         // Create an account request in Firestore
         $firestore = new FirestoreService();
         // Check if email already exists in users or account_requests
-        $existingUser = $firestore->db->collection('users')->where('email', '=', $request->email)->documents();
-        foreach ($existingUser as $doc) {
-            if ($doc->exists()) {
-                return response()->json(['email' => ['Email already exists.']], 400);
-            }
+        $existingUser = $firestore->getUserByCredentials(['email' => $request->email]);
+        if ($existingUser) {
+            return response()->json(['email' => ['Email already exists.']], 400);
         }
-        $existingRequest = $firestore->db->collection('account_requests')->where('email', '=', $request->email)->documents();
-        foreach ($existingRequest as $doc) {
-            if ($doc->exists()) {
+        $existingRequest = $firestore->getUserByCredentials(['email' => $request->email]);
+        if ($existingRequest) {
                 return response()->json(['email' => ['Account request already submitted with this email.']], 400);
             }
         }
