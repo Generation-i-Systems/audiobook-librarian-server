@@ -1,12 +1,10 @@
 @extends(isset($layout) ? $layout : 'layouts.app')
 
 @section('content')
-@dump($book)
 <div class="container">
     @if(empty($isModal))
         <h1>{{ isset($book) ? 'Edit Book' : 'Create New Book' }}</h1>
     @endif
-
     @if(session('error'))
         <div class="alert alert-danger">{{ session('error') }}</div>
     @endif
@@ -23,13 +21,13 @@
         </div>
     @endif
 
-    <form action="{{ isset($book) ? route('admin.books.update', ['book' => $book['id'] ?? 0]) : route('admin.books.store') }}"
+    <form action="{{ isset($book) ? route('admin.books.update', ['book' => $book['id']]) : route('admin.books.store') }}"
         method="POST" enctype="multipart/form-data" id="book-{{ isset($book) ? 'edit' : 'form' }}" class="mt-3">
         @csrf
         @if(isset($book))
             @method('PUT')
         @endif
-        @if(isset($book) && $book['directory_path'])
+        @if(isset($book) && !empty($book['directory_path']))
             <input type="hidden" name="original_directory_path" value="{{ $book['directory_path'] }}">
         @elseif(old('directory_path'))
             <input type="hidden" name="original_directory_path" value="{{ old('directory_path') }}">
@@ -39,7 +37,7 @@
         <div class="mb-3">
             <label for="title">Title:</label>
             <input type="text" class="form-control @error('title') is-invalid @enderror" id="title" name="title"
-                value="{{ old('title', isset($book) ? $book['title'] : ($initial['title'] ?? null)) }}" required>
+                value="{{ old('title', isset($book) && !empty($book['title']) ? $book['title'] : ($initial['title'] ?? null)) }}" required>
             @error('title')
                 <span class="invalid-feedback d-block">{{ $message }}</span>
             @enderror
@@ -48,7 +46,7 @@
             <label class="form-label">Authors</label>
             <div id="authors-group">
                 @php
-                    $authors = old('author', isset($book) ? (is_array($book['author']) ? $book['author'] : [$book['author']]) : ($initial['author'] ?? []));
+                    $authors = old('author', isset($book) && !empty($book['author']) ? (is_array($book['author']) ? $book['author'] : [$book['author']]) : ($initial['author'] ?? []));
                     if (!is_array($authors))
                         $authors = [$authors];
                 @endphp
@@ -80,7 +78,7 @@
 
                     // Log the raw series data for debugging
                     Log::debug('Series Data:', [
-                        'book_series' => $book['series'] ?? null,
+                        'book_series' => isset($book) && !empty($book['series']) ? $book['series'] : null,
                         'old_series' => $oldSeries,
                         'old_series_numbers' => $oldSeriesNumbers,
                     ]);
@@ -149,8 +147,8 @@
                 @endphp
                 @foreach($seriesList as $idx => $series)
                     @php
-                        $name = $series['name'] ?? '';
-                        $number = $series['number'] ?? '';
+                        $name = isset($series['name']) ? $series['name'] : '';
+                        $number = isset($series['number']) ? $series['number'] : '';
                         \Log::debug('Rendering series input', [
                             'series' => $series,
                             'name' => $name,
@@ -182,7 +180,7 @@
             <label>Genres</label>
             <div id="genres-group">
                 @php
-                    $genres = old('genre', isset($book) ? (is_array($book['genre']) ? $book['genre'] : [$book['genre']]) : ($initial['genre'] ?? []));
+                    $genres = old('genre', isset($book) && !empty($book['genre']) ? (is_array($book['genre']) ? $book['genre'] : [$book['genre']]) : ($initial['genre'] ?? []));
                     if (!is_array($genres))
                         $genres = [$genres];
                 @endphp
@@ -211,7 +209,7 @@
             <label for="published_year">Published Year (Optional):</label>
             <input type="number" class="form-control @error('published_year') is-invalid @enderror" id="published_year"
                 name="published_year" min="1000" max="9999"
-                value="{{ old('published_year', isset($book) ? $book['published_year'] : ($initial['published_year'] ?? null)) }}">
+                value="{{ old('published_year', isset($book) && !empty($book['published_year']) ? $book['published_year'] : ($initial['published_year'] ?? null)) }}">
             @error('published_year')
                 <span class="invalid-feedback d-block">{{ $message }}</span>
             @enderror
@@ -227,8 +225,8 @@
             </div>
         </div>
         @php
-            $dirPath = isset($book) ? $book['directory_path'] : ($directory_path ?? $initial['directory_path'] ?? null);
-            $coverImg = isset($book) ? $book['cover_image'] : ($initial['cover_image'] ?? null);
+            $dirPath = isset($book) && !empty($book['directory_path']) ? $book['directory_path'] : ($directory_path ?? ($initial['directory_path'] ?? null));
+            $coverImg = isset($book) && !empty($book['cover_image']) ? $book['cover_image'] : ($initial['cover_image'] ?? null);
             $coverAuto = $coverAuto ?? null;
             $coverCandidates = $coverCandidates ?? [];
             $coverOptions = [];
@@ -328,7 +326,7 @@
             <label for="description">Description (Optional):</label>
             <textarea class="form-control @error('description') is-invalid @enderror" id="description"
                 name="description"
-                rows="3">{{ old('description', isset($book) ? $book['description'] : ($initial['description'] ?? null)) }}</textarea>
+                rows="3">{{ old('description', isset($book) && !empty($book['description']) ? $book['description'] : ($initial['description'] ?? null)) }}</textarea>
             @error('description')
                 <span class="invalid-feedback d-block">{{ $message }}</span>
             @enderror
@@ -920,6 +918,79 @@
                     if (firstError) {
                         firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }
+                    return false;
+                }
+
+                // Handle AJAX form submission
+                if (window.self !== window.top) {  // Check if we're in an iframe/modal
+                    e.preventDefault();
+
+                    // Show loading state
+                    const submitButton = form.querySelector('button[type="submit"]');
+                    const originalButtonText = submitButton ? submitButton.innerHTML : '';
+                    if (submitButton) {
+                        submitButton.disabled = true;
+                        submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
+                    }
+
+                    // Prepare form data for AJAX
+                    const formData = new FormData(form);
+                    const url = form.getAttribute('action');
+                    const method = form.getAttribute('method');
+                    const isUpdate = !!'{{ isset($book) }}';
+
+                    fetch(url, {
+                        method: method,
+                        body: formData,
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Get the directory path from the form
+                            const directoryPath = document.querySelector('input[name="directory_path"]')?.value || '';
+
+                            // Update the action link in the parent window
+                            if (window.parent && window.parent.updateBookAction) {
+                                window.parent.updateBookAction(data.book_id, data.edit_url, directoryPath);
+                            }
+
+                            // Show success message
+                            alert('Book saved successfully!');
+
+                            // Close the modal if we're in one
+                            const modal = bootstrap.Modal.getInstance(form.closest('.modal'));
+                            if (modal) {
+                                modal.hide();
+                            }
+
+                            // If we're creating a new book, update the form action to point to the edit URL
+                            if (!isUpdate && data.edit_url) {
+                                form.action = data.edit_url;
+                                form.method = 'PUT';
+                            }
+                        } else {
+                            // Show error message
+                            alert(data.message || 'An error occurred while saving the book.');
+                            if (submitButton) {
+                                submitButton.disabled = false;
+                                submitButton.innerHTML = originalButtonText;
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('An error occurred while saving the book.');
+                        if (submitButton) {
+                            submitButton.disabled = false;
+                            submitButton.innerHTML = originalButtonText;
+                        }
+                    });
+
                     return false;
                 }
             });

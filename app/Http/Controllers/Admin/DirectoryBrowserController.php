@@ -7,9 +7,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
-
-
-
 class DirectoryBrowserController extends Controller
 {
 
@@ -29,11 +26,12 @@ class DirectoryBrowserController extends Controller
         $path = $request->input('path', $basePath);
         $filterLetter = $request->input('filter_letter');
         $search = $request->input('search');
-        if (!is_dir($basePath . $path)) {
+        if (!is_dir($basePath . '/' . $path)) {
+            Log::error('Path: ' . $basePath . '/' . $path . ' is not a directory');
             return response()->json(['error' => 'Invalid directory.'], 400);
         }
 
-        $files = $this->scanDirectory($basePath . $path);
+        $files = $this->scanDirectory($basePath . '/' . $path);
         if ($files === false) {
             Log::error('Attempt to perform a scandir but failed to get value.');
             return response()->json(['error' => 'The scan for all files has been invalid to be done.'], 400);
@@ -41,8 +39,9 @@ class DirectoryBrowserController extends Controller
         $data = [];
 
         foreach ($files as $file) {
-            if ($file === '.' || $file === '..')
+            if ($file === '.' || $file === '..') {
                 continue;
+            }
 
             // Filtering by letter
             if ($filterLetter && stripos($file, $filterLetter) !== 0) {
@@ -53,27 +52,21 @@ class DirectoryBrowserController extends Controller
                 continue;
             }
 
-            $filePath = $path . '/' . $file;
+            $filePath = ltrim($path . '/' . $file, '/');
             $isPotentialBookDirectory = $this->isPotentialBookDirectory($basePath . $filePath);
 
-            if (is_dir($basePath . $filePath)) {
-                $book = null;
-$firestore = new \App\Services\FirestoreService();
-foreach ($firestore->listBooks() as $b) {
-    if (!empty($b['directory_path']) && $b['directory_path'] === $filePath) {
-        $book = $b;
-        break;
-    }
-}
-                $bookId = $book?->id;
-                if ($this->isPotentialBookDirectory($basePath . $filePath)) {
-                    if ($book) {
+            if (is_dir($basePath . '/' . $filePath)) {
+                $firestore = new \App\Services\FirestoreService();
+                $book = $firestore->findBookByDirectoryPath($filePath);
+                $bookId = $book['id'] ?? null;
+                if ($this->isPotentialBookDirectory($basePath . '/' . $filePath)) {
+                    if (!empty($bookId)) {
                         $data[] = [
                             'type' => 'book',
+                            'id' => $bookId,  // Include book ID for frontend reference
                             'name' => $file,
                             'path' => $filePath,
-                            'edit' => route('admin.books.edit', ['book' => $book->id]),
-                            'bulk_import' => route('admin.books.bulkImportDir', ['dir' => $filePath]),
+                            'edit' => route('admin.books.edit', ['book' => $bookId]),
                         ];
                     } else {
                         $data[] = [
@@ -85,6 +78,7 @@ foreach ($firestore->listBooks() as $b) {
                         ];
                     }
                 } else {
+                    // Log::error('Not a book directory: ' . $basePath . '/' . $filePath);
                     $data[] = [
                         'type' => 'directory',
                         'name' => $file,

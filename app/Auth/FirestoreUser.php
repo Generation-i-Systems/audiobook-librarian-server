@@ -10,7 +10,6 @@ class FirestoreUser implements Authenticatable
 
     public function __construct(array $user)
     {
-        \Log::debug('FirestoreUser::__construct', ['user' => $user]);
         $this->user = $user;
     }
 
@@ -49,19 +48,6 @@ class FirestoreUser implements Authenticatable
     {
         return $this->user[$key] ?? null;
     }
-
-    /*
-    // Ensure user is serializable for session storage
-    public function __serialize(): array
-    {
-        return ['user' => $this->user];
-    }
-
-    public function __unserialize(array $data): void
-    {
-        $this->user = $data['user'];
-    }
-    */
 
     public function getRememberTokenName()
     {

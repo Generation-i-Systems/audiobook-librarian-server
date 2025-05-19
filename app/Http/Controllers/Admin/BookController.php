@@ -178,6 +178,13 @@ class BookController extends Controller
         }
         $firestore = new FirestoreService();
         $genreList = $firestore->listGenres();
+        $book = []; // Initialize empty book array
+
+        // Ensure directory_path is set in initial array
+        if (!isset($initial['directory_path'])) {
+            $initial['directory_path'] = '';
+        }
+
         if ($request->ajax()) {
             return view('admin.books.create_form', compact('genreList', 'initial', 'coverCandidates', 'coverAuto', 'biggestCover', 'directory_path'))
                 ->with('isModal', true)
@@ -335,6 +342,32 @@ class BookController extends Controller
                 $file->storeAs($this->storagePath . '/' . $bookDirectory, $filename);
             }
         }
+
+        if ($request->ajax()) {
+            // Render the row HTML for the new book
+            $rowHtml = view('admin.books.partials.directory_row', [
+                'item' => [
+                    'type' => 'book',
+                    'id' => $bookId,
+                    'name' => basename($book['directory_path']),
+                    'path' => $book['directory_path'],
+                    'edit_url' => route('admin.books.edit', ['book' => $bookId]),
+                    'created_at' => now(),
+                    'size' => 0,
+                    'mime_type' => 'directory',
+                    'book' => $book
+                ]
+            ])->render();
+
+            return response()->json([
+                'success' => true,
+                'book_id' => $bookId,
+                'edit_url' => route('admin.books.edit', ['book' => $bookId]),
+                'row_html' => $rowHtml,
+                'directory_path' => $book['directory_path']
+            ]);
+        }
+
         return redirect()->route('admin.books.index')->with('success', 'Book created successfully!');
     }
 
@@ -524,15 +557,15 @@ class BookController extends Controller
                 array_map('trim', $validated['series']),
                 fn($name) => $name !== ''
             );
-            
+
             // Get the series numbers, ensuring we have the same number of entries as filtered series
             $seriesNumbers = $validated['series_number'] ?? [];
-            
+
             // Combine the filtered series names with their corresponding numbers
             foreach ($filteredSeries as $i => $seriesName) {
                 $number = $seriesNumbers[$i] ?? null;
                 $newBook['series'][$seriesName] = $number !== null && $number !== ''
-                    ? (is_numeric($number) ? (float)$number : $number)
+                    ? (is_numeric($number) ? (float) $number : $number)
                     : null;
             }
         }
@@ -573,11 +606,11 @@ class BookController extends Controller
         }
 
         // Debug: Dump the data being sent to Firestore
-        \Log::debug('Updating book in Firestore', [
+        Log::debug('Updating book in Firestore', [
             'book_id' => $id,
-            'data' => $newBook
+            'data' => $newBook,
         ]);
-        
+
         $firestore->updateBook($id, $newBook);
 
         return redirect()->route('admin.books.show', $id)->with('success', 'Book updated successfully!');

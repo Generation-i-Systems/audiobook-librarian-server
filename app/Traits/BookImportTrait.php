@@ -99,7 +99,7 @@ trait BookImportTrait
             '-an',
             '-vcodec',
             'copy',
-            $outputImage
+            $outputImage,
         ]);
         $process->run();
         if ($process->isSuccessful() && file_exists($outputImage)) {
@@ -214,7 +214,6 @@ trait BookImportTrait
         $seriesParent = null;
 
         $parts = explode('/', trim($directoryPath, '/'));
-        dump($parts);
 
         $genre = array_shift($parts);
         if (count($parts) > 0 && $parts[0] == 'R') {
@@ -256,13 +255,6 @@ trait BookImportTrait
             }
         }
 
-        print "Processing directory path: {$directoryPath}\n";
-        print "Genre: {$genre}\n";
-        print "Author: {$author}\n";
-        print "Series: {$series}\n";
-        print "Series Number: {$seriesNumber}\n";
-        print "Title: {$title}\n";
-
         $book['genre'] = [$genre];
 
         //if author contains 'and', '&' or ',', split into multiple authors and each author is more than 4 letters
@@ -288,21 +280,16 @@ trait BookImportTrait
 
         if (!empty($series)) {
             if (empty($seriesNumber)) {
-                $book['series'][] = [$series => null];
+                $book['series'] = [$series => null];
             } else {
-                $book['series'][] = [$series => $seriesNumber];
+                $book['series'] = [$series => $seriesNumber];
                 if ($seriesParent) {
-                    $book['series'][] = ["$seriesParent/$series" => $seriesNumber];
+                    $book['series'] = ["$seriesParent/$series" => $seriesNumber];
                 }
             }
         }
 
         $book['title'] = $title;
-        dump($book);
-
-        // print "Book: " . json_encode($book) . "\n";
-        // print "\n";
-
         return $book;
     }
 
@@ -444,7 +431,7 @@ trait BookImportTrait
                 $bestMatch = $item;
             }
         }
-        usort($matches, function($a, $b) {
+        usort($matches, function ($a, $b) {
             return $b['score'] <=> $a['score'];
         });
         // Only consider a close match if score is very high (stricter)

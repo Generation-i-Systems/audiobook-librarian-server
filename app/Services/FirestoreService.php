@@ -23,17 +23,14 @@ class FirestoreService
     {
         try {
             if (!$this->db) {
-                Log::error('getUserById: Firestore client not initialized');
                 return null;
             }
             $snap = $this->db->collection('users')->document($identifier)->snapshot();
             if (!$snap->exists()) {
-                Log::warning('getUserById: No user document found for id ' . $identifier);
                 return null;
             }
             $user = $snap->data();
             $user['id'] = $identifier;
-            Log::debug('getUserById: User found', ['user' => $user]);
             return $user;
         } catch (\Throwable $e) {
             Log::error('Firestore getUserById failed: ' . $e->getMessage());
@@ -53,13 +50,10 @@ class FirestoreService
     {
         try {
             if (!$this->db) {
-                Log::error('getUserByRememberToken: Firestore client not initialized');
                 return null;
             }
-            Log::debug('getUserByRememberToken', ['identifier' => $identifier, 'token' => $token]);
             $snap = $this->db->collection('users')->document($identifier)->snapshot();
             if (!$snap->exists()) {
-                Log::warning('getUserByRememberToken: No user document found for id ' . $identifier);
                 return null;
             }
             $user = $snap->data();
@@ -360,17 +354,39 @@ class FirestoreService
     }
 
     /**
+     * Get a list of unique authors that are currently being used in books
      * @return array
      */
     public function listAuthors()
     {
-        $documents = $this->db->collection('authors')->documents();
-        $authors = [];
+        // First, get all books that have authors
+        $booksQuery = $this->db->collection('books')
+            ->where('author', '!=', null);
+
+        $documents = $booksQuery->documents();
+
+        // Extract and deduplicate authors
+        $uniqueAuthors = [];
+
         foreach ($documents as $doc) {
-            $author = $doc->data();
-            $author['id'] = $doc->id();
-            $authors[] = $author;
+            $bookData = $doc->data();
+            if (!empty($bookData['author']) && is_array($bookData['author'])) {
+                foreach ($bookData['author'] as $authorName) {
+                    if (!empty($authorName) && !isset($uniqueAuthors[$authorName])) {
+                        $uniqueAuthors[$authorName] = [
+                            'name' => $authorName,
+                            'id' => $authorName // Using name as ID since we're not storing in authors collection
+                        ];
+                    }
+                }
+            }
         }
+
+        // Convert to indexed array and sort alphabetically by author name
+        $authors = array_values($uniqueAuthors);
+        usort($authors, function ($a, $b) {
+            return strcasecmp($a['name'], $b['name']);
+        });
         return $authors;
     }
 
@@ -447,6 +463,29 @@ class FirestoreService
             $series[] = $ser;
         }
         return $series;
+    }
+
+    /**
+     * Find a book by its directory path
+     *
+     * @param string $directoryPath
+     * @return array|null Returns book data if found, null otherwise
+     */
+    public function findBookByDirectoryPath(string $directoryPath): ?array
+    {
+        $query = $this->db->collection('books')
+            ->where('directory_path', '=', $directoryPath)
+            ->limit(1);
+
+        $documents = $query->documents();
+
+        foreach ($documents as $document) {
+            if ($document->exists()) {
+                return array_merge(['id' => $document->id()], $document->data());
+            }
+        }
+
+        return null;
     }
 
     // BOOK QUEUE (STUBS)

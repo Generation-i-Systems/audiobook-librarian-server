@@ -16,13 +16,15 @@
                 <label>Filter by first letter:</label>
                 <div id="letter-filter" class="btn-group btn-group-sm" role="group">
                     <button type="button" class="btn btn-outline-secondary" data-letter="">All</button>
-                    @foreach(range('A','Z') as $letter)
-                        <button type="button" class="btn btn-outline-secondary" data-letter="{{ $letter }}">{{ $letter }}</button>
+                    @foreach(range('A', 'Z') as $letter)
+                        <button type="button" class="btn btn-outline-secondary"
+                            data-letter="{{ $letter }}">{{ $letter }}</button>
                     @endforeach
                 </div>
             </div>
             <div>
-                <input type="text" id="search-filter" class="form-control form-control-sm" placeholder="Search directories..." style="width: 200px; display: inline-block;" />
+                <input type="text" id="search-filter" class="form-control form-control-sm"
+                    placeholder="Search directories..." style="width: 200px; display: inline-block;" />
             </div>
         </div>
 
@@ -92,11 +94,32 @@
                 color: #888;
             }
 
-            .btn-primary { background-color: #007bff !important; color: #fff !important; }
-            .btn-success { background-color: #28a745 !important; color: #fff !important; }
-            .btn-danger { background-color: #dc3545 !important; color: #fff !important; }
-            .open-add-book-modal { background-color: #28a745 !important; color: #fff !important; border: none !important; }
-            .open-edit-book-modal { background-color: #007bff !important; color: #fff !important; border: none !important; }
+            .btn-primary {
+                background-color: #007bff !important;
+                color: #fff !important;
+            }
+
+            .btn-success {
+                background-color: #28a745 !important;
+                color: #fff !important;
+            }
+
+            .btn-danger {
+                background-color: #dc3545 !important;
+                color: #fff !important;
+            }
+
+            .open-add-book-modal {
+                background-color: #28a745 !important;
+                color: #fff !important;
+                border: none !important;
+            }
+
+            .open-edit-book-modal {
+                background-color: #007bff !important;
+                color: #fff !important;
+                border: none !important;
+            }
         </style>
 
         <!-- Add Book Modal -->
@@ -147,6 +170,15 @@
                     return text.replace(/[&<>"']/g, function (m) { return map[m]; });
                 }
 
+                // Handle browser back/forward buttons
+                window.onpopstate = function(event) {
+                    if (event.state && event.state.path !== undefined) {
+                        loadDirectory(event.state.path, false, false);
+                    } else {
+                        loadDirectory('', false, false);
+                    }
+                };
+
                 function updateBreadcrumbs(path) {
                     let pathParts = path.split('/');
                     var html = '<ul class="breadcrumb">';
@@ -174,7 +206,12 @@
                         html += '<tr><td colspan="3"><a href="#" class="previous-link" data-path="' + escapeHtml(parentPath) + '"><i class="fas fa-arrow-left"></i> Previous</a></td></tr>';
                     }
                     data.forEach(function (item) {
-                        html += '<tr>';
+                        // Add data-book-id attribute for book rows
+                        if (item.type === 'book' && item.id) {
+                            html += '<tr data-book-id="' + escapeHtml(item.id) + '">';
+                        } else {
+                            html += '<tr>';
+                        }
                         // Directory name: clickable for directories
                         if (item.type === 'directory') {
                             html += '<td><a href="#" class="directory-link" data-path="' + escapeHtml(item.path) + '">' + escapeHtml(item.name) + '</a></td>';
@@ -219,7 +256,7 @@
                 });
 
                 // Breadcrumb navigation
-                $(document).on('click', '.breadcrumb-link', function(e) {
+                $(document).on('click', '.breadcrumb-link', function (e) {
                     e.preventDefault();
                     const path = $(this).data('path') ?? '';
                     loadDirectory(path);
@@ -233,7 +270,7 @@
                 });
 
                 // Inline rename button event
-                $(document).on('click', '.rename-dir-btn', function(e) {
+                $(document).on('click', '.rename-dir-btn', function (e) {
                     e.preventDefault();
                     const $row = $(this).closest('tr');
                     $row.find('.rename-dir-btn').addClass('d-none');
@@ -241,7 +278,7 @@
                     $row.find('.rename-input').focus().select();
                 });
                 // Confirm inline rename
-                $(document).on('click', '.confirm-rename-btn', function(e) {
+                $(document).on('click', '.confirm-rename-btn', function (e) {
                     e.preventDefault();
                     const $row = $(this).closest('tr');
                     const path = $row.find('.rename-dir-btn').data('path');
@@ -266,19 +303,34 @@
                     }
                 });
                 // Cancel inline rename
-                $(document).on('click', '.cancel-rename-btn', function(e) {
+                $(document).on('click', '.cancel-rename-btn', function (e) {
                     e.preventDefault();
                     const $row = $(this).closest('tr');
                     $row.find('.rename-dir-btn').removeClass('d-none');
                     $row.find('.rename-inline-field').addClass('d-none');
                 });
 
-                function loadDirectory(path) {
-                    currentPath = path;
-                    // Update the URL so reload stays on the same directory
-                    if (window.location.pathname + window.location.search !== updateUrlForPath(path)) {
-                        window.history.replaceState({ path: path }, '', updateUrlForPath(path));
+                function loadDirectory(path, updateFilter = true, updateHistory = true, callback) {
+                    currentPath = path || '';
+                    if (updateFilter) {
+                        filterLetter = '';
+                        $('.btn-letter-filter').removeClass('active');
+                        $('#search-filter').val('');
                     }
+                    updateBreadcrumbs(path);
+
+                    // Update browser history if needed
+                    if (updateHistory) {
+                        const url = new URL(window.location);
+                        url.searchParams.set('path', path);
+                        window.history.pushState({path: path}, '', url);
+                    }
+
+                    // Show loading indicator
+                    const $directoryContents = $('#directory-contents');
+                    const $loading = $('<div class="text-center p-5"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>');
+                    $directoryContents.html($loading);
+
                     $.ajax({
                         url: '{{ route("admin.directoryBrowser") }}',
                         type: 'GET',
@@ -289,6 +341,20 @@
                         },
                         success: function (data) {
                             renderDirectoryBrowser(data, path);
+
+                            // Call the callback if provided
+                            if (typeof callback === 'function') {
+                                callback();
+                            }
+                        },
+                        error: function(xhr, status, error) {
+                            console.error('Error loading directory:', status, error);
+                            $directoryContents.html('<div class="alert alert-danger">Error loading directory: ' + error + '</div>');
+
+                            // Still call the callback if there was an error
+                            if (typeof callback === 'function') {
+                                callback();
+                            }
                         }
                     });
                 }
@@ -302,7 +368,7 @@
                 }
 
                 // Modal dialog for Create/Edit
-                $(document).on('click', '.open-add-book-modal, .open-edit-book-modal', function(e) {
+                $(document).on('click', '.open-add-book-modal, .open-edit-book-modal', function (e) {
                     e.preventDefault();
                     const url = $(this).data('url');
                     const isEdit = $(this).hasClass('open-edit-book-modal');
@@ -310,7 +376,7 @@
                     const body = isEdit ? $('#edit-book-modal-body') : $('#addBookModalBody');
                     body.html('<div class="text-center p-4"><i class="fas fa-spinner fa-spin fa-2x"></i></div>');
                     modal.modal('show');
-                    $.get(url, function(html) {
+                    $.get(url, function (html) {
                         body.html(html);
                     });
                 });
@@ -330,36 +396,65 @@
                 // Letter filter: start with All active
                 $('#letter-filter button[data-letter=""]').addClass('active');
 
-                // Bulk import for filtered list
-                $('#bulk-import-btn').off('click').on('click', function () {
-                    // Get visible directories
+                // Handle form submission
+                $(document).on('submit', '#book-form', function(e) {
+                    e.preventDefault();
+                    const $form = $(this);
+                    const $modal = $form.closest('.modal');
+                    const $submitBtn = $form.find('button[type="submit"]');
+                    const originalBtnText = $submitBtn.html();
+                    const directoryPath = $form.find('input[name="directory_path"]').val() || '';
+
+                    // Show loading state
+                    $submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Saving...');
+
+                    // Submit form via AJAX
                     $.ajax({
-                        url: '{{ route("admin.directoryBrowser") }}',
-                        type: 'GET',
-                        data: {
-                            path: currentPath,
-                            filter_letter: filterLetter,
-                            search: searchString
-                        },
-                        success: function (data) {
-                            let dirs = data.filter(item => item.type === 'directory' || item.type === 'book');
-                            if (dirs.length === 0) {
-                                $('#bulk-import-status').text('No directories to import.');
-                                return;
-                            }
-                            $('#bulk-import-status').text('Starting bulk import...');
-                            $.ajax({
-                                url: '{{ route("admin.books.bulkImport") }}',
-                                type: 'POST',
-                                data: { dirs: dirs.map(d => d.path), _token: '{{ csrf_token() }}' },
-                                success: function (data) {
-                                    $('#bulk-import-status').text(data.message);
-                                },
-                                error: function (xhr) {
-                                    let msg = 'Error: ' + (xhr.responseJSON?.error || xhr.statusText);
-                                    $('#bulk-import-status').text(msg);
+                        url: $form.attr('action'),
+                        method: $form.attr('method'),
+                        data: $form.serialize(),
+                        dataType: 'json',
+                        success: function(response) {
+                            if (response.success) {
+                                // Close the modal
+                                $modal.modal('hide');
+
+                                // If we have row HTML, replace the existing row
+                                if (response.row_html) {
+                                    // Find the row to replace (either by book ID or path)
+                                    let $existingRow = $(`tr[data-book-id="${response.book_id}"]`);
+                                    const path = response.directory_path || directoryPath;
+
+                                    if (!$existingRow.length && path) {
+                                        // Try to find by path if not found by ID
+                                        $existingRow = $(`tr[data-path*="${path}"]`);
+                                    }
+
+                                    if ($existingRow.length) {
+                                        // Replace the existing row with the new one
+                                        $existingRow.replaceWith(response.row_html);
+
+                                        // Show success message
+                                        showAlert('Book saved successfully!', 'success');
+                                    } else {
+                                        // If we can't find the row, reload the directory
+                                        loadDirectory(currentPath, false, false, function() {
+                                            showAlert('Book saved successfully!', 'success');
+                                        });
+                                    }
+                                } else if (typeof updateBookAction === 'function') {
+                                    // Fallback to the old update method if no row HTML
+                                    updateBookAction(response.book_id, response.edit_url, response.directory_path || directoryPath);
                                 }
-                            });
+                            } else {
+                                showAlert(response.message || 'An error occurred while saving the book.', 'danger');
+                                $submitBtn.prop('disabled', false).html(originalBtnText);
+                            }
+                        },
+                        error: function(xhr) {
+                            const response = xhr.responseJSON || {};
+                            showAlert(response.message || 'An error occurred while saving the book.', 'danger');
+                            $submitBtn.prop('disabled', false).html(originalBtnText);
                         }
                     });
                 });
@@ -382,14 +477,86 @@
                     });
                 });
 
-                // Initial Load
+                // Initial load - check for path in URL
                 const urlParams = new URLSearchParams(window.location.search);
-                const initialPath = urlParams.get('path') || '';
-                loadDirectory(initialPath);
+                const initialPath = urlParams.get('path') ? decodeURIComponent(urlParams.get('path')) : '';
+                loadDirectory(initialPath, true, false);
 
-                window.addEventListener('popstate', function (event) {
-                    loadDirectory(event.state ? event.state.path : (new URLSearchParams(window.location.search).get('path') || ''));
-                });
+                // Function to update book action links after creation/update
+                window.updateBookAction = function(bookId, editUrl, directoryPath) {
+                    console.log('Updating book action for ID:', bookId, 'with URL:', editUrl, 'and path:', directoryPath);
+
+                    // First, try to find the row by book ID
+                    let row = $(`tr[data-book-id="${bookId}"]`);
+
+                    // If not found by ID, try to find by directory path
+                    if (!row.length && directoryPath) {
+                        row = $(`tr a[data-path*="${directoryPath}"]`).closest('tr');
+                    }
+
+                    // If we found the row, update it
+                    if (row.length) {
+                        updateBookRow(row, bookId, editUrl);
+                    } else {
+                        // If we can't find the row, refresh the directory and try again
+                        loadDirectory(currentPath, true, false, function() {
+                            // After refresh, try to find the row again
+                            let row = $(`tr[data-book-id="${bookId}"]`);
+                            if (!row.length && directoryPath) {
+                                row = $(`tr a[data-path*="${directoryPath}"]`).closest('tr');
+                            }
+
+                            if (row.length) {
+                                updateBookRow(row, bookId, editUrl);
+                            } else {
+                                console.warn('Book row not found after refresh for ID:', bookId, 'with path:', directoryPath);
+                                // Show an error message
+                                const errorAlert = $('<div class="alert alert-warning alert-dismissible fade show" role="alert">' +
+                                    'Could not update book action. Please refresh the page to see changes.' +
+                                    '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>' +
+                                    '</div>');
+                                $('#alerts-container').append(errorAlert);
+
+                                setTimeout(() => {
+                                    errorAlert.alert('close');
+                                }, 5000);
+                            }
+                        });
+                    }
+
+                    // Helper function to update a book row
+                    function updateBookRow(row, bookId, editUrl) {
+                        // Update the row's data-book-id if it wasn't set
+                        if (!row.data('book-id')) {
+                            row.attr('data-book-id', bookId);
+                        }
+
+                        // Update the action cell
+                        const actionCell = row.find('td:last');
+                        actionCell.html(`
+                            <button class="btn btn-sm btn-primary me-1 open-edit-book-modal" data-url="${editUrl}">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                        `);
+
+                        console.log('Successfully updated book action for row:', row);
+
+                        // Show a success message
+                        const successAlert = $('<div class="alert alert-success alert-dismissible fade show" role="alert">' +
+                            'Book action updated successfully.' +
+                            '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>' +
+                            '</div>');
+                        $('#alerts-container').append(successAlert);
+
+                        // Auto-dismiss the alert after 3 seconds
+                        setTimeout(() => {
+                            successAlert.alert('close');
+                        }, 3000);
+
+                        // Ensure the row is visible in case it was in a collapsed section
+                        row[0].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                };
             });
         </script>
     </div>
