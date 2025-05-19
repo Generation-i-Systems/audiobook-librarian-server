@@ -3,8 +3,6 @@
 @section('content')
     <div class="container">
         @include('admin.books.form', [
-            'authorList' => $authorList,
-            'seriesList' => $seriesList,
             'genreList' => $genreList,
             'coverCandidates' => $coverCandidates,
             'coverAuto' => $coverAuto,
@@ -12,5 +10,5 @@
             'initial' => $initial,
             'isModal' => $isModal ?? false
         ])
-    </div>
+        </div>
 @endsection

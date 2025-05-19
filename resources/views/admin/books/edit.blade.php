@@ -18,15 +18,13 @@
 
         @include('admin.books.form', [
             'book' => $book,
-            'authorList' => $authorList,
-            'seriesList' => $seriesList,
             'genreList' => $genreList,
             'coverCandidates' => $coverCandidates,
             'coverAuto' => $coverAuto,
-            'directory_path' => $book->directory_path,
+            'directory_path' => $book['directory_path'] ?? null,
             'isModal' => $isModal ?? false
         ])
 
-    </div>
+        </div>
 
 @endsection

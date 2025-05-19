@@ -21,25 +21,19 @@ class FirestoreService
 
     public function getUserById($identifier)
     {
-        \Log::debug('getUserById: inProviderCall=' . (self::$inProviderCall ? 'true' : 'false'));
-        if (self::$inProviderCall) {
-            \Log::warning('getUserById: Recursion guard triggered, returning null');
-            return null;
-        }
-        self::$inProviderCall = true;
         try {
             if (!$this->db) {
-                \Log::error('getUserById: Firestore client not initialized');
+                Log::error('getUserById: Firestore client not initialized');
                 return null;
             }
             $snap = $this->db->collection('users')->document($identifier)->snapshot();
             if (!$snap->exists()) {
-                \Log::warning('getUserById: No user document found for id ' . $identifier);
+                Log::warning('getUserById: No user document found for id ' . $identifier);
                 return null;
             }
             $user = $snap->data();
             $user['id'] = $identifier;
-            \Log::debug('getUserById: User found', ['user' => $user]);
+            Log::debug('getUserById: User found', ['user' => $user]);
             return $user;
         } catch (\Throwable $e) {
             Log::error('Firestore getUserById failed: ' . $e->getMessage());
@@ -58,10 +52,16 @@ class FirestoreService
     public function getUserByRememberToken($identifier, $token)
     {
         try {
-            if (!$this->db) return null;
+            if (!$this->db) {
+                Log::error('getUserByRememberToken: Firestore client not initialized');
+                return null;
+            }
             Log::debug('getUserByRememberToken', ['identifier' => $identifier, 'token' => $token]);
             $snap = $this->db->collection('users')->document($identifier)->snapshot();
-            if (!$snap->exists()) return null;
+            if (!$snap->exists()) {
+                Log::warning('getUserByRememberToken: No user document found for id ' . $identifier);
+                return null;
+            }
             $user = $snap->data();
             $user['id'] = $identifier;
             if (($user['remember_token'] ?? null) === $token) {
@@ -85,7 +85,7 @@ class FirestoreService
     public function updateRememberToken($identifier, $token)
     {
         $this->db->collection('users')->document($identifier)->set([
-            'remember_token' => $token
+            'remember_token' => $token,
         ], ['merge' => true]);
     }
 
@@ -99,28 +99,43 @@ class FirestoreService
         try {
             // Only log which keys are being used, not values
             Log::debug('getUserByCredentials', ['credential_keys' => array_keys($credentials)]);
-        if (!$this->db) {
-            Log::error('getUserByCredentials: db not initialized');
-            return null;
-        }
+            if (!$this->db) {
+                Log::error('getUserByCredentials: db not initialized');
+                return null;
+            }
             $query = $this->db->collection('users');
             foreach ($credentials as $key => $value) {
-                if ($key === 'password') continue; // Never filter by password
+                if ($key === 'password') {
+                    continue; // Never filter by password
+                }
                 Log::debug('getUserByCredentials: adding filter: ' . $key);
-                $query = $query->where($key, '=', $value);
+                // For username/email, fetch all users and filter in PHP for case-insensitive match
+                if (in_array($key, ['username', 'email'])) {
+                    $allDocs = $this->db->collection('users')->documents();
+                    foreach ($allDocs as $doc) {
+                        if (!$doc->exists())
+                            continue;
+                        $data = $doc->data();
+                        if (isset($data[$key]) && mb_strtolower($data[$key]) === mb_strtolower($value)) {
+                            $data['id'] = $doc->id();
+                            return $data;
+                        }
+                    }
+                    return null;
+                } else {
+                    $query = $query->where($key, '=', $value);
+                }
             }
             $documents = $query->documents();
-            if ($documents->size() === 0) return null;
+            if ($documents->size() === 0)
+                return null;
             $user = $documents->rows()[0]->data();
             $user['id'] = $documents->rows()[0]->id();
             return $user;
         } catch (\Throwable $e) {
             Log::error('Firestore getUserByCredentials failed: ' . $e->getMessage());
             return null;
-        } finally {
-            self::$inProviderCall = false;
         }
-        return null;
     }
 
     /**
@@ -144,7 +159,7 @@ class FirestoreService
             $result = Hash::check($plain, $hash);
             Log::debug('validateUserCredentials: plain: ' . $plain);
             Log::debug('validateUserCredentials: hash: ' . $hash);
-                Log::debug('Checking password', [
+            Log::debug('Checking password', [
                 'plain' => $plain,
                 'hash' => $hash,
                 'result' => $result,
@@ -202,7 +217,7 @@ class FirestoreService
             ]);
         } catch (\Throwable $e) {
             // Log error but do NOT trigger auth/user lookup!
-            \Log::error('Firestore client init failed: ' . $e->getMessage());
+            Log::error('Firestore client init failed: ' . $e->getMessage());
             $this->db = null;
         }
     }
@@ -210,7 +225,12 @@ class FirestoreService
     // USER CRUD
     public function createUser(array $data)
     {
-        if (!$this->db) return null;
+        if (!$this->db)
+            return null;
+        // Default role to 'preview' if not set
+        if (!isset($data['role'])) {
+            $data['role'] = 'preview';
+        }
         try {
             $docRef = $this->db->collection('users')->add($data);
             return $docRef->id();
@@ -218,6 +238,15 @@ class FirestoreService
             \Log::error('Firestore createUser failed: ' . $e->getMessage());
             return null;
         }
+    }
+
+    /**
+     * Get the global genre list from config/genres.php
+     * @return array
+     */
+    public static function listGenres()
+    {
+        return config('genres.list');
     }
 
     // BOOKS CRUD
@@ -244,23 +273,29 @@ class FirestoreService
      * @param string $genreId
      * @return array
      */
-    public function getBooksByAuthorAndGenre($authorId, $genreId)
+    public function getBooksByAuthorAndGenre($author, $genre)
     {
         $books = $this->listBooks();
-        return array_values(array_filter($books, function($book) use ($authorId, $genreId) {
-            return (isset($book['author_id']) && $book['author_id'] === $authorId)
-                && (isset($book['genre_id']) && $book['genre_id'] === $genreId);
+        return array_values(array_filter($books, function ($book) use ($author, $genre) {
+            return (isset($book['author']) && $book['author'] === $author)
+                && (isset($book['genre']) && $book['genre'] === $genre);
         }));
     }
 
     public function updateBook(string $id, array $data)
     {
-        $this->db->collection('books')->document($id)->set($data, ['merge' => true]);
+        $this->db->collection('books')->document($id)->set($data);
     }
 
     public function getBook(string $id)
     {
-        return $this->db->collection('books')->document($id)->snapshot()->data();
+        $snapshot = $this->db->collection('books')->document($id)->snapshot();
+        if (!$snapshot->exists()) {
+            return null;
+        }
+        $data = $snapshot->data();
+        $data['id'] = $id; // Ensure the ID is included in the returned data
+        return $data;
     }
 
     public function deleteBook(string $id)
@@ -280,34 +315,34 @@ class FirestoreService
         return $books;
     }
 
-    // AUTHORS CRUD
-    /**
-     * Finds an author by name, or creates one if not found.
-     * @param string $name
-     * @return array Author data including id
-     */
-    public function findOrCreateAuthorByName(string $name)
-    {
-        $authors = $this->db->collection('authors')->where('name', '=', $name)->documents();
-        foreach ($authors as $doc) {
-            if ($doc->exists()) {
-                $author = $doc->data();
-                $author['id'] = $doc->id();
-                return $author;
-            }
-        }
-        $id = $this->createAuthor(['name' => $name]);
-        return [ 'id' => $id, 'name' => $name ];
-    }
-    /**
-     * @param array $data
-     * @return string
-     */
-    public function createAuthor(array $data)
-    {
-        $docRef = $this->db->collection('authors')->add($data);
-        return $docRef->id();
-    }
+    // // AUTHORS CRUD
+    // /**
+    //  * Finds an author by name, or creates one if not found.
+    //  * @param string $name
+    //  * @return array Author data including id
+    //  */
+    // public function findOrCreateAuthorByName(string $name)
+    // {
+    //     $authors = $this->db->collection('authors')->where('name', '=', $name)->documents();
+    //     foreach ($authors as $doc) {
+    //         if ($doc->exists()) {
+    //             $author = $doc->data();
+    //             $author['id'] = $doc->id();
+    //             return $author;
+    //         }
+    //     }
+    //     $id = $this->createAuthor(['name' => $name]);
+    //     return [ 'id' => $id, 'name' => $name ];
+    // }
+    // /**
+    //  * @param array $data
+    //  * @return string
+    //  */
+    // public function createAuthor(array $data)
+    // {
+    //     $docRef = $this->db->collection('authors')->add($data);
+    //     return $docRef->id();
+    // }
 
     /**
      * @param string $id
@@ -316,7 +351,9 @@ class FirestoreService
     public function getAuthor(string $id)
     {
         $snap = $this->db->collection('authors')->document($id)->snapshot();
-        if (!$snap->exists()) return null;
+        if (!$snap->exists()) {
+            return null;
+        }
         $author = $snap->data();
         $author['id'] = $id;
         return $author;
@@ -367,53 +404,6 @@ class FirestoreService
         return $docRef->id();
     }
 
-    /**
-     * @param string $id
-     * @return array|null
-     */
-    public function getGenre(string $id)
-    {
-        $snap = $this->db->collection('genres')->document($id)->snapshot();
-        if (!$snap->exists()) return null;
-        $genre = $snap->data();
-        $genre['id'] = $id;
-        return $genre;
-    }
-
-    /**
-     * @return array
-     */
-    public function listGenres()
-    {
-        $documents = $this->db->collection('genres')->documents();
-        $genres = [];
-        foreach ($documents as $doc) {
-            $genre = $doc->data();
-            $genre['id'] = $doc->id();
-            $genres[] = $genre;
-        }
-        return $genres;
-    }
-
-    /**
-     * @param string $id
-     * @param array $data
-     * @return void
-     */
-    public function updateGenre(string $id, array $data): void
-    {
-        $this->db->collection('genres')->document($id)->set($data, ['merge' => true]);
-    }
-
-    /**
-     * @param string $id
-     * @return void
-     */
-    public function deleteGenre(string $id): void
-    {
-        $this->db->collection('genres')->document($id)->delete();
-    }
-
     // SERIES CRUD
     /**
      * Finds a series by name, or creates one if not found.
@@ -431,7 +421,7 @@ class FirestoreService
             }
         }
         $id = $this->createSeries(['name' => $name]);
-        return [ 'id' => $id, 'name' => $name ];
+        return ['id' => $id, 'name' => $name];
     }
     public function createSeries(array $data)
     {
@@ -441,7 +431,8 @@ class FirestoreService
     public function getSeries(string $id)
     {
         $snap = $this->db->collection('series')->document($id)->snapshot();
-        if (!$snap->exists()) return null;
+        if (!$snap->exists())
+            return null;
         $series = $snap->data();
         $series['id'] = $id;
         return $series;

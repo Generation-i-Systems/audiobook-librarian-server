@@ -9,7 +9,8 @@
                 <input type="text" class="form-control" placeholder="Search title, author, or series" name="search"
                     value="{{ request('search') }}">
                 <select name="sort" class="form-select ms-2" onchange="this.form.submit()">
-                    <option value="recent_desc" {{ (request('sort', 'recent_desc') == 'recent_desc') ? 'selected' : '' }}>Most Recent</option>
+                    <option value="recent_desc" {{ (request('sort', 'recent_desc') == 'recent_desc') ? 'selected' : '' }}>Most
+                        Recent</option>
                     <option value="recent_asc" {{ (request('sort') == 'recent_asc') ? 'selected' : '' }}>Oldest</option>
                     <option value="author_asc" {{ (request('sort') == 'author_asc') ? 'selected' : '' }}>Author A-Z</option>
                     <option value="author_desc" {{ (request('sort') == 'author_desc') ? 'selected' : '' }}>Author Z-A</option>
@@ -45,20 +46,88 @@
                     <tr class="{{ $loop->iteration % 2 == 0 ? 'table-secondary' : '' }}">
                         <td style="vertical-align: middle; text-align: center;">
                             @php
-                                $coverProxyUrl = $book->cover_image && Storage::disk('books')->exists($book->cover_image)
-                                    ? url('/cover/' . ltrim($book->cover_image, '/'))
+                                $coverImage = $book['cover_image'] ?? null;
+                                $coverProxyUrl = $coverImage && Storage::disk('books')->exists($coverImage)
+                                    ? url('/cover/' . ltrim($coverImage, '/'))
                                     : asset('images/placeholder.png');
                             @endphp
-                            <img src="{{ $coverProxyUrl }}" alt="cover" style="height: 48px; width: auto; object-fit: contain; border-radius: 3px; box-shadow: 0 1px 2px rgba(0,0,0,.07); background: #f8f8f8;" loading="lazy">
+                            <img src="{{ $coverProxyUrl }}" alt="cover"
+                                style="height: 48px; width: auto; object-fit: contain; border-radius: 3px; box-shadow: 0 1px 2px rgba(0,0,0,.07); background: #f8f8f8;"
+                                loading="lazy">
                         </td>
-                        <td>{{ $book->title }}</td>
-                        <td>{{ $book->author->name }}</td>
-                        <td>{{--Display new values--}}</td>
-                        <td>{{ $book->genre->name }}</td>
+                        <td>{{ $book['title'] ?? 'Untitled' }}</td>
                         <td>
-                            <a href="{{ route('admin.books.edit', $book) }}" class="btn btn-sm btn-outline-primary"
+                            @if(!empty($book['author']))
+                                @if(is_array($book['author']))
+                                    @foreach($book['author'] as $author)
+                                        @if(is_array($author) && isset($author['name']))
+                                            {{ $author['name'] }}@if(!$loop->last)<br>@endif
+                                        @else
+                                            {{ is_string($author) ? $author : 'Unknown' }}@if(!$loop->last)<br>@endif
+                                        @endif
+                                    @endforeach
+                                @else
+                                    {{ $book['author'] }}
+                                @endif
+                            @else
+                                Unknown
+                            @endif
+                        </td>
+                        <td>
+                            @if(!empty($book['series']))
+                                @if(is_array($book['series']))
+                                    @php
+                                        // Handle both new format (name => number) and old format (array of arrays)
+                                        $isNewFormat = array_keys($book['series']) !== range(0, count($book['series']) - 1);
+                                    @endphp
+                                    @if($isNewFormat)
+                                        @foreach($book['series'] as $seriesName => $seriesNumber)
+                                            {{ $seriesName }}{{ $seriesNumber ? ' (#' . $seriesNumber . ')' : '' }}
+                                            @if(!$loop->last)<br>@endif
+                                        @endforeach
+                                    @else
+                                        @foreach($book['series'] as $seriesItem)
+                                            @if(is_array($seriesItem) && isset($seriesItem['name']))
+                                                {{ $seriesItem['name'] }}{{ !empty($seriesItem['number']) ? ' (#' . $seriesItem['number'] . ')' : '' }}
+                                            @elseif(is_array($seriesItem))
+                                                @foreach($seriesItem as $name => $number)
+                                                    {{ $name }}{{ $number ? ' (#' . $number . ')' : '' }}
+                                                @endforeach
+                                            @else
+                                                {{ $seriesItem }}
+                                            @endif
+                                            @if(!$loop->last)<br>@endif
+                                        @endforeach
+                                    @endif
+                                @else
+                                    {{ $book['series'] }}
+                                @endif
+                            @endif
+                        </td>
+                        <td>
+                            @if(!empty($book['genre']))
+                                @if(is_array($book['genre']))
+                                    @if(isset($book['genre']['name']))
+                                        {{ $book['genre']['name'] }}
+                                    @else
+                                        @foreach($book['genre'] as $genre)
+                                            {{ is_array($genre) ? ($genre['name'] ?? '') : $genre }}@if(!$loop->last), @endif
+                                        @endforeach
+                                    @endif
+                                @else
+                                    {{ $book['genre'] }}
+                                @endif
+                            @else
+                                Unknown
+                            @endif
+                        </td>
+                        <td>
+                            @php
+                                $bookId = $book['id'] ?? ($book['documentId'] ?? 0);
+                            @endphp
+                            <a href="{{ route('admin.books.edit', $bookId) }}" class="btn btn-sm btn-outline-primary"
                                 title="Edit"><i class="fas fa-pencil-alt"></i></a>
-                            <form action="{{ route('admin.books.destroy', $book) }}" method="POST" style="display: inline;">
+                            <form action="{{ route('admin.books.destroy', $bookId) }}" method="POST" style="display: inline;">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"

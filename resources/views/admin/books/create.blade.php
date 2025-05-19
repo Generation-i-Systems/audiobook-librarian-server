@@ -18,8 +18,6 @@
         <div class="tab-content" id="bookCreateTabsContent">
             <div class="tab-pane fade show active" id="regular" role="tabpanel" aria-labelledby="regular-tab">
                 @include('admin.books.form', [
-                    'authorList' => $authorList ?? [],
-                    'seriesList' => $seriesList ?? [],
                     'genreList' => $genreList ?? [],
                     'coverCandidates' => $coverCandidates ?? [],
                     'coverAuto' => $coverAuto ?? null,

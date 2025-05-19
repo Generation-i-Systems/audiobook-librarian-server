@@ -244,19 +244,15 @@ trait BookImportTrait
                 // Series number at start should be removed from title unlike other places where it belongs in the title
                 $seriesNumber = $matches[1];
                 $title = $matches[2];
-            } else {
-                // 1. book [num], volume [num], vol [num], vol. [num] (case-insensitive, anywhere)
-                if (preg_match('/(?:book|volume|vol\.?)[ _-]*(\d{1,3}(\.\d{1,2})?)/i', $title, $m)) {
-                    $seriesNumber = $m[1];
-                }
-                // 2. number at end
-                elseif (preg_match('/(\d{1,3}(\.\d{1,2})?)$/', $title, $m)) {
-                    $seriesNumber = $m[1];
-                }
-                // 3. number in parens, braces or brackets
-                elseif (preg_match('/\s*[\[\{\(](\d{1,3}(\.\d{1,2})?)[\]\}\)](?:\s|$)/', $title, $m)) {
-                    $seriesNumber = $m[1];
-                }
+            } elseif (preg_match('/(?:book|volume|vol\.?)[ _-]*(\d{1,3}(\.\d{1,2})?)/i', $title, $m)) {
+                // book [num], volume [num], vol [num], vol. [num] (case-insensitive, anywhere)
+                $seriesNumber = $m[1];
+            } elseif (preg_match('/(\d{1,3}(\.\d{1,2})?)$/', $title, $m)) {
+                // number at end
+                $seriesNumber = $m[1];
+            } elseif (preg_match('/\s*[\[\{\(](\d{1,3}(\.\d{1,2})?)[\]\}\)](?:\s|$)/', $title, $m)) {
+                // number in parens, braces or brackets
+                $seriesNumber = $m[1];
             }
         }
 
@@ -267,54 +263,45 @@ trait BookImportTrait
         print "Series Number: {$seriesNumber}\n";
         print "Title: {$title}\n";
 
-        $genreRec = Genre::where('name', 'like', "%{$genre}%")->first();
-        if (!$genreRec) {
-            $genreId = $firestore->createGenre(["name" => $genre]);
-            $genreRec = $firestore->getGenre($genreId);
-        }
-        $book['genre_id'] = $genreRec['id'];
+        $book['genre'] = [$genre];
 
-        // Firestore author lookup or create
-        $authorRec = null;
-        foreach ($firestore->listAuthors() as $a) {
-            if (stripos($a['name'], $author) !== false) {
-                $authorRec = $a;
-                break;
-            }
+        //if author contains 'and', '&' or ',', split into multiple authors and each author is more than 4 letters
+        if (stripos($author, 'and') !== false || stripos($author, '&') !== false || stripos($author, ',') !== false) {
+            // First normalize all separators to commas, then split
+            $author = str_replace([' and ', ' & '], ',', $author);
+            $authors = explode(',', $author);
+            $authors = array_map(
+                function ($author) {
+                    if (strlen(trim($author)) > 4) {
+                        return trim($author);
+                    } else {
+                        return null;
+                    }
+                },
+                $authors
+            );
+            $authors = array_filter($authors);
+            $book['author'] = $authors;
+        } else {
+            $book['author'] = [$author];
         }
-        if (!$authorRec) {
-            $authorId = $firestore->createAuthor(["name" => $author]);
-            $authorRec = $firestore->getAuthor($authorId);
-        }
-        $book['author_id'] = $authorRec['id'];
 
         if (!empty($series)) {
-            // Firestore series lookup or create
-            $seriesRec = null;
-            foreach ($firestore->listSeries() as $s) {
-                if (stripos($s['name'], $series) !== false) {
-                    $seriesRec = $s;
-                    break;
+            if (empty($seriesNumber)) {
+                $book['series'][] = [$series => null];
+            } else {
+                $book['series'][] = [$series => $seriesNumber];
+                if ($seriesParent) {
+                    $book['series'][] = ["$seriesParent/$series" => $seriesNumber];
                 }
             }
-            // Skipping updateSeries as FirestoreService::updateSeries does not exist yet
-            if (!$seriesRec) {
-                $seriesId = $firestore->createSeries(["name" => $series, 'parent_name' => $seriesParent]);
-                $seriesRec = $firestore->getSeries($seriesId);
-            }
-            $book['series_id'] = $seriesRec['id'];
-            Log::info("Series: {$series}, Series ID: {$seriesRec['id']}");
         }
 
-        if (!empty($seriesNumber)) {
-            print "Series number: {$seriesNumber}\n";
-            $book['series_number'] = $seriesNumber + 0;
-        }
-        print "Book Series Number: {$book['series_number']}\n";
         $book['title'] = $title;
+        dump($book);
 
-        print "Book: " . json_encode($book) . "\n";
-        print "\n";
+        // print "Book: " . json_encode($book) . "\n";
+        // print "\n";
 
         return $book;
     }
