@@ -80,7 +80,7 @@ if (app()->environment('local')) {
     });
     // TEMPORARY DEBUG: Dump all Firestore users
     Route::get('/firestore-books-dump', function () {
-        $result = \App\Services\FirestoreService::dumpAllUsers();
+        $result = \App\Services\FirestoreService::dumpAllBooks();
         return response()->json($result);
     });
 }
@@ -171,6 +171,18 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::resource('genres', Admin\GenreController::class);
     Route::resource('authors', Admin\AuthorController::class);
     Route::resource('books', Admin\BookController::class);
+
+    // Autocomplete routes for Book form
+    Route::get('/books/autocomplete/authors', [
+        Admin\BookController::class,
+        'autocompleteAuthors'
+    ])->name('books.autocomplete.authors');
+
+    Route::get('/books/autocomplete/series', [
+        Admin\BookController::class,
+        'autocompleteSeries'
+    ])->name('books.autocomplete.series');
+
     Route::resource('account_requests', Admin\AccountRequestController::class);
     Route::get('/books/import-from-title', [
         Admin\BookController::class,

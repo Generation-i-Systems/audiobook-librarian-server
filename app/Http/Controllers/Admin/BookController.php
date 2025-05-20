@@ -21,12 +21,14 @@ class BookController extends Controller
     use BookImportTrait;
 
     protected $googleBooksApiService;
+    protected $firestoreService;
 
     private $storagePath;
 
-    public function __construct(GoogleBooksApiService $googleBooksApiService)
+    public function __construct(GoogleBooksApiService $googleBooksApiService, FirestoreService $firestoreService)
     {
         $this->setGoogleBooksApiService($googleBooksApiService);
+        $this->firestoreService = $firestoreService;
         $this->storagePath = env('BOOK_STORAGE_PATH');
     }
 
@@ -903,5 +905,37 @@ class BookController extends Controller
             }
         }
         return response()->json(['files' => $files]);
+    }
+
+    /**
+     * Provides autocomplete suggestions for author names.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function autocompleteAuthors(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $term = $request->input('term', '');
+        if (empty($term)) {
+            return response()->json([]);
+        }
+        $authors = $this->firestoreService->searchAuthorsByName($term);
+        return response()->json($authors);
+    }
+
+    /**
+     * Provides autocomplete suggestions for series titles.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function autocompleteSeries(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $term = $request->input('term', '');
+        if (empty($term)) {
+            return response()->json([]);
+        }
+        $series = $this->firestoreService->searchSeriesByName($term);
+        return response()->json($series);
     }
 }

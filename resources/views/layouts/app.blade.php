@@ -30,11 +30,9 @@
 
     <link rel="stylesheet" href="/css/pagination-fix.css">
 
-    <!-- Tom Select -->
-    <link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
-
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <!-- jQuery and jQuery UI (for autocomplete) -->
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
@@ -65,18 +63,21 @@
                                     <a class="nav-link" style="color:white" href="{{ route('admin.books.index') }}">Books</a>
                                 </li>
                                 <li class="nav-item">
-                                    <a class="nav-link" style="color:white" href="{{ route('admin.messages.index') }}">Messages</a>
+                                    <a class="nav-link" style="color:white"
+                                        href="{{ route('admin.messages.index') }}">Messages</a>
                                 </li>
                                 <li class="nav-item">
                                     <a class="nav-link" style="color:white" href="{{ route('admin.queue.index') }}">Queue</a>
                                 </li>
                                 <li class="nav-item">
-                                    <a class="nav-link" style="color:white" href="{{ route('admin.users.index') }}">User Management</a>
+                                    <a class="nav-link" style="color:white" href="{{ route('admin.users.index') }}">User
+                                        Management</a>
                                 </li>
                             @else
                                 <!-- Public Links (Show on public pages) -->
                                 <li class="nav-item">
-                                    <a class="nav-link" style="color:white" href="{{ route('books.index') }}">{{ __('Books') }}</a>
+                                    <a class="nav-link" style="color:white"
+                                        href="{{ route('books.index') }}">{{ __('Books') }}</a>
                                 </li>
                             @endif
                         @endauth
@@ -128,7 +129,7 @@
                                     @endif
 
                                     <a class="dropdown-item" href="{{ route('logout') }}" onclick="event.preventDefault();
-                                                                     document.getElementById('logout-form').submit();">
+                                                                         document.getElementById('logout-form').submit();">
                                         {{ __('Logout') }}
                                     </a>
 
@@ -148,4 +149,5 @@
         </main>
     </div>
     @stack('scripts')
- </html>
+
+</html>

@@ -171,7 +171,6 @@ class FirestoreService
         return $this->db;
     }
 
-    // TEMP DEBUG: Dump all users without triggering auth recursion
     public static function dumpAllUsers()
     {
         try {
@@ -193,6 +192,30 @@ class FirestoreService
             return $users;
         } catch (\Throwable $e) {
             error_log('Firestore dumpAllUsers error: ' . $e->getMessage());
+            return ['error' => $e->getMessage()];
+        }
+    }
+    public static function dumpAllBooks()
+    {
+        try {
+            $projectId = env('FIREBASE_PROJECT_ID');
+            $credentials = base_path(env('FIREBASE_CREDENTIALS'));
+            $db = new \Google\Cloud\Firestore\FirestoreClient([
+                'projectId' => $projectId,
+                'keyFilePath' => $credentials,
+            ]);
+            $books = [];
+            $documents = $db->collection('books')->documents();
+            foreach ($documents as $doc) {
+                if ($doc->exists()) {
+                    $data = $doc->data();
+                    $data['id'] = $doc->id();
+                    $books[] = $data;
+                }
+            }
+            return $books;
+        } catch (\Throwable $e) {
+            error_log('Firestore dumpAllBooks error: ' . $e->getMessage());
             return ['error' => $e->getMessage()];
         }
     }
@@ -384,35 +407,67 @@ class FirestoreService
      */
     public function listAuthors()
     {
-        // First, get all books that have authors
-        $booksQuery = $this->db->collection('books')
-            ->where('author', '!=', null);
+        try {
+            if (!$this->db) {
+                return [];
+            }
+            $allBooks = $this->db->collection('books')->documents();
+            $authors = [];
+            foreach ($allBooks as $bookDoc) {
+                if ($bookDoc->exists()) {
+                    $bookData = $bookDoc->data();
+                    // Assuming authors are stored under a field like 'authors' or 'author' as an array of strings
+                    // Let's check for 'authors' first, then 'author' as a fallback for the array.
+                    $authorData = null;
+                    if (isset($bookData['authors']) && is_array($bookData['authors'])) {
+                        $authorData = $bookData['authors'];
+                    } elseif (isset($bookData['author']) && is_array($bookData['author'])) { // Fallback to 'author' if it's an array
+                        $authorData = $bookData['author'];
+                    }
 
-        $documents = $booksQuery->documents();
-
-        // Extract and deduplicate authors
-        $uniqueAuthors = [];
-
-        foreach ($documents as $doc) {
-            $bookData = $doc->data();
-            if (!empty($bookData['author']) && is_array($bookData['author'])) {
-                foreach ($bookData['author'] as $authorName) {
-                    if (!empty($authorName) && !isset($uniqueAuthors[$authorName])) {
-                        $uniqueAuthors[$authorName] = [
-                            'name' => $authorName,
-                            'id' => $authorName // Using name as ID since we're not storing in authors collection
-                        ];
+                    if ($authorData) {
+                        foreach ($authorData as $authorName) {
+                            if (is_string($authorName) && !empty($authorName)) {
+                                $authors[$authorName] = true; // Use keys for uniqueness
+                            }
+                        }
+                    } elseif (isset($bookData['author']) && is_string($bookData['author']) && !empty($bookData['author'])){
+                        // Handle case where 'author' might be a single string (legacy or specific cases)
+                        $authors[$bookData['author']] = true;
                     }
                 }
             }
+            $uniqueAuthors = array_keys($authors);
+            sort($uniqueAuthors);
+            return $uniqueAuthors;
+        } catch (\Exception $e) {
+            Log::error('Firestore listAuthors failed: ' . $e->getMessage());
+            return [];
         }
+    }
 
-        // Convert to indexed array and sort alphabetically by author name
-        $authors = array_values($uniqueAuthors);
-        usort($authors, function ($a, $b) {
-            return strcasecmp($a['name'], $b['name']);
-        });
-        return $authors;
+    /**
+     * Search for author names starting with a given term.
+     *
+     * @param string $term The search term.
+     * @return array A list of unique author names.
+     */
+    public function searchAuthorsByName(string $term): array
+    {
+        if (empty($term)) {
+            return [];
+        }
+        $termLower = strtolower($term);
+        $allAuthors = $this->listAuthors(); // Leverage existing method to get all unique authors
+        $matches = [];
+        foreach ($allAuthors as $authorName) {
+            if (stripos($authorName, $termLower) === 0) { // Case-insensitive starts-with
+                $matches[] = $authorName;
+            }
+        }
+        // Firestore might return them sorted, but ensure sorting if listAuthors changes
+        // sort($matches);
+        return $matches;
     }
 
     /**
@@ -480,14 +535,56 @@ class FirestoreService
     }
     public function listSeries()
     {
-        $documents = $this->db->collection('series')->documents();
-        $series = [];
-        foreach ($documents as $doc) {
-            $ser = $doc->data();
-            $ser['id'] = $doc->id();
-            $series[] = $ser;
+        try {
+            if (!$this->db) {
+                return [];
+            }
+            $allBooks = $this->db->collection('books')->documents();
+            $series = [];
+            foreach ($allBooks as $bookDoc) {
+                if ($bookDoc->exists()) {
+                    $bookData = $bookDoc->data();
+                    // Series are stored as a map: {"Series Name": 1, ...}
+                    if (isset($bookData['series']) && is_array($bookData['series'])) { // Firestore maps are PHP associative arrays
+                        $seriesNames = array_keys($bookData['series']);
+                        foreach ($seriesNames as $seriesName) {
+                            if (is_string($seriesName) && !empty($seriesName)) {
+                                $series[$seriesName] = true; // Use keys for uniqueness
+                            }
+                        }
+                    }
+                }
+            }
+            $uniqueSeries = array_keys($series);
+            sort($uniqueSeries);
+            return $uniqueSeries;
+        } catch (\Exception $e) {
+            Log::error('Firestore listSeries failed: ' . $e->getMessage());
+            return [];
         }
-        return $series;
+    }
+
+    /**
+     * Search for series titles starting with a given term.
+     *
+     * @param string $term The search term.
+     * @return array A list of unique series titles.
+     */
+    public function searchSeriesByName(string $term): array
+    {
+        if (empty($term)) {
+            return [];
+        }
+        $termLower = strtolower($term);
+        $allSeries = $this->listSeries(); // Leverage existing method to get all unique series
+        $matches = [];
+        foreach ($allSeries as $seriesName) {
+            if (stripos($seriesName, $termLower) === 0) { // Case-insensitive starts-with
+                $matches[] = $seriesName;
+            }
+        }
+        // sort($matches);
+        return $matches;
     }
 
     /**
@@ -741,7 +838,7 @@ class FirestoreService
             $this->db->collection('jobs')
                 ->document($jobId)
                 ->update([
-                    ['path' => 'logs', 'value' => \Google\Cloud\Firestore\FieldValue::arrayUnion([$logEntry])]
+                    ['path' => 'logs', 'value' => \Google\Cloud\Firestore\FieldValue::arrayUnion([$logEntry])],
                 ]);
 
             return true;
@@ -767,7 +864,7 @@ class FirestoreService
                 'progress' => [
                     'current' => $current,
                     'updated_at' => now()->toDateTimeString(),
-                ]
+                ],
             ];
 
             if ($total !== null) {
