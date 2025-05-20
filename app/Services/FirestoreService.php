@@ -8,16 +8,16 @@ use Illuminate\Support\Facades\Log;
 
 class FirestoreService
 {
-    // ... existing properties and constructor ...
+    /** @var FirestoreClient|null */
+    protected $db;
+
+    /** @var string */
+    protected $projectId;
+
+    /** @var bool */
+    protected static $inProviderCall = false;
 
     // --- AUTHENTICATION METHODS ---
-
-    /**
-     * Retrieve user by unique identifier (ID).
-     * @param string $identifier
-     * @return array|null
-     */
-    protected static $inProviderCall = false;
 
     public function getUserById($identifier)
     {
@@ -166,9 +166,6 @@ class FirestoreService
         }
     }
 
-    protected $db;
-    protected $projectId;
-
     public function getClient()
     {
         return $this->db;
@@ -244,10 +241,24 @@ class FirestoreService
     }
 
     // BOOKS CRUD
-    public function createBook(array $data)
+    /**
+     * Create a new book in Firestore
+     * @param array $data
+     * @return string|null Returns the document ID or null on failure
+     */
+    public function createBook(array $data): ?string
     {
-        $docRef = $this->db->collection('books')->add($data);
-        return $docRef->id();
+        if (!$this->db) {
+            Log::error('Cannot create book: Firestore client not initialized');
+            return null;
+        }
+        try {
+            $docRef = $this->db->collection('books')->add($data);
+            return $docRef->id();
+        } catch (\Throwable $e) {
+            Log::error('Failed to create book: ' . $e->getMessage());
+            return null;
+        }
     }
 
     // REVIEWS CRUD
@@ -255,10 +266,24 @@ class FirestoreService
      * @param array $data
      * @return string
      */
-    public function createReview(array $data)
+    /**
+     * Create a new review in Firestore
+     * @param array $data
+     * @return string|null Returns the document ID or null on failure
+     */
+    public function createReview(array $data): ?string
     {
-        $docRef = $this->db->collection('reviews')->add($data);
-        return $docRef->id();
+        if (!$this->db) {
+            Log::error('Cannot create review: Firestore client not initialized');
+            return null;
+        }
+        try {
+            $docRef = $this->db->collection('reviews')->add($data);
+            return $docRef->id();
+        } catch (\Throwable $e) {
+            Log::error('Failed to create review: ' . $e->getMessage());
+            return null;
+        }
     }
 
     /**
@@ -522,5 +547,295 @@ class FirestoreService
     {
         // Implement as needed
     }
-}
 
+    // JOB QUEUE MANAGEMENT
+
+    /**
+     * Create or update a job status in Firestore
+     * @param string $jobId
+     * @param string $type
+     * @param string $status
+     * @param array $data
+     * @return string Job ID
+     */
+    /**
+     * Create or update a job status in Firestore with detailed tracking
+     *
+     * @param string $jobId Unique job identifier
+     * @param string $type Job type (e.g., 'book_import', 'directory_import')
+     * @param string $status Job status ('queued', 'processing', 'completed', 'failed')
+     * @param array $data Additional job data
+     * @param string|null $message Optional status message
+     * @param array $error Optional error details if job failed
+     * @param array $logs Optional array of log entries
+     * @return string Job ID
+     */
+    public function updateJobStatus(
+        string $jobId,
+        string $type,
+        string $status,
+        array $data = [],
+        ?string $message = null,
+        ?array $error = null,
+        array $logs = []
+    ): string {
+        $now = now()->toDateTimeString();
+        $jobData = [
+            'type' => $type,
+            'status' => $status,
+            'updated_at' => $now,
+            'data' => $data,
+        ];
+
+        // Set timestamps based on status
+        if ($status === 'queued') {
+            $jobData['created_at'] = $now;
+            $jobData['queued_at'] = $now;
+        } elseif ($status === 'processing') {
+            $jobData['started_at'] = $now;
+        } elseif (in_array($status, ['completed', 'failed'])) {
+            $jobData['completed_at'] = $now;
+
+            // Calculate duration if we have start time
+            if (isset($jobData['started_at'])) {
+                $startTime = \Carbon\Carbon::parse($jobData['started_at']);
+                $endTime = now();
+                $jobData['duration'] = $endTime->diffInSeconds($startTime);
+            }
+        }
+
+        // Add message if provided
+        if ($message !== null) {
+            $jobData['message'] = $message;
+        }
+
+        // Add error details if provided
+        if ($error !== null) {
+            $jobData['error'] = $error;
+        }
+
+        // Append logs if provided
+        if (!empty($logs)) {
+            $jobData['logs'] = array_merge($jobData['logs'] ?? [], $logs);
+        }
+
+        $this->db->collection('jobs')->document($jobId)->set($jobData, ['merge' => true]);
+        return $jobId;
+    }
+
+    /**
+     * Get job status
+     * @param string $jobId
+     * @return array|null
+     */
+    /**
+     * Get job status by ID
+     *
+     * @param string $jobId
+     * @return array|null Job data or null if not found
+     */
+    public function getJobStatus(string $jobId): ?array
+    {
+        try {
+            $doc = $this->db->collection('jobs')->document($jobId)->snapshot();
+            if (!$doc->exists()) {
+                return null;
+            }
+
+            $data = $doc->data();
+            $data['id'] = $jobId;
+
+            return $data;
+        } catch (\Exception $e) {
+            Log::error("Failed to get job status: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * List jobs by type and/or status
+     * @param string|null $type
+     * @param string|null $status
+     * @param int $limit
+     * @return array
+     */
+    /**
+     * List jobs with filtering and pagination
+     *
+     * @param string|null $type Filter by job type
+     * @param string|null $status Filter by status
+     * @param int $limit Maximum number of results
+     * @param string $orderBy Field to order by
+     * @param string $direction Order direction ('ASC' or 'DESC')
+     * @param string|null $startAfterId Start after specific job ID for pagination
+     * @return array List of jobs with their data
+     */
+    public function listJobs(
+        ?string $type = null,
+        ?string $status = null,
+        int $limit = 50,
+        string $orderBy = 'updated_at',
+        string $direction = 'DESC',
+        ?string $startAfterId = null
+    ): array {
+        try {
+            $query = $this->db->collection('jobs');
+
+            // Apply filters
+            if ($type) {
+                $query = $query->where('type', '=', $type);
+            }
+
+            if ($status) {
+                $query = $query->where('status', '=', $status);
+            }
+
+            // Apply cursor for pagination
+            if ($startAfterId) {
+                $startAfterDoc = $this->db->collection('jobs')->document($startAfterId)->snapshot();
+                if ($startAfterDoc->exists()) {
+                    $query = $query->startAfter($startAfterDoc);
+                }
+            }
+
+            // Apply ordering and limit
+            $query = $query->orderBy($orderBy, $direction)->limit($limit);
+
+            // Execute query and process results
+            $results = [];
+            $documents = $query->documents();
+
+            foreach ($documents as $doc) {
+                $data = $doc->data();
+                $data['id'] = $doc->id();
+                $results[] = $data;
+            }
+
+            return $results;
+
+        } catch (\Exception $e) {
+            Log::error('Failed to list jobs: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Add a log entry to a job
+     *
+     * @param string $jobId
+     * @param string $level Log level (info, warning, error, etc.)
+     * @param string $message Log message
+     * @param array $context Additional context data
+     * @return bool Success status
+     */
+    public function addJobLog(string $jobId, string $level, string $message, array $context = []): bool
+    {
+        try {
+            $logEntry = [
+                'timestamp' => now()->toDateTimeString(),
+                'level' => $level,
+                'message' => $message,
+                'context' => $context,
+            ];
+
+            $this->db->collection('jobs')
+                ->document($jobId)
+                ->update([
+                    ['path' => 'logs', 'value' => \Google\Cloud\Firestore\FieldValue::arrayUnion([$logEntry])]
+                ]);
+
+            return true;
+        } catch (\Exception $e) {
+            Log::error('Failed to add job log: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Update job progress
+     *
+     * @param string $jobId
+     * @param int $current Current progress value
+     * @param int|null $total Total value (optional)
+     * @param string|null $message Optional status message
+     * @return bool Success status
+     */
+    public function updateJobProgress(string $jobId, int $current, ?int $total = null, ?string $message = null): bool
+    {
+        try {
+            $updateData = [
+                'progress' => [
+                    'current' => $current,
+                    'updated_at' => now()->toDateTimeString(),
+                ]
+            ];
+
+            if ($total !== null) {
+                $updateData['progress']['total'] = $total;
+                $updateData['progress']['percent'] = $total > 0 ? round(($current / $total) * 100, 2) : 0;
+            }
+
+            if ($message !== null) {
+                $updateData['message'] = $message;
+            }
+
+            $this->db->collection('jobs')
+                ->document($jobId)
+                ->set($updateData, ['merge' => true]);
+
+            return true;
+        } catch (\Exception $e) {
+            Log::error('Failed to update job progress: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Delete a job and its data
+     *
+     * @param string $jobId
+     * @return bool Success status
+     */
+    public function deleteJob(string $jobId): bool
+    {
+        try {
+            $this->db->collection('jobs')->document($jobId)->delete();
+            return true;
+        } catch (\Exception $e) {
+            Log::error('Failed to delete job: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Clean up old completed/failed jobs
+     *
+     * @param int $daysOld Delete jobs older than this many days
+     * @param int $batchSize Maximum number of jobs to delete in one operation
+     * @return int Number of jobs deleted
+     */
+    public function cleanupOldJobs(int $daysOld = 30, int $batchSize = 100): int
+    {
+        try {
+            $cutoffDate = now()->subDays($daysOld)->toDateTimeString();
+
+            $query = $this->db->collection('jobs')
+                ->where('status', 'in', ['completed', 'failed', 'cancelled'])
+                ->where('updated_at', '<', $cutoffDate)
+                ->limit($batchSize);
+
+            $deleted = 0;
+            $documents = $query->documents();
+
+            foreach ($documents as $doc) {
+                $doc->reference()->delete();
+                $deleted++;
+            }
+
+            return $deleted;
+        } catch (\Exception $e) {
+            Log::error('Failed to clean up old jobs: ' . $e->getMessage());
+            return 0;
+        }
+    }
+}

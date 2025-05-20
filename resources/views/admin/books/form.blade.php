@@ -370,11 +370,38 @@
     }
 
     // Dynamic add/remove for authors, genres, series
-    document.addEventListener('DOMContentLoaded', function () {
+    document.addEventListener('DOMContentLoaded', function() {
         // Initialize + buttons on page load
-        updateAddRowButtons('#authors-group', '.author-row', '.add-author-row');
-        updateAddRowButtons('#series-group', '.series-row', '.add-series-row');
-        updateAddRowButtons('#genres-group', '.genre-row', '.add-genre-row');
+        try {
+            // Update author row buttons
+            if (document.querySelector('#authors-group')) {
+                updateAddRowButtons(
+                    '#authors-group',
+                    '.author-row',
+                    '.add-author-row'
+                );
+            }
+
+            // Update series row buttons
+            if (document.querySelector('#series-group')) {
+                updateAddRowButtons(
+                    '#series-group',
+                    '.series-row',
+                    '.add-series-row'
+                );
+            }
+
+            // Update genre row buttons
+            if (document.querySelector('#genres-group')) {
+                updateAddRowButtons(
+                    '#genres-group',
+                    '.genre-row',
+                    '.add-genre-row'
+                );
+            }
+        } catch (error) {
+            console.error('Error initializing row buttons:', error);
+        }
 
         // Authors
         document.getElementById('authors-group').addEventListener('click', function (e) {
@@ -399,14 +426,23 @@
         });
 
         function enableAuthorAutocomplete(input) {
-            if (!window.jQuery || !window.jQuery.ui) return;
+            if (!window.jQuery || !window.jQuery.ui) {
+                return;
+            }
+
             $(input).autocomplete({
-                source: function (request, response) {
+                source: function(request, response) {
                     $.ajax({
                         url: '/api/browse',
-                        data: { type: 'author', search: request.term },
-                        success: function (data) {
-                            response((data.data || []).map(function (item) { return item.name; }));
+                        data: {
+                            type: 'author',
+                            search: request.term
+                        },
+                        success: function(data) {
+                            const items = Array.isArray(data.data) ? data.data : [];
+                            response(items.map(function(item) {
+                                return item.name;
+                            }));
                         }
                     });
                 },
@@ -547,8 +583,17 @@
 
         // Function to populate genre dropdown with options
         function populateGenreDropdown(select) {
+            if (!select) {
+                console.error('No select element provided to populateGenreDropdown');
+                return;
+            }
             // Use the genres from the config that are already in the template
-            const genres = @json(config('genres.list', []));
+            const genres = {!! json_encode(config('genres.list', []), JSON_HEX_APOS) !!};
+
+            if (!Array.isArray(genres)) {
+                console.error('Genres is not an array:', genres);
+                return;
+            }
 
             // Clear existing options except the first one (Select a genre)
             while (select.options.length > 1) {
@@ -556,12 +601,14 @@
             }
 
             // Add genre options
-            genres.forEach(function (genre) {
-                const option = document.createElement('option');
-                option.value = genre;
-                option.textContent = genre;
-                select.appendChild(option);
-            });
+            if (Array.isArray(genres)) {
+                genres.forEach(function (genre) {
+                    const option = document.createElement('option');
+                    option.value = genre;
+                    option.textContent = genre;
+                    select.appendChild(option);
+                });
+            }
         }
 
         // Initialize all genre selects on page load
@@ -575,7 +622,8 @@
         });
     });
 
-    (function () {
+    // IIFE for Google Books functionality
+    (function() {
         window.googleBooksMoreMatches = false;
         window.googleBooksMatchLimit = 10;
 
@@ -687,13 +735,21 @@
                                 $('#description').val(data.description);
                             }
                             if (data.cover_image_url) {
-                                const proxiedUrl = googleBooksProxyUrl(data.cover_image_url);
-                                $('#cover-preview-img').attr('src', proxiedUrl);
-                                $('#cover-preview-group').show();
+                                try {
+                                    const proxiedUrl = googleBooksProxyUrl(data.cover_image_url);
+                                    $('#cover-preview-img').attr('src', proxiedUrl);
+                                    $('#cover-preview-group').show();
+                                } catch (error) {
+                                    console.error('Error processing cover image URL:', error);
+                                }
                             }
                             let hidden = $('#cover_image_url');
                             if (!hidden.length) {
-                                $('<input>').attr({ type: 'hidden', id: 'cover_image_url', name: 'cover_image_url' }).appendTo('#book-{{ isset($book) ? 'edit' : 'form' }}');
+                                $('<input>').attr({
+                                    type: 'hidden',
+                                    id: 'cover_image_url',
+                                    name: 'cover_image_url'
+                                }).appendTo('#book-{{ isset($book) ? 'edit' : 'form' }}');
                                 hidden = $('#cover_image_url');
                             }
                             hidden.val(data.cover_image_url || '');
@@ -1146,7 +1202,16 @@
         // Helper for proxying Google Books cover images
         function googleBooksProxyUrl(url) {
             if (url && url.match(/^https?:\/\/books\.google\.com\//)) {
-                return '/google-books-cover/' + btoa(url);
+                try {
+                    // Fallback for browsers that don't support btoa
+                    const encodedUrl = typeof btoa === 'function'
+                        ? btoa(encodeURIComponent(url))
+                        : Buffer.from(url).toString('base64');
+                    return '/google-books-cover/' + encodedUrl;
+                } catch (e) {
+                    console.error('Error encoding URL:', e);
+                    return url;
+                }
             }
             return url;
         }

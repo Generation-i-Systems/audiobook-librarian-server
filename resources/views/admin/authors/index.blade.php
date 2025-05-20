@@ -42,7 +42,10 @@
             </tbody>
         </table>
 
-        {{ $authors->links() }}
+        {{-- Simple pagination removed as we're not using Laravel's paginator --}}
+        @if(count($authors) === 0)
+            <div class="alert alert-info">No authors found.</div>
+        @endif
 
     </div>
 @endsection

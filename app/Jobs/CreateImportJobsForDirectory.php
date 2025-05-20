@@ -40,26 +40,121 @@ class CreateImportJobsForDirectory implements ShouldQueue
             Log::error("Directory not found for import: $absDir");
             return;
         }
-        $bookDirs = $this->findBookDirectories($absDir);
-        $queued = [];
+
         $firestore = new FirestoreService();
-        foreach ($bookDirs as $dirPath) {
-            $relDir = ltrim(str_replace($storagePath, '', $dirPath), '/');
-            $exists = false;
-            $books = $firestore->listBooks();
-            foreach ($books as $book) {
-                if (($book['directory_path'] ?? null) === $relDir) {
-                    $exists = true;
-                    break;
+        $jobId = 'import_dir_' . md5($this->dir . '_' . now()->timestamp);
+
+        try {
+            // Update job status to processing
+            $firestore->updateJobStatus(
+                $jobId,
+                'directory_import',
+                'processing',
+                [
+                    'directory' => $this->dir,
+                    'total_items' => 0,
+                    'processed_items' => 0,
+                    'queued_items' => 0,
+                    'skipped_items' => 0,
+                    'started_at' => now()->toDateTimeString()
+                ]
+            );
+
+            $bookDirs = $this->findBookDirectories($absDir);
+            $queued = [];
+            $skipped = [];
+            $total = count($bookDirs);
+
+            // Update total items count
+            $firestore->updateJobStatus(
+                $jobId,
+                'directory_import',
+                'processing',
+                ['total_items' => $total]
+            );
+
+            foreach ($bookDirs as $dirPath) {
+                $relDir = ltrim(str_replace($storagePath, '', $dirPath), '/');
+                $exists = false;
+                $books = $firestore->listBooks();
+
+                foreach ($books as $book) {
+                    if (($book['directory_path'] ?? null) === $relDir) {
+                        $exists = true;
+                        break;
+                    }
                 }
+
+                if ($exists) {
+                    $skipped[] = $relDir;
+                    $firestore->updateJobStatus(
+                        $jobId,
+                        'directory_import',
+                        'processing',
+                        ['skipped_items' => count($skipped)]
+                    );
+                    continue;
+                }
+
+                // Create a job for this directory
+                $importJob = new ImportBookFromDirectoryJob($relDir);
+                $importJob->onQueue('imports');
+                dispatch($importJob);
+
+                $queued[] = $relDir;
+
+                // Update progress
+                $firestore->updateJobStatus(
+                    $jobId,
+                    'directory_import',
+                    'processing',
+                    [
+                        'queued_items' => count($queued),
+                        'processed_items' => count($queued) + count($skipped)
+                    ]
+                );
             }
-            if ($exists) {
-                continue;
+
+            // Mark job as completed
+            $firestore->updateJobStatus(
+                $jobId,
+                'directory_import',
+                'completed',
+                [
+                    'completed_at' => now()->toDateTimeString(),
+                    'queued_dirs' => $queued,
+                    'skipped_dirs' => $skipped
+                ]
+            );
+
+            Log::info('Queued ' . count($queued) . ' book directories for import.', [
+                'job_id' => $jobId,
+                'queued_dirs' => $queued,
+                'skipped_dirs' => $skipped
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error in CreateImportJobsForDirectory: ' . $e->getMessage(), [
+                'directory' => $this->dir,
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            // Update job status to failed
+            if (isset($firestore)) {
+                $firestore->updateJobStatus(
+                    $jobId,
+                    'directory_import',
+                    'failed',
+                    [
+                        'error' => $e->getMessage(),
+                        'failed_at' => now()->toDateTimeString()
+                    ]
+                );
             }
-            ImportBookFromDirectoryJob::dispatch($relDir);
-            $queued[] = $relDir;
+
+            // Re-throw to allow Laravel to handle the failure
+            throw $e;
         }
-        Log::info('Queued ' . count($queued) . ' book directories for import.', ['queued_dirs' => $queued]);
     }
 
     /**

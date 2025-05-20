@@ -26,24 +26,44 @@ class ImportBookFromDirectoryJob implements ShouldQueue
     public function handle()
     {
         $firestore = new FirestoreService();
-        Log::info("[BulkImport] Starting: {$this->directoryPath}");
-        $this->setGoogleBooksApiService(app(\App\Services\GoogleBooksApiService::class));
-        Log::info("[BulkImport] Processing: {$this->directoryPath}");
-        $dirPath = '/' . ltrim($this->directoryPath, '/');
-        $storagePath = rtrim(env('BOOK_STORAGE_PATH'), '/');
-        $fullPath = $storagePath . $dirPath;
-        if (!is_dir($fullPath)) {
-            Log::error("[BulkImport] Directory does not exist: $fullPath");
-            return;
-        }
-        // Check for existing book in Firestore
-        $existingBooks = $firestore->listBooks();
-        foreach ($existingBooks as $b) {
-            if (($b['directory_path'] ?? null) === $dirPath) {
-                Log::error("[BulkImport] Book already exists: " . json_encode($b));
-                return;
+        $jobId = 'import_book_' . md5($this->directoryPath . '_' . now()->timestamp);
+
+        try {
+            // Update job status to processing
+            $firestore->updateJobStatus(
+                $jobId,
+                'book_import',
+                'processing',
+                [
+                    'directory_path' => $this->directoryPath,
+                    'started_at' => now()->toDateTimeString(),
+                    'message' => 'Starting import process'
+                ]
+            );
+
+            Log::info("[BulkImport] Starting: {$this->directoryPath}");
+            $this->setGoogleBooksApiService(app(\App\Services\GoogleBooksApiService::class));
+            Log::info("[BulkImport] Processing: {$this->directoryPath}");
+
+            $dirPath = '/' . ltrim($this->directoryPath, '/');
+            $storagePath = rtrim(env('BOOK_STORAGE_PATH'), '/');
+            $fullPath = $storagePath . $dirPath;
+
+            if (!is_dir($fullPath)) {
+                $error = "[BulkImport] Directory does not exist: $fullPath";
+                Log::error($error);
+                throw new \RuntimeException($error);
             }
-        }
+
+            // Check for existing book in Firestore
+            $existingBooks = $firestore->listBooks();
+            foreach ($existingBooks as $b) {
+                if (($b['directory_path'] ?? null) === $dirPath) {
+                    $error = "[BulkImport] Book already exists: " . json_encode($b);
+                    Log::error($error);
+                    throw new \RuntimeException('Book already exists in the database');
+                }
+            }
         $bookTmp = $this->processDirPath($dirPath);
         $bookData = [
             'directory_path' => $dirPath,
@@ -157,7 +177,42 @@ class ImportBookFromDirectoryJob implements ShouldQueue
             // Update cover_image in Firestore
             $firestore->updateBook($bookId, ['cover_image' => $candidates[0]['path']]);
         }
-        Log::info("[BulkImport] Book imported: " . ($bookData['title'] ?? '') . " ({$bookId}) " . ($bookData['directory_path'] ?? ''));
+            Log::info("[BulkImport] Book imported: " . ($bookData['title'] ?? '') . " ({$bookId}) " . ($bookData['directory_path'] ?? ''));
+
+            // Update job status to completed
+            $firestore->updateJobStatus(
+                $jobId,
+                'book_import',
+                'completed',
+                [
+                    'book_id' => $bookId,
+                    'title' => $bookData['title'] ?? '',
+                    'completed_at' => now()->toDateTimeString(),
+                    'message' => 'Book imported successfully'
+                ]
+            );
+
+        } catch (\Exception $e) {
+            Log::error('[BulkImport] Error importing book: ' . $e->getMessage(), [
+                'directory_path' => $this->directoryPath,
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            // Update job status to failed
+            $firestore->updateJobStatus(
+                $jobId,
+                'book_import',
+                'failed',
+                [
+                    'error' => $e->getMessage(),
+                    'failed_at' => now()->toDateTimeString(),
+                    'message' => 'Failed to import book: ' . $e->getMessage()
+                ]
+            );
+
+            // Re-throw to allow Laravel to handle the failure
+            throw $e;
+        }
     }
 
     /**
@@ -165,16 +220,24 @@ class ImportBookFromDirectoryJob implements ShouldQueue
      */
     protected function notifyAdminQuotaFailure($book, $msg, $attempts)
     {
-        // // Send message to all admins (or first admin)
-        // $admin = \App\Models\User::where('is_admin', true)->first();
-        // \App\Models\Message::create([
-        //     'subject' => '[ERROR][ImportBookFromDirectoryJob] Google Books API quota exceeded',
-        //     'body' => "Book '{$book->title}' in '{$book->directory_path}' failed after $attempts attempts. Last error: $msg",
-        //     'to_user_id' => $admin ? $admin->id : null,
-        //     'from_user_id' => null,
-        //     'is_read' => false,
-        // ]);
-        // Firestore version: just log error (custom notification logic can be added)
+        $firestore = new FirestoreService();
+        $jobId = 'quota_failure_' . md5(($book['title'] ?? '') . '_' . now()->timestamp);
+
+        // Log the quota failure as a special job type
+        $firestore->updateJobStatus(
+            $jobId,
+            'quota_failure',
+            'failed',
+            [
+                'book_title' => $book['title'] ?? 'Unknown',
+                'directory_path' => $book['directory_path'] ?? 'Unknown',
+                'attempts' => $attempts,
+                'error' => $msg,
+                'occurred_at' => now()->toDateTimeString(),
+                'message' => "Google Books API quota exceeded after $attempts attempts"
+            ]
+        );
+
         Log::error("[ERROR][ImportBookFromDirectoryJob] Google Books API quota exceeded for '{$book['title']}' in '{$book['directory_path']}' after $attempts attempts. Last error: $msg");
     }
 }

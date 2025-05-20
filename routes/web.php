@@ -12,7 +12,7 @@ use App\Http\Controllers\ReadingProgressController;
 use App\Http\Controllers\AdminNotificationController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\ImageProxyController;
-
+use App\Http\Controllers\Admin\JobController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
@@ -71,16 +71,22 @@ if (app()->environment('local')) {
         session(['foo' => 'bar']);
         return ['session_id' => session()->getId(), 'session_data' => session()->all()];
     });
+
+
+    // TEMPORARY DEBUG: Dump all Firestore users
+    Route::get('/firestore-users-dump', function () {
+        $result = \App\Services\FirestoreService::dumpAllUsers();
+        return response()->json($result);
+    });
+    // TEMPORARY DEBUG: Dump all Firestore users
+    Route::get('/firestore-books-dump', function () {
+        $result = \App\Services\FirestoreService::dumpAllUsers();
+        return response()->json($result);
+    });
 }
 
 Route::get('/', function () {
     return view('welcome');
-});
-
-// TEMPORARY DEBUG: Dump all Firestore users
-Route::get('/firestore-users-dump', function () {
-    $result = \App\Services\FirestoreService::dumpAllUsers();
-    return response()->json($result);
 });
 
 Auth::routes();
@@ -89,7 +95,10 @@ Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name
 
 Route::middleware(['auth', 'standard'])->group(function () {
     Route::resource('books', BookController::class)->only(['index', 'show', 'download', 'create']);
-    Route::get('/books/create', [App\Http\Controllers\Admin\BookController::class, 'showCreateForm'])->name('books.create');
+    Route::get('/books/create', [
+        \App\Http\Controllers\Admin\BookController::class,
+        'showCreateForm',
+    ])->name('books.create');
     Route::get('/books/{book}/download', [BookController::class, 'download'])->name('books.download');
     Route::post('/books/{book}/reviews', [ReviewController::class, 'store'])->name('reviews.store');
     Route::delete('/reviews/{review}', [ReviewController::class, 'destroy'])->name('reviews.destroy');
@@ -127,8 +136,15 @@ Route::post(
 // General image proxy for covers and previews
 Route::get('/image-proxy', [ImageProxyController::class, 'show'])->name('image.proxy');
 // Pretty URL for covers, supports slashes in path
-Route::get('/cover/{path}', [ImageProxyController::class, 'cover'])->where('path', '.*')->name('cover.proxy');
-Route::get('/google-books-cover/{encodedUrl}', [ImageProxyController::class, 'googleBooksCover'])->where('encodedUrl', '.+')->name('google.books.cover.proxy');
+Route::get('/cover/{path}', [
+    ImageProxyController::class,
+    'cover',
+])->where('path', '.*')->name('cover.proxy');
+
+Route::get('/google-books-cover/{encodedUrl}', [
+    ImageProxyController::class,
+    'googleBooksCover',
+])->where('encodedUrl', '.+')->name('google.books.cover.proxy');
 
 Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(function () {
     Route::get('/', function () {
@@ -144,7 +160,10 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     // AJAX endpoints for Tom Select
     Route::get('/authors/ajax', [Admin\AuthorController::class, 'ajax'])->name('authors.ajax');
     Route::get('/series/ajax', [Admin\BookController::class, 'seriesAjax'])->name('series.ajax');
-    Route::post('/import/rename', [Admin\BookController::class, 'books.renameImportItem'])->name('import.rename');
+    Route::post(
+        '/import/rename',
+        [Admin\BookController::class, 'books.renameImportItem']
+    )->name('import.rename');
 
     // AJAX: List files in book directory
     Route::get('books/files-ajax', [Admin\BookController::class, 'filesAjax'])->name('books.filesAjax');
@@ -153,19 +172,41 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::resource('authors', Admin\AuthorController::class);
     Route::resource('books', Admin\BookController::class);
     Route::resource('account_requests', Admin\AccountRequestController::class);
-    Route::get('/books/import-from-title', [Admin\BookController::class, 'importFromTitle'])->name('books.importFromTitle');
-    Route::post('/books/search-google-books', [Admin\BookController::class, 'searchGoogleBooks'])->name('books.searchGoogleBooks');
-    Route::post('/books/import-from-google-books', [Admin\BookController::class, 'importFromGoogleBooks'])->name('books.importFromGoogleBooks');
-    Route::post('/books/processImport', [Admin\BookController::class, 'processImport'])->name('books.processImport');
+    Route::get('/books/import-from-title', [
+        Admin\BookController::class,
+        'importFromTitle',
+    ])->name('books.importFromTitle');
+
+    Route::post('/books/search-google-books', [
+        Admin\BookController::class,
+        'searchGoogleBooks',
+    ])->name('books.searchGoogleBooks');
+
+    Route::post('/books/import-from-google-books', [
+        Admin\BookController::class,
+        'importFromGoogleBooks',
+    ])->name('books.importFromGoogleBooks');
+
+    Route::post('/books/processImport', [
+        Admin\BookController::class,
+        'processImport',
+    ])->name('books.processImport');
     Route::get(
         '/directory-browser',
         [Admin\DirectoryBrowserController::class, 'browse']
     )->name('directoryBrowser');
 
     // Bulk import books from directory (recursive, queued)
-    Route::post('/books/bulk-import', [Admin\BookController::class, 'bulkImportBooks'])->name('books.bulkImport');
+    Route::post('/books/bulk-import', [
+        Admin\BookController::class,
+        'bulkImportBooks',
+    ])->name('books.bulkImport');
+
     // Bulk import from a specific directory (recursive)
-    Route::post('/books/bulk-import-dir', [Admin\BookController::class, 'bulkImportBooksFromDir'])->name('books.bulkImportDir');
+    Route::post('/books/bulk-import-dir', [
+        Admin\BookController::class,
+        'bulkImportBooksFromDir',
+    ])->name('books.bulkImportDir');
 
     Route::resource('users', Admin\UserController::class);
 
@@ -185,7 +226,10 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::get('messages/create', [Admin\MessagesController::class, 'create'])->name('messages.create');
     Route::post('messages', [Admin\MessagesController::class, 'store'])->name('messages.store');
     // Route::get('messages/{id}', [Admin\MessagesController::class, 'show'])->name('messages.show');
-    Route::post('messages/{id}/mark-as-read', [Admin\MessagesController::class, 'markAsRead'])->name('messages.markAsRead');
+    Route::post('messages/{id}/mark-as-read', [
+        Admin\MessagesController::class,
+        'markAsRead',
+    ])->name('messages.markAsRead');
 
     Route::post(
         '/send-notification',
@@ -196,4 +240,45 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         '/messages/{message}/acknowledge',
         [Admin\MessageController::class, 'acknowledge']
     )->name('messages.acknowledge');
+
+    // Job management
+    Route::get('/jobs', [
+        Admin\JobController::class,
+        'index',
+    ])->name('jobs.index');
+
+    Route::get('/jobs/{id}', [
+        Admin\JobController::class,
+        'show',
+    ])->name('jobs.show');
+
+    Route::post('/jobs/{id}/retry', [
+        Admin\JobController::class,
+        'retry',
+    ])->name('jobs.retry');
+
+    Route::post('/jobs/{id}/cancel', [
+        Admin\JobController::class,
+        'cancel',
+    ])->name('jobs.cancel');
+
+    Route::delete('/jobs/cleanup/{daysOld?}', [
+        Admin\JobController::class,
+        'cleanup',
+    ])->name('jobs.cleanup');
+
+    Route::get('/jobs/{id}/logs', [
+        Admin\JobController::class,
+        'logs',
+    ])->name('jobs.logs');
+
+    Route::get('/jobs/{id}/output', [
+        Admin\JobController::class,
+        'output',
+    ])->name('jobs.output');
+
+    Route::get('/jobs/{id}/errors', [
+        Admin\JobController::class,
+        'errors',
+    ])->name('jobs.errors');
 });
