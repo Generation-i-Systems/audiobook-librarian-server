@@ -13,7 +13,10 @@ use App\Services\FirestoreService;
 
 class CreateImportJobsForDirectory implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+    use SerializesModels;
 
     protected $dir;
 
@@ -132,7 +135,6 @@ class CreateImportJobsForDirectory implements ShouldQueue
                 'queued_dirs' => $queued,
                 'skipped_dirs' => $skipped
             ]);
-
         } catch (\Exception $e) {
             Log::error('Error in CreateImportJobsForDirectory: ' . $e->getMessage(), [
                 'directory' => $this->dir,
@@ -164,7 +166,9 @@ class CreateImportJobsForDirectory implements ShouldQueue
     {
         $results = [];
         foreach (scandir($dir) as $item) {
-            if ($item === '.' || $item === '..') continue;
+            if ($item === '.' || $item === '..') {
+                continue;
+            }
             $path = $dir . '/' . $item;
             if (is_dir($path)) {
                 // If directory contains audio files, treat as book dir

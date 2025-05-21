@@ -17,7 +17,7 @@ class GoogleBooksApiService
             'timeout'  => 5.0,
         ]);
 
-       $this->apiKey = config('services.googlebooks.key');
+        $this->apiKey = config('services.googlebooks.key');
     }
 
     public function searchBooks(string $query, int $maxResults = 5)
@@ -46,7 +46,7 @@ class GoogleBooksApiService
             $response = $this->client->request('GET', "volumes/{$volumeId}", [
                  'query' => [
                     'key' => $this->apiKey
-                ],
+                 ],
             ]);
 
             $body = $response->getBody()->getContents();

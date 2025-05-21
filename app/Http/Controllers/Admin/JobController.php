@@ -48,7 +48,7 @@ class JobController extends Controller
             $page,
             ['path' => $request->url(), 'query' => $request->query()]
         );
-        
+
         return view('admin.jobs.index', compact('jobs'));
     }
 
@@ -67,17 +67,17 @@ class JobController extends Controller
     public function show($id)
     {
         $job = $this->firestore->getJobStatus($id);
-        
+
         if (!$job) {
             abort(404);
         }
-        
+
         // Ensure the ID is included in the job data
         $job['id'] = $id;
-        
+
         return view('admin.jobs.show', compact('job'));
     }
-    
+
     /**
      * Retry a failed or queued job.
      *
@@ -87,11 +87,11 @@ class JobController extends Controller
     public function retry($id)
     {
         $job = $this->firestore->getJobStatus($id);
-        
+
         if (!$job) {
             abort(404);
         }
-        
+
         // Update job status to queued
         $this->firestore->updateJobStatus(
             $id,
@@ -108,14 +108,14 @@ class JobController extends Controller
                 ]
             ]
         );
-        
+
         // TODO: Dispatch the job based on its type
-        
+
         return redirect()
             ->route('admin.jobs.show', $id)
             ->with('status', 'Job has been requeued for processing.');
     }
-    
+
     /**
      * Cancel a queued or processing job.
      *
@@ -125,18 +125,18 @@ class JobController extends Controller
     public function cancel($id)
     {
         $job = $this->firestore->getJobStatus($id);
-        
+
         if (!$job) {
             abort(404);
         }
-        
+
         // Only allow cancelling queued or processing jobs
         if (!in_array($job['status'] ?? null, ['queued', 'processing'])) {
             return redirect()
                 ->route('admin.jobs.show', $id)
                 ->with('error', 'Only queued or processing jobs can be cancelled.');
         }
-        
+
         // Update job status to cancelled
         $this->firestore->updateJobStatus(
             $id,
@@ -153,9 +153,9 @@ class JobController extends Controller
                 ]
             ]
         );
-        
+
         // TODO: Cancel the actual job if it's still running
-        
+
         return redirect()
             ->route('admin.jobs.show', $id)
             ->with('status', 'Job has been cancelled.');
@@ -176,14 +176,14 @@ class JobController extends Controller
     public function status($id)
     {
         $job = $this->firestore->getJobStatus($id);
-        
+
         if (!$job) {
             return response()->json([
                 'success' => false,
                 'message' => 'Job not found'
             ], 404);
         }
-        
+
         return response()->json([
             'success' => true,
             'data' => $job
@@ -209,19 +209,19 @@ class JobController extends Controller
             'status' => 'nullable|string',
             'limit' => 'nullable|integer|min:1|max:100',
         ]);
-        
+
         $type = $request->input('type');
         $status = $request->input('status');
         $limit = $request->input('limit', 50);
-        
+
         $jobs = $this->firestore->listJobs($type, $status, $limit);
-        
+
         return response()->json([
             'success' => true,
             'data' => $jobs
         ]);
     }
-    
+
     /**
      * Clean up old completed/failed jobs.
      *
@@ -231,7 +231,7 @@ class JobController extends Controller
     public function cleanup($daysOld = 30)
     {
         $deleted = $this->firestore->cleanupOldJobs($daysOld);
-        
+
         return redirect()
             ->route('admin.jobs.index')
             ->with('status', "Successfully cleaned up $deleted old jobs.");

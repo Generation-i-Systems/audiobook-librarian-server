@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-
 use Illuminate\Support\Facades\Auth;
 use App\Services\FirestoreService;
 
@@ -22,7 +21,7 @@ class MessagesController extends Controller
             $messages[] = $doc->data();
         }
         // Optionally sort in PHP if Firestore ordering is unavailable
-        usort($messages, function($a, $b) {
+        usort($messages, function ($a, $b) {
             if (($a['is_read'] ?? false) == ($b['is_read'] ?? false)) {
                 return strtotime($b['created_at'] ?? '') <=> strtotime($a['created_at'] ?? '');
             }

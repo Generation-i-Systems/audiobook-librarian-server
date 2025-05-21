@@ -79,7 +79,9 @@ class BookApiController extends Controller
     {
         $firestore = new FirestoreService();
         $book = $firestore->getBook($id);
-        if (!$book) return response()->json(['error' => 'Book not found'], 404);
+        if (!$book) {
+            return response()->json(['error' => 'Book not found'], 404);
+        }
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
         return response()->json($this->getBookWithCover($book, $withCover, $inlineCovers));
@@ -186,7 +188,9 @@ class BookApiController extends Controller
     {
         $firestore = new FirestoreService();
         $book = $firestore->getBook($id);
-        if (!$book) abort(404);
+        if (!$book) {
+            abort(404);
+        }
         $directoryPath = $book['directory_path'] ?? null;
         if (!$directoryPath || !\Storage::disk('books')->exists($directoryPath)) {
             abort(404, 'Book directory not found.');
@@ -198,7 +202,7 @@ class BookApiController extends Controller
         $zipFileName = str_replace(' ', '_', $book['title']) . '.zip';
         $zipPath = storage_path('app/public/temp/' . $zipFileName);
         $zip = new \ZipArchive();
-        if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== TRUE) {
+        if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
             abort(500, 'Failed to create zip archive.');
         }
         foreach ($files as $file) {
@@ -221,8 +225,8 @@ class BookApiController extends Controller
             $zipName = 'bookqueue_' . $user->id . '_' . Str::random(8) . '.zip';
             $zipPath = storage_path('app/public/' . $zipName);
 
-            $zip = new ZipArchive;
-            if ($zip->open($zipPath, ZipArchive::CREATE) === TRUE) {
+            $zip = new ZipArchive();
+            if ($zip->open($zipPath, ZipArchive::CREATE) === true) {
                 foreach ($queue as $item) {
                     $book = $item->book;
                     if ($book && $book->directory_path && Storage::exists($book->directory_path)) {
@@ -271,10 +275,12 @@ class BookApiController extends Controller
     {
         $firestore = new FirestoreService();
         $genres = $firestore->listGenres();
-        usort($genres, function($a, $b) {
+        usort($genres, function ($a, $b) {
             return strcmp($a['name'], $b['name']);
         });
-        $genres = array_map(function($g) { return ['id' => $g['id'], 'name' => $g['name']]; }, $genres);
+        $genres = array_map(function ($g) {
+            return ['id' => $g['id'], 'name' => $g['name']];
+        }, $genres);
         return response()->json($genres);
     }
 
@@ -287,7 +293,9 @@ class BookApiController extends Controller
         $perPage = $request->input('per_page', 20);
         $search = $request->input('search');
         $genre = $firestore->getGenre($genreId);
-        if (!$genre) return response()->json(['error' => 'Genre not found'], 404);
+        if (!$genre) {
+            return response()->json(['error' => 'Genre not found'], 404);
+        }
         $books = array_filter($firestore->listBooks(), function ($book) use ($genreId) {
             return ($book['genre_id'] ?? null) == $genreId;
         });
@@ -300,7 +308,9 @@ class BookApiController extends Controller
             return $match;
         });
         $authors = array_values($authors);
-        usort($authors, function($a, $b) { return strcmp($a['name'], $b['name']); });
+        usort($authors, function ($a, $b) {
+            return strcmp($a['name'], $b['name']);
+        });
         $total = count($authors);
         $page = (int) $request->input('page', 1);
         $authors = array_slice($authors, ($page - 1) * $perPage, $perPage);
@@ -319,7 +329,9 @@ class BookApiController extends Controller
     {
         $firestore = new FirestoreService();
         $genre = $firestore->getGenre($genreId);
-        if (!$genre) return response()->json(['error' => 'Genre not found'], 404);
+        if (!$genre) {
+            return response()->json(['error' => 'Genre not found'], 404);
+        }
         $books = array_filter($firestore->listBooks(), function ($book) use ($genreId) {
             return ($book['genre_id'] ?? null) == $genreId;
         });
@@ -328,8 +340,12 @@ class BookApiController extends Controller
             return in_array($author['id'], $authorIds);
         });
         $authors = array_values($authors);
-        usort($authors, function($a, $b) { return strcmp($a['name'], $b['name']); });
-        $authors = array_map(function($a) { return ['id' => $a['id'], 'name' => $a['name']]; }, $authors);
+        usort($authors, function ($a, $b) {
+            return strcmp($a['name'], $b['name']);
+        });
+        $authors = array_map(function ($a) {
+            return ['id' => $a['id'], 'name' => $a['name']];
+        }, $authors);
         return response()->json([
             'genre' => ['id' => $genre['id'], 'name' => $genre['name']],
             'authors' => $authors
@@ -346,7 +362,9 @@ class BookApiController extends Controller
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
         $series = $firestore->getSeries($seriesId);
-        if (!$series) return response()->json(['error' => 'Series not found'], 404);
+        if (!$series) {
+            return response()->json(['error' => 'Series not found'], 404);
+        }
         $books = array_filter($firestore->listBooks(), function ($book) use ($seriesId) {
             return ($book['series_id'] ?? null) == $seriesId;
         });
@@ -378,7 +396,9 @@ class BookApiController extends Controller
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
         $author = $firestore->getAuthor($authorId);
-        if (!$author) return response()->json(['error' => 'Author not found'], 404);
+        if (!$author) {
+            return response()->json(['error' => 'Author not found'], 404);
+        }
         $books = array_filter($firestore->listBooks(), function ($book) use ($authorId) {
             return ($book['author_id'] ?? null) == $authorId;
         });
@@ -407,7 +427,9 @@ class BookApiController extends Controller
     {
         $firestore = new FirestoreService();
         $author = $firestore->getAuthor($authorId);
-        if (!$author) return response()->json(['error' => 'Author not found'], 404);
+        if (!$author) {
+            return response()->json(['error' => 'Author not found'], 404);
+        }
         $books = array_filter($firestore->listBooks(), function ($book) use ($authorId) {
             return ($book['author_id'] ?? null) == $authorId;
         });
@@ -416,8 +438,12 @@ class BookApiController extends Controller
             return in_array($ser['id'], $seriesIds);
         });
         $series = array_values($series);
-        usort($series, function($a, $b) { return strcmp($a['name'], $b['name']); });
-        $series = array_map(function($s) { return ['id' => $s['id'], 'name' => $s['name']]; }, $series);
+        usort($series, function ($a, $b) {
+            return strcmp($a['name'], $b['name']);
+        });
+        $series = array_map(function ($s) {
+            return ['id' => $s['id'], 'name' => $s['name']];
+        }, $series);
         return response()->json([
             'author' => ['id' => $author['id'], 'name' => $author['name']],
             'series' => $series
@@ -445,13 +471,17 @@ class BookApiController extends Controller
             return response()->json(['error' => 'Author or Genre not found.'], 404);
         }
         // Sort books by series name, series number, and title
-        usort($books, function($a, $b) {
+        usort($books, function ($a, $b) {
             $seriesA = $a['series']['name'] ?? '';
             $seriesB = $b['series']['name'] ?? '';
-            if ($seriesA !== $seriesB) return strcmp($seriesA, $seriesB);
+            if ($seriesA !== $seriesB) {
+                return strcmp($seriesA, $seriesB);
+            }
             $numA = $a['series_number'] ?? 0;
             $numB = $b['series_number'] ?? 0;
-            if ($numA !== $numB) return $numA <=> $numB;
+            if ($numA !== $numB) {
+                return $numA <=> $numB;
+            }
             return strcmp($a['title'] ?? '', $b['title'] ?? '');
         });
         // Paginate manually
@@ -490,6 +520,4 @@ class BookApiController extends Controller
         unset($arr['cover_image_content']);
         return $arr;
     }
-
-
 }

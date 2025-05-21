@@ -7,7 +7,6 @@ use Illuminate\Support\Facades\Auth;
 use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Log;
 
-
 class ImageProxyController extends Controller
 {
     /**

@@ -18,7 +18,7 @@ class BookRequestController extends Controller
         ]);
 
         $firestore = new \App\Services\FirestoreService();
-    $firestore->db->collection('book_requests')->add([
+        $firestore->db->collection('book_requests')->add([
             'user_id' => Auth::id(),
             'title' => $request->title,
             'author' => $request->author,

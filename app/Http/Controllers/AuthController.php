@@ -35,8 +35,8 @@ class AuthController extends Controller
         $existingRequest = $firestore->getUserByCredentials(['email' => $request->email]);
         if ($existingRequest) {
                 return response()->json(['email' => ['Account request already submitted with this email.']], 400);
-            }
         }
+    }
         $firestore->db->collection('account_requests')->add([
             'name' => $request->name,
             'email' => $request->email,
@@ -45,5 +45,5 @@ class AuthController extends Controller
         ]);
 
         return response()->json(['message' => 'Account request submitted. Please wait for approval.'], 201); // Created
-    }
+}
 }

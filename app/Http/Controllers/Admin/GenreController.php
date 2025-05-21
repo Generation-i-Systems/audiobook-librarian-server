@@ -38,7 +38,9 @@ class GenreController extends Controller
     {
         $firestore = new FirestoreService();
         $genre = $firestore->getGenre($id);
-        if (!$genre) abort(404);
+        if (!$genre) {
+            abort(404);
+        }
         return view('admin.genres.edit', compact('genre'));
     }
 
@@ -47,7 +49,9 @@ class GenreController extends Controller
         $request->validate(['name' => 'required|string|max:255']);
         $firestore = new FirestoreService();
         $genre = $firestore->getGenre($id);
-        if (!$genre) abort(404);
+        if (!$genre) {
+            abort(404);
+        }
         // Check for duplicate name
         foreach ($firestore->listGenres() as $g) {
             if (strcasecmp($g['name'], $request->name) === 0 && $g['id'] !== $id) {

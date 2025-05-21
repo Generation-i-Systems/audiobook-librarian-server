@@ -45,7 +45,7 @@ class RepairBooksNoAudio extends Command
                 continue;
             }
             $files = collect($disk->allFiles($dir));
-            $audio = $files->filter(function($file) {
+            $audio = $files->filter(function ($file) {
                 return preg_match('/\.(m4b|mp3|m4a|wav|flac|ogg|aac)$/i', $file);
             });
             if ($audio->isEmpty()) {

@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Admin;
 
 use Illuminate\Http\Request;
-
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Process;
@@ -99,7 +98,9 @@ class QueueController extends Controller
 
     public function clear()
     {
-        (new \App\Services\FirestoreService())->db->collection('jobs')->documents()->each(function($doc) { $doc->reference()->delete(); });
+        (new \App\Services\FirestoreService())->db->collection('jobs')->documents()->each(function ($doc) {
+            $doc->reference()->delete();
+        });
         return response()->json(['success' => true]);
     }
 }

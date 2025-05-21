@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\Storage;
 
 class DirectoryBrowserController extends Controller
 {
-
     public function browse(Request $request)
     {
         $basePath = env('BOOK_STORAGE_PATH');
@@ -119,11 +118,10 @@ class DirectoryBrowserController extends Controller
                 $hasAudioFiles = true;
 
                 break;
-            } else if (is_dir($directoryPath . '/' . $file) && !in_array(strtolower($file), ['mp3', 'm4b', 'm4a'])) {
+            } elseif (is_dir($directoryPath . '/' . $file) && !in_array(strtolower($file), ['mp3', 'm4b', 'm4a'])) {
                 $hasSubDirectories = true;
                 break;
             }
-
         }
         return $hasAudioFiles && !$hasSubDirectories;
     }
@@ -141,6 +139,5 @@ class DirectoryBrowserController extends Controller
             return [];  // Return an empty array on failure
         }
         return $files;
-
     }
 }

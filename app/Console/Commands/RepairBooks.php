@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use Illuminate\Support\Facades\Log;
-
 use Illuminate\Console\Command;
 use App\Services\FirestoreService;
 use Illuminate\Support\Facades\Storage;
@@ -46,12 +45,12 @@ class RepairBooks extends Command
             $dirPath = $arg1;
         }
         $query = Book::query();
-        $query->where(function($q) use ($doCover, $doSeries) {
+        $query->where(function ($q) use ($doCover, $doSeries) {
             if ($doCover) {
                 $q->where('cover_image', '/cover.jpg');
             }
             if ($doCover && $doSeries) {
-                $q->orWhere(function($q2) {
+                $q->orWhere(function ($q2) {
                     $q2->whereNotNull('series_id')->whereNull('series_number');
                 });
             } elseif ($doSeries) {
@@ -148,29 +147,37 @@ class RepairBooks extends Command
     {
         $disk = Storage::disk('books');
         $dir = $book->directory_path;
-        if (!$disk->exists($dir)) return null;
+        if (!$disk->exists($dir)) {
+            return null;
+        }
         // 1. Try cover embedded in first m4b
         $allFiles = collect($disk->allFiles($dir));
-        $m4bs = $allFiles->filter(function($file) {
+        $m4bs = $allFiles->filter(function ($file) {
             return Str::endsWith(strtolower($file), '.m4b');
         })->values();
         if ($m4bs->count()) {
             $cover = $this->extractCoverFromM4B($disk->path($m4bs[0]), $disk->path($dir));
-            if ($cover) return $cover;
+            if ($cover) {
+                return $cover;
+            }
         }
         // 2. cover.*
-        $covers = $allFiles->filter(function($file) {
+        $covers = $allFiles->filter(function ($file) {
             return preg_match('/\/cover\.[^\/]+$/i', $file);
         });
         foreach ($covers as $file) {
-            if ($this->isImage($disk->path($file))) return $this->storeCover($disk->path($file), $book);
+            if ($this->isImage($disk->path($file))) {
+                return $this->storeCover($disk->path($file), $book);
+            }
         }
         // 3. any image
-        $images = $allFiles->filter(function($file) {
+        $images = $allFiles->filter(function ($file) {
             return preg_match('/\.(jpg|jpeg|png|gif)$/i', $file);
         });
         foreach ($images as $file) {
-            if ($this->isImage($disk->path($file))) return $this->storeCover($disk->path($file), $book);
+            if ($this->isImage($disk->path($file))) {
+                return $this->storeCover($disk->path($file), $book);
+            }
         }
         return null;
     }
@@ -203,7 +210,9 @@ class RepairBooks extends Command
 
     private function extractSeriesNumberFromPath($path, $seriesName)
     {
-        if (!$path || !$seriesName) return null;
+        if (!$path || !$seriesName) {
+            return null;
+        }
         // Find the segment containing the series name
         $segments = explode('/', trim($path, '/'));
         $seriesIdx = -1;

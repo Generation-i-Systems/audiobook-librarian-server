@@ -157,19 +157,23 @@ trait BookImportTrait
     {
         $storagePath = env('BOOK_STORAGE_PATH');
         $dir = rtrim($storagePath, '/') . '/' . ltrim($directoryPath, '/');
-        if (!is_dir($dir))
+        if (!is_dir($dir)) {
             return [null, []];
+        }
         $images = [];
         $selected = null;
         foreach (scandir($dir) as $file) {
-            if ($file === '.' || $file === '..')
+            if ($file === '.' || $file === '..') {
                 continue;
+            }
             $full = $dir . '/' . $file;
-            if (!is_file($full))
+            if (!is_file($full)) {
                 continue;
+            }
             $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-            if (!in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp']))
+            if (!in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
                 continue;
+            }
             $images[] = $file;
             if (!$selected && stripos($file, 'cover') !== false) {
                 $selected = $file;
@@ -188,8 +192,9 @@ trait BookImportTrait
         $bookDirs = [];
         $rii = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root));
         foreach ($rii as $file) {
-            if ($file->isDir())
+            if ($file->isDir()) {
                 continue;
+            }
             $ext = strtolower($file->getExtension());
             if (in_array($ext, ['m4b', 'jpg', 'jpeg', 'png', 'gif', 'webp']) || $file->getFilename() === 'metadata.abs') {
                 $bookDirs[] = $file->getPath();
@@ -218,7 +223,7 @@ trait BookImportTrait
         $genre = array_shift($parts);
         if (count($parts) > 0 && $parts[0] == 'R') {
             array_shift($parts);
-        } else if (count($parts) > 0 && $parts[0] == 'VA') {
+        } elseif (count($parts) > 0 && $parts[0] == 'VA') {
             Log::error("Skipping VA: {$directoryPath}");
             return null;
         }
@@ -335,12 +340,13 @@ trait BookImportTrait
             }
             // Determine extension
             $ext = 'jpg';
-            if (strpos($contentType, 'png') !== false)
+            if (strpos($contentType, 'png') !== false) {
                 $ext = 'png';
-            elseif (strpos($contentType, 'gif') !== false)
+            } elseif (strpos($contentType, 'gif') !== false) {
                 $ext = 'gif';
-            elseif (strpos($contentType, 'jpeg') !== false)
+            } elseif (strpos($contentType, 'jpeg') !== false) {
                 $ext = 'jpg';
+            }
 
             $filename = 'cover.' . $ext;
             $fullPath = $fullDir . '/' . $filename;

@@ -14,7 +14,11 @@ use Illuminate\Support\Facades\Storage;
 
 class ImportBookFromDirectoryJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, BookImportTrait;
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+    use SerializesModels;
+    use BookImportTrait;
 
     protected $directoryPath;
 
@@ -64,119 +68,119 @@ class ImportBookFromDirectoryJob implements ShouldQueue
                     throw new \RuntimeException('Book already exists in the database');
                 }
             }
-        $bookTmp = $this->processDirPath($dirPath);
-        $bookData = [
+            $bookTmp = $this->processDirPath($dirPath);
+            $bookData = [
             'directory_path' => $dirPath,
             'author_id' => $bookTmp->author->id,
             'genre_id' => $bookTmp->genre->id,
             'title' => $bookTmp->title,
-        ];
-        if ($bookTmp->series) {
-            $bookData['series_id'] = $bookTmp->series->id;
-            $bookData['series_number'] = $bookTmp->series_number;
-        }
-        Log::info("[BulkImport] Found book: " . json_encode($bookData));
-
-        list($coverAuto, $coverCandidates) = $this->findCoverImageCandidate($dirPath);
-        Log::info("[BulkImport] Found cover candidates: " . json_encode($coverCandidates));
-        $m4bs = is_dir($fullPath) ? array_values(array_filter(scandir($fullPath), function ($f) use ($fullPath) {
-            return is_file($fullPath . '/' . $f) && strtolower(pathinfo($f, PATHINFO_EXTENSION)) === 'm4b';
-        })) : [];
-        $tags = [];
-        if ($m4bs) {
-            $firstM4b = $fullPath . '/' . $m4bs[0];
-            $tags = $this->extractTagData($firstM4b);
-            if (empty($coverAuto) && empty($coverCandidates)) {
-                $coverAuto = $this->extractCoverFromM4B($firstM4b, $fullPath);
+            ];
+            if ($bookTmp->series) {
+                $bookData['series_id'] = $bookTmp->series->id;
+                $bookData['series_number'] = $bookTmp->series_number;
             }
-        }
-        $meta = $this->extractMetadataAbs($fullPath);
-        if (!empty($tags['description'])) {
-            $bookData['description'] = $tags['description'];
-        } elseif (!empty($meta['description'])) {
-            $bookData['description'] = $meta['description'];
-        }
-        if (!empty($meta['year'])) {
-            $bookData['published_year'] = $meta['year'];
-        }
-        if ($coverAuto) {
-            $bookData['cover_image'] = ltrim($this->directoryPath, '/') . '/' . $coverAuto;
-        } elseif (!empty($coverCandidates)) {
-            $bookData['cover_image'] = ltrim($this->directoryPath, '/') . '/' . $coverCandidates[0];
-        }
-        Log::info("[BulkImport] Cover image: " . ($bookData['cover_image'] ?? ''));
-        Log::info("[BulkImport] Description: " . ($bookData['description'] ?? ''));
-        Log::info("[BulkImport] Published year: " . ($bookData['published_year'] ?? ''));
+            Log::info("[BulkImport] Found book: " . json_encode($bookData));
 
-        try {
-            if (empty($bookData['cover_image'] ?? null) || empty($bookData['description'] ?? null) || empty($bookData['published_year'] ?? null)) {
-                Log::info("[BulkImport] Searching Google Books for: " . $bookData['title'] . ' ' . ($bookTmp->author->name ?? ''));
-                [$matches, $closeMatch] = $this->searchGoogleBooksWithSimilarity($bookData['title'], $bookTmp->author->name ?? '', $bookTmp->series->name ?? '', $bookTmp->series_number ?? '');
-                if ($closeMatch) {
-                    $info = $closeMatch['volumeInfo'];
-                    $bookData['published_year'] = isset($info['publishedDate']) ? substr($info['publishedDate'], 0, 4) : '';
-                    $bookData['description'] = $info['description'] ?? '';
-                    $cover_image = $info['imageLinks']['thumbnail'] ?? '';
-                    Log::info("[BulkImport] Cover image from Google Books: " . $cover_image);
-                    $bookData['cover_image'] = $this->importCoverImageFromUrl($cover_image, $bookData['directory_path']);
-                } else {
-                    Log::error("[BulkImport] No close match found for: " . $bookData['title'] . ' ' . ($bookTmp->author->name ?? ''));
+            list($coverAuto, $coverCandidates) = $this->findCoverImageCandidate($dirPath);
+            Log::info("[BulkImport] Found cover candidates: " . json_encode($coverCandidates));
+            $m4bs = is_dir($fullPath) ? array_values(array_filter(scandir($fullPath), function ($f) use ($fullPath) {
+                return is_file($fullPath . '/' . $f) && strtolower(pathinfo($f, PATHINFO_EXTENSION)) === 'm4b';
+            })) : [];
+            $tags = [];
+            if ($m4bs) {
+                $firstM4b = $fullPath . '/' . $m4bs[0];
+                $tags = $this->extractTagData($firstM4b);
+                if (empty($coverAuto) && empty($coverCandidates)) {
+                    $coverAuto = $this->extractCoverFromM4B($firstM4b, $fullPath);
                 }
             }
-        } catch (\Exception $e) {
-            $msg = $e->getMessage();
-            if (strpos($msg, 'Quota exceeded for quota metric') !== false) {
-                $attempts = $this->attempts();
-                if ($attempts == 1) {
-                    // Random delay between 5 and 30 minutes
-                    $delay = rand(5 * 60, 30 * 60);
-                } elseif ($attempts == 2) {
-                    // 4 hours
-                    $delay = 4 * 60 * 60;
-                } elseif ($attempts >= 3 && $attempts < 10) {
-                    // 8 hours
-                    $delay = 8 * 60 * 60;
-                } else {
-                    // Max retries reached, notify admin
-                    $this->notifyAdminQuotaFailure($book, $msg, $attempts);
-                    Log::error("[BulkImport] Google Books API quota exceeded after 10 retries for book: {$book->title} ({$book->directory_path})");
+            $meta = $this->extractMetadataAbs($fullPath);
+            if (!empty($tags['description'])) {
+                $bookData['description'] = $tags['description'];
+            } elseif (!empty($meta['description'])) {
+                $bookData['description'] = $meta['description'];
+            }
+            if (!empty($meta['year'])) {
+                $bookData['published_year'] = $meta['year'];
+            }
+            if ($coverAuto) {
+                $bookData['cover_image'] = ltrim($this->directoryPath, '/') . '/' . $coverAuto;
+            } elseif (!empty($coverCandidates)) {
+                $bookData['cover_image'] = ltrim($this->directoryPath, '/') . '/' . $coverCandidates[0];
+            }
+            Log::info("[BulkImport] Cover image: " . ($bookData['cover_image'] ?? ''));
+            Log::info("[BulkImport] Description: " . ($bookData['description'] ?? ''));
+            Log::info("[BulkImport] Published year: " . ($bookData['published_year'] ?? ''));
+
+            try {
+                if (empty($bookData['cover_image'] ?? null) || empty($bookData['description'] ?? null) || empty($bookData['published_year'] ?? null)) {
+                    Log::info("[BulkImport] Searching Google Books for: " . $bookData['title'] . ' ' . ($bookTmp->author->name ?? ''));
+                    [$matches, $closeMatch] = $this->searchGoogleBooksWithSimilarity($bookData['title'], $bookTmp->author->name ?? '', $bookTmp->series->name ?? '', $bookTmp->series_number ?? '');
+                    if ($closeMatch) {
+                        $info = $closeMatch['volumeInfo'];
+                        $bookData['published_year'] = isset($info['publishedDate']) ? substr($info['publishedDate'], 0, 4) : '';
+                        $bookData['description'] = $info['description'] ?? '';
+                        $cover_image = $info['imageLinks']['thumbnail'] ?? '';
+                        Log::info("[BulkImport] Cover image from Google Books: " . $cover_image);
+                        $bookData['cover_image'] = $this->importCoverImageFromUrl($cover_image, $bookData['directory_path']);
+                    } else {
+                        Log::error("[BulkImport] No close match found for: " . $bookData['title'] . ' ' . ($bookTmp->author->name ?? ''));
+                    }
+                }
+            } catch (\Exception $e) {
+                $msg = $e->getMessage();
+                if (strpos($msg, 'Quota exceeded for quota metric') !== false) {
+                    $attempts = $this->attempts();
+                    if ($attempts == 1) {
+                        // Random delay between 5 and 30 minutes
+                        $delay = rand(5 * 60, 30 * 60);
+                    } elseif ($attempts == 2) {
+                        // 4 hours
+                        $delay = 4 * 60 * 60;
+                    } elseif ($attempts >= 3 && $attempts < 10) {
+                        // 8 hours
+                        $delay = 8 * 60 * 60;
+                    } else {
+                        // Max retries reached, notify admin
+                        $this->notifyAdminQuotaFailure($book, $msg, $attempts);
+                        Log::error("[BulkImport] Google Books API quota exceeded after 10 retries for book: {$book->title} ({$book->directory_path})");
+                        return;
+                    }
+                    Log::warning("[BulkImport] Google Books API quota exceeded. Releasing job for retry #$attempts after $delay seconds.");
+                    $this->release($delay);
                     return;
+                } else {
+                    throw $e;
                 }
-                Log::warning("[BulkImport] Google Books API quota exceeded. Releasing job for retry #$attempts after $delay seconds.");
-                $this->release($delay);
-                return;
-            } else {
-                throw $e;
             }
-        }
 
-        Log::info("[BulkImport] Cover image: " . ($bookData['cover_image'] ?? ''));
-        Log::info("[BulkImport] Published year: " . ($bookData['published_year'] ?? ''));
-        Log::info("--------------------------[BulkImport] Series number: " . ($bookData['series_number'] ?? ''));
-        $bookData['date_added'] = now()->toDateTimeString();
-        $bookId = $firestore->createBook($bookData);
-        Log::info("--------------------------[BulkImport] Book Firestore ID: " . $bookId);
-        $dirPath = $bookData['directory_path'];
-        $storagePath = env('BOOK_STORAGE_PATH');
-        $candidates = [];
-        if ($dirPath && $storagePath && Storage::disk('public')->exists($dirPath)) {
-            $files = Storage::disk('public')->files($dirPath);
-            foreach ($files as $file) {
-                if (preg_match('/\.(jpe?g|png|gif|svg)$/i', $file)) {
-                    $candidates[] = [
+            Log::info("[BulkImport] Cover image: " . ($bookData['cover_image'] ?? ''));
+            Log::info("[BulkImport] Published year: " . ($bookData['published_year'] ?? ''));
+            Log::info("--------------------------[BulkImport] Series number: " . ($bookData['series_number'] ?? ''));
+            $bookData['date_added'] = now()->toDateTimeString();
+            $bookId = $firestore->createBook($bookData);
+            Log::info("--------------------------[BulkImport] Book Firestore ID: " . $bookId);
+            $dirPath = $bookData['directory_path'];
+            $storagePath = env('BOOK_STORAGE_PATH');
+            $candidates = [];
+            if ($dirPath && $storagePath && Storage::disk('public')->exists($dirPath)) {
+                $files = Storage::disk('public')->files($dirPath);
+                foreach ($files as $file) {
+                    if (preg_match('/\.(jpe?g|png|gif|svg)$/i', $file)) {
+                        $candidates[] = [
                         'path' => $file,
                         'size' => Storage::disk('public')->size($file)
-                    ];
+                        ];
+                    }
                 }
             }
-        }
-        if (count($candidates) > 0) {
-            usort($candidates, function($a, $b) {
-                return $b['size'] <=> $a['size'];
-            });
-            // Update cover_image in Firestore
-            $firestore->updateBook($bookId, ['cover_image' => $candidates[0]['path']]);
-        }
+            if (count($candidates) > 0) {
+                usort($candidates, function ($a, $b) {
+                    return $b['size'] <=> $a['size'];
+                });
+                // Update cover_image in Firestore
+                $firestore->updateBook($bookId, ['cover_image' => $candidates[0]['path']]);
+            }
             Log::info("[BulkImport] Book imported: " . ($bookData['title'] ?? '') . " ({$bookId}) " . ($bookData['directory_path'] ?? ''));
 
             // Update job status to completed
@@ -191,7 +195,6 @@ class ImportBookFromDirectoryJob implements ShouldQueue
                     'message' => 'Book imported successfully'
                 ]
             );
-
         } catch (\Exception $e) {
             Log::error('[BulkImport] Error importing book: ' . $e->getMessage(), [
                 'directory_path' => $this->directoryPath,

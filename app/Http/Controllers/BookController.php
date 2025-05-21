@@ -3,8 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Services\FirestoreService;
-
-
 use App\Services\GoogleBooksApiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -38,7 +36,9 @@ class BookController extends Controller
     {
         $firestore = new FirestoreService();
         $book = $firestore->getBook($id);
-        if (!$book) abort(404);
+        if (!$book) {
+            abort(404);
+        }
         return view('books.show', compact('book'));
     }
 
@@ -46,7 +46,9 @@ class BookController extends Controller
     {
         $firestore = new FirestoreService();
         $book = $firestore->getBook($id);
-        if (!$book) abort(404);
+        if (!$book) {
+            abort(404);
+        }
         $directoryPath = $book['directory_path'] ?? null;
         if (!$directoryPath || !\Storage::disk('books')->exists($directoryPath)) {
             abort(404, 'Book directory not found.');
@@ -58,7 +60,7 @@ class BookController extends Controller
         $zipFileName = str_replace(' ', '_', $book['title']) . '.zip';
         $zipPath = storage_path('app/public/temp/' . $zipFileName);
         $zip = new \ZipArchive();
-        if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== TRUE) {
+        if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
             abort(500, 'Failed to create zip archive.');
         }
         foreach ($files as $file) {

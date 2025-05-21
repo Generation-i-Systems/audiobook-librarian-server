@@ -107,8 +107,9 @@ class FirestoreService
                 if (in_array($key, ['username', 'email'])) {
                     $allDocs = $this->db->collection('users')->documents();
                     foreach ($allDocs as $doc) {
-                        if (!$doc->exists())
+                        if (!$doc->exists()) {
                             continue;
+                        }
                         $data = $doc->data();
                         if (isset($data[$key]) && mb_strtolower($data[$key]) === mb_strtolower($value)) {
                             $data['id'] = $doc->id();
@@ -121,8 +122,9 @@ class FirestoreService
                 }
             }
             $documents = $query->documents();
-            if ($documents->size() === 0)
+            if ($documents->size() === 0) {
                 return null;
+            }
             $user = $documents->rows()[0]->data();
             $user['id'] = $documents->rows()[0]->id();
             return $user;
@@ -239,8 +241,9 @@ class FirestoreService
     // USER CRUD
     public function createUser(array $data)
     {
-        if (!$this->db)
+        if (!$this->db) {
             return null;
+        }
         // Default role to 'preview' if not set
         if (!isset($data['role'])) {
             $data['role'] = 'preview';
@@ -249,7 +252,7 @@ class FirestoreService
             $docRef = $this->db->collection('users')->add($data);
             return $docRef->id();
         } catch (\Throwable $e) {
-            \Log::error('Firestore createUser failed: ' . $e->getMessage());
+            Log::error('Firestore createUser failed: ' . $e->getMessage());
             return null;
         }
     }
@@ -416,23 +419,23 @@ class FirestoreService
             foreach ($allBooks as $bookDoc) {
                 if ($bookDoc->exists()) {
                     $bookData = $bookDoc->data();
-                    // Assuming authors are stored under a field like 'authors' or 'author' as an array of strings
-                    // Let's check for 'authors' first, then 'author' as a fallback for the array.
                     $authorData = null;
                     if (isset($bookData['authors']) && is_array($bookData['authors'])) {
                         $authorData = $bookData['authors'];
-                    } elseif (isset($bookData['author']) && is_array($bookData['author'])) { // Fallback to 'author' if it's an array
+                    } elseif (isset($bookData['author']) && is_array($bookData['author'])) {
                         $authorData = $bookData['author'];
                     }
-
                     if ($authorData) {
                         foreach ($authorData as $authorName) {
                             if (is_string($authorName) && !empty($authorName)) {
-                                $authors[$authorName] = true; // Use keys for uniqueness
+                                $authors[$authorName] = true;
                             }
                         }
-                    } elseif (isset($bookData['author']) && is_string($bookData['author']) && !empty($bookData['author'])){
-                        // Handle case where 'author' might be a single string (legacy or specific cases)
+                    } elseif (
+                        isset($bookData['author']) &&
+                        is_string($bookData['author']) &&
+                        !empty($bookData['author'])
+                    ) {
                         $authors[$bookData['author']] = true;
                     }
                 }
@@ -527,8 +530,9 @@ class FirestoreService
     public function getSeries(string $id)
     {
         $snap = $this->db->collection('series')->document($id)->snapshot();
-        if (!$snap->exists())
+        if (!$snap->exists()) {
             return null;
+        }
         $series = $snap->data();
         $series['id'] = $id;
         return $series;
@@ -544,12 +548,11 @@ class FirestoreService
             foreach ($allBooks as $bookDoc) {
                 if ($bookDoc->exists()) {
                     $bookData = $bookDoc->data();
-                    // Series are stored as a map: {"Series Name": 1, ...}
-                    if (isset($bookData['series']) && is_array($bookData['series'])) { // Firestore maps are PHP associative arrays
+                    if (isset($bookData['series']) && is_array($bookData['series'])) {
                         $seriesNames = array_keys($bookData['series']);
                         foreach ($seriesNames as $seriesName) {
                             if (is_string($seriesName) && !empty($seriesName)) {
-                                $series[$seriesName] = true; // Use keys for uniqueness
+                                $series[$seriesName] = true;
                             }
                         }
                     }
@@ -568,6 +571,9 @@ class FirestoreService
      * Search for series titles starting with a given term.
      *
      * @param string $term The search term.
+     * Search for series titles starting with a given term.
+     *
+     * @param string $term The search term.
      * @return array A list of unique series titles.
      */
     public function searchSeriesByName(string $term): array
@@ -576,10 +582,10 @@ class FirestoreService
             return [];
         }
         $termLower = strtolower($term);
-        $allSeries = $this->listSeries(); // Leverage existing method to get all unique series
+        $allSeries = $this->listSeries();
         $matches = [];
         foreach ($allSeries as $seriesName) {
-            if (stripos($seriesName, $termLower) === 0) { // Case-insensitive starts-with
+            if (stripos($seriesName, $termLower) === 0) {
                 $matches[] = $seriesName;
             }
         }
@@ -809,7 +815,6 @@ class FirestoreService
             }
 
             return $results;
-
         } catch (\Exception $e) {
             Log::error('Failed to list jobs: ' . $e->getMessage());
             return [];

@@ -39,7 +39,7 @@ class MessageController extends Controller
             'user_id' => Auth::id(),
             'content' => $request->input('content'),
             'is_from_admin' => true,
-        ]);
+         ]);
 
         return back()->with('success', 'Message sent to admin!');
     }

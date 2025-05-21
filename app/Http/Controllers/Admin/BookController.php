@@ -238,8 +238,9 @@ class BookController extends Controller
         if (!empty($validated['series'])) {
             foreach ($validated['series'] as $i => $seriesName) {
                 $seriesName = trim($seriesName);
-                if ($seriesName === '')
+                if ($seriesName === '') {
                     continue;
+                }
 
                 $number = isset($validated['series_number'][$i]) ? $validated['series_number'][$i] : null;
                 if ($number !== null && $number !== '') {
@@ -377,8 +378,9 @@ class BookController extends Controller
     {
         $firestore = new FirestoreService();
         $book = $firestore->getBook($id);
-        if (!$book)
+        if (!$book) {
             abort(404);
+        }
         return view('admin.books.show', compact('book'));
     }
 
@@ -649,7 +651,7 @@ class BookController extends Controller
 
         $zip = new ZipArchive();
 
-        if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== TRUE) {
+        if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
             abort(500, 'Failed to create zip archive.');
         }
 
@@ -893,11 +895,13 @@ class BookController extends Controller
             $allFiles = scandir($dir);
             $audioExts = ['mp3', 'm4b', 'm4a', 'aac', 'flac', 'ogg', 'wav'];
             foreach ($allFiles as $file) {
-                if ($file === '.' || $file === '..')
+                if ($file === '.' || $file === '..') {
                     continue;
+                }
                 $path = $dir . '/' . $file;
-                if (!is_file($path))
+                if (!is_file($path)) {
                     continue;
+                }
                 $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
                 if ($showAll || in_array($ext, $audioExts)) {
                     $files[] = $file;

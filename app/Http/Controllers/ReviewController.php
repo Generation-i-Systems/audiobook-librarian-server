@@ -8,7 +8,6 @@ use App\Services\FirestoreService;
 
 class ReviewController extends Controller
 {
-
     public function store(Request $request, $bookId)
     {
         $request->validate([

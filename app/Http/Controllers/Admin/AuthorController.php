@@ -19,7 +19,9 @@ class AuthorController extends Controller
             });
         }
         // Optionally sort authors by name
-        usort($authors, function($a, $b) { return strcmp($a['name'], $b['name']); });
+        usort($authors, function ($a, $b) {
+            return strcmp($a['name'], $b['name']);
+        });
         return view('admin.authors.index', ['authors' => $authors, 'search' => $search]);
     }
 
@@ -46,7 +48,9 @@ class AuthorController extends Controller
     {
         $firestore = new FirestoreService();
         $author = $firestore->getAuthor($id);
-        if (!$author) abort(404);
+        if (!$author) {
+            abort(404);
+        }
         return view('admin.authors.edit', compact('author'));
     }
 
@@ -55,7 +59,9 @@ class AuthorController extends Controller
         $request->validate(['name' => 'required|string|max:255']);
         $firestore = new FirestoreService();
         $author = $firestore->getAuthor($id);
-        if (!$author) abort(404);
+        if (!$author) {
+            abort(404);
+        }
         // Check for duplicate name
         foreach ($firestore->listAuthors() as $a) {
             if (strcasecmp($a['name'], $request->name) === 0 && $a['id'] !== $id) {
@@ -88,7 +94,9 @@ class AuthorController extends Controller
         }
         // Limit and sort
         $authors = array_slice($authors, 0, 20);
-        usort($authors, function($a, $b) { return strcmp($a['name'], $b['name']); });
+        usort($authors, function ($a, $b) {
+            return strcmp($a['name'], $b['name']);
+        });
         return response()->json(['data' => array_values($authors)]);
     }
 }
