@@ -96,4 +96,20 @@ Audiobook Librarian is a Laravel-based web app for managing audiobooks, supporti
 - **JS:** `public/js/admin/books/form.js`
 
 ---
+
+## Appendix: Screenshots
+
+### Create Book Form
+![Create Book Form](public/screenshots/Screenshot-Book%20Form.png)
+
+### Book List View
+![Book List View](public/screenshots/Screenshot-Book%20List.png)
+
+### Import Author View
+![Import Author View](public/screenshots/Screenshot-Import%20Author%20View.png)
+
+### Login Screen
+![Login Screen](public/screenshots/Screenshot-Login.png)
+
+---
 This blueprint summarizes the architecture, features, and design up to this point. Use for onboarding, planning, or future extension.
