@@ -41,7 +41,7 @@ class ImportBookFromDirectoryJob implements ShouldQueue
                 [
                     'directory_path' => $this->directoryPath,
                     'started_at' => now()->toDateTimeString(),
-                    'message' => 'Starting import process'
+                    'message' => 'Starting import process',
                 ]
             );
 
@@ -70,10 +70,10 @@ class ImportBookFromDirectoryJob implements ShouldQueue
             }
             $bookTmp = $this->processDirPath($dirPath);
             $bookData = [
-            'directory_path' => $dirPath,
-            'author_id' => $bookTmp->author->id,
-            'genre_id' => $bookTmp->genre->id,
-            'title' => $bookTmp->title,
+                'directory_path' => $dirPath,
+                'author_id' => $bookTmp->author->id,
+                'genre_id' => $bookTmp->genre->id,
+                'title' => $bookTmp->title,
             ];
             if ($bookTmp->series) {
                 $bookData['series_id'] = $bookTmp->series->id;
@@ -168,8 +168,8 @@ class ImportBookFromDirectoryJob implements ShouldQueue
                 foreach ($files as $file) {
                     if (preg_match('/\.(jpe?g|png|gif|svg)$/i', $file)) {
                         $candidates[] = [
-                        'path' => $file,
-                        'size' => Storage::disk('public')->size($file)
+                            'path' => $file,
+                            'size' => Storage::disk('public')->size($file),
                         ];
                     }
                 }
@@ -192,13 +192,13 @@ class ImportBookFromDirectoryJob implements ShouldQueue
                     'book_id' => $bookId,
                     'title' => $bookData['title'] ?? '',
                     'completed_at' => now()->toDateTimeString(),
-                    'message' => 'Book imported successfully'
+                    'message' => 'Book imported successfully',
                 ]
             );
         } catch (\Exception $e) {
             Log::error('[BulkImport] Error importing book: ' . $e->getMessage(), [
                 'directory_path' => $this->directoryPath,
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             // Update job status to failed
@@ -237,10 +237,12 @@ class ImportBookFromDirectoryJob implements ShouldQueue
                 'attempts' => $attempts,
                 'error' => $msg,
                 'occurred_at' => now()->toDateTimeString(),
-                'message' => "Google Books API quota exceeded after $attempts attempts"
+                'message' => "Google Books API quota exceeded after $attempts attempts",
             ]
         );
 
-        Log::error("[ERROR][ImportBookFromDirectoryJob] Google Books API quota exceeded for '{$book['title']}' in '{$book['directory_path']}' after $attempts attempts. Last error: $msg");
+        Log::error("[ERROR][ImportBookFromDirectoryJob] Google Books API quota exceeded for '" .
+            ($book['title'] ?? 'Unknown') . "' in " . "'" . ($book['directory_path'] ?? 'Unknown') .
+            "' after $attempts attempts. Last error: $msg");
     }
 }

@@ -84,7 +84,9 @@ class RepairBooks extends Command
             }
             // Series number repair
             if ($doSeries && $book->series_id && !$book->series_number) {
-                $this->info("Repairing series number for: {$book->title} by {$book->author->name} {$book->series?->name}");
+                $this->info(
+                    "Repairing series number for: {$book->title} by {$book->author->name} {$book->series?->name}"
+                );
                 $this->info("Directory path: {$book->directory_path}");
 
                 $num = $this->extractSeriesNumberFromPath($book->directory_path, $book->series?->name);
@@ -93,7 +95,9 @@ class RepairBooks extends Command
                     $book->save();
                     $this->info("Set series number for {$book->title} to {$num}");
                 } else {
-                    $this->warn("No series number found for: {$book->title} by {$book->author->name} {$book->series?->name}");
+                    $this->warn(
+                        "No series number found for: {$book->title} by {$book->author->name} {$book->series?->name}"
+                    );
                 }
             }
         }
@@ -114,9 +118,16 @@ class RepairBooks extends Command
             $this->info("Romance query: " . $romanceQuery->toRawSql());
 
             $romanceRBooks = $romanceQuery->get();
-            $this->info('Found ' . $romanceRBooks->count() . ' books with /Romance/R/ in directory_path (filtered). Reprocessing...');
+            $this->info(
+                "Found {$romanceRBooks->count()} books with /Romance/R/ in directory_path (filtered). Reprocessing..."
+            );
             foreach ($romanceRBooks as $book) {
-                $fixedPath = preg_replace('#/Romance/R/#', '/Romance/', $book->directory_path, 1);
+                $fixedPath = preg_replace(
+                    '#/Romance/R/#',
+                    '/Romance/',
+                    $book->directory_path,
+                    1
+                );
                 if ($fixedPath !== $book->directory_path) {
                     if (method_exists($this, 'processDirPath')) {
                         $newBook = $this->processDirPath($fixedPath);
@@ -126,7 +137,12 @@ class RepairBooks extends Command
                         $this->warn('processDirPath not available. Skipping.');
                         continue;
                     }
-                    $this->warn("genre: {$newBook->genre}, author: {$newBook->author}, series: {$newBook->series}, title: {$newBook->title}");
+                    $this->warn(
+                        "genre: {$newBook->genre}, " .
+                        "author: {$newBook->author}, " .
+                        "series: {$newBook->series}, " .
+                        "title: {$newBook->title}"
+                    );
 
                     // Update fields if newBook has them
                     $book->genre_id = $newBook->genre_id ?? $book->genre_id;

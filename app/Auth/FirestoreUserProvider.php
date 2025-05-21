@@ -93,6 +93,9 @@ class FirestoreUserProvider implements UserProvider
     public function validateCredentials(Authenticatable $user, array $credentials)
     {
         // Validate user credentials (e.g., password)
-        return $this->firestore->validateUserCredentials($user, $credentials);
+        return $this->firestore->validateUserCredentials(
+            $user,
+            $credentials
+        );
     }
 }

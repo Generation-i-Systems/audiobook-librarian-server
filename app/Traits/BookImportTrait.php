@@ -14,13 +14,23 @@ trait BookImportTrait
 
         if (!$storagePath) {
             Log::error('BOOK_STORAGE_PATH is not defined in the .env file.');
-            return response()->json(['message' => 'The token could not be found and is not able to search or implement a path. Please check security of the system and notify the system admin.'], 400);
+            return response()->json(
+                [
+                    'message' => 'The token could not be found and is not able to search or implement a path.',
+                ],
+                400
+            );
         }
 
         $files = scandir($path);
         if ($files === false) {
             Log::error('Attempt to perform a scandir but failed to get value.');
-            return response()->json(['message' => 'Attempt to get the folder or information of the folder with failure call. Please check if it is installed. Please check security of the system and notify the system admin.'], 400);
+            return response()->json(
+                [
+                    'message' => 'Attempt to get the folder or information of the folder with failure call.',
+                ],
+                400
+            );
         }
         return $files;
     }
@@ -30,7 +40,12 @@ trait BookImportTrait
         $storagePath = env('BOOK_STORAGE_PATH');
         if (!$storagePath) {
             Log::error('BOOK_STORAGE_PATH is not defined in the .env file.');
-            return response()->json(['message' => 'The token could not be found and is not able to be located for information . Please check security of the system and notify the system admin.'], 400);
+            return response()->json(
+                [
+                    'message' => 'The token could not be found and is not able to be located for information .',
+                ],
+                400
+            );
         }
         $directoryPath = dirname($filePath);
         $process = new Process([
@@ -196,7 +211,10 @@ trait BookImportTrait
                 continue;
             }
             $ext = strtolower($file->getExtension());
-            if (in_array($ext, ['m4b', 'jpg', 'jpeg', 'png', 'gif', 'webp']) || $file->getFilename() === 'metadata.abs') {
+            if (
+                in_array($ext, ['m4b', 'jpg', 'jpeg', 'png', 'gif', 'webp']) ||
+                $file->getFilename() === 'metadata.abs'
+            ) {
                 $bookDirs[] = $file->getPath();
             }
         }
@@ -245,7 +263,7 @@ trait BookImportTrait
 
         if (!empty($series)) {
             if (preg_match('#^([0-9.]+)\s?(.*)$#', $title, $matches)) {
-                // Series number at start should be removed from title unlike other places where it belongs in the title
+                // Remove Series number at start from title unlike other places where it is part of the title
                 $seriesNumber = $matches[1];
                 $title = $matches[2];
             } elseif (preg_match('/(?:book|volume|vol\.?)[ _-]*(\d{1,3}(\.\d{1,2})?)/i', $title, $m)) {
@@ -263,7 +281,11 @@ trait BookImportTrait
         $book['genre'] = [$genre];
 
         //if author contains 'and', '&' or ',', split into multiple authors and each author is more than 4 letters
-        if (stripos($author, 'and') !== false || stripos($author, '&') !== false || stripos($author, ',') !== false) {
+        if (
+            stripos($author, 'and') !== false ||
+            stripos($author, '&') !== false ||
+            stripos($author, ',') !== false
+        ) {
             // First normalize all separators to commas, then split
             $author = str_replace([' and ', ' & '], ',', $author);
             $authors = explode(',', $author);
@@ -329,7 +351,12 @@ trait BookImportTrait
             $ch = curl_init($url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3');
+            curl_setopt(
+                $ch,
+                CURLOPT_USERAGENT,
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) ' .
+                'Chrome/58.0.3029.110 Safari/537.3'
+            );
             $contents = curl_exec($ch);
             $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
             curl_close($ch);
@@ -411,10 +438,18 @@ trait BookImportTrait
             $itemSeriesNumber = $info['seriesNumber'] ?? '';
             $score = 0;
             // Title similarity (Levenshtein, case-insensitive)
-            $titleLev = 100 - min(levenshtein(mb_strtolower($title), mb_strtolower($itemTitle)), 100);
+            $titleLev = 100 -
+                min(
+                    levenshtein(mb_strtolower($title), mb_strtolower($itemTitle)),
+                    100
+                );
             $score += $titleLev;
             // Author similarity (Levenshtein, case-insensitive)
-            $authorLev = 100 - min(levenshtein(mb_strtolower($author), mb_strtolower($itemAuthors)), 100);
+            $authorLev = 100 -
+                min(
+                    levenshtein(mb_strtolower($author), mb_strtolower($itemAuthors)),
+                    100
+                );
             $score += $authorLev;
             // Series similarity
             if ($series && stripos($itemSeries, $series) !== false) {

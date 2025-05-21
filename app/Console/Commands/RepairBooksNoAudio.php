@@ -9,7 +9,8 @@ use Illuminate\Support\Str;
 
 class RepairBooksNoAudio extends Command
 {
-    protected $signature = 'books:repair-no-audio {parent_path?} {--delete : Delete books with no audio files} {--interactive : Interactively review each book with no audio files}';
+    protected $signature = 'books:repair-no-audio {parent_path?} {--delete : Delete books with no audio files} ' .
+        '{--interactive : Interactively review each book with no audio files}';
     protected $description = 'Find (and optionally delete) books whose directory contains no audio files.';
 
     public function handle()

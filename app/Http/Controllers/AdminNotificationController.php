@@ -48,11 +48,14 @@ class AdminNotificationController extends Controller
     {
         // Implement your push notification logic here (Firebase Cloud Messaging)
         // For example:
-        $deviceToken = isset($user['device_token']) ? $user['device_token'] : null; // Store device tokens in the users collection
+        $deviceToken = isset($user['device_token']) ? $user['device_token'] : null;
+        // Store device tokens in the users collection
         if ($deviceToken) {
             // Send notification
             // You'll need to use a library like Firebase Admin SDK to send the notification
-            Log::info("Sending push notification to user {$user['id']} with message: {$message}");
+            Log::info(
+                "Sending push notification to user {$user['id']} with message: {$message}"
+            );
         }
     }
 }

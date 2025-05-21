@@ -6,10 +6,17 @@ use App\Services\FirestoreService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
+    protected $firestore;
+    protected $firestoreUserProvider;
+
+    public function __construct()
+    {
+        $this->firestore = new FirestoreService();
+    }
+
     public function register(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -25,19 +32,17 @@ class AuthController extends Controller
         // Hash password here
         $password = Hash::make($request->password);
 
-        // Create an account request in Firestore
-        $firestore = new FirestoreService();
         // Check if email already exists in users or account_requests
-        $existingUser = $firestore->getUserByCredentials(['email' => $request->email]);
+        $existingUser = $this->firestore->getUserByCredentials(['email' => $request->email]);
         if ($existingUser) {
             return response()->json(['email' => ['Email already exists.']], 400);
         }
-        $existingRequest = $firestore->getUserByCredentials(['email' => $request->email]);
+        $existingRequest = $this->firestore->getUserByCredentials(['email' => $request->email]);
         if ($existingRequest) {
-                return response()->json(['email' => ['Account request already submitted with this email.']], 400);
+            return response()->json(['email' => ['Account request already submitted with this email.']], 400);
         }
-    }
-        $firestore->db->collection('account_requests')->add([
+
+        $this->firestore->db->collection('account_requests')->add([
             'name' => $request->name,
             'email' => $request->email,
             'password' => $password,
@@ -45,5 +50,5 @@ class AuthController extends Controller
         ]);
 
         return response()->json(['message' => 'Account request submitted. Please wait for approval.'], 201); // Created
-}
+    }
 }

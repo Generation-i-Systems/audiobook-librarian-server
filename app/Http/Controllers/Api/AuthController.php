@@ -41,7 +41,8 @@ class AuthController extends Controller
         foreach ($adminUsers as $admin) {
             Message::create([
                 'user_id' => $admin->id,
-                'content' => 'New user registered: ' . $user->name . ' (' . $user->email . '). <a href="' . url('/admin/users/' . $user->id . '/edit') . '">Edit User</a>',
+                'content' => 'New user registered: ' . $user->name . ' (' . $user->email . '). <a href="' .
+                    url('/admin/users/' . $user->id . '/edit') . '">Edit User</a>',
                 'is_from_admin' => false,
             ]);
         }
@@ -78,7 +79,7 @@ class AuthController extends Controller
         return response()->json(array_merge($userArr, [
             'authToken' => $token,
             'refreshToken' => $token,
-            'token' => $token
+            'token' => $token,
         ]));
     }
 

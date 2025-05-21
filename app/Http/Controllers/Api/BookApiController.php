@@ -28,35 +28,38 @@ class BookApiController extends Controller
         $publication_date = $request->input('publication_date');
         $date_added = $request->input('date_added');
         // Filter
-        $books = array_filter($books, function ($book) use ($query, $genre, $author, $series, $title, $publication_date, $date_added) {
-            $match = true;
-            if ($query) {
-                $match = $match && (
-                    stripos($book['title'] ?? '', $query) !== false ||
-                    stripos($book['author_name'] ?? '', $query) !== false ||
-                    stripos($book['series_name'] ?? '', $query) !== false
-                );
+        $books = array_filter(
+            $books,
+            function ($book) use ($query, $genre, $author, $series, $title, $publication_date, $date_added) {
+                $match = true;
+                if ($query) {
+                    $match = $match && (
+                        stripos($book['title'] ?? '', $query) !== false ||
+                        stripos($book['author_name'] ?? '', $query) !== false ||
+                        stripos($book['series_name'] ?? '', $query) !== false
+                    );
+                }
+                if ($genre) {
+                    $match = $match && (strcasecmp($book['genre'] ?? '', $genre) === 0);
+                }
+                if ($author) {
+                    $match = $match && (stripos($book['author_name'] ?? '', $author) !== false);
+                }
+                if ($series) {
+                    $match = $match && (stripos($book['series_name'] ?? '', $series) !== false);
+                }
+                if ($title) {
+                    $match = $match && (stripos($book['title'] ?? '', $title) !== false);
+                }
+                if ($publication_date) {
+                    $match = $match && (($book['published_year'] ?? null) == $publication_date);
+                }
+                if ($date_added) {
+                    $match = $match && (isset($book['date_added']) && strpos($book['date_added'], $date_added) === 0);
+                }
+                return $match;
             }
-            if ($genre) {
-                $match = $match && (strcasecmp($book['genre'] ?? '', $genre) === 0);
-            }
-            if ($author) {
-                $match = $match && (stripos($book['author_name'] ?? '', $author) !== false);
-            }
-            if ($series) {
-                $match = $match && (stripos($book['series_name'] ?? '', $series) !== false);
-            }
-            if ($title) {
-                $match = $match && (stripos($book['title'] ?? '', $title) !== false);
-            }
-            if ($publication_date) {
-                $match = $match && (($book['published_year'] ?? null) == $publication_date);
-            }
-            if ($date_added) {
-                $match = $match && (isset($book['date_added']) && strpos($book['date_added'], $date_added) === 0);
-            }
-            return $match;
-        });
+        );
         // Pagination
         $books = array_values($books);
         $total = count($books);
@@ -70,7 +73,7 @@ class BookApiController extends Controller
             'data' => $books,
             'total' => $total,
             'per_page' => $perPage,
-            'current_page' => $page
+            'current_page' => $page,
         ]);
     }
 
@@ -80,11 +83,15 @@ class BookApiController extends Controller
         $firestore = new FirestoreService();
         $book = $firestore->getBook($id);
         if (!$book) {
-            return response()->json(['error' => 'Book not found'], 404);
+            return response()->json([
+                'error' => 'Book not found or not authorized.',
+            ], 404);
         }
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
-        return response()->json($this->getBookWithCover($book, $withCover, $inlineCovers));
+        return response()->json(
+            $this->getBookWithCover($book, $withCover, $inlineCovers)
+        );
     }
 
     public function browse(Request $request)
@@ -115,7 +122,7 @@ class BookApiController extends Controller
             'data' => $items,
             'total' => $total,
             'per_page' => $perPage,
-            'current_page' => $page
+            'current_page' => $page,
         ]);
     }
 
@@ -124,12 +131,26 @@ class BookApiController extends Controller
         $firestore = new FirestoreService();
         $book = $firestore->getBook($id);
         if (!$book) {
-            return response()->json(['error' => 'Book not found.'], 404);
+            return response()->json([
+                'error' => 'Book not found or not authorized.',
+            ], 404);
         }
-        Log::info('Cover image requested for book: ' . ($book['title'] ?? '[unknown]') . ' (' . ($book['cover_image'] ?? '[none]') . ')');
-        if (!empty($book['cover_image']) && Storage::disk('books')->exists($book['cover_image'])) {
+        Log::info(
+            'Cover image requested for book: ' .
+            ($book['title'] ?? '[unknown]') .
+            ' (' .
+            ($book['cover_image'] ?? '[none]') .
+            ')'
+        );
+        if (
+            !empty($book['cover_image']) &&
+            Storage::disk('books')->exists($book['cover_image'])
+        ) {
             $mime = Storage::disk('books')->mimeType($book['cover_image']);
-            return response(Storage::disk('books')->get($book['cover_image']), 200)->header('Content-Type', $mime);
+            return response(
+                Storage::disk('books')->get($book['cover_image']),
+                200
+            )->header('Content-Type', $mime);
         }
         return response()->json(['error' => 'Cover image not found.'], 404);
     }
@@ -147,25 +168,28 @@ class BookApiController extends Controller
         $publication_date = $request->input('publication_date');
         $date_added = $request->input('date_added');
         // Filter
-        $books = array_filter($books, function ($book) use ($title, $author, $series, $publication_date, $date_added) {
-            $match = true;
-            if ($title) {
-                $match = $match && (stripos($book['title'] ?? '', $title) !== false);
+        $books = array_filter(
+            $books,
+            function ($book) use ($title, $author, $series, $publication_date, $date_added) {
+                $match = true;
+                if ($title) {
+                    $match = $match && (stripos($book['title'] ?? '', $title) !== false);
+                }
+                if ($author) {
+                    $match = $match && (stripos($book['author_name'] ?? '', $author) !== false);
+                }
+                if ($series) {
+                    $match = $match && (stripos($book['series_name'] ?? '', $series) !== false);
+                }
+                if ($publication_date) {
+                    $match = $match && (($book['published_year'] ?? null) == $publication_date);
+                }
+                if ($date_added) {
+                    $match = $match && (isset($book['date_added']) && strpos($book['date_added'], $date_added) === 0);
+                }
+                return $match;
             }
-            if ($author) {
-                $match = $match && (stripos($book['author_name'] ?? '', $author) !== false);
-            }
-            if ($series) {
-                $match = $match && (stripos($book['series_name'] ?? '', $series) !== false);
-            }
-            if ($publication_date) {
-                $match = $match && (($book['published_year'] ?? null) == $publication_date);
-            }
-            if ($date_added) {
-                $match = $match && (isset($book['date_added']) && strpos($book['date_added'], $date_added) === 0);
-            }
-            return $match;
-        });
+        );
         // Pagination
         $books = array_values($books);
         $total = count($books);
@@ -179,7 +203,7 @@ class BookApiController extends Controller
             'data' => $books,
             'total' => $total,
             'per_page' => $perPage,
-            'current_page' => $page
+            'current_page' => $page,
         ]);
     }
 
@@ -318,7 +342,7 @@ class BookApiController extends Controller
             'data' => $authors,
             'total' => $total,
             'per_page' => $perPage,
-            'current_page' => $page
+            'current_page' => $page,
         ]);
     }
 
@@ -348,7 +372,7 @@ class BookApiController extends Controller
         }, $authors);
         return response()->json([
             'genre' => ['id' => $genre['id'], 'name' => $genre['name']],
-            'authors' => $authors
+            'authors' => $authors,
         ]);
     }
 
@@ -381,8 +405,8 @@ class BookApiController extends Controller
                 'data' => $books,
                 'total' => $total,
                 'per_page' => $perPage,
-                'current_page' => $page
-            ]
+                'current_page' => $page,
+            ],
         ]);
     }
 
@@ -415,8 +439,8 @@ class BookApiController extends Controller
                 'data' => $books,
                 'total' => $total,
                 'per_page' => $perPage,
-                'current_page' => $page
-            ]
+                'current_page' => $page,
+            ],
         ]);
     }
 
@@ -446,7 +470,7 @@ class BookApiController extends Controller
         }, $series);
         return response()->json([
             'author' => ['id' => $author['id'], 'name' => $author['name']],
-            'series' => $series
+            'series' => $series,
         ]);
     }
 
@@ -466,9 +490,11 @@ class BookApiController extends Controller
         $firestore = app(FirestoreService::class);
         $author = $firestore->getAuthor($authorId);
         $genre = $firestore->getGenre($genreId);
-        $books = $firestore->getBooksByAuthorAndGenre($authorId, $genreId); // returns array of books
+        $books = $firestore->getBooksByAuthorAndGenre($authorId, $genreId);
         if (!$author || !$genre) {
-            return response()->json(['error' => 'Author or Genre not found.'], 404);
+            return response()->json([
+                'error' => 'Author or Genre not found.',
+            ], 404);
         }
         // Sort books by series name, series number, and title
         usort($books, function ($a, $b) {
@@ -486,7 +512,7 @@ class BookApiController extends Controller
         });
         // Paginate manually
         $total = count($books);
-        $page = max(1, (int)$request->input('page', 1));
+        $page = max(1, (int) $request->input('page', 1));
         $offset = ($page - 1) * $perPage;
         $paginatedBooks = array_slice($books, $offset, $perPage);
         $paginatedBooks = array_map(function ($book) use ($withCover, $inlineCovers) {

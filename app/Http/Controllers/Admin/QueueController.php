@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
+use App\Services\FirestoreService;
 
 class QueueController extends Controller
 {
@@ -19,7 +20,7 @@ class QueueController extends Controller
     public function list(Request $request)
     {
         $typeFilter = $request->query('type');
-        $jobs = (new \App\Services\FirestoreService())->db->collection('jobs')->orderBy('id')->get();
+        $jobs = (new FirestoreService())->getClient()->collection('jobs')->orderBy('id')->documents();
         $jobTypeCounts = [];
         $jobTypes = [];
         $jobs = $jobs->map(function ($job) use (&$jobTypeCounts, &$jobTypes) {
@@ -73,7 +74,12 @@ class QueueController extends Controller
 
     public function remove($id)
     {
-        (new \App\Services\FirestoreService())->db->collection('jobs')->where('id', $id)->delete();
+        (new FirestoreService())->getClient()->collection('jobs')->where('id', $id)->delete();
+        return response()->json(['success' => true]);
+    }
+    public function retry($id)
+    {
+        (new FirestoreService())->getClient()->collection('jobs')->where('id', $id)->delete();
         return response()->json(['success' => true]);
     }
 
@@ -81,7 +87,7 @@ class QueueController extends Controller
     {
         // Check for running worker (simple: look for process, or use a cache heartbeat)
         $running = Cache::get('queue_worker_heartbeat') ? true : false;
-        $pending = (new \App\Services\FirestoreService())->db->collection('jobs')->count();
+        $pending = (new FirestoreService())->db->collection('jobs')->count();
         return response()->json(['worker_running' => $running, 'pending_jobs' => $pending]);
     }
 
@@ -98,7 +104,7 @@ class QueueController extends Controller
 
     public function clear()
     {
-        (new \App\Services\FirestoreService())->db->collection('jobs')->documents()->each(function ($doc) {
+        (new FirestoreService())->getClient()->collection('jobs')->documents()->each(function ($doc) {
             $doc->reference()->delete();
         });
         return response()->json(['success' => true]);

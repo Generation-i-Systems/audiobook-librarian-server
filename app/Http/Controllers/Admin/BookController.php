@@ -182,19 +182,35 @@ class BookController extends Controller
         $genreList = $firestore->listGenres();
         $book = []; // Initialize empty book array
 
-        // Ensure directory_path is set in initial array
         if (!isset($initial['directory_path'])) {
             $initial['directory_path'] = '';
         }
 
         if ($request->ajax()) {
-            return view('admin.books.create_form', compact('genreList', 'initial', 'coverCandidates', 'coverAuto', 'biggestCover', 'directory_path'))
+            return view(
+                'admin.books.create_form',
+                compact(
+                    'genreList',
+                    'initial',
+                    'coverCandidates',
+                    'coverAuto',
+                    'biggestCover',
+                    'directory_path'
+                )
+            )
                 ->with('isModal', true)
                 ->with('layout', 'layouts.modal');
         }
         return view(
             'admin.books.create_form',
-            compact('genreList', 'initial', 'coverCandidates', 'coverAuto', 'biggestCover', 'directory_path')
+            compact(
+                'genreList',
+                'initial',
+                'coverCandidates',
+                'coverAuto',
+                'biggestCover',
+                'directory_path'
+            )
         );
     }
 
@@ -358,8 +374,8 @@ class BookController extends Controller
                     'created_at' => now(),
                     'size' => 0,
                     'mime_type' => 'directory',
-                    'book' => $book
-                ]
+                    'book' => $book,
+                ],
             ])->render();
 
             return response()->json([
@@ -367,7 +383,7 @@ class BookController extends Controller
                 'book_id' => $bookId,
                 'edit_url' => route('admin.books.edit', ['book' => $bookId]),
                 'row_html' => $rowHtml,
-                'directory_path' => $book['directory_path']
+                'directory_path' => $book['directory_path'],
             ]);
         }
 
@@ -466,7 +482,10 @@ class BookController extends Controller
         if ($request->hasFile('cover_image')) {
             $ext = $request->file('cover_image')->getClientOriginalExtension();
             $coverPath = ($book['directory_path'] ? trim($book['directory_path'], '/') . '/' : '') . 'cover.' . $ext;
-            Storage::disk('books')->put($coverPath, file_get_contents($request->file('cover_image')->getRealPath()));
+            Storage::disk('books')->put(
+                $coverPath,
+                file_get_contents($request->file('cover_image')->getRealPath())
+            );
             $book['cover_image'] = $coverPath;
             Log::info('Book Edit: cover_image uploaded via file to ' . $coverPath);
             $coverCandidatesForDefault[] = [
@@ -478,7 +497,13 @@ class BookController extends Controller
             Log::info('Book Edit: cover_image_path = ' . $request->input('cover_image_path'));
             $coverCandidatesForDefault[] = [
                 'path' => $request->input('cover_image_path'),
-                'size' => Storage::disk('books')->exists($request->input('cover_image_path')) ? Storage::disk('books')->size($request->input('cover_image_path')) : 0
+                'size' => Storage::disk('books')->exists(
+                    $request->input('cover_image_path')
+                )
+                    ? Storage::disk('books')->size(
+                        $request->input('cover_image_path')
+                    )
+                    : 0,
             ];
         } elseif ($request->input('cover_image_url')) {
             Log::info('Book Edit: Importing cover image from URL: ' . $request->input('cover_image_url'));
@@ -582,7 +607,12 @@ class BookController extends Controller
             $newAbs = $this->storagePath . '/' . ltrim($newDirectoryPath, '/');
             if (is_dir($oldAbs) && !is_dir($newAbs)) {
                 if (!@rename($oldAbs, $newAbs)) {
-                    return back()->withErrors(['directory_path' => 'Failed to rename directory from ' . $oldDirectoryPath . ' to ' . $newDirectoryPath]);
+                    return back()->withErrors(
+                        [
+                            'directory_path' => 'Failed to rename directory from ' . $oldDirectoryPath .
+                                ' to ' . $newDirectoryPath
+                        ]
+                    );
                 }
             }
             $newBook['directory_path'] = $newDirectoryPath; // Update the record to match the new directory
@@ -592,7 +622,10 @@ class BookController extends Controller
         if ($request->hasFile('cover_image')) {
             $ext = $request->file('cover_image')->getClientOriginalExtension();
             $coverImagePath = ($newDirectoryPath ? trim($newDirectoryPath, '/') . '/' : '') . 'cover.' . $ext;
-            Storage::disk('books')->put($coverImagePath, file_get_contents($request->file('cover_image')->getRealPath()));
+            Storage::disk('books')->put(
+                $coverImagePath,
+                file_get_contents($request->file('cover_image')->getRealPath())
+            );
             $validated['cover_image'] = $coverImagePath;
         } elseif ($request->input('cover_image_url')) {
             $dirPath = $newBook['directory_path'] ?? $book['directory_path'] ?? null;
@@ -647,7 +680,9 @@ class BookController extends Controller
         }
 
         $zipFileName = str_replace(' ', '_', $book['title']) . '.zip';  //Sanitize filename
-        $zipPath = storage_path('app/public/temp/' . $zipFileName);  //Temporary storage
+        $zipPath = storage_path(
+            'app/public/temp/' . $zipFileName
+        );  // Temporary storage
 
         $zip = new ZipArchive();
 
@@ -662,7 +697,9 @@ class BookController extends Controller
         $zip->close();
 
         // Return the zip file as a download
-        return response()->download($zipPath, $zipFileName)->deleteFileAfterSend(true); // Delete the temp zip file after sending.
+        return response()
+            ->download($zipPath, $zipFileName)
+            ->deleteFileAfterSend(true); // Delete the temp zip file after sending.
     }
 
     public function googleBooks(Request $request)
@@ -671,11 +708,21 @@ class BookController extends Controller
         $author = $request->query('author');
         $series = $request->query('series', '');
         $seriesNumber = $request->query('series_number', '');
+
         if (!$title || !$author) {
-            return response()->json(['error' => 'Title and author are required.'], 400);
+            return response()->json([
+                'error' => 'Title and author are required.',
+            ], 400);
         }
+
         // Use trait method for similarity
-        [$matches, $closeMatch] = $this->searchGoogleBooksWithSimilarity($title, $author, $series, $seriesNumber);
+        [$matches, $closeMatch] = $this->searchGoogleBooksWithSimilarity(
+            $title,
+            $author,
+            $series,
+            $seriesNumber
+        );
+
         $more = $request->query('more');
         $limit = min((int) $request->query('limit', 10), 40); // Default 10, max 40
         if ($closeMatch && !$more) {
@@ -747,7 +794,9 @@ class BookController extends Controller
         $storagePath = env('BOOK_STORAGE_PATH');
         $absRoot = rtrim($storagePath, '/') . '/' . ltrim($root, '/');
         if (!is_dir($absRoot)) {
-            return response()->json(['error' => 'Directory not found.'], 404);
+            $response = response()->json([
+                'error' => 'Invalid Google Books API response.',
+            ], 422);
         }
         $bookDirs = $this->findBookDirectories($absRoot);
         $queued = [];
@@ -877,7 +926,9 @@ class BookController extends Controller
                 'new_name' => $newName,
             ]);
         } else {
-            return response()->json(['error' => 'Rename failed. Check permissions.'], 500);
+            return response()->json([
+                'error' => 'Rename failed. Check permissions.',
+            ], 500);
         }
     }
 
@@ -910,7 +961,6 @@ class BookController extends Controller
         }
         return response()->json(['files' => $files]);
     }
-
     /**
      * Provides autocomplete suggestions for author names.
      *
