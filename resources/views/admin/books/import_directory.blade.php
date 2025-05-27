@@ -170,8 +170,28 @@
                     return text.replace(/[&<>"']/g, function (m) { return map[m]; });
                 }
 
+                $('#bulk-import-btn').on('click', function (e) {
+    e.preventDefault();
+    $('#bulk-import-status').text('Starting bulk import...');
+    $.ajax({
+        url: '{{ route("admin.books.bulkImportDir") }}',
+        type: 'POST',
+        data: {
+            dir: currentPath,
+            _token: '{{ csrf_token() }}'
+        },
+        success: function (data) {
+            $('#bulk-import-status').text(data.message || 'Bulk import started!');
+        },
+        error: function (xhr) {
+            let msg = 'Error: ' + (xhr.responseJSON?.error || xhr.statusText);
+            $('#bulk-import-status').text(msg);
+        }
+    });
+});
+
                 // Handle browser back/forward buttons
-                window.onpopstate = function(event) {
+                window.onpopstate = function (event) {
                     if (event.state && event.state.path !== undefined) {
                         loadDirectory(event.state.path, false, false);
                     } else {
@@ -323,7 +343,7 @@
                     if (updateHistory) {
                         const url = new URL(window.location);
                         url.searchParams.set('path', path);
-                        window.history.pushState({path: path}, '', url);
+                        window.history.pushState({ path: path }, '', url);
                     }
 
                     // Show loading indicator
@@ -347,7 +367,7 @@
                                 callback();
                             }
                         },
-                        error: function(xhr, status, error) {
+                        error: function (xhr, status, error) {
                             console.error('Error loading directory:', status, error);
                             $directoryContents.html('<div class="alert alert-danger">Error loading directory: ' + error + '</div>');
 
@@ -397,7 +417,7 @@
                 $('#letter-filter button[data-letter=""]').addClass('active');
 
                 // Handle form submission
-                $(document).on('submit', '#book-form', function(e) {
+                $(document).on('submit', '#book-form', function (e) {
                     e.preventDefault();
                     const $form = $(this);
                     const $modal = $form.closest('.modal');
@@ -414,7 +434,7 @@
                         method: $form.attr('method'),
                         data: $form.serialize(),
                         dataType: 'json',
-                        success: function(response) {
+                        success: function (response) {
                             if (response.success) {
                                 // Close the modal
                                 $modal.modal('hide');
@@ -438,7 +458,7 @@
                                         showAlert('Book saved successfully!', 'success');
                                     } else {
                                         // If we can't find the row, reload the directory
-                                        loadDirectory(currentPath, false, false, function() {
+                                        loadDirectory(currentPath, false, false, function () {
                                             showAlert('Book saved successfully!', 'success');
                                         });
                                     }
@@ -451,7 +471,7 @@
                                 $submitBtn.prop('disabled', false).html(originalBtnText);
                             }
                         },
-                        error: function(xhr) {
+                        error: function (xhr) {
                             const response = xhr.responseJSON || {};
                             showAlert(response.message || 'An error occurred while saving the book.', 'danger');
                             $submitBtn.prop('disabled', false).html(originalBtnText);
@@ -483,7 +503,7 @@
                 loadDirectory(initialPath, true, false);
 
                 // Function to update book action links after creation/update
-                window.updateBookAction = function(bookId, editUrl, directoryPath) {
+                window.updateBookAction = function (bookId, editUrl, directoryPath) {
                     console.log('Updating book action for ID:', bookId, 'with URL:', editUrl, 'and path:', directoryPath);
 
                     // First, try to find the row by book ID
@@ -499,7 +519,7 @@
                         updateBookRow(row, bookId, editUrl);
                     } else {
                         // If we can't find the row, refresh the directory and try again
-                        loadDirectory(currentPath, true, false, function() {
+                        loadDirectory(currentPath, true, false, function () {
                             // After refresh, try to find the row again
                             let row = $(`tr[data-book-id="${bookId}"]`);
                             if (!row.length && directoryPath) {
@@ -534,10 +554,10 @@
                         // Update the action cell
                         const actionCell = row.find('td:last');
                         actionCell.html(`
-                            <button class="btn btn-sm btn-primary me-1 open-edit-book-modal" data-url="${editUrl}">
-                                <i class="fas fa-edit"></i> Edit
-                            </button>
-                        `);
+                                                <button class="btn btn-sm btn-primary me-1 open-edit-book-modal" data-url="${editUrl}">
+                                                    <i class="fas fa-edit"></i> Edit
+                                                </button>
+                                            `);
 
                         console.log('Successfully updated book action for row:', row);
 

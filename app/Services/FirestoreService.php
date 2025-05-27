@@ -19,6 +19,32 @@ class FirestoreService
 
     // --- AUTHENTICATION METHODS ---
 
+    /**
+     * Get a document from any collection by ID (for debugging).
+     *
+     * @param string $collection
+     * @param string $docId
+     * @return array|null
+     */
+    public function getDocument(string $collection, string $docId): ?array
+    {
+        try {
+            if (!$this->db) {
+                return null;
+            }
+            $snap = $this->db->collection($collection)->document($docId)->snapshot();
+            if (!$snap->exists()) {
+                return null;
+            }
+            $data = $snap->data();
+            $data['id'] = $docId;
+            return $data;
+        } catch (\Throwable $e) {
+            \Log::error("Firestore getDocument failed: " . $e->getMessage());
+            return null;
+        }
+    }
+
     public function getUserById($identifier)
     {
         try {

@@ -37,6 +37,7 @@ class CreateImportJobsForDirectory implements ShouldQueue
      */
     public function handle()
     {
+        Log::info("Processing directory for import: " . $this->dir);
         $storagePath = env('BOOK_STORAGE_PATH');
         $absDir = rtrim($storagePath, '/') . '/' . ltrim($this->dir, '/');
         if (!is_dir($absDir)) {
@@ -59,7 +60,7 @@ class CreateImportJobsForDirectory implements ShouldQueue
                     'processed_items' => 0,
                     'queued_items' => 0,
                     'skipped_items' => 0,
-                    'started_at' => now()->toDateTimeString()
+                    'started_at' => now()->toDateTimeString(),
                 ]
             );
 
@@ -126,19 +127,19 @@ class CreateImportJobsForDirectory implements ShouldQueue
                 [
                     'completed_at' => now()->toDateTimeString(),
                     'queued_dirs' => $queued,
-                    'skipped_dirs' => $skipped
+                    'skipped_dirs' => $skipped,
                 ]
             );
 
             Log::info('Queued ' . count($queued) . ' book directories for import.', [
                 'job_id' => $jobId,
                 'queued_dirs' => $queued,
-                'skipped_dirs' => $skipped
+                'skipped_dirs' => $skipped,
             ]);
         } catch (\Exception $e) {
             Log::error('Error in CreateImportJobsForDirectory: ' . $e->getMessage(), [
                 'directory' => $this->dir,
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             // Update job status to failed
@@ -149,7 +150,7 @@ class CreateImportJobsForDirectory implements ShouldQueue
                     'failed',
                     [
                         'error' => $e->getMessage(),
-                        'failed_at' => now()->toDateTimeString()
+                        'failed_at' => now()->toDateTimeString(),
                     ]
                 );
             }

@@ -19,70 +19,20 @@ use Illuminate\Support\Facades\Session;
 
 // --- DEBUG AUTH/SESSION ROUTES (local only) ---
 if (app()->environment('local')) {
-    Route::get('/debug/middleware', function (\Illuminate\Http\Request $request) {
-        return [
-            'route_middleware' => $request->route()->gatherMiddleware(),
-            'web_group' => \Illuminate\Support\Facades\Route::getMiddlewareGroups()['web'] ?? null,
-        ];
-    });
+    // Move all /debug/ routes to DebugController
+    Route::get('/debug/middleware', [Admin\DebugController::class, 'debugMiddleware']);
+    Route::get('/debug/auth', [Admin\DebugController::class, 'auth']);
+    Route::get('/debug/session', [Admin\DebugController::class, 'session']);
+    Route::get('/debug/sessiondb', [Admin\DebugController::class, 'sessiondb']);
+    Route::get('/debug/firestore/{collection}/{docId}', [Admin\DebugController::class, 'showDocument']);
 
-    Route::get('/debug/auth', function () {
-        \App\Auth\FirestoreUserProvider::logAuthState(); // Log detailed state
-        return [
-            'auth_user' => Auth::user(),
-            'auth_id' => Auth::id(),
-            'session_id' => session()->getId(),
-            'session_data' => session()->all(),
-            'user_class' => Auth::user() ? get_class(Auth::user()) : null,
-            'guard' => Auth::getDefaultDriver(),
-            'provider' => config('auth.guards.' . Auth::getDefaultDriver() . '.provider'),
-            'session_driver' => config('session.driver'),
-            'session_cookie' => config('session.cookie'),
-            'session_cookie_value' => request()->cookie(config('session.cookie')),
-        ];
-    });
-    Route::get('/debug/session', function () {
-        return [
-            'session_id' => session()->getId(),
-            'session_data' => session()->all(),
-        ];
-    });
-    Route::get('/debug/sessiondb', function () {
-        $sessionId = session()->getId();
-        $row = null;
-        try {
-            $row = \DB::table('sessions')->where('id', $sessionId)->first();
-        } catch (\Exception $e) {
-            $row = $e->getMessage();
-        }
-        return [
-            'session_id' => $sessionId,
-            'db_row' => $row,
-        ];
-    });
-
-    Route::get('/debug/logout', function () {
-        Auth::logout();
-        session()->invalidate();
-        return ['status' => 'logged out'];
-    });
-
-    Route::get('/debug/session-write', function () {
-        session(['foo' => 'bar']);
-        return ['session_id' => session()->getId(), 'session_data' => session()->all()];
-    });
+    Route::get('/debug/logout', [Admin\DebugController::class, 'logout']);
+    Route::get('/debug/session-write', [Admin\DebugController::class, 'sessionWrite']);
 
 
-    // TEMPORARY DEBUG: Dump all Firestore users
-    Route::get('/firestore-users-dump', function () {
-        $result = \App\Services\FirestoreService::dumpAllUsers();
-        return response()->json($result);
-    });
-    // TEMPORARY DEBUG: Dump all Firestore users
-    Route::get('/firestore-books-dump', function () {
-        $result = \App\Services\FirestoreService::dumpAllBooks();
-        return response()->json($result);
-    });
+    // Dump all Firestore users/books via DebugController
+    Route::get('/debug/firestore-users-dump', [Admin\DebugController::class, 'firestoreUsersDump']);
+    Route::get('/debug/firestore-books-dump', [Admin\DebugController::class, 'firestoreBooksDump']);
 }
 
 Route::get('/', function () {
@@ -175,12 +125,12 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     // Autocomplete routes for Book form
     Route::get('/books/autocomplete/authors', [
         Admin\BookController::class,
-        'autocompleteAuthors'
+        'autocompleteAuthors',
     ])->name('books.autocomplete.authors');
 
     Route::get('/books/autocomplete/series', [
         Admin\BookController::class,
-        'autocompleteSeries'
+        'autocompleteSeries',
     ])->name('books.autocomplete.series');
 
     Route::resource('account_requests', Admin\AccountRequestController::class);
@@ -210,13 +160,13 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
 
     // Bulk import books from directory (recursive, queued)
     Route::post('/books/bulk-import', [
-        Admin\BookController::class,
+        Admin\QueueController::class,
         'bulkImportBooks',
     ])->name('books.bulkImport');
 
     // Bulk import from a specific directory (recursive)
     Route::post('/books/bulk-import-dir', [
-        Admin\BookController::class,
+        Admin\QueueController::class,
         'bulkImportBooksFromDir',
     ])->name('books.bulkImportDir');
 

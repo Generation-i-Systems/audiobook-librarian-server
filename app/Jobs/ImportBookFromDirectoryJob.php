@@ -242,7 +242,7 @@ class ImportBookFromDirectoryJob implements ShouldQueue
         );
 
         Log::error("[ERROR][ImportBookFromDirectoryJob] Google Books API quota exceeded for '" .
-            ($book['title'] ?? 'Unknown') . "' in " . "'" . ($book['directory_path'] ?? 'Unknown') .
+            ($book['title'] ?? 'Unknown') . "' in '" . ($book['directory_path'] ?? 'Unknown') .
             "' after $attempts attempts. Last error: $msg");
     }
 }

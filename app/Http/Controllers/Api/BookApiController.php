@@ -230,7 +230,7 @@ class BookApiController extends Controller
             abort(500, 'Failed to create zip archive.');
         }
         foreach ($files as $file) {
-            $zip->addFile(\Storage::disk('books')->path($file), basename($file));
+            $zip->addFile(Storage::disk('books')->path($file), basename($file));
         }
         $zip->close();
         return response()->download($zipPath, $zipFileName)->deleteFileAfterSend(true);

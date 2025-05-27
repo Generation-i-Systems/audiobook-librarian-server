@@ -148,6 +148,8 @@
             @yield('content')
         </main>
     </div>
+    <script src="{{ asset('js/global-ajax-auth.js') }}"></script>
     @stack('scripts')
+</body>
 
 </html>

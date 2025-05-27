@@ -3,15 +3,19 @@
 namespace App\Http\Controllers\Admin;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Process;
+use App\Services\FirestoreService;
 use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
-use App\Services\FirestoreService;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Process;
+use App\Jobs\CreateImportJobsForDirectory;
+use App\Traits\BookImportTrait;
 
 class QueueController extends Controller
 {
+    use BookImportTrait;
+
     public function index()
     {
         return view('admin.queue.index');
@@ -20,50 +24,42 @@ class QueueController extends Controller
     public function list(Request $request)
     {
         $typeFilter = $request->query('type');
-        $jobs = (new FirestoreService())->getClient()->collection('jobs')->orderBy('id')->documents();
+        $firestore = new FirestoreService();
+        $jobsDocs = $firestore->getClient()->collection('jobs')->documents();
+
         $jobTypeCounts = [];
         $jobTypes = [];
-        $jobs = $jobs->map(function ($job) use (&$jobTypeCounts, &$jobTypes) {
-            $payload = json_decode($job->payload, true);
-            $dir = null;
-            $jobType = 'Unknown';
-            if (isset($payload['data']['command'])) {
-                $command = $payload['data']['command'];
-                // Extract job class name
-                if (preg_match('/O:(\\d+):\"([^\"]+)\"/', $command, $matches)) {
-                    $jobType = class_basename(str_replace('\\', '\\', $matches[2]));
-                }
-                // Extract directory for ImportBookFromDirectoryJob
-                if ($jobType === 'ImportBookFromDirectoryJob') {
-                    if (preg_match('/directoryPath";s:\\d+:"([^"]+)"/', $command, $matches)) {
-                        $dir = $matches[1];
-                    }
-                }
-                // Extract dir for CreateImportJobsForDirectory
-                elseif ($jobType === 'CreateImportJobsForDirectory') {
-                    if (preg_match('/dir";s:\\d+:"([^"]+)"/', $command, $matches)) {
-                        $dir = $matches[1];
-                    }
-                }
-            }
+        $jobs = collect();
+
+        foreach ($jobsDocs as $doc) {
+            if (!$doc->exists()) continue;
+            $job = $doc->data();
+            $job['id'] = $doc->id(); // Ensure ID is present
+
+            $jobType = $job['type'] ?? 'Unknown';
+            $dir = $job['data']['directory_path'] ?? null;
+
             $jobTypeCounts[$jobType] = ($jobTypeCounts[$jobType] ?? 0) + 1;
             if (!in_array($jobType, $jobTypes)) {
                 $jobTypes[] = $jobType;
             }
-            return [
-                'id' => $job->id,
-                'queue' => $job->queue,
-                'attempts' => $job->attempts,
-                'available_at' => date('Y-m-d H:i:s', $job->available_at),
-                'created_at' => date('Y-m-d H:i:s', $job->created_at),
-                'directory' => $dir,
-                'payload' => $payload,
+
+            $jobs->push([
+                'id' => $job['id'],
                 'type' => $jobType,
-            ];
-        });
+                'directory' => $dir,
+                'status' => $job['status'] ?? '',
+                'attempts' => $job['data']['attempts'] ?? 0,
+                'available_at' => $job['started_at'] ?? '',
+                'created_at' => $job['started_at'] ?? '',
+                'message' => $job['data']['message'] ?? '',
+            ]);
+        }
+
         if ($typeFilter) {
             $jobs = $jobs->where('type', $typeFilter)->values();
         }
+
         return response()->json([
             'jobs' => $jobs,
             'job_type_counts' => $jobTypeCounts,
@@ -74,12 +70,13 @@ class QueueController extends Controller
 
     public function remove($id)
     {
-        (new FirestoreService())->getClient()->collection('jobs')->where('id', $id)->delete();
+        (new FirestoreService())->getClient()->collection('jobs')->document($id)->delete();
         return response()->json(['success' => true]);
     }
+
     public function retry($id)
     {
-        (new FirestoreService())->getClient()->collection('jobs')->where('id', $id)->delete();
+        (new FirestoreService())->getClient()->collection('jobs')->document($id)->delete();
         return response()->json(['success' => true]);
     }
 
@@ -87,7 +84,7 @@ class QueueController extends Controller
     {
         // Check for running worker (simple: look for process, or use a cache heartbeat)
         $running = Cache::get('queue_worker_heartbeat') ? true : false;
-        $pending = (new FirestoreService())->db->collection('jobs')->count();
+        $pending = (new FirestoreService())->getClient()->collection('jobs')->count();
         return response()->json(['worker_running' => $running, 'pending_jobs' => $pending]);
     }
 
@@ -104,9 +101,93 @@ class QueueController extends Controller
 
     public function clear()
     {
-        (new FirestoreService())->getClient()->collection('jobs')->documents()->each(function ($doc) {
-            $doc->reference()->delete();
-        });
+        $docs = (new FirestoreService())->getClient()->collection('jobs')->documents();
+        foreach ($docs as $doc) {
+            if ($doc->exists()) {
+                $doc->reference()->delete();
+            }
+        }
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * Bulk import all book directories under a given path, using Firestore jobs collection for deduplication.
+     */
+    public function bulkImportBooks(Request $request)
+    {
+        $root = $request->input('dir');
+        $storagePath = env('BOOK_STORAGE_PATH');
+        $absRoot = rtrim($storagePath, '/') . '/' . ltrim($root, '/');
+        if (!is_dir($absRoot)) {
+            return response()->json([
+                'error' => 'Invalid Google Books API response.',
+            ], 422);
+        }
+        // Use BookImportTrait's findBookDirectories
+        $bookDirs = $this->findBookDirectories($absRoot);
+        $queued = [];
+        $firestore = new FirestoreService();
+        $jobsCollection = $firestore->getClient()->collection('jobs');
+        $jobsDocs = $jobsCollection->documents();
+        $pendingJobs = collect($jobsDocs)->map(function ($doc) {
+            return $doc->exists() ? $doc->data() : null;
+        })->filter();
+        foreach ($bookDirs as $dir) {
+            $relDir = ltrim(str_replace($storagePath, '', $dir), '/');
+            $alreadyQueued = false;
+            // Check Firestore jobs collection for queued jobs with this directory
+            foreach ($pendingJobs as $job) {
+                $payload = json_decode($job['payload'] ?? '', true);
+                if (
+                    isset($payload['data']['command']) &&
+                    preg_match('/directoryPath";s:\\d+:"([^"]+)"/', $payload['data']['command'], $matches) &&
+                    $matches[1] === $relDir
+                ) {
+                    $alreadyQueued = true;
+                    break;
+                }
+            }
+            // Check for existing book record in Firestore
+            $bookExists = false;
+            $booksCollection = $firestore->getClient()->collection('books');
+            $bookDocs = $booksCollection->where('directory_path', '=', $relDir)->documents();
+            foreach ($bookDocs as $doc) {
+                if ($doc->exists()) {
+                    $bookExists = true;
+                    break;
+                }
+            }
+            if ($bookExists) {
+                $alreadyQueued = true;
+            }
+            if (!$alreadyQueued) {
+                \App\Jobs\ImportBookFromDirectoryJob::dispatch($relDir);
+                $queued[] = $relDir;
+            }
+        }
+        return response()->json(
+            [
+                'message' => 'Queued ' . count($queued) . ' book directories for import.',
+                'skipped' => count($bookDirs) - count($queued),
+                'queued_dirs' => $queued,
+            ],
+            200,
+        );
+    }
+
+    /**
+     * Bulk import all book directories from a specific directory (recursive, queued)
+     */
+    public function bulkImportBooksFromDir(Request $request)
+    {
+        $dir = $request->input('dir');
+        // Dispatch a single job that will queue all the import jobs
+        CreateImportJobsForDirectory::dispatch($dir);
+        return response()->json(
+            [
+                'message' => 'Queued job to scan and import all book directories.',
+            ],
+            200,
+        );
     }
 }
