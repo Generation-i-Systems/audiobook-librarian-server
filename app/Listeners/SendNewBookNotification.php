@@ -7,44 +7,165 @@ use App\Services\FirestoreService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Log;
+use Kreait\Firebase\Messaging\CloudMessage;
+use Kreait\Firebase\Messaging\Notification;
 
 class SendNewBookNotification implements ShouldQueue
 {
     use InteractsWithQueue;
 
+    protected $firestore;
+
+    public function __construct(FirestoreService $firestore)
+    {
+        $this->firestore = $firestore;
+    }
+
+    /**
+     * Handle the event.
+     *
+     * @param  \App\Events\NewBookAdded  $event
+     * @return void
+     */
     public function handle(NewBookAdded $event)
     {
         $book = $event->book;
+        $followers = [];
+        $bookId = $book['id'] ?? '';
+        $bookTitle = $book['title'] ?? 'Unknown Book';
+        $bookAuthors = $book['author'] ?? [];
+        $bookSeries = $book['series'] ?? [];
 
-        // Find followers of the author
-        $authorFollowers = User::whereHas('follows', function ($query) use ($book) {
-            $query->where('followable_type', 'author')
-                  ->where('followable_id', $book->author_id);
-        })->get();
+        // Ensure authors is always an array
+        if (!is_array($bookAuthors)) {
+            $bookAuthors = [$bookAuthors];
+        }
 
-        // Find followers of the series
-        $seriesFollowers = User::whereHas('follows', function ($query) use ($book) {
-            $query->where('followable_type', 'series')
-                  ->where('followable_id', $book->series);
-        })->get();
+        try {
+            // Get all users who follow any of the book's authors
+            if (!empty($bookAuthors)) {
+                $authorFollowers = [];
+                foreach ($bookAuthors as $author) {
+                    $followersQuery = $this->firestore->getClient()
+                        ->collection('user_follows')
+                        ->where('followable_type', '=', 'author')
+                        ->where('followable_id', '=', $author);
 
-        $followers = $authorFollowers->merge($seriesFollowers)->unique('id');
+                    $authorFollowersDocs = $followersQuery->documents();
+                    foreach ($authorFollowersDocs as $doc) {
+                        if ($doc->exists()) {
+                            $followData = $doc->data();
+                            $followers[$followData['user_id']] = true;
+                        }
+                    }
+                }
+            }
 
-        foreach ($followers as $follower) {
-            // Send push notification (using a service like Firebase Cloud Messaging)
-            $this->sendPushNotification($follower, $book);
+            // Get all users who follow the book's series
+            if (!empty($bookSeries)) {
+                foreach (array_keys($bookSeries) as $seriesName) {
+                    $seriesFollowers = $this->firestore->getClient()
+                        ->collection('user_follows')
+                        ->where('followable_type', '=', 'series')
+                        ->where('followable_id', '=', $seriesName)
+                        ->documents();
+
+                    foreach ($seriesFollowers as $doc) {
+                        if ($doc->exists()) {
+                            $followData = $doc->data();
+                            $followers[$followData['user_id']] = true;
+                        }
+                    }
+                }
+            }
+
+            // Get user details for each follower and send notifications
+            foreach (array_keys($followers) as $userId) {
+                $userDoc = $this->firestore->getClient()
+                    ->collection('users')
+                    ->document($userId)
+                    ->snapshot();
+
+                if ($userDoc->exists()) {
+                    $user = $userDoc->data();
+                    $this->sendPushNotification($user, [
+                        'id' => $bookId,
+                        'title' => $bookTitle,
+                        'authors' => $bookAuthors,
+                        'series' => $bookSeries,
+                    ]);
+                }
+            }
+
+            Log::info(sprintf(
+                'Sent new book notifications to %d followers for book: %s',
+                count($followers),
+                $bookTitle
+            ));
+        } catch (\Exception $e) {
+            Log::error('Error sending new book notifications: ' . $e->getMessage(), [
+                'book_id' => $bookId,
+                'book_title' => $bookTitle,
+                'exception' => $e->getTraceAsString(),
+            ]);
         }
     }
 
-    private function sendPushNotification(User $user, Book $book)
+    /**
+     * Send push notification to a user's device
+     *
+     * @param array $user User data from Firestore
+     * @param array $book Book data from Firestore
+     */
+    private function sendPushNotification(array $user, array $book)
     {
-        // Implement your push notification logic here (Firebase Cloud Messaging)
-        // For example:
-        $deviceToken = $user->device_token; // Store device tokens in the users table
-        if ($deviceToken) {
-            // Send notification
-            // You'll need to use a library like Firebase Admin SDK to send the notification
-            Log::info("Sending push notification to user {$user->id} for book {$book->title}");
+        try {
+            // Skip if user has no device token
+            if (empty($user['fcm_tokens'])) {
+                return;
+            }
+
+            $title = 'New Book Available';
+            // Format authors for display
+            $authors = $book['author'] ?? [];
+            $authorText = !empty($authors)
+                ? (is_array($authors) ? implode(', ', $authors) : $authors)
+                : 'an unknown author';
+
+            $body = sprintf(
+                '%s by %s has been added to the library',
+                $book['title'] ?? 'A new book',
+                $authorText
+            );
+
+            // Create notification payload
+            $notification = Notification::create($title, $body);
+
+            // Create message for each device token
+            foreach ((array)$user['fcm_tokens'] as $token) {
+                $message = CloudMessage::withTarget('token', $token)
+                    ->withNotification($notification)
+                    ->withData([
+                        'type' => 'new_book',
+                        'book_id' => $book['id'] ?? '',
+                        'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
+                    ]);
+
+                // Send the message using Firebase Admin SDK
+                $messaging = app('firebase.messaging');
+                $messaging->send($message);
+
+                Log::debug(sprintf(
+                    'Sent push notification to user %s for book %s',
+                    $user['id'] ?? 'unknown',
+                    $book['title'] ?? 'unknown'
+                ));
+            }
+        } catch (\Exception $e) {
+            Log::error('Error sending push notification: ' . $e->getMessage(), [
+                'user_id' => $user['id'] ?? 'unknown',
+                'book_id' => $book['id'] ?? 'unknown',
+            ]);
         }
     }
 }

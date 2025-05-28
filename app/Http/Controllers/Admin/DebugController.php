@@ -120,7 +120,7 @@ class DebugController extends Controller
      */
     public function firestoreUsersDump(): JsonResponse
     {
-        $result = \App\Services\FirestoreService::dumpAllUsers();
+        $result = FirestoreService::dumpAllUsers();
         return response()->json($result);
     }
 
@@ -129,7 +129,7 @@ class DebugController extends Controller
      */
     public function firestoreBooksDump(): JsonResponse
     {
-        $result = \App\Services\FirestoreService::dumpAllBooks();
+        $result = FirestoreService::dumpAllBooks();
         return response()->json($result);
     }
 }

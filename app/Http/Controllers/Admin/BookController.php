@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Events\NewBookAdded;
 use App\Services\FirestoreService;
 use App\Services\GoogleBooksApiService;
 use Illuminate\Http\Request;
@@ -341,6 +342,15 @@ class BookController extends Controller
         // Store the book record in Firestore
         $bookId = $firestore->createBook($book);
 
+        if ($bookId) {
+            // Get the created book data from Firestore
+            $createdBook = $firestore->getBook($bookId);
+            if ($createdBook) {
+                // Dispatch the NewBookAdded event with the Firestore document data
+                event(new NewBookAdded($createdBook));
+            }
+        }
+
         // Handle Book File Uploads and directory creation
         if (!$this->storagePath) {
             Log::error('BOOK_STORAGE_PATH is not defined in the .env file.');
@@ -531,7 +541,8 @@ class BookController extends Controller
             $book['cover_image'] = $candidatePath;
             $coverCandidatesForDefault[] = [
                 'path' => $candidatePath,
-                'size' => Storage::disk('books')->exists($candidatePath) ? Storage::disk('books')->size($candidatePath) : 0
+                'size' => Storage::disk('books')->exists($candidatePath) ?
+                    Storage::disk('books')->size($candidatePath) : 0
             ];
         }
         // If there are multiple candidates (including Google Books), pick the largest as default
@@ -792,7 +803,7 @@ class BookController extends Controller
     public function seriesAjax(Request $request)
     {
         $q = $request->input('q', '');
-        $firestore = new \App\Services\FirestoreService();
+        $firestore = new FirestoreService();
         $series = $firestore->listSeries();
         if ($q) {
             $series = array_filter($series, function ($item) use ($q) {
@@ -845,7 +856,7 @@ class BookController extends Controller
                 $newRel = str_replace($this->storagePath, '', $newPath);
                 Log::info("({$this->storagePath}) {$oldRel} -> {$newRel}");
                 // Update Firestore books whose directory_path matches $oldRel
-                $firestore = new \App\Services\FirestoreService();
+                $firestore = new FirestoreService();
                 $booksToUpdate = array_filter($firestore->listBooks(), function ($book) use ($oldRel) {
                     return isset($book['directory_path']) && $book['directory_path'] === $oldRel;
                 });

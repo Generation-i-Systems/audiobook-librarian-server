@@ -32,7 +32,7 @@ class CreateAdminUser extends Command
     {
         $firestore = new FirestoreService();
         // Check if admin user exists in Firestore
-        $adminUsers = $firestore->db->collection('users')->where('role', '=', 'admin')->documents();
+        $adminUsers = $firestore->getClient()->collection('users')->where('role', '=', 'admin')->documents();
         foreach ($adminUsers as $doc) {
             if ($doc->exists()) {
                 $this->info('An admin user already exists.');
@@ -40,7 +40,7 @@ class CreateAdminUser extends Command
             }
         }
         $password = Str::random(12);
-        $firestore->db->collection('users')->add([
+        $firestore->getClient()->collection('users')->add([
             'name' => 'Admin',
             'email' => 'admin@example.com',
             'password' => Hash::make($password),
