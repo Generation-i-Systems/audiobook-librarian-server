@@ -36,6 +36,9 @@
         </div>
 
         <div class="table-responsive">
+            <div id="directory-loading-spinner" class="text-center" style="display:none;">
+                <div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div>
+            </div>
             <table class="table table-bordered table-hover align-middle" id="directory-browser-table">
                 <thead>
                     <tr>
@@ -271,6 +274,7 @@
                 // Previous link click: go up one directory
                 $(document).on('click', '.previous-link', function (e) {
                     e.preventDefault();
+                    $('#directory-loading-spinner').show();
                     const parentPath = $(this).data('path') ?? '';
                     loadDirectory(parentPath);
                 });
@@ -278,6 +282,7 @@
                 // Breadcrumb navigation
                 $(document).on('click', '.breadcrumb-link', function (e) {
                     e.preventDefault();
+                    $('#directory-loading-spinner').show();
                     const path = $(this).data('path') ?? '';
                     loadDirectory(path);
                 });
@@ -285,6 +290,7 @@
                 // Directory click navigation
                 $(document).on('click', '.directory-link', function (e) {
                     e.preventDefault();
+                    $('#directory-loading-spinner').show();
                     const path = $(this).data('path');
                     loadDirectory(path);
                 });
@@ -347,6 +353,7 @@
                     }
 
                     // Show loading indicator
+                    $('#directory-loading-spinner').show();
                     const $directoryContents = $('#directory-contents');
                     const $loading = $('<div class="text-center p-5"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>');
                     $directoryContents.html($loading);
@@ -361,7 +368,7 @@
                         },
                         success: function (data) {
                             renderDirectoryBrowser(data, path);
-
+                            $('#directory-loading-spinner').hide();
                             // Call the callback if provided
                             if (typeof callback === 'function') {
                                 callback();
@@ -370,7 +377,7 @@
                         error: function (xhr, status, error) {
                             console.error('Error loading directory:', status, error);
                             $directoryContents.html('<div class="alert alert-danger">Error loading directory: ' + error + '</div>');
-
+                            $('#directory-loading-spinner').hide();
                             // Still call the callback if there was an error
                             if (typeof callback === 'function') {
                                 callback();
