@@ -32,7 +32,8 @@ class QueueController extends Controller
         $jobs = collect();
 
         foreach ($jobsDocs as $doc) {
-            if (!$doc->exists()) continue;
+            if (!$doc->exists())
+                continue;
             $job = $doc->data();
             $job['id'] = $doc->id(); // Ensure ID is present
 
@@ -182,7 +183,11 @@ class QueueController extends Controller
     {
         $dir = $request->input('dir');
         // Dispatch a single job that will queue all the import jobs
-        CreateImportJobsForDirectory::dispatch($dir);
+
+        Log::info("Bulk importing books from directory: $dir");
+
+        $out = CreateImportJobsForDirectory::dispatch($dir);
+        Log::info("Bulk import job dispatched: " . print_r($out, true));
         return response()->json(
             [
                 'message' => 'Queued job to scan and import all book directories.',

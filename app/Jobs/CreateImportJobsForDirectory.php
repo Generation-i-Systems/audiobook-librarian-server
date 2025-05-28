@@ -8,6 +8,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use App\Jobs\ImportBookFromDirectoryJob;
 use App\Services\FirestoreService;
 
@@ -18,6 +19,18 @@ class CreateImportJobsForDirectory implements ShouldQueue
     use Queueable;
     use SerializesModels;
 
+    /**
+     * The number of times the job may be attempted.
+     *
+     * @var int
+     */
+    public $tries = 3;
+
+    /**
+     * The directory to process
+     *
+     * @var string
+     */
     protected $dir;
 
     /**
@@ -37,13 +50,31 @@ class CreateImportJobsForDirectory implements ShouldQueue
      */
     public function handle()
     {
-        Log::info("Processing directory for import: " . $this->dir);
+        $startTime = microtime(true);
+        Log::info('[DIRECTORY_IMPORT] Starting directory import job', [
+            'directory' => $this->dir,
+            'job_id' => $this->job ? $this->job->getJobId() : 'sync'
+        ]);
+        print "[DIRECTORY_IMPORT] Starting import for directory: " . $this->dir . "\n";
+
         $storagePath = env('BOOK_STORAGE_PATH');
+        if (empty($storagePath)) {
+            $error = 'BOOK_STORAGE_PATH is not set in environment';
+            Log::error('[DIRECTORY_IMPORT] ' . $error);
+            throw new \RuntimeException($error);
+        }
+
         $absDir = rtrim($storagePath, '/') . '/' . ltrim($this->dir, '/');
         if (!is_dir($absDir)) {
-            Log::error("Directory not found for import: $absDir");
-            return;
+            $error = "Directory not found for import: $absDir";
+            Log::error('[DIRECTORY_IMPORT] ' . $error);
+            throw new \RuntimeException($error);
         }
+
+        Log::debug('[DIRECTORY_IMPORT] Directory scan starting', [
+            'storage_path' => $storagePath,
+            'absolute_path' => $absDir
+        ]);
 
         $firestore = new FirestoreService();
         $jobId = 'import_dir_' . md5($this->dir . '_' . now()->timestamp);
@@ -77,6 +108,7 @@ class CreateImportJobsForDirectory implements ShouldQueue
                 ['total_items' => $total]
             );
 
+            print "Looping through " . count($bookDirs) . " directories\n";
             foreach ($bookDirs as $dirPath) {
                 $relDir = ltrim(str_replace($storagePath, '', $dirPath), '/');
                 $exists = false;
@@ -100,12 +132,55 @@ class CreateImportJobsForDirectory implements ShouldQueue
                     continue;
                 }
 
-                // Create a job for this directory
-                $importJob = new ImportBookFromDirectoryJob($relDir);
-                $importJob->onQueue('imports');
-                dispatch($importJob);
+                $jobNumber = count($queued) + 1;
+                $totalDirs = count($bookDirs);
 
-                $queued[] = $relDir;
+                Log::info(sprintf(
+                    '[DIRECTORY_IMPORT] Queueing import job %d/%d for: %s',
+                    $jobNumber,
+                    $totalDirs,
+                    $relDir
+                ));
+
+                try {
+                    $importJob = new ImportBookFromDirectoryJob($relDir);
+                    $importJob->onQueue('imports');
+
+                    Log::debug('[DIRECTORY_IMPORT] Dispatching ImportBookFromDirectoryJob', [
+                        'directory' => $relDir,
+                        'queue' => 'imports'
+                    ]);
+
+                    $dispatchId = (string) Str::uuid();
+
+                    Log::debug('[DIRECTORY_IMPORT] About to dispatch job', [
+                        'dispatch_id' => $dispatchId,
+                        'directory' => $relDir
+                    ]);
+
+                    dispatch($importJob);
+
+                    Log::info('[DIRECTORY_IMPORT] Successfully queued job', [
+                        'dispatch_id' => $dispatchId,
+                        'directory' => $relDir,
+                        'queue' => 'imports'
+                    ]);
+
+                    print sprintf("[DIRECTORY_IMPORT] Queued job %s for: %s\n", $dispatchId, $relDir);
+
+                    $queued[] = [
+                        'dispatch_id' => $dispatchId,
+                        'directory' => $relDir,
+                        'queued_at' => now()->toDateTimeString()
+                    ];
+                } catch (\Exception $e) {
+                    Log::error('[DIRECTORY_IMPORT] Failed to queue job', [
+                        'directory' => $relDir,
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString()
+                    ]);
+                    throw $e;
+                }
 
                 // Update progress
                 $firestore->updateJobStatus(

@@ -2,9 +2,10 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Log;
+
 use Google\Cloud\Firestore\FirestoreClient;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Log;
 
 class FirestoreService
 {
@@ -262,6 +263,17 @@ class FirestoreService
             Log::error('Firestore client init failed: ' . $e->getMessage());
             $this->db = null;
         }
+    }
+
+    // QUEUE COLLECTION ACCESS
+    /**
+     * Get a Firestore collection reference for a queue.
+     * @param string $name
+     * @return \Google\Cloud\Firestore\CollectionReference
+     */
+    public function getQueueCollection($name)
+    {
+        return $this->db->collection($name);
     }
 
     // USER CRUD
