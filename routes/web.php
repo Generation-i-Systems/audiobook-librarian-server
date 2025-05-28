@@ -202,10 +202,14 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         [AdminNotificationController::class, 'sendNotification']
     )->name('sendNotification');
     Route::post('/messages', [MessageController::class, 'storeAdmin'])->name('messages.storeAdmin');
+    // Message routes
     Route::post(
-        '/messages/{message}/acknowledge',
+        '/messages/{messageId}/acknowledge',
         [Admin\MessageController::class, 'acknowledge']
     )->name('messages.acknowledge');
+
+    // Admin message creation
+    Route::post('/admin/messages', [MessageController::class, 'storeAdmin'])->name('admin.messages.store');
 
     // Job management
     Route::get('/jobs', [

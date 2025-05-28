@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Log;
-
 use Google\Cloud\Firestore\FirestoreClient;
 use Illuminate\Support\Facades\Hash;
 
@@ -302,6 +301,174 @@ class FirestoreService
     public static function listGenres()
     {
         return config('genres.list');
+    }
+
+    // MESSAGES
+
+    /**
+     * Create a new message in Firestore
+     *
+     * @param array $messageData
+     * @return string|null Returns the document ID or null on failure
+     */
+    public function createMessage(array $messageData): ?string
+    {
+        if (!$this->db) {
+            Log::error('Cannot create message: Firestore client not initialized');
+            return null;
+        }
+
+        try {
+            $messageData['created_at'] = $this->getServerTimestamp();
+            $messageData['updated_at'] = $this->getServerTimestamp();
+
+            $docRef = $this->db->collection('messages')->add($messageData);
+            return $docRef->id();
+        } catch (\Exception $e) {
+            Log::error('Failed to create message: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Get all messages, optionally filtered by user ID
+     *
+     * @param string|null $userId Optional user ID to filter by
+     * @param bool $includeAcknowledged Whether to include acknowledged messages
+     * @param int $limit Maximum number of messages to return
+     * @return array
+     */
+    public function getMessages(?string $userId = null, bool $includeAcknowledged = false, int $limit = 100): array
+    {
+        if (!$this->db) {
+            Log::error('Cannot get messages: Firestore client not initialized');
+            return [];
+        }
+
+        try {
+            $query = $this->db->collection('messages');
+
+            if ($userId) {
+                $query = $query->where('to_user_id', '==', $userId);
+            }
+
+            if (!$includeAcknowledged) {
+                $query = $query->where('acknowledged_at', '==', null);
+            }
+
+            $query = $query->orderBy('created_at', 'DESC')
+                          ->limit($limit);
+
+            $snapshots = $query->documents();
+
+            $messages = [];
+            foreach ($snapshots as $snapshot) {
+                $message = $snapshot->data();
+                $message['id'] = $snapshot->id();
+                $messages[] = $message;
+            }
+
+            return $messages;
+        } catch (\Exception $e) {
+            Log::error('Failed to get messages: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Get a single message by ID
+     *
+     * @param string $messageId
+     * @return array|null
+     */
+    public function getMessage(string $messageId): ?array
+    {
+        if (!$this->db) {
+            Log::error('Cannot get message: Firestore client not initialized');
+            return null;
+        }
+
+        try {
+            $snapshot = $this->db->collection('messages')->document($messageId)->snapshot();
+
+            if (!$snapshot->exists()) {
+                return null;
+            }
+
+            $message = $snapshot->data();
+            $message['id'] = $snapshot->id();
+
+            return $message;
+        } catch (\Exception $e) {
+            Log::error('Failed to get message: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Acknowledge a message
+     *
+     * @param string $messageId
+     * @return bool
+     */
+    public function acknowledgeMessage(string $messageId): bool
+    {
+        if (!$this->db) {
+            Log::error('Cannot acknowledge message: Firestore client not initialized');
+            return false;
+        }
+
+        try {
+            $this->db->collection('messages')->document($messageId)->update([
+                ['path' => 'acknowledged_at', 'value' => $this->getServerTimestamp()],
+                ['path' => 'updated_at', 'value' => $this->getServerTimestamp()]
+            ]);
+            return true;
+        } catch (\Exception $e) {
+            Log::error('Failed to acknowledge message: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Get all users for the admin message interface
+     *
+     * @return array
+     */
+    public function getUsersForMessaging(): array
+    {
+        if (!$this->db) {
+            Log::error('Cannot get users: Firestore client not initialized');
+            return [];
+        }
+
+        try {
+            $snapshots = $this->db->collection('users')
+                                ->select(['id', 'name', 'email'])
+                                ->documents();
+
+            $users = [];
+            foreach ($snapshots as $snapshot) {
+                $user = $snapshot->data();
+                $user['id'] = $snapshot->id();
+                $users[] = $user;
+            }
+
+            return $users;
+        } catch (\Exception $e) {
+            Log::error('Failed to get users: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Helper method to get server timestamp for Firestore
+     *
+     * @return \Google\Cloud\Firestore\FieldValue\ServerTimestampValue
+     */
+    private function getServerTimestamp()
+    {
+        return new \Google\Cloud\Firestore\FieldValue\ServerTimestampValue();
     }
 
     // BOOKS CRUD

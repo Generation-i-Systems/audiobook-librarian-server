@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Services\FirestoreService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class MessageController extends Controller
 {
@@ -14,33 +16,72 @@ class MessageController extends Controller
         $this->firestoreService = $firestoreService;
     }
 
+    /**
+     * Store a new message from a user to admin
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\RedirectResponse
+     */
     public function store(Request $request)
     {
         $request->validate(['content' => 'required|string']);
 
-        // Messages from mobile apps will not have an authenticated user
-        $userId = Auth::check() ? Auth::id() : null;
+        try {
+            // Messages from mobile apps will not have an authenticated user
+            $userId = Auth::check() ? Auth::id() : null;
 
-        Message::create([
-            'user_id' => $userId,
-            'content' => $request->input('content'),
-            'is_from_admin' => false,
-        ]);
+            $messageData = [
+                'content' => $request->input('content'),
+                'from_user_id' => $userId,
+                'is_from_admin' => false,
+                'is_read' => false,
+            ];
 
-        return back()->with('success', 'Message sent to admin!');
+            $messageId = $this->firestoreService->createMessage($messageData);
+
+            if ($messageId) {
+                return back()->with('success', 'Message sent to admin!');
+            }
+
+            return back()->with('error', 'Failed to send message. Please try again.');
+        } catch (\Exception $e) {
+            Log::error('Failed to send message: ' . $e->getMessage());
+            return back()->with('error', 'An error occurred while sending your message.');
+        }
     }
 
-    //Admin messages creation
+    /**
+     * Store a new message from admin to a user
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\RedirectResponse
+     */
     public function storeAdmin(Request $request)
     {
-         $request->validate(['content' => 'required|string']);
+        $request->validate([
+            'content' => 'required|string',
+            'to_user_id' => 'required|string'
+        ]);
 
-         Message::create([
-            'user_id' => Auth::id(),
-            'content' => $request->input('content'),
-            'is_from_admin' => true,
-         ]);
+        try {
+            $messageData = [
+                'content' => $request->input('content'),
+                'from_user_id' => Auth::id(),
+                'to_user_id' => $request->input('to_user_id'),
+                'is_from_admin' => true,
+                'is_read' => false,
+            ];
 
-        return back()->with('success', 'Message sent to admin!');
+            $messageId = $this->firestoreService->createMessage($messageData);
+
+            if ($messageId) {
+                return back()->with('success', 'Message sent to user!');
+            }
+
+            return back()->with('error', 'Failed to send message. Please try again.');
+        } catch (\Exception $e) {
+            Log::error('Failed to send admin message: ' . $e->getMessage());
+            return back()->with('error', 'An error occurred while sending the message.');
+        }
     }
 }
