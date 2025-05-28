@@ -216,17 +216,17 @@ class BookApiController extends Controller
             abort(404);
         }
         $directoryPath = $book['directory_path'] ?? null;
-        if (!$directoryPath || !\Storage::disk('books')->exists($directoryPath)) {
+        if (!$directoryPath || !Storage::disk('books')->exists($directoryPath)) {
             abort(404, 'Book directory not found.');
         }
-        $files = \Storage::disk('books')->files($directoryPath);
+        $files = Storage::disk('books')->files($directoryPath);
         if (empty($files)) {
             abort(404, 'No files found for this book.');
         }
         $zipFileName = str_replace(' ', '_', $book['title']) . '.zip';
         $zipPath = storage_path('app/public/temp/' . $zipFileName);
-        $zip = new \ZipArchive();
-        if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
+        $zip = new ZipArchive();
+        if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
             abort(500, 'Failed to create zip archive.');
         }
         foreach ($files as $file) {
@@ -529,13 +529,13 @@ class BookApiController extends Controller
     private function getBookWithCover($book, $withCover = false, $inlineCovers = false)
     {
         $arr = $book;
-        if ($withCover && !empty($book['cover_image']) && \Storage::disk('books')->exists($book['cover_image'])) {
+        if ($withCover && !empty($book['cover_image']) && Storage::disk('books')->exists($book['cover_image'])) {
             if ($inlineCovers) {
-                $coverPath = \Storage::disk('books')->path($book['cover_image']);
+                $coverPath = Storage::disk('books')->path($book['cover_image']);
                 $arr['cover'] = [
                     'type' => 'base64',
                     'path' => $coverPath,
-                    'data' => base64_encode(\Storage::disk('books')->get($book['cover_image'])),
+                    'data' => base64_encode(Storage::disk('books')->get($book['cover_image'])),
                 ];
             } else {
                 $arr['cover_url'] = url('/api/v1/books/' . ($book['id'] ?? '') . '/cover');

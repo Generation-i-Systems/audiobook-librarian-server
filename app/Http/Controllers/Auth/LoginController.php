@@ -3,13 +3,14 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Foundation\Auth\AuthenticatesUsers;
-
-use Laravel\Socialite\Facades\Socialite;
 use App\Auth\FirestoreUser;
-use Illuminate\Support\Facades\Auth;
 use App\Services\FirestoreService;
+use Google\Cloud\Core\Timestamp as GoogleTimestamp;
+use Illuminate\Foundation\Auth\AuthenticatesUsers;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Laravel\Socialite\Facades\Socialite;
 
 class LoginController extends Controller
 {
@@ -68,9 +69,27 @@ class LoginController extends Controller
     }
     /**
      * Called after user is authenticated.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  mixed  $user
+     * @return \Illuminate\Http\Response|\Illuminate\Http\RedirectResponse
      */
     protected function authenticated(\Illuminate\Http\Request $request, $user)
     {
+        // Update last login timestamp
+        try {
+            $firestore = new FirestoreService();
+            $firestore->getClient()->collection('users')
+                ->document($user->getAuthIdentifier())
+                ->update([
+                    ['path' => 'last_login_at', 'value' => new GoogleTimestamp(new \DateTime())],
+                    ['path' => 'updated_at', 'value' => new GoogleTimestamp(new \DateTime())],
+                ]);
+        } catch (\Exception $e) {
+            Log::error('Error updating last login time: ' . $e->getMessage());
+        }
+
+        return redirect()->intended($this->redirectPath());
     }
 
     /**
@@ -83,58 +102,113 @@ class LoginController extends Controller
 
     /**
      * Obtain the user information from Google.
+     *
+     * @return \Illuminate\Http\RedirectResponse
      */
     public function handleGoogleCallback()
     {
         try {
             $googleUser = Socialite::driver('google')->stateless()->user();
         } catch (\Exception $e) {
-            return redirect('/login')->withErrors(['google' => 'Unable to login with Google.']);
+            Log::error('Google login error: ' . $e->getMessage());
+            return redirect('/login')->withErrors(['google' => 'Unable to login with Google. Please try again.']);
+        }
+
+        if (!$googleUser->getEmail()) {
+            return redirect('/login')->withErrors(['google' => 'No email provided by Google.']);
         }
 
         $firestore = new FirestoreService();
-        $userData = $firestore->getClient()->collection('users')
-            ->where('email', '=', $googleUser->getEmail())
-            ->documents();
 
-        $userArr = null;
-        foreach ($userData as $doc) {
-            if ($doc->exists()) {
-                $userArr = $doc->data();
-                $userArr['id'] = $doc->id();
-                break;
+        try {
+            // Check if user exists
+            $userQuery = $firestore->getClient()->collection('users')
+                ->where('email', '=', $googleUser->getEmail())
+                ->limit(1)
+                ->documents();
+
+            $userArr = null;
+            foreach ($userQuery as $doc) {
+                if ($doc->exists()) {
+                    $userArr = $doc->data();
+                    $userArr['id'] = $doc->id();
+                    break;
+                }
             }
-        }
 
-        if (!$userArr) {
-            // Create new user
-            $newUserData = [
-                'name' => $googleUser->getName() ?? $googleUser->getNickname(),
+            // Create new user if not exists
+            if (!$userArr) {
+                $newUserData = [
+                    'name' => $googleUser->getName() ?? $googleUser->getNickname() ?? explode('@', $googleUser->getEmail())[0],
+                    'email' => $googleUser->getEmail(),
+                    'password' => bcrypt(Str::random(32)), // random password, not used
+                    'role' => 'user',
+                    'email_verified_at' => new GoogleTimestamp(new \DateTime()),
+                    'created_at' => new GoogleTimestamp(new \DateTime()),
+                    'updated_at' => new GoogleTimestamp(new \DateTime()),
+                    'google_id' => $googleUser->getId(),
+                    'avatar' => $googleUser->getAvatar(),
+                ];
+
+                $docRef = $firestore->getClient()->collection('users')->add($newUserData);
+                $userArr = $newUserData;
+                $userArr['id'] = $docRef->id();
+
+                Log::info('New user created via Google login', [
+                    'user_id' => $userArr['id'],
+                    'email' => $userArr['email'],
+                ]);
+            } else {
+                // Update existing user's Google ID and avatar
+                $firestore->getClient()->collection('users')
+                    ->document($userArr['id'])
+                    ->update([
+                        ['path' => 'google_id', 'value' => $googleUser->getId()],
+                        ['path' => 'avatar', 'value' => $googleUser->getAvatar()],
+                        ['path' => 'updated_at', 'value' => new GoogleTimestamp(new \DateTime())],
+                    ]);
+            }
+
+            if (empty($userArr)) {
+                throw new \Exception('Failed to create or retrieve user account.');
+            }
+
+            // Create user object and log in
+            $user = new FirestoreUser($userArr);
+            Auth::login($user, true);
+
+            Log::info('User logged in via Google', [
+                'user_id' => $user->getAuthIdentifier(),
+                'email' => $user->email,
+            ]);
+
+            // Redirect to intended URL or home
+            return redirect()->intended($this->redirectPath());
+
+        } catch (\Exception $e) {
+            Log::error('Error during Google authentication: ' . $e->getMessage(), [
+                'exception' => $e,
                 'email' => $googleUser->getEmail(),
-                'password' => bcrypt(str()->random(16)), // random password, not used
-                'created_at' => now(),
-                'role' => 'user',
-            ];
-            $docRef = $firestore->getClient()->collection('users')->add($newUserData);
-            $userArr = $docRef->snapshot()->data();
-            $userArr['id'] = $docRef->id();
+            ]);
+
+            return redirect('/login')
+                ->withErrors(['google' => 'An error occurred during authentication. Please try again or contact support.']);
         }
+    }
 
-        if (!$userArr) {
-            return redirect('/login')->withErrors(['google' => 'Unable to create or retrieve your account. Please try again or contact support.']);
-        }
+    /**
+     * Log the user out of the application.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function logout(\Illuminate\Http\Request $request)
+    {
+        $this->guard()->logout();
 
-        $user = new FirestoreUser($userArr);
-        Auth::login($user, true);
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
 
-        Log::debug('Google login', [
-            'auth_check' => Auth::check(),
-            'user_id' => Auth::id(),
-            'user_class' => get_class(Auth::user()),
-            'session_id' => session()->getId(),
-            'session_data' => session()->all(),
-        ]);
-
-        return redirect('/home');
+        return $this->loggedOut($request) ?: redirect('/');
     }
 }

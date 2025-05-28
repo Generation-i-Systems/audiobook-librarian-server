@@ -34,97 +34,111 @@
                         </div>
                     @endif
 
-                    <div class="table-responsive">
-                        <table class="table table-striped table-hover">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Type</th>
-                                    <th>Status</th>
-                                    <th>Message</th>
-                                    <th>Created</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @forelse($jobs as $job)
-                                    <tr>
-                                        <td title="{{ $job['id'] }}">
-                                            {{ substr($job['id'], 0, 8) }}...
-                                        </td>
-                                        <td>
-                                            @php
-                                                $typeClass = [
-                                                    'directory_import' => 'primary',
-                                                    'book_import' => 'info',
-                                                    'quota_failure' => 'danger'
-                                                ][$job['type'] ?? ''] ?? 'secondary';
-                                            @endphp
-                                            <span class="badge bg-{{ $typeClass }}">
-                                                {{ ucfirst(str_replace('_', ' ', $job['type'] ?? 'unknown')) }}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            @php
-                                                $statusClass = [
-                                                    'queued' => 'warning',
-                                                    'processing' => 'info',
-                                                    'completed' => 'success',
-                                                    'failed' => 'danger'
-                                                ][$job['status']] ?? 'secondary';
-                                            @endphp
-                                            <span class="badge bg-{{ $statusClass }}">
-                                                {{ ucfirst($job['status']) }}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            {{ $job['message'] ?? '—' }}
-                                            @if(isset($job['details']['directory']))
-                                                <div class="text-muted small">
-                                                    {{ $job['details']['directory'] }}
-                                                </div>
-                                            @endif
-                                        </td>
-                                        <td>
-                                            {{ \Carbon\Carbon::parse($job['created_at'] ?? now())->diffForHumans() }}
-                                            <div class="text-muted small">
-                                                {{ \Carbon\Carbon::parse($job['created_at'] ?? now())->format('Y-m-d H:i:s') }}
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <a href="{{ route('admin.jobs.show', $job['id']) }}" 
-                                               class="btn btn-sm btn-outline-primary">
-                                                View
-                                            </a>
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="6" class="text-center">
-                                            No jobs found.
-                                        </td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-
-                    @if($jobs->hasPages())
-                        <div class="d-flex justify-content-center mt-4">
-                            {{ $jobs->appends(request()->query())->links() }}
+                    @if(!isset($jobs) || $jobs->isEmpty())
+                        <div class="alert alert-info">
+                            No jobs found.
                         </div>
+                    @else
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Type</th>
+                                        <th>Status</th>
+                                        <th>Message</th>
+                                        <th>Created</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($jobs as $job)
+                                        <tr>
+                                            <td title="{{ e($job['id'] ?? 'N/A') }}">
+                                                {{ isset($job['id']) ? substr($job['id'], 0, 8) . '...' : 'N/A' }}
+                                            </td>
+                                            <td>
+                                                @php
+                                                    $type = $job['type'] ?? 'unknown';
+                                                    $typeClass = [
+                                                        'directory_import' => 'primary',
+                                                        'book_import' => 'info',
+                                                        'quota_failure' => 'danger'
+                                                    ][$type] ?? 'secondary';
+                                                @endphp
+                                                <span class="badge bg-{{ $typeClass }}">
+                                                    {{ ucfirst(str_replace('_', ' ', $type)) }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                @php
+                                                    $status = $job['status'] ?? 'unknown';
+                                                    $statusClass = [
+                                                        'queued' => 'warning',
+                                                        'processing' => 'info',
+                                                        'completed' => 'success',
+                                                        'failed' => 'danger'
+                                                    ][$status] ?? 'secondary';
+                                                @endphp
+                                                <span class="badge bg-{{ $statusClass }}">
+                                                    {{ ucfirst($status) }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                {{ e($job['message'] ?? '—') }}
+                                                @if(!empty($job['details']['directory']))
+                                                    <div class="text-muted small">
+                                                        {{ e($job['details']['directory']) }}
+                                                    </div>
+                                                @endif
+                                            </td>
+                                            <td>
+                                                @php
+                                                    $createdAt = $job['created_at'] ?? now();
+                                                    $date = \Carbon\Carbon::parse($createdAt);
+                                                @endphp
+                                                <span title="{{ $date->format('Y-m-d H:i:s') }}">
+                                                    {{ $date->diffForHumans() }}
+                                                </span>
+                                                <div class="text-muted small">
+                                                    {{ $date->format('Y-m-d H:i:s') }}
+                                                </div>
+                                            </td>
+                                            <td>
+                                                @if(!empty($job['id']))
+                                                    <a href="{{ route('admin.jobs.show', $job['id']) }}" 
+                                                       class="btn btn-sm btn-outline-primary"
+                                                       title="View job details">
+                                                        <i class="fas fa-eye"></i> View
+                                                    </a>
+                                                @else
+                                                    <span class="text-muted">N/A</span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+
+                        @if(method_exists($jobs, 'hasPages') && $jobs->hasPages())
+                            <div class="d-flex justify-content-center mt-4">
+                                {{ $jobs->appends(request()->query())->links() }}
+                            </div>
+                        @endif
                     @endif
                 </div>
             </div>
         </div>
     </div>
 </div>
+@endsection
 
 @push('scripts')
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // Auto-refresh the page every 30 seconds if there are any processing/queued jobs
-        @if($jobs->contains('status', 'processing') || $jobs->contains('status', 'queued'))
+        @if(isset($jobs) && ($jobs->contains('status', 'processing') || $jobs->contains('status', 'queued')))
             setTimeout(function() {
                 window.location.reload();
             }, 30000);
@@ -132,5 +146,3 @@
     });
 </script>
 @endpush
-
-@endsection

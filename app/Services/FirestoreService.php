@@ -40,7 +40,7 @@ class FirestoreService
             $data['id'] = $docId;
             return $data;
         } catch (\Throwable $e) {
-            \Log::error("Firestore getDocument failed: " . $e->getMessage());
+            Log::error("Firestore getDocument failed: " . $e->getMessage());
             return null;
         }
     }
@@ -357,7 +357,7 @@ class FirestoreService
             }
 
             $query = $query->orderBy('created_at', 'DESC')
-                          ->limit($limit);
+                ->limit($limit);
 
             $snapshots = $query->documents();
 
@@ -421,7 +421,7 @@ class FirestoreService
         try {
             $this->db->collection('messages')->document($messageId)->update([
                 ['path' => 'acknowledged_at', 'value' => $this->getServerTimestamp()],
-                ['path' => 'updated_at', 'value' => $this->getServerTimestamp()]
+                ['path' => 'updated_at', 'value' => $this->getServerTimestamp()],
             ]);
             return true;
         } catch (\Exception $e) {
@@ -444,8 +444,8 @@ class FirestoreService
 
         try {
             $snapshots = $this->db->collection('users')
-                                ->select(['id', 'name', 'email'])
-                                ->documents();
+                ->select(['id', 'name', 'email'])
+                ->documents();
 
             $users = [];
             foreach ($snapshots as $snapshot) {

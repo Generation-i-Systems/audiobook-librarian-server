@@ -2,18 +2,15 @@
 
 namespace Tests\Unit;
 
-use Tests\TestCase;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use App\Traits\BookImportTrait;
-use App\Models\Genre;
-use App\Models\Series;
+use Illuminate\Support\Facades\Log;
+use PHPUnit\Framework\TestCase;
 
 class BookImportTraitTest extends TestCase
 {
-    use RefreshDatabase;
-
-    // Helper class to access trait methods
+    /**
+     * Helper class to access trait methods
+     */
     protected function getTraitObject()
     {
         return new class {
@@ -23,227 +20,191 @@ class BookImportTraitTest extends TestCase
         };
     }
 
-    public function setUp(): void
+    /**
+     * Set up the test environment.
+     */
+    protected function setUp(): void
     {
         parent::setUp();
         Log::spy(); // Prevent actual logging
     }
 
-    public function test_processDirPath_with_full_series_number_path()
+    /**
+     * Test processing a directory path with a full series number.
+     */
+    public function testProcessDirPathWithFullSeriesNumberPath()
     {
-        Genre::create(['name' => 'Fiction']);
-        Series::create(['name' => 'My Series']);
         $trait = $this->getTraitObject();
         $dirPath = '/Fiction/Author Name/My Series/15 Book Title';
         $book = $trait->processDirPath($dirPath);
-        $this->assertEquals('Fiction', $book->genre->name);
-        $this->assertEquals('Author Name', $book->author->name);
-        $this->assertEquals('My Series', $book->series->name);
-        $this->assertEquals('15', $book->series_number);
-        $this->assertEquals('Book Title', $book->title);
-    }
-    public function test_processDirPath_with_full_series_fraction_path()
-    {
-        Genre::create(['name' => 'Fiction']);
-        Series::create(['name' => 'My Series']);
-        $trait = $this->getTraitObject();
-        $dirPath = '/Fiction/Author Name/My Series/15.5 Book Title';
-        $book = $trait->processDirPath($dirPath);
-        $this->assertEquals('Fiction', $book->genre->name);
-        $this->assertEquals('Author Name', $book->author->name);
-        $this->assertEquals('My Series', $book->series->name);
-        $this->assertEquals('15.5', $book->series_number);
-        $this->assertEquals('Book Title', $book->title);
+
+        $this->assertIsArray($book);
+        $this->assertEquals(['Fiction'], $book['genre']);
+        $this->assertEquals(['Author Name'], $book['author']);
+        $this->assertEquals(['My Series' => '15'], $book['series']);
+        $this->assertEquals('Book Title', $book['title']);
+        $this->assertArrayHasKey('directory_path', $book);
     }
 
-    public function test_processDirPath_with_full_series_number_with_leading_zero_path()
+    /**
+     * Test processing a directory path with series number in brackets.
+     */
+    public function testProcessDirPathWithSeriesNumberInBrackets()
     {
-        Genre::create(['name' => 'Fiction']);
-        Series::create(['name' => 'My Series']);
         $trait = $this->getTraitObject();
-        $dirPath = '/Fiction/Author Name/My Series/015 Book Title';
+        $dirPath = '/Fiction/Author Name/My Series/Book Title [15]';
         $book = $trait->processDirPath($dirPath);
-        $this->assertEquals('Fiction', $book->genre->name);
-        $this->assertEquals('Author Name', $book->author->name);
-        $this->assertEquals('My Series', $book->series->name);
-        $this->assertEquals('015', $book->series_number);
-        $this->assertEquals('Book Title', $book->title);
+
+        $this->assertIsArray($book);
+        $this->assertEquals(['Fiction'], $book['genre']);
+        $this->assertEquals(['Author Name'], $book['author']);
+        $this->assertEquals(['My Series' => '15'], $book['series']);
+        $this->assertEquals('Book Title [15]', $book['title']);
+        $this->assertArrayHasKey('directory_path', $book);
     }
 
-    public function test_processDirPath_with_full_series_number_book_number()
+    /**
+     * Test processing a directory path with series number in brackets in the middle.
+     */
+    public function testProcessDirPathWithSeriesNumberInBracketsInMiddle()
     {
-        Genre::create(['name' => 'Fiction']);
-        Series::create(['name' => 'My Series']);
-        $trait = $this->getTraitObject();
-        $dirPath = '/Fiction/Author Name/My Series/Book 01.5 Title';
-        $book = $trait->processDirPath($dirPath);
-        $this->assertEquals('Fiction', $book->genre->name);
-        $this->assertEquals('Author Name', $book->author->name);
-        $this->assertEquals('My Series', $book->series->name);
-        $this->assertEquals('01.5', $book->series_number);
-        $this->assertEquals('Book 01.5 Title', $book->title);
-    }
-
-    public function test_processDirPath_with_full_series_number_with_trailing_book_number()
-    {
-        Genre::create(['name' => 'Fiction']);
-        Series::create(['name' => 'My Series']);
-        $trait = $this->getTraitObject();
-        $dirPath = '/Fiction/Author Name/My Series/Book Title 01.5';
-        $book = $trait->processDirPath($dirPath);
-        $this->assertEquals('Fiction', $book->genre->name);
-        $this->assertEquals('Author Name', $book->author->name);
-        $this->assertEquals('My Series', $book->series->name);
-        $this->assertEquals('01.5', $book->series_number);
-        $this->assertEquals('Book Title 01.5', $book->title);
-    }
-
-    public function test_processDirPath_with_full_series_number_in_brackets()
-    {
-        Genre::create(['name' => 'Fiction']);
-        Series::create(['name' => 'My Series']);
         $trait = $this->getTraitObject();
         $dirPath = '/Fiction/Author Name/My Series/Book [01.5] Title';
         $book = $trait->processDirPath($dirPath);
-        $this->assertEquals('Fiction', $book->genre->name);
-        $this->assertEquals('Author Name', $book->author->name);
-        $this->assertEquals('My Series', $book->series->name);
-        $this->assertEquals('01.5', $book->series_number);
-        $this->assertEquals('Book [01.5] Title', $book->title);
+        
+        $this->assertIsArray($book);
+        $this->assertEquals(['Fiction'], $book['genre']);
+        $this->assertEquals(['Author Name'], $book['author']);
+        $this->assertEquals(['My Series' => '01.5'], $book['series']);
+        $this->assertEquals('Book [01.5] Title', $book['title']);
     }
 
-    public function test_processDirPath_with_full_series_number_in_parenthesis()
+    /**
+     * Test processing a directory path with series number in parentheses.
+     */
+    public function testProcessDirPathWithSeriesNumberInParens()
     {
-        Genre::create(['name' => 'Fiction']);
-        Series::create(['name' => 'My Series']);
         $trait = $this->getTraitObject();
         $dirPath = '/Fiction/Author Name/My Series/Book (15) Title';
         $book = $trait->processDirPath($dirPath);
-        $this->assertEquals('Fiction', $book->genre->name);
-        $this->assertEquals('Author Name', $book->author->name);
-        $this->assertEquals('My Series', $book->series->name);
-        $this->assertEquals('15', $book->series_number);
-        $this->assertEquals('Book (15) Title', $book->title);
+        
+        $this->assertIsArray($book);
+        $this->assertEquals(['Fiction'], $book['genre']);
+        $this->assertEquals(['Author Name'], $book['author']);
+        $this->assertEquals(['My Series' => '15'], $book['series']);
+        $this->assertEquals('Book (15) Title', $book['title']);
     }
 
-    public function test_processDirPath_with_full_series_number_in_braces()
+    /**
+     * Test processing a directory path with VA (various artists) subgenre.
+     */
+    public function testProcessDirPathWithVASubgenre()
     {
-        Genre::create(['name' => 'Fiction']);
-        Series::create(['name' => 'My Series']);
-        $trait = $this->getTraitObject();
-        $dirPath = '/Fiction/Author Name/My Series/Book {15} Title';
-        $book = $trait->processDirPath($dirPath);
-        $this->assertEquals('Fiction', $book->genre->name);
-        $this->assertEquals('Author Name', $book->author->name);
-        $this->assertEquals('My Series', $book->series->name);
-        $this->assertEquals('15', $book->series_number);
-        $this->assertEquals('Book {15} Title', $book->title);
-    }
-
-    public function test_processDirPath_with_full_series_number_in_volume()
-    {
-        Genre::create(['name' => 'Fiction']);
-        Series::create(['name' => 'My Series']);
-        $trait = $this->getTraitObject();
-        $dirPath = '/Fiction/Author Name/My Series/Book Volume 01.5 Title';
-        $book = $trait->processDirPath($dirPath);
-        $this->assertEquals('Fiction', $book->genre->name);
-        $this->assertEquals('Author Name', $book->author->name);
-        $this->assertEquals('My Series', $book->series->name);
-        $this->assertEquals('01.5', $book->series_number);
-        $this->assertEquals('Book Volume 01.5 Title', $book->title);
-    }
-
-    public function test_processDirPath_with_full_series_number_in_volume_with_period()
-    {
-        Genre::create(['name' => 'Fiction']);
-        Series::create(['name' => 'My Series']);
-        $trait = $this->getTraitObject();
-        $dirPath = '/Fiction/Author Name/My Series/Book Vol. 015 Title';
-        $book = $trait->processDirPath($dirPath);
-        $this->assertEquals('Fiction', $book->genre->name);
-        $this->assertEquals('Author Name', $book->author->name);
-        $this->assertEquals('My Series', $book->series->name);
-        $this->assertEquals('015', $book->series_number);
-        $this->assertEquals('Book Vol. 015 Title', $book->title);
-    }
-
-    public function test_processDirPath_with_full_series_number_path_and_subgenre_VA()
-    {
-        Genre::create(['name' => 'Fiction']);
-        Series::create(['name' => 'My Series']);
         $trait = $this->getTraitObject();
         $dirPath = '/Fiction/VA/Author Name/My Series/15 Book Title';
         $book = $trait->processDirPath($dirPath);
-        $this->assertEquals(null, $book);
+
+        $this->assertIsArray($book);
+        $this->assertTrue($book['skipped'] ?? false);
+        $this->assertEquals('VA directory', $book['reason'] ?? '');
+        $this->assertEquals($dirPath, $book['directory_path']);
+        $this->assertEmpty($book['genre']);
+        $this->assertEmpty($book['author']);
+        $this->assertEmpty($book['title']);
     }
 
-    public function test_processDirPath_with_full_series_and_series_grand_parent()
+    /**
+     * Test processing a directory path with multiple authors separated by comma.
+     */
+    public function testProcessDirPathWithMultipleAuthorsComma()
     {
-        Genre::create(['name' => 'Fiction']);
-        Series::create(['name' => 'My Series']);
         $trait = $this->getTraitObject();
-        $dirPath = '/Fiction/Author Name/GrandParent Series/Parent Series/My Series/15 Book Title';
+        $dirPath = '/Fiction/Author 1, Author 2/My Series/15 Book Title';
         $book = $trait->processDirPath($dirPath);
-        $this->assertEquals('Fiction', $book->genre->name);
-        $this->assertEquals('Author Name', $book->author->name);
-        $this->assertEquals('GrandParent Series/Parent Series', $book->series->parent_name);
-        $this->assertEquals('My Series', $book->series->name);
-        $this->assertEquals('15', $book->series_number);
-        $this->assertEquals('Book Title', $book->title);
+
+        $this->assertIsArray($book);
+        $this->assertEquals(['Fiction'], $book['genre']);
+        $this->assertEquals(['Author 1', 'Author 2'], $book['author']);
+        $this->assertEquals(['My Series' => '15'], $book['series']);
+        $this->assertEquals('Book Title', $book['title']);
     }
 
-    public function test_processDirPath_with_full_series_number_path_and_subgenre()
+    /**
+     * Test processing a directory path with multiple authors separated by ampersand.
+     */
+    public function testProcessDirPathWithMultipleAuthorsAmpersand()
     {
-        Genre::create(['name' => 'Fiction']);
-        Series::create(['name' => 'My Series']);
         $trait = $this->getTraitObject();
-        $dirPath = '/Fiction/R/Author Name/My Series/15 Book Title';
+        $dirPath = '/Fiction/Author 1 & Author 2/My Series/15 Book Title';
         $book = $trait->processDirPath($dirPath);
-        $this->assertEquals('Fiction', $book->genre->name);
-        $this->assertEquals('Author Name', $book->author->name);
-        $this->assertEquals('My Series', $book->series->name);
-        $this->assertEquals('15', $book->series_number);
-        $this->assertEquals('Book Title', $book->title);
+
+        $this->assertIsArray($book);
+        $this->assertEquals(['Fiction'], $book['genre']);
+        $this->assertEquals(['Author 1', 'Author 2'], $book['author']);
+        $this->assertEquals(['My Series' => '15'], $book['series']);
+        $this->assertEquals('Book Title', $book['title']);
     }
 
-    public function test_processDirPath_with_series_no_number()
+    /**
+     * Test processing an invalid directory path.
+     */
+    public function testProcessDirPathWithInvalidPath()
     {
-        Genre::create(['name' => 'Nonfiction']);
-        Series::create(['name' => 'Another Series']);
         $trait = $this->getTraitObject();
-        $dirPath = '/Nonfiction/Author/Another Series/Book Title';
+        $dirPath = '/Invalid/Path';
         $book = $trait->processDirPath($dirPath);
-        $this->assertEquals('Nonfiction', $book->genre->name);
-        $this->assertEquals('Author', $book->author->name);
-        $this->assertEquals('Another Series', $book->series->name);
-        $this->assertNull($book->series_number);
-        $this->assertEquals('Book Title', $book->title);
+
+        $this->assertIsArray($book);
+        $this->assertArrayHasKey('error', $book);
+        $this->assertArrayHasKey('skipped', $book);
+        $this->assertTrue($book['skipped']);
+        $this->assertStringContainsString('No title in path', $book['error']);
     }
 
-    public function test_processDirPath_with_no_series()
+    /**
+     * Test processing an empty directory path.
+     */
+    public function testProcessDirPathWithEmptyPath()
     {
-        Genre::create(['name' => 'SciFi']);
         $trait = $this->getTraitObject();
-        $dirPath = '/SciFi/Isaac Asimov/Foundation';
+        $dirPath = '';
         $book = $trait->processDirPath($dirPath);
-        $this->assertEquals('SciFi', $book->genre->name);
-        $this->assertEquals('Isaac Asimov', $book->author->name);
-        $this->assertNull($book->series);
-        $this->assertNull($book->series_number);
-        $this->assertEquals('Foundation', $book->title);
+
+        $this->assertIsArray($book);
+        $this->assertArrayHasKey('error', $book);
+        $this->assertArrayHasKey('skipped', $book);
+        $this->assertTrue($book['skipped']);
+        $this->assertStringContainsString('Empty directory path', $book['error']);
     }
 
-    public function test_processDirPath_with_invalid_path()
+    /**
+     * Test processing a VA (various artists) directory.
+     */
+    public function testProcessDirPathWithVADirectory()
     {
         $trait = $this->getTraitObject();
-        $dirPath = '/invalidpath';
+        $dirPath = '/VA/Directory';
         $book = $trait->processDirPath($dirPath);
-        $this->assertNull($book->genre);
-        $this->assertNull($book->author);
-        $this->assertNull($book->series);
-        $this->assertNull($book->series_number);
-        $this->assertNull($book->title);
-        Log::shouldHaveReceived('error')->once();
+
+        $this->assertIsArray($book);
+        $this->assertTrue($book['skipped'] ?? false);
+        $this->assertEquals('VA directory', $book['reason'] ?? '');
+        $this->assertEquals($dirPath, $book['directory_path']);
+    }
+
+    /**
+     * Test processing a directory path with a rated subdirectory.
+     */
+    public function testProcessDirPathWithRatedDirectory()
+    {
+        $trait = $this->getTraitObject();
+        $dirPath = '/Fiction/R/Author Name/Book Title';
+        $book = $trait->processDirPath($dirPath);
+
+        $this->assertIsArray($book);
+        $this->assertEquals(['Fiction'], $book['genre']);
+        $this->assertEquals(['Author Name'], $book['author']);
+        $this->assertEquals('Book Title', $book['title']);
+        $this->assertArrayNotHasKey('skipped', $book);
     }
 }

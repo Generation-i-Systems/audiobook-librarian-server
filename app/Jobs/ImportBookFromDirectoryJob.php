@@ -83,7 +83,13 @@ class ImportBookFromDirectoryJob implements ShouldQueue
 
             $bookTmp = $this->processDirPath($dirPath);
 
-            if (!is_array($bookTmp)) {
+            if (isset($bookTmp['skipped']) && $bookTmp['skipped'] === true) {
+                $reason = $bookTmp['reason'] ?? 'Unknown reason';
+                Log::warning("[BulkImport] Skipped directory {$dirPath}: {$reason}");
+                return;
+            }
+
+            if (!is_array($bookTmp) || !isset($bookTmp['author']) || !isset($bookTmp['title'])) {
                 Log::error("[BulkImport] Failed to process directory: " . $dirPath);
                 return;
             }

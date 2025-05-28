@@ -17,13 +17,13 @@ class MessageApiController extends Controller
         $userId = auth()->check() ? auth()->id() : null;
 
         $firestore = new FirestoreService();
-        $firestore->db->collection('messages')->add([
+        $firestore->getClient()->collection('messages')->add([
             'user_id' => $userId,
             'content' => $request->input('content'),
             'is_from_admin' => false, // All messages via API are from users
         ]);
 
-        $messagesDocs = $firestore->db->collection('messages')->where('user_id', '=', $userId)->documents();
+        $messagesDocs = $firestore->getClient()->collection('messages')->where('user_id', '=', $userId)->documents();
         $messages = [];
         foreach ($messagesDocs as $doc) {
             if ($doc->exists()) {

@@ -5,7 +5,9 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
-use App\Models\User;
+use App\Services\FirestoreService;
+use Illuminate\Support\Str;
+use Google\Cloud\Firestore\Timestamp as FirestoreTimestamp;
 
 class AdminUserSeeder extends Seeder
 {
@@ -37,13 +39,24 @@ class AdminUserSeeder extends Seeder
             return;
         }
 
-        User::factory()->create([
+        $firestore = new FirestoreService();
+
+        // Generate a unique ID for the user
+        $userId = (string) Str::uuid();
+
+        $userData = [
+            'id' => $userId,
             'name' => $name,
             'username' => $username,
             'email' => $email,
             'password' => Hash::make($password),
             'role' => 'admin',
-        ]);
+            // 'created_at' => new FirestoreTimestamp(new \DateTime()),
+            // 'updated_at' => new FirestoreTimestamp(new \DateTime()),
+        ];
+
+        // Add the user to Firestore
+        $firestore->getClient()->collection('users')->document($userId)->set($userData);
 
         $this->command->info('Admin user created successfully!');
     }

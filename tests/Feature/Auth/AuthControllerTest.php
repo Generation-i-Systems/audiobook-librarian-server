@@ -1,0 +1,164 @@
+<?php
+
+namespace Tests\Feature\Auth;
+
+use Tests\TestCase;
+use Google\Cloud\Firestore\FirestoreClient;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+
+class AuthControllerTest extends TestCase
+{
+    protected $firestore;
+    protected $usersCollection;
+    protected $tokensCollection;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        
+        // Initialize Firestore client
+        $this->firestore = new FirestoreClient([
+            'projectId' => config('firebase.project_id'),
+            'keyFilePath' => config('firebase.credentials.file')
+        ]);
+        
+        $this->usersCollection = $this->firestore->collection('users');
+        $this->tokensCollection = $this->firestore->collection('api_tokens');
+        
+        // Clear test data
+        $this->clearTestData();
+    }
+    
+    protected function tearDown(): void
+    {
+        $this->clearTestData();
+        parent::tearDown();
+    }
+    
+    protected function clearTestData()
+    {
+        // Delete test users
+        $users = $this->usersCollection->where('email', '=', 'test@example.com')
+            ->documents();
+        foreach ($users as $user) {
+            $user->reference()->delete();
+        }
+        
+        // Delete test tokens
+        $tokens = $this->tokensCollection->documents();
+        foreach ($tokens as $token) {
+            $token->reference()->delete();
+        }
+    }
+    
+    public function test_user_can_register()
+    {
+        $response = $this->postJson('/api/register', [
+            'name' => 'Test User',
+            'username' => 'testuser',
+            'email' => 'test@example.com',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+        ]);
+        
+        $response->assertStatus(201)
+            ->assertJson([
+                'message' => 'Account created. Waiting for admin approval.'
+            ]);
+            
+        // Verify user was created in Firestore
+        $user = $this->usersCollection->where('email', '=', 'test@example.com')
+            ->documents()
+            ->rows()[0] ?? null;
+            
+        $this->assertNotNull($user);
+        $this->assertEquals('testuser', $user['username']);
+        $this->assertEquals('unverified', $user['role']);
+        $this->assertTrue(Hash::check('password', $user['password']));
+    }
+    
+    public function test_user_can_login()
+    {
+        // Create a test user
+        $this->usersCollection->add([
+            'name' => 'Test User',
+            'username' => 'testuser',
+            'email' => 'test@example.com',
+            'password' => Hash::make('password'),
+            'role' => 'user',
+        ]);
+        
+        $response = $this->postJson('/api/login', [
+            'email' => 'test@example.com',
+            'password' => 'password',
+        ]);
+        
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'id',
+                'name',
+                'email',
+                'username',
+                'role',
+                'token'
+            ]);
+    }
+    
+    public function test_unverified_user_cannot_login()
+    {
+        // Create an unverified test user
+        $this->usersCollection->add([
+            'name' => 'Test User',
+            'username' => 'testuser',
+            'email' => 'test@example.com',
+            'password' => Hash::make('password'),
+            'role' => 'unverified',
+        ]);
+        
+        $response = $this->postJson('/api/login', [
+            'email' => 'test@example.com',
+            'password' => 'password',
+        ]);
+        
+        $response->assertStatus(403)
+            ->assertJson([
+                'message' => 'Account pending admin approval'
+            ]);
+    }
+    
+    public function test_user_can_logout()
+    {
+        // Create a test user and token
+        $userRef = $this->usersCollection->add([
+            'name' => 'Test User',
+            'username' => 'testuser',
+            'email' => 'test@example.com',
+            'password' => Hash::make('password'),
+            'role' => 'user',
+        ]);
+        
+        $token = 'test_token_' . Str::random(32);
+        $this->tokensCollection->add([
+            'user_id' => $userRef->id(),
+            'token' => $token,
+            'created_at' => new \Google\Cloud\Core\Timestamp(new \DateTime()),
+            'expires_at' => new \Google\Cloud\Core\Timestamp(now()->addDays(30)),
+        ]);
+        
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+        ])->postJson('/api/logout');
+        
+        $response->assertStatus(200)
+            ->assertJson([
+                'message' => 'Successfully logged out'
+            ]);
+            
+        // Verify token was deleted
+        $tokens = $this->tokensCollection->where('token', '=', $token)
+            ->documents();
+            
+        $this->assertTrue($tokens->isEmpty());
+    }
+}

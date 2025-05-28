@@ -5,47 +5,44 @@ namespace App\Traits;
 use App\Services\FirestoreService;
 use Symfony\Component\Process\Process;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
+use InvalidArgumentException;
 
 trait BookImportTrait
 {
-    private function scanDirectory($path)
+    /**
+     * Scan a directory and return its contents.
+     *
+     * @param string $path The directory path to scan
+     * @return array
+     * @throws RuntimeException If the directory cannot be scanned
+     */
+    private function scanDirectory(string $path): array
     {
         $storagePath = env('BOOK_STORAGE_PATH');
-
         if (!$storagePath) {
-            Log::error('BOOK_STORAGE_PATH is not defined in the .env file.');
-            return response()->json(
-                [
-                    'message' => 'The token could not be found and is not able to search or implement a path.',
-                ],
-                400
-            );
+            throw new RuntimeException('BOOK_STORAGE_PATH is not defined in the .env file');
         }
 
         $files = scandir($path);
         if ($files === false) {
-            Log::error('Attempt to perform a scandir but failed to get value.');
-            return response()->json(
-                [
-                    'message' => 'Attempt to get the folder or information of the folder with failure call.',
-                ],
-                400
-            );
+            throw new RuntimeException("Failed to scan directory: {$path}");
         }
-        return $files;
+
+        return array_diff($files, ['.', '..']);
     }
 
-    private function extractTagData($filePath)
+    /**
+     * Extract tag data from an audio file.
+     *
+     * @param string $filePath Path to the audio file
+     * @return array Extracted tag data
+     */
+    private function extractTagData(string $filePath): array
     {
         $storagePath = env('BOOK_STORAGE_PATH');
         if (!$storagePath) {
-            Log::error('BOOK_STORAGE_PATH is not defined in the .env file.');
-            return response()->json(
-                [
-                    'message' => 'The token could not be found and is not able to be located for information .',
-                ],
-                400
-            );
+            throw new RuntimeException('BOOK_STORAGE_PATH is not defined in the .env file');
         }
         $directoryPath = dirname($filePath);
         $process = new Process([
@@ -168,7 +165,13 @@ trait BookImportTrait
      * Scan directory for images, prefer one with 'cover' in the name.
      * Returns [selected, candidates[]]
      */
-    protected function findCoverImageCandidate($directoryPath)
+    /**
+     * Find a suitable cover image in the specified directory.
+     *
+     * @param string $directoryPath Relative path from BOOK_STORAGE_PATH
+     * @return array [string|null $selected, array $candidates]
+     */
+    protected function findCoverImageCandidate(string $directoryPath): array
     {
         $storagePath = env('BOOK_STORAGE_PATH');
         $dir = rtrim($storagePath, '/') . '/' . ltrim($directoryPath, '/');
@@ -222,101 +225,120 @@ trait BookImportTrait
     }
 
     /**
-     * Processes a directory path and returns a Book instance populated with extracted metadata.
+     * Process a directory path and extract book metadata.
      *
-     * @param string $directoryPath The path to the directory to process.
-     * @return array|null The populated Book array or null if skipped/invalid.
+     * @param string $directoryPath The directory path to process
+     * @return array{genre: array, author: array, series?: array, title: string, directory_path: string, skipped?: bool, error?: string}
+     * @throws InvalidArgumentException If the directory path is invalid
      */
-    public function processDirPath($directoryPath)
+    public function processDirPath(string $directoryPath): array
     {
-        $firestore = new FirestoreService();
-        $book = [];
-        $book['directory_path'] = $directoryPath;
-        $seriesNumber = null;
-        $series = null;
-        $seriesParent = null;
-
-        $parts = explode('/', trim($directoryPath, '/'));
-
-        $genre = array_shift($parts);
-        if (count($parts) > 0 && $parts[0] == 'R') {
-            array_shift($parts);
-        } elseif (count($parts) > 0 && $parts[0] == 'VA') {
-            Log::error("Skipping VA: {$directoryPath}");
-            return null;
-        }
-        $author = array_shift($parts);
-
-        if (count($parts) > 2) {
-            $title = array_pop($parts);
-            $series = array_pop($parts);
-            $seriesParent = implode('/', $parts);
-        } elseif (count($parts) == 2) {
-            $series = array_shift($parts);
-            $title = array_shift($parts);
-        } elseif (count($parts) == 1) {
-            $title = array_shift($parts);
-        } else {
-            Log::error("Invalid directory path: {$directoryPath}");
-            return $book;
-        }
-
-        if (!empty($series)) {
-            if (preg_match('#^([0-9.]+)\s?(.*)$#', $title, $matches)) {
-                // Remove Series number at start from title unlike other places where it is part of the title
-                $seriesNumber = $matches[1];
-                $title = $matches[2];
-            } elseif (preg_match('/(?:book|volume|vol\.?)[ _-]*(\d{1,3}(\.\d{1,2})?)/i', $title, $m)) {
-                // book [num], volume [num], vol [num], vol. [num] (case-insensitive, anywhere)
-                $seriesNumber = $m[1];
-            } elseif (preg_match('/(\d{1,3}(\.\d{1,2})?)$/', $title, $m)) {
-                // number at end
-                $seriesNumber = $m[1];
-            } elseif (preg_match('/\s*[\[\{\(](\d{1,3}(\.\d{1,2})?)[\]\}\)](?:\s|$)/', $title, $m)) {
-                // number in parens, braces or brackets
-                $seriesNumber = $m[1];
+        // Initialize book array with default values
+        $book = [
+            'directory_path' => $directoryPath,
+            'genre' => [],
+            'author' => [],
+            'title' => ''
+        ];
+        
+        try {
+            // Split directory path into components
+            $parts = array_values(array_filter(explode('/', trim($directoryPath, '/')), 'strlen'));
+            
+            // Handle empty or invalid paths
+            if (empty($parts)) {
+                throw new InvalidArgumentException('Empty directory path');
             }
-        }
-
-        $book['genre'] = [$genre];
-
-        //if author contains 'and', '&' or ',', split into multiple authors and each author is more than 4 letters
-        if (
-            stripos($author, 'and') !== false ||
-            stripos($author, '&') !== false ||
-            stripos($author, ',') !== false
-        ) {
-            // First normalize all separators to commas, then split
-            $author = str_replace([' and ', ' & '], ',', $author);
-            $authors = explode(',', $author);
-            $authors = array_map(
-                function ($author) {
-                    if (strlen(trim($author)) > 4) {
-                        return trim($author);
-                    } else {
-                        return null;
-                    }
-                },
-                $authors
-            );
-            $authors = array_filter($authors);
-            $book['author'] = $authors;
-        } else {
-            $book['author'] = [$author];
-        }
-
-        if (!empty($series)) {
-            if (empty($seriesNumber)) {
-                $book['series'] = [$series => null];
+            
+            // Handle VA (various artists) directories
+            if (in_array('VA', $parts, true)) {
+                Log::warning("Skipping VA directory: {$directoryPath}");
+                return [
+                    'directory_path' => $directoryPath,
+                    'genre' => [],
+                    'author' => [],
+                    'title' => '',
+                    'skipped' => true,
+                    'reason' => 'VA directory'
+                ];
+            }
+            
+            // Remove 'R' rating if present
+            if (($key = array_search('R', $parts, true)) !== false) {
+                unset($parts[$key]);
+                $parts = array_values($parts); // Re-index array
+            }
+            
+            // We need at least genre and author
+            if (count($parts) < 2) {
+                throw new InvalidArgumentException("Path too short: {$directoryPath}");
+            }
+            
+            // First part is always genre
+            $genre = array_shift($parts);
+            $book['genre'] = [$genre];
+            
+            // Second part is author(s)
+            $author = array_shift($parts);
+            
+            // Handle multiple authors
+            if (str_contains($author, ',') || stripos($author, ' and ') !== false || str_contains($author, '&')) {
+                $author = str_replace([' and ', ' & '], ',', $author);
+                $authors = array_map('trim', explode(',', $author));
+                $book['author'] = array_values(array_filter($authors, fn($a) => strlen(trim($a)) > 4));
             } else {
-                $book['series'] = [$series => $seriesNumber];
-                if ($seriesParent) {
-                    $book['series'] = ["$seriesParent/$series" => $seriesNumber];
-                }
+                $book['author'] = [trim($author)];
             }
+            
+            // Remaining parts are series/title
+            if (empty($parts)) {
+                throw new InvalidArgumentException("No title in path: {$directoryPath}");
+            }
+            
+            $series = null;
+            $seriesNumber = null;
+            $title = '';
+            $seriesParent = null;
+            
+            // If we have more than one part left, the last part is the title, rest is series
+            if (count($parts) > 1) {
+                $title = array_pop($parts);
+                $series = array_pop($parts);
+                
+                // If there's still parts left, they're parent series
+                if (!empty($parts)) {
+                    $seriesParent = implode('/', $parts);
+                    $series = $seriesParent . '/' . $series;
+                }
+                
+                // Try to extract series number from title
+                if (preg_match('#^[\[\{\(]?([0-9.]+)[\]\}\)]?\s?(.*)$#', $title, $matches)) {
+                    $seriesNumber = $matches[1];
+                    $title = trim($matches[2]);
+                } elseif (preg_match('/(?:book|volume|vol\.?)[ _-]*(\d{1,3}(\.\d{1,2})?)/i', $title, $m)) {
+                    $seriesNumber = $m[1];
+                } elseif (preg_match('/(\d{1,3}(\.\d{1,2})?)$/', $title, $m)) {
+                    $seriesNumber = $m[1];
+                } elseif (preg_match('/\s*[\[\{\(](\d{1,3}(\.\d{1,2})?)[\]\)\}](?:\s|$)/', $title, $m)) {
+                    $seriesNumber = $m[1];
+                }
+            } else {
+                $title = $parts[0];
+            }
+            
+            // Set series data if we have a series
+            if (!empty($series)) {
+                $book['series'] = empty($seriesNumber) ? [$series => null] : [$series => $seriesNumber];
+            }
+            
+            $book['title'] = trim($title);
+            
+        } catch (\Exception $e) {
+            Log::error("Error processing directory path {$directoryPath}: " . $e->getMessage());
+            $book['error'] = $e->getMessage();
+            $book['skipped'] = true;
         }
-
-        $book['title'] = $title;
+        
         return $book;
     }
 
@@ -333,12 +355,14 @@ trait BookImportTrait
             Log::error("Invalid URL: {$url}");
             return null;
         }
+        
         try {
             $storagePath = env('BOOK_STORAGE_PATH'); // absolute path
             if (!$storagePath) {
                 Log::error('BOOK_STORAGE_PATH is not defined.');
                 return null;
             }
+            
             $fullDir = rtrim($storagePath, '/') . '/' . ltrim($directoryPath, '/');
             if (!is_dir($fullDir)) {
                 if (!mkdir($fullDir, 0775, true) && !is_dir($fullDir)) {
@@ -365,6 +389,7 @@ trait BookImportTrait
                 Log::error("importCoverImageFromUrl error: Unable to fetch image from {$url}");
                 return null;
             }
+            
             // Determine extension
             $ext = 'jpg';
             if (strpos($contentType, 'png') !== false) {
@@ -383,15 +408,20 @@ trait BookImportTrait
             }
 
             // Return only the path relative to BOOK_STORAGE_PATH
-            return (ltrim($directoryPath, '/') . '/' . $filename);
+            return ltrim($directoryPath, '/') . '/' . $filename;
+            
         } catch (\Exception $e) {
             Log::error('importCoverImageFromUrl error: ' . $e->getMessage());
             return null;
         }
     }
 
-    // --- Google Books integration ---
-    protected $googleBooksApiService;
+    /**
+     * Google Books API service instance.
+     *
+     * @var mixed|null
+     */
+    protected $googleBooksApiService = null;
 
     public function setGoogleBooksApiService($service)
     {
