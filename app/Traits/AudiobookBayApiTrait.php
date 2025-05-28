@@ -79,4 +79,26 @@ trait AudiobookBayApiTrait
         }
         return null;
     }
+
+    /**
+     * Get book details from AudiobookBay
+     * @param string $url Full URL to the book details page
+     * @return array|null Parsed book details or null on failure
+     */
+    public function getAudiobookDetails(string $url): ?array
+    {
+        $this->checkAudiobookBayRateLimit();
+        $cookie = $this->getAudiobookBayCookie();
+        
+        $response = Http::withHeaders([
+            'Cookie' => $cookie,
+            'User-Agent' => 'Mozilla/5.0',
+        ])->get($url);
+        
+        if ($response->successful()) {
+            return $this->parseAudiobookBayPage($response->body());
+        }
+        
+        return null;
+    }
 }

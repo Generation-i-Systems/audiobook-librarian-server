@@ -1,0 +1,117 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Services\AudibleService;
+use Illuminate\Support\Facades\Http;
+use Tests\TestCase;
+
+class AudibleServiceTest extends TestCase
+{
+    private AudibleService $service;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->service = new AudibleService();
+    }
+
+    /** @test */
+    public function it_can_search_books_by_title()
+    {
+        // Mock the HTTP response
+        Http::fake([
+            'api.audible.com/1.0/catalog/products*' => Http::response([
+                'products' => [
+                    $this->getMockBookData()
+                ]
+            ], 200, ['Content-Type' => 'application/json'])
+        ]);
+
+        $results = $this->service->searchBooks('Test Book');
+
+        $this->assertIsArray($results);
+        $this->assertCount(1, $results);
+        $this->assertEquals('Test Book', $results[0]['title']);
+        $this->assertEquals('Test Author', $results[0]['authors'][0]['author']['name']);
+        $this->assertStringContainsString('500x500', $results[0]['cover_image_url']);
+    }
+
+    /** @test */
+    public function it_gets_book_details()
+    {
+        $mockBook = $this->getMockBookData();
+        
+        // Mock the HTTP response
+        Http::fake([
+            'api.audible.com/1.0/catalog/products/TEST123*' => Http::response([
+                'product' => $mockBook
+            ], 200, ['Content-Type' => 'application/json'])
+        ]);
+
+        $book = $this->service->getBookDetails('TEST123');
+
+        $this->assertIsArray($book);
+        $this->assertEquals('Test Book', $book['title']);
+        $this->assertEquals('Test Author', $book['authors'][0]['author']['name']);
+        $this->assertEquals('Test Narrator', $book['narrators'][0]['author']['name']);
+        $this->assertEquals('Fiction', $book['genres'][0]['genre']['name']);
+        $this->assertEquals('10:30:00', $book['duration']);
+    }
+
+    /** @test */
+    public function it_handles_api_errors_gracefully()
+    {
+        Http::fake([
+            'api.audible.com/1.0/catalog/products*' => Http::response(
+                ['message' => 'Invalid request'], 
+                400
+            )
+        ]);
+
+        $results = $this->service->searchBooks('Nonexistent Book');
+        $this->assertNull($results);
+
+        $book = $this->service->getBookDetails('INVALID123');
+        $this->assertNull($book);
+    }
+
+    private function getMockBookData(): array
+    {
+        return [
+            'asin' => 'TEST123',
+            'title' => 'Test Book',
+            'subtitle' => 'A Test Subtitle',
+            'authors' => [
+                ['name' => 'Test Author', 'asin' => 'AUTH123']
+            ],
+            'narrators' => [
+                ['name' => 'Test Narrator', 'asin' => 'NARR123']
+            ],
+            'publisher_name' => 'Test Publisher',
+            'release_date' => '2023-01-01T00:00:00.000Z',
+            'publisher_summary' => 'This is a test book summary.',
+            'merchandising_summary' => 'This is a test book description.',
+            'product_images' => [
+                '_500x500' => 'https://example.com/image_500x500.jpg',
+                '_400x400' => 'https://example.com/image_400x400.jpg',
+            ],
+            'category_ladders' => [
+                [
+                    ['name' => 'Fiction'],
+                    ['name' => 'Science Fiction'],
+                ]
+            ],
+            'runtime_length_min' => 630, // 10 hours 30 minutes
+            'language' => 'english',
+            'rating' => 4.5,
+            'ratings_count' => 1234,
+            'series' => [
+                ['title' => 'Test Series', 'sequence' => 'Book 1', 'asin' => 'SERIES123']
+            ],
+            'series_sequence' => '1',
+            'whats_included' => 'Test content',
+            'about_author' => 'Test author bio',
+        ];
+    }
+}
