@@ -42,7 +42,7 @@ class AuthController extends Controller
             return response()->json(['email' => ['Account request already submitted with this email.']], 400);
         }
 
-        $this->firestore->db->collection('account_requests')->add([
+        $this->firestore->getClient()->collection('account_requests')->add([
             'name' => $request->name,
             'email' => $request->email,
             'password' => $password,

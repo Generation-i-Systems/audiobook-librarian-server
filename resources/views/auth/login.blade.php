@@ -67,6 +67,12 @@
                     </form>
                 </div>
             </div>
+            <div class="text-center mt-4">
+                <a href="{{ route('login.google') }}" class="btn btn-outline-primary" style="background: #fff; color: #444; border-color: #ddd;">
+                    <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google Logo" style="width:20px; margin-right:8px; vertical-align:middle;">
+                    Sign in with Google
+                </a>
+            </div>
         </div>
     </div>
 </div>

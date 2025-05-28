@@ -12,7 +12,7 @@ class UserController extends Controller
     public function index()
     {
         $firestore = new FirestoreService();
-        $users = $firestore->db->collection('users')->documents();
+        $users = $firestore->getClient()->collection('users')->documents();
         $userList = [];
         foreach ($users as $userDoc) {
             if ($userDoc->exists()) {
@@ -40,7 +40,7 @@ class UserController extends Controller
             'role' => 'required|string',
         ]);
         // Uniqueness check
-        $existingUser = $firestore->db->collection('users')
+        $existingUser = $firestore->getClient()->collection('users')
             ->where('username', '=', $validated['username'])
             ->documents();
         foreach ($existingUser as $doc) {
@@ -48,7 +48,7 @@ class UserController extends Controller
                 return back()->withErrors(['username' => 'Username already exists.']);
             }
         }
-        $existingEmail = $firestore->db->collection('users')
+        $existingEmail = $firestore->getClient()->collection('users')
             ->where('email', '=', $validated['email'])
             ->documents();
         foreach ($existingEmail as $doc) {
@@ -57,14 +57,14 @@ class UserController extends Controller
             }
         }
         $validated['password'] = Hash::make($validated['password']);
-        $firestore->db->collection('users')->add($validated);
+        $firestore->getClient()->collection('users')->add($validated);
         return redirect()->route('admin.users.index')->with('success', 'User created successfully.');
     }
 
     public function edit($id)
     {
         $firestore = new FirestoreService();
-        $userDoc = $firestore->db->collection('users')->document($id)->snapshot();
+        $userDoc = $firestore->getClient()->collection('users')->document($id)->snapshot();
         if (!$userDoc->exists()) {
             abort(404);
         }
@@ -84,7 +84,7 @@ class UserController extends Controller
             'password' => 'nullable|string|min:6|confirmed',
         ]);
         // Uniqueness check (ignore current user)
-        $existingUser = $firestore->db->collection('users')
+        $existingUser = $firestore->getClient()->collection('users')
             ->where('username', '=', $validated['username'])
             ->documents();
         foreach ($existingUser as $doc) {
@@ -92,7 +92,7 @@ class UserController extends Controller
                 return back()->withErrors(['username' => 'Username already exists.']);
             }
         }
-        $existingEmail = $firestore->db->collection('users')
+        $existingEmail = $firestore->getClient()->collection('users')
             ->where('email', '=', $validated['email'])
             ->documents();
         foreach ($existingEmail as $doc) {
@@ -105,14 +105,14 @@ class UserController extends Controller
         } else {
             unset($validated['password']);
         }
-        $firestore->db->collection('users')->document($id)->set($validated, ['merge' => true]);
+        $firestore->getClient()->collection('users')->document($id)->set($validated, ['merge' => true]);
         return redirect()->route('admin.users.index')->with('success', 'User updated successfully.');
     }
 
     public function destroy($id)
     {
         $firestore = new FirestoreService();
-        $firestore->db->collection('users')->document($id)->delete();
+        $firestore->getClient()->collection('users')->document($id)->delete();
         return redirect()->route('admin.users.index')->with('success', 'User deleted successfully.');
     }
 }
