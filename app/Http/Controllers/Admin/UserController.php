@@ -56,6 +56,8 @@ class UserController extends Controller
                 return back()->withErrors(['email' => 'Email already exists.']);
             }
         }
+        // Never store password_confirmation on user record
+        unset($validated['password_confirmation']);
         $validated['password'] = Hash::make($validated['password']);
         $firestore->getClient()->collection('users')->add($validated);
         return redirect()->route('admin.users.index')->with('success', 'User created successfully.');
@@ -100,6 +102,8 @@ class UserController extends Controller
                 return back()->withErrors(['email' => 'Email already exists.']);
             }
         }
+        // Never store password_confirmation on user record
+        unset($validated['password_confirmation']);
         if (!empty($validated['password'])) {
             $validated['password'] = Hash::make($validated['password']);
         } else {
