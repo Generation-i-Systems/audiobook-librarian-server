@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Services\FirestoreService;
 
 class ReadingProgressController extends Controller
 {
@@ -14,11 +15,11 @@ class ReadingProgressController extends Controller
             'current_position' => 'required|integer|min:0',
         ]);
         $user = Auth::user();
-        $firestore = new \App\Services\FirestoreService();
+        $firestore = new FirestoreService();
         $userId = $user->id;
         $bookId = $request->book_id;
         // Find or create reading progress document
-        $progressQuery = $firestore->db->collection('reading_progress')
+        $progressQuery = $firestore->getClient()->collection('reading_progress')
             ->where('user_id', '=', $userId)
             ->where('book_id', '=', $bookId)
             ->documents();
@@ -31,13 +32,13 @@ class ReadingProgressController extends Controller
         }
         if ($progressDoc) {
             $progressDoc->reference()->set([
-                'current_position' => $request->current_position
+                'current_position' => $request->current_position,
             ], ['merge' => true]);
         } else {
-            $firestore->db->collection('reading_progress')->add([
+            $firestore->getClient()->collection('reading_progress')->add([
                 'user_id' => $userId,
                 'book_id' => $bookId,
-                'current_position' => $request->current_position
+                'current_position' => $request->current_position,
             ]);
         }
         return response()->json(['success' => true]);
@@ -49,10 +50,10 @@ class ReadingProgressController extends Controller
             'book_id' => 'required|string',
         ]);
         $user = Auth::user();
-        $firestore = new \App\Services\FirestoreService();
+        $firestore = new FirestoreService();
         $userId = $user->id;
         $bookId = $request->book_id;
-        $progressQuery = $firestore->db->collection('reading_progress')
+        $progressQuery = $firestore->getClient()->collection('reading_progress')
             ->where('user_id', '=', $userId)
             ->where('book_id', '=', $bookId)
             ->documents();

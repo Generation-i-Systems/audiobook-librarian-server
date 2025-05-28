@@ -21,7 +21,7 @@ class AdminNotificationController extends Controller
         $firestore = new FirestoreService();
         if ($userId) {
             // Send to a specific user
-            $userDoc = $firestore->db->collection('users')->document($userId)->snapshot();
+            $userDoc = $firestore->getClient()->collection('users')->document($userId)->snapshot();
             if ($userDoc->exists()) {
                 $user = $userDoc->data();
                 $user['id'] = $userDoc->id();
@@ -32,7 +32,7 @@ class AdminNotificationController extends Controller
             }
         } else {
             // Send to all users
-            $users = $firestore->db->collection('users')->documents();
+            $users = $firestore->getClient()->collection('users')->documents();
             foreach ($users as $userDoc) {
                 if ($userDoc->exists()) {
                     $user = $userDoc->data();

@@ -13,7 +13,7 @@ class ProfileController extends Controller
     {
         $firestore = new FirestoreService();
         $userId = Auth::id();
-        $userDoc = $firestore->db->collection('users')->document($userId)->snapshot();
+        $userDoc = $firestore->getClient()->collection('users')->document($userId)->snapshot();
         $user = $userDoc->exists() ? $userDoc->data() : null;
         if ($user) {
             $user['id'] = $userId;
@@ -30,9 +30,9 @@ class ProfileController extends Controller
 
         $firestore = new FirestoreService();
         $userId = Auth::id();
-        $firestore->db->collection('users')->document($userId)->set([
+        $firestore->getClient()->collection('users')->document($userId)->set([
             'name' => $request->name,
-            'email' => $request->email
+            'email' => $request->email,
         ], ['merge' => true]);
         return back()->with('success', 'Profile updated successfully!');
     }
@@ -46,13 +46,13 @@ class ProfileController extends Controller
 
         $firestore = new FirestoreService();
         $userId = Auth::id();
-        $userDoc = $firestore->db->collection('users')->document($userId)->snapshot();
+        $userDoc = $firestore->getClient()->collection('users')->document($userId)->snapshot();
         $user = $userDoc->exists() ? $userDoc->data() : null;
         if (!$user || !Hash::check($request->current_password, $user['password'])) {
             return back()->withErrors(['current_password' => 'Incorrect current password.']);
         }
-        $firestore->db->collection('users')->document($userId)->set([
-            'password' => Hash::make($request->password)
+        $firestore->getClient()->collection('users')->document($userId)->set([
+            'password' => Hash::make($request->password),
         ], ['merge' => true]);
         return back()->with('success', 'Password changed successfully!');
     }
@@ -65,7 +65,7 @@ class ProfileController extends Controller
 
         $firestore = new FirestoreService();
         $userId = Auth::id();
-        $firestore->db->collection('messages')->add([
+        $firestore->getClient()->collection('messages')->add([
             'user_id' => $userId,
             'content' => $request->input('content'),
             'is_from_admin' => false,

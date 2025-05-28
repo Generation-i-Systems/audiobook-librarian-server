@@ -60,7 +60,7 @@ class MessageController extends Controller
     {
         $request->validate([
             'content' => 'required|string',
-            'to_user_id' => 'required|string'
+            'to_user_id' => 'required|string',
         ]);
 
         try {

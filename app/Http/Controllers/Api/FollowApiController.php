@@ -23,7 +23,7 @@ class FollowApiController extends Controller
         if ($userId === $followableId) {
             return response()->json(['error' => 'You cannot follow yourself.'], 400);
         }
-        $existing = $firestore->db->collection('follows')
+        $existing = $firestore->getClient()->collection('follows')
             ->where('user_id', '=', $userId)
             ->where('followable_type', '=', $followableType)
             ->where('followable_id', '=', $followableId)
@@ -33,7 +33,7 @@ class FollowApiController extends Controller
                 return response()->json(['error' => 'Already following.'], 400);
             }
         }
-        $firestore->db->collection('follows')->add([
+        $firestore->getClient()->collection('follows')->add([
             'user_id' => $userId,
             'followable_type' => $followableType,
             'followable_id' => $followableId,
@@ -50,7 +50,7 @@ class FollowApiController extends Controller
         ]);
 
         $firestore = new FirestoreService();
-        $follows = $firestore->db->collection('follows')
+        $follows = $firestore->getClient()->collection('follows')
             ->where('user_id', '=', Auth::id())
             ->where('followable_type', '=', $followableType)
             ->where('followable_id', '=', $followableId)

@@ -17,8 +17,8 @@ class FollowController extends Controller
         ]);
 
         // No need to fetch author/series from Eloquent, just trust input (validated above)
-        $firestore = new \App\Services\FirestoreService();
-        $firestore->db->collection('follows')->add([
+        $firestore = new FirestoreService();
+        $firestore->getClient()->collection('follows')->add([
             'user_id' => Auth::id(),
             'followable_type' => $followableType,
             'followable_id' => $followableId,
@@ -35,8 +35,8 @@ class FollowController extends Controller
             'followable_id' => 'required|integer',
         ]);
         // No need to fetch author/series from Eloquent, just trust input (validated above)
-        $firestore = new \App\Services\FirestoreService();
-        $follows = $firestore->db->collection('follows')
+        $firestore = new FirestoreService();
+        $follows = $firestore->getClient()->collection('follows')
             ->where('user_id', '=', Auth::id())
             ->where('followable_type', '=', $followableType)
             ->where('followable_id', '=', $followableId)

@@ -18,8 +18,8 @@ class AdminController extends Controller
         $userId = $request->input('user_id');
         $role = $request->input('role');
         // Assuming users are stored in a 'users' collection
-        $firestore->db->collection('users')->document($userId)->set([
-            'role' => $role
+        $firestore->getClient()->collection('users')->document($userId)->set([
+            'role' => $role,
         ], ['merge' => true]);
         return back()->with('success', 'User role updated successfully!');
     }

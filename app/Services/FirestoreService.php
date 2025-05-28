@@ -204,7 +204,7 @@ class FirestoreService
         try {
             $projectId = env('FIREBASE_PROJECT_ID');
             $credentials = base_path(env('FIREBASE_CREDENTIALS'));
-            $db = new \Google\Cloud\Firestore\FirestoreClient([
+            $db = new FirestoreClient([
                 'projectId' => $projectId,
                 'keyFilePath' => $credentials,
             ]);
@@ -228,7 +228,7 @@ class FirestoreService
         try {
             $projectId = env('FIREBASE_PROJECT_ID');
             $credentials = base_path(env('FIREBASE_CREDENTIALS'));
-            $db = new \Google\Cloud\Firestore\FirestoreClient([
+            $db = new FirestoreClient([
                 'projectId' => $projectId,
                 'keyFilePath' => $credentials,
             ]);
@@ -253,7 +253,7 @@ class FirestoreService
         try {
             $this->projectId = env('FIREBASE_PROJECT_ID');
             $credentials = base_path(env('FIREBASE_CREDENTIALS'));
-            $this->db = new \Google\Cloud\Firestore\FirestoreClient([
+            $this->db = new FirestoreClient([
                 'projectId' => $this->projectId,
                 'keyFilePath' => $credentials,
             ]);

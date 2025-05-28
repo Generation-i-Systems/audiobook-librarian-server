@@ -20,7 +20,7 @@ class ReadingProgressApiController extends Controller
         $firestore = new FirestoreService();
         $userId = Auth::id();
         $bookId = $request->input('book_id');
-        $progressDocs = $firestore->db->collection('reading_progress')
+        $progressDocs = $firestore->getClient()->collection('reading_progress')
             ->where('user_id', '=', $userId)
             ->where('book_id', '=', $bookId)
             ->documents();
@@ -28,13 +28,13 @@ class ReadingProgressApiController extends Controller
         foreach ($progressDocs as $doc) {
             if ($doc->exists()) {
                 $doc->reference()->set([
-                    'current_position' => $request->current_position
+                    'current_position' => $request->current_position,
                 ], ['merge' => true]);
                 $found = true;
             }
         }
         if (!$found) {
-            $firestore->db->collection('reading_progress')->add([
+            $firestore->getClient()->collection('reading_progress')->add([
                 'user_id' => $userId,
                 'book_id' => $bookId,
                 'current_position' => $request->current_position,
@@ -50,7 +50,7 @@ class ReadingProgressApiController extends Controller
         $firestore = new FirestoreService();
         $userId = Auth::id();
         $bookId = $request->input('book_id');
-        $progressDocs = $firestore->db->collection('reading_progress')
+        $progressDocs = $firestore->getClient()->collection('reading_progress')
             ->where('user_id', '=', $userId)
             ->where('book_id', '=', $bookId)
             ->documents();
@@ -69,7 +69,7 @@ class ReadingProgressApiController extends Controller
         $firestore = new FirestoreService();
         $userId = Auth::id();
         $bookId = $request->input('book_id');
-        $progressDocs = $firestore->db->collection('reading_progress')
+        $progressDocs = $firestore->getClient()->collection('reading_progress')
             ->where('user_id', '=', $userId)
             ->where('book_id', '=', $bookId)
             ->documents();
