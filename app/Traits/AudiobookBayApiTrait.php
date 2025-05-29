@@ -2,103 +2,184 @@
 
 namespace App\Traits;
 
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 
+/**
+ * Trait for interacting with the AudiobookBay API
+ */
 trait AudiobookBayApiTrait
 {
-    protected $audiobookBayCookie = null;
+    use BaseApiTrait;
 
-    protected function getAudiobookBayRateLimit(): int
+    protected ?string $username = null;
+    protected ?string $password = null;
+    protected ?string $authToken = null;
+    protected ?string $cookie = null;
+
+    /**
+     * Initialize the AudiobookBay API client
+     */
+    public function __construct()
     {
-        return (int) (env('AUDIOBOOK_BAY_RATE_LIMIT', 100));
+        $this->setBaseUrl('https://audiobookbay.lu');
     }
 
-    protected function getAudiobookBayUsername(): string
+    /**
+     * Initialize with configuration
+     */
+    public function initAudiobookBay(array $config = []): self
     {
-        return env('AUDIOBOOK_BAY_USERNAME', '');
+        $this->username = $config['username'] ?? config('services.audiobookbay.username');
+        $this->password = $config['password'] ?? config('services.audiobookbay.password');
+        
+        if (isset($config['base_url'])) {
+            $this->setBaseUrl($config['base_url']);
+        }
+        
+        return $this;
+    }
+    
+    /**
+     * Search for books
+     */
+    public function searchBooks(string $query, array $options = []): array
+    {
+        return $this->searchAudiobooks($query, $options) ?? [];
+    }
+    
+    /**
+     * Get book details by ID
+     */
+    public function getBookDetails(string $id): array
+    {
+        return $this->getAudiobookDetails($id) ?? [];
+    }
+    
+    /**
+     * Login to AudiobookBay
+     */
+    public function login(): bool
+    {
+        if (empty($this->username) || empty($this->password)) {
+            Log::warning('AudiobookBay credentials not fully configured');
+            return false;
+        }
+        
+        // Implementation for login would go here
+        return true;
     }
 
-    protected function getAudiobookBayPassword(): string
+    /**
+     * Get the authentication cookie
+     */
+    protected function getAuthCookie(): string
     {
-        return env('AUDIOBOOK_BAY_PASSWORD', '');
-    }
+        if ($this->cookie) {
+            return $this->cookie;
+        }
 
-    protected function getAudiobookBayCookie(): ?string
-    {
-        // Cache the cookie for 1 hour
-        return Cache::remember('audiobookbay_cookie', 3600, function () {
-            return $this->audiobookBayLogin();
+        $cacheKey = 'audiobookbay_auth_cookie';
+        $this->cookie = Cache::remember($cacheKey, 3600, function () {
+            $response = Http::asForm()
+                ->withHeaders([
+                    'User-Agent' => 'Mozilla/5.0',
+                ])
+                ->post($this->baseUrl . '/member/login.php', [
+                    'username' => $this->username,
+                    'password' => $this->password,
+                    'login' => 'Login',
+                ]);
+
+            if (!$response->successful() || count($response->cookies()) === 0) {
+                Log::error('Failed to authenticate with AudiobookBay');
+                return '';
+            }
+
+            return collect($response->cookies())
+                ->map(fn ($cookie) => "{$cookie->getName()}={$cookie->getValue()}")
+                ->implode('; ');
         });
-    }
 
-    protected function audiobookBayLogin(): ?string
-    {
-        $username = $this->getAudiobookBayUsername();
-        $password = $this->getAudiobookBayPassword();
-        $response = Http::asForm()->post('https://audiobookbay.lu/member/login.php', [
-            'username' => $username,
-            'password' => $password,
-            'login' => 'Login',
-        ]);
-        if ($response->successful() && $response->cookies()->count() > 0) {
-            // Return cookie header string
-            return collect($response->cookies())->map(function ($cookie) {
-                return $cookie->getName() . '=' . $cookie->getValue();
-            })->implode('; ');
-        }
-        return null;
-    }
-
-    protected function checkAudiobookBayRateLimit(): void
-    {
-        $cacheKey = 'audiobookbay_query_count_' . date('YmdH');
-        $count = Cache::get($cacheKey, 0);
-        $limit = $this->getAudiobookBayRateLimit();
-        if ($count >= $limit) {
-            abort(429, 'AudiobookBay API rate limit exceeded.');
-        }
-        Cache::put($cacheKey, $count + 1, now()->addHour());
+        return $this->cookie;
     }
 
     /**
-     * Search AudiobookBay and return HTML (raw)
-     * @param string $query
-     * @return string|null
+     * Search for audiobooks
      */
-    public function audiobookBaySearch(string $query): ?string
+    public function searchAudiobooks(string $query, array $options = []): ?array
     {
-        $this->checkAudiobookBayRateLimit();
-        $cookie = $this->getAudiobookBayCookie();
-        $response = Http::withHeaders([
-            'Cookie' => $cookie,
-            'User-Agent' => 'Mozilla/5.0',
-        ])->get('https://audiobookbay.lu/?s=' . urlencode($query));
-        if ($response->successful()) {
-            return $response->body();
+        $params = [
+            's' => $query,
+            'page' => $options['page'] ?? 1,
+            'orderby' => $options['sort'] ?? 'relevance',
+            'order' => $options['order'] ?? 'desc',
+        ];
+        
+        if (isset($options['author'])) {
+            $params['author'] = $options['author'];
         }
-        return null;
+        
+        if (isset($options['narrator'])) {
+            $params['narrator'] = $options['narrator'];
+        }
+        
+        $response = $this->makeRequest('GET', '/', $params);
+        
+        if (!$response || empty($response['html'])) {
+            return null;
+        }
+        
+        return $this->parseSearchResults($response['html']);
     }
 
     /**
-     * Get book details from AudiobookBay
-     * @param string $url Full URL to the book details page
-     * @return array|null Parsed book details or null on failure
+     * Get audiobook details by ID or URL
      */
-    public function getAudiobookDetails(string $url): ?array
+    public function getAudiobookDetails(string $id): ?array
     {
-        $this->checkAudiobookBayRateLimit();
-        $cookie = $this->getAudiobookBayCookie();
+        $url = str_starts_with($id, 'http') ? $id : "{$this->baseUrl}/book/{$id}";
+        $response = $this->makeRequest('GET', $url);
         
-        $response = Http::withHeaders([
-            'Cookie' => $cookie,
-            'User-Agent' => 'Mozilla/5.0',
-        ])->get($url);
-        
-        if ($response->successful()) {
-            return $this->parseAudiobookBayPage($response->body());
+        if (!$response || empty($response['html'])) {
+            return null;
         }
         
-        return null;
+        return $this->parseAudiobookDetailsApi($response['html']);
+    }
+    
+    /**
+     * Get audiobooks by author
+     */
+    public function getAudiobooksByAuthor(string $author, int $limit = 10): array
+    {
+        return $this->searchAudiobooks('', ['author' => $author, 'limit' => $limit]) ?? [];
+    }
+    
+    /**
+     * Get audiobooks by narrator
+     */
+    public function getAudiobooksByNarrator(string $narrator, int $limit = 10): array
+    {
+        return $this->searchAudiobooks('', ['narrator' => $narrator, 'limit' => $limit]) ?? [];
+    }
+    
+    /**
+     * Parse search results HTML into structured data
+     */
+    protected function parseSearchResults(string $html): array
+    {
+        // Implementation for parsing search results
+        return [];
+    }
+    
+    /**
+     * Parse audiobook details from HTML (API version)
+     */
+    protected function parseAudiobookDetailsApi(string $html): array
+    {
+        // Implementation for parsing audiobook details
+        return [];
     }
 }

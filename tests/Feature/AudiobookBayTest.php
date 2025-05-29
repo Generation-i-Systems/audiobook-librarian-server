@@ -190,15 +190,15 @@ class AudiobookBayTest extends TestCase
     public function testCanParseBookDetails()
     {
         $sampleHtml = file_get_contents(__DIR__ . '/../fixtures/audiobookbay_book.html');
-        $book = $this->parseAudiobookBayPage($sampleHtml);
+        $book = $this->parseAudiobookDetails($sampleHtml);
 
         $this->assertIsArray($book);
         $this->assertArrayHasKey('title', $book);
-        $this->assertArrayHasKey('author', $book);
-        $this->assertArrayHasKey('narrator', $book);
+        $this->assertArrayHasKey('authors', $book);
+        $this->assertArrayHasKey('narrators', $book);
         $this->assertArrayHasKey('description', $book);
-        $this->assertArrayHasKey('cover_image', $book);
-        $this->assertArrayHasKey('datePublished', $book);
+        $this->assertArrayHasKey('cover_image_url', $book);
+        $this->assertArrayHasKey('published_date', $book);
     }
 
     /** @test */

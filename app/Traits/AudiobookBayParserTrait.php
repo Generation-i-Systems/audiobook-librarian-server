@@ -2,115 +2,238 @@
 
 namespace App\Traits;
 
+use DOMDocument;
+use DOMXPath;
+use Exception;
+use Illuminate\Support\Str;
+
 /**
- * Trait to parse audiobook metadata from AudiobookBay HTML page with rate limiting.
+ * Trait to parse audiobook metadata from AudiobookBay HTML page
  */
 trait AudiobookBayParserTrait
 {
-    // Simple static rate limiter (per-process)
-    protected static $lastRequestTime = 0;
-    protected static $minIntervalSeconds = 2; // 2 seconds between requests
+    use BaseParserTrait;
 
     /**
-     * Parse AudiobookBay HTML and extract metadata fields.
-     * @param string $html
-     * @return array
+     * Parse search results from AudiobookBay HTML
      */
-    public function parseAudiobookBayPage($html)
+    public function parseSearchResults(string $html): array
     {
-        // Rate limiting
-        $now = microtime(true);
-        if (self::$lastRequestTime && ($now - self::$lastRequestTime) < self::$minIntervalSeconds) {
-            $sleep = self::$minIntervalSeconds - ($now - self::$lastRequestTime);
-            usleep($sleep * 1_000_000);
+        $dom = new DOMDocument();
+        @$dom->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'));
+        $xpath = new DOMXPath($dom);
+        
+        $results = [];
+        $items = $xpath->query('//div[contains(@class, "post")]');
+        
+        foreach ($items as $item) {
+            $result = [
+                'title' => '',
+                'authors' => [],
+                'narrators' => [],
+                'description' => '',
+                'cover_image_url' => '',
+                'url' => '',
+                'metadata' => [
+                    'source' => 'audiobookbay',
+                ],
+            ];
+            
+            // Extract title and URL
+            $titleNode = $xpath->query('.//div[contains(@class, "postTitle")]//a', $item)->item(0);
+            if ($titleNode instanceof \DOMElement && $titleNode->hasAttribute('href')) {
+                $result['title'] = trim($titleNode->textContent);
+                $result['url'] = 'https://audiobookbay.lu' . $titleNode->getAttribute('href');
+            }
+            
+            // Extract cover image
+            $imgNode = $xpath->query('.//div[contains(@class, "postImg")]//img', $item)->item(0);
+            if ($imgNode instanceof \DOMElement && $imgNode->hasAttribute('src')) {
+                $result['cover_image_url'] = $imgNode->getAttribute('src');
+            }
+            
+            // Extract author
+            $authorNode = $xpath->query('.//div[contains(@class, "postAuthor")]//a', $item)->item(0);
+            if ($authorNode instanceof \DOMNode) {
+                $result['authors'][] = [
+                    'name' => trim($authorNode->textContent),
+                ];
+            }
+            
+            // Extract description
+            $descNode = $xpath->query('.//div[contains(@class, "postContent")]', $item)->item(0);
+            if ($descNode instanceof \DOMNode) {
+                $result['description'] = trim($descNode->textContent);
+            }
+            
+            // Extract metadata from info section
+            $infoNodes = $xpath->query('.//div[contains(@class, "postInfo")]//li', $item);
+            foreach ($infoNodes as $infoNode) {
+                $text = trim($infoNode->textContent);
+                
+                // Extract narrator
+                if (Str::startsWith($text, 'Read by:')) {
+                    $result['narrators'][] = [
+                        'name' => trim(Str::after($text, 'Read by:')),
+                    ];
+                }
+                
+                // Extract categories
+                if (Str::startsWith($text, 'Category:')) {
+                    $result['metadata']['categories'] = array_map('trim', 
+                        explode(',', Str::after($text, 'Category:'))
+                    );
+                }
+                
+                // Extract language
+                if (Str::startsWith($text, 'Language:')) {
+                    $result['language'] = trim(Str::after($text, 'Language:'));
+                }
+                
+                // Extract format
+                if (Str::startsWith($text, 'Format:')) {
+                    $result['metadata']['format'] = trim(Str::after($text, 'Format:'));
+                }
+                
+                // Extract size
+                if (Str::startsWith($text, 'Size:')) {
+                    $result['metadata']['size'] = trim(Str::after($text, 'Size:'));
+                }
+                
+                // Extract bitrate
+                if (preg_match('/(\d+\s*kbps)/i', $text, $matches)) {
+                    $result['metadata']['bitrate'] = $matches[1];
+                }
+            }
+            
+            if (!empty($result['title'])) {
+                $results[] = $result;
+            }
         }
-        self::$lastRequestTime = microtime(true);
-
-        $fields = [
-            'title' => null,
-            'datePublished' => null,
-            'author' => null,
-            'narrator' => null,
-            'series' => null,
-            'seriesNumber' => null,
-            'description' => null,
-            'cover_image' => null,
-            'category' => [],
-            'keywords' => [],
+        
+        return $results;
+    }
+    
+    /**
+     * Parse audiobook details from AudiobookBay HTML
+     */
+    public function parseAudiobookDetails(string $html): array
+    {
+        $dom = new DOMDocument();
+        @$dom->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'));
+        $xpath = new DOMXPath($dom);
+        
+        $book = [
+            'title' => '',
+            'authors' => [],
+            'narrators' => [],
+            'description' => '',
+            'cover_image_url' => '',
+            'metadata' => [
+                'source' => 'audiobookbay',
+                'categories' => [],
+            ],
         ];
-
-        libxml_use_internal_errors(true);
-        $dom = new \DOMDocument();
-        $dom->loadHTML($html);
-        $xpath = new \DOMXPath($dom);
-
-        // Title: <title>...</title> or <h1 itemprop="name">...</h1>
+        
+        // Extract title
         $titleNode = $xpath->query('//h1[@itemprop="name"]')->item(0);
-        $fields['title'] = $titleNode ? trim($titleNode->textContent) : null;
-        if (!$fields['title']) {
-            $titleTag = $xpath->query('//title')->item(0);
-            if ($titleTag) {
-                $fields['title'] = trim($titleTag->textContent);
+        if ($titleNode instanceof \DOMNode) {
+            $book['title'] = trim($titleNode->textContent);
+            
+            // Try to extract series info from title (e.g., "Series Name, Book 1 - Book Title")
+            if (preg_match('/^(.*?),\s*(?:Book|Vol(?:\.|ume)?)\s*(\d+)(?:\s*-\s*(.*))?$/i', $book['title'], $matches)) {
+                $book['series'] = [
+                    'name' => trim($matches[1]),
+                    'number' => $matches[2],
+                ];
+                $book['title'] = trim($matches[3] ?? $book['title']);
             }
         }
-
-        // datePublished: <meta itemprop="datePublished" content="YYYY-MM-DD">
-        $dateNode = $xpath->query('//meta[@itemprop="datePublished"]')->item(0);
-        if ($dateNode && $dateNode instanceof \DOMElement && $dateNode->hasAttribute('content')) {
-            $fields['datePublished'] = $dateNode->getAttribute('content');
+        
+        // Extract cover image
+        $imgNode = $xpath->query('//div[contains(@class, "book-page-cover")]//img')->item(0);
+        if ($imgNode instanceof \DOMElement && $imgNode->hasAttribute('src')) {
+            $book['cover_image_url'] = $imgNode->getAttribute('src');
         }
-
-        // author & narrator: in .desc or .postContent
-        $descNode = $xpath->query('//div[contains(@class,"desc")]')->item(0);
-        if ($descNode) {
-            $descHtml = $dom->saveHTML($descNode);
-            // Written by
-            if (preg_match('/Written by\s*<a[^>]*><span[^>]*>(.*?)<\/span><\/a>/i', $descHtml, $m)) {
-                $fields['author'] = trim($m[1]);
+        
+        // Extract description
+        $descriptionNode = $xpath->query('//div[contains(@class, "book-page-description")]')->item(0);
+        if ($descriptionNode instanceof \DOMNode) {
+            $book['description'] = trim($descriptionNode->textContent);
+        }
+        
+        // Extract metadata from info section
+        $metadataNodes = $xpath->query('//div[contains(@class, "book-page-meta")]//div[contains(@class, "row")]');
+        foreach ($metadataNodes as $node) {
+            if (!$node instanceof \DOMElement) {
+                continue;
             }
-            // Read by
-            if (preg_match('/Read by\s*<a[^>]*><span[^>]*>(.*?)<\/span><\/a>/i', $descHtml, $m)) {
-                $fields['narrator'] = trim($m[1]);
+            
+            // Get the text content of the node
+            $labelNode = $xpath->query('.//div[contains(@class, "label")]', $node)->item(0);
+            $valueNode = $xpath->query('.//div[contains(@class, "value")]', $node)->item(0);
+            
+            if ($labelNode instanceof \DOMNode && $valueNode instanceof \DOMNode) {
+                $label = trim($labelNode->textContent, ": \t\n\r\0\x0B");
+                $value = trim($valueNode->textContent);
+                
+                switch (strtolower($label)) {
+                    case 'author':
+                    case 'authors':
+                        $book['authors'][] = ['name' => $value];
+                        break;
+                    case 'narrator':
+                    case 'narrators':
+                        $book['narrators'][] = ['name' => $value];
+                        break;
+                    case 'published':
+                    case 'published date':
+                        if (($timestamp = strtotime($value)) !== false) {
+                            $book['published_date'] = date('Y-m-d', $timestamp);
+                        }
+                        break;
+                    case 'publisher':
+                        $book['publisher'] = $value;
+                        break;
+                    case 'category':
+                    case 'categories':
+                        $book['metadata']['categories'] = array_map('trim', explode(',', $value));
+                        break;
+                    case 'format':
+                        $book['metadata']['format'] = $value;
+                        break;
+                    case 'size':
+                        $book['metadata']['size'] = $value;
+                        break;
+                    case 'bitrate':
+                    case 'bit rate':
+                        $book['metadata']['bitrate'] = $value;
+                        break;
+                    case 'language':
+                        $book['language'] = $value;
+                        break;
+                    default:
+                        $book['metadata'][strtolower($label)] = $value;
+                }
             }
-            // Format (series/seriesNumber sometimes in title, not always in HTML)
         }
-
-        // Series/SeriesNumber: Try to extract from title
-        if ($fields['title'] && preg_match('/(.*)\s*[:-]\s*(.*?)\s*,\s*Book\s*(\d+)/i', $fields['title'], $m)) {
-            $fields['series'] = trim($m[2]);
-            $fields['seriesNumber'] = trim($m[3]);
-        }
-
-        // Description: try meta[name=description], then .desc
-        $metaDesc = $xpath->query('//meta[@name="description"]')->item(0);
-        if ($metaDesc && $metaDesc instanceof \DOMElement && $metaDesc->hasAttribute('content')) {
-            $fields['description'] = trim($metaDesc->getAttribute('content'));
-        } elseif ($descNode) {
-            $fields['description'] = trim(strip_tags($descNode->textContent));
-        }
-
-        // Cover image: <img ... itemprop="image" ...>
-        $imgNode = $xpath->query('//img[@itemprop="image"]')->item(0);
-        if ($imgNode && $imgNode instanceof \DOMElement && $imgNode->hasAttribute('src')) {
-            $fields['cover_image'] = $imgNode->getAttribute('src');
-        }
-
-        // Category: in .postInfo (Category: ...)
-        $postInfo = $xpath->query('//div[contains(@class,"postInfo")]')->item(0);
-        if ($postInfo) {
-            $cats = [];
-            foreach ($xpath->query('.//a[contains(@href,"/audio-books/type/")]', $postInfo) as $catNode) {
-                $cats[] = trim($catNode->textContent);
+        
+        // Extract download links
+        $downloadNodes = $xpath->query('//div[contains(@class, "download-links")]//a');
+        $downloads = [];
+        foreach ($downloadNodes as $node) {
+            if ($node instanceof \DOMElement && $node->hasAttribute('href')) {
+                $downloads[] = [
+                    'url' => 'https://audiobookbay.lu' . $node->getAttribute('href'),
+                    'text' => trim($node->textContent),
+                ];
             }
-            $fields['category'] = $cats;
         }
-
-        // Keywords: <meta name="keywords">
-        $metaKeywords = $xpath->query('//meta[@name="keywords"]')->item(0);
-        if ($metaKeywords && $metaKeywords instanceof \DOMElement && $metaKeywords->hasAttribute('content')) {
-            $fields['keywords'] = array_map('trim', explode(',', $metaKeywords->getAttribute('content')));
+        
+        if (!empty($downloads)) {
+            $book['metadata']['downloads'] = $downloads;
         }
-
-        return $fields;
+        
+        return $book;
     }
 }

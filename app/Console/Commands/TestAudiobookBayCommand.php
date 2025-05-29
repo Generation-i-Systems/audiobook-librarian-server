@@ -16,6 +16,20 @@ class TestAudiobookBayCommand extends Command
     use AudiobookBayApiTrait, AudiobookBayParserTrait;
 
     /**
+     * Create a new command instance.
+     *
+     * @return void
+     */
+    public function __construct()
+    {
+        parent::__construct();
+        $this->initAudiobookBay([
+            'username' => config('services.audiobookbay.username'),
+            'password' => config('services.audiobookbay.password'),
+        ]);
+    }
+
+    /**
      * The name and signature of the console command.
      *
      * @var string

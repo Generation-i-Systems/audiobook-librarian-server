@@ -2,13 +2,14 @@
 
 namespace App\Services;
 
+use App\Contracts\BookServiceInterface;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\HardcoverTokenExpiring;
 use Carbon\Carbon;
 
-class HardcoverService
+class HardcoverService extends BaseBookService implements BookServiceInterface
 {
     protected string $apiUrl;
     protected ?string $apiToken;
@@ -129,10 +130,21 @@ class HardcoverService
     }
 
     /**
-     * Search for books by title and author
+     * @inheritDoc
      */
-    public function searchBooks(string $title, ?string $author = null, int $limit = 5): ?array
+    public function getServiceName(): string
     {
+        return 'hardcover';
+    }
+
+    /**
+     * @inheritDoc
+     */
+    protected function performSearch(string $query, array $options = []): ?array
+    {
+        $title = $query;
+        $author = $options['author'] ?? null;
+        $limit = $options['limit'] ?? 5;
         $query = '
             query SearchBooks($title: String!, $author: String, $limit: Int!) {
                 books(
@@ -181,13 +193,23 @@ class HardcoverService
             'result' => $result,
         ]);
 
-        return $result['data']['books'] ?? null;
+        $books = $result['data']['books'] ?? [];
+        
+        if (empty($books)) {
+            Log::warning('No results found in Hardcover API response', [
+                'query' => $query,
+                'options' => $options
+            ]);
+            return [];
+        }
+        
+        return $this->formatSearchResults($books);
     }
 
     /**
-     * Get book details by ID
+     * @inheritDoc
      */
-    public function getBookDetails(string $bookId): ?array
+    protected function performGetBookDetails(string $id): ?array
     {
         $query = '
             query GetBookDetails($bookId: uuid!) {
@@ -225,48 +247,119 @@ class HardcoverService
             }
         ';
 
-        $result = $this->makeRequest($query, ['bookId' => $bookId]);
-        return $result['data']['books_by_pk'] ?? null;
-    }
-
-    /**
-     * Find a book by title and author
-     */
-    public function findBookByTitleAndAuthor(string $title, string $author): ?array
-    {
-        $books = $this->searchBooks($title, $author, 1);
-        return $books[0] ?? null;
-    }
-
-    /**
-     * Get book cover image URL by title and author
-     */
-    public function getBookCover(string $title, string $author): ?string
-    {
-        $book = $this->findBookByTitleAndAuthor($title, $author);
-        return $book['cover_image_url'] ?? null;
-    }
-
-    /**
-     * Get book description by title and author
-     */
-    public function getBookDescription(string $title, string $author): ?string
-    {
-        $book = $this->findBookByTitleAndAuthor($title, $author);
-        return $book['description'] ?? null;
-    }
-
-    /**
-     * Get book genres by title and author
-     */
-    public function getBookGenres(string $title, string $author): array
-    {
-        $book = $this->findBookByTitleAndAuthor($title, $author);
-
-        if (empty($book['genres'])) {
-            return [];
+        $result = $this->makeRequest($query, ['bookId' => $id]);
+        $book = $result['data']['books_by_pk'] ?? null;
+        
+        if (!$book) {
+            Log::warning('Book not found in Hardcover API', ['id' => $id]);
+            return null;
         }
+        
+        return $this->formatBookDetails($book);
+    }
 
-        return array_map(fn($genre) => $genre['genre']['name'], $book['genres']);
+    /**
+     * Format search results from Hardcover API
+     */
+    protected function formatSearchResults(array $items): array
+    {
+        $results = [];
+        
+        foreach ($items as $item) {
+            if (empty($item['id'])) {
+                continue;
+            }
+            
+            $results[] = [
+                'id' => $item['id'],
+                'title' => $item['title'] ?? 'Unknown Title',
+                'subtitle' => $item['subtitle'] ?? null,
+                'authors' => $this->formatAuthors($item['authors'] ?? []),
+                'publisher' => $item['publisher'] ?? null,
+                'published_date' => $item['release_date'] ?? null,
+                'description' => $item['description'] ?? null,
+                'page_count' => $item['pages'] ?? null,
+                'genres' => $item['genres'] ?? [],
+                'cover_image_url' => $item['cover_image_url'] ?? null,
+                'isbn_10' => $item['isbn_10'] ?? null,
+                'isbn_13' => $item['isbn_13'] ?? null,
+            ];
+        }
+        
+        return $results;
+    }
+    
+    /**
+     * Format book details from Hardcover API
+     */
+    protected function formatBookDetails(array $item): array
+    {
+        return [
+            'id' => $item['id'],
+            'title' => $item['title'] ?? 'Unknown Title',
+            'subtitle' => $item['subtitle'] ?? null,
+            'authors' => $this->formatAuthors($item['authors'] ?? []),
+            'narrators' => $this->formatNarrators($item['narrators'] ?? []),
+            'publisher' => $item['publisher'] ?? null,
+            'published_date' => $item['release_date'] ?? null,
+            'description' => $item['description'] ?? null,
+            'page_count' => $item['pages'] ?? null,
+            'isbn_10' => $item['isbn_10'] ?? null,
+            'isbn_13' => $item['isbn_13'] ?? null,
+            'cover_image_url' => $item['cover_image_url'] ?? null,
+            'genres' => $this->formatGenres($item['genres'] ?? []),
+        ];
+    }
+    
+    /**
+     * Format authors array to a consistent format
+     */
+    protected function formatAuthors(array $authors): array
+    {
+        return array_map(function ($author) {
+            return [
+                'author' => [
+                    'id' => $author['author']['id'] ?? null,
+                    'name' => $author['author']['name'] ?? 'Unknown Author',
+                ]
+            ];
+        }, $authors);
+    }
+    
+    /**
+     * Format narrators array to a consistent format
+     */
+    protected function formatNarrators(array $narrators): array
+    {
+        return array_map(function ($narrator) {
+            return [
+                'author' => [
+                    'id' => $narrator['author']['id'] ?? null,
+                    'name' => $narrator['author']['name'] ?? 'Unknown Narrator',
+                ]
+            ];
+        }, $narrators);
+    }
+    
+    /**
+     * Format genres array to a consistent format
+     */
+    protected function formatGenres(array $genres): array
+    {
+        return array_map(function ($genre) {
+            return [
+                'genre' => [
+                    'name' => $genre['genre']['name'] ?? 'Unknown Genre',
+                ]
+            ];
+        }, $genres);
+    }
+    
+    /**
+     * Check if the service is available
+     */
+    public function isAvailable(): bool
+    {
+        return !empty($this->apiToken) && !empty($this->apiUrl);
     }
 }
