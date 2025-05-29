@@ -174,24 +174,24 @@
                 }
 
                 $('#bulk-import-btn').on('click', function (e) {
-    e.preventDefault();
-    $('#bulk-import-status').text('Starting bulk import...');
-    $.ajax({
-        url: '{{ route("admin.books.bulkImportDir") }}',
-        type: 'POST',
-        data: {
-            dir: currentPath,
-            _token: '{{ csrf_token() }}'
-        },
-        success: function (data) {
-            $('#bulk-import-status').text(data.message || 'Bulk import started!');
-        },
-        error: function (xhr) {
-            let msg = 'Error: ' + (xhr.responseJSON?.error || xhr.statusText);
-            $('#bulk-import-status').text(msg);
-        }
-    });
-});
+                    e.preventDefault();
+                    $('#bulk-import-status').text('Starting bulk import...');
+                    $.ajax({
+                        url: '{{ route("admin.books.bulkImportDir") }}',
+                        type: 'POST',
+                        data: {
+                            dir: currentPath,
+                            _token: '{{ csrf_token() }}'
+                        },
+                        success: function (data) {
+                            $('#bulk-import-status').text(data.message || 'Bulk import started!');
+                        },
+                        error: function (xhr) {
+                            let msg = 'Error: ' + (xhr.responseJSON?.error || xhr.statusText);
+                            $('#bulk-import-status').text(msg);
+                        }
+                    });
+                });
 
                 // Handle browser back/forward buttons
                 window.onpopstate = function (event) {
@@ -404,7 +404,24 @@
                     body.html('<div class="text-center p-4"><i class="fas fa-spinner fa-spin fa-2x"></i></div>');
                     modal.modal('show');
                     $.get(url, function (html) {
-                        body.html(html);
+                        body.html(html); // Inject the HTML response
+
+                        // IMPORTANT: Explicitly load and execute scripts after HTML injection.
+                        const formContainerId = body.attr('id'); // Get the ID of the container where HTML was injected
+                        const formJsPath = "{{ asset('js/admin/books/form.js') }}";
+
+                        $.getScript(formJsPath)
+                            .done(function (script, textStatus) {
+                                // Now that form.js is loaded and executed, initBookForm should be defined.
+                                if (typeof window.initBookForm === 'function') {
+                                    window.initBookForm('#' + formContainerId);
+                                } else {
+                                    console.error('CRITICAL: initBookForm is not defined after loading form.js via $.getScript.');
+                                }
+                            })
+                            .fail(function (jqxhr, settings, exception) {
+                                console.error(`CRITICAL: Failed to load ${formJsPath}. Exception: `, exception, jqxhr.responseText);
+                            });
                     });
                 });
 
@@ -454,7 +471,7 @@
 
                                     if (!$existingRow.length && path) {
                                         // Try to find by path if not found by ID
-                                        $existingRow = $(`tr[data-path*="${path}"]`);
+                                        $existingRow = $(`tr a[data-path*="${path}"]`).closest('tr');
                                     }
 
                                     if ($existingRow.length) {
@@ -561,12 +578,11 @@
                         // Update the action cell
                         const actionCell = row.find('td:last');
                         actionCell.html(`
-                                                <button class="btn btn-sm btn-primary me-1 open-edit-book-modal" data-url="${editUrl}">
-                                                    <i class="fas fa-edit"></i> Edit
-                                                </button>
-                                            `);
+                                                                        <button class="btn btn-sm btn-primary me-1 open-edit-book-modal" data-url="${editUrl}">
+                                                                            <i class="fas fa-edit"></i> Edit
+                                                                        </button>
+                                                                    `);
 
-                        console.log('Successfully updated book action for row:', row);
 
                         // Show a success message
                         const successAlert = $('<div class="alert alert-success alert-dismissible fade show" role="alert">' +

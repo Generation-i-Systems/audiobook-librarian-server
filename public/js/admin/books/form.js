@@ -4,8 +4,8 @@ window.googleBooksMoreMatches = false;
 window.googleBooksMatches = [];
 
 // Function to update the + button position to always be on the last row
-function updateAddRowButtons(groupSelector, rowSelector, buttonClass) {
-    const group = document.querySelector(groupSelector);
+function updateAddRowButtons($container, groupSelector, rowSelector, buttonClass) {
+    const group = $container.find(groupSelector)[0];
     if (!group) return;
     const rows = group.querySelectorAll(rowSelector);
 
@@ -24,79 +24,9 @@ function updateAddRowButtons(groupSelector, rowSelector, buttonClass) {
     }
 }
 
-function initTomSelect(selector, ajaxUrl, createUrl, initialOptions = [],genreOptions = []) {
-    let el = document.querySelector(selector);
-    if (!el) return;
-
-    let options = {
-        create: false,
-        persist: false,
-        valueField: 'id',
-        labelField: 'name',
-        searchField: 'name',
-        maxOptions: 20,
-        loadThrottle: 300,
-        onFocus: function () {
-            if (!this.isOpen) this.open();
-            this.refreshOptions(false);
-        },
-        onInitialize: function () {
-            initialOptions.forEach(opt => {
-                this.addOption(opt);
-            });
-            if (initialOptions.length > 0) {
-                this.setValue(initialOptions.map(opt => opt.id), true);
-            }
-        }
-    };
-
-    if (ajaxUrl) {
-        options.load = function (query, callback) {
-            let url = ajaxUrl + '?q=' + encodeURIComponent(query || '');
-            fetch(url)
-                .then(response => response.json())
-                .then(json => {
-                    callback(json.data || []);
-                })
-                .catch(() => {
-                    callback();
-                });
-        };
-    }
-
-    if (createUrl) {
-        options.create = function (input, callback) {
-            fetch(createUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                },
-                body: JSON.stringify({ name: input })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.id && data.name) {
-                    callback({ id: data.id, name: data.name });
-                }
-            })
-            .catch(() => callback());
-        };
-    }
-    
-    if (selector === '#genre-select-tom') { // Special handling for static genre list
-        options.options = genreOptions;
-        delete options.load; // No dynamic loading for genres if static list is provided
-        options.create = false; // No creating genres from TomSelect by default
-    }
-
-    new TomSelect(el, options);
-}
-window.initTomSelect = initTomSelect;
-
 // Function to add a new author row
-function addAuthorRow(authorName = '') {
-    const group = document.getElementById('authors-group');
+function addAuthorRow($container, authorName = '') {
+    const group = $container.find('#authors-group')[0];
     if (!group) return;
     const div = document.createElement('div');
     div.className = 'input-group author-row align-items-start mb-3';
@@ -108,14 +38,15 @@ function addAuthorRow(authorName = '') {
         </div>`;
     group.appendChild(div);
     // Re-initialize autocomplete for the new element if needed, or rely on delegation
-    // $(div).find('.author-autocomplete').autocomplete({ source: window.BOOK_FORM_ROUTES.authorsAutocomplete }); 
-    updateAddRowButtons('#authors-group', '.author-row', '.add-author-row');
+    // $(div).find('.author-autocomplete').autocomplete({ source: window.BOOK_FORM_ROUTES.authorsAutocomplete });
+    updateAddRowButtons($container, '#authors-group', '.author-row', '.add-author-row');
 }
 window.addAuthorRow = addAuthorRow;
 
+
 // Function to add a new series row
-function addSeriesRow(seriesName = '', seriesNumber = '') {
-    const group = document.getElementById('series-group');
+function addSeriesRow($container, seriesName = '', seriesNumber = '') {
+    const group = $container.find('#series-group')[0];
     if (!group) return;
     const div = document.createElement('div');
     div.className = 'input-group series-row align-items-start mb-3';
@@ -129,13 +60,14 @@ function addSeriesRow(seriesName = '', seriesNumber = '') {
     group.appendChild(div);
     // Re-initialize autocomplete for the new element if needed, or rely on delegation
     // $(div).find('.series-autocomplete').autocomplete({ source: window.BOOK_FORM_ROUTES.seriesAutocomplete });
-    updateAddRowButtons('#series-group', '.series-row', '.add-series-row');
+    updateAddRowButtons($container, '#series-group', '.series-row', '.add-series-row');
 }
 window.addSeriesRow = addSeriesRow;
 
+
 // Function to add a new genre row
-function addGenreRow(selectedGenre = '') {
-    const group = document.getElementById('genres-group');
+function addGenreRow($container, selectedGenre = '') {
+    const group = $container.find('#genres-group')[0];
     if (!group) return;
     const div = document.createElement('div');
     div.className = 'input-group genre-row align-items-start mb-3';
@@ -152,81 +84,109 @@ function addGenreRow(selectedGenre = '') {
             <button type="button" class="btn btn-primary btn-sm add-genre-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
         </div>`;
     group.appendChild(div);
-    updateAddRowButtons('#genres-group', '.genre-row', '.add-genre-row');
+    updateAddRowButtons($container, '#genres-group', '.genre-row', '.add-genre-row');
 }
 window.addGenreRow = addGenreRow;
 
 // Helper function to initialize jQuery UI Autocomplete
-function initializeAutocomplete(selector, sourceUrl) {
-    // Use event delegation on a static parent for dynamically added elements
-    $('body').on('focus', selector, function() {
-        if (!$(this).data('autocomplete-initialized')) {
-            $(this).autocomplete({
-                source: sourceUrl,
-                minLength: 2, // Minimum characters to trigger autocomplete
+function initializeAutocomplete($container, selector, sourceUrl) {
+    $container.on('focus', selector, function() {
+        const $inputField = $(this); // Capture 'this' to use in callbacks
+
+        // Check if autocomplete has already been initialized on this element
+        if (!$inputField.data('autocomplete-initialized')) {
+            $inputField.autocomplete({
+                minLength: 2,
+                source: function(request, responseCallback) {
+                    // request.term is the current value in the input field
+                    $.ajax({
+                        url: sourceUrl,
+                        dataType: "json",
+                        data: {
+                            term: request.term // Pass the search term to the server
+                        },
+                        async: true, // Explicitly ensure the request is asynchronous
+                        success: function(data) {
+                            responseCallback(data); // Provide the data to jQuery UI
+                        },
+                        error: function(jqXHR, textStatus, errorThrown) {
+                            responseCallback([]); // Call with empty array on error
+                        }
+                    });
+                },
                 select: function(event, ui) {
-                    $(this).val(ui.item.value); // Set the input value
-                    // You can add more logic here if needed when an item is selected
+                    $inputField.val(ui.item.value); // Set the input field's value to the selected item
+                    // You might want to trigger a 'change' event if other parts of your code listen for it
+                    // $inputField.trigger('change');
+                    return false; // Prevent the default behavior of setting the value, as we did it manually
+                },
+                // Optional: Customize how items are rendered in the dropdown
+                create: function () {
+                    // $(this).data('ui-autocomplete')._renderItem = function (ul, item) {
+                    //     return $('<li>')
+                    //         .append('<div>' + item.label + '</div>') // Adjust 'item.label' based on your server response
+                    //         .appendTo(ul);
+                    // };
                 }
-            }).data('autocomplete-initialized', true);
+            });
+            $inputField.data('autocomplete-initialized', true); // Mark as initialized
         }
     });
 }
-
 // Autofill handler - ensure it is always bound after TomSelect
-function bindAutofillBtn() {
-    $('#autofill-btn').off('click').on('click', function () {
-        const title = $('#title').val().trim();
-        const authorInputs = $('input[name="author[]"]').filter(function() {
+function bindAutofillBtn($container) {
+    $container.find('#autofill-btn').off('click').on('click', function () {
+        const title = $container.find('#title').val().trim();
+        const authorInputs = $container.find('input[name="author[]"]').filter(function() {
             return $(this).val().trim() !== '';
         });
 
         if (!title) {
-            $('#title').addClass('is-invalid').next('.invalid-feedback').remove();
-            $('#title').after('<span class="invalid-feedback d-block">Title is required.</span>');
+            $container.find('#title').addClass('is-invalid').next('.invalid-feedback').remove();
+            $container.find('#title').after('<span class="invalid-feedback d-block">Title is required.</span>');
             return;
         }
         if (authorInputs.length === 0) {
-            const firstAuthorInput = $('input[name="author[]"]').first();
+            const firstAuthorInput = $container.find('input[name="author[]"]').first();
             firstAuthorInput.addClass('is-invalid').parent().find('.invalid-feedback').remove();
             firstAuthorInput.closest('.input-group').after('<span class="invalid-feedback d-block">At least one author is required.</span>');
             return;
         }
 
         const authorName = $(authorInputs[0]).val().trim();
-        const series = $('#series-select option:selected').text() || ''; // Assuming TomSelect for series, otherwise adjust
-        const seriesNumber = $('input[name="series_number[]"]').first().val() || ''; // Assuming first series number
-        $('#autofill-btn').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Searching...');
-        
+        const series = $container.find('#series-select option:selected').text() || ''; // Assuming TomSelect for series, otherwise adjust
+        const seriesNumber = $container.find('input[name="series_number[]"]').first().val() || ''; // Assuming first series number
+        $container.find('#autofill-btn').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Searching...');
+
         const googleBooksUrl = window.BOOK_FORM_ROUTES.googleBooks || '/admin/books/google-books'; // Fallback if not defined
 
         fetch(`${googleBooksUrl}?title=${encodeURIComponent(title)}&author=${encodeURIComponent(authorName)}&series=${encodeURIComponent(series)}&series_number=${encodeURIComponent(seriesNumber)}&limit=${window.googleBooksMatchLimit}${window.googleBooksMoreMatches ? '&more=1' : ''}`)
             .then(response => response.json())
             .then(data => {
-                $('#autofill-btn').prop('disabled', false).html('<i class="fas fa-search"></i> Autofill from Google Books');
+                $container.find('#autofill-btn').prop('disabled', false).html('<i class="fas fa-search"></i> Autofill from Google Books');
                 if (data.match_type === 'close') {
-                    if (data.published_year) $('#published_year').val(data.published_year);
-                    if (data.description) $('#description').val(data.description);
+                    if (data.published_year) $container.find('#published_year').val(data.published_year);
+                    if (data.description) $container.find('#description').val(data.description);
                     if (data.cover_image_url) {
                         try {
                             const proxiedUrl = googleBooksProxyUrl(data.cover_image_url);
-                            $('#cover-preview-img').attr('src', proxiedUrl);
-                            $('#cover-preview-group').show();
+                            $container.find('#cover-preview-img').attr('src', proxiedUrl);
+                            $container.find('#cover-preview-group').show();
                         } catch (error) {
                             console.error('Error processing cover image URL:', error);
                         }
                     }
-                    let hidden = $('#cover_image_url');
+                    let hidden = $container.find('#cover_image_url');
                     if (!hidden.length) {
-                        hidden = $('<input>').attr({ type: 'hidden', id: 'cover_image_url', name: 'cover_image_url' }).appendTo('#book-form');
+                        hidden = $('<input>').attr({ type: 'hidden', id: 'cover_image_url', name: 'cover_image_url' }).appendTo($container.find('#book-form'));
                     }
                     hidden.val(data.cover_image_url || '');
-                    $('#google-books-matches-table-wrapper').hide();
-                    $('#autofill-btn').html('<i class="fas fa-search"></i> Get More Matches');
+                    $container.find('#google-books-matches-table-wrapper').hide();
+                    $container.find('#autofill-btn').html('<i class="fas fa-search"></i> Get More Matches');
                     window.googleBooksMoreMatches = true;
                     window.googleBooksMatchLimit = 10;
                 } else if (data.match_type === 'list' && data.matches && data.matches.length > 0) {
-                    const $tbody = $('#google-books-matches-table tbody');
+                    const $tbody = $container.find('#google-books-matches-table tbody');
                     $tbody.empty();
                     data.matches.forEach((match, idx) => {
                         const row = `<tr>
@@ -238,24 +198,24 @@ function bindAutofillBtn() {
                         </tr>`;
                         $tbody.append(row);
                     });
-                    $('#google-books-matches-table-wrapper').show();
-                    $('input[name="google_books_match_select"]').off('change').on('change', function () {
+                    $container.find('#google-books-matches-table-wrapper').show();
+                    $container.find('input[name="google_books_match_select"]').off('change').on('change', function () {
                         const idx = $(this).val();
                         const match = data.matches[idx];
-                        if (match.published_year) $('#published_year').val(match.published_year);
-                        if (match.description) $('#description').val(match.description);
+                        if (match.published_year) $container.find('#published_year').val(match.published_year);
+                        if (match.description) $container.find('#description').val(match.description);
                         if (match.authors) {
-                            $('.author-row').remove(); // Clear all authors
+                            $container.find('.author-row').remove(); // Clear all authors
                             const authorDelimiters = /,|\s+and\s+|\s*&\s*/i;
                             const authors = match.authors.split(authorDelimiters)
                                 .map(author => author.trim())
                                 .filter(author => author.length > 0);
-                            authors.forEach(author => addAuthorRow(author));
-                            if (authors.length === 0) addAuthorRow(); // Ensure at least one empty row
+                            authors.forEach(author => addAuthorRow($container, author));
+                            if (authors.length === 0) addAuthorRow($container); // Ensure at least one empty row
                         }
                         if (match.cover_image_url) {
                             const proxiedUrl = googleBooksProxyUrl(match.cover_image_url);
-                            $('#google-books-candidate').remove();
+                            $container.find('#google-books-candidate').remove();
                             var candidateHtml = `<div class="text-center" id="google-books-candidate">
                                 <label>
                                 <input type="radio" name="cover_image_candidate" value="${match.cover_image_url}" checked>
@@ -264,47 +224,40 @@ function bindAutofillBtn() {
                                 </label>
                                 <div style="font-size:12px;word-break:break-all;">Google Books</div>
                                 </div>`;
-                            if ($('#cover-candidates-list').length) {
-                                $('#cover-candidates-list').append(candidateHtml);
+                            if ($container.find('#cover-candidates-list').length) {
+                                $container.find('#cover-candidates-list').append(candidateHtml);
                             } else {
-                                $('#cover-preview-img').attr('src', proxiedUrl);
-                                $('#cover-preview-group').show();
+                                $container.find('#cover-preview-img').attr('src', proxiedUrl);
+                                $container.find('#cover-preview-group').show();
                             }
                         }
-                        let hidden = $('#cover_image_url');
+                        let hidden = $container.find('#cover_image_url');
                         if (!hidden.length) {
-                           hidden = $('<input>').attr({ type: 'hidden', id: 'cover_image_url', name: 'cover_image_url' }).appendTo('#book-form');
+                           hidden = $('<input>').attr({ type: 'hidden', id: 'cover_image_url', name: 'cover_image_url' }).appendTo($container.find('#book-form'));
                         }
                         hidden.val(match.cover_image_url || '');
                     });
                     if (data.maxed || window.googleBooksMatchLimit >= 40) {
-                        $('#autofill-btn').prop('disabled', true).html('<i class="fas fa-check"></i> All Results Shown');
+                        $container.find('#autofill-btn').prop('disabled', true).html('<i class="fas fa-check"></i> All Results Shown');
                     } else {
-                        $('#autofill-btn').prop('disabled', false).html('<i class="fas fa-search"></i> Get More Matches');
+                        $container.find('#autofill-btn').prop('disabled', false).html('<i class="fas fa-search"></i> Get More Matches');
                         window.googleBooksMoreMatches = true;
                         window.googleBooksMatchLimit += 10;
                     }
                 } else {
-                    $('#google-books-matches-table-wrapper').hide();
-                    $('#autofill-btn').html('<i class="fas fa-search"></i> Autofill from Google Books');
+                    $container.find('#google-books-matches-table-wrapper').hide();
+                    $container.find('#autofill-btn').html('<i class="fas fa-search"></i> Autofill from Google Books');
                     window.googleBooksMoreMatches = false;
                     window.googleBooksMatchLimit = 10;
                 }
             })
             .catch(() => {
-                $('#autofill-btn').prop('disabled', false).html('<i class="fas fa-search"></i> Autofill from Google Books');
-                $('#title').addClass('is-invalid').next('.invalid-feedback').remove();
-                $('#title').after('<span class="invalid-feedback d-block">Failed to fetch book info.</span>');
+                $container.find('#autofill-btn').prop('disabled', false).html('<i class="fas fa-search"></i> Autofill from Google Books');
+                $container.find('#title').addClass('is-invalid').next('.invalid-feedback').remove();
+                $container.find('#title').after('<span class="invalid-feedback d-block">Failed to fetch book info.</span>');
             });
     });
 
-    // Initialize jQuery UI Autocomplete
-    if (window.BOOK_FORM_ROUTES && window.BOOK_FORM_ROUTES.authorsAutocomplete) {
-        initializeAutocomplete('.author-autocomplete', window.BOOK_FORM_ROUTES.authorsAutocomplete);
-    }
-    if (window.BOOK_FORM_ROUTES && window.BOOK_FORM_ROUTES.seriesAutocomplete) {
-        initializeAutocomplete('.series-autocomplete', window.BOOK_FORM_ROUTES.seriesAutocomplete);
-    }
 }
 
 // Helper for proxying Google Books cover images
@@ -324,19 +277,20 @@ function googleBooksProxyUrl(url) {
 }
 window.googleBooksProxyUrl = googleBooksProxyUrl;
 
-function loadDirectoryFiles() {
-    const dirPath = $("#directory_path").val() || $("input[name='directory_path']").val() || $("input[name='original_directory_path']").val();
-    const filesList = $('#directory-files-list');
-    const linkText = $('#show-files-link div');
+function loadDirectoryFiles($container) {
+    console.log('loadDirectoryFiles called. Container:', $container);
+    const dirPath = $container.find('#directory_path').val();
+    const filesList = $container.find('#directory-files-list');
+    const $viewFilesBtn = $container.find('#show-files-link');
 
     if (!dirPath) {
-        filesList.html('<div class="p-3 text-danger">Please select a directory first.</div>').show();
+        filesList.html('<div class="p-3 text-danger">Please select a directory first.</div>').show(); // Or slideDown()
         return;
     }
-    const originalText = linkText.html();
-    linkText.html('<i class="fas fa-spinner fa-spin me-2"></i>Loading files...');
-    filesList.html('<div class="text-center p-3"><div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div> Loading files...</div>').show();
-    
+    const originalBtnHtml = $viewFilesBtn.html();
+    $viewFilesBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>Loading...');
+    filesList.html('<div class="text-center p-3"><div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div> Loading files...</div>').show(); // Or slideDown()
+
     const filesAjaxUrl = window.BOOK_FORM_ROUTES.filesAjax || '/admin/books/files-ajax'; // Fallback
 
     $.ajax({
@@ -345,7 +299,7 @@ function loadDirectoryFiles() {
         data: { directory: dirPath },
         dataType: 'json',
         success: function(response) {
-            linkText.html(originalText);
+            $viewFilesBtn.prop('disabled', false).html(originalBtnHtml);
             let html = '';
             let files = [];
             if (typeof response === 'string') try { response = JSON.parse(response); } catch (e) { console.error('Error parsing response:', e); }
@@ -370,65 +324,79 @@ function loadDirectoryFiles() {
             } else {
                 html = '<div class="p-3 text-muted text-center">No files found in this directory.</div>';
             }
-            filesList.html(html).show().css('display', 'block');
+            filesList.html(html).show(); // Or slideDown()
         },
         error: function(xhr, status, error) {
-            linkText.html(originalText);
-            filesList.html('<div class="p-3 text-danger">Error loading files. Please check the console.</div>');
+            $viewFilesBtn.prop('disabled', false).html(originalBtnHtml);
+            filesList.html('<div class="p-3 text-danger">Error loading files. Please check the console.</div>').show(); // Or slideDown()
         }
     });
 }
 window.loadDirectoryFiles = loadDirectoryFiles; // Expose if called by onclick
 
+window.initBookForm = function(formContainerSelector) {
+    console.log('initBookForm - BOOK_FORM_ROUTES:', window.BOOK_FORM_ROUTES);
+    const $container = $(formContainerSelector); // Scope all operations to this container
+    // Initialize dynamic row buttons
+    updateAddRowButtons($container, '#authors-group', '.author-row', '.add-author-row');
+    updateAddRowButtons($container, '#series-group', '.series-row', '.add-series-row');
+    updateAddRowButtons($container, '#genres-group', '.genre-row', '.add-genre-row');
+
+    // Re-bind autofill button
+    if (typeof bindAutofillBtn === 'function') {
+        bindAutofillBtn($container);
+    }
+
+    // Any additional initialization (e.g., autocomplete)
+    if (typeof initializeAutocomplete === 'function') {
+        // Setup delegated event handlers for autocomplete on the container
+        initializeAutocomplete($container, '.author-autocomplete', window.BOOK_FORM_ROUTES.authorsAutocomplete);
+        initializeAutocomplete($container, '.series-autocomplete', window.BOOK_FORM_ROUTES.seriesAutocomplete);
+    }
+
+    // Event delegation for add row buttons
+    $container.off('click', '.add-author-row').on('click', '.add-author-row', function() { addAuthorRow($container); });
+    $container.off('click', '.add-series-row').on('click', '.add-series-row', function() { addSeriesRow($container); });
+    $container.off('click', '.add-genre-row').on('click', '.add-genre-row', function() { addGenreRow($container); });
+
+    // Event delegation for remove row buttons
+    $container.off('click', '.remove-author').on('click', '.remove-author', function() {
+        $(this).closest('.author-row').remove();
+        updateAddRowButtons($container, '#authors-group', '.author-row', '.add-author-row');
+    });
+    $container.off('click', '.remove-series').on('click', '.remove-series', function() {
+        $(this).closest('.series-row').remove();
+        updateAddRowButtons($container, '#series-group', '.series-row', '.add-series-row');
+    });
+    $container.off('click', '.remove-genre').on('click', '.remove-genre', function() {
+        $(this).closest('.genre-row').remove();
+        updateAddRowButtons($container, '#genres-group', '.genre-row', '.add-genre-row');
+    });
+
+    // Event listener for viewing directory files
+    $container.off('click', '#show-files-link').on('click', '#show-files-link', function(e) {
+        e.preventDefault(); // Prevent the default anchor behavior
+        console.log('#show-files-link clicked. Container:', $container);
+        loadDirectoryFiles($container);
+    });
+};
+
 
 document.addEventListener('DOMContentLoaded', function () {
-    // Initialize dynamic row buttons
-    updateAddRowButtons('#authors-group', '.author-row', '.add-author-row');
-    updateAddRowButtons('#series-group', '.series-row', '.add-series-row');
-    updateAddRowButtons('#genres-group', '.genre-row', '.add-genre-row');
-
-    // Event delegation for remove/add buttons
-    document.body.addEventListener('click', function(e) {
-        if (e.target.classList.contains('remove-author')) {
-            e.target.closest('.author-row').remove();
-            updateAddRowButtons('#authors-group', '.author-row', '.add-author-row');
-        }
-        if (e.target.classList.contains('add-author-row')) {
-            addAuthorRow();
-        }
-        if (e.target.classList.contains('remove-series')) {
-            e.target.closest('.series-row').remove();
-            updateAddRowButtons('#series-group', '.series-row', '.add-series-row');
-        }
-        if (e.target.classList.contains('add-series-row')) {
-            addSeriesRow();
-        }
-        if (e.target.classList.contains('remove-genre')) {
-            e.target.closest('.genre-row').remove();
-            updateAddRowButtons('#genres-group', '.genre-row', '.add-genre-row');
-        }
-        if (e.target.classList.contains('add-genre-row')) {
-            addGenreRow();
-        }
-    });
-
-    // Bind autofill button
-    bindAutofillBtn();
-
-    // Toggle files list on link click
-    $('#show-files-link').on('click', function(e) {
-        e.preventDefault();
-        const filesList = $('#directory-files-list');
-        const linkDiv = $(this).find('div');
-        if (filesList.is(':visible')) {
-            filesList.slideUp();
-            linkDiv.html('<i class="fas fa-chevron-down me-2"></i>Show Files in Directory');
+    const $bookForm = $('#book-form');
+    if ($bookForm.length) {
+        // Check if it's part of a modal
+        if (!$bookForm.closest('.modal').length) {
+            console.log('DOMContentLoaded: Initializing #book-form (not in a modal).');
+            initBookForm($bookForm); // Pass the jQuery object for #book-form
         } else {
-            loadDirectoryFiles(); // Load files when opening
-            filesList.slideDown();
-            linkDiv.html('<i class="fas fa-chevron-up me-2"></i>Hide Files in Directory');
+            console.log('DOMContentLoaded: #book-form found, but it is inside a modal. Initialization will be handled by modal events.');
+            // For modals, initBookForm is typically called when the modal is shown.
+            // Ensure that logic exists elsewhere if this form can also be in a modal.
         }
-    });
+    } else {
+        console.log('DOMContentLoaded: #book-form not found.');
+    }
 
     // Form validation
     const form = document.getElementById('book-form'); // Ensure your form has id="book-form"
@@ -465,7 +433,6 @@ document.addEventListener('DOMContentLoaded', function () {
                  hasError = true;
             }
 
-
             const genreSelects = form.querySelectorAll('select[name="genre[]"]');
             let hasGenre = false;
             genreSelects.forEach(select => { if (select.value) hasGenre = true; });
@@ -494,7 +461,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 var url = $form.attr('action');
                 var method = $form.find('input[name="_method"]').val() || 'POST';
                 var formData = new FormData(this);
-                
+
                 const submitButton = form.querySelector('button[type="submit"]');
                 const originalButtonText = submitButton ? submitButton.innerHTML : '';
                 if (submitButton) {
@@ -566,11 +533,6 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
     }
-    
-    // Initialize TomSelect for series if the element exists
-    // This part needs the route for fetching series, passed from Blade
-    // Example: initTomSelect('#series-select-tom', window.BOOK_FORM_ROUTES.seriesAjax, window.BOOK_FORM_ROUTES.seriesStore, window.INITIAL_SERIES_OPTIONS);
-    
-    // Initialize TomSelect for genres if the element exists and window.GENRE_OPTIONS is populated
-    // Example: initTomSelect('#genre-select-tom', null, null, [], window.GENRE_OPTIONS.map(g => ({id: g, name: g}) ));
+
 });
+console.log('Form JS loaded 4');

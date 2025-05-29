@@ -10,6 +10,13 @@ use Illuminate\Support\Facades\Cache;
 abstract class BaseBookService implements BookServiceInterface
 {
     /**
+     * BaseBookService constructor.
+     */
+    public function __construct()
+    {
+        // Constructor logic can be added here if needed
+    }
+    /**
      * Default headers for HTTP requests
      */
     protected array $defaultHeaders = [

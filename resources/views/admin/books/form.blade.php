@@ -334,15 +334,18 @@
         <div class="form-group">
             <label for="book_files">Directory Path:</label>
             <input type="text" class="form-control @error('directory_path') is-invalid @enderror" id="directory_path"
-                name="directory_path" value="{{ old('directory_path', $dirPath) }}">
+                name="directory_path" value="{{ old('directory_path', $dirPath ?? (isset($book) && !empty($book['directory_path']) ? $book['directory_path'] : ($initial['directory_path'] ?? ''))) }}">
             @error('directory_path')
                 <span class="invalid-feedback d-block">{{ $message }}</span>
             @enderror
         </div>
+        <div id="directory-files-list" class="mt-2 mb-3" style="display:none; border: 1px solid #ddd; padding: 10px; border-radius: 4px;">
+            {{-- Files will be listed here by JavaScript --}}
+        </div>
         <button type="submit" class="btn btn-primary"
             id="modal-{{ isset($book) ? 'update' : 'create' }}-btn">{{ isset($book) ? 'Update' : 'Create' }}</button>
         @if(!empty($isModal))
-            <button type="button" class="btn btn-secondary" id="modal-cancel-btn">Cancel</button>
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="modal-cancel-btn">Cancel</button>
         @else
             <a href="{{ route('admin.books.index') }}" class="btn btn-secondary">Cancel</a>
         @endif
@@ -361,5 +364,4 @@
     window.GENRE_OPTIONS = @json(config('genres.list', []));
 </script>
 <script src="{{ asset('js/admin/books/form.js') }}"></script>
-
 @endsection

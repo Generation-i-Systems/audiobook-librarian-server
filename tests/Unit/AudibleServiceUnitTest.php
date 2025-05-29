@@ -113,9 +113,7 @@ class AudibleServiceUnitTest extends TestCase
             ],
             'content_type' => 'audio',
             'content_delivery_type' => 'SinglePartBook',
-            'publication_name' => 'Test Publication',
-            'publisher_summary' => 'This is a test book summary.',
-            'merchandising_summary' => 'This is a test book description.'
+            'publication_name' => 'Test Publication'
         ];
     }
 }

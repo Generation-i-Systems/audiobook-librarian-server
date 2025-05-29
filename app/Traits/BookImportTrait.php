@@ -445,7 +445,7 @@ trait BookImportTrait
     public function searchGoogleBooksWithSimilarity($title, $author, $series = '', $seriesNumber = '')
     {
         $query = trim("intitle:{$title} inauthor:{$author}");
-        $results = $this->googleBooksApiService->searchBooks($query, 30);
+        $results = $this->googleBooksApiService->searchBooks($query, ['limit' => 30]);
         if (empty($results['items'])) {
             return [[], null];
         }

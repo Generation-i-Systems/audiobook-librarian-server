@@ -260,28 +260,6 @@ trait AudibleApiTrait
                 }
             }
         }
-{
-    if (empty($reviews['EditorialReview'])) {
-        return [];
-    }
-    
-    // Handle both single review and multiple reviews
-    if (isset($reviews['EditorialReview']['Source'])) {
-        return [
-            'source' => $reviews['EditorialReview']['Source'],
-            'content' => $reviews['EditorialReview']['Content'] ?? '',
-        ];
-    }
-    
-    // Find the first review with content
-    foreach ($reviews['EditorialReview'] as $review) {
-        if (!empty($review['Content'])) {
-            return [
-                'source' => $review['Source'] ?? '',
-                'content' => $review['Content'],
-            ];
-        }
-        
         return [
             'id' => $item['ASIN'] ?? null,
             'title' => $attributes['Title'] ?? null,
