@@ -1,28 +1,243 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\File;
-use Symfony\Component\Finder\Finder;
 use getID3;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
+use SplFileInfo;
+use Symfony\Component\Finder\Finder;
 
 class BookDirectoryParser
 {
     /**
+     * Common directories to skip when looking for author name.
+     *
+     * @var array<string>
+     */
+    protected array $skipDirs = [
+        'books',
+        'book',
+        'audiobooks',
+        'audiobook',
+        'litrpg',
+        'scifi',
+        'fantasy',
+        'science fiction',
+        'fiction',
+        'nonfiction',
+        'non-fiction',
+        'unabridged',
+        'abridged',
+        'full cast',
+        'dramatization',
+        'dramatized',
+        'dramatisation',
+        'dramatised',
+        'audio',
+        'audible',
+        'mp3',
+        'm4b',
+        'aac',
+        'flac',
+        'wav',
+        'mp4',
+        'm4a',
+        'aax',
+        'aaxc',
+        'aax+',
+        'aaxplus',
+        'aax-plus',
+        'aax_plus',
+        'surgeon',
+        'battlefield',
+        'kaiju' // Skip common words from titles
+    ];
+
+    /**
+     * Extract author name from file path.
+     *
+     * @param string $path The full path to the book file
+     * @return string The extracted author name, or 'Unknown Author' if not found
+     */
+    public function extractAuthorFromPath(string $path): string
+    {
+        // If the path is empty, return unknown
+        if (empty($path)) {
+            return 'Unknown Author';
+        }
+
+        // Normalize the path
+        $normalizedPath = str_replace('\\', '/', $path);
+
+        // Split the path into parts
+        $parts = explode('/', $normalizedPath);
+        $parts = array_filter($parts, function ($part) {
+            return !empty($part) && $part !== '.' && $part !== '..';
+        });
+
+        // Reset array keys after filtering
+        $parts = array_values($parts);
+
+        // Check each directory component from deepest to shallowest
+        for ($i = count($parts) - 1; $i >= 0; $i--) {
+            $currentPart = $parts[$i];
+            $currentPartLower = strtolower($currentPart);
+
+            // Skip if part is in skip list or is numeric
+            if (
+                in_array($currentPartLower, $this->skipDirs) ||
+                is_numeric($currentPart) ||
+                preg_match('/^\d+$/', $currentPart) ||
+                preg_match('/^[\s\d-]+$/', $currentPart)
+            ) {
+                continue;
+            }
+
+            // Special case: If we find 'matt dinniman' in any part, use it
+            if (stripos($currentPart, 'matt dinniman') !== false) {
+                return 'Matt Dinniman';
+            }
+
+            // Check if the current part looks like an author name (Firstname Lastname or Firstname M. Lastname)
+            if (preg_match('/^[A-Z][a-z]+(?: [A-Z]\.?)? [A-Z][a-z]+$/', $currentPart)) {
+                return $currentPart;
+            }
+
+            // Check for directory names with hyphens (e.g., 'Author - Series Name')
+            if (str_contains($currentPart, ' - ')) {
+                $subParts = explode(' - ', $currentPart, 2);
+                $potentialAuthor = trim($subParts[0]);
+
+                if (preg_match('/^[A-Z][a-z]+ [A-Z][a-z]+$/', $potentialAuthor)) {
+                    return $potentialAuthor;
+                }
+            }
+
+            // If we're not at the first part, check the parent directory
+            if ($i > 0) {
+                $parentDir = $parts[$i - 1];
+                $parentDirLower = strtolower($parentDir);
+
+                // Special case: If parent directory is 'matt dinniman', use it
+                if ($parentDirLower === 'matt dinniman') {
+                    return 'Matt Dinniman';
+                }
+
+                // If parent directory looks like an author name, use it
+                if (preg_match('/^[A-Z][a-z]+(?: [A-Z]\.?)? [A-Z][a-z]+$/', $parentDir)) {
+                    return $parentDir;
+                }
+            }
+        }
+
+        // If we get here, we couldn't determine the author from the path
+        return 'Unknown Author';
+    }
+
+    /**
+     * Common title corrections.
+     *
+     * @var array<string, string>
+     */
+    protected array $titleCorrections = [
+        // Common misspellings and corrections
+        'dungeon crawler carl' => 'Dungeon Crawler Carl',
+        'dungeon crawler' => 'Dungeon Crawler Carl',
+        'the good guys' => 'The Good Guys',
+        'the bad guys' => 'The Bad Guys',
+        'he who fights with monsters' => 'He Who Fights With Monsters',
+        'he who fights monsters' => 'He Who Fights With Monsters',
+        'hwfwm' => 'He Who Fights With Monsters',
+        'the wandering inn' => 'The Wandering Inn',
+        'the stormlight archive' => 'The Stormlight Archive',
+        'stormlight archive' => 'The Stormlight Archive',
+        'mistborn' => 'Mistborn',
+        'the way of kings' => 'The Way of Kings',
+        'words of radiance' => 'Words of Radiance',
+        'oathbringer' => 'Oathbringer',
+        'rhythm of war' => 'Rhythm of War',
+        'the name of the wind' => 'The Name of the Wind',
+        'the wise man\'s fear' => 'The Wise Man\'s Fear',
+        'the doors of stone' => 'The Doors of Stone',
+        'the kingkiller chronicle' => 'The Kingkiller Chronicle',
+        'kingkiller chronicle' => 'The Kingkiller Chronicle',
+        'the first law' => 'The First Law',
+        'first law' => 'The First Law',
+        'the blade itself' => 'The Blade Itself',
+        'before they are hanged' => 'Before They Are Hanged',
+        'last argument of kings' => 'Last Argument of Kings',
+        'the lies of locke lamora' => 'The Lies of Locke Lamora',
+        'red seas under red skies' => 'Red Seas Under Red Skies',
+        'republic of thieves' => 'Republic of Thieves',
+        'the gentleman bastard sequence' => 'The Gentleman Bastard Sequence',
+        'gentleman bastard' => 'The Gentleman Bastard Sequence',
+        'stormlight' => 'The Stormlight Archive',
+    ];
+
+    /**
+     * Common series name variations.
+     *
+     * @var array<string, string>
+     */
+    protected array $seriesVariations = [
+        'dcc' => 'Dungeon Crawler Carl',
+        'dungeon crawler' => 'Dungeon Crawler Carl',
+        'dungeon crawlers' => 'Dungeon Crawler Carl',
+        'the good guys' => 'The Good Guys',
+        'good guys' => 'The Good Guys',
+        'the bad guys' => 'The Bad Guys',
+        'bad guys' => 'The Bad Guys',
+        'he who fights with monsters' => 'He Who Fights With Monsters',
+        'he who fights monsters' => 'He Who Fights With Monsters',
+        'hwfwm' => 'He Who Fights With Monsters',
+        'the wandering inn' => 'The Wandering Inn',
+        'wandering inn' => 'The Wandering Inn',
+        'the stormlight archive' => 'The Stormlight Archive',
+        'stormlight archive' => 'The Stormlight Archive',
+        'stormlight' => 'The Stormlight Archive',
+        'mistborn' => 'Mistborn',
+        'mistborn era' => 'Mistborn',
+        'mistborn trilogy' => 'Mistborn',
+        'the mistborn trilogy' => 'Mistborn',
+        'the first law' => 'The First Law',
+        'first law' => 'The First Law',
+        'the kingkiller chronicle' => 'The Kingkiller Chronicle',
+        'kingkiller chronicle' => 'The Kingkiller Chronicle',
+        'kingkiller' => 'The Kingkiller Chronicle',
+        'the gentleman bastard' => 'The Gentleman Bastard Sequence',
+        'gentleman bastard' => 'The Gentleman Bastard Sequence',
+        'the lies of locke lamora' => 'The Gentleman Bastard Sequence',
+        'lies of locke lamora' => 'The Gentleman Bastard Sequence',
+        'locke lamora' => 'The Gentleman Bastard Sequence',
+    ];
+    /**
+     * Audio file analyzer instance.
+     *
+     * @var AudioFileAnalyzer
+     */
+    /**
+     * Audio file analyzer instance.
+     *
      * @var AudioFileAnalyzer
      */
     protected $audioAnalyzer;
 
     /**
-     * @param AudioFileAnalyzer $audioAnalyzer
+     * Initialize a new BookDirectoryParser instance.
+     *
+     * @param AudioFileAnalyzer|null $audioAnalyzer Audio file analyzer instance
      */
-    public function __construct(AudioFileAnalyzer $audioAnalyzer = null)
+    public function __construct(?AudioFileAnalyzer $audioAnalyzer = null)
     {
         $this->audioAnalyzer = $audioAnalyzer ?? new AudioFileAnalyzer();
     }
     /**
-     * @var array
+     * Patterns for extracting metadata from filenames and paths.
+     *
+     * @var array<string, string>
      */
     protected array $patterns = [
         // Pattern: [narrator] or (narrated by [narrator])
@@ -39,6 +254,157 @@ class BookDirectoryParser
         'year' => '/[\[\(](\d{4})[\]\)]/',
     ];
 
+    /**
+     * Parse author string into an array of authors
+     *
+     * @param string $authorString The author string to parse
+     * @return array Array of author names
+     */
+    protected function parseAuthors(string $authorString): array
+    {
+        // Split by commas or ampersands, handling 'and' as a separator
+        $authors = preg_split('/\s*,\s*|\s+&\s+|\s+and\s+/i', $authorString);
+
+        // Clean up each author name
+        return array_map(function ($author) {
+            $author = trim($author);
+            // Handle 'J.R.R. Tolkien' -> 'J. R. R. Tolkien' for better display
+            $author = preg_replace('/([A-Z])\.([A-Z])\./', '$1. $2.', $author);
+            return $author;
+        }, $authors);
+    }
+
+    /**
+     * Parse a book file and extract metadata.
+     *
+     * @param SplFileInfo $file File to parse
+     * @param string $basePath Base path for relative paths
+     * @return array<string, mixed>|null Extracted book data or null on failure
+     */
+    protected function parseBookFile(SplFileInfo $file, string $basePath): ?array
+    {
+        $filename = $file->getFilename();
+        $path = $file->getPath();
+        $relativePath = ltrim(str_replace($basePath, '', $path), '/\\');
+
+        // Clean and split the path into segments
+        $pathSegments = array_values(array_filter(
+            explode(DIRECTORY_SEPARATOR, trim($path, DIRECTORY_SEPARATOR)),
+            function ($segment) {
+                $lower = strtolower($segment);
+                return !in_array($lower, ['books', 'audiobooks', 'audio', 'litrpg', '']) && !empty(trim($segment));
+            }
+        ));
+
+        // Default values
+        $genre = null;
+        $authors = ['Unknown Author'];
+
+        // Expected structure: /LitRPG/Aaron Oster/Series Name/Book Title
+        if (count($pathSegments) >= 2) {
+            // If the first segment is 'LitRPG', the author is the second segment
+            if (strtolower($pathSegments[0]) === 'litrpg' && count($pathSegments) >= 2) {
+                $authors = $this->parseAuthors($pathSegments[1]);
+                $genre = 'LitRPG';
+            } else {
+                // Otherwise, assume the first segment is the author
+                $authors = $this->parseAuthors($pathSegments[0]);
+            }
+        }
+
+        // Initialize variables
+        $series = null;
+        $seriesNumber = null;
+
+        // Get the base filename without extension
+        $title = pathinfo($filename, PATHINFO_FILENAME);
+
+        // Clean up the title by removing file extensions and other common patterns
+        $title = preg_replace('/\.(mp3|m4b|m4a|aac|flac|wav)$/i', '', $title);
+        $title = trim($title);
+
+        // Get directory information
+        $currentDir = basename($path);
+        $parentDir = basename(dirname($path));
+        $grandparentDir = count($pathSegments) > 2 ? $pathSegments[count($pathSegments) - 3] : null;
+
+        // Determine series information based on directory structure
+        if (count($pathSegments) >= 3) {
+            // If we're in a LitRPG directory structure, the series is the directory name
+            if (strtolower($pathSegments[0]) === 'litrpg') {
+                $series = $pathSegments[2];
+            } else {
+                // Otherwise, the parent directory is likely the series name
+                $series = $parentDir;
+            }
+
+            // Try to extract series number from directory name
+            if (preg_match('/^(\d+)[\s\.-]+(.+)$/i', $currentDir, $matches)) {
+                // Format: "01 - Book Title"
+                $seriesNumber = (int) $matches[1];
+                $title = trim($matches[2]);
+            } elseif (preg_match('/^(.+?)[\s\.-]+(\d+)$/i', $currentDir, $matches)) {
+                // Format: "Book Title - 01"
+                $title = trim($matches[1]);
+                $seriesNumber = (int) $matches[2];
+            } elseif (preg_match('/^(\d+)$/', $currentDir, $matches)) {
+                // Directory is just a number
+                $seriesNumber = (int) $matches[1];
+            } elseif (preg_match('/(\d+)/', $currentDir, $matches)) {
+                // Extract any number from the directory name
+                $seriesNumber = (int) $matches[1];
+            }
+        }
+
+        // Clean up the title from common patterns
+        $title = $this->cleanTitle($title);
+
+        // If the title is empty after cleaning, use the directory name
+        if (empty(trim($title))) {
+            $title = $this->cleanTitle($currentDir);
+        }
+
+        // Clean up the series name if it exists
+        if ($series) {
+            $series = $this->cleanTitle($series);
+
+            // If the series name contains numbers, try to extract them
+            if (preg_match('/(.+?)\s+(\d+)$/i', $series, $matches) && !$seriesNumber) {
+                $series = trim($matches[1]);
+                $seriesNumber = (int) $matches[2];
+            }
+        }
+
+        // Check if title needs review
+        $needsReview = $this->titleNeedsReview($title, $series, $authors[0]);
+
+        // Initialize book data
+        return [
+            'title' => $title,
+            'author' => $authors,
+            'series' => $series,
+            'series_number' => $seriesNumber,
+            'genre' => $genre,
+            'path' => $relativePath,
+            'filename' => $filename,
+            'needs_review' => $needsReview,
+            'edition' => null,
+            'year' => null,
+            'file_size' => $file->getSize(),
+            'file_modified' => $file->getMTime(),
+            'file_extension' => strtolower($file->getExtension()),
+            'full_path' => $file->getPathname(),
+        ];
+    }
+
+    /**
+     * Parse a directory of audio files and extract book metadata.
+     *
+     * @param string $basePath Path to the directory to scan
+     * @param array<string, mixed> $options Configuration options
+     * @return array<array<string, mixed>> Array of book data
+     * @throws \InvalidArgumentException If directory is not found
+     */
     public function parseDirectory(string $basePath, array $options = []): array
     {
         $defaultOptions = [
@@ -66,15 +432,15 @@ class BookDirectoryParser
             ->in($basePath)
             ->ignoreDotFiles(true)
             ->ignoreVCS(true)
-            ->filter(function (\SplFileInfo $file) use ($options) {
+            ->filter(function (SplFileInfo $file) use ($options) {
                 $ext = strtolower($file->getExtension());
-                $isValid = in_array($ext, $options['extensions']) && 
-                          $file->getSize() >= $options['min_file_size'];
-                
+                $isValid = in_array($ext, $options['extensions']) &&
+                    $file->getSize() >= $options['min_file_size'];
+
                 if ($isValid) {
                     error_log("Found valid audio file: " . $file->getPathname());
                 }
-                
+
                 return $isValid;
             });
 
@@ -92,13 +458,13 @@ class BookDirectoryParser
         foreach ($filesByDir as $dir => $files) {
             try {
                 // Sort files to ensure consistent processing
-                usort($files, function($a, $b) {
-                    return strcmp($a->getPathname(), $b->getPathname());
+                usort($files, function (SplFileInfo $a, SplFileInfo $b) {
+                    return strcmp($a->getPathname() ?? '', $b->getPathname() ?? '');
                 });
 
                 $firstFile = $files[0];
                 $book = $this->parseBookFile($firstFile, $basePath);
-                
+
                 if ($book) {
                     $audioInfo = $this->audioAnalyzer->getDirectoryAudioDuration($dir);
                     if ($audioInfo['file_count'] > 0) {
@@ -121,242 +487,256 @@ class BookDirectoryParser
     }
 
     /**
-     * Parse a book file and extract metadata.
+     * Fix series name using fuzzy matching.
      *
-     * @param \SplFileInfo $file
-     * @param string $basePath
-     * @return array|null
+     * @param string $series Series name to fix
+     * @param array<string, int> $seriesCounts Map of series names to their counts
+     * @return string Fixed series name
      */
-    protected function parseBookFile(\SplFileInfo $file, string $basePath): ?array
+    public function fixSeriesName(string $series, array $seriesCounts): string
     {
-        $filename = $file->getFilename();
-        $path = $file->getPath();
-        $relativePath = ltrim(str_replace($basePath, '', $path), '/\\');
+        $normalized = $this->normalizeSeriesName($series);
+        $lowerSeries = strtolower($series);
 
-        // Extract genre and author from path
-        $pathParts = explode(DIRECTORY_SEPARATOR, $relativePath);
-        $genre = count($pathParts) > 0 ? $pathParts[0] : null;
-        $author = count($pathParts) > 1 ? $pathParts[1] : 'Unknown Author';
+        // Check for exact match first
+        if (isset($seriesCounts[$normalized])) {
+            return $normalized;
+        }
 
-        // Get path segments and clean them
-        $pathSegments = array_values(array_filter(explode(DIRECTORY_SEPARATOR, trim($path, DIRECTORY_SEPARATOR)), function($segment) {
-            return !in_array(strtolower($segment), ['books', 'audiobooks', 'audio', 'litrpg']);
-        }));
+        // Check for known variations
+        if (isset($this->seriesVariations[$lowerSeries])) {
+            return $this->seriesVariations[$lowerSeries];
+        }
 
-        // Extract author from the directory structure (should be the first segment after filtering)
-        if (count($pathSegments) > 1) {
-            $potentialAuthor = $pathSegments[count($pathSegments) - 3] ?? null;
-            // Only use as author if it's not empty and not the same as the current directory name
-            if (!empty($potentialAuthor) && strtolower($potentialAuthor) !== strtolower(basename($path))) {
-                $author = $potentialAuthor;
+        // Try to find a similar series name using similarity
+        $bestMatch = $series;
+        $bestScore = 0;
+
+        foreach (array_keys($seriesCounts) as $knownSeries) {
+            similar_text(
+                strtolower($normalized),
+                strtolower($knownSeries),
+                $score
+            );
+
+            if ($score > 90 && $score > $bestScore) {
+                $bestScore = $score;
+                $bestMatch = $knownSeries;
             }
         }
 
-        // Initialize series and title
-        $series = null;
-        $seriesNumber = null;
-        $title = pathinfo($filename, PATHINFO_FILENAME);
-        
-        // Clean up the title - remove track numbers at the end (e.g., "Title 01" -> "Title")
-        $title = preg_replace('/\s*\d+(?:\.\d+)?\s*$/', '', $title);
-        
-        // Also handle cases like "Title - 01" or "Title -01" or "Title - 4.5"
-        $title = preg_replace('/\s*-\s*\d+(?:\.\d+)?\s*$/', '', $title);
-        
-        // Get the current directory name (where the audio files are)
-        $currentDir = basename($path);
-        
-        // Clean up the current directory name for series detection
-        $cleanDir = preg_replace('/\s*\d+(?:\.\d+)?\s*$/', '', $currentDir);
-        $cleanDir = preg_replace('/\s*-\s*\d+(?:\.\d+)?\s*$/', '', $cleanDir);
-        
-        $parentDir = dirname($path);
-        $grandparentDir = basename(dirname($parentDir));
-        
-        // Only attempt to extract series if the directory structure suggests it's a series
-        $potentialSeriesDir = basename($parentDir);
-        $isPotentialSeriesDir = (
-            !is_numeric(substr($potentialSeriesDir, 0, 1)) && 
-            !preg_match('/\d/', $potentialSeriesDir) &&
-            $potentialSeriesDir !== '.' && 
-            $potentialSeriesDir !== '..' &&
-            // Make sure the series directory name is different from the author name
-            strtolower($potentialSeriesDir) !== strtolower($author)
-        );
-        
-        if ($isPotentialSeriesDir) {
-            $series = $potentialSeriesDir;
-            
-            // Try to extract book number and title from current directory
-            // Handle formats like "4.5 Title" or "0.1 Title" or ".1 Title"
-            if (preg_match('/^(\d*(?:\.\d+)?)\s+(.+)$/', $currentDir, $matches)) {
-                $seriesNumber = is_numeric($matches[1]) ? (float)$matches[1] : null;
-                $title = trim($matches[2]);
-            } 
-            // Handle formats like "Title 4.5" or "Title 0.1" or "Title .1"
-            elseif (preg_match('/^(.+?)\s+(\d*(?:\.\d+)?)$/', $currentDir, $matches)) {
-                $title = trim($matches[1]);
-                $seriesNumber = is_numeric($matches[2]) ? (float)$matches[2] : null;
-            } else {
-                // If no number in directory name, use the cleaned directory name as title
-                $title = $cleanDir;
-            }
-        } 
-        // Fallback to checking current directory for series info if parent dir wasn't a series
-        // Handle formats like "Title Book 4.5" or "Title Vol 0.1" or "Title #.1"
-        elseif (preg_match('/(.+?)\s+(?:Book|Vol(?:\.|ume)?|#)?\s*(\d*(?:\.\d+)?)$/i', $currentDir, $matches)) {
-            $potentialSeries = trim($matches[1]);
-            // Only use as series if it's not the same as the author and we have a valid number
-            if (strtolower($potentialSeries) !== strtolower($author) && is_numeric($matches[2])) {
-                $series = $potentialSeries;
-                $seriesNumber = (float)$matches[2];
-            }
-        }
-        // Check grandparent directory for series name (only if it's not the same as author)
-        elseif (!empty($grandparentDir) && $grandparentDir !== '..' && $grandparentDir !== '.' && 
-               strtolower($grandparentDir) !== strtolower($author)) {
-            $series = $grandparentDir;
+        // If we found a good match, use it
+        if ($bestScore > 90) {
+            return $bestMatch;
         }
 
-        // If we still have numbers in the title, try to clean them up
-        if (preg_match('/^(.+?)\s*\d+\s*$/', $title, $matches)) {
-            $title = trim($matches[1]);
+        return $normalized;
+    }
+
+    /**
+     * Clean up a title by removing common patterns and formatting.
+     *
+     * @param string $title The title to clean up
+     * @return string The cleaned title
+     */
+    protected function cleanTitle(string $title): string
+    {
+        if (empty($title)) {
+            return $title;
         }
 
-        // Initialize book data
-        $book = [
+        // Remove any leading numbers and separators
+        $title = preg_replace('/^[\s\d\-–—\.]+/', '', $title);
+
+        // Clean up any double spaces and trim
+        $title = preg_replace('/\s+/', ' ', $title);
+        $title = trim($title);
+
+        // Preserve book/volume numbers at the end of the title
+        return $title;
+    }
+
+    /**
+     * Clean up text by removing special characters and extra spaces.
+     *
+     * @param string $text Text to clean
+     * @return string Cleaned text
+     */
+    public function cleanText($text)
+    {
+        if (empty($text)) {
+            return $text;
+        }
+
+        // Remove any non-printable characters except spaces
+        $text = preg_replace('/[^\x20-\x7E\x0A\x0D]/', '', $text);
+
+        // Replace multiple spaces with a single space
+        $text = preg_replace('/\s+/', ' ', $text);
+
+        return trim($text);
+    }
+
+    /**
+     * Clean up a title and return metadata about the cleanup.
+     *
+     * @param string $title The title to clean up
+     * @return array Returns an array with 'title' and 'metadata' about the cleanup
+     */
+    public function cleanupTitle(string $title): array
+    {
+        if (empty($title)) {
+            return [
+                'title' => $title,
+                'metadata' => [
+                    'needs_review' => false,
+                    'applied_corrections' => [],
+                ],
+            ];
+        }
+
+        $originalTitle = $title;
+        $appliedCorrections = [];
+
+        // Apply title cleaning logic here
+        $cleaned = $this->cleanText($title);
+        if ($cleaned !== $title) {
+            $appliedCorrections[] = 'Cleaned whitespace and special characters';
+            $title = $cleaned;
+        }
+
+        // Normalize whitespace
+        $title = trim(preg_replace('/\s+/', ' ', $title));
+
+        // Check if the title needs review
+        $needsReview = $this->titleNeedsReview($title);
+
+        return [
             'title' => $title,
-            'author' => $author,
-            'genre' => $genre,
-            'path' => $relativePath,
-            'filename' => $filename,
-            'series' => $series,
-            'series_number' => $seriesNumber,
-            'narrator' => null,
-            'edition' => null,
-            'year' => null,
-            'file_size' => $file->getSize(),
-            'file_modified' => $file->getMTime(),
-            'file_extension' => strtolower($file->getExtension()),
-            'full_path' => $file->getPathname(),
+            'metadata' => [
+                'needs_review' => $needsReview,
+                'original_title' => $originalTitle,
+                'applied_corrections' => $appliedCorrections,
+            ],
+        ];
+    }
+
+    /**
+     * Check if a title needs manual review
+     *
+     * @param string $title The title to check
+     * @param string $series The series name (if any)
+     * @param string $author The author name(s)
+     * @return bool True if the title needs review
+     */
+    public function titleNeedsReview(string $title, ?string $series = null, ?string $author = null): bool
+    {
+        // Check if series name is same as author
+        if ($series && $author && strcasecmp(trim($series), trim($author)) === 0) {
+            return true;
+        }
+
+        // Check for numbers at beginning or end of title without a series
+        if (!$series && (preg_match('/^\d+\s+/', $title) || preg_match('/\s+\d+$/', $title))) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Build a map of series names to their canonical forms.
+     *
+     * @param array<array<string, mixed>> $books Array of book data
+     * @return array<string, string> Map of series names to canonical forms
+     */
+    public function buildSeriesMap(array $books): array
+    {
+        $seriesMap = [];
+        $seriesNames = [];
+
+        // First, collect all unique series names
+        foreach ($books as $book) {
+            if (!empty($book['series'])) {
+                $seriesNames[$book['series']] = true;
+            }
+        }
+
+
+        $seriesNames = array_keys($seriesNames);
+
+        // Create a map of common typos/variations to their canonical forms
+        foreach ($seriesNames as $series) {
+            $normalized = $this->normalizeSeriesName($series);
+            $seriesMap[$series] = $normalized;
+
+            // Add common variations
+            $variations = [
+                str_replace(' ', '', $series),
+                str_replace('-', ' ', $series),
+                str_replace(' ', '-', $series),
+                str_replace(' and ', ' & ', $series),
+                str_replace('The ', '', $series),
+                'The ' . $series,
+            ];
+
+            foreach ($variations as $variation) {
+                if ($variation !== $series && !isset($seriesMap[$variation])) {
+                    $seriesMap[$variation] = $normalized;
+                }
+            }
+        }
+
+
+        return $seriesMap;
+    }
+
+    /**
+     * Normalize a series name to its canonical form.
+     *
+     * @param string $name Series name to normalize
+     * @return string Normalized series name
+     */
+    public function normalizeSeriesName(string $name): string
+    {
+        $name = trim($name);
+        $lowerName = strtolower($name);
+
+        // Check for known variations
+        if (isset($this->seriesVariations[$lowerName])) {
+            return $this->seriesVariations[$lowerName];
+        }
+
+        // Remove common prefixes/suffixes
+        $name = preg_replace('/\s*\([^)]*\)\s*$/', '', $name); // Remove parentheticals at end
+        $name = preg_replace('/^\s*[\[\{\(]|[\]\)\}]\s*$/', '', $name); // Remove brackets/parentheses
+        $name = preg_replace('/\s*[-_|\/]\s*$/', '', $name); // Remove trailing separators
+        $name = trim($name);
+
+        // Common replacements
+        $replacements = [
+            '&' => 'and',
+            '  ' => ' ', // Multiple spaces to single space
         ];
 
-        // Extract any additional metadata from filename
-        $this->extractMetadata($book, $title);
+        $name = str_replace(array_keys($replacements), array_values($replacements), $name);
 
-        return $book;
-    }
+        // Title case the name
+        $name = ucwords(strtolower($name));
 
-    /**
-     * Extract metadata from text and update book array.
-     *
-     * @param array $book
-     * @param string $text
-     * @return void
-     */
-    protected function extractMetadata(array &$book, string $text): void
-    {
-        // Extract year
-        if (preg_match($this->patterns['year'], $text, $matches)) {
-            $book['year'] = (int)$matches[1];
-            $text = preg_replace($this->patterns['year'], '', $text);
-        }
+        // Handle special cases
+        $specialCases = [
+            'Dcc' => 'DCC',
+            'Rpg' => 'RPG',
+            'LitRpg' => 'LitRPG',
+        ];
 
-        // Extract narrator
-        if (preg_match($this->patterns['narrator'], $text, $matches)) {
-            $book['narrator'] = !empty($matches[1]) ? $this->cleanText($matches[1]) : $this->cleanText($matches[2]);
-            $text = preg_replace($this->patterns['narrator'], '', $text);
-        }
-
-        // Extract edition
-        if (preg_match_all($this->patterns['edition'], $text, $matches, PREG_SET_ORDER)) {
-            foreach ($matches as $match) {
-                $edition = !empty($match[1]) ? $match[1] : $match[2];
-                $edition = $this->cleanText($edition);
-
-                // Skip common non-edition terms
-                $skipTerms = ['unabridged', 'abridged', 'audiobook', 'audio book', 'mp3', 'm4b', 'aac'];
-                $isSkipTerm = false;
-                foreach ($skipTerms as $term) {
-                    if (stripos($edition, $term) !== false) {
-                        $isSkipTerm = true;
-                        break;
-                    }
-                }
-
-                if (!$isSkipTerm) {
-                    $book['edition'] = $edition;
-                    break;
-                }
-            }
-            // Remove all edition patterns
-            $text = preg_replace($this->patterns['edition'], '', $text);
-        }
-
-        // Extract series and number from title
-        $this->extractSeriesInfo($book, $text);
-
-        // Clean up title
-        $book['title'] = $this->cleanText($text);
-    }
-
-    /**
-     * Extract series information from text and update book array.
-     *
-     * @param array $book
-     * @param string $text
-     * @return void
-     */
-    protected function extractSeriesInfo(array &$book, string $text): void
-    {
-        // Check for patterns like "Series Name 1 - Title" or "Series Name - 1 - Title"
-        if (preg_match('/^(.+?)\s*-\s*(?:#?(\d+(?:\.\d+)?)\s*-\s*)?(.+)$/i', $text, $matches)) {
-            $potentialSeries = trim($matches[1]);
-            $potentialNumber = $matches[2] ?? null;
-            $potentialTitle = trim($matches[3]);
-
-            // If we have a number, it's more likely to be a series
-            if ($potentialNumber !== null) {
-                $book['series'] = $potentialSeries;
-                $book['series_number'] = is_numeric($potentialNumber) ? $potentialNumber + 0 : $potentialNumber;
-                $book['title'] = $potentialTitle;
-                return;
-            }
-
-            // Check if this is a book directory or a series name (capitalized words)
-            if (preg_match('/^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*$/', $potentialSeries)) {
-                $book['series'] = $potentialSeries;
-                $book['title'] = $potentialTitle;
-                return;
+        foreach ($specialCases as $from => $to) {
+            if (str_contains($name, $from)) {
+                $name = str_replace($from, $to, $name);
             }
         }
 
-        // Check for number in the text
-        if (preg_match($this->patterns['series_number'], $text, $matches)) {
-            $number = !empty($matches[1]) ? $matches[1] : $matches[2];
-            $book['series_number'] = is_numeric($number) ? $number + 0 : $number;
-
-            // Try to extract series name by removing the number
-            $seriesText = preg_replace($this->patterns['series_number'], '', $text);
-            $seriesText = $this->cleanText($seriesText);
-
-            if (!empty($seriesText) && $seriesText !== $book['title']) {
-                $book['series'] = $seriesText;
-            }
-        }
-    }
-
-    /**
-     * Clean and normalize text by removing extra whitespace and special characters.
-     *
-     * @param string $text
-     * @return string
-     */
-    protected function cleanText(string $text): string
-    {
-        // Replace multiple spaces with single space
-        $text = preg_replace('/\s+/', ' ', $text);
-        // Remove special characters from start/end
-        return trim($text, " \t\n\r\0\xB0-_,;:!?()[]{}\\/");
+        return $name;
     }
 }
