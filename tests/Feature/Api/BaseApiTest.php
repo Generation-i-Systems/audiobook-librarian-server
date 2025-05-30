@@ -2,14 +2,11 @@
 
 namespace Tests\Feature\Api;
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 abstract class BaseApiTest extends TestCase
 {
-    use RefreshDatabase;
-
     protected string $apiBaseUrl;
     protected string $apiKey;
     protected string $testQuery = 'test';

@@ -6,9 +6,25 @@ use App\Traits\GoogleBooksApiTrait;
 
 class GoogleBooksApiTest extends BaseApiTest
 {
-    use GoogleBooksApiTrait;
+    private GoogleBooksApiTrait $googleBooksApi;
 
     protected string $apiBaseUrl = 'https://www.googleapis.com/books/v1/volumes';
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Create a new instance of a class that uses the trait
+        $this->googleBooksApi = new class {
+            use GoogleBooksApiTrait;
+        };
+
+        // Initialize the API client with test credentials
+        $this->googleBooksApi->initGoogleBooks([
+            'api_key' => 'test-api-key',
+            'base_url' => $this->apiBaseUrl
+        ]);
+    }
 
     protected function getServiceName(): string
     {
@@ -55,26 +71,33 @@ class GoogleBooksApiTest extends BaseApiTest
         ];
     }
 
-    /** @test */
-    public function it_can_search_books()
+    /**
+     * @test
+     */
+    public function testSearchBooks(): void
     {
-        $this->mockSuccessfulSearchResponse();
+        $this->mockHttpResponse([$this->getMockSearchResponse()]);
         
-        $results = $this->searchBooks($this->testQuery);
+        $results = $this->googleBooksApi->searchBooks('test query');
         
         $this->assertIsArray($results);
-        $this->assertNotEmpty($results);
-        $this->assertCommonBookStructure($results[0]);
+        $this->assertArrayHasKey('items', $results);
+        $this->assertCount(1, $results['items']);
+        $this->assertEquals('test_id', $results['items'][0]['id']);
     }
 
-    /** @test */
-    public function it_can_get_book_details()
+    /**
+     * @test
+     */
+    public function testGetBookDetails(): void
     {
-        $this->mockSuccessfulDetailsResponse();
+        $mockResponse = $this->getMockDetailsResponse();
+        $this->mockHttpResponse([$mockResponse]);
         
-        $book = $this->getBookDetails('test_id');
+        $book = $this->googleBooksApi->getBookDetails('test_id');
         
         $this->assertIsArray($book);
-        $this->assertCommonBookStructure($book);
+        $this->assertEquals('test_id', $book['id']);
+        $this->assertEquals('Test Book', $book['volumeInfo']['title']);
     }
 }

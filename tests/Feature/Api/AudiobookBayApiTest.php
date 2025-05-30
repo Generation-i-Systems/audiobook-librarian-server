@@ -7,11 +7,27 @@ use Illuminate\Support\Facades\Http;
 
 class AudiobookBayApiTest extends BaseApiTest
 {
-    use AudiobookBayApiTrait;
+    private AudiobookBayApiTrait $audiobookBayApi;
 
     protected string $apiBaseUrl = 'https://audiobookbay.lu';
     protected string $testUsername = 'testuser';
     protected string $testPassword = 'testpass';
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Create a new instance of a class that uses the trait
+        $this->audiobookBayApi = new class {
+            use AudiobookBayApiTrait;
+        };
+
+        // Initialize the API client with test credentials
+        $this->audiobookBayApi->initAudiobookBay([
+            'username' => $this->testUsername,
+            'password' => $this->testPassword,
+        ]);
+    }
 
     protected function getServiceName(): string
     {
@@ -60,14 +76,7 @@ class AudiobookBayApiTest extends BaseApiTest
         ];
     }
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-        
-        // Set up test credentials
-        config(['services.audiobookbay.username' => $this->testUsername]);
-        config(['services.audiobookbay.password' => $this->testPassword]);
-    }
+
 
     /** @test */
     public function it_can_login()

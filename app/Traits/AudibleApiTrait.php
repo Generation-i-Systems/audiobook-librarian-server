@@ -18,9 +18,14 @@ trait AudibleApiTrait
     protected ?string $audibleSecretKey = null;
     protected ?string $audibleAssociateTag = null;
     protected ?string $audibleRegion = 'us';
-    protected string $baseUrl = 'https://webservices.amazon.com/onca/xml';
-    protected int $cacheTtl = 3600; // 1 hour
-    protected int $rateLimit = 1; // requests per second
+
+    // The following properties are defined in BaseApiTrait:
+    // - string $baseUrl = ''
+    // - ?string $apiKey = null
+    // - int $cacheTtl = 86400 (24 hours)
+    // - int $rateLimit = 100 (requests per hour)
+    // - string $serviceName = ''
+
     protected ?float $lastRequestTime = null;
 
     /**
@@ -107,7 +112,20 @@ trait AudibleApiTrait
         }
         
         $item = $response['Items']['Item'];
-        return $this->formatBookResponse($item);
+
+        // If the response is not an array (single item), wrap it in an array
+        if (!isset($item[0])) {
+            $item = [$item];
+        }
+
+        $formatted = $this->formatBookResponse($item[0]);
+
+        // Ensure we have the required fields
+        if (empty($formatted['title']) || empty($formatted['authors'])) {
+            return null;
+        }
+
+        return $formatted;
     }
 
     /**

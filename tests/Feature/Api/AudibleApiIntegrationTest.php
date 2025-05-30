@@ -8,7 +8,7 @@ use Tests\Feature\Api\BaseApiTest;
 
 class AudibleApiIntegrationTest extends BaseApiTest
 {
-    use AudibleApiTrait;
+    private AudibleApiTrait $audibleApi;
 
     protected string $apiBaseUrl = 'https://api.audible.com/1.0';
     protected string $testAssociateTag = 'test-tag';
@@ -20,16 +20,24 @@ class AudibleApiIntegrationTest extends BaseApiTest
     {
         parent::setUp();
         
-        // Mock HTTP client
-        Http::fake();
+        // Create a new instance of a class that uses the trait
+        $this->audibleApi = new class {
+            use AudibleApiTrait;
+        };
         
-        // Initialize the trait
-        $this->initAudible([
+        // Initialize the API client with test credentials
+        $this->audibleApi->initAudible([
             'access_key' => $this->testAccessKey,
             'secret_key' => $this->testSecretKey,
             'associate_tag' => $this->testAssociateTag,
             'region' => $this->testRegion,
         ]);
+
+        // Mock HTTP client
+        Http::fake();
+
+        // Set up test API key
+        $this->apiKey = config('services.audible.key', 'test_key');
     }
     
     protected function getServiceName(): string

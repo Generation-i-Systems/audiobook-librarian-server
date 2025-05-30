@@ -13,8 +13,6 @@ trait GoogleBooksApiTrait
 {
     use BaseApiTrait;
 
-    protected string $serviceName = 'google_books';
-    protected string $baseUrl = 'https://www.googleapis.com/books/v1';
     protected ?string $apiKey = null;
 
     /**
@@ -23,7 +21,9 @@ trait GoogleBooksApiTrait
     public function initGoogleBooks(array $config = []): self
     {
         $this->apiKey = $config['api_key'] ?? config('services.google.books_api_key');
-        $this->setBaseUrl($config['base_url'] ?? $this->baseUrl);
+        $baseUrl = $config['base_url'] ?? 'https://www.googleapis.com/books/v1';
+        $this->setBaseUrl($baseUrl);
+        $this->setServiceName('google_books');
         
         if (empty($this->apiKey)) {
             Log::warning('Google Books API key not configured');

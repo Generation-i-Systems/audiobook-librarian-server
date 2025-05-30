@@ -6,7 +6,7 @@ use App\Traits\AudibleApiTrait;
 
 class AudibleApiTest extends BaseApiTest
 {
-    use AudibleApiTrait;
+    private AudibleApiTrait $audibleApi;
 
     protected string $apiBaseUrl = 'https://api.audible.com/1.0/catalog/products';
     
@@ -14,8 +14,13 @@ class AudibleApiTest extends BaseApiTest
     {
         parent::setUp();
         
+        // Create a new instance of a class that uses the trait
+        $this->audibleApi = new class {
+            use AudibleApiTrait;
+        };
+
         // Initialize the Audible API client with test credentials
-        $this->initAudible([
+        $this->audibleApi->initAudible([
             'access_key' => 'test_access_key',
             'secret_key' => 'test_secret_key',
             'associate_tag' => 'test_associate_tag',
@@ -74,24 +79,28 @@ class AudibleApiTest extends BaseApiTest
         ];
     }
 
-    /** @test */
-    public function it_can_search_books()
+    /**
+     * @test
+     */
+    public function it_can_search_books(): void
     {
         $this->mockSuccessfulSearchResponse();
         
-        $results = $this->searchBooks($this->testQuery);
+        $results = $this->audibleApi->searchBooks($this->testQuery);
         
         $this->assertIsArray($results);
         $this->assertNotEmpty($results);
         $this->assertCommonBookStructure($results[0]);
     }
 
-    /** @test */
-    public function it_can_get_book_details()
+    /**
+     * @test
+     */
+    public function it_can_get_book_details(): void
     {
         $this->mockSuccessfulDetailsResponse();
         
-        $book = $this->getBookDetails('TEST123');
+        $book = $this->audibleApi->getBookDetails('TEST123');
         
         $this->assertIsArray($book);
         $this->assertCommonBookStructure($book);

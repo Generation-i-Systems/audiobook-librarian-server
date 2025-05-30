@@ -23,8 +23,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'standard' => \App\Http\Middleware\RequireStandardRole::class,
             'firebase.auth' => \App\Http\Middleware\FirebaseAuth::class,
         ]);
-        //
     })
+    ->withProviders([
+        \App\Providers\BookParserServiceProvider::class,
+    ])
     ->withExceptions(function (Exceptions $exceptions) {
         //
     })->create();

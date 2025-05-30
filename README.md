@@ -328,6 +328,84 @@ Creates a new admin user.
 
 ---
 
+## Running Tests
+
+Run the full test suite with PHPUnit:
+
+```bash
+# Run all tests
+composer test
+
+# Run specific test file
+./vendor/bin/phpunit tests/Feature/BookDirectoryParserTest.php
+
+# Run with code coverage (requires Xdebug)
+XDEBUG_MODE=coverage ./vendor/bin/phpunit --coverage-html coverage-report
+
+# Run with detailed output
+./vendor/bin/phpunit --testdox
+```
+
+## Available Commands
+
+### Book Parser
+
+```bash
+# Scan a directory for audiobooks and display results
+php artisan books:test-parse /path/to/audiobooks
+
+# Save results to JSON file
+php artisan books:test-parse /path/to/audiobooks --output=json > books.json
+
+# Limit results and show verbose output
+php artisan books:test-parse /path/to/audiobooks --limit=10 --verbose
+
+# Filter by file extensions
+php artisan books:test-parse /path/to/audiobooks --extensions=m4b,mp3
+
+# Set minimum file size (in bytes)
+php artisan books:test-parse /path/to/audiobooks --min-size=1048576  # 1MB
+```
+
+### Queue Processing
+
+```bash
+# Process queued jobs
+php artisan queue:work
+
+# Process a single job (for testing)
+php artisan queue:work --once
+
+# Retry failed jobs
+php artisan queue:retry all
+
+# Clear failed jobs
+php artisan queue:flush
+```
+
+## Documentation
+
+- [Book Parser Documentation](./docs/book-parser.md) - Detailed guide on using the book parser
+- [API Documentation](#api-specification) - Complete API reference
+- [Web Interface](#web-interface) - User and admin interface documentation
+
+## Development
+
+1. Clone the repository
+2. Install dependencies: `composer install`
+3. Copy `.env.example` to `.env` and configure your environment
+4. Generate application key: `php artisan key:generate`
+5. Run migrations: `php artisan migrate`
+6. Start the development server: `php artisan serve`
+
+## Troubleshooting
+
+- **Missing dependencies**: Run `composer install`
+- **Permission issues**: Ensure storage and bootstrap/cache directories are writable
+- **Environment configuration**: Verify your `.env` file has all required settings
+
+---
+
 ## License
 
 MIT
