@@ -376,7 +376,7 @@ class BookDirectoryParser
         }
 
         // Check if title needs review
-        $needsReview = $this->titleNeedsReview($title, $series, $authors[0]);
+        $needsReview = $this->titleNeedsReview($title, $series, $authors[0], $relativePath);
 
         // Initialize book data
         return [
@@ -614,7 +614,7 @@ class BookDirectoryParser
         return [
             'title' => $title,
             'metadata' => [
-                'needs_review' => $needsReview,
+                // 'needs_review' => $needsReview,
                 'original_title' => $originalTitle,
                 'applied_corrections' => $appliedCorrections,
             ],
@@ -627,20 +627,42 @@ class BookDirectoryParser
      * @param string $title The title to check
      * @param string $series The series name (if any)
      * @param string $author The author name(s)
+     * @param string $path The file path (optional)
      * @return bool True if the title needs review
      */
-    public function titleNeedsReview(string $title, ?string $series = null, ?string $author = null): bool
+    public function titleNeedsReview(string $title, ?string $series = null, ?string $author = null, ?string $path = null): bool
     {
+        $title = trim($title);
+        $series = $series ? trim($series) : null;
+        $author = $author ? trim($author) : null;
+        $path = $path ? strtolower(trim($path)) : null;
+        error_log("Checking title needs review: $title, series: $series, author: $author, path: $path");
+
         // Check if series name is same as author
-        if ($series && $author && strcasecmp(trim($series), trim($author)) === 0) {
+        if ($series && $author && strcasecmp($series, $author) === 0) {
+            error_log("Series name is same as author: $series, $author");
+            return true;
+        }
+
+        // Check if title is the same as the series name
+        if ($series && strcasecmp($title, $series) === 0) {
+            error_log("Title is the same as series name: $title, $series");
+            return true;
+        }
+
+        // Check if title is not a substring of the path (case-insensitive)
+        if ($path && strpos($path, strtolower($title)) === false) {
+            error_log("Title is not a substring of path: $title, $path");
             return true;
         }
 
         // Check for numbers at beginning or end of title without a series
         if (!$series && (preg_match('/^\d+\s+/', $title) || preg_match('/\s+\d+$/', $title))) {
+            error_log("Title has numbers at beginning or end: $title");
             return true;
         }
 
+        error_log("Title does not need review: $title");
         return false;
     }
 

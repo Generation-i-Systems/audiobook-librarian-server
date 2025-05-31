@@ -85,8 +85,20 @@ class TestBookParserCommand extends Command
 
             // First pass: Clean up basic fields
             foreach ($allBooks as &$book) {
-                // Clean up author
-                if (empty($book['author']) || str_contains($book['author'] ?? '', 'Unknown')) {
+                // Clean up author - handle both string and array cases
+                $hasValidAuthor = false;
+
+                if (isset($book['author'])) {
+                    if (is_array($book['author'])) {
+                        $hasValidAuthor = !empty(array_filter($book['author'], function ($author) {
+                            return !empty(trim($author)) && !str_contains($author, 'Unknown');
+                        }));
+                    } else {
+                        $hasValidAuthor = !empty(trim($book['author'])) && !str_contains($book['author'], 'Unknown');
+                    }
+                }
+
+                if (!$hasValidAuthor) {
                     // Use the directory path from the book data if available, otherwise use the path from the book file
                     $pathToUse = $book['directory_path'] ?? $book['path'] ?? '';
 
@@ -96,15 +108,25 @@ class TestBookParserCommand extends Command
                     }
 
                     $this->info("Extracting author from path: $pathToUse");
-                    $book['author'] = $parser->extractAuthorFromPath($pathToUse);
+                    $author = $parser->extractAuthorFromPath($pathToUse);
+                    $book['author'] = is_array($author) ? $author : [$author];
+                }
 
-                    // If we still don't have an author, try to get it from the parent directory
-                    $hasNoAuthor = $book['author'] === 'Unknown Author' || empty($book['author']);
-                    if ($hasNoAuthor && !empty($book['full_path'])) {
-                        $parentDir = dirname($book['full_path']);
-                        $this->info("Trying parent directory for author: $parentDir");
-                        $book['author'] = $this->extractAuthorFromPath($parentDir);
-                    }
+                // Check if we still don't have a valid author
+                $hasNoAuthor = false;
+                if (is_array($book['author'])) {
+                    $hasNoAuthor = empty(array_filter($book['author'], function ($a) {
+                        return !empty(trim($a)) && $a !== 'Unknown Author';
+                    }));
+                } else {
+                    $hasNoAuthor = empty($book['author']) || $book['author'] === 'Unknown Author';
+                }
+
+                if ($hasNoAuthor && !empty($book['full_path'])) {
+                    $parentDir = dirname($book['full_path']);
+                    $this->info("Trying parent directory for author: $parentDir");
+                    $author = $this->extractAuthorFromPath($parentDir);
+                    $book['author'] = is_array($author) ? $author : [$author];
                 }
 
                 // Clean up title
@@ -116,8 +138,20 @@ class TestBookParserCommand extends Command
                 if (!empty($book['series'])) {
                     $book['series'] = trim($book['series']);
 
-                    // If series is the same as author (case-insensitive), unset it
-                    if (strtolower($book['series']) === strtolower($book['author'] ?? '')) {
+                    // Check if series matches any of the authors (case-insensitive)
+                    $seriesMatchesAuthor = false;
+                    if (is_array($book['author'] ?? null)) {
+                        foreach ($book['author'] as $author) {
+                            if (strtolower($book['series']) === strtolower(trim($author))) {
+                                $seriesMatchesAuthor = true;
+                                break;
+                            }
+                        }
+                    } else {
+                        $seriesMatchesAuthor = strtolower($book['series']) === strtolower(trim($book['author'] ?? ''));
+                    }
+
+                    if ($seriesMatchesAuthor) {
                         $book['series'] = '';
                         $book['series_number'] = null;
                     }
@@ -138,13 +172,13 @@ class TestBookParserCommand extends Command
                 $book['title'] = $cleanupResult['title'];
 
                 // Store metadata for review if needed
-                if ($cleanupResult['metadata']['needs_review']) {
-                    $book['needs_review'] = true;
-                    $book['review_reason'] = 'Title may need manual review';
-                    if (!empty($cleanupResult['metadata']['applied_corrections'])) {
-                        $book['applied_corrections'] = $cleanupResult['metadata']['applied_corrections'];
-                    }
-                }
+                // if ($cleanupResult['metadata']['needs_review']) {
+                //     $book['needs_review'] = true;
+                //     $book['review_reason'] = 'Title may need manual review';
+                //     if (!empty($cleanupResult['metadata']['applied_corrections'])) {
+                //         $book['applied_corrections'] = $cleanupResult['metadata']['applied_corrections'];
+                //     }
+                // }
             }
             unset($book); // Break the reference
 
@@ -270,14 +304,46 @@ class TestBookParserCommand extends Command
      */
     protected function outputTable(array $books): void
     {
+        // Sort books by author, series, and series number
+        usort($books, function ($a, $b) {
+            // Get primary author for comparison (first author in the array)
+            $aAuthor = is_array($a['author'] ?? '') ? ($a['author'][0] ?? '') : ($a['author'] ?? '');
+            $bAuthor = is_array($b['author'] ?? '') ? ($b['author'][0] ?? '') : ($b['author'] ?? '');
+
+            // Compare authors
+            $authorCmp = strcasecmp($aAuthor, $bAuthor);
+            if ($authorCmp !== 0) {
+                return $authorCmp;
+            }
+
+            // If same author, compare series
+            $seriesCmp = strcasecmp($a['series'] ?? '', $b['series'] ?? '');
+            if ($seriesCmp !== 0) {
+                return $seriesCmp;
+            }
+
+            // If same series, compare series numbers (treat empty as 0)
+            $aNum = (int) ($a['series_number'] ?? 0);
+            $bNum = (int) ($b['series_number'] ?? 0);
+            return $aNum <=> $bNum;
+        });
+
         $headers = ['#', 'Title', 'Author', 'Duration', 'Files', 'Series', 'Number', 'Narrator', 'Edition', 'Path', 'Needs Review'];
 
         $rows = [];
         foreach ($books as $index => $book) {
+            // Handle author as array or string
+            $author = $book['author'] ?? '';
+            if (is_array($author)) {
+                $author = implode(', ', array_filter($author, function ($a) {
+                    return !empty(trim($a));
+                }));
+            }
+
             $rows[] = [
                 $index + 1,
                 $book['title'] ?? '',
-                $book['author'] ?? '',
+                $author,
                 $book['duration_formatted'] ?? 'N/A',
                 $book['audio_file_count'] ?? 0,
                 $book['series'] ?? '',
@@ -285,7 +351,7 @@ class TestBookParserCommand extends Command
                 $book['narrator'] ?? '',
                 $book['edition'] ?? '',
                 $book['path'] ?? '',
-                $book['needs_review'] ?? false,
+                $book['needs_review'] ? 'Yes' : 'No',
             ];
         }
 
