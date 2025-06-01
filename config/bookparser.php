@@ -45,6 +45,28 @@ return [
     | Supports regex patterns.
     |
     */
+    /*
+    |--------------------------------------------------------------------------
+    | Metadata Storage
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for storing book metadata. You can choose between:
+    | - 'local': Stores metadata in a JSON file in the book directory
+    | - 'firestore': Stores metadata in Firestore
+    |
+    */
+    'metadata_storage' => env('BOOK_METADATA_STORAGE', 'local'), // 'local' or 'firestore'
+    'local_metadata_filename' => 'librarian.json',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Excluded Directories
+    |--------------------------------------------------------------------------
+    |
+    | Directories that match these patterns will be excluded from scanning.
+    | Supports regex patterns.
+    |
+    */
     'exclude_dirs' => [
         '\\.', // Hidden directories
         '@eaDir', // Synology thumbnail directory
