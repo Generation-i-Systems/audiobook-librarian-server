@@ -170,15 +170,18 @@ class TestBookParserCommand extends Command
                 // Clean up common title issues using the parser
                 $cleanupResult = $parser->cleanupTitle($book['title'] ?? '');
                 $book['title'] = $cleanupResult['title'];
-
+                
+                // Set the needs_review flag from the cleanup result
+                $book['needs_review'] = $cleanupResult['needs_review'] ?? false;
+                
                 // Store metadata for review if needed
-                // if ($cleanupResult['metadata']['needs_review']) {
-                //     $book['needs_review'] = true;
-                //     $book['review_reason'] = 'Title may need manual review';
-                //     if (!empty($cleanupResult['metadata']['applied_corrections'])) {
-                //         $book['applied_corrections'] = $cleanupResult['metadata']['applied_corrections'];
-                //     }
-                // }
+                if ($cleanupResult['metadata']['needs_review'] ?? false) {
+                    $book['needs_review'] = true;
+                    $book['review_reason'] = 'Title may need manual review';
+                    if (!empty($cleanupResult['metadata']['applied_corrections'])) {
+                        $book['applied_corrections'] = $cleanupResult['metadata']['applied_corrections'];
+                    }
+                }
             }
             unset($book); // Break the reference
 

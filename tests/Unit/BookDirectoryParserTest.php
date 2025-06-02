@@ -8,12 +8,14 @@ use Illuminate\Support\Facades\Config;
 use PHPUnit\Framework\MockObject\MockObject;
 use Tests\TestCase;
 use org\bovigo\vfs\vfsStream;
+use App\Services\AudioFileAnalyzer;
 
 class BookDirectoryParserTest extends TestCase
 {
     private BookDirectoryParser $parser;
     private $root;
     private BookMetadataService|MockObject $mockMetadataService;
+    private AudioFileAnalyzer|MockObject $mockAudioAnalyzer;
 
     protected function setUp(): void
     {
@@ -33,12 +35,291 @@ class BookDirectoryParserTest extends TestCase
         $this->mockMetadataService->method('loadMetadata')
             ->willReturn([]);
 
-        // Create the parser with null AudioFileAnalyzer and mocked metadata service
-        $this->parser = new BookDirectoryParser(null, $this->mockMetadataService);
+        // Create a mock AudioFileAnalyzer
+        $this->mockAudioAnalyzer = $this->createMock(AudioFileAnalyzer::class);
+        
+        // Create the parser with mocked services
+        $this->parser = new BookDirectoryParser(
+            $this->mockAudioAnalyzer,
+            $this->mockMetadataService
+        );
 
         // Configure default metadata storage to local for testing
         Config::set('bookparser.metadata_storage', 'local');
         Config::set('bookparser.local_metadata_filename', 'librarian.json');
+    }
+
+    /** @test */
+    public function testParsesAuthorTitleDirectoryStructure()
+    {
+        // Create directory structure: /genre/author/title/
+        $structure = [
+            'books' => [
+                'Fantasy' => [
+                    'Brandon Sanderson' => [
+                        'The Way of Kings' => [
+                            'file1.mp3' => 'audio content',
+                            'file2.mp3' => 'audio content',
+                            'metadata.abs' => "title=The Way of Kings\n" .
+                                "author=Brandon Sanderson\n" .
+                                "series=The Stormlight Archive\n" .
+                                "series_number=1"
+                        ]
+                    ]
+                ]
+            ]
+        ];
+        vfsStream::create($structure, $this->root);
+
+        // Configure the mock AudioFileAnalyzer to return a duration for audio files
+        $this->mockAudioAnalyzer->method('getAudioDuration')
+            ->willReturn(3600.0); // 1 hour per file
+
+        // Mock the metadata service to return empty array to force file parsing
+        $this->mockMetadataService->method('loadMetadata')
+            ->willReturn([]);
+
+        $books = $this->parser->parseDirectory(vfsStream::url('testDir/books'));
+
+        // Filter to only include valid books (should have title and audio files)
+        $validBooks = array_values(array_filter($books, function ($book) {
+            return !empty($book['title']) && $book['audio_file_count'] > 0;
+        }));
+
+        $this->assertCount(1, $validBooks, 'Should only find one valid book');
+        $this->assertEquals('The Way of Kings', $validBooks[0]['title']);
+        $this->assertEquals(['Brandon Sanderson'], $validBooks[0]['author']);
+        $this->assertEquals('The Stormlight Archive', $validBooks[0]['series']);
+        $this->assertEquals(2, $validBooks[0]['audio_file_count']);
+        $this->assertFalse($validBooks[0]['needs_review']);
+        $this->assertEquals('02:00:00', $validBooks[0]['duration_formatted']);
+    }
+
+    /** @test */
+    public function testParsesAuthorSeriesTitleDirectoryStructure()
+    {
+        // Create directory structure: /genre/author/series/title/
+        $structure = [
+            'books' => [
+                'Fantasy' => [
+                    'Brandon Sanderson' => [
+                        'The Stormlight Archive' => [
+                            'The Way of Kings' => [
+                                'file1.mp3' => 'audio content',
+                                'file2.mp3' => 'audio content',
+                                'metadata.abs' => "title=The Way of Kings\n" .
+                                    "author=Brandon Sanderson\n" .
+                                    "series=The Stormlight Archive\n" .
+                                    "series_number=1"
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ];
+        vfsStream::create($structure, $this->root);
+
+        // Configure the mock AudioFileAnalyzer to return a duration for audio files
+        $this->mockAudioAnalyzer->method('getAudioDuration')
+            ->willReturn(3600.0); // 1 hour per file
+
+        // Mock the metadata service to return empty array to force file parsing
+        $this->mockMetadataService->method('loadMetadata')
+            ->willReturn([]);
+
+        $books = $this->parser->parseDirectory(vfsStream::url('testDir/books'));
+
+        // Filter to only include valid books (should have title and audio files)
+        $validBooks = array_values(array_filter($books, function ($book) {
+            return !empty($book['title']) && $book['audio_file_count'] > 0;
+        }));
+
+        $this->assertCount(1, $validBooks, 'Should only find one valid book');
+        $this->assertEquals('The Way of Kings', $validBooks[0]['title']);
+        $this->assertEquals(['Brandon Sanderson'], $validBooks[0]['author']);
+        $this->assertEquals('The Stormlight Archive', $validBooks[0]['series']);
+        $this->assertEquals(1, $validBooks[0]['series_number']);
+        $this->assertEquals(2, $validBooks[0]['audio_file_count']);
+        $this->assertEquals('02:00:00', $validBooks[0]['duration_formatted']);
+    }
+
+    /** @test */
+    public function testMarksBooksWithoutAuthorAsNeedingReview()
+    {
+        // Create a book without an author in the path or metadata
+        $structure = [
+            'books' => [
+                'Fiction' => [
+                    'Unknown' => [
+                        'Book Without Author' => [
+                            'file1.mp3' => 'audio content',
+                            'metadata.abs' => "title=Book Without Author"
+                        ]
+                    ]
+                ]
+            ]
+        ];
+        vfsStream::create($structure, $this->root);
+
+        // Configure the mock AudioFileAnalyzer to return a duration for audio files
+        $this->mockAudioAnalyzer->method('getAudioDuration')
+            ->willReturn(3600.0); // 1 hour per file
+
+        // Mock the metadata service to return empty array to force file parsing
+        $this->mockMetadataService->method('loadMetadata')
+            ->willReturn([]);
+
+        $books = $this->parser->parseDirectory(vfsStream::url('testDir/books'));
+
+        // Filter to only include valid books (should have title and audio files)
+        $validBooks = array_values(array_filter($books, function ($book) {
+            return !empty($book['title']) && $book['audio_file_count'] > 0;
+        }));
+
+        $this->assertCount(1, $validBooks, 'Should find one book that needs review');
+        $this->assertTrue($validBooks[0]['needs_review']);
+        $this->assertStringContainsString('Could not determine author', $validBooks[0]['review_reason']);
+    }
+
+    /** @test */
+    public function testSkipsDirectoriesWithoutAudioFiles()
+    {
+        // Create directory structure with a directory that has no audio files
+        $structure = [
+            'books' => [
+                'Fantasy' => [
+                    'Brandon Sanderson' => [
+                        'Empty Book' => [
+                            'notes.txt' => 'No audio files here'
+                        ]
+                    ]
+                ]
+            ]
+        ];
+        vfsStream::create($structure, $this->root);
+
+        $books = $this->parser->parseDirectory(vfsStream::url('testDir/books'));
+
+        $this->assertCount(0, $books);
+    }
+
+    /** @test */
+    public function testHandlesMetadataAbsFiles()
+    {
+        // Create directory structure with metadata.abs file
+        $structure = [
+            'books' => [
+                'Sci-Fi' => [
+                    'Frank Herbert' => [
+                        'Dune' => [
+                            'file1.mp3' => 'audio content',
+                            'metadata.abs' => ";ABMETADATA2\n" .
+                                "#audiobookshelf v2.4.4\n\n" .
+                                "title=Dune\n" .
+                                "author=Frank Herbert\n" .
+                                "series=Dune\n" .
+                                "series_number=1\n\n[description]\n" .
+                                "A brilliant science fiction novel.\n\n"
+                        ]
+                    ]
+                ]
+            ]
+        ];
+        vfsStream::create($structure, $this->root);
+
+        // Configure the mock AudioFileAnalyzer to return a duration for audio files
+        $this->mockAudioAnalyzer->method('getAudioDuration')
+            ->willReturn(3600.0); // 1 hour per file
+
+        // Mock the metadata service to return empty array to force file parsing
+        $this->mockMetadataService->method('loadMetadata')
+            ->willReturn([]);
+
+        $books = $this->parser->parseDirectory(vfsStream::url('testDir/books'));
+
+        // Filter to only include valid books (should have title and audio files)
+        $validBooks = array_values(array_filter($books, function ($book) {
+            return !empty($book['title']) && $book['audio_file_count'] > 0;
+        }));
+
+        $this->assertCount(1, $validBooks, 'Should find one valid book');
+        $this->assertEquals('Dune', $validBooks[0]['title']);
+        $this->assertEquals(['Frank Herbert'], $validBooks[0]['author']);
+        $this->assertEquals('Dune', $validBooks[0]['series']);
+        $this->assertEquals(1, $validBooks[0]['series_number']);
+        $this->assertEquals('A brilliant science fiction novel.', $validBooks[0]['description']);
+    }
+
+    /** @test */
+    public function testHandlesMultipleAudioFiles()
+    {
+        // Create a book with multiple audio files
+        $structure = [
+            'books' => [
+                'Fantasy' => [
+                    'J.R.R. Tolkien' => [
+                        'The Lord of the Rings' => [
+                            '01 - The Fellowship of the Ring' => [
+                                'file1.mp3' => 'audio content',
+                                'file2.mp3' => 'audio content',
+                                'file3.mp3' => 'audio content',
+                                'metadata.abs' => "title=The Fellowship of the Ring\n" .
+                                    "author=J.R.R. Tolkien\n" .
+                                    "series=The Lord of the Rings\n" .
+                                    "series_number=1"
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ];
+        vfsStream::create($structure, $this->root);
+
+        // Configure the mock AudioFileAnalyzer to return a duration for audio files
+        $this->mockAudioAnalyzer->method('getAudioDuration')
+            ->willReturn(3600.0); // 1 hour per file
+
+        // Mock the metadata service to return empty array to force file parsing
+        $this->mockMetadataService->method('loadMetadata')
+            ->willReturn([]);
+
+        $books = $this->parser->parseDirectory(vfsStream::url('testDir/books'));
+
+        // Filter to only include valid books (should have title and audio files)
+        $validBooks = array_values(array_filter($books, function ($book) {
+            return !empty($book['title']) && $book['audio_file_count'] > 0;
+        }));
+
+        $this->assertCount(1, $validBooks, 'Should only find one valid book');
+        $this->assertEquals('The Fellowship of the Ring', $validBooks[0]['title']);
+        $this->assertEquals(3, $validBooks[0]['audio_file_count']);
+        $this->assertEquals(10800, $validBooks[0]['duration']); // 3 hours total
+        $this->assertEquals('03:00:00', $validBooks[0]['duration_formatted']);
+    }
+
+    /** @test */
+    public function testHandlesEmptyDirectoriesGracefully()
+    {
+        // Create empty directory structure
+        $structure = [
+            'empty' => []
+        ];
+        vfsStream::create($structure, $this->root);
+
+        $books = $this->parser->parseDirectory(vfsStream::url('testDir/empty'));
+
+        $this->assertCount(0, $books);
+    }
+
+    /** @test */
+    public function testHandlesInvalidPathsGracefully()
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Directory does not exist');
+
+        // Use a non-existent path that's guaranteed to not exist
+        $nonExistentPath = sys_get_temp_dir() . '/nonexistent_path_' . uniqid();
+        $this->parser->parseDirectory($nonExistentPath);
     }
 
     /** @test */
@@ -264,16 +545,26 @@ EOT;
             "author=Test Author\n" .
             "description=This is a long description line 1\n" .
             "  This is a long description line 2\n" .
-            "  This is a long description line 3\n";
+            "  This is a long description line 3";
 
         // Add more lines to make it larger
         for ($i = 0; $i < 100; $i++) {
-            $metadataContent .= "  Additional description line " . ($i + 4) . "\n";
+            $metadataContent .= "\n  Additional description line " . ($i + 4);
         }
+        
+        // Log the metadata content for debugging
+        error_log("Metadata content:\n" . $metadataContent);
+        error_log("Metadata content length: " . strlen($metadataContent));
 
-        vfsStream::newFile('large_metadata.abs')
+        $file = vfsStream::newFile('large_metadata.abs')
             ->at($this->root)
             ->setContent($metadataContent);
+            
+        // Log the actual file content for debugging
+        $fileContent = $file->getContent();
+        error_log("File content length: " . strlen($fileContent));
+        error_log("File content first 200 chars: " . substr($fileContent, 0, 200));
+        error_log("File content last 200 chars: " . substr($fileContent, -200));
 
         // Configure the mock to return no metadata, forcing fallback to file
         $this->mockMetadataService->method('generateBookId')
@@ -282,12 +573,21 @@ EOT;
         $this->mockMetadataService->method('loadMetadata')
             ->willReturn([]);
 
-        $result = $this->parser->readMetadataFile(vfsStream::url('testDir/large_metadata.abs'));
+        $fileUrl = vfsStream::url('testDir/large_metadata.abs');
+        error_log("Reading metadata from: " . $fileUrl);
+        
+        $result = $this->parser->readMetadataFile($fileUrl);
 
         $this->assertEquals('Large Metadata Test', $result['title']);
         $this->assertEquals(['Test Author'], $result['author']);
+        
+        // Debug output
+        error_log("Parsed description length: " . strlen($result['description']));
+        error_log("Parsed description content: " . $result['description']);
+        
         $this->assertStringContainsString('This is a long description line', $result['description']);
-        $this->assertGreaterThan(1000, strlen($result['description']));
+        $this->assertGreaterThan(1000, strlen($result['description']), 
+            sprintf('Description length %d is not greater than 1000', strlen($result['description'])));
     }
 
     /** @test */
@@ -316,15 +616,37 @@ EOT;
     /** @test */
     public function handleMixedLineEndings()
     {
-        // Mix of Windows (\r\n) and Unix (\n) line endings
+        $filename = 'metadata.abs';
         $metadataContent = "title=Mixed Line Endings\n" .
             "author=Author X\r\n" .
             "series=Test Series\n" .
             "narrator=Narrator Y\r\n";
 
-        vfsStream::newFile('mixed_line_endings.abs')
-            ->at($this->root)
+        // Log the content we're creating
+        error_log("Test content: " . str_replace(["\r", "\n"], ['\\r', '\\n'], $metadataContent));
+        error_log("Test content hex: " . bin2hex($metadataContent));
+
+        // Create a directory for the book
+        $bookDir = vfsStream::newDirectory('testBook')
+            ->at($this->root);
+
+        // Create the metadata file inside the directory
+        $file = vfsStream::newFile($filename, 0777)
+            ->at($bookDir)
             ->setContent($metadataContent);
+
+        $dirPath = vfsStream::url('testDir/testBook');
+        $filePath = $dirPath . '/' . $filename;
+
+        error_log("File created at: " . $filePath);
+        error_log("File exists: " . (file_exists($filePath) ? 'yes' : 'no'));
+        error_log("File is readable: " . (is_readable($filePath) ? 'yes' : 'no'));
+        error_log("File permissions: " . substr(sprintf('%o', fileperms($filePath)), -4));
+
+        $fileContents = file_get_contents($filePath);
+        error_log("File contents length: " . strlen($fileContents));
+        error_log("File contents: " . $fileContents);
+        error_log("File contents hex: " . bin2hex($fileContents));
 
         // Configure the mock to return no metadata, forcing fallback to file
         $this->mockMetadataService->method('generateBookId')
@@ -333,12 +655,60 @@ EOT;
         $this->mockMetadataService->method('loadMetadata')
             ->willReturn([]);
 
-        $result = $this->parser->readMetadataFile(vfsStream::url('testDir/mixed_line_endings.abs'));
+        // Log the directory and file we're about to read
+        error_log("Attempting to read from directory: " . $dirPath);
+        error_log("Directory exists: " . (is_dir($dirPath) ? 'yes' : 'no'));
+        error_log("Metadata file exists: " . (file_exists($filePath) ? 'yes' : 'no'));
+        error_log("Metadata file is readable: " . (is_readable($filePath) ? 'yes' : 'no'));
 
-        $this->assertEquals('Mixed Line Endings', $result['title']);
-        $this->assertEquals(['Author X'], $result['author']);
-        $this->assertEquals('Test Series', $result['series']);
-        $this->assertEquals('Narrator Y', $result['narrator']);
+        try {
+            error_log("Calling readMetadataFile with directory: " . $dirPath);
+            
+            // Log the file contents right before parsing
+            $beforeReadContents = file_get_contents($filePath);
+            error_log("File contents before parsing: " . $beforeReadContents);
+            error_log("File contents hex before parsing: " . bin2hex($beforeReadContents));
+            
+            // Log the contents line by line
+            $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            error_log("File lines before parsing (" . count($lines) . "):");
+            foreach ($lines as $i => $line) {
+                error_log(sprintf("  Line %d: [%s] (hex: %s)", 
+                    $i + 1, 
+                    $line,
+                    bin2hex($line)
+                ));
+            }
+            
+            // Pass the directory path, not the file path
+            $result = $this->parser->readMetadataFile($dirPath);
+            error_log("Parser result: " . print_r($result, true));
+
+            // Log the raw file contents that were read
+            $readContents = file_get_contents($filePath);
+            error_log("Raw file contents after reading: " . $readContents);
+            error_log("Raw file contents hex: " . bin2hex($readContents));
+            
+            // Log the file contents line by line after reading
+            $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            error_log("File lines after reading (" . count($lines) . "):");
+            foreach ($lines as $i => $line) {
+                error_log(sprintf("  Line %d: [%s] (hex: %s)", 
+                    $i + 1, 
+                    $line,
+                    bin2hex($line)
+                ));
+            }
+        } catch (\Exception $e) {
+            error_log("Error reading metadata file: " . $e->getMessage());
+            error_log("Stack trace: " . $e->getTraceAsString());
+            throw $e;
+        }
+
+        $this->assertEquals('Mixed Line Endings', $result['title'] ?? '', 'Title does not match expected');
+        $this->assertEquals(['Author X'] ?? [], $result['author'] ?? [], 'Author does not match expected');
+        $this->assertEquals('Test Series', $result['series'] ?? '', 'Series does not match expected');
+        $this->assertEquals('Narrator Y', $result['narrator'] ?? '', 'Narrator does not match expected');
     }
 
     /** @test */

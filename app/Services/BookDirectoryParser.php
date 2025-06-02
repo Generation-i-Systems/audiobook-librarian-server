@@ -250,18 +250,13 @@ class BookDirectoryParser
      */
     public function readMetadataFile(string $path): array
     {
-        $directoryPath = null;
+        // Determine if the path is a directory or a file
+        $isFile = pathinfo($path, PATHINFO_EXTENSION) === 'abs' || is_file($path);
+        $directoryPath = $isFile ? dirname($path) : rtrim($path, '/');
+        $metadataPath = $isFile ? $path : $directoryPath . '/metadata.abs';
 
-        // Handle virtual filesystem paths (like those used in tests)
-        $isVirtualPath = strpos($path, 'vfs://') === 0;
-        $isDirectory = $isVirtualPath ? true : is_dir($path);
-
-        // Initialize variables
-        $metadataPath = $path;
-        $directoryPath = $isDirectory ? rtrim($path, '/\\') : dirname($path);
-
-        // If path is a directory or a virtual path, try to load metadata from service first
-        if ($isDirectory) {
+        // If metadata service is available, try to load from there first
+        if ($this->metadataService) {
             try {
                 $bookId = $this->metadataService->generateBookId($directoryPath);
                 $metadata = $this->metadataService->loadMetadata($bookId, $directoryPath);
@@ -274,26 +269,19 @@ class BookDirectoryParser
                             : (isset($metadata['author']) ? [$metadata['author']] : []),
                         'narrator' => $metadata['narrator'] ?? '',
                         'series' => $metadata['series'] ?? '',
+                        'series_number' => isset($metadata['series_number']) ? (int) $metadata['series_number'] : null,
                         'year' => $metadata['year'] ?? null,
                         'description' => $metadata['description'] ?? ''
                     ];
                 }
             } catch (\Exception $e) {
-                // Continue to try loading from file if service fails
                 error_log("Error loading metadata from service: " . $e->getMessage());
-            }
-            
-            // Only set metadataPath if it's a directory and we're not already pointing to a file
-            if ($isDirectory && basename($path) !== 'metadata.abs') {
-                $metadataPath = $directoryPath . '/metadata.abs';
             }
         }
 
-        // If we don't have a valid file at this point, return array with expected keys
-        error_log("Checking file: " . $metadataPath . " (exists: " . (file_exists($metadataPath) ? 'yes' : 'no') . ", readable: " . (is_readable($metadataPath) ? 'yes' : 'no') . ")");
-        
+        // If the file doesn't exist, return empty metadata
         if (!file_exists($metadataPath) || !is_readable($metadataPath)) {
-            error_log("Metadata file not found or not readable: " . $metadataPath);
+            error_log("Metadata file does not exist or is not readable: " . $metadataPath);
             return [
                 'title' => '',
                 'author' => [],
@@ -302,6 +290,12 @@ class BookDirectoryParser
                 'year' => null,
                 'description' => '',
             ];
+        } else {
+            error_log("Reading metadata file: " . $metadataPath);
+            error_log("File exists and is readable");
+            $contents = file_get_contents($metadataPath);
+            error_log("File content length: " . strlen($contents));
+            error_log("First 200 chars: " . substr($contents, 0, 200));
         }
 
         try {
@@ -315,86 +309,139 @@ class BookDirectoryParser
             // Normalize line endings
             $contents = str_replace(["\r\n", "\r"], "\n", $contents);
 
-            $metadata = [];
-            $currentSection = null;
-            $inDescription = false;
-            $descriptionLines = [];
-
             $lines = explode("\n", $contents);
-            $inDescription = false;
-            $inChapter = false;
+
+            // Process each line using a for loop for better control
+            $currentSection = '';
             $descriptionLines = [];
+            // Initialize metadata with empty array - we'll add fields as we find them
             $metadata = [];
 
-            foreach ($lines as $line) {
-                $line = trim($line);
+            $lineCount = count($lines);
+            error_log("Total lines to process: " . $lineCount);
+
+            for ($i = 0; $i < $lineCount; $i++) {
+                $line = trim($lines[$i]);
+                error_log("Processing line $i: " . $line);
 
                 // Skip empty lines and comments
-                if (empty($line) || $line[0] === ';' || $line[0] === '#') {
+                if ($line === '' || str_starts_with($line, ';') || str_starts_with($line, '#')) {
                     continue;
                 }
 
-                // Check for section headers
-                if (preg_match('/^\[(.+)\]$/i', $line, $matches)) {
-                    $section = strtolower(trim($matches[1]));
-                    $inDescription = ($section === 'description');
-                    $inChapter = ($section === 'chapter');
-
-                    // If we were in a description section, save it
-                    if ($inDescription === false && !empty($descriptionLines)) {
-                        $metadata['description'] = trim(implode("\n", $descriptionLines));
-                        $descriptionLines = [];
-                    }
+                // Handle section headers
+                if (preg_match('/^\[(.*?)\]$/', $line, $matches)) {
+                    $currentSection = strtolower(trim($matches[1]));
                     continue;
                 }
 
-                // If we're in a description section, collect all lines
-                if ($inDescription) {
-                    $descriptionLines[] = $line;
-                    continue;
-                }
-                
-                // Skip chapter section content
-                if ($inChapter) {
-                    continue;
-                }
-
-                // Parse key=value pairs
+                // Handle key=value pairs
                 if (str_contains($line, '=')) {
                     list($key, $value) = explode('=', $line, 2);
                     $key = strtolower(trim($key));
-                    $value = trim($value, ' "\'');
+                    $value = trim($value);
 
-                    // Skip empty values
-                    if ($value === '') {
+                    // Handle description field in key=value format
+                    if ($key === 'description') {
+                        $descriptionLines = []; // Reset description lines
+                        $descriptionLines[] = $value;
+
+                        // Check the next lines to see if they're part of a multi-line description
+                        $j = $i + 1;
+                        while ($j < $lineCount) {
+                            $nextLine = $lines[$j];
+
+                            // If the line is empty or a comment, include it in the description
+                            if (
+                                trim($nextLine) === '' ||
+                                str_starts_with(trim($nextLine), ';') ||
+                                str_starts_with(trim($nextLine), '#')
+                            ) {
+                                $descriptionLines[] = $nextLine;
+                                $j++;
+                                continue;
+                            }
+
+                            // If the line starts with a key or section header, stop reading
+                            if (str_contains($nextLine, '=') || preg_match('/^\s*\[.*\]\s*$/', $nextLine)) {
+                                break;
+                            }
+
+                            // Otherwise, it's part of the description
+                            $descriptionLines[] = $nextLine;
+                            $j++;
+                        }
+
+                        // Skip the lines we've already processed
+                        if ($j > $i + 1) {
+                            $i = $j - 1; // -1 because the loop will increment $i
+                        }
+
+                        error_log("Finished reading description. Total lines: " . count($descriptionLines));
                         continue;
                     }
 
-                    // Handle special fields
-                    if ($key === 'authors' || $key === 'author') {
-                        // Map both 'authors' and 'author' to 'author' array
-                        $metadata['author'] = $this->parseAuthors($value);
-                    } elseif ($key === 'narrators' || $key === 'narrator') {
-                        // Map both 'narrators' and 'narrator' to 'narrator'
-                        $metadata['narrator'] = $value;
-                    } elseif ($key === 'publishedyear' || $key === 'year') {
-                        $metadata['year'] = (int) $value;
-                    } else {
-                        $metadata[$key] = $value;
+                    // Handle other key=value pairs, only setting if not already set (first occurrence wins)
+                    error_log("Processing key: $key, value: $value");
+                    
+                    // Special handling for description since it's built incrementally
+                    if ($key === 'description') {
+                        if (!isset($metadata['description'])) {
+                            $metadata['description'] = '';
+                        }
+                        $metadata['description'] .= $value . "\n";
+                        continue;
+                    }
+                    
+                    // Skip if we've already seen this key (first occurrence wins)
+                    if (array_key_exists($key, $metadata)) {
+                        error_log("Skipping duplicate key: $key - already set to: " . json_encode($metadata[$key]));
+                        continue;
+                    }
+                    
+                    // Handle known keys with special processing
+                    switch ($key) {
+                        case 'title':
+                            $metadata['title'] = $value;
+                            break;
+                        case 'author':
+                        case 'authors':
+                            $metadata['author'] = $this->parseAuthors($value);
+                            break;
+                        case 'narrator':
+                            $metadata['narrator'] = $value;
+                            break;
+                        case 'series':
+                            $metadata['series'] = $value;
+                            break;
+                        case 'series_number':
+                            $metadata['series_number'] = is_numeric($value) ? (int) $value : null;
+                            break;
+                        case 'year':
+                            $metadata['year'] = is_numeric($value) ? (int) $value : null;
+                            break;
+                        default:
+                            // For any other keys, just store them as-is
+                            $metadata[$key] = $value;
                     }
                 }
             }
 
-            // Save any remaining description lines
+            // Save any remaining description lines, preserving line breaks
             if (!empty($descriptionLines)) {
-                $description = implode("\n", $descriptionLines);
+                $description = implode("\n", array_map('trim', $descriptionLines));
                 $metadata['description'] = trim($description);
+                error_log("Set description from lines. Length: " . strlen($metadata['description']));
             }
 
-            // If we loaded metadata from a file, save it to the service
-            if ($directoryPath && !empty($metadata)) {
-                $bookId = $this->metadataService->generateBookId($directoryPath);
-                $this->metadataService->saveMetadata($bookId, $directoryPath, $metadata);
+            // If we loaded metadata from a file, save it to the service if available
+            if ($this->metadataService && $directoryPath && !empty($metadata)) {
+                try {
+                    $bookId = $this->metadataService->generateBookId($directoryPath);
+                    $this->metadataService->saveMetadata($bookId, $directoryPath, $metadata);
+                } catch (\Exception $e) {
+                    error_log("Failed to save metadata to service: " . $e->getMessage());
+                }
             }
 
             // Ensure we return all expected keys with proper defaults
@@ -405,6 +452,7 @@ class BookDirectoryParser
                     : (isset($metadata['author']) ? [$metadata['author']] : []),
                 'narrator' => $metadata['narrator'] ?? '',
                 'series' => $metadata['series'] ?? '',
+                'series_number' => isset($metadata['series_number']) ? (int) $metadata['series_number'] : null,
                 'year' => $metadata['year'] ?? null,
                 'description' => $metadata['description'] ?? ''
             ];
@@ -487,6 +535,400 @@ class BookDirectoryParser
         $text = preg_replace('/\s+/', ' ', $text);
 
         return trim($text);
+    }
+
+    /**
+     * Parse a directory for book files and extract metadata.
+     *
+     * @param string $directory The directory path to parse
+     * @param array $config Configuration options
+     * @return array Array of book metadata
+     */
+    /**
+     * Parse a directory structure to find books and extract metadata.
+     *
+     * Directory structure should be: /genre/author/series/title/
+     * or /genre/author/title/
+     *
+     * @param string $directory The base directory to parse
+     * @param array $config Configuration options
+     * @return array Array of book metadata
+     */
+    public function parseDirectory(string $directory, array $config = []): array
+    {
+        $books = [];
+        $finder = new Finder();
+        $baseDepth = count(explode('/', rtrim($directory, '/')));
+
+        try {
+            // Find all directories that could be books (2-4 levels deep from base)
+            $dirs = $finder
+                ->directories()
+                ->in($directory)
+                ->sortByName();
+
+            error_log('Found ' . iterator_count($dirs) . ' potential book directories in ' . $directory);
+
+            // First pass: Find all directories with audio files
+            $directoriesWithAudio = [];
+            foreach ($dirs as $dir) {
+                $path = $dir->getPathname();
+                $parts = explode('/', $path);
+                $depth = count($parts) - $baseDepth;
+
+                // Skip the base directory and genre level
+                if ($depth < 2) {
+                    continue;
+                }
+
+                // Check if this directory contains audio files
+                $audioFiles = (new Finder())
+                    ->files()
+                    ->in($path)
+                    ->name(['*.mp3', '*.m4b', '*.m4a', '*.aac', '*.flac', '*.wav', '*.ogg']);
+
+                $audioFileCount = iterator_count($audioFiles);
+                if ($audioFileCount > 0) {
+                    $directoriesWithAudio[] = [
+                        'path' => $path,
+                        'depth' => $depth,
+                        'audioFileCount' => $audioFileCount,
+                        'audioFiles' => $audioFiles,
+                    ];
+                }
+            }
+
+
+            // Sort by depth (deepest first)
+            usort($directoriesWithAudio, function ($a, $b) {
+                return $b['depth'] <=> $a['depth'];
+            });
+
+            // Track processed paths to avoid processing parent directories of already processed directories
+            $processedPaths = [];
+
+            // Process directories from deepest to shallowest
+            foreach ($directoriesWithAudio as $dirInfo) {
+                $path = $dirInfo['path'];
+                $audioFiles = $dirInfo['audioFiles'];
+                $audioFileCount = $dirInfo['audioFileCount'];
+
+                // Skip if this directory is a parent of an already processed directory
+                $isParentOfProcessed = false;
+                foreach ($processedPaths as $processedPath) {
+                    if (strpos($processedPath, $path . '/') === 0) {
+                        $isParentOfProcessed = true;
+                        break;
+                    }
+                }
+
+                if ($isParentOfProcessed) {
+                    continue;
+                }
+
+                $processedPaths[] = $path;
+
+                try {
+                    $parts = explode('/', $path);
+
+                    // Parse the path to extract metadata
+                    $book = [
+                        'path' => $path,
+                        'full_path' => $path,
+                        'audio_file_count' => iterator_count($audioFiles),
+                        'needs_review' => false,
+                    ];
+
+                    // Try to determine author from path structure
+                    $relativePath = substr($path, strlen($directory) + 1);
+                    $pathParts = explode('/', trim($relativePath, '/'));
+                    $authorFound = false;
+
+                    // Set title from the last part of the path
+                    $title = end($pathParts);
+                    $cleanedTitle = $this->cleanupTitle($title);
+                    $book['title'] = $cleanedTitle['title'];
+
+                    // If we have at least 2 parts (genre/author/...), the second part is likely the author
+                    if (count($pathParts) >= 2) {
+                        $potentialAuthor = $pathParts[1];
+
+                        // Skip if the author is 'Unknown' (case insensitive)
+                        if (strtolower($potentialAuthor) === 'unknown') {
+                            $authorFound = false;
+                            error_log("[DEBUG] Found 'Unknown' author in path");
+                        } elseif (
+                            // Check if this looks like a valid author name
+                            !in_array(strtolower($potentialAuthor), $this->skipDirs)
+                            && !is_numeric($potentialAuthor)
+                            && !preg_match('/^\d+$/', $potentialAuthor)
+                            && !preg_match('/^[\s\d-]+$/', $potentialAuthor)
+                        ) {
+                            // Clean up the author name
+                            $authorName = $this->cleanText($potentialAuthor);
+                            if (!empty($authorName)) {
+                                $book['author'] = [$authorName];
+                                $authorFound = true;
+                                error_log("[DEBUG] Found author in path: " . $authorName);
+                            }
+                        }
+                    }
+
+                    // Check if any part of the path is 'unknown' (case insensitive)
+                    $hasUnknownAuthor = false;
+                    foreach ($pathParts as $part) {
+                        if (strtolower($part) === 'unknown') {
+                            $hasUnknownAuthor = true;
+                            break;
+                        }
+                    }
+
+                    error_log("[DEBUG] Path parts: " . json_encode($pathParts));
+                    error_log("[DEBUG] Has unknown author: " . ($hasUnknownAuthor ? 'yes' : 'no'));
+
+                    // If we have an unknown author, don't try to extract author from path
+                    if ($hasUnknownAuthor) {
+                        if (!empty($author)) {
+                            $normalizedAuthor = $this->normalizeAuthorName($author);
+                            if (!empty($normalizedAuthor)) {
+                                $book['author'] = [$normalizedAuthor];
+                                $book['title'] = $this->cleanText($title);
+                                $authorFound = true;
+                            }
+                        }
+                    }
+
+                    // If we couldn't determine the author from the path, flag for review
+                    if (!$authorFound) {
+                        // Clean up the title using cleanupTitle method
+                        $cleanedTitle = $this->cleanupTitle(basename($path));
+                        $book['title'] = $cleanedTitle['title'];
+                        $book['needs_review'] = true;
+                        $book['review_reason'] = 'Could not determine author from path';
+                        $book['author'] = []; // Ensure author is an empty array
+                        error_log("[DEBUG] Author not found. Set needs_review=true for book: " . $book['title']);
+                        error_log("[DEBUG] Path parts: " . json_encode($pathParts));
+                    } else {
+                        // Reset needs_review in case it was set previously
+                        $book['needs_review'] = false;
+                        error_log("[DEBUG] Author found. Set needs_review=false for book: " . $book['title']);
+                        error_log("[DEBUG] Author: " . json_encode($book['author'] ?? 'N/A'));
+                    }
+
+                    // Check for metadata file
+                    $metadataPath = $path . '/metadata.abs';
+                    if (file_exists($metadataPath)) {
+                        $metadata = $this->readMetadataFile($metadataPath);
+                        $conflicts = [];
+
+                        // Check for conflicts between directory-parsed fields and metadata file
+                        $fieldsToCheck = ['title', 'author', 'series', 'narrator'];
+                        foreach ($fieldsToCheck as $field) {
+                            $dirValue = $book[$field] ?? null;
+                            $fileValue = $metadata[$field] ?? null;
+
+                            // Skip if either value is empty
+                            if (empty($dirValue) || empty($fileValue)) {
+                                continue;
+                            }
+
+                            // For arrays (like authors), check if they have different values
+                            if (is_array($dirValue) && is_array($fileValue)) {
+                                $dirValue = array_map('strtolower', array_map('trim', $dirValue));
+                                $fileValue = array_map('strtolower', array_map('trim', $fileValue));
+                                $diff1 = array_diff($dirValue, $fileValue);
+                                $diff2 = array_diff($fileValue, $dirValue);
+                                if (!empty($diff1) || !empty($diff2)) {
+                                    $conflicts[] = $field;
+                                }
+                            } elseif (
+                                is_string($dirValue)
+                                && is_string($fileValue)
+                                && strtolower(trim($dirValue)) !== strtolower(trim($fileValue))
+                            ) {
+                                // For strings, do a case-insensitive comparison
+                                $conflicts[] = $field;
+                            }
+                        }
+
+                        // If there are conflicts, keep the directory values but flag for review
+                        if (!empty($conflicts)) {
+                            $book['needs_review'] = true;
+                            $book['review_reason'] = 'Field conflict with metadata file: ' . implode(', ', $conflicts);
+                            error_log(
+                                "[DEBUG] Field conflicts detected for {$book['title']}: " . $book['review_reason']
+                            );
+                        }
+
+                        // Merge metadata, but don't override directory-parsed values
+                        $book = array_merge(
+                            $metadata,
+                            array_filter(
+                                $book,
+                                function ($value) {
+                                    return $value !== null
+                                        && $value !== ''
+                                        && $value !== [];
+                                }
+                            )
+                        );
+                    }
+
+                    // Calculate total duration from audio files
+                    if ($this->audioAnalyzer) {
+                        $totalDuration = 0;
+                        foreach ($audioFiles as $file) {
+                            try {
+                                if ($this->audioAnalyzer) {
+                                    $duration = $this->audioAnalyzer->getAudioDuration($file->getPathname());
+                                    if ($duration !== null) {
+                                        $totalDuration += $duration;
+                                    }
+                                }
+                            } catch (\Exception $e) {
+                                error_log(sprintf(
+                                    'Error getting duration for %s: %s',
+                                    $file->getPathname(),
+                                    $e->getMessage()
+                                ));
+                            }
+                        }
+                        if ($totalDuration > 0) {
+                            $book['duration'] = $totalDuration;
+                            $book['duration_formatted'] = $this->formatDuration($totalDuration);
+                        }
+                    }
+
+                    $books[] = $book;
+                } catch (\Exception $e) {
+                    error_log(sprintf(
+                        'Error processing directory %s: %s',
+                        $dir->getPathname(),
+                        $e->getMessage()
+                    ));
+                }
+            }
+        } catch (\Exception $e) {
+            error_log(sprintf('Error scanning directory %s: %s', $directory, $e->getMessage()));
+        }
+
+        return $books;
+    }
+
+    /**
+     * Parse a single book file and extract metadata.
+     *
+     * @param SplFileInfo $file The file to parse
+     * @param array $config Configuration options
+     * @return array|null Book metadata or null if parsing fails
+     */
+    /**
+     * Format duration in seconds to a human-readable string (HH:MM:SS)
+     *
+     * @param int $seconds Duration in seconds
+     * @return string Formatted duration
+     */
+    protected function formatDuration(float $seconds): string
+    {
+        $seconds = (int) round($seconds);
+        $hours = floor($seconds / 3600);
+        $minutes = floor(($seconds % 3600) / 60);
+        $seconds = $seconds % 60;
+
+        return sprintf('%02d:%02d:%02d', $hours, $minutes, $seconds);
+    }
+
+    /**
+     * Parse a single book file and extract metadata.
+     * This is now a helper method used internally by parseDirectory.
+     *
+     * @param \SplFileInfo $file The file to parse
+     * @param array $config Configuration options
+     * @return array|null Book metadata or null if parsing fails
+     */
+    protected function parseBookFile(\SplFileInfo $file, array $config = []): ?array
+    {
+        try {
+            $filename = $file->getFilename();
+            $basename = pathinfo($filename, PATHINFO_FILENAME);
+
+            // Try to extract author and title from path
+            $author = $this->extractAuthorFromPath($file->getPath());
+            $title = $this->cleanText($basename);
+
+            // Initialize basic book data
+            $book = [
+                'title' => $title,
+                'author' => $author,
+                'path' => $file->getPathname(),
+                'filename' => $filename,
+                'file_size' => $file->getSize(),
+                'file_modified' => $file->getMTime(),
+                'file_extension' => strtolower($file->getExtension()),
+                'full_path' => $file->getPathname(),
+                'needs_review' => true,
+                'review_reason' => 'Found individual file instead of directory',
+            ];
+
+            // Try to extract additional metadata from filename
+            $this->extractMetadata($book, $basename);
+
+            // Try to read metadata from metadata file if it exists
+            $metadataPath = dirname($file->getPathname()) . '/metadata.abs';
+            if (file_exists($metadataPath)) {
+                $metadata = $this->readMetadataFile($metadataPath);
+                if (!empty($metadata['title'])) {
+                    $book['title'] = $metadata['title'];
+                }
+                if (!empty($metadata['author'])) {
+                    $book['author'] = $metadata['author'];
+                }
+                if (!empty($metadata['series'])) {
+                    $book['series'] = $metadata['series'];
+                }
+                if (isset($metadata['series_number'])) {
+                    $book['series_number'] = $metadata['series_number'];
+                }
+                if (!empty($metadata['year'])) {
+                    $book['year'] = $metadata['year'];
+                }
+            }
+
+            return $book;
+        } catch (\Exception $e) {
+            error_log(sprintf('Error parsing book file %s: %s', $file->getPathname(), $e->getMessage()));
+            return null;
+        }
+    }
+
+    /**
+     * Extract metadata from a filename and update the book array.
+     *
+     * @param array &$book Reference to the book array to update
+     * @param string $filename The filename to extract metadata from
+     * @return void
+     */
+    protected function extractMetadata(array &$book, string $filename): void
+    {
+        // Extract year (e.g., (2020) or [2020])
+        if (preg_match('/\(([0-9]{4})\)|\[([0-9]{4})\]/', $filename, $matches)) {
+            $book['year'] = (int) ($matches[1] ?? $matches[2]);
+        }
+
+        // Extract narrator (e.g., 'narrated by John Smith' or 'narr. Jane Doe')
+        if (preg_match('/(?:narrated by|narr\.?|read by)\s+([^\[\]()]+)/i', $filename, $matches)) {
+            $book['narrator'] = trim($matches[1]);
+        }
+
+        // Extract edition (e.g., '2nd edition', 'revised edition')
+        if (preg_match('/(\d+(?:st|nd|rd|th) edition|revised edition|unabridged|abridged)/i', $filename, $matches)) {
+            $book['edition'] = $matches[1];
+        }
+
+        // Extract series number (e.g., 'Book 1', '#2', 'Vol. 3')
+        if (preg_match('/(?:book|vol\.?|#)\s*(\d+)/i', $filename, $matches)) {
+            $book['series_number'] = (int) $matches[1];
+        }
     }
 
     /**
