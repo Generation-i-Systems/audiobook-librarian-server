@@ -551,6 +551,9 @@ class BookDirectoryParser
                 }
 
 
+                // Find cover image for this book directory
+                [$coverImage, $coverCandidates] = $this->findCoverImageCandidate($path);
+
                 // Build $book array using trait output and audio file data
                 $book = [
                     'directory_path' => $path,
@@ -565,6 +568,7 @@ class BookDirectoryParser
                     'duration_formatted' => is_numeric($totalDuration) ? $this->formatDuration($totalDuration) : 'N/A',
                     'file_tags' => $fileTags,
                     'needs_review' => false,
+                    'cover_image' => $coverImage ?? null,
                 ];
 
                 // Optionally: merge in additional metadata from .abs or audio files here
