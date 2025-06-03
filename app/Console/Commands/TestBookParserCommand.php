@@ -51,10 +51,11 @@ class TestBookParserCommand extends Command
             $paths = [getcwd()];
         }
 
-        // Validate all paths
-        foreach ($paths as $path) {
-            if (!File::exists($path) || !File::isDirectory($path)) {
-                $this->error("The specified path does not exist or is not a directory: $path");
+        // Validate all paths using resolved storage path
+        foreach ($paths as $inputPath) {
+            $resolvedPath = $parser->resolveStoragePath($inputPath);
+            if (!File::exists($resolvedPath) || !File::isDirectory($resolvedPath)) {
+                $this->error("The specified path does not exist or is not a directory: $inputPath (resolved: $resolvedPath)");
                 return 1;
             }
         }
@@ -135,25 +136,29 @@ class TestBookParserCommand extends Command
                 }
 
                 // Clean up series - don't use author name as series
-                if (!empty($book['series'])) {
-                    $book['series'] = trim($book['series']);
+                if (!empty($book['seriesName'])) {
+                    $series = $book['seriesName'];
+                    $seriesNumber = $book['seriesNumber'];
 
                     // Check if series matches any of the authors (case-insensitive)
                     $seriesMatchesAuthor = false;
                     if (is_array($book['author'] ?? null)) {
                         foreach ($book['author'] as $author) {
-                            if (strtolower($book['series']) === strtolower(trim($author))) {
+                            if (strtolower($series) === strtolower(trim($author))) {
                                 $seriesMatchesAuthor = true;
                                 break;
                             }
                         }
                     } else {
-                        $seriesMatchesAuthor = strtolower($book['series']) === strtolower(trim($book['author'] ?? ''));
+                        $seriesMatchesAuthor = strtolower($series) === strtolower(trim($book['author'] ?? '')); // $book['author'] is always an array, but this fallback is safe
                     }
 
                     if ($seriesMatchesAuthor) {
-                        $book['series'] = '';
-                        $book['series_number'] = null;
+                        $book['seriesName'] = '';
+                        $book['seriesNumber'] = null;
+                    } else {
+                        $book['seriesName'] = $series;
+                        $book['seriesNumber'] = $seriesNumber;
                     }
                 }
             }
@@ -163,17 +168,17 @@ class TestBookParserCommand extends Command
             $seriesMap = $parser->buildSeriesMap($allBooks);
             foreach ($allBooks as &$book) {
                 // Fix series names using fuzzy matching
-                if (!empty($book['series'])) {
-                    $book['series'] = $parser->fixSeriesName($book['series'], $seriesMap);
+                if (!empty($book['seriesName'])) {
+                    $book['seriesName'] = $parser->normalizeSeriesName($book['seriesName']);
                 }
 
                 // Clean up common title issues using the parser
                 $cleanupResult = $parser->cleanupTitle($book['title'] ?? '');
                 $book['title'] = $cleanupResult['title'];
-                
+
                 // Set the needs_review flag from the cleanup result
                 $book['needs_review'] = $cleanupResult['needs_review'] ?? false;
-                
+
                 // Store metadata for review if needed
                 if ($cleanupResult['metadata']['needs_review'] ?? false) {
                     $book['needs_review'] = true;
@@ -185,15 +190,15 @@ class TestBookParserCommand extends Command
             }
             unset($book); // Break the reference
 
-            // Third pass: Rebuild series map with corrected names
-            $seriesMap = $parser->buildSeriesMap($allBooks);
+            // // Third pass: Rebuild series map with corrected names
+            // $seriesMap = $parser->buildSeriesMap($allBooks);
 
-            // Fourth pass: Ensure series consistency
-            foreach ($allBooks as &$book) {
-                if (!empty($book['series']) && isset($seriesMap[$book['series']])) {
-                    $book['series'] = $seriesMap[$book['series']];
-                }
-            }
+            // // Fourth pass: Ensure series consistency
+            // foreach ($allBooks as &$book) {
+            //     if (!empty($book['seriesName']) && isset($seriesMap[$book['seriesName']])) {
+            //         $book['seriesName'] = $seriesMap[$book['seriesName']];
+            //     }
+            // }
             unset($book); // Break the reference
 
             // Sort the books if requested
@@ -208,11 +213,11 @@ class TestBookParserCommand extends Command
                     }
 
                     // Then by series (case-insensitive, empty series last)
-                    $seriesA = !empty($a['series'])
-                        ? strtolower($a['series'])
+                    $seriesA = !empty($a['seriesName'])
+                        ? strtolower($a['seriesName'])
                         : 'zzz_no_series';
-                    $seriesB = !empty($b['series'])
-                        ? strtolower($b['series'])
+                    $seriesB = !empty($b['seriesName'])
+                        ? strtolower($b['seriesName'])
                         : 'zzz_no_series';
                     $cmp = strnatcasecmp($seriesA, $seriesB);
 
@@ -221,8 +226,8 @@ class TestBookParserCommand extends Command
                     }
 
                     // Then by series number (handle null/empty values)
-                    $aNum = !empty($a['series_number']) ? (float) $a['series_number'] : 0;
-                    $bNum = !empty($b['series_number']) ? (float) $b['series_number'] : 0;
+                    $aNum = !empty($a['seriesNumber']) ? (float) $a['seriesNumber'] : 0;
+                    $bNum = !empty($b['seriesNumber']) ? (float) $b['seriesNumber'] : 0;
                     if ($aNum != $bNum) {
                         return $aNum <=> $bNum;
                     }
@@ -320,14 +325,14 @@ class TestBookParserCommand extends Command
             }
 
             // If same author, compare series
-            $seriesCmp = strcasecmp($a['series'] ?? '', $b['series'] ?? '');
+            $seriesCmp = strcasecmp($a['seriesName'] ?? '', $b['seriesName'] ?? '');
             if ($seriesCmp !== 0) {
                 return $seriesCmp;
             }
 
             // If same series, compare series numbers (treat empty as 0)
-            $aNum = (int) ($a['series_number'] ?? 0);
-            $bNum = (int) ($b['series_number'] ?? 0);
+            $aNum = !empty($a['seriesNumber']) ? (float) $a['seriesNumber'] : 0;
+            $bNum = !empty($b['seriesNumber']) ? (float) $b['seriesNumber'] : 0;
             return $aNum <=> $bNum;
         });
 
@@ -349,8 +354,8 @@ class TestBookParserCommand extends Command
                 $author,
                 $book['duration_formatted'] ?? 'N/A',
                 $book['audio_file_count'] ?? 0,
-                $book['series'] ?? '',
-                $book['series_number'] ?? '',
+                $book['seriesName'] ?? '',
+                $book['seriesNumber'] ?? '',
                 $book['narrator'] ?? '',
                 $book['edition'] ?? '',
                 $book['path'] ?? '',

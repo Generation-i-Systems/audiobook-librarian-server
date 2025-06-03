@@ -12,6 +12,22 @@ use App\Services\AudioFileAnalyzer;
 
 class BookDirectoryParserTest extends TestCase
 {
+    /** @test */
+    public function testExtractAuthorFromPathWithGenreAndSubgenre()
+    {
+        $parser = new BookDirectoryParser();
+        // genre/author
+        $this->assertEquals('Brandon Sanderson', $parser->extractAuthorFromPath('Fantasy/Brandon Sanderson/Stormlight Archive'));
+        // genre/subgenre/author
+        $this->assertEquals('Brandon Sanderson', $parser->extractAuthorFromPath('Fantasy/VA/Brandon Sanderson/Stormlight Archive'));
+        $this->assertEquals('Isaac Asimov', $parser->extractAuthorFromPath('Science Fiction/R/Isaac Asimov/Foundation'));
+        $this->assertEquals('Agatha Christie', $parser->extractAuthorFromPath('Mystery/Antoologies/Agatha Christie/Some Title'));
+        // no genre, just author
+        $this->assertEquals('J.K. Rowling', $parser->extractAuthorFromPath('J.K. Rowling/Harry Potter'));
+        // unknown path
+        $this->assertEquals('Unknown Author', $parser->extractAuthorFromPath(''));
+    }
+
     private BookDirectoryParser $parser;
     private $root;
     private BookMetadataService|MockObject $mockMetadataService;
@@ -37,7 +53,7 @@ class BookDirectoryParserTest extends TestCase
 
         // Create a mock AudioFileAnalyzer
         $this->mockAudioAnalyzer = $this->createMock(AudioFileAnalyzer::class);
-        
+
         // Create the parser with mocked services
         $this->parser = new BookDirectoryParser(
             $this->mockAudioAnalyzer,
@@ -64,10 +80,10 @@ class BookDirectoryParserTest extends TestCase
                                 "author=Brandon Sanderson\n" .
                                 "series=The Stormlight Archive\n" .
                                 "series_number=1"
-                        ]
-                    ]
-                ]
-            ]
+                        ],
+                    ],
+                ],
+            ],
         ];
         vfsStream::create($structure, $this->root);
 
@@ -111,11 +127,11 @@ class BookDirectoryParserTest extends TestCase
                                     "author=Brandon Sanderson\n" .
                                     "series=The Stormlight Archive\n" .
                                     "series_number=1"
-                            ]
-                        ]
-                    ]
-                ]
-            ]
+                            ],
+                        ],
+                    ],
+                ],
+            ],
         ];
         vfsStream::create($structure, $this->root);
 
@@ -153,11 +169,11 @@ class BookDirectoryParserTest extends TestCase
                     'Unknown' => [
                         'Book Without Author' => [
                             'file1.mp3' => 'audio content',
-                            'metadata.abs' => "title=Book Without Author"
-                        ]
-                    ]
-                ]
-            ]
+                            'metadata.abs' => "title=Book Without Author",
+                        ],
+                    ],
+                ],
+            ],
         ];
         vfsStream::create($structure, $this->root);
 
@@ -190,11 +206,11 @@ class BookDirectoryParserTest extends TestCase
                 'Fantasy' => [
                     'Brandon Sanderson' => [
                         'Empty Book' => [
-                            'notes.txt' => 'No audio files here'
-                        ]
-                    ]
-                ]
-            ]
+                            'notes.txt' => 'No audio files here',
+                        ],
+                    ],
+                ],
+            ],
         ];
         vfsStream::create($structure, $this->root);
 
@@ -220,10 +236,10 @@ class BookDirectoryParserTest extends TestCase
                                 "series=Dune\n" .
                                 "series_number=1\n\n[description]\n" .
                                 "A brilliant science fiction novel.\n\n"
-                        ]
-                    ]
-                ]
-            ]
+                        ],
+                    ],
+                ],
+            ],
         ];
         vfsStream::create($structure, $this->root);
 
@@ -267,11 +283,11 @@ class BookDirectoryParserTest extends TestCase
                                     "author=J.R.R. Tolkien\n" .
                                     "series=The Lord of the Rings\n" .
                                     "series_number=1"
-                            ]
-                        ]
-                    ]
-                ]
-            ]
+                            ],
+                        ],
+                    ],
+                ],
+            ],
         ];
         vfsStream::create($structure, $this->root);
 
@@ -302,7 +318,7 @@ class BookDirectoryParserTest extends TestCase
     {
         // Create empty directory structure
         $structure = [
-            'empty' => []
+            'empty' => [],
         ];
         vfsStream::create($structure, $this->root);
 
@@ -471,7 +487,7 @@ EOT;
 
         // Get the file path for testing
         $filePath = vfsStream::url('testDir/' . $nestedPath . '/metadata.abs');
-        
+
         // Debug output
         error_log("Virtual filesystem root: " . vfsStream::url('testDir'));
         error_log("Test file path: " . $filePath);
@@ -551,7 +567,7 @@ EOT;
         for ($i = 0; $i < 100; $i++) {
             $metadataContent .= "\n  Additional description line " . ($i + 4);
         }
-        
+
         // Log the metadata content for debugging
         error_log("Metadata content:\n" . $metadataContent);
         error_log("Metadata content length: " . strlen($metadataContent));
@@ -559,7 +575,7 @@ EOT;
         $file = vfsStream::newFile('large_metadata.abs')
             ->at($this->root)
             ->setContent($metadataContent);
-            
+
         // Log the actual file content for debugging
         $fileContent = $file->getContent();
         error_log("File content length: " . strlen($fileContent));
@@ -575,19 +591,22 @@ EOT;
 
         $fileUrl = vfsStream::url('testDir/large_metadata.abs');
         error_log("Reading metadata from: " . $fileUrl);
-        
+
         $result = $this->parser->readMetadataFile($fileUrl);
 
         $this->assertEquals('Large Metadata Test', $result['title']);
         $this->assertEquals(['Test Author'], $result['author']);
-        
+
         // Debug output
         error_log("Parsed description length: " . strlen($result['description']));
         error_log("Parsed description content: " . $result['description']);
-        
+
         $this->assertStringContainsString('This is a long description line', $result['description']);
-        $this->assertGreaterThan(1000, strlen($result['description']), 
-            sprintf('Description length %d is not greater than 1000', strlen($result['description'])));
+        $this->assertGreaterThan(
+            1000,
+            strlen($result['description']),
+            sprintf('Description length %d is not greater than 1000', strlen($result['description']))
+        );
     }
 
     /** @test */
@@ -663,23 +682,24 @@ EOT;
 
         try {
             error_log("Calling readMetadataFile with directory: " . $dirPath);
-            
+
             // Log the file contents right before parsing
             $beforeReadContents = file_get_contents($filePath);
             error_log("File contents before parsing: " . $beforeReadContents);
             error_log("File contents hex before parsing: " . bin2hex($beforeReadContents));
-            
+
             // Log the contents line by line
             $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
             error_log("File lines before parsing (" . count($lines) . "):");
             foreach ($lines as $i => $line) {
-                error_log(sprintf("  Line %d: [%s] (hex: %s)", 
-                    $i + 1, 
+                error_log(sprintf(
+                    "  Line %d: [%s] (hex: %s)",
+                    $i + 1,
                     $line,
                     bin2hex($line)
                 ));
             }
-            
+
             // Pass the directory path, not the file path
             $result = $this->parser->readMetadataFile($dirPath);
             error_log("Parser result: " . print_r($result, true));
@@ -688,13 +708,14 @@ EOT;
             $readContents = file_get_contents($filePath);
             error_log("Raw file contents after reading: " . $readContents);
             error_log("Raw file contents hex: " . bin2hex($readContents));
-            
+
             // Log the file contents line by line after reading
             $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
             error_log("File lines after reading (" . count($lines) . "):");
             foreach ($lines as $i => $line) {
-                error_log(sprintf("  Line %d: [%s] (hex: %s)", 
-                    $i + 1, 
+                error_log(sprintf(
+                    "  Line %d: [%s] (hex: %s)",
+                    $i + 1,
                     $line,
                     bin2hex($line)
                 ));

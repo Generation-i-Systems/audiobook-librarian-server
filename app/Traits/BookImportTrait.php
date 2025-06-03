@@ -238,18 +238,18 @@ trait BookImportTrait
             'directory_path' => $directoryPath,
             'genre' => [],
             'author' => [],
-            'title' => ''
+            'title' => '',
         ];
-        
+
         try {
             // Split directory path into components
             $parts = array_values(array_filter(explode('/', trim($directoryPath, '/')), 'strlen'));
-            
+
             // Handle empty or invalid paths
             if (empty($parts)) {
                 throw new InvalidArgumentException('Empty directory path');
             }
-            
+
             // Handle VA (various artists) directories
             if (in_array('VA', $parts, true)) {
                 Log::warning("Skipping VA directory: {$directoryPath}");
@@ -259,28 +259,28 @@ trait BookImportTrait
                     'author' => [],
                     'title' => '',
                     'skipped' => true,
-                    'reason' => 'VA directory'
+                    'reason' => 'VA directory',
                 ];
             }
-            
+
             // Remove 'R' rating if present
             if (($key = array_search('R', $parts, true)) !== false) {
                 unset($parts[$key]);
                 $parts = array_values($parts); // Re-index array
             }
-            
+
             // We need at least genre and author
             if (count($parts) < 2) {
                 throw new InvalidArgumentException("Path too short: {$directoryPath}");
             }
-            
+
             // First part is always genre
             $genre = array_shift($parts);
             $book['genre'] = [$genre];
-            
+
             // Second part is author(s)
             $author = array_shift($parts);
-            
+
             // Handle multiple authors
             if (str_contains($author, ',') || stripos($author, ' and ') !== false || str_contains($author, '&')) {
                 $author = str_replace([' and ', ' & '], ',', $author);
@@ -289,28 +289,29 @@ trait BookImportTrait
             } else {
                 $book['author'] = [trim($author)];
             }
-            
+
             // Remaining parts are series/title
             if (empty($parts)) {
                 throw new InvalidArgumentException("No title in path: {$directoryPath}");
             }
-            
+
             $series = null;
             $seriesNumber = null;
             $title = '';
             $seriesParent = null;
-            
-            // If we have more than one part left, the last part is the title, rest is series
+
+            // If we have more than one part left, the last part is the title, the immediate parent is the series
             if (count($parts) > 1) {
                 $title = array_pop($parts);
-                $series = array_pop($parts);
-                
-                // If there's still parts left, they're parent series
-                if (!empty($parts)) {
-                    $seriesParent = implode('/', $parts);
-                    $series = $seriesParent . '/' . $series;
+                $seriesCandidate = array_pop($parts);
+                // Only set series if the folder is not numeric
+                if (!is_numeric($seriesCandidate)) {
+                    $series = $seriesCandidate;
+                } else {
+                    // If the folder is numeric, treat it as part of the title (prepend to title)
+                    $title = $seriesCandidate . ' ' . $title;
+                    $series = null;
                 }
-                
                 // Try to extract series number from title
                 if (preg_match('#^[\[\{\(]?([0-9.]+)[\]\}\)]?\s?(.*)$#', $title, $matches)) {
                     $seriesNumber = $matches[1];
@@ -324,21 +325,22 @@ trait BookImportTrait
                 }
             } else {
                 $title = $parts[0];
+                $series = null;
             }
-            
-            // Set series data if we have a series
-            if (!empty($series)) {
+
+            // Set series data if we have a valid series name (string, not numeric)
+            if (!empty($series) && is_string($series)) {
                 $book['series'] = empty($seriesNumber) ? [$series => null] : [$series => $seriesNumber];
             }
-            
+
             $book['title'] = trim($title);
-            
+
         } catch (\Exception $e) {
             Log::error("Error processing directory path {$directoryPath}: " . $e->getMessage());
             $book['error'] = $e->getMessage();
             $book['skipped'] = true;
         }
-        
+
         return $book;
     }
 
@@ -355,14 +357,14 @@ trait BookImportTrait
             Log::error("Invalid URL: {$url}");
             return null;
         }
-        
+
         try {
             $storagePath = env('BOOK_STORAGE_PATH'); // absolute path
             if (!$storagePath) {
                 Log::error('BOOK_STORAGE_PATH is not defined.');
                 return null;
             }
-            
+
             $fullDir = rtrim($storagePath, '/') . '/' . ltrim($directoryPath, '/');
             if (!is_dir($fullDir)) {
                 if (!mkdir($fullDir, 0775, true) && !is_dir($fullDir)) {
@@ -389,7 +391,7 @@ trait BookImportTrait
                 Log::error("importCoverImageFromUrl error: Unable to fetch image from {$url}");
                 return null;
             }
-            
+
             // Determine extension
             $ext = 'jpg';
             if (strpos($contentType, 'png') !== false) {
@@ -409,7 +411,7 @@ trait BookImportTrait
 
             // Return only the path relative to BOOK_STORAGE_PATH
             return ltrim($directoryPath, '/') . '/' . $filename;
-            
+
         } catch (\Exception $e) {
             Log::error('importCoverImageFromUrl error: ' . $e->getMessage());
             return null;
@@ -509,4 +511,180 @@ trait BookImportTrait
         $closeMatch = ($bestScore > 160) ? $bestMatch : null;
         return [$matches, $closeMatch];
     }
+
+
+
+    /**
+     * Extract metadata from a filename and update the book array.
+     *
+     * @param array &$book Reference to the book array to update
+     * @param string $filename The filename to extract metadata from
+     * @return void
+     */
+    protected function extractMetadata(array &$book, string $filename): void
+    {
+        // Extract year (e.g., (2020) or [2020])
+        if (preg_match('/\(([0-9]{4})\)|\[([0-9]{4})\]/', $filename, $matches)) {
+            $book['year'] = (int) ($matches[1] ?? $matches[2]);
+        }
+
+        // Extract narrator (e.g., 'narrated by John Smith' or 'narr. Jane Doe')
+        if (preg_match('/(?:narrated by|narr\.?|read by)\s+([^\[\]()]+)/i', $filename, $matches)) {
+            $book['narrator'] = trim($matches[1]);
+        }
+
+        // Extract edition (e.g., '2nd edition', 'revised edition')
+        if (preg_match('/(\d+(?:st|nd|rd|th) edition|revised edition|unabridged|abridged)/i', $filename, $matches)) {
+            $book['edition'] = $matches[1];
+        }
+
+        // Extract series number (e.g., 'Book 1', '#2', 'Vol. 3')
+        if (preg_match('/(?:book|vol\.?|#)\s*(\d+)/i', $filename, $matches)) {
+            $book['series_number'] = (int) $matches[1];
+        }
+    }
+
+    /**
+     * Clean up a title and return metadata about the cleanup.
+     *
+     * @param string $title The title to clean up
+     * @return array Returns an array with 'title' and 'metadata' about the cleanup
+     */
+    public function cleanupTitle(string $title): array
+    {
+        if (empty($title)) {
+            return [
+                'title' => $title,
+                'metadata' => [
+                    'needs_review' => false,
+                    'applied_corrections' => [],
+                ],
+            ];
+        }
+
+        $originalTitle = $title;
+        $appliedCorrections = [];
+
+        // Apply title cleaning logic here
+        $cleaned = $this->cleanText($title);
+        if ($cleaned !== $title) {
+            $appliedCorrections[] = 'Cleaned whitespace and special characters';
+            $title = $cleaned;
+        }
+
+        // Normalize whitespace
+        $title = trim(preg_replace('/\s+/', ' ', $title));
+
+        // Check if the title needs review
+        $needsReview = $this->titleNeedsReview($title);
+
+        return [
+            'title' => $title,
+            'metadata' => [
+                // 'needs_review' => $needsReview,
+                'original_title' => $originalTitle,
+                'applied_corrections' => $appliedCorrections,
+            ],
+        ];
+    }
+
+    /**
+     * Check if a title needs manual review
+     *
+     * @param string $title The title to check
+     * @param string $series The series name (if any)
+     * @param string $author The author name(s)
+     * @param string $path The file path (optional)
+     * @return bool True if the title needs review
+     */
+    /**
+     * Check if a title needs manual review. Returns an array of reasons if review is needed, or null if not.
+     *
+     * @param string $title The title to check
+     * @param string $series The series name (if any)
+     * @param string $author The author name(s)
+     * @param string $path The file path (optional)
+     * @return array|null Array of reasons, or null if no review needed
+     */
+    public function titleNeedsReview(string $title, ?string $series = null, ?string $author = null, ?string $path = null): ?array
+    {
+        $title = trim($title);
+        $series = $series ? trim($series) : null;
+        $author = $author ? trim($author) : null;
+        $path = $path ? strtolower(trim($path)) : null;
+        $reasons = [];
+
+        // Check if series name is same as author
+        if ($series && $author && strcasecmp($series, $author) === 0) {
+            $reasons[] = "Series name is same as author: $series, $author";
+        }
+
+        // Check if title is the same as the series name
+        if ($series && strcasecmp($title, $series) === 0) {
+            $reasons[] = "Title is the same as series name: $title, $series";
+        }
+
+        // Check if title is not a substring of the path (case-insensitive)
+        if ($path && strpos($path, strtolower($title)) === false) {
+            $reasons[] = "Title is not a substring of path: $title, $path";
+        }
+
+        // Check for numbers at beginning or end of title without a series
+        if (!$series && (preg_match('/^\d+\s+/', $title) || preg_match('/\s+\d+$/', $title))) {
+            $reasons[] = "Title has numbers at beginning or end: $title";
+        }
+
+        // Return reasons if any, otherwise null
+        return !empty($reasons) ? $reasons : null;
+    }
+
+    /**
+     * Normalize a series name to its canonical form.
+     *
+     * @param string $name Series name to normalize
+     * @return string Normalized series name
+     */
+    public function normalizeSeriesName(string $name): string
+    {
+        $name = trim($name);
+        $lowerName = strtolower($name);
+
+        // Check for known variations
+        if (isset($this->seriesVariations[$lowerName])) {
+            return $this->seriesVariations[$lowerName];
+        }
+
+        // Remove common prefixes/suffixes
+        $name = preg_replace('/\s*\([^)]*\)\s*$/', '', $name); // Remove parentheticals at end
+        $name = preg_replace('/^\s*[\[\{\(]|[\]\)\}]\s*$/', '', $name); // Remove brackets/parentheses
+        $name = preg_replace('/\s*[-_|\/]\s*$/', '', $name); // Remove trailing separators
+        $name = trim($name);
+
+        // Common replacements
+        $replacements = [
+            '&' => 'and',
+            '  ' => ' ', // Multiple spaces to single space
+        ];
+
+        $name = str_replace(array_keys($replacements), array_values($replacements), $name);
+
+        // Title case the name
+        $name = ucwords(strtolower($name));
+
+        // Handle special cases
+        $specialCases = [
+            'Dcc' => 'DCC',
+            'Rpg' => 'RPG',
+            'LitRpg' => 'LitRPG',
+        ];
+
+        foreach ($specialCases as $from => $to) {
+            if (str_contains($name, $from)) {
+                $name = str_replace($from, $to, $name);
+            }
+        }
+
+        return $name;
+    }
+
 }
