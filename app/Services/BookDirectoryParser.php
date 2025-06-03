@@ -349,6 +349,7 @@ class BookDirectoryParser
                                     $metadata['author'] = $this->parseAuthors($value);
                                     break;
                                 case 'narrator':
+                                case 'narrators':
                                     $metadata['narrator'] = $value;
                                     break;
                                 case 'series':
@@ -358,7 +359,12 @@ class BookDirectoryParser
                                     $metadata['series_number'] = is_numeric($value) ? (int) $value : null;
                                     break;
                                 case 'year':
-                                    $metadata['year'] = is_numeric($value) ? (int) $value : null;
+                                    $yearTrimmed = trim($value);
+                                    $metadata['year'] = is_numeric($yearTrimmed) ? (int) $yearTrimmed : null;
+                                    break;
+                                case 'publishedyear':
+                                    $publishedYearTrimmed = trim($value);
+                                    $metadata['publishedYear'] = is_numeric($publishedYearTrimmed) ? (int) $publishedYearTrimmed : null;
                                     break;
                                 default:
                                     $metadata[$key] = $value;
@@ -382,14 +388,19 @@ class BookDirectoryParser
                         'series_number' => array_key_exists('series_number', $metadata)
                             ? (is_numeric($metadata['series_number']) ? (int) $metadata['series_number'] : null)
                             : (array_key_exists('seriesIndex', $metadata) && is_numeric($metadata['seriesIndex']) ? (int) $metadata['seriesIndex'] : null),
-                        'year' => (array_key_exists('year', $metadata) && is_numeric($metadata['year']))
-                            ? (int) $metadata['year']
-                            : ((array_key_exists('publishedYear', $metadata) && is_numeric($metadata['publishedYear'])) ? (int) $metadata['publishedYear'] : null),
-                        'description' => array_key_exists('description', $metadata) ? $metadata['description'] : ''
+                        'year' => (
+                            (array_key_exists('year', $metadata) && is_numeric($metadata['year']))
+                                ? (int) $metadata['year']
+                                : ((array_key_exists('publishedYear', $metadata) && is_numeric($metadata['publishedYear']))
+                                    ? (int) $metadata['publishedYear']
+                                    : null)
+                        ),
+                        'description' => array_key_exists('description', $metadata)
+                            ? preg_replace('/^\[description\]\s*/i', '', $metadata['description'])
+                            : ''
                     ];
                 }
             } catch (\Exception $e) {
-                error_log("Error parsing metadata file: " . $e->getMessage());
             }
         }
         return $fileMetadata;
@@ -479,27 +490,11 @@ class BookDirectoryParser
      *
      * @param string $directory The base directory to parse
      * @param array $config Configuration options
-     * @return array Array of book metadata
-     */
-    public function parseDirectory(string $directory, array $config = []): array
-    {
-        $directory = $this->resolveStoragePath($directory);
-        $books = [];
-        $finder = new Finder();
-        $baseDepth = count(explode('/', rtrim($directory, '/')));
-
-        error_log('Parsing directory: ' . $directory);
-        error_log('Base depth: ' . $baseDepth);
-
-
-        try {
-            // Find all directories that could be books (2-4 levels deep from base)
             $dirs = $finder
                 ->directories()
                 ->in($directory)
                 ->sortByName();
 
-            error_log(iterator_count($dirs) . ' directories');
             foreach ($dirs as $dir) {
                 $path = trim(str_replace($this->storageRoot, '', $dir->getPathname()), '/');
 
@@ -511,7 +506,6 @@ class BookDirectoryParser
                     continue;
                 }
                 if (!empty($bookPathInfo['error'])) {
-                    error_log('processDirPath error: ' . $bookPathInfo['error']);
                     continue;
                 }
 
@@ -577,7 +571,110 @@ class BookDirectoryParser
                 $books[] = $book;
             }
         } catch (\Exception $e) {
-            error_log(sprintf('Error scanning directory %s: %s', $directory, $e->getMessage()));
+        }
+
+        return $books;
+    }
+
+    /**
+     * Parse a directory structure to find books and extract metadata.
+     *
+     * Directory structure should be: /genre/author/series/title/
+     * or /genre/author/title/
+     *
+     * @param string $directory The base directory to parse
+     * @param array $config Configuration options
+     * @return array Array of book metadata
+     */
+    public function parseDirectory(string $directory, array $config = []): array
+    {
+        $directory = $this->resolveStoragePath($directory);
+        if (!is_dir($directory) || !is_readable($directory)) {
+            throw new \InvalidArgumentException("Directory does not exist or is not readable: $directory");
+        }
+        $books = [];
+        $finder = new Finder();
+        $baseDepth = count(explode('/', rtrim($directory, '/')));
+
+        try {
+            // Find all directories that could be books (2-4 levels deep from base)
+            $dirs = $finder
+                ->directories()
+                ->in($directory)
+                ->sortByName();
+
+            foreach ($dirs as $dir) {
+                $path = trim(str_replace($this->storageRoot, '', $dir->getPathname()), '/');
+                $bookPathInfo = $this->processDirPath($path);
+
+                if (!empty($bookPathInfo['skipped'])) {
+                    continue;
+                }
+                if (!empty($bookPathInfo['error'])) {
+                    continue;
+                }
+
+                // Skip if any direct subdirectory contains audio files (treat only leaf-most dirs as books)
+                $subdirs = iterator_to_array((new Finder())->directories()->in($this->storageRoot . '/' . $path)->depth('== 0'));
+                $hasAudioInSubdir = false;
+                foreach ($subdirs as $subdir) {
+                    $audioFiles = (new Finder())->files()
+                        ->in($subdir->getPathname())
+                        ->name(['*.mp3', '*.m4b', '*.m4a', '*.aac', '*.flac', '*.wav', '*.ogg'])
+                        ->depth('== 0');
+                    if (iterator_count($audioFiles) > 0) {
+                        $hasAudioInSubdir = true;
+                        break;
+                    }
+                }
+                if ($hasAudioInSubdir) {
+                    continue;
+                }
+
+                // Get audio file data
+                $audioFilesData = $this->getAudioFiles($this->storageRoot . '/' . $path);
+                $audioFileCount = $audioFilesData['count'];
+                $totalDuration = $audioFilesData['totalDuration'];
+                $fileTags = $audioFilesData['fileTags'];
+
+                if ($audioFileCount === 0) {
+                    continue;
+                }
+
+                if (!empty($bookPathInfo['series']) && is_array($bookPathInfo['series'])) {
+                    $seriesName = array_key_first($bookPathInfo['series']);
+                    $seriesNumber = $bookPathInfo['series'][$seriesName] ?? null;
+                } else {
+                    $seriesName = '';
+                    $seriesNumber = null;
+                }
+
+                // Find cover image for this book directory
+                [$coverImage, $coverCandidates] = $this->findCoverImageCandidate($path);
+
+                // Build $book array using trait output and audio file data
+                $book = [
+                    'directory_path' => $path,
+                    'genre' => $bookPathInfo['genre'] ?? [],
+                    'author' => $bookPathInfo['author'] ?? [],
+                    'series' => $bookPathInfo['series'] ?? null,
+                    'seriesName' => $seriesName,
+                    'seriesNumber' => $seriesNumber,
+                    'title' => $bookPathInfo['title'] ?? '',
+                    'audio_file_count' => $audioFileCount,
+                    'duration' => $totalDuration,
+                    'duration_formatted' => is_numeric($totalDuration) ? $this->formatDuration($totalDuration) : 'N/A',
+                    'file_tags' => $fileTags,
+                    'needs_review' => false,
+                    'cover_image' => $coverImage ?? null,
+                ];
+
+                // Optionally: merge in additional metadata from .abs or audio files here
+                // ...
+
+                $books[] = $book;
+            }
+        } catch (\Exception $e) {
         }
 
         return $books;
@@ -609,11 +706,6 @@ class BookDirectoryParser
                         }
                     }
                 } catch (\Exception $e) {
-                    error_log(sprintf(
-                        'Error getting duration for %s: %s',
-                        $file->getPathname(),
-                        $e->getMessage()
-                    ));
                 }
             }
             if ($totalDuration > 0) {
@@ -685,6 +777,12 @@ class BookDirectoryParser
             $title = $this->cleanText($basename);
 
             // Initialize basic book data
+            // Count all audio files in the directory
+            $directory = $file->getPath();
+            $audioExtensions = ['mp3', 'm4b', 'm4a', 'aac', 'flac', 'wav', 'ogg'];
+            $audioFiles = glob($directory . '/*.{mp3,m4b,m4a,aac,flac,wav,ogg}', GLOB_BRACE);
+            $audioFileCount = $audioFiles ? count($audioFiles) : 1;
+
             $book = [
                 'title' => $title,
                 'author' => $author,
@@ -696,6 +794,10 @@ class BookDirectoryParser
                 'full_path' => $file->getPathname(),
                 'needs_review' => true,
                 'review_reason' => 'Found individual file instead of directory',
+                'audio_file_count' => $audioFileCount,
+                'duration' => 0,
+                'duration_formatted' => '00:00:00',
+                'description' => '',
             ];
 
             // Try to extract additional metadata from filename
@@ -719,12 +821,16 @@ class BookDirectoryParser
                 }
                 if (!empty($metadata['year'])) {
                     $book['year'] = $metadata['year'];
+                } elseif (!empty($metadata['publishedYear'])) {
+                    $book['year'] = is_numeric($metadata['publishedYear']) ? (int)$metadata['publishedYear'] : $metadata['publishedYear'];
+                }
+                if (isset($metadata['description'])) {
+                    $book['description'] = $metadata['description'];
                 }
             }
 
             return $book;
         } catch (\Exception $e) {
-            error_log(sprintf('Error parsing book file %s: %s', $file->getPathname(), $e->getMessage()));
             return null;
         }
     }
