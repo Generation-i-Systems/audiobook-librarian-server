@@ -9,6 +9,127 @@ use Illuminate\Support\Facades\Cache;
 
 class AudibleService extends BaseBookService
 {
+    /**
+     * Attempt to look up the book in Audible and return additional metadata.
+     *
+     * @param array $book
+     * @return array|null
+     */
+    public function searchAndMerge(array $book): ?array
+    {
+        $inputTitle = trim($book['title'] ?? '');
+        $inputAuthor = trim(($book['authors'][0]['author']['name'] ?? '') ?: ($book['author'] ?? ''));
+        if (!$inputTitle) {
+            return null;
+        }
+        $query = $inputTitle;
+        $options = ['limit' => 10];
+        if ($inputAuthor) {
+            $options['author'] = $inputAuthor;
+        }
+        $results = $this->performSearch($query, $options) ?? [];
+        if (empty($results)) {
+            return null;
+        }
+        $bestScore = 0;
+        $bestMatch = null;
+        foreach ($results as $result) {
+            $score = 0;
+            if (!empty($result['title']) && stripos($result['title'], $inputTitle) !== false) {
+                $score += 3;
+            } elseif (!empty($result['title']) && similar_text(strtolower($result['title']), strtolower($inputTitle), $pct) && $pct > 80) {
+                $score += 2;
+            }
+            if (!empty($inputAuthor) && !empty($result['authors'])) {
+                foreach ($result['authors'] as $authorObj) {
+                    $authorName = is_array($authorObj['author'] ?? null) ? $authorObj['author']['name'] ?? '' : ($authorObj['author'] ?? '');
+                    if ($authorName && stripos($authorName, $inputAuthor) !== false) {
+                        $score += 2;
+                        break;
+                    }
+                }
+            }
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $bestMatch = $result;
+            }
+        }
+        if (!$bestMatch) {
+            return null;
+        }
+        $details = null;
+        if (!empty($bestMatch['id'])) {
+            $details = $this->performGetBookDetails($bestMatch['id']);
+        }
+        // Use detail structure if available, fallback to search result
+        $source = $details ?: $bestMatch;
+        $merged = [
+            'audible_id' => $source['id'] ?? $source['asin'] ?? null,
+            'title' => $source['title'] ?? null,
+            'subtitle' => $source['subtitle'] ?? null,
+            'description' => $source['description'] ?? $source['publisher_summary'] ?? null,
+            'cover_image' => $source['cover_image_url'] ?? ($source['product_images']['large'] ?? null),
+            'authors' => $source['authors'] ?? null,
+            'narrators' => $source['narrators'] ?? null,
+            'publisher' => $source['publisher']['name'] ?? $source['publisher_name'] ?? null,
+            'release_date' => $source['published_date'] ?? $source['release_date'] ?? null,
+            'series' => $source['series'] ?? null,
+            'categories' => $source['categories'] ?? null,
+            'duration' => $source['duration'] ?? ($source['runtime_length_min'] ? ($source['runtime_length_min'] . ':00') : null),
+            'rating' => $source['rating'] ?? null,
+            'ratings_count' => $source['ratings_count'] ?? null,
+            'sample_url' => $source['sample_url'] ?? null,
+            'url' => $source['url'] ?? $source['product_url'] ?? null,
+            'language' => $source['language'] ?? null,
+        ];
+        // Download cover image if present and directory_path is available
+        if (!empty($merged['cover_image']) && !empty($book['directory_path'])) {
+            $coverUrl = $merged['cover_image'];
+            $directory = rtrim($book['directory_path'], '/');
+            $ext = pathinfo(parse_url($coverUrl, PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'jpg';
+            $localFilename = $directory . '/cover.' . $ext;
+            try {
+                if (class_exists('Illuminate\\Support\\Facades\\Http')) {
+                    $response = \Illuminate\Support\Facades\Http::withOptions(['verify' => false])->get($coverUrl);
+                    if ($response->successful()) {
+                        file_put_contents($localFilename, $response->body());
+                        $merged['cover_image'] = $localFilename;
+                    }
+                } else {
+                    $imageData = @file_get_contents($coverUrl);
+                    if ($imageData !== false) {
+                        file_put_contents($localFilename, $imageData);
+                        $merged['cover_image'] = $localFilename;
+                    }
+                }
+            } catch (\Exception $e) {
+                if (class_exists('Illuminate\\Support\\Facades\\Log')) {
+                    \Illuminate\Support\Facades\Log::warning('Failed to download cover image', ['url' => $coverUrl, 'error' => $e->getMessage()]);
+                }
+            }
+        }
+        $apiFields = [];
+        $needsReview = false;
+        foreach ($merged as $field => $newValue) {
+            if (array_key_exists($field, $book) && $book[$field] !== null && $newValue !== null && $book[$field] != $newValue) {
+                $apiFields[$field] = $newValue;
+                $needsReview = true;
+                $merged[$field] = $book[$field];
+            }
+        }
+        if ($needsReview) {
+            $merged['audible_fields'] = $apiFields;
+            $merged['needsReview'] = true;
+        }
+        // Remove nulls and skip ISBN/pages if not present
+        return array_filter($merged, function($v, $k) {
+            if (in_array($k, ['isbn_10', 'isbn_13', 'pages']) && $v === null) {
+                return false;
+            }
+            return $v !== null;
+        }, ARRAY_FILTER_USE_BOTH);
+    }
+
     protected string $baseUrl = 'https://api.audible.com/1.0/catalog';
     protected string $imageBaseUrl = 'https://m.media-amazon.com/images/I/';
 

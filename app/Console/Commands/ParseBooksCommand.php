@@ -22,7 +22,11 @@ class ParseBooksCommand extends Command
                             {--min-size= : Minimum file size in bytes}
                             {--max-depth= : Maximum directory depth to scan}
                             {--dry-run : Show what would be done without making any changes}
-                            {--sort : Sort output by author, series, series number, and title}';
+                            {--sort : Sort output by author, series, series number, and title}
+                            {--save-json : Save output JSON into each book directory}
+                            {--json-filename= : Filename for saved JSON (default: librarian.json)}
+                            {--enrich : Lookup and enrich metadata from selected APIs}
+                            {--apis= : Comma-separated list of APIs to use with --enrich (google,audible,abbay,hardcover)}';
 
     /**
      * The console command description.
@@ -84,6 +88,99 @@ class ParseBooksCommand extends Command
             }
 
             $duration = round(microtime(true) - $startTime, 2);
+
+            // Enrich metadata from APIs if requested
+            $enrich = $this->option('enrich');
+            $apisOpt = $this->option('apis');
+            $apiMap = [
+                'google' => 'Google Books',
+                'audible' => 'Audible',
+                'abbay' => 'AudiobookBay',
+                'hardcover' => 'Hardcover',
+            ];
+            $apis = $apisOpt ? array_intersect(array_keys($apiMap), array_map('trim', explode(',', strtolower($apisOpt)))) : array_keys($apiMap);
+            if ($enrich) {
+                foreach ($allBooks as &$book) {
+                    $title = $book['title'] ?? '';
+                    $author = is_array($book['author'] ?? null) ? ($book['author'][0] ?? '') : ($book['author'] ?? '');
+                    $this->info("Enriching metadata for: $title by $author");
+
+                    // Google Books API
+                    if (in_array('google', $apis) && class_exists('\App\Services\GoogleBooksApiService')) {
+                        $googleApi = app(\App\Services\GoogleBooksApiService::class);
+                        $result = $googleApi->searchAndMerge($book);
+                        if ($result) {
+                            $book = array_merge($book, $result);
+                            $this->info('  Google Books: found and merged');
+                        } else {
+                            $this->info('  Google Books: no match');
+                        }
+                    }
+                    // Audible API
+                    if (in_array('audible', $apis) && class_exists('\App\Services\AudibleService')) {
+                        $audibleApi = app(\App\Services\AudibleService::class);
+                        $result = $audibleApi->searchAndMerge($book);
+                        if ($result) {
+                            $book = array_merge($book, $result);
+                            $this->info('  Audible: found and merged');
+                        } else {
+                            $this->info('  Audible: no match');
+                        }
+                    }
+                    // AudiobookBay API
+                    if (in_array('abbay', $apis) && trait_exists('\App\Traits\AudiobookBayApiTrait')) {
+                        $trait = new class {
+                            use \App\Traits\AudiobookBayApiTrait;
+                        };
+                        $result = $trait->searchAndMerge($book);
+                        if ($result) {
+                            $book = array_merge($book, $result);
+                            $this->info('  AudiobookBay: found and merged');
+                        } else {
+                            $this->info('  AudiobookBay: no match');
+                        }
+                    }
+                    // Hardcover API
+                    if (in_array('hardcover', $apis) && trait_exists('\App\Traits\HardcoverApiTrait')) {
+                        $trait = new class {
+                            use \App\Traits\HardcoverApiTrait;
+                        };
+                        $result = $trait->searchAndMerge($book);
+                        if ($result) {
+                            $book = array_merge($book, $result);
+                            $this->info('  Hardcover: found and merged');
+                        } else {
+                            $this->info('  Hardcover: no match');
+                        }
+                    }
+                }
+                unset($book);
+            }
+
+            // Save JSON files if requested
+            $saveJson = $this->option('save-json');
+            $jsonFilename = $this->option('json-filename') ?: 'librarian.json';
+            if ($saveJson) {
+                foreach ($allBooks as $book) {
+                    $dirPath = $book['directory_path'] ?? null;
+                    if ($dirPath) {
+                        $resolvedDir = $parser->resolveStoragePath($dirPath);
+                        if (!is_dir($resolvedDir)) {
+                            $this->error("Directory does not exist: $resolvedDir");
+                            continue;
+                        }
+                        $jsonPath = rtrim($resolvedDir, '/').'/'.$jsonFilename;
+                        $jsonData = json_encode($book, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+                        if (file_put_contents($jsonPath, $jsonData) !== false) {
+                            $this->info("Saved JSON to $jsonPath");
+                        } else {
+                            $this->error("Failed to write JSON to $jsonPath");
+                        }
+                    } else {
+                        $this->error("No directory_path for book: ".($book['title'] ?? '[unknown]'));
+                    }
+                }
+            }
 
             // First pass: Clean up basic fields
             foreach ($allBooks as &$book) {

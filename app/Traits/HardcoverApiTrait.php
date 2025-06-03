@@ -11,6 +11,83 @@ use Illuminate\Support\Facades\Log;
 trait HardcoverApiTrait
 {
     /**
+     * Attempt to look up the book in Hardcover and return additional metadata.
+     *
+     * @param array $book
+     * @return array|null
+     */
+    /**
+     * Attempt to look up the book in Hardcover and return additional metadata.
+     *
+     * @param array $book
+     * @return array|null
+     */
+    public function searchAndMerge(array $book): ?array
+    {
+        $title = $book['title'] ?? null;
+        $authors = $book['authors'] ?? [];
+        if (!$title) {
+            return null;
+        }
+        $limit = 5;
+        $results = $this->searchBooksByTitle($title, $limit);
+        if (!$results || empty($results)) {
+            return null;
+        }
+
+        // Try to find the best match by title and author similarity
+        $bestMatch = null;
+        $bestScore = 0;
+        foreach ($results as $result) {
+            $score = 0;
+            // Title similarity (case-insensitive, normalized)
+            if (strcasecmp(trim($result['title']), trim($title)) === 0) {
+                $score += 2;
+            } elseif (stripos($result['title'], $title) !== false) {
+                $score += 1;
+            }
+            // Author match (if available)
+            if (!empty($authors) && !empty($result['authors'])) {
+                foreach ($authors as $inputAuthor) {
+                    foreach ($result['authors'] as $authorObj) {
+                        $authorName = is_array($authorObj['author'] ?? null) ? $authorObj['author']['name'] ?? '' : ($authorObj['author'] ?? '');
+                        if ($authorName && stripos($authorName, $inputAuthor) !== false) {
+                            $score += 2;
+                            break 2;
+                        }
+                    }
+                }
+            }
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $bestMatch = $result;
+            }
+        }
+        if (!$bestMatch) {
+            return null;
+        }
+
+        // Optionally fetch more details by ID (if available)
+        $details = null;
+        if (!empty($bestMatch['id'])) {
+            $details = $this->getBookDetails($bestMatch['id']);
+        }
+        $merged = [
+            'hardcover_id' => $bestMatch['id'] ?? null,
+            'title' => $bestMatch['title'] ?? null,
+            'description' => $details['description'] ?? $bestMatch['description'] ?? null,
+            'cover_image' => $details['cover_image_url'] ?? $bestMatch['cover_image_url'] ?? null,
+            'pages' => $details['pages'] ?? $bestMatch['pages'] ?? null,
+            'release_date' => $details['release_date'] ?? $bestMatch['release_date'] ?? null,
+            'isbn_10' => $details['isbn_10'] ?? $bestMatch['isbn_10'] ?? null,
+            'isbn_13' => $details['isbn_13'] ?? $bestMatch['isbn_13'] ?? null,
+            'publisher' => $details['publisher']['name'] ?? $bestMatch['publisher']['name'] ?? null,
+        ];
+        // Remove nulls
+        return array_filter($merged, fn($v) => $v !== null);
+    }
+
+    /**
      * Base URL for the Hardcover API
      *
      * @var string
