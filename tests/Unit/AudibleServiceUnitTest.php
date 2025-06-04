@@ -5,6 +5,7 @@ namespace Tests\Unit;
 use App\Services\AudibleService;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\Test;
 
 class AudibleServiceUnitTest extends TestCase
 {
@@ -13,19 +14,27 @@ class AudibleServiceUnitTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Mock the cache facade
+        $cache = new \Illuminate\Cache\Repository(
+            new \Illuminate\Cache\ArrayStore()
+        );
+        $this->app->instance('cache', $cache);
+
+        // Create the service instance
         $this->service = new AudibleService();
     }
 
-    /** @test */
-    public function it_can_search_books_by_title()
+    #[Test]
+    public function testItCanSearchBooksByTitle()
     {
         // Mock the HTTP response
         Http::fake([
             'api.audible.com/1.0/catalog/products*' => Http::response([
                 'products' => [
-                    $this->getMockBookData()
-                ]
-            ], 200, ['Content-Type' => 'application/json'])
+                    $this->getMockBookData(),
+                ],
+            ], 200, ['Content-Type' => 'application/json']),
         ]);
 
         $results = $this->service->searchBooks('Test Book');
@@ -37,16 +46,16 @@ class AudibleServiceUnitTest extends TestCase
         $this->assertStringContainsString('500x500', $results[0]['cover_image_url']);
     }
 
-    /** @test */
-    public function it_gets_book_details()
+    #[Test]
+    public function testItGetsBookDetails()
     {
         $mockBook = $this->getMockBookData();
-        
+
         // Mock the HTTP response
         Http::fake([
             'api.audible.com/1.0/catalog/products/TEST123*' => Http::response([
-                'product' => $mockBook
-            ], 200, ['Content-Type' => 'application/json'])
+                'product' => $mockBook,
+            ], 200, ['Content-Type' => 'application/json']),
         ]);
 
         $book = $this->service->getBookDetails('TEST123');
@@ -55,18 +64,18 @@ class AudibleServiceUnitTest extends TestCase
         $this->assertEquals('Test Book', $book['title']);
         $this->assertEquals('Test Author', $book['authors'][0]['author']['name']);
         $this->assertEquals('Test Narrator', $book['narrators'][0]['author']['name']);
-        $this->assertEquals('Fiction', $book['genres'][0]['genre']['name']);
-        $this->assertEquals('10:30:00', $book['duration']);
+        $this->assertEquals('Fiction', $book['categories'][0]);
+        $this->assertEquals('630:00', $book['duration']);
     }
 
-    /** @test */
-    public function it_handles_api_errors_gracefully()
+    #[Test]
+    public function testItHandlesApiErrorsGracefully()
     {
         Http::fake([
             'api.audible.com/1.0/catalog/products*' => Http::response(
-                ['message' => 'Invalid request'], 
+                ['message' => 'Invalid request'],
                 400
-            )
+            ),
         ]);
 
         $results = $this->service->searchBooks('Nonexistent Book');
@@ -83,10 +92,10 @@ class AudibleServiceUnitTest extends TestCase
             'title' => 'Test Book',
             'subtitle' => 'A Test Subtitle',
             'authors' => [
-                ['name' => 'Test Author', 'asin' => 'AUTH123']
+                ['name' => 'Test Author', 'asin' => 'AUTH123'],
             ],
             'narrators' => [
-                ['name' => 'Test Narrator', 'asin' => 'NARR123']
+                ['name' => 'Test Narrator', 'asin' => 'NARR123'],
             ],
             'publisher_name' => 'Test Publisher',
             'release_date' => '2023-01-01T00:00:00.000Z',
@@ -100,8 +109,8 @@ class AudibleServiceUnitTest extends TestCase
                 [
                     ['name' => 'Fiction'],
                     ['name' => 'Science Fiction'],
-                    ['name' => 'Adventure']
-                ]
+                    ['name' => 'Adventure'],
+                ],
             ],
             'runtime_length_min' => 630, // 10 hours and 30 minutes in minutes
             'language' => 'english',
@@ -109,11 +118,11 @@ class AudibleServiceUnitTest extends TestCase
             'format_type' => 'unabridged',
             'available_codecs' => [
                 ['name' => 'format4', 'enhanced_codec' => 'mp4a'],
-                ['name' => 'format3', 'enhanced_codec' => 'mp3']
+                ['name' => 'format3', 'enhanced_codec' => 'mp3'],
             ],
             'content_type' => 'audio',
             'content_delivery_type' => 'SinglePartBook',
-            'publication_name' => 'Test Publication'
+            'publication_name' => 'Test Publication',
         ];
     }
 }

@@ -20,7 +20,7 @@ trait BaseApiTrait
     /**
      * Make an HTTP GET request
      */
-    protected function httpGet(string $endpoint, array $params = []): ?array
+    protected function httpGet(string $endpoint, array $params = []): ?\Illuminate\Http\Client\Response
     {
         $cacheKey = $this->getCacheKey($endpoint, $params);
         
@@ -31,7 +31,7 @@ trait BaseApiTrait
                 ->get($this->baseUrl . $endpoint, $params);
                 
             if ($response->successful()) {
-                return $response->json();
+                return $response;
             }
             
             Log::error('API request failed', [
@@ -48,7 +48,7 @@ trait BaseApiTrait
     /**
      * Make an HTTP POST request
      */
-    protected function httpPost(string $endpoint, array $data = []): ?array
+    protected function httpPost(string $endpoint, array $data = []): ?\Illuminate\Http\Client\Response
     {
         $cacheKey = $this->getCacheKey($endpoint, $data);
         
@@ -59,7 +59,7 @@ trait BaseApiTrait
                 ->post($this->baseUrl . $endpoint, $data);
                 
             if ($response->successful()) {
-                return $response->json();
+                return $response;
             }
             
             Log::error('API request failed', [
@@ -83,7 +83,7 @@ trait BaseApiTrait
         
         if ($count >= $this->rateLimit) {
             Log::warning('API rate limit reached', ['service' => $this->serviceName]);
-            throw new \RuntimeException("{$this->serviceName} API rate limit exceeded. Please try again later.");
+            throw new \RuntimeException("{$this->serviceName}API rate limit exceeded. Please try again later.");
         }
         
         Cache::put($cacheKey, $count + 1, now()->addHour());
@@ -147,6 +147,15 @@ trait BaseApiTrait
     public function setRateLimit(int $requestsPerHour): self
     {
         $this->rateLimit = $requestsPerHour;
+        return $this;
+    }
+
+    /**
+     * Set the service name
+     */
+    public function setServiceName(string $serviceName): self
+    {
+        $this->serviceName = $serviceName;
         return $this;
     }
 }

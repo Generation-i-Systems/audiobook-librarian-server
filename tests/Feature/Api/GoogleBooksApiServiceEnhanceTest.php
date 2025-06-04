@@ -6,9 +6,8 @@ namespace Tests\Feature\Api;
 
 use App\Services\GoogleBooksApiService;
 use Illuminate\Filesystem\Filesystem;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Orchestra\Testbench\TestCase;
+use PHPUnit\Framework\Attributes\Test;
 
 class GoogleBooksApiServiceEnhanceTest extends TestCase
 {
@@ -30,7 +29,7 @@ class GoogleBooksApiServiceEnhanceTest extends TestCase
         parent::tearDown();
     }
 
-    #[\PHPUnit\Framework\Attributes\Test]
+    #[Test]
     public function coverImageIsDownloadedAndPathIsSet()
     {
         $service = new GoogleBooksApiService();

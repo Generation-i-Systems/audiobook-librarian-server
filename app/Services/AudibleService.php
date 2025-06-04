@@ -397,13 +397,15 @@ class AudibleService extends BaseBookService
     protected function extractGenres(array $ladders): array
     {
         $genres = [];
-
-        foreach ($ladders as $ladder) {
-            if (is_array($ladder) && !empty($ladder['root'])) {
-                $genres[] = $ladder['root'];
+        foreach ($ladders as $ladder_items) { // e.g., [['name' => 'Fiction'], ['name' => 'Sci-Fi']]
+            if (is_array($ladder_items)) {
+                foreach ($ladder_items as $item) { // e.g., ['name' => 'Fiction']
+                    if (is_array($item) && !empty($item['name'])) {
+                        $genres[] = $item['name'];
+                    }
+                }
             }
         }
-
         return array_unique($genres);
     }
 

@@ -3,6 +3,8 @@
 namespace Tests\Feature\Api;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Config;
 use Tests\TestCase;
 
 abstract class BaseApiTest extends TestCase
@@ -14,12 +16,20 @@ abstract class BaseApiTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Ensure a clean cache state for tests
+        if (config('cache.default') === 'array') {
+            \Illuminate\Support\Facades\Cache::store('array')->flush();
+        } else {
+            \Illuminate\Support\Facades\Cache::fake();
+        }
+
+        // HTTP faking will be handled by specific test methods or their own setUp.
         
-        // Mock HTTP client
-        Http::fake();
-        
-        // Set up test API key
-        $this->apiKey = config('services.' . $this->getServiceName() . '.key', 'test_key');
+        // Set up test API key by directly setting the config value
+        $testApiKey = 'test_api_key_for_' . $this->getServiceName();
+        Config::set('services.' . $this->getServiceName() . '.key', $testApiKey);
+        $this->apiKey = $testApiKey;
     }
     
     abstract protected function getServiceName(): string;

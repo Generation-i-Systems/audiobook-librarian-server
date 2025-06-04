@@ -3,11 +3,14 @@
 namespace Tests\Feature\Api;
 
 use App\Traits\AudiobookBayApiTrait;
+use App\Traits\BaseApiTrait; // Re-added BaseApiTrait import
 use Illuminate\Support\Facades\Http;
+use Tests\Feature\Api\BaseApiTest;
+use PHPUnit\Framework\Attributes\Test;
 
 class AudiobookBayApiTest extends BaseApiTest
 {
-    private AudiobookBayApiTrait $audiobookBayApi;
+    private object $audiobookBayApi; // Changed type hint to object
 
     protected string $apiBaseUrl = 'https://audiobookbay.lu';
     protected string $testUsername = 'testuser';
@@ -19,6 +22,7 @@ class AudiobookBayApiTest extends BaseApiTest
 
         // Create a new instance of a class that uses the trait
         $this->audiobookBayApi = new class {
+            use BaseApiTrait; // Re-added BaseApiTrait
             use AudiobookBayApiTrait;
         };
 
@@ -27,6 +31,8 @@ class AudiobookBayApiTest extends BaseApiTest
             'username' => $this->testUsername,
             'password' => $this->testPassword,
         ]);
+        $this->audiobookBayApi->setBaseUrl($this->apiBaseUrl); // Explicitly set base URL
+        $this->audiobookBayApi->setServiceName($this->getServiceName()); // Set service name
     }
 
     protected function getServiceName(): string
@@ -45,10 +51,10 @@ class AudiobookBayApiTest extends BaseApiTest
                     'cover_image_url' => 'http://example.com/cover.jpg',
                     'metadata' => [
                         'source' => 'audiobookbay',
-                        'categories' => ['Fiction']
-                    ]
-                ]
-            ]
+                        'categories' => ['Fiction'],
+                    ],
+                ],
+            ],
         ];
     }
 
@@ -69,47 +75,47 @@ class AudiobookBayApiTest extends BaseApiTest
                 'downloads' => [
                     [
                         'url' => 'https://audiobookbay.lu/download/test',
-                        'text' => 'Download'
-                    ]
-                ]
-            ]
+                        'text' => 'Download',
+                    ],
+                ],
+            ],
         ];
     }
 
 
 
-    /** @test */
-    public function it_can_login()
+    #[Test]
+    public function testCanLogin()
     {
         // Mock successful login
         Http::fake([
             'audiobookbay.lu/member/login.php' => Http::response('', 200, ['Set-Cookie' => 'test_cookie=value']),
         ]);
 
-        $result = $this->login();
-        
+        $result = $this->audiobookBayApi->login();
+
         $this->assertTrue($result);
     }
 
-    /** @test */
-    public function it_can_search_books()
+    #[Test]
+    public function testCanSearchBooks()
     {
         $this->mockSuccessfulSearchResponse();
-        
-        $results = $this->searchBooks($this->testQuery);
-        
+
+        $results = $this->audiobookBayApi->searchBooks($this->testQuery);
+
         $this->assertIsArray($results);
         $this->assertNotEmpty($results);
-        $this->assertCommonBookStructure($results[0]);
+        $this->assertCommonBookStructure($results['items'][0]);
     }
 
-    /** @test */
-    public function it_can_get_book_details()
+    #[Test]
+    public function testCanGetBookDetails()
     {
         $this->mockSuccessfulDetailsResponse();
-        
-        $book = $this->getBookDetails('test-id');
-        
+
+        $book = $this->audiobookBayApi->getBookDetails('test-id');
+
         $this->assertIsArray($book);
         $this->assertCommonBookStructure($book);
     }

@@ -9,11 +9,11 @@ class AudibleApiTest extends BaseApiTest
     private AudibleApiTrait $audibleApi;
 
     protected string $apiBaseUrl = 'https://api.audible.com/1.0/catalog/products';
-    
+
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Create a new instance of a class that uses the trait
         $this->audibleApi = new class {
             use AudibleApiTrait;
@@ -41,19 +41,19 @@ class AudibleApiTest extends BaseApiTest
                     'asin' => 'TEST123',
                     'title' => 'Test Audiobook',
                     'authors' => [
-                        ['name' => 'Test Author']
+                        ['name' => 'Test Author'],
                     ],
                     'publisher_name' => 'Test Publisher',
                     'publisher_summary' => 'Test Description',
                     'release_date' => '2023-01-01T00:00:00Z',
                     'product_images' => [
-                        '500' => 'http://example.com/cover.jpg'
+                        '500' => 'http://example.com/cover.jpg',
                     ],
                     'category_ladders' => [
-                        ['name' => 'Fiction']
-                    ]
-                ]
-            ]
+                        ['name' => 'Fiction'],
+                    ],
+                ],
+            ],
         ];
     }
 
@@ -64,44 +64,40 @@ class AudibleApiTest extends BaseApiTest
                 'asin' => 'TEST123',
                 'title' => 'Test Audiobook',
                 'authors' => [
-                    ['name' => 'Test Author']
+                    ['name' => 'Test Author'],
                 ],
                 'publisher_name' => 'Test Publisher',
                 'publisher_summary' => 'Test Description',
                 'release_date' => '2023-01-01T00:00:00Z',
                 'product_images' => [
-                    '500' => 'http://example.com/cover.jpg'
+                    '500' => 'http://example.com/cover.jpg',
                 ],
                 'category_ladders' => [
-                    ['name' => 'Fiction']
-                ]
-            ]
+                    ['name' => 'Fiction'],
+                ],
+            ],
         ];
     }
 
-    /**
-     * @test
-     */
-    public function it_can_search_books(): void
+    #[Test]
+    public function canSearchBooks(): void
     {
         $this->mockSuccessfulSearchResponse();
-        
+
         $results = $this->audibleApi->searchBooks($this->testQuery);
-        
+
         $this->assertIsArray($results);
         $this->assertNotEmpty($results);
         $this->assertCommonBookStructure($results[0]);
     }
 
-    /**
-     * @test
-     */
-    public function it_can_get_book_details(): void
+    #[Test]
+    public function canGetBookDetails(): void
     {
         $this->mockSuccessfulDetailsResponse();
-        
+
         $book = $this->audibleApi->getBookDetails('TEST123');
-        
+
         $this->assertIsArray($book);
         $this->assertCommonBookStructure($book);
     }

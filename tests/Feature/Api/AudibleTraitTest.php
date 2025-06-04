@@ -6,6 +6,7 @@ use App\Traits\AudibleApiTrait;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\Test;
 
 class AudibleTraitTest extends TestCase
 {
@@ -20,22 +21,22 @@ class AudibleTraitTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Mock Cache facade
         Cache::shouldReceive('remember')
             ->andReturnUsing(function ($key, $ttl, $callback) {
                 return $callback();
             });
-            
+
         Cache::shouldReceive('get')
             ->andReturn(0);
-            
+
         Cache::shouldReceive('put')
             ->andReturn(true);
-        
+
         // Mock HTTP client
         Http::fake();
-        
+
         // Initialize the trait
         $this->initAudible([
             'access_key' => $this->testAccessKey,
@@ -45,8 +46,8 @@ class AudibleTraitTest extends TestCase
         ]);
     }
 
-    /** @test */
-    public function it_can_initialize_audible_api()
+    #[Test]
+    public function testCanInitializeAudibleApi()
     {
         $this->assertNotNull($this->audibleAccessKey);
         $this->assertNotNull($this->audibleSecretKey);
@@ -58,8 +59,8 @@ class AudibleTraitTest extends TestCase
         $this->assertEquals($this->testRegion, $this->audibleRegion);
     }
 
-    /** @test */
-    public function it_can_search_audiobooks()
+    #[Test]
+    public function testCanSearchAudiobooks()
     {
         $mockResponse = [
             'Items' => [
@@ -78,15 +79,15 @@ class AudibleTraitTest extends TestCase
                             'EditorialReview' => [
                                 'Source' => 'Product Description',
                                 'Content' => 'Test Description',
-                            ]
-                        ]
-                    ]
-                ]
-            ]
+                            ],
+                        ],
+                    ],
+                ],
+            ],
         ];
 
         Http::fake([
-            'api.audible.*' => Http::response($mockResponse, 200)
+            'api.audible.*' => Http::response($mockResponse, 200),
         ]);
 
         $results = $this->searchAudiobooks('test');
@@ -98,8 +99,8 @@ class AudibleTraitTest extends TestCase
         $this->assertEquals(['Test Author'], $results[0]['authors']);
     }
 
-    /** @test */
-    public function it_can_get_audiobook_details()
+    #[Test]
+    public function testCanGetAudiobookDetails()
     {
         $mockResponse = [
             'Items' => [
@@ -118,14 +119,14 @@ class AudibleTraitTest extends TestCase
                         'EditorialReview' => [
                             'Source' => 'Product Description',
                             'Content' => 'Test Description',
-                        ]
-                    ]
-                ]
-            ]
+                        ],
+                    ],
+                ],
+            ],
         ];
 
         Http::fake([
-            'api.audible.*' => Http::response($mockResponse, 200)
+            'api.audible.*' => Http::response($mockResponse, 200),
         ]);
 
         $details = $this->getAudiobookDetails('TEST123');

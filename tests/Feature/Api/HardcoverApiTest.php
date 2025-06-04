@@ -3,6 +3,8 @@
 namespace Tests\Feature\Api;
 
 use App\Traits\HardcoverApiTrait;
+use Tests\Feature\Api\BaseApiTest;
+use PHPUnit\Framework\Attributes\Test;
 
 class HardcoverApiTest extends BaseApiTest
 {
@@ -27,9 +29,9 @@ class HardcoverApiTest extends BaseApiTest
                     'cover_image_url' => 'http://example.com/cover.jpg',
                     'published_date' => '2023-01-01',
                     'publisher' => 'Test Publisher',
-                    'categories' => ['Fiction']
-                ]
-            ]
+                    'categories' => ['Fiction'],
+                ],
+            ],
         ];
     }
 
@@ -43,29 +45,29 @@ class HardcoverApiTest extends BaseApiTest
             'cover_image_url' => 'http://example.com/cover.jpg',
             'published_date' => '2023-01-01',
             'publisher' => 'Test Publisher',
-            'categories' => ['Fiction']
+            'categories' => ['Fiction'],
         ];
     }
 
-    /** @test */
-    public function it_can_search_books()
+    #[Test]
+    public function testCanSearchBooks()
     {
         $this->mockSuccessfulSearchResponse();
-        
+
         $results = $this->searchBooks($this->testQuery);
-        
+
         $this->assertIsArray($results);
         $this->assertNotEmpty($results);
         $this->assertCommonBookStructure($results[0]);
     }
 
-    /** @test */
-    public function it_can_get_book_details()
+    #[Test]
+    public function testCanGetBookDetails()
     {
         $this->mockSuccessfulDetailsResponse();
-        
+
         $book = $this->getBookDetails('test_id');
-        
+
         $this->assertIsArray($book);
         $this->assertCommonBookStructure($book);
     }
