@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Api;
 
-use App\Traits\AudibleApiTrait;
+use App\Services\AudibleApiService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
 use PHPUnit\Framework\Attributes\Test;
@@ -10,7 +10,7 @@ use Tests\Feature\Api\BaseApiTest;
 
 class AudibleApiTraitTest extends BaseApiTest
 {
-    protected $audibleApi;
+    protected AudibleApiService $audibleApi;
     protected string $apiBaseUrl = 'https://api.audible.com/1.0';
     protected string $testAssociateTag = 'test-tag';
     protected string $testAccessKey = 'test-access-key';
@@ -21,35 +21,48 @@ class AudibleApiTraitTest extends BaseApiTest
     {
         parent::setUp();
 
-        // Mock the Cache facade to prevent database access
+        // Mock Cache::remember() for BaseApiTrait::httpGet users
         Cache::shouldReceive('remember')
             ->andReturnUsing(function ($key, $ttl, $callback) {
-                return $callback();
+                // You might want to add logging here to see which keys are being remembered
+                // Log::debug('Cache::remember mock called', ['key' => $key]);
+                return $callback(); // Execute the callback to simulate cache miss and fetch
             });
 
-        // Create a new instance of a class that uses the trait
-        $this->audibleApi = new class {
-            use AudibleApiTrait;
-        };
+        // Mock the Cache facade for AudibleApiService's custom cachedOrFetch
+        Cache::shouldReceive('tags')
+            ->with(['audible']) // Assuming 'audible' is the service name tag
+            ->andReturnSelf(); // Return the mock itself to chain ->get() and ->put()
 
-        // Initialize the trait properties
-        $this->audibleApi->initAudible([
-            'associate_tag' => $this->testAssociateTag,
-            'access_key' => $this->testAccessKey,
-            'secret_key' => $this->testSecretKey,
-            'region' => $this->testRegion,
+        Cache::shouldReceive('get')
+            ->withArgs(function ($key) {
+                // You can add more specific key checks here if needed
+                return is_string($key);
+            })
+            ->andReturnNull(); // Simulate cache miss
+
+        Cache::shouldReceive('put')
+            ->withArgs(function ($key, $value, $ttl) {
+                // Allow TTL to be numeric or a Carbon instance for rate limiting
+                return is_string($key) && (is_numeric($ttl) || $ttl instanceof \Illuminate\Support\Carbon);
+            })
+            ->andReturnTrue(); // Or ->byDefault()
+
+        // Configure service credentials for test environment
+        config([
+            'services.audible.access_key' => $this->testAccessKey,
+            'services.audible.secret_key' => $this->testSecretKey,
+            'services.audible.associate_tag' => $this->testAssociateTag,
+            'services.audible.region' => $this->testRegion,
+            'services.audible.base_url' => null, // Ensure service uses default for region
         ]);
 
-        // Mock HTTP client
+        // Resolve the service from the container
+        $this->audibleApi = app(AudibleApiService::class);
+
+        // Mock HTTP client - Http::fake() without arguments clears previous fakes and sets a default passthrough.
+        // Specific fakes are set in each test method.
         Http::fake();
-
-        // Initialize the trait
-        $this->audibleApi->initAudible([
-            'access_key' => $this->testAccessKey,
-            'secret_key' => $this->testSecretKey,
-            'associate_tag' => $this->testAssociateTag,
-            'region' => $this->testRegion,
-        ]);
     }
     
     protected function getServiceName(): string

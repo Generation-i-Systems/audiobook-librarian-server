@@ -23,7 +23,9 @@ class AudiobookBayApiTest extends BaseApiTest
         // Create a new instance of a class that uses the trait
         $this->audiobookBayApi = new class {
             use BaseApiTrait; // Re-added BaseApiTrait
-            use AudiobookBayApiTrait;
+            use AudiobookBayApiTrait {
+                AudiobookBayApiTrait::getDefaultHeaders insteadof BaseApiTrait;
+            }
         };
 
         // Initialize the API client with test credentials

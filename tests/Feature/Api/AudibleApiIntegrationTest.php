@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Api;
 
-use App\Traits\AudibleApiTrait;
+use App\Services\AudibleApiService;
 use App\Traits\BaseApiTrait;
 use Illuminate\Support\Facades\Http;
 use Tests\Feature\Api\BaseApiTest;
@@ -10,9 +10,9 @@ use PHPUnit\Framework\Attributes\Test;
 
 class AudibleApiIntegrationTest extends BaseApiTest
 {
-    private object $audibleApi;
+    private AudibleApiService $audibleApi;
 
-    protected string $apiBaseUrl = 'https://api.audible.us/1.0'; // Aligned with 'us' region
+    protected string $apiBaseUrl = 'https://api.audible.us/1.0'; // Aligned with 'us' region in service
     protected string $testAssociateTag = 'test-tag';
     protected string $testAccessKey = 'test-access-key';
     protected string $testSecretKey = 'test-secret-key';
@@ -22,26 +22,20 @@ class AudibleApiIntegrationTest extends BaseApiTest
     {
         parent::setUp();
 
-        // Create a new instance of a class that uses the trait
-        $this->audibleApi = new class {
-            use BaseApiTrait;
-            use AudibleApiTrait;
-        };
-
-        // Initialize the API client with test credentials
-        $this->audibleApi->initAudible([
-            'access_key' => $this->testAccessKey,
-            'secret_key' => $this->testSecretKey,
-            'associate_tag' => $this->testAssociateTag,
-            'region' => $this->testRegion,
+        // Configure service credentials for test environment
+        config([
+            'services.audible.access_key' => $this->testAccessKey,
+            'services.audible.secret_key' => $this->testSecretKey,
+            'services.audible.associate_tag' => $this->testAssociateTag,
+            'services.audible.region' => $this->testRegion,
+            // Ensure a base_url is not set in config for tests, so service defaults correctly
+            'services.audible.base_url' => null,
         ]);
 
-        $this->audibleApi->setServiceName($this->getServiceName());
+        // Resolve the service from the container
+        $this->audibleApi = app(AudibleApiService::class);
 
         // HTTP faking is handled by specific test methods.
-
-        // Set up test API key
-        $this->apiKey = config('services.audible.key', 'test_key');
     }
 
     protected function getServiceName(): string
@@ -109,34 +103,94 @@ class AudibleApiIntegrationTest extends BaseApiTest
         ];
     }
 
+    protected function getFakeXmlSearchResponseString(): string
+    {
+        return <<<'XML'
+<?xml version="1.0"?>
+<ItemSearchResponse xmlns="http://webservices.amazon.com/AWSECommerceService/2011-08-01">
+    <Items>
+        <Request><IsValid>True</IsValid></Request>
+        <TotalResults>1</TotalResults>
+        <TotalPages>1</TotalPages>
+        <Item>
+            <ASIN>TEST123</ASIN>
+            <ItemAttributes>
+                <Title>Test Audiobook</Title>
+                <Author>Test Author</Author>
+            </ItemAttributes>
+        </Item>
+    </Items>
+</ItemSearchResponse>
+XML;
+    }
+
+    protected function getFakeXmlDetailsResponseString(): string
+    {
+        return <<<'XML'
+<?xml version="1.0"?>
+<ItemLookupResponse xmlns="http://webservices.amazon.com/AWSECommerceService/2011-08-01">
+    <Items>
+        <Request><IsValid>True</IsValid></Request>
+        <Item>
+            <ASIN>TEST123</ASIN>
+            <ItemAttributes>
+                <Title>Test Audiobook</Title>
+                <Author>Test Author</Author>
+                <Narrator>Test Narrator</Narrator>
+                <Publisher>Test Publisher</Publisher>
+                <PublicationDate>2023-01-01</PublicationDate>
+            </ItemAttributes>
+            <EditorialReviews>
+                <EditorialReview>
+                    <Source>Product Description</Source>
+                    <Content>Test Description</Content>
+                </EditorialReview>
+            </EditorialReviews>
+            <MediumImage><URL>http://example.com/cover.jpg</URL></MediumImage>
+            <LargeImage><URL>http://example.com/cover_large.jpg</URL></LargeImage>
+            <SmallImage><URL>http://example.com/cover_small.jpg</URL></SmallImage>
+            <BrowseNodes>
+                <BrowseNode>
+                    <BrowseNodeId>12345</BrowseNodeId>
+                    <Name>Science Fiction</Name>
+                </BrowseNode>
+            </BrowseNodes>
+            <CustomerReviews><AverageRating>4.5</AverageRating><TotalReviews>100</TotalReviews></CustomerReviews>
+            <DetailPageURL>http://example.com/details/TEST123</DetailPageURL>
+            <Offers><TotalOffers>1</TotalOffers><Offer><OfferListing><Price><FormattedPrice>$0.00</FormattedPrice></Price></OfferListing></Offer></Offers>
+            <AudibleProgram><Format>Unabridged</Format></AudibleProgram>
+            <AudibleRuntime>5025</AudibleRuntime>
+        </Item>
+    </Items>
+</ItemLookupResponse>
+XML;
+    }
+
     #[Test]
     public function testItCanSearchAudiobooks()
     {
         $apiBaseUrl = $this->apiBaseUrl;
         $mockSearchResponse = $this->getMockSearchResponse();
 
-        Http::fake(function (\Illuminate\Http\Client\Request $request) use ($apiBaseUrl, $mockSearchResponse) {
-            try {
-                $requestData = $request->data();
-                $urlParts = parse_url($request->url());
-                $urlWithoutQuery = ($urlParts['scheme'] ?? 'http') . '://' . ($urlParts['host'] ?? '') . ($urlParts['path'] ?? '');
+        Http::fake(function (\Illuminate\Http\Client\Request $request) use ($apiBaseUrl) {
+            $urlParts = parse_url($request->url());
+            $queryString = $urlParts['query'] ?? '';
+            parse_str($queryString, $queryParams);
 
-                $rtrimmedUrlWithoutQuery = rtrim($urlWithoutQuery, '/');
-                $rtrimmedApiBaseUrl = rtrim($apiBaseUrl, '/');
-                $urlCondition = $rtrimmedUrlWithoutQuery === $rtrimmedApiBaseUrl;
-                $keywordsCondition = isset($requestData['Keywords']);
+            $urlWithoutQuery = ($urlParts['scheme'] ?? 'http') . '://' . ($urlParts['host'] ?? '') . ($urlParts['path'] ?? '');
+            $rtrimmedUrlWithoutQuery = rtrim($urlWithoutQuery, '/');
+            $rtrimmedApiBaseUrl = rtrim($apiBaseUrl, '/');
 
-                if ($urlCondition && $keywordsCondition) {
-                    return Http::response($mockSearchResponse, 200, ['Content-Type' => 'application/json']);
-                }
+            $isCorrectUrl = $rtrimmedUrlWithoutQuery === $rtrimmedApiBaseUrl;
+            $isSearchOperation = isset($queryParams['Operation']) && $queryParams['Operation'] === 'ItemSearch';
+            $hasKeywords = isset($queryParams['Keywords']);
 
-                // Log if no match, this can be helpful for future debugging if new cases are added.
-                \Illuminate\Support\Facades\Log::warning("S_LOG: Http::fake did not match for search.", ['url' => $request->url(), 'data' => $requestData, 'base_url_expected' => $apiBaseUrl]);
-                return Http::response(['error' => 'Mock not found for search', 'url' => $request->url(), 'data' => $requestData], 404, ['Content-Type' => 'application/json']);
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::error("S_LOG: Exception in Http::fake callback: " . $e->getMessage(), ['exception' => $e]);
-                return Http::response(['error' => 'Exception in mock callback: ' . $e->getMessage()], 500);
+            if ($isCorrectUrl && $isSearchOperation && $hasKeywords) {
+                return Http::response($this->getFakeXmlSearchResponseString(), 200, ['Content-Type' => 'application/xml']);
             }
+
+            \Illuminate\Support\Facades\Log::warning("S_LOG_INT: Http::fake did not match for search.", ['url' => $request->url(), 'query_params' => $queryParams, 'base_url_expected' => $apiBaseUrl]);
+            return Http::response('Mock not found for integration search: ' . $request->url(), 404, ['Content-Type' => 'text/plain']);
         });
 
         $results = $this->audibleApi->searchAudiobooks('test');
@@ -154,30 +208,26 @@ class AudibleApiIntegrationTest extends BaseApiTest
         $apiBaseUrl = $this->apiBaseUrl;
         $mockDetailsResponse = $this->getMockDetailsResponse();
 
-        Http::fake(function (\Illuminate\Http\Client\Request $request) use ($apiBaseUrl, $mockDetailsResponse) {
-            try {
-                $requestData = $request->data();
-                $urlParts = parse_url($request->url());
-                $urlWithoutQuery = ($urlParts['scheme'] ?? 'http') . '://' . ($urlParts['host'] ?? '') . ($urlParts['path'] ?? '');
+        Http::fake(function (\Illuminate\Http\Client\Request $request) use ($apiBaseUrl) {
+            $urlParts = parse_url($request->url());
+            $queryString = $urlParts['query'] ?? '';
+            parse_str($queryString, $queryParams);
 
-                $rtrimmedUrlWithoutQuery = rtrim($urlWithoutQuery, '/');
-                $rtrimmedApiBaseUrl = rtrim($apiBaseUrl, '/');
-                $urlCondition = $rtrimmedUrlWithoutQuery === $rtrimmedApiBaseUrl;
+            $urlWithoutQuery = ($urlParts['scheme'] ?? 'http') . '://' . ($urlParts['host'] ?? '') . ($urlParts['path'] ?? '');
+            $rtrimmedUrlWithoutQuery = rtrim($urlWithoutQuery, '/');
+            $rtrimmedApiBaseUrl = rtrim($apiBaseUrl, '/');
 
-                $itemIdCondition = isset($requestData['ItemId']);
-                $idTypeCondition = isset($requestData['IdType']) && $requestData['IdType'] === 'ASIN';
+            $isCorrectUrl = $rtrimmedUrlWithoutQuery === $rtrimmedApiBaseUrl;
+            $isLookupOperation = isset($queryParams['Operation']) && $queryParams['Operation'] === 'ItemLookup';
+            $hasItemId = isset($queryParams['ItemId']);
+            $isAsinIdType = isset($queryParams['IdType']) && $queryParams['IdType'] === 'ASIN';
 
-                if ($urlCondition && $itemIdCondition && $idTypeCondition) {
-                    return Http::response($mockDetailsResponse, 200, ['Content-Type' => 'application/json']);
-                }
-
-                // Log if no match, this can be helpful for future debugging if new cases are added.
-                \Illuminate\Support\Facades\Log::warning("D_LOG: Http::fake did not match for details.", ['url' => $request->url(), 'data' => $requestData, 'base_url_expected' => $apiBaseUrl]);
-                return Http::response(['error' => 'Mock not found for details', 'url' => $request->url(), 'data' => $requestData], 404, ['Content-Type' => 'application/json']);
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::error("D_LOG: Exception in Http::fake callback: " . $e->getMessage(), ['exception' => $e]);
-                return Http::response(['error' => 'Exception in mock callback: ' . $e->getMessage()], 500);
+            if ($isCorrectUrl && $isLookupOperation && $hasItemId && $isAsinIdType) {
+                return Http::response($this->getFakeXmlDetailsResponseString(), 200, ['Content-Type' => 'application/xml']);
             }
+            
+            \Illuminate\Support\Facades\Log::warning("D_LOG_INT: Http::fake did not match for details.", ['url' => $request->url(), 'query_params' => $queryParams, 'base_url_expected' => $apiBaseUrl]);
+            return Http::response('Mock not found for integration details: ' . $request->url(), 404, ['Content-Type' => 'text/plain']);
         });
 
         $details = $this->audibleApi->getAudiobookDetails('TEST123');

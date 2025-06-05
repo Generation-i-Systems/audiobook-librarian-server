@@ -28,14 +28,7 @@ class AudibleApiService
         $configuredRegion = $config['region'] ?? config('services.audible.region');
         $this->audibleRegion = !empty($configuredRegion) ? $configuredRegion : 'us';
 
-        Log::debug('AudibleApiService Constructor: Region determined.', [
-            'config_param_region' => $config['region'] ?? 'not_set_in_param',
-            'env_config_services_audible_region' => config('services.audible.region'),
-            'final_audible_region' => $this->audibleRegion
-        ]);
-
         $this->baseUrl = "https://api.audible." . $this->audibleRegion . "/1.0";
-        Log::debug('AudibleApiService Constructor: Base URL set.', ['baseUrl' => $this->baseUrl]);
 
         $this->serviceName = 'Audible'; // Set service name for BaseApiTrait
 
@@ -82,10 +75,6 @@ class AudibleApiService
         }
 
         $apiResult = $this->signedRequest('', $params);
-        Log::debug(
-            'AudibleApiService:searchAudiobooks:apiResult',
-            ['query' => $query, 'params' => $params, 'result' => $apiResult]
-        );
 
         if (empty($apiResult)) {
             return [];
@@ -94,28 +83,13 @@ class AudibleApiService
         // Extract the actual data payload, typically under a root key like 'ItemSearchResponse'
         $operationKey = array_key_first($apiResult); // This should be 'Items' based on current API structure
         $payload = $operationKey ? ($apiResult[$operationKey] ?? null) : null;
-        Log::debug('AudibleApiService:searchAudiobooks:responsePayload', [
-            'query' => $query,
-            'operation_key' => $operationKey,
-            'payload' => $payload
-        ]);
 
         $isPayloadEmptyForSearch = empty($payload);
         $isItemSetInPayloadForSearch = isset($payload['Item']);
-        Log::debug('AudibleApiService:searchAudiobooks:CHECKS', [
-            'isPayloadEmpty' => $isPayloadEmptyForSearch,
-            'isItemSetInPayload' => $isItemSetInPayloadForSearch,
-            'condition_is_true' => ($isPayloadEmptyForSearch || !$isItemSetInPayloadForSearch)
-        ]);
 
         if ($isPayloadEmptyForSearch || !$isItemSetInPayloadForSearch) {
-            Log::warning(
-                'AudibleApiService searchAudiobooks: Condition TRUE. No items found in payload or payload is empty.',
-                ['query' => $query, 'payload' => $payload]
-            );
             return [];
         }
-        Log::debug('AudibleApiService searchAudiobooks: Condition FALSE. Proceeding.');
 
         // formatSearchResults expects the content of 'ItemSearchResponse', which contains 'Items'
         return $this->formatSearchResults($payload);
@@ -134,10 +108,6 @@ class AudibleApiService
         ];
 
         $apiResult = $this->signedRequest('', $params);
-        Log::debug(
-            'AudibleApiService:getAudiobookDetails:apiResult',
-            ['asin' => $asin, 'params' => $params, 'result' => $apiResult]
-        );
 
         if (empty($apiResult)) {
             return null;
@@ -146,28 +116,13 @@ class AudibleApiService
         // Extract the actual data payload, typically under a root key like 'ItemLookupResponse'
         $operationKey = array_key_first($apiResult); // This should be 'Items' based on current API structure
         $payload = $operationKey ? ($apiResult[$operationKey] ?? null) : null;
-        Log::debug('AudibleApiService:getAudiobookDetails:responsePayload', [
-            'asin' => $asin,
-            'operation_key' => $operationKey,
-            'payload' => $payload
-        ]);
 
-        $isPayloadEmpty = empty($payload);
-        $isItemSetInPayload = isset($payload['Item']);
-        Log::debug('AudibleApiService:getAudiobookDetails:CHECKS', [
-            'isPayloadEmpty' => $isPayloadEmpty,
-            'isItemSetInPayload' => $isItemSetInPayload,
-            'condition_is_true' => ($isPayloadEmpty || !$isItemSetInPayload)
-        ]);
+        $isPayloadEmptyForDetails = empty($payload);
+        $isItemSetInPayloadForDetails = isset($payload['Item']);
 
-        if ($isPayloadEmpty || !$isItemSetInPayload) {
-            Log::warning(
-                'AudibleApiService getAudiobookDetails: Condition TRUE. No item found in payload or payload is empty.',
-                ['asin' => $asin, 'payload' => $payload]
-            );
+        if ($isPayloadEmptyForDetails || !$isItemSetInPayloadForDetails) {
             return null;
         }
-        Log::debug('AudibleApiService getAudiobookDetails: Condition FALSE. Proceeding.');
 
         $item = $payload['Item'];
 
@@ -553,13 +508,9 @@ class AudibleApiService
      */
     protected function formatSearchResults(array $itemsNodeContent): array
     {
-        Log::debug('AudibleApiService:formatSearchResults:input', ['itemsNodeContent' => $itemsNodeContent]);
-
         $itemData = $itemsNodeContent['Item'] ?? [];
-        Log::debug('AudibleApiService:formatSearchResults:itemData', ['itemData' => $itemData]);
 
         if (empty($itemData)) {
-            Log::debug('AudibleApiService:formatSearchResults:itemData_is_empty_returning_empty_array');
             return [];
         }
 
@@ -567,47 +518,23 @@ class AudibleApiService
         // Check if $itemData is a single item (associative array) or a list of items (numerically indexed array)
         if (isset($itemData['ASIN'])) { // If 'ASIN' key exists directly, it's a single item
             $processedItems = [$itemData];
-            Log::debug('AudibleApiService:formatSearchResults:single_item_detected', [
-                'processedItems_count' => count($processedItems),
-                'processedItems_keys' => array_keys($processedItems)
-            ]);
         } else { // Otherwise, assume it's an array of items (or an empty array if no results)
             $processedItems = $itemData;
-            Log::debug('AudibleApiService:formatSearchResults:array_of_items_assumed', [
-                'processedItems_count' => count($processedItems),
-                'processedItems_keys' => is_array($processedItems) ? array_keys($processedItems) : 'not_an_array'
-            ]);
         }
 
         if (empty($processedItems)) {
-            Log::debug(
-                'AudibleApiService:formatSearchResults:processedItems_is_empty_returning_empty_array',
-                ['processedItems' => $processedItems]
-            );
             return [];
         }
 
         $results = [];
         foreach ($processedItems as $key => $singleItem) {
-            Log::debug('AudibleApiService:formatSearchResults:looping_item', [
-                'key' => $key,
-                'singleItem_type' => gettype($singleItem)
-            ]);
             if (empty($singleItem) || !is_array($singleItem)) {
-                Log::warning('AudibleApiService:formatSearchResults:skipping_empty_or_non_array_item_in_loop', [
-                    'key' => $key,
-                    'singleItem' => $singleItem
-                ]);
+                // Optionally log a warning here if skipping items is unexpected in normal operation
                 continue;
             }
             $formattedBook = $this->formatBookResponse($singleItem);
-            Log::debug('AudibleApiService:formatSearchResults:formattedBook_from_response', [
-                'key' => $key,
-                'formattedBook_id' => $formattedBook['id'] ?? 'N/A'
-            ]);
             $results[] = $formattedBook;
         }
-        Log::debug('AudibleApiService:formatSearchResults:final_results_count', ['count' => count($results)]);
         return $results;
     }
 }
