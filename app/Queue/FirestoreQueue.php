@@ -82,7 +82,11 @@ class FirestoreQueue extends Queue implements QueueContract
                 ['path' => 'attempts', 'value' => ($document['attempts'] ?? 0) + 1],
             ]);
             return new FirestoreJob(
-                $this->container, $this, $document, $this->connectionName, $queue
+                $this->container,
+                $this,
+                $document,
+                $this->connectionName,
+                $queue
             );
         }
         return null;

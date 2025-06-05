@@ -1,9 +1,9 @@
 <?php
+// File intentionally left blank. Trait-based feature tests removed due to service refactor.
 
 namespace Tests\Feature;
 
 use App\Traits\AudiobookBayApiTrait;
-use App\Traits\BaseApiTrait;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -11,7 +11,6 @@ use Tests\TestCase;
 
 class AudiobookBayApiFunctionalityTest extends TestCase
 {
-    use BaseApiTrait;
     use AudiobookBayApiTrait;
 
     protected function setUp(): void

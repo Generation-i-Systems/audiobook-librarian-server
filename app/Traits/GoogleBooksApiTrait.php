@@ -24,11 +24,11 @@ trait GoogleBooksApiTrait
         $baseUrl = $config['base_url'] ?? 'https://www.googleapis.com/books/v1';
         $this->setBaseUrl($baseUrl);
         $this->setServiceName('google_books');
-        
+
         if (empty($this->apiKey)) {
             Log::warning('Google Books API key not configured');
         }
-        
+
         return $this;
     }
 
@@ -50,11 +50,11 @@ trait GoogleBooksApiTrait
         if (isset($options['author'])) {
             $params['q'] .= "+inauthor:{$options['author']}";
         }
-        
+
         if (isset($options['title'])) {
             $params['q'] .= "+intitle:{$options['title']}";
         }
-        
+
         if (isset($options['isbn'])) {
             $params['q'] .= "+isbn:{$options['isbn']}";
         }
@@ -97,7 +97,7 @@ trait GoogleBooksApiTrait
         $volumeInfo = $bookData['volumeInfo'] ?? [];
         $saleInfo = $bookData['saleInfo'] ?? [];
         $accessInfo = $bookData['accessInfo'] ?? [];
-        
+
         return [
             'id' => $bookData['id'] ?? null,
             'title' => $volumeInfo['title'] ?? 'Unknown Title',
@@ -162,13 +162,13 @@ trait GoogleBooksApiTrait
                 return $id['identifier'];
             }
         }
-        
+
         foreach ($identifiers as $id) {
             if (isset($id['type']) && $id['type'] === 'ISBN_10') {
                 return $id['identifier'];
             }
         }
-        
+
         return null;
     }
 
@@ -183,7 +183,7 @@ trait GoogleBooksApiTrait
 
         return array_map(function ($item) {
             $volumeInfo = $item['volumeInfo'] ?? [];
-            
+
             return [
                 'id' => $item['id'] ?? null,
                 'title' => $volumeInfo['title'] ?? 'Unknown Title',

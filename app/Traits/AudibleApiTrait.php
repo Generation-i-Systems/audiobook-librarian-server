@@ -38,15 +38,15 @@ trait AudibleApiTrait
         $this->audibleSecretKey = $config['secret_key'] ?? config('services.audible.secret_key');
         $this->audibleAssociateTag = $config['associate_tag'] ?? config('services.audible.associate_tag');
         $this->audibleRegion = $config['region'] ?? config('services.audible.region', 'us');
-        
+
         // Set the base URL based on region
         $this->baseUrl = "https://api.audible.{$this->audibleRegion}/1.0";
-        
+
         if (empty($this->audibleAccessKey) || empty($this->audibleSecretKey) || empty($this->audibleAssociateTag)) {
             Log::warning('Missing required Audible API credentials');
             return null;
         }
-        
+
         return $this;
     }
 
@@ -67,29 +67,29 @@ trait AudibleApiTrait
         if (isset($options['author'])) {
             $params['Author'] = $options['author'];
         }
-        
+
         if (isset($options['narrator'])) {
             $params['Narrator'] = $options['narrator'];
         }
-        
+
         if (isset($options['title'])) {
             $params['Title'] = $options['title'];
         }
-        
+
         if (isset($options['category'])) {
             $params['BrowseNodeId'] = $options['category'];
         }
 
         $response = $this->signedRequest('', $params);
-        
+
         if (empty($response['Items']['Item'])) {
             return [];
         }
-        
-        $items = isset($response['Items']['Item'][0]) 
-            ? $response['Items']['Item'] 
+
+        $items = isset($response['Items']['Item'][0])
+            ? $response['Items']['Item']
             : [$response['Items']['Item']];
-            
+
         return array_map([$this, 'formatBookResponse'], $items);
     }
 
@@ -106,11 +106,11 @@ trait AudibleApiTrait
         ];
 
         $response = $this->signedRequest('', $params);
-        
+
         if (empty($response['Items']['Item'])) {
             return null;
         }
-        
+
         $item = $response['Items']['Item'];
 
         // If the response is not an array (single item), wrap it in an array
@@ -169,21 +169,21 @@ trait AudibleApiTrait
         if (app()->environment('testing')) {
             return $this->makeAudibleRequest($path, $params);
         }
-        
+
         $cacheKey = $this->getCacheKey($path, $params);
-        
+
         return Cache::remember($cacheKey, $this->cacheTtl, function () use ($path, $params) {
             return $this->makeAudibleRequest($path, $params);
         });
     }
-    
+
     /**
      * Make the actual API request to Audible
      */
     protected function makeAudibleRequest(string $path, array $params): ?array
     {
         $this->checkRateLimit();
-        
+
         // Add required parameters
         $defaultParams = [
             'associate_tag' => $this->audibleAssociateTag,
@@ -197,54 +197,54 @@ trait AudibleApiTrait
             'SignatureMethod' => 'HmacSHA256',
             'SignatureVersion' => '2',
         ];
-        
+
         $params = array_merge($defaultParams, $params);
-        
+
         // Sort parameters by key
         ksort($params);
-        
+
         // Create the canonical query string
         $canonicalQuery = '';
         foreach ($params as $key => $value) {
             $canonicalQuery .= '&' . $this->urlEncode($key) . '=' . $this->urlEncode($value);
         }
         $canonicalQuery = substr($canonicalQuery, 1);
-        
+
         // Create the string to sign
         $stringToSign = "GET\nwebservices.amazon.{$this->audibleRegion}\n{$path}\n{$canonicalQuery}";
-        
+
         // Calculate the signature
         $signature = base64_encode(hash_hmac('sha256', $stringToSign, $this->audibleSecretKey, true));
-        
+
         // Add the signature to the parameters
         $params['Signature'] = $signature;
-        
+
         // Build the URL
         $url = $this->baseUrl . $path . '?' . http_build_query($params);
-        
+
         try {
             $response = Http::withHeaders([
                 'User-Agent' => 'AudiobookLibrarian/1.0',
                 'Accept' => 'application/json',
             ])->get($url);
-            
+
             if ($response->successful()) {
                 return $response->json();
             }
-            
+
             Log::error('Audible API request failed', [
                 'status' => $response->status(),
                 'response' => $response->body(),
                 'url' => $url,
             ]);
-            
+
             return null;
         } catch (\Exception $e) {
             Log::error('Audible API request exception', [
                 'error' => $e->getMessage(),
                 'url' => $url,
             ]);
-            
+
             return null;
         }
     }
@@ -264,13 +264,13 @@ trait AudibleApiTrait
     {
         $attributes = $item['ItemAttributes'] ?? [];
         $image = $item['LargeImage']['URL'] ?? $item['MediumImage']['URL'] ?? $item['SmallImage']['URL'] ?? null;
-        
+
         $description = '';
         if (isset($item['EditorialReviews']['EditorialReview'])) {
-            $reviews = isset($item['EditorialReviews']['EditorialReview'][0]) 
-                ? $item['EditorialReviews']['EditorialReview'] 
+            $reviews = isset($item['EditorialReviews']['EditorialReview'][0])
+                ? $item['EditorialReviews']['EditorialReview']
                 : [$item['EditorialReviews']['EditorialReview']];
-                
+
             foreach ($reviews as $review) {
                 if (($review['Source'] ?? '') === 'Product Description') {
                     $description = $review['Content'] ?? '';
@@ -304,7 +304,7 @@ trait AudibleApiTrait
         if (empty($reviews['EditorialReview'])) {
             return [];
         }
-        
+
         // Handle both single review and multiple reviews
         if (isset($reviews['EditorialReview']['Source'])) {
             return [
@@ -312,7 +312,7 @@ trait AudibleApiTrait
                 'content' => $reviews['EditorialReview']['Content'] ?? '',
             ];
         }
-        
+
         // Find the first review with content
         foreach ($reviews['EditorialReview'] as $review) {
             if (!empty($review['Content'])) {
@@ -322,7 +322,7 @@ trait AudibleApiTrait
                 ];
             }
         }
-        
+
         return [];
     }
 
@@ -334,7 +334,7 @@ trait AudibleApiTrait
         if (is_string($contributors)) {
             return [['name' => $contributors]];
         }
-        
+
         if (is_array($contributors)) {
             // Handle case where it's an array of strings
             if (isset($contributors[0]) && is_string($contributors[0])) {
@@ -342,13 +342,13 @@ trait AudibleApiTrait
                     return ['name' => $name];
                 }, $contributors);
             }
-            
+
             // Handle case where it's an array with a 'Name' key
             if (isset($contributors['Name'])) {
                 return [['name' => $contributors['Name']]];
             }
         }
-        
+
         return [];
     }
 
@@ -360,17 +360,17 @@ trait AudibleApiTrait
         if (empty($browseNodes['BrowseNode'])) {
             return [];
         }
-        
+
         $genres = [];
         $nodes = isset($browseNodes['BrowseNode'][0]) ? $browseNodes['BrowseNode'] : [$browseNodes['BrowseNode']];
-        
+
         foreach ($nodes as $node) {
             $this->extractGenresRecursive($node, $genres);
         }
-        
+
         return $genres;
     }
-    
+
     /**
      * Recursively extract genres from browse nodes
      */
@@ -383,41 +383,41 @@ trait AudibleApiTrait
                 'path' => $this->getBrowseNodePath($node),
             ];
         }
-        
+
         if (!empty($node['Children']['BrowseNode'])) {
-            $children = isset($node['Children']['BrowseNode'][0]) 
-                ? $node['Children']['BrowseNode'] 
+            $children = isset($node['Children']['BrowseNode'][0])
+                ? $node['Children']['BrowseNode']
                 : [$node['Children']['BrowseNode']];
-                
+
             foreach ($children as $child) {
                 $this->extractGenresRecursive($child, $genres);
             }
         }
     }
-    
+
     /**
      * Get the full path for a browse node
      */
     protected function getBrowseNodePath(array $node): string
     {
         $path = [];
-        
+
         if (!empty($node['Ancestors']['BrowseNode'])) {
             $ancestors = isset($node['Ancestors']['BrowseNode'][0])
                 ? $node['Ancestors']['BrowseNode']
                 : [$node['Ancestors']['BrowseNode']];
-                
+
             foreach ($ancestors as $ancestor) {
                 if (!empty($ancestor['Name'])) {
                     array_unshift($path, $ancestor['Name']);
                 }
             }
         }
-        
+
         if (!empty($node['Name'])) {
             $path[] = $node['Name'];
         }
-        
+
         return implode(' > ', $path);
     }
 
@@ -429,15 +429,15 @@ trait AudibleApiTrait
         if (empty($apiResponse['Items']['Item'])) {
             return [];
         }
-        
-        $items = isset($apiResponse['Items']['Item'][0]) 
-            ? $apiResponse['Items']['Item'] 
+
+        $items = isset($apiResponse['Items']['Item'][0])
+            ? $apiResponse['Items']['Item']
             : [$apiResponse['Items']['Item']];
-        
+
         return array_map(function ($item) {
             $itemAttributes = $item['ItemAttributes'] ?? [];
             $audioDetails = $item['AudioDetails'] ?? [];
-            
+
             return [
                 'id' => $item['ASIN'] ?? null,
                 'title' => $itemAttributes['Title'] ?? null,

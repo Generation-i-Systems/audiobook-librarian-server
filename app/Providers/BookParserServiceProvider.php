@@ -13,7 +13,8 @@ class BookParserServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(
-            __DIR__.'/../../config/bookparser.php', 'bookparser'
+            __DIR__.'/../../config/bookparser.php',
+            'bookparser'
         );
 
         $this->app->singleton(BookDirectoryParser::class, function ($app) {

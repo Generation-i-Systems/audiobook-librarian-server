@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Traits\HardcoverApiTrait;
+use App\Services\HardcoverApiService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -10,17 +10,19 @@ use Tests\TestCase;
 class HardcoverApiTest extends TestCase
 {
     use RefreshDatabase;
-    use HardcoverApiTrait;
+
+    protected HardcoverApiService $hardcoverApiService;
 
     protected function setUp(): void
     {
         parent::setUp();
-        
         // Mock the HTTP client for all tests
         Http::fake();
-        
-        // Set a test API key
-        $this->setHardcoverApiKey('test-api-key');
+        // Instantiate service with test API key and base URL
+        $this->hardcoverApiService = new HardcoverApiService(
+            'test-api-key',
+            'https://api.hardcover.app/v1'
+        );
     }
     
     /** @test */
@@ -47,8 +49,8 @@ class HardcoverApiTest extends TestCase
             ])
         ]);
         
-        $results = $this->searchBooksByTitle('Test');
-        
+        $results = $this->hardcoverApiService->searchBooksByTitle('Test');
+
         $this->assertIsArray($results);
         $this->assertCount(1, $results);
         $this->assertEquals('Test Book', $results[0]['title']);
@@ -84,8 +86,8 @@ class HardcoverApiTest extends TestCase
             ])
         ]);
         
-        $book = $this->getBookDetails('1');
-        
+        $book = $this->hardcoverApiService->getBookDetails('1');
+
         $this->assertIsArray($book);
         $this->assertEquals('Test Book', $book['title']);
         $this->assertEquals('Test Author', $book['authors'][0]['author']['name']);
@@ -117,8 +119,8 @@ class HardcoverApiTest extends TestCase
             ])
         ]);
         
-        $books = $this->getBooksByAuthor('Test Author');
-        
+        $books = $this->hardcoverApiService->getBooksByAuthor('Test Author');
+
         $this->assertIsArray($books);
         $this->assertCount(2, $books);
         $this->assertEquals('Test Book 1', $books[0]['title']);
@@ -128,11 +130,9 @@ class HardcoverApiTest extends TestCase
     /** @test */
     public function testApiKeyRequired()
     {
-        // Clear the API key
-        $this->setHardcoverApiKey('');
-        
-        $result = $this->searchBooksByTitle('Test');
-        
+        // Instantiate service with empty API key
+        $service = new HardcoverApiService('', 'https://api.hardcover.app/v1');
+        $result = $service->searchBooksByTitle('Test');
         $this->assertNull($result);
     }
 }

@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-
 use App\Services\BookDirectoryParser;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
@@ -129,7 +128,7 @@ class ParseBooksCommand extends Command
                     }
                     // AudiobookBay API
                     if (in_array('abbay', $apis) && trait_exists('\App\Traits\AudiobookBayApiTrait')) {
-                        $trait = new class {
+                        $trait = new class () {
                             use \App\Traits\AudiobookBayApiTrait;
                         };
                         $result = $trait->searchAndMerge($book);
@@ -142,7 +141,7 @@ class ParseBooksCommand extends Command
                     }
                     // Hardcover API
                     if (in_array('hardcover', $apis) && trait_exists('\App\Traits\HardcoverApiTrait')) {
-                        $trait = new class {
+                        $trait = new class () {
                             use \App\Traits\HardcoverApiTrait;
                         };
                         $result = $trait->searchAndMerge($book);

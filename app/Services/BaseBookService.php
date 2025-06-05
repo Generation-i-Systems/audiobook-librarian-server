@@ -40,7 +40,7 @@ abstract class BaseBookService implements BookServiceInterface
     public function searchBooks(string $query, array $options = []): ?array
     {
         $cacheKey = $this->getServiceName() . '_search_' . md5($query . json_encode($options));
-        
+
         return Cache::remember($cacheKey, $this->cacheTtl, function () use ($query, $options) {
             try {
                 return $this->performSearch($query, $options);
@@ -61,7 +61,7 @@ abstract class BaseBookService implements BookServiceInterface
     public function getBookDetails(string $id): ?array
     {
         $cacheKey = $this->getServiceName() . '_details_' . $id;
-        
+
         return Cache::remember($cacheKey, $this->cacheTtl, function () use ($id) {
             try {
                 return $this->performGetBookDetails($id);
@@ -86,7 +86,7 @@ abstract class BaseBookService implements BookServiceInterface
 
     /**
      * Perform the actual search implementation
-     * 
+     *
      * @param string $query
      * @param array $options
      * @return array|null
@@ -95,7 +95,7 @@ abstract class BaseBookService implements BookServiceInterface
 
     /**
      * Perform the actual book details lookup
-     * 
+     *
      * @param string $id
      * @return array|null
      */

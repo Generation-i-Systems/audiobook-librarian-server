@@ -194,7 +194,7 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
         ]);
 
         $books = $result['data']['books'] ?? [];
-        
+
         if (empty($books)) {
             Log::warning('No results found in Hardcover API response', [
                 'query' => $query,
@@ -202,7 +202,7 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
             ]);
             return [];
         }
-        
+
         return $this->formatSearchResults($books);
     }
 
@@ -249,12 +249,12 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
 
         $result = $this->makeRequest($query, ['bookId' => $id]);
         $book = $result['data']['books_by_pk'] ?? null;
-        
+
         if (!$book) {
             Log::warning('Book not found in Hardcover API', ['id' => $id]);
             return null;
         }
-        
+
         return $this->formatBookDetails($book);
     }
 
@@ -264,12 +264,12 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
     protected function formatSearchResults(array $items): array
     {
         $results = [];
-        
+
         foreach ($items as $item) {
             if (empty($item['id'])) {
                 continue;
             }
-            
+
             $results[] = [
                 'id' => $item['id'],
                 'title' => $item['title'] ?? 'Unknown Title',
@@ -285,10 +285,10 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
                 'isbn_13' => $item['isbn_13'] ?? null,
             ];
         }
-        
+
         return $results;
     }
-    
+
     /**
      * Format book details from Hardcover API
      */
@@ -310,7 +310,7 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
             'genres' => $this->formatGenres($item['genres'] ?? []),
         ];
     }
-    
+
     /**
      * Format authors array to a consistent format
      */
@@ -325,7 +325,7 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
             ];
         }, $authors);
     }
-    
+
     /**
      * Format narrators array to a consistent format
      */
@@ -340,7 +340,7 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
             ];
         }, $narrators);
     }
-    
+
     /**
      * Format genres array to a consistent format
      */
@@ -354,7 +354,7 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
             ];
         }, $genres);
     }
-    
+
     /**
      * Check if the service is available
      */

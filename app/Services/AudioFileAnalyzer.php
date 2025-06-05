@@ -54,7 +54,7 @@ class AudioFileAnalyzer
         try {
             $fileInfo = $this->getID3->analyze($filePath);
             getid3_lib::CopyTagsToComments($fileInfo);
-            
+
             if (isset($fileInfo['playtime_seconds'])) {
                 return (float) $fileInfo['playtime_seconds'];
             }
@@ -78,7 +78,7 @@ class AudioFileAnalyzer
         $hours = floor($seconds / 3600);
         $minutes = floor(($seconds % 3600) / 60);
         $seconds = floor($seconds % 60);
-        
+
         return sprintf('%02d:%02d:%02d', $hours, $minutes, $seconds);
     }
 

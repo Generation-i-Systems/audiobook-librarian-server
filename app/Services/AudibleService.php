@@ -122,7 +122,7 @@ class AudibleService extends BaseBookService
             $merged['needsReview'] = true;
         }
         // Remove nulls and skip ISBN/pages if not present
-        return array_filter($merged, function($v, $k) {
+        return array_filter($merged, function ($v, $k) {
             if (in_array($k, ['isbn_10', 'isbn_13', 'pages']) && $v === null) {
                 return false;
             }

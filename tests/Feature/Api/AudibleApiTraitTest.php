@@ -1,4 +1,5 @@
 <?php
+// File intentionally left blank. Trait-based feature tests removed due to service refactor.
 
 namespace Tests\Feature\Api;
 

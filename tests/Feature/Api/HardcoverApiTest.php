@@ -2,15 +2,24 @@
 
 namespace Tests\Feature\Api;
 
-use App\Traits\HardcoverApiTrait;
+use App\Services\HardcoverApiService;
+use Illuminate\Support\Facades\Http;
 use Tests\Feature\Api\BaseApiTest;
 use PHPUnit\Framework\Attributes\Test;
 
 class HardcoverApiTest extends BaseApiTest
 {
-    use HardcoverApiTrait;
+    protected HardcoverApiService $hardcoverApiService;
+    protected string $testQuery = 'Test Book';
 
-    protected string $apiBaseUrl = 'https://hardcover.app/api';
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->hardcoverApiService = new HardcoverApiService(
+            config('services.hardcover.api_key'),
+            config('services.hardcover.base_url', 'https://hardcover.app/api')
+        );
+    }
 
     protected function getServiceName(): string
     {
@@ -49,24 +58,36 @@ class HardcoverApiTest extends BaseApiTest
         ];
     }
 
-    #[Test]
+    /** @test */
     public function testCanSearchBooks()
     {
-        $this->mockSuccessfulSearchResponse();
+        Http::fake([
+            'https://hardcover.app/api/graphql' => Http::response([
+                'data' => [
+                    'searchBooks' => $this->getMockSearchResponse()['books'],
+                ],
+            ], 200)
+        ]);
 
-        $results = $this->searchBooks($this->testQuery);
+        $results = $this->hardcoverApiService->searchBooks($this->testQuery);
 
         $this->assertIsArray($results);
         $this->assertNotEmpty($results);
         $this->assertCommonBookStructure($results[0]);
     }
 
-    #[Test]
+    /** @test */
     public function testCanGetBookDetails()
     {
-        $this->mockSuccessfulDetailsResponse();
+        Http::fake([
+            'https://hardcover.app/api/graphql' => Http::response([
+                'data' => [
+                    'book' => $this->getMockDetailsResponse(),
+                ],
+            ], 200)
+        ]);
 
-        $book = $this->getBookDetails('test_id');
+        $book = $this->hardcoverApiService->getBookDetails('test_id');
 
         $this->assertIsArray($book);
         $this->assertCommonBookStructure($book);

@@ -547,7 +547,7 @@ class BookController extends Controller
         }
         // If there are multiple candidates (including Google Books), pick the largest as default
         if (count($coverCandidatesForDefault) > 1) {
-            usort($coverCandidatesForDefault, callback: fn($a, $b) => $b['size'] <=> $a['size']);
+            usort($coverCandidatesForDefault, callback: fn ($a, $b) => $b['size'] <=> $a['size']);
             $book['cover_image'] = $coverCandidatesForDefault[0]['path'];
         }
 
@@ -595,7 +595,7 @@ class BookController extends Controller
             // Filter out empty series names and reindex the array to ensure proper alignment with series numbers
             $filteredSeries = array_filter(
                 array_map('trim', $validated['series']),
-                fn($name) => $name !== ''
+                fn ($name) => $name !== ''
             );
 
             // Get the series numbers, ensuring we have the same number of entries as filtered series

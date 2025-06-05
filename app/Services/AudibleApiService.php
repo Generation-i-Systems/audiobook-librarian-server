@@ -2,15 +2,142 @@
 
 namespace App\Services;
 
-use App\Traits\BaseApiTrait;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Str;
 
 class AudibleApiService
 {
-    use BaseApiTrait;
+    // --- Begin inlined BaseApiTrait properties ---
+    protected string $baseUrl = '';
+    protected ?string $apiKey = null;
+    protected int $cacheTtl = 86400; // 24 hours in seconds
+    protected int $rateLimit = 100; // Requests per hour
+    protected string $serviceName = '';
+    // --- End inlined BaseApiTrait properties ---
+
+    // --- Begin inlined BaseApiTrait methods ---
+    /**
+     * Make an HTTP GET request (inlined from BaseApiTrait)
+     */
+    protected function httpGet(string $endpoint, array $params = []): ?\Illuminate\Http\Client\Response
+    {
+        $cacheKey = $this->getCacheKey($endpoint, $params);
+        return Cache::remember($cacheKey, $this->cacheTtl, function () use ($endpoint, $params) {
+            $this->checkRateLimit();
+            $response = Http::withHeaders($this->getDefaultHeaders())
+                ->get($this->baseUrl . $endpoint, $params);
+            if ($response->successful()) {
+                return $response;
+            }
+            Log::error('API request failed', [
+                'service' => $this->serviceName,
+                'endpoint' => $endpoint,
+                'status' => $response->status(),
+                'response' => $response->body(),
+            ]);
+            return null;
+        });
+    }
+    /**
+     * Make an HTTP POST request (inlined from BaseApiTrait)
+     */
+    protected function httpPost(string $endpoint, array $data = []): ?\Illuminate\Http\Client\Response
+    {
+        $cacheKey = $this->getCacheKey($endpoint, $data);
+        return Cache::remember($cacheKey, $this->cacheTtl, function () use ($endpoint, $data) {
+            $this->checkRateLimit();
+            $response = Http::withHeaders($this->getDefaultHeaders())
+                ->post($this->baseUrl . $endpoint, $data);
+            if ($response->successful()) {
+                return $response;
+            }
+            Log::error('API request failed', [
+                'service' => $this->serviceName,
+                'endpoint' => $endpoint,
+                'status' => $response->status(),
+                'response' => $response->body(),
+            ]);
+            return null;
+        });
+    }
+    /**
+     * Check and enforce rate limiting (inlined from BaseApiTrait)
+     */
+    protected function checkRateLimit(): void
+    {
+        $cacheKey = "{$this->serviceName}_rate_limit_" . now()->format('YmdH');
+        $count = Cache::get($cacheKey, 0);
+        if ($count >= $this->rateLimit) {
+            Log::warning('API rate limit reached', ['service' => $this->serviceName]);
+            throw new \RuntimeException("{$this->serviceName}API rate limit exceeded. Please try again later.");
+        }
+        Cache::put($cacheKey, $count + 1, now()->addHour());
+    }
+    /**
+     * Generate a cache key for the request (inlined from BaseApiTrait)
+     */
+    protected function getCacheKey(string $endpoint, array $params): string
+    {
+        return "{$this->serviceName}_" . md5($endpoint . json_encode($params));
+    }
+    /**
+     * Set the API key (inlined from BaseApiTrait)
+     */
+    public function setApiKey(string $apiKey): self
+    {
+        $this->apiKey = $apiKey;
+        return $this;
+    }
+    /**
+     * Set the base URL (inlined from BaseApiTrait)
+     */
+    public function setBaseUrl(string $baseUrl): self
+    {
+        $this->baseUrl = rtrim($baseUrl, '/');
+        return $this;
+    }
+    /**
+     * Set the cache TTL in seconds (inlined from BaseApiTrait)
+     */
+    public function setCacheTtl(int $seconds): self
+    {
+        $this->cacheTtl = $seconds;
+        return $this;
+    }
+    /**
+     * Set the rate limit (requests per hour) (inlined from BaseApiTrait)
+     */
+    public function setRateLimit(int $requestsPerHour): self
+    {
+        $this->rateLimit = $requestsPerHour;
+        return $this;
+    }
+    /**
+     * Set the service name (inlined from BaseApiTrait)
+     */
+    public function setServiceName(string $serviceName): self
+    {
+        $this->serviceName = $serviceName;
+        return $this;
+    }
+    // --- End inlined BaseApiTrait methods ---
+
+    /**
+     * Get the default headers for API requests (inlined from BaseApiTrait)
+     */
+    protected function getDefaultHeaders(): array
+    {
+        $headers = [
+            'Accept' => 'application/json',
+            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36',
+        ];
+        if ($this->apiKey) {
+            $headers['Authorization'] = 'Bearer ' . $this->apiKey;
+        }
+        return $headers;
+    }
 
     protected ?string $audibleAccessKey = null;
     protected ?string $audibleSecretKey = null;
@@ -352,7 +479,7 @@ class AudibleApiService
 
         // If it's an array of strings
         if (is_array($contributors) && isset($contributors[0]) && is_string($contributors[0])) {
-            return array_map(fn($name) => ['name' => $name], $contributors);
+            return array_map(fn ($name) => ['name' => $name], $contributors);
         }
 
         // If it's an array of ['Role' => ..., 'Contributor' => ...] or similar structures
@@ -395,11 +522,11 @@ class AudibleApiService
             // Case 1: $bnData is an array of nodes (indexed array, e.g., multiple <BrowseNode> tags)
             if (isset($bnData[0]) && is_array($bnData[0])) {
                 $actualNodeList = $bnData;
-            // Case 2: $bnData is a single node (e.g., one <BrowseNode> tag)
+                // Case 2: $bnData is a single node (e.g., one <BrowseNode> tag)
             } elseif (is_array($bnData) && isset($bnData['BrowseNodeId'])) {
                 $actualNodeList = [$bnData];
             }
-        // Case 3: $browseNodes is a single node (no 'BrowseNode' wrapper)
+            // Case 3: $browseNodes is a single node (no 'BrowseNode' wrapper)
         } elseif (isset($browseNodes['BrowseNodeId'])) {
             $actualNodeList = [$browseNodes];
         }

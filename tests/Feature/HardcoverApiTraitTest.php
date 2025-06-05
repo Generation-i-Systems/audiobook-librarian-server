@@ -7,40 +7,39 @@ namespace Tests\Feature;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Orchestra\Testbench\TestCase;
-use App\Traits\HardcoverApiTrait;
+use App\Services\HardcoverApiService;
 
 class HardcoverApiTraitTest extends TestCase
 {
-    use HardcoverApiTrait;
+    protected $serviceMock;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->setHardcoverApiKey('fake-key');
+        $this->serviceMock = $this->getMockBuilder(HardcoverApiService::class)
+            ->setConstructorArgs(['fake-key', 'https://api.hardcover.app/v1'])
+            ->onlyMethods(['searchBooksByTitle', 'getBookDetails'])
+            ->getMock();
     }
 
+    /** @test */
     public function testSearchAndMergeReturnsNullIfNoTitle(): void
     {
-        $result = $this->searchAndMerge(['authors' => ['Test Author']]);
+        $result = $this->serviceMock->searchAndMerge(['authors' => ['Test Author']]);
         $this->assertNull($result);
     }
 
+    /** @test */
     public function testSearchAndMergeReturnsNullIfNoResults(): void
     {
-        // Mock searchBooksByTitle to return null
-        $trait = $this->getMockForTrait(HardcoverApiTrait::class);
-        $trait->setHardcoverApiKey('fake-key');
-        $trait->expects($this->any())
-            ->method('searchBooksByTitle')
-            ->willReturn(null);
-        $result = $trait->searchAndMerge(['title' => 'Nonexistent Book', 'authors' => ['Nobody']]);
+        $this->serviceMock->method('searchBooksByTitle')->willReturn(null);
+        $result = $this->serviceMock->searchAndMerge(['title' => 'Nonexistent Book', 'authors' => ['Nobody']]);
         $this->assertNull($result);
     }
 
+    /** @test */
     public function testSearchAndMergeReturnsMergedData(): void
     {
-        $trait = $this->getMockForTrait(HardcoverApiTrait::class, [], '', true, true, true, ['searchBooksByTitle', 'getBookDetails']);
-        $trait->setHardcoverApiKey('fake-key');
         $mockBooks = [[
             'id' => 'abc123',
             'title' => 'Test Book',
@@ -62,14 +61,10 @@ class HardcoverApiTraitTest extends TestCase
             'isbn_13' => '0987654321098',
             'publisher' => ['name' => 'BigPub'],
         ];
-        $trait->expects($this->any())
-            ->method('searchBooksByTitle')
-            ->willReturn($mockBooks);
-        $trait->expects($this->any())
-            ->method('getBookDetails')
-            ->willReturn($mockDetails);
+        $this->serviceMock->method('searchBooksByTitle')->willReturn($mockBooks);
+        $this->serviceMock->method('getBookDetails')->willReturn($mockDetails);
 
-        $result = $trait->searchAndMerge(['title' => 'Test Book', 'authors' => ['Test Author']]);
+        $result = $this->serviceMock->searchAndMerge(['title' => 'Test Book', 'authors' => ['Test Author']]);
         $this->assertIsArray($result);
         $this->assertSame('abc123', $result['hardcover_id']);
         $this->assertSame('Test Book', $result['title']);

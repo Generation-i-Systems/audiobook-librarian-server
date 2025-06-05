@@ -54,9 +54,9 @@ class TestAudibleCommand extends Command
     private function handleSearch(string $query, ?string $author, int $limit): void
     {
         $this->info("Searching for: {$query}" . ($author ? " by {$author}" : ''));
-        
+
         $books = $this->audibleService->searchBooks($query, $author, $limit);
-        
+
         if (empty($books)) {
             $this->error('No books found or an error occurred.');
             return;
@@ -78,9 +78,9 @@ class TestAudibleCommand extends Command
     private function handleDetails(string $asin): void
     {
         $this->info("Fetching details for ASIN: {$asin}");
-        
+
         $book = $this->audibleService->getBookDetails($asin);
-        
+
         if (!$book) {
             $this->error('Book not found or an error occurred.');
             return;
@@ -93,35 +93,35 @@ class TestAudibleCommand extends Command
         $this->line("Publisher: " . ($book['publisher']['name'] ?? 'N/A'));
         $this->line("Published: " . ($book['release_date'] ?? 'N/A'));
         $this->line("Duration: " . ($book['duration'] ?? 'N/A'));
-        
+
         // Handle genres
-        $genres = array_map(function($genre) {
+        $genres = array_map(function ($genre) {
             return $genre['genre']['name'] ?? null;
         }, $book['genres'] ?? []);
         $genres = array_filter($genres);
         $this->line("Genres: " . (!empty($genres) ? implode(', ', $genres) : 'N/A'));
-        
+
         // Handle rating safely
         $rating = null;
         $ratingsCount = 0;
-        
+
         if (isset($book['rating']) && is_array($book['rating'])) {
             if (isset($book['rating']['average_rating'])) {
-                $rating = is_numeric($book['rating']['average_rating']) 
+                $rating = is_numeric($book['rating']['average_rating'])
                     ? round($book['rating']['average_rating'], 1)
                     : null;
             }
             if (isset($book['rating']['ratings_count'])) {
-                $ratingsCount = is_numeric($book['rating']['ratings_count']) 
-                    ? (int)$book['rating']['ratings_count'] 
+                $ratingsCount = is_numeric($book['rating']['ratings_count'])
+                    ? (int)$book['rating']['ratings_count']
                     : 0;
             }
         }
-        
+
         $ratingDisplay = $rating !== null ? "$rating/5" : 'N/A';
         $ratingsDisplay = $ratingsCount > 0 ? " ($ratingsCount ratings)" : '';
         $this->line("Rating: $ratingDisplay$ratingsDisplay");
-                   
+
         // Handle cover image
         $coverUrl = $book['cover_image_url'] ?? null;
         if ($coverUrl) {
@@ -130,7 +130,7 @@ class TestAudibleCommand extends Command
         } else {
             $this->line("Cover: N/A");
         }
-        
+
         if (!empty($book['description'])) {
             $this->line("\nDescription:");
             $this->line(wordwrap($book['description'], 80));

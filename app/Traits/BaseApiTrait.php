@@ -23,24 +23,24 @@ trait BaseApiTrait
     protected function httpGet(string $endpoint, array $params = []): ?\Illuminate\Http\Client\Response
     {
         $cacheKey = $this->getCacheKey($endpoint, $params);
-        
+
         return Cache::remember($cacheKey, $this->cacheTtl, function () use ($endpoint, $params) {
             $this->checkRateLimit();
-            
+
             $response = Http::withHeaders($this->getDefaultHeaders())
                 ->get($this->baseUrl . $endpoint, $params);
-                
+
             if ($response->successful()) {
                 return $response;
             }
-            
+
             Log::error('API request failed', [
                 'service' => $this->serviceName,
                 'endpoint' => $endpoint,
                 'status' => $response->status(),
                 'response' => $response->body(),
             ]);
-            
+
             return null;
         });
     }
@@ -51,24 +51,24 @@ trait BaseApiTrait
     protected function httpPost(string $endpoint, array $data = []): ?\Illuminate\Http\Client\Response
     {
         $cacheKey = $this->getCacheKey($endpoint, $data);
-        
+
         return Cache::remember($cacheKey, $this->cacheTtl, function () use ($endpoint, $data) {
             $this->checkRateLimit();
-            
+
             $response = Http::withHeaders($this->getDefaultHeaders())
                 ->post($this->baseUrl . $endpoint, $data);
-                
+
             if ($response->successful()) {
                 return $response;
             }
-            
+
             Log::error('API request failed', [
                 'service' => $this->serviceName,
                 'endpoint' => $endpoint,
                 'status' => $response->status(),
                 'response' => $response->body(),
             ]);
-            
+
             return null;
         });
     }
@@ -80,12 +80,12 @@ trait BaseApiTrait
     {
         $cacheKey = "{$this->serviceName}_rate_limit_" . now()->format('YmdH');
         $count = Cache::get($cacheKey, 0);
-        
+
         if ($count >= $this->rateLimit) {
             Log::warning('API rate limit reached', ['service' => $this->serviceName]);
             throw new \RuntimeException("{$this->serviceName}API rate limit exceeded. Please try again later.");
         }
-        
+
         Cache::put($cacheKey, $count + 1, now()->addHour());
     }
 
@@ -106,11 +106,11 @@ trait BaseApiTrait
             'Accept' => 'application/json',
             'User-Agent' => 'AudiobookLibrarian/1.0',
         ];
-        
+
         if ($this->apiKey) {
             $headers['Authorization'] = "Bearer {$this->apiKey}";
         }
-        
+
         return $headers;
     }
 

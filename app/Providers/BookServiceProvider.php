@@ -28,7 +28,7 @@ class BookServiceProvider extends ServiceProvider
         // $this->registerBookService('google_books', function () {
         //     return new GoogleBooksApiService();
         // });
-        
+
         // $this->registerBookService('hardcover', function () {
         //     return new HardcoverService();
         // });
@@ -42,7 +42,7 @@ class BookServiceProvider extends ServiceProvider
         $this->app->when($name)
             ->needs(BookServiceInterface::class)
             ->give($factory);
-            
+
         $this->app->extend('book.services', function ($services) use ($name, $factory) {
             $service = $factory();
             if ($service->isAvailable()) {

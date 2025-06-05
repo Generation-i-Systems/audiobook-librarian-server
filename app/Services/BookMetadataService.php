@@ -62,13 +62,13 @@ class BookMetadataService
     protected function saveToLocalFile(string $directoryPath, array $metadata): bool
     {
         $filePath = rtrim($directoryPath, '/') . '/' . $this->localFilename;
-        
+
         try {
             $json = json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
             if ($json === false) {
                 throw new \RuntimeException('Failed to encode metadata to JSON');
             }
-            
+
             $result = file_put_contents($filePath, $json);
             return $result !== false;
         } catch (\Throwable $e) {
@@ -89,17 +89,17 @@ class BookMetadataService
     protected function loadFromLocalFile(string $directoryPath): array
     {
         $filePath = rtrim($directoryPath, '/') . '/' . $this->localFilename;
-        
+
         if (!file_exists($filePath) || !is_readable($filePath)) {
             return [];
         }
-        
+
         try {
             $json = file_get_contents($filePath);
             if ($json === false) {
                 throw new \RuntimeException('Failed to read metadata file');
             }
-            
+
             $data = json_decode($json, true);
             return is_array($data) ? $data : [];
         } catch (\Throwable $e) {
@@ -124,10 +124,10 @@ class BookMetadataService
             // Ensure we have required fields
             $metadata['id'] = $bookId;
             $metadata['updated_at'] = now()->toIso8601String();
-            
+
             // Check if document exists
             $existing = $this->firestoreService->getBook($bookId);
-            
+
             if ($existing) {
                 // Update existing document
                 $this->firestoreService->updateBook($bookId, $metadata);
@@ -136,7 +136,7 @@ class BookMetadataService
                 $metadata['created_at'] = $metadata['updated_at'];
                 $this->firestoreService->createBook($metadata);
             }
-            
+
             return true;
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('Failed to save metadata to Firestore', [
@@ -178,7 +178,7 @@ class BookMetadataService
     {
         // Remove any trailing slashes and normalize the path
         $normalizedPath = rtrim(str_replace('\\', '/', $directoryPath), '/');
-        
+
         // Create a hash of the normalized path
         return hash('sha256', $normalizedPath);
     }

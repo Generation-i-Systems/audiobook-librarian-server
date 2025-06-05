@@ -9,7 +9,7 @@ trait BaseParserTrait
 {
     /**
      * Format authors to a consistent structure
-     * 
+     *
      * @param array|string $authors Author data or string of author names
      * @return array
      */
@@ -24,11 +24,11 @@ trait BaseParserTrait
                 ];
             }, array_filter(explode(',', $authors)));
         }
-        
+
         if (!is_array($authors)) {
             return [];
         }
-        
+
         return array_map(function ($author) {
             if (is_string($author)) {
                 return [
@@ -37,7 +37,7 @@ trait BaseParserTrait
                     ]
                 ];
             }
-            
+
             return [
                 'author' => [
                     'id' => $author['id'] ?? null,
@@ -50,7 +50,7 @@ trait BaseParserTrait
 
     /**
      * Format narrators to a consistent structure
-     * 
+     *
      * @param array|string $narrators Narrator data or string of narrator names
      * @return array
      */
@@ -65,11 +65,11 @@ trait BaseParserTrait
                 ];
             }, array_filter(explode(',', $narrators)));
         }
-        
+
         if (!is_array($narrators)) {
             return [];
         }
-        
+
         return array_map(function ($narrator) {
             if (is_string($narrator)) {
                 return [
@@ -78,7 +78,7 @@ trait BaseParserTrait
                     ]
                 ];
             }
-            
+
             return [
                 'narrator' => [
                     'id' => $narrator['id'] ?? null,
@@ -90,7 +90,7 @@ trait BaseParserTrait
 
     /**
      * Format genres to a consistent structure
-     * 
+     *
      * @param array|string $genres Genre data or string of genre names
      * @return array
      */
@@ -105,11 +105,11 @@ trait BaseParserTrait
                 ];
             }, array_filter(explode(',', $genres)));
         }
-        
+
         if (!is_array($genres)) {
             return [];
         }
-        
+
         return array_map(function ($genre) {
             if (is_string($genre)) {
                 return [
@@ -118,7 +118,7 @@ trait BaseParserTrait
                     ]
                 ];
             }
-            
+
             return [
                 'genre' => [
                     'id' => $genre['id'] ?? null,
@@ -131,7 +131,7 @@ trait BaseParserTrait
 
     /**
      * Format series information
-     * 
+     *
      * @param array|string $series Series data or string of series name
      * @param int|string|null $number Series number/position
      * @return array
@@ -141,7 +141,7 @@ trait BaseParserTrait
         if (empty($series)) {
             return [];
         }
-        
+
         if (is_string($series)) {
             return [
                 [
@@ -152,13 +152,13 @@ trait BaseParserTrait
                 ]
             ];
         }
-        
+
         if (is_array($series)) {
             // If it's already in the correct format, return as is
             if (isset($series['series'])) {
                 return [$series];
             }
-            
+
             // If it's an array of series entries
             if (isset($series[0]) && is_array($series[0])) {
                 return array_map(function ($item) {
@@ -171,7 +171,7 @@ trait BaseParserTrait
                     ];
                 }, $series);
             }
-            
+
             // Single series entry
             return [
                 [
@@ -183,7 +183,7 @@ trait BaseParserTrait
                 ]
             ];
         }
-        
+
         return [];
     }
 
@@ -262,7 +262,7 @@ trait BaseParserTrait
         if ($str === null) {
             return '';
         }
-        
+
         return trim(mb_strtolower($str));
     }
 
@@ -273,21 +273,21 @@ trait BaseParserTrait
     {
         $str1 = $this->normalizeString($str1);
         $str2 = $this->normalizeString($str2);
-        
+
         if ($str1 === $str2) {
             return 1.0;
         }
-        
+
         $len1 = mb_strlen($str1);
         $len2 = mb_strlen($str2);
-        
+
         if ($len1 < 1 || $len2 < 1) {
             return 0.0;
         }
-        
+
         $maxLen = max($len1, $len2);
         $distance = levenshtein($str1, $str2);
-        
+
         return 1 - ($distance / $maxLen);
     }
 }

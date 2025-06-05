@@ -61,7 +61,7 @@ class AudibleService
                 ->get("{$this->baseUrl}/products", $params);
 
             $data = $response->json();
-            
+
             Log::debug('Audible API search response', [
                 'status' => $response->status(),
                 'response' => $data
@@ -70,21 +70,21 @@ class AudibleService
             // If no results, try with keywords
             if (empty($data['products']) && !empty($query)) {
                 Log::debug('No results with title search, trying with keywords');
-                
+
                 unset($params['title']);
                 $params['keywords'] = $query;
-                
+
                 Log::debug('Audible API keywords search request', [
                     'url' => "{$this->baseUrl}/products",
                     'params' => $params
                 ]);
-                
+
                 $response = Http::withHeaders($this->defaultHeaders)
                     ->timeout(10)
                     ->get("{$this->baseUrl}/products", $params);
-                    
+
                 $data = $response->json();
-                
+
                 Log::debug('Audible API keywords search response', [
                     'status' => $response->status(),
                     'response' => $data
@@ -98,7 +98,7 @@ class AudibleService
                     'params' => $params,
                     'response' => $data ?? $response->body(),
                 ]);
-                
+
                 // Try a direct search using the ASIN if the query looks like one
                 if (preg_match('/^[A-Z0-9]{10}$/', $query)) {
                     Log::debug('Trying direct ASIN lookup', ['asin' => $query]);
@@ -107,7 +107,7 @@ class AudibleService
                         return [$book];
                     }
                 }
-                
+
                 return null;
             }
 
@@ -298,14 +298,14 @@ class AudibleService
     protected function extractPeople($people, string $role = 'author'): array
     {
         $result = [];
-        
+
         if (empty($people)) {
             return $result;
         }
-        
+
         // If it's already an array of authors/narrators in the correct format
         if (is_array($people) && isset($people[0]['author'])) {
-            return array_map(function($item) {
+            return array_map(function ($item) {
                 return [
                     'author' => [
                         'name' => $item['author']['name'] ?? null,
@@ -314,11 +314,11 @@ class AudibleService
                 ];
             }, $people);
         }
-        
+
         if (!is_array($people)) {
             $people = [$people];
         }
-        
+
         foreach ($people as $person) {
             $data = $this->extractPersonData($person);
             if (!empty($data) && !empty($data['author']['name'])) {
@@ -330,7 +330,7 @@ class AudibleService
                 ];
             }
         }
-        
+
         return $result;
     }
 

@@ -2,25 +2,21 @@
 
 namespace Tests\Feature;
 
-use App\Traits\AudiobookBayApiTrait;
-use App\Traits\AudiobookBayParserTrait;
-use App\Traits\BaseApiTrait;
-use DOMDocument;
-use DOMXPath;
+use App\Services\AudiobookBayService;
+use App\Services\AudiobookBayApiService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Mockery;
 use Tests\TestCase;
 
 class AudiobookBayTest extends TestCase
 {
-    // use RefreshDatabase;
-    // BaseApiTrait is used by AudiobookBayApiTrait, so no need to use it directly here.
-    use AudiobookBayApiTrait;
-    use AudiobookBayParserTrait;
+    // use RefreshDatabase; // Uncomment if database interactions are tested
+
+    protected AudiobookBayService $service;
+    protected $audiobookBayApiServiceMock; // Mockery objects don't always play nice with strict typing here
 
     /**
      * Set up the test environment.
@@ -29,349 +25,217 @@ class AudiobookBayTest extends TestCase
     {
         parent::setUp();
 
-        // Mock environment variables for testing *before* initAudiobookBay
-        putenv('AUDIOBOOK_BAY_USERNAME=testuser');
-        putenv('AUDIOBOOK_BAY_PASSWORD=testpass');
+        // Config values for AudiobookBayApiService are typically loaded from config/services.php
+        // Ensure your test environment has necessary stubs or actual config if service relies on it.
+        // e.g., config(['services.audiobook_bay.username' => 'testuser']);
+        // e.g., config(['services.audiobook_bay.password' => 'testpass']);
 
-        $this->initAudiobookBay();
+        $this->audiobookBayApiServiceMock = Mockery::mock(AudiobookBayApiService::class);
 
-        // Mock the HTTP client for all tests
-        // Http::fake(); // This should be commented out if tests use Http::shouldReceive()
+        // Instantiate AudiobookBayService with the mock
+        $this->service = new AudiobookBayService($this->audiobookBayApiServiceMock);
 
-        // Clear the rate limiter before each test
-        Cache::forget('audiobookbay_rate_limit');
-
-        // Disable logging for tests
+        // Disable logging for tests to keep output clean
         Log::spy();
 
-        // Clear any cached cookies
-        Cache::forget('audiobookbay_cookie');
-    }
-
-    /** @test */
-    public function testCanLoginToAudiobookbay()
-    {
-        // Create a mock of Illuminate\Http\Client\Response
-        $mockedHttpResponse = Mockery::mock(\Illuminate\Http\Client\Response::class);
-
-        // Create a Symfony cookie object
-        $symfonyCookie = new \Symfony\Component\HttpFoundation\Cookie('PHPSESSID', 'testsessionidfrommock');
-
-        // Stub methods on the mocked response
-        $mockedHttpResponse->shouldReceive('successful')->andReturn(true);
-        $mockedHttpResponse->shouldReceive('cookies')->andReturn([$symfonyCookie]); // Return an array containing the cookie
-        // If the trait uses ->json() or other methods, they might need stubbing too if they are called before cookies()
-
-        Http::shouldReceive('asForm')->andReturnSelf()
-            ->shouldReceive('withHeaders')->withAnyArgs()->andReturnSelf()
-            ->shouldReceive('post')
-            ->with($this->baseUrl . '/member/login.php', [
-                'username' => 'testuser',
-                'password' => 'testpass',
-                'login' => 'Login',
-            ])
-            ->andReturn($mockedHttpResponse);
-
-        $cookie = $this->getAuthCookie();
-
-        $this->assertNotEmpty($cookie);
-        $this->assertStringContainsString('PHPSESSID=testsessionidfrommock', $cookie);
-    }
-
-    /** @test */
-    public function testHandlesLoginFailure()
-    {
-        // Mock failed login response using Http::shouldReceive()
-        $mockedFailedHttpResponse = Mockery::mock(\Illuminate\Http\Client\Response::class);
-        $mockedFailedHttpResponse->shouldReceive('successful')->andReturn(true); // Or false, depending on how failure is checked
-        $mockedFailedHttpResponse->shouldReceive('cookies')->andReturn([]); // No cookies = login failure for the trait
-
-        Http::shouldReceive('asForm')->once()->andReturnSelf()
-            ->shouldReceive('withHeaders')->once()->withAnyArgs()->andReturnSelf()
-            ->shouldReceive('post')
-            ->once()
-            ->with($this->baseUrl . '/member/login.php', [
-                'username' => 'testuser',
-                'password' => 'testpass',
-                'login' => 'Login',
-            ])
-            ->andReturn($mockedFailedHttpResponse);
-
-        $cookie = $this->getAuthCookie();
-
-        // The trait returns an empty string on failure, not null.
-        $this->assertEmpty($cookie);
-    }
-
-    /** @test */
-    public function testCanSearchAudiobookbay()
-    {
-        $sampleHtml = file_get_contents(__DIR__ . '/../fixtures/audiobookbay_search.html');
-
-        // Mock successful login response
-        $mockedLoginResponse = Mockery::mock(\Illuminate\Http\Client\Response::class);
-        $symfonyCookie = new \Symfony\Component\HttpFoundation\Cookie('PHPSESSID', 'searchsessionid');
-        $mockedLoginResponse->shouldReceive('successful')->andReturn(true);
-        $mockedLoginResponse->shouldReceive('cookies')->andReturn([$symfonyCookie]);
-
-        // Mock successful search response
-        $mockedSearchResponse = Mockery::mock(\Illuminate\Http\Client\Response::class);
-        // --- Mocked Responses --- 
-        // Login Response (provides cookie)
-        $mockedLoginResponse = Mockery::mock(\Illuminate\Http\Client\Response::class);
-        $symfonyCookie = new \Symfony\Component\HttpFoundation\Cookie('PHPSESSID', 'searchsessionid');
-        $mockedLoginResponse->shouldReceive('successful')->andReturn(true);
-        $mockedLoginResponse->shouldReceive('cookies')->andReturn([$symfonyCookie]);
-
-        // Search Response (provides HTML content)
-        $mockedSearchHtmlResponse = Mockery::mock(\Illuminate\Http\Client\Response::class);
-        $mockedSearchHtmlResponse->shouldReceive('successful')->andReturn(true);
-        $mockedSearchHtmlResponse->shouldReceive('body')->andReturn($sampleHtml);
-        $mockedSearchHtmlResponse->shouldReceive('cookies')->andReturn([]); // Search response usually doesn't set cookies
-
-        // --- Mocked Pending Requests --- 
-        $mockedPendingRequestForLogin = Mockery::mock(\Illuminate\Http\Client\PendingRequest::class);
-        $mockedPendingRequestForSearch = Mockery::mock(\Illuminate\Http\Client\PendingRequest::class);
-
-        // --- LOGIN PHASE EXPECTATIONS ---
-        Http::shouldReceive('asForm')
-            ->once()
-            ->ordered('login_phase')
-            ->andReturn($mockedPendingRequestForLogin);
-
-        $mockedPendingRequestForLogin->shouldReceive('withHeaders')
-            ->once()
-            ->ordered('login_phase')
-            ->with(['User-Agent' => 'Mozilla/5.0']) // Exact UA used in getAuthCookie's POST
-            ->andReturnSelf();
-
-        $mockedPendingRequestForLogin->shouldReceive('post')
-            ->once()
-            ->ordered('login_phase')
-            ->with($this->baseUrl . '/member/login.php', ['username' => 'testuser', 'password' => 'testpass', 'login' => 'Login'])
-            ->andReturn($mockedLoginResponse);
-
-        // --- SEARCH PHASE EXPECTATIONS ---
-        $expectedSearchUserAgent = 'TestUA';
-        $expectedSearchCookie = 'PHPSESSID=searchsessionid';
-        $expectedSearchHeaders = [
-            'User-Agent' => $expectedSearchUserAgent,
-            'Cookie' => $expectedSearchCookie,
-            'Accept' => 'application/json', // Added to match actual headers
-        ];
-
-        Http::shouldReceive('withHeaders')
-            ->once()
-            ->with($expectedSearchHeaders)
-            ->andReturn($mockedPendingRequestForSearch);
-
-        $expectedSearchParams = [
-            's' => 'test',
-            'page' => 1,
-            'cat' => 'undefined',
-            'orderby' => 'relevance',
-            'order' => 'desc',
-        ];
-        $mockedPendingRequestForSearch->shouldReceive('get')
-            ->once()
-            ->ordered('search_phase')
-            ->with('/', [
-                's' => 'test', // Corrected to match the actual call searchAudiobooks('test')
-                'page' => 1,
-                'orderby' => 'relevance',
-                'order' => 'desc',
-            ])
-            ->andReturn($mockedSearchHtmlResponse);
-
-        $results = $this->searchAudiobooks('test');
-
-        $this->assertIsArray($results);
-        $this->assertNotEmpty($results);
-        // Example assertion for the first result, if structure is known and consistent from fixture
-        if (!empty($results)) {
-            $firstResult = $results[0];
-            $this->assertArrayHasKey('title', $firstResult);
-            $this->assertEquals('Test Book 1', $firstResult['title']);
-            $this->assertArrayHasKey('url', $firstResult);
-            $this->assertEquals('https://audiobookbay.lu/book/test-book-1', $firstResult['url']);
-
-            $this->assertArrayHasKey('authors', $firstResult);
-            $this->assertIsArray($firstResult['authors']);
-            $this->assertNotEmpty($firstResult['authors']);
-            $this->assertArrayHasKey('name', $firstResult['authors'][0]);
-            $this->assertEquals('John Doe', $firstResult['authors'][0]['name']);
-
-            $this->assertArrayHasKey('narrators', $firstResult);
-            $this->assertIsArray($firstResult['narrators']);
-            $this->assertNotEmpty($firstResult['narrators']);
-            $this->assertArrayHasKey('name', $firstResult['narrators'][0]);
-            $this->assertEquals('Jane Smith', $firstResult['narrators'][0]['name']);
-
-            $this->assertArrayHasKey('cover_image_url', $firstResult);
-            $this->assertEquals('https://example.com/cover1.jpg', $firstResult['cover_image_url']);
-            
-            $this->assertArrayHasKey('description', $firstResult);
-            $this->assertEquals('Description for Test Book 1.', $firstResult['description']);
-
-            $this->assertArrayHasKey('metadata', $firstResult);
-            $this->assertArrayHasKey('categories', $firstResult['metadata']);
-            $this->assertNotEmpty($firstResult['metadata']['categories']);
-            $this->assertEquals('Fiction', $firstResult['metadata']['categories'][0]);
-
-            $this->assertArrayHasKey('language', $firstResult);
-            $this->assertEquals('English', $firstResult['language']);
-            
-            $this->assertArrayHasKey('metadata', $firstResult);
-            $this->assertArrayHasKey('format', $firstResult['metadata']);
-            $this->assertEquals('MP3', $firstResult['metadata']['format']);
-
-            $this->assertArrayHasKey('metadata', $firstResult);
-            $this->assertArrayHasKey('size', $firstResult['metadata']);
-            $this->assertEquals('256.7 MB', $firstResult['metadata']['size']);
-
-            $this->assertArrayHasKey('metadata', $firstResult);
-            $this->assertArrayHasKey('bitrate', $firstResult['metadata']);
-            $this->assertEquals('128 kbps', $firstResult['metadata']['bitrate']);
-        }
+        // Clear relevant caches before each test if AudiobookBayService uses specific cache keys
+        // For example, if performSearch uses a cache key like 'audiobookbay_service_search_...'
+        // Cache::forget('some_specific_cache_key_used_by_AudiobookBayService');
     }
 
     /**
-     * Parse search results from HTML (copied from the command for testing)
-     *
-     * @param string $html The HTML content to parse
-     * @return array
+     * Clean up the testing environment before the next test.
      */
-    protected function parseTestSearchResults(string $html): array
+    protected function tearDown(): void
     {
-        $results = [];
-        libxml_use_internal_errors(true);
-
-        $dom = new DOMDocument();
-        $dom->loadHTML($html);
-        $xpath = new DOMXPath($dom);
-
-        // Find all book entries
-        $entries = $xpath->query('//div[contains(@class, "post")]');
-
-        foreach ($entries as $entry) {
-            $result = [
-                'title' => '',
-                'author' => '',
-                'narrator' => '',
-                'size' => '',
-                'format' => '',
-                'link' => '',
-                'cover' => '',
-            ];
-
-            // Title and link
-            $titleNode = $xpath->query('.//h2/a', $entry)->item(0);
-            if ($titleNode instanceof \DOMElement) {
-                $result['title'] = trim($titleNode->nodeValue);
-                $result['link'] = 'https://audiobookbay.lu' . $titleNode->getAttribute('href');
-            }
-
-            // Cover image
-            $imgNode = $xpath->query('.//div[contains(@class, "postImg")]//img', $entry)->item(0);
-            if ($imgNode instanceof \DOMElement) {
-                $result['cover'] = $imgNode->getAttribute('src');
-            }
-
-            // Details (author, narrator, size, format)
-            $details = $xpath->query('.//div[contains(@class, "postInfo")]', $entry);
-            if ($details->length > 0) {
-                $text = $details->item(0)->nodeValue;
-
-                // Extract author (simplified)
-                if (preg_match('/Author:\s*(.+?)(?=\n|$)/i', $text, $matches)) {
-                    $result['author'] = trim($matches[1]);
-                }
-
-                // Extract narrator (simplified)
-                if (preg_match('/Narrated by:\s*(.+?)(?=\n|$)/i', $text, $matches)) {
-                    $result['narrator'] = trim($matches[1]);
-                }
-
-                // Extract size
-                if (preg_match('/Size:\s*(.+?)(?=\n|$)/i', $text, $matches)) {
-                    $result['size'] = trim($matches[1]);
-                }
-
-                // Extract format
-                if (preg_match('/Format:\s*(.+?)(?=\n|$)/i', $text, $matches)) {
-                    $result['format'] = trim($matches[1]);
-                }
-            }
-
-            if (!empty($result['title'])) {
-                $results[] = $result;
-            }
-        }
-
-        return $results;
+        Mockery::close();
+        parent::tearDown();
     }
 
-    // /** @test */
-    // public function testCanParseSearchResults()
-    // {
-    //     $sampleHtml = file_get_contents(__DIR__ . '/../fixtures/audiobookbay_search.html');
-    //     $results = $this->parseTestSearchResults($sampleHtml);
-    //
-    //     $this->assertIsArray($results);
-    //     $this->assertNotEmpty($results);
-    //
-    //     $firstResult = $results[0];
-    //     $this->assertArrayHasKey('title', $firstResult);
-    //     $this->assertArrayHasKey('author', $firstResult);
-    //     $this->assertArrayHasKey('narrator', $firstResult);
-    //     $this->assertArrayHasKey('size', $firstResult);
-    //     $this->assertArrayHasKey('format', $firstResult);
-    //     $this->assertArrayHasKey('link', $firstResult);
-    //     $this->assertArrayHasKey('cover', $firstResult);
-    // }
+    /** @test */
+    public function testCanSearchAudiobooksAndFormatsResults()
+    {
+        $query = 'test query';
+        $options = ['page' => 1]; // Example options passed to apiService
+        $serviceOptions = ['page' => 1, 'limit' => 10]; // Options including limit for service layer
 
-    // /** @test */
-    // public function testCanParseBookDetails()
-    // {
-    //     $sampleHtml = file_get_contents(__DIR__ . '/../fixtures/audiobookbay_book.html');
-    //     $book = $this->parseAudiobookDetails($sampleHtml);
-    //
-    //     $this->assertIsArray($book);
-    //     $this->assertArrayHasKey('title', $book);
-    //     $this->assertArrayHasKey('authors', $book);
-    //     $this->assertArrayHasKey('narrators', $book);
-    //     $this->assertArrayHasKey('description', $book);
-    //     $this->assertArrayHasKey('cover_image_url', $book);
-    //     $this->assertArrayHasKey('published_date', $book);
-    // }
+        // Expected data structure from AudiobookBayApiService->searchAudiobooks()
+        // This structure should match what AudiobookBayParserTrait's parseSearchResults produces
+        $mockApiResults = [
+            [
+                'title' => 'Test Book 1 from API',
+                'authors' => [['name' => 'Author A']],
+                'narrators' => [['name' => 'Narrator X']],
+                'url' => 'https://audiobookbay.lu/ab/test-book-1-slug',
+                'cover_image_url' => 'http://example.com/cover1.jpg',
+                'description' => 'Description for book 1.',
+                'language' => 'English',
+                'metadata' => [
+                    'size' => '100 MB',
+                    'format' => 'MP3',
+                    'source' => 'audiobookbay', // Added by parser
+                    'categories' => ['Fiction'],
+                    'bitrate' => '64 kbps'
+                ]
+            ],
+            [
+                'title' => 'Test Book 2 from API',
+                'authors' => [['name' => 'Author B']],
+                'narrators' => [['name' => 'Narrator Y']],
+                'url' => 'https://audiobookbay.lu/ab/test-book-2-slug',
+                'cover_image_url' => 'http://example.com/cover2.jpg',
+                'description' => 'Description for book 2.',
+                'language' => 'German',
+                'metadata' => [
+                    'size' => '120 MB',
+                    'format' => 'M4B',
+                    'source' => 'audiobookbay',
+                    'categories' => ['Non-Fiction'],
+                    'bitrate' => '128 kbps'
+                ]
+            ],
+        ];
 
-    // /** @test */
-    // public function testRespectsRateLimiting()
-    // {
-    //     $this->expectException(\RuntimeException::class);
-    //     $this->expectExceptionMessage('AudiobookBay API rate limit exceeded.');
-    //
-    //     // Set up a low rate limit for testing
-    //     putenv('AUDIOBOOK_BAY_RATE_LIMIT=1');
-    //
-    //     // First request should pass
-    //     $this->testCanSearchWithRateLimiting();
-    //
-    //     // Second request should throw exception
-    //     $this->testCanSearchWithRateLimiting();
-    // }
+        $this->audiobookBayApiServiceMock
+            ->shouldReceive('searchAudiobooks')
+            ->once()
+            ->with($query, $options) // Assert options passed to the underlying API service
+            ->andReturn($mockApiResults);
 
-    // /** @test */
-    // public function testCanSearchWithRateLimiting()
-    // {
-    //     // Mock successful search response
-    //     Http::fake([
-    //         'audiobookbay.lu/member/login.php' => Http::response('', 200, [
-    //             'Set-Cookie' => 'abc=123; path=/;',
-    //         ]),
-    //         'audiobookbay.lu/?s=test' => Http::response('<html><body>Search Results</body></html>'),
-    //     ]);
-    //
-    //     return $this->searchAudiobooks('test');
-    // }
+        // Call the method on AudiobookBayService (which includes its own caching and formatting)
+        $serviceResults = $this->service->performSearch($query, $serviceOptions);
+
+        $this->assertIsArray($serviceResults);
+        $this->assertNotEmpty($serviceResults);
+        // Assuming default limit of 10, and we provided 2 mock results, count should be 2.
+        // If $serviceOptions['limit'] was less than count($mockApiResults), this would be different.
+        $this->assertCount(count($mockApiResults), $serviceResults);
+
+        // Check formatting of the first result by AudiobookBayService
+        $firstServiceResult = $serviceResults[0];
+        $firstApiResult = $mockApiResults[0];
+
+        $this->assertEquals('test-book-1-slug', $firstServiceResult['id']);
+        $this->assertEquals($firstApiResult['title'], $firstServiceResult['title']);
+        $this->assertEquals($firstApiResult['authors'][0]['name'], $firstServiceResult['author']);
+        $this->assertEquals($firstApiResult['narrators'][0]['name'], $firstServiceResult['narrator']);
+        $this->assertEquals($firstApiResult['metadata']['size'], $firstServiceResult['size']);
+        $this->assertEquals($firstApiResult['metadata']['format'], $firstServiceResult['format']);
+        $this->assertEquals($firstApiResult['url'], $firstServiceResult['link']);
+        $this->assertEquals($firstApiResult['cover_image_url'], $firstServiceResult['cover']);
+        $this->assertEquals($firstApiResult['description'], $firstServiceResult['description']);
+        $this->assertEquals($firstApiResult['metadata'], $firstServiceResult['metadata']);
+    }
+
+    /** @test */
+    public function testPerformSearchReturnsEmptyArrayOnApiServiceFailure()
+    {
+        $query = 'failing query';
+        $options = ['page' => 1];
+        $serviceOptions = ['page' => 1, 'limit' => 10];
+
+        $this->audiobookBayApiServiceMock
+            ->shouldReceive('searchAudiobooks')
+            ->once()
+            ->with($query, $options)
+            ->andReturn(null); // Simulate API service returning null (e.g., on error)
+
+        $serviceResults = $this->service->performSearch($query, $serviceOptions);
+
+        $this->assertIsArray($serviceResults);
+        $this->assertEmpty($serviceResults);
+    }
+
+    /** @test */
+    public function testCanGetBookDetailsAndFormatsResult()
+    {
+        $bookIdOrSlug = 'test-book-detailed-slug';
+
+        // Expected data structure from AudiobookBayApiService->getAudiobookDetails()
+        // This structure should match what AudiobookBayParserTrait's parseAudiobookDetails produces
+        $mockApiDetails = [
+            'id' => $bookIdOrSlug, // Assuming apiService might add this or it's derived from URL
+            'title' => 'Detailed Test Book', 
+            'subtitle' => 'The Subtitle of The Detailed Test Book',
+            'authors' => [['name' => 'Author Detailed', 'id' => null]],
+            'narrators' => [['name' => 'Narrator Detailed', 'id' => null]],
+            'description' => 'A very detailed description of the book content.',
+            'published_date' => '2023-03-15',
+            'publisher' => 'Detailed Publisher Inc.',
+            'cover_image_url' => 'http://example.com/detailed_cover.jpg',
+            'categories' => ['Mystery', 'Thriller'], // This might be $mockApiDetails['metadata']['categories'] too
+            'language' => 'French',
+            'series' => ['name' => 'Detailed Series', 'number' => '3'],
+            'url' => 'https://audiobookbay.lu/ab/test-book-detailed-slug',
+            'metadata' => [
+                'source' => 'audiobookbay', // Added by parser
+                'format' => 'M4B - HQ', 
+                'size' => '350 MB',
+                'duration' => 'PT8H15M30S', // ISO8601 Duration format
+                'downloads' => '1234 times',
+                'categories' => ['Mystery', 'Thriller'] // Ensure consistency if categories are here too
+            ]
+        ];
+
+        $this->audiobookBayApiServiceMock
+            ->shouldReceive('getAudiobookDetails')
+            ->once()
+            ->with($bookIdOrSlug)
+            ->andReturn($mockApiDetails);
+
+        // Call the method on AudiobookBayService
+        $serviceDetails = $this->service->performGetBookDetails($bookIdOrSlug);
+
+        $this->assertIsArray($serviceDetails);
+        $this->assertNotEmpty($serviceDetails);
+
+        $this->assertEquals($bookIdOrSlug, $serviceDetails['id']);
+        $this->assertEquals($mockApiDetails['title'], $serviceDetails['title']);
+        $this->assertEquals($mockApiDetails['subtitle'], $serviceDetails['subtitle']);
+        $this->assertCount(1, $serviceDetails['authors']);
+        $this->assertEquals($mockApiDetails['authors'][0]['name'], $serviceDetails['authors'][0]['author']['name']);
+        $this->assertCount(1, $serviceDetails['narrators']);
+        $this->assertEquals($mockApiDetails['narrators'][0]['name'], $serviceDetails['narrators'][0]['author']['name']);
+        $this->assertEquals($mockApiDetails['description'], $serviceDetails['description']);
+        $this->assertEquals($mockApiDetails['published_date'], $serviceDetails['published_date']);
+        $this->assertEquals($mockApiDetails['publisher'], $serviceDetails['publisher']);
+        $this->assertEquals($mockApiDetails['cover_image_url'], $serviceDetails['cover_image_url']);
+        $this->assertCount(2, $serviceDetails['categories']);
+        $this->assertEquals($mockApiDetails['categories'][0], $serviceDetails['categories'][0]['genre']['name']);
+        $this->assertEquals($mockApiDetails['language'], $serviceDetails['language']);
+        $this->assertEquals('Detailed Series #3', $serviceDetails['series']);
+        $this->assertEquals('3', $serviceDetails['series_number']);
+        
+        // Duration: PT8H15M30S = (8*3600) + (15*60) + 30 = 28800 + 900 + 30 = 29730 seconds
+        $this->assertEquals(29730, $serviceDetails['duration_seconds']);
+        
+        $this->assertArrayHasKey('source', $serviceDetails['metadata']);
+        $this->assertEquals('AudiobookBay', $serviceDetails['metadata']['source']);
+        $this->assertEquals($mockApiDetails['url'], $serviceDetails['metadata']['url']);
+        $this->assertEquals($mockApiDetails['metadata']['format'], $serviceDetails['metadata']['format']);
+        $this->assertEquals($mockApiDetails['metadata']['size'], $serviceDetails['metadata']['size']);
+    }
+
+    /** @test */
+    public function testPerformGetBookDetailsReturnsNullOnApiServiceFailure()
+    {
+        $bookIdOrSlug = 'non-existent-slug';
+
+        $this->audiobookBayApiServiceMock
+            ->shouldReceive('getAudiobookDetails')
+            ->once()
+            ->with($bookIdOrSlug)
+            ->andReturn(null); // Simulate API service returning null
+
+        $serviceDetails = $this->service->performGetBookDetails($bookIdOrSlug);
+
+        $this->assertNull($serviceDetails);
+    }
+
+    /** @test */
+    public function testIsAvailableReturnsTrueWhenServiceIsSet()
+    {
+        // In setUp, $this->service is initialized with a mock, so it should be available.
+        $this->assertTrue($this->service->isAvailable());
+    }
 }

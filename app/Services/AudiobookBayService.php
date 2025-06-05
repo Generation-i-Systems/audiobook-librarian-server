@@ -3,24 +3,22 @@
 namespace App\Services;
 
 use App\Contracts\BookServiceInterface;
-use App\Traits\AudiobookBayApiTrait;
-use App\Traits\AudiobookBayParserTrait;
+use App\Services\AudiobookBayApiService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Str;
 
 class AudiobookBayService extends BaseBookService implements BookServiceInterface
 {
-    use AudiobookBayApiTrait, AudiobookBayParserTrait {
-        search as protected audiobookBaySearch;
-        getBookDetails as protected audiobookBayGetBookDetails;
-    }
-
-    protected string $baseUrl = 'https://audiobookbay.lu';
     protected int $defaultLimit = 10;
     protected int $cacheTtl = 86400; // 24 hours in seconds
-    protected ?string $cookie = null;
+
+    protected AudiobookBayApiService $apiService;
+
+    public function __construct(AudiobookBayApiService $apiService)
+    {
+        $this->apiService = $apiService;
+    }
 
     /**
      * @inheritDoc
@@ -33,53 +31,51 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
     /**
      * @inheritDoc
      */
-    /**
-     * @inheritDoc
-     */
-    protected function performSearch(string $query, array $options = []): ?array
+    public function performSearch(string $query, array $options = []): ?array
     {
         $limit = $options['limit'] ?? $this->defaultLimit;
         $page = $options['page'] ?? 1;
-        
-        $cacheKey = 'audiobookbay_search_' . md5($query . '_' . $limit . '_' . $page);
-        
-        return Cache::remember($cacheKey, $this->cacheTtl, function () use ($query, $limit) {
+
+        $cacheKey = 'audiobookbay_service_search_' . md5($query . '_' . $limit . '_' . $page);
+
+        return Cache::remember($cacheKey, $this->cacheTtl, function () use ($query, $options, $limit) {
             try {
-                $html = $this->audiobookBaySearch($query);
-                if (!$html) {
-                    Log::warning('No HTML content returned from AudiobookBay search', ['query' => $query]);
+                $searchOptions = [
+                    'page' => $options['page'] ?? 1,
+                ];
+
+                $results = $this->apiService->searchAudiobooks($query, $searchOptions);
+
+                if (is_null($results)) {
+                    Log::warning('AudiobookBayService:performSearch - Null result from apiService->searchAudiobooks', ['query' => $query, 'options' => $searchOptions]);
                     return [];
                 }
-                
-                $results = $this->parseSearchResults($html);
-                
-                // Format results to match expected structure
+
                 $formattedResults = [];
-                foreach ($results as $result) {
+                foreach ($results as $resultItem) {
                     $formattedResults[] = [
-                        'title' => $result['title'] ?? '',
-                        'author' => $result['authors'][0]['name'] ?? '',
-                        'narrator' => $result['narrators'][0]['name'] ?? '',
-                        'size' => $result['metadata']['size'] ?? '',
-                        'format' => $result['metadata']['format'] ?? '',
-                        'link' => $result['url'] ?? '',
-                        'cover' => $result['cover_image_url'] ?? '',
-                        'description' => $result['description'] ?? '',
-                        'metadata' => $result['metadata'] ?? []
+                        'id' => basename(parse_url($resultItem['url'] ?? '', PHP_URL_PATH) ?? ''),
+                        'title' => $resultItem['title'] ?? '',
+                        'author' => $resultItem['authors'][0]['name'] ?? '',
+                        'narrator' => $resultItem['narrators'][0]['name'] ?? '',
+                        'size' => $resultItem['metadata']['size'] ?? '',
+                        'format' => $resultItem['metadata']['format'] ?? '',
+                        'link' => $resultItem['url'] ?? '',
+                        'cover' => $resultItem['cover_image_url'] ?? '',
+                        'description' => $resultItem['description'] ?? '',
+                        'metadata' => $resultItem['metadata'] ?? []
                     ];
                 }
-                
-                // Limit results
-                if ($limit > 0) {
+
+                if ($limit > 0 && count($formattedResults) > $limit) {
                     $formattedResults = array_slice($formattedResults, 0, $limit);
                 }
-                
+
                 return $formattedResults;
             } catch (\Exception $e) {
-                Log::error('Error searching AudiobookBay', [
+                Log::error('AudiobookBayService: Error in performSearch', [
                     'query' => $query,
                     'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString()
                 ]);
                 return [];
             }
@@ -93,55 +89,29 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
     {
         return $this->performGetBookDetails($id);
     }
-    
+
     /**
      * @inheritDoc
      */
-    protected function performGetBookDetails(string $id): ?array
+    public function performGetBookDetails(string $idOrSlug): ?array
     {
-        $cacheKey = 'audiobookbay_book_' . md5($id);
-        
-        return Cache::remember($cacheKey, $this->cacheTtl, function () use ($id) {
+        $cacheKey = 'audiobookbay_service_book_details_' . md5($idOrSlug);
+
+        return Cache::remember($cacheKey, $this->cacheTtl, function () use ($idOrSlug) {
             try {
-                // First try to search for the book
-                $results = $this->performSearch($id, ['limit' => 1]);
-                
-                if (empty($results)) {
-                    Log::warning('No results found for book details', ['id' => $id]);
+                $details = $this->apiService->getAudiobookDetails($idOrSlug);
+
+                if (is_null($details)) {
+                    Log::warning('AudiobookBayService:performGetBookDetails - Null result from apiService->getAudiobookDetails', ['idOrSlug' => $idOrSlug]);
                     return null;
                 }
-                
-                // Get the first result's URL
-                $bookUrl = $results[0]['url'] ?? null;
-                if (!$bookUrl) {
-                    Log::warning('No URL found in search results', ['id' => $id]);
-                    return null;
-                }
-                
-                // Fetch the book details page
-                $html = $this->makeRequest($bookUrl);
-                if (!$html) {
-                    Log::warning('Failed to fetch book details page', ['url' => $bookUrl]);
-                    return null;
-                }
-                
-                // Parse the book details
-                $details = $this->parseAudiobookDetails($html);
-                
-                return [
-                    'title' => $details['title'] ?? '',
-                    'authors' => $details['authors'] ?? [],
-                    'narrators' => $details['narrators'] ?? [],
-                    'description' => $details['description'] ?? '',
-                    'cover_image' => $details['cover_image_url'] ?? '',
-                    'published_date' => $details['published_date'] ?? null,
-                    'metadata' => $details['metadata'] ?? []
-                ];
+
+                return $this->formatBookDetails($details);
+
             } catch (\Exception $e) {
-                Log::error('Error getting book details from AudiobookBay', [
-                    'id' => $id,
+                Log::error('AudiobookBayService: Error in performGetBookDetails', [
+                    'idOrSlug' => $idOrSlug,
                     'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
                 ]);
                 return null;
             }
@@ -149,255 +119,118 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
     }
 
     /**
-     * Get the AudiobookBay username from config
-     */
-    protected function getAudiobookBayUsername(): ?string
-    {
-        return Config::get('services.audiobookbay.username');
-    }
-    
-    /**
-     * Get the AudiobookBay password from config
-     */
-    protected function getAudiobookBayPassword(): ?string
-    {
-        return Config::get('services.audiobookbay.password');
-    }
-    
-    /**
-     * Make an HTTP request to AudiobookBay
-     * 
-     * @param string $url
-     * @param string $method
-     * @param array $data
-     * @return string|null
-     */
-    protected function makeRequest(string $url, string $method = 'GET', array $data = []): ?string
-    {
-        try {
-            $client = new \GuzzleHttp\Client([
-                'cookies' => true,
-                'headers' => [
-                    'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                    'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                    'Accept-Language' => 'en-US,en;q=0.5',
-                ]
-            ]);
-            
-            $options = [
-                'http_errors' => false,
-                'timeout' => 30,
-            ];
-            
-            if ($method === 'POST') {
-                $options['form_params'] = $data;
-            }
-            
-            $response = $client->request($method, $url, $options);
-            
-            if ($response->getStatusCode() !== 200) {
-                Log::warning('Failed to fetch URL', [
-                    'url' => $url,
-                    'status' => $response->getStatusCode(),
-                ]);
-                return null;
-            }
-            
-            return (string) $response->getBody();
-        } catch (\Exception $e) {
-            Log::error('Request failed', [
-                'url' => $url,
-                'error' => $e->getMessage(),
-            ]);
-            return null;
-        }
-    }
-
-    /**
-     * Check if a string is a URL
-     */
-    protected function isUrl(string $string): bool
-    {
-        return filter_var($string, FILTER_VALIDATE_URL) !== false;
-    }
-
-    /**
-     * Parse search results from HTML
-     */
-    protected function parseSearchResults(string $html): array
-    {
-        $dom = new \DOMDocument();
-        @$dom->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'));
-        $xpath = new \DOMXPath($dom);
-        
-        $results = [];
-        $entries = $xpath->query('//div[contains(@class, "post")]');
-        
-        foreach ($entries as $entry) {
-            $result = [
-                'title' => '',
-                'url' => '',
-                'cover' => '',
-                'author' => '',
-                'narrator' => '',
-                'size' => '',
-                'format' => '',
-                'bitrate' => '',
-            ];
-            
-            // Title and URL
-            $titleNode = $xpath->query('.//div[contains(@class, "postTitle")]//a', $entry)->item(0);
-            if ($titleNode) {
-                $result['title'] = trim($titleNode->textContent);
-                $result['url'] = $this->baseUrl . $titleNode->getAttribute('href');
-            }
-            
-            // Cover image
-            $imgNode = $xpath->query('.//div[contains(@class, "postImg")]//img', $entry)->item(0);
-            if ($imgNode) {
-                $result['cover'] = $imgNode->getAttribute('src');
-            }
-            
-            // Details (author, narrator, size, format)
-            $details = $xpath->query('.//div[contains(@class, "postInfo")]', $entry);
-            if ($details->length > 0) {
-                $text = $details->item(0)->textContent;
-                
-                // Extract author
-                if (preg_match('/Author:\s*(.*?)(?:\n|$)/i', $text, $matches)) {
-                    $result['author'] = trim($matches[1]);
-                }
-                
-                // Extract narrator
-                if (preg_match('/Narrated by:\s*(.*?)(?:\n|$)/i', $text, $matches)) {
-                    $result['narrator'] = trim($matches[1]);
-                }
-                
-                // Extract size
-                if (preg_match('/Size:\s*(\d+(\.\d+)?\s*[KMG]B)/i', $text, $matches)) {
-                    $result['size'] = trim($matches[1]);
-                }
-                
-                // Extract format
-                if (preg_match('/Format:\s*(.*?)(?:\n|$)/i', $text, $matches)) {
-                    $result['format'] = trim($matches[1]);
-                }
-                
-                // Extract bitrate if available
-                if (preg_match('/(\d+\s*kbps)/i', $text, $matches)) {
-                    $result['bitrate'] = $matches[1];
-                }
-            }
-            
-            if (!empty($result['title'])) {
-                $results[] = $result;
-            }
-        }
-        
-        return $results;
-    }
-
-    /**
-     * Format search results into a consistent structure
-     * 
-     * @deprecated Use the direct formatting in performSearch instead
-     */
-    protected function formatSearchResults(array $results): array
-    {
-        return array_map(function ($result) {
-            return [
-                'title' => $result['title'] ?? '',
-                'author' => $result['author'] ?? '',
-                'narrator' => $result['narrator'] ?? '',
-                'description' => $result['description'] ?? '',
-                'cover_image' => $result['cover_image_url'] ?? $result['cover_image'] ?? '',
-                'date_published' => $result['published_date'] ?? $result['date_published'] ?? null,
-                'metadata' => $result['metadata'] ?? [],
-            ];
-        }, $results);
-    }
-
-    /**
-     * Format book details to a consistent format
+     * Format book details (from apiService) to a consistent format for BookServiceInterface.
      */
     protected function formatBookDetails(array $details): array
     {
         return [
-            'id' => $details['url'] ?? null,
+            'id' => $details['id'] ?? basename(parse_url($details['url'] ?? '', PHP_URL_PATH) ?? ''),
             'title' => $details['title'] ?? 'Unknown Title',
-            'authors' => $this->formatAuthors($details['author'] ?? ''),
-            'narrators' => $this->formatNarrators($details['narrator'] ?? ''),
+            'subtitle' => $details['subtitle'] ?? null,
+            'authors' => $this->formatAuthors($details['authors'] ?? []),
+            'narrators' => $this->formatNarrators($details['narrators'] ?? []),
             'description' => $details['description'] ?? null,
-            'published_date' => $details['datePublished'] ?? null,
-            'cover_image_url' => $details['cover_image'] ?? null,
-            'categories' => $this->formatCategories($details['category'] ?? []),
-            'keywords' => $details['keywords'] ?? [],
-            'series' => $details['series'] ?? null,
-            'series_number' => $details['seriesNumber'] ?? null,
-            'metadata' => [
-                'source' => 'AudiobookBay',
-                'url' => $details['url'] ?? null,
-            ]
+            'published_date' => $details['published_date'] ?? null,
+            'publisher' => $details['publisher'] ?? null,
+            'cover_image_url' => $details['cover_image_url'] ?? null,
+            'categories' => $this->formatCategories($details['categories'] ?? ($details['metadata']['categories'] ?? [])),
+            'language' => $details['language'] ?? null,
+            'series' => (!empty($details['series']['name'])) ? ($details['series']['name'] . (!empty($details['series']['number']) ? ' #' . $details['series']['number'] : '')) : null,
+            'series_number' => $details['series']['number'] ?? null,
+            'duration_seconds' => $this->parseDuration($details['metadata']['duration'] ?? $details['duration'] ?? null),
+            'metadata' => array_merge($details['metadata'] ?? [], ['source' => 'AudiobookBay', 'url' => $details['url'] ?? null]),
         ];
     }
 
     /**
-     * Format authors string to a consistent format
+     * Format authors array (from apiService's parsed data) to a consistent structure.
      */
-    protected function formatAuthors(string $authors): array
+    protected function formatAuthors(array $authorsArray): array
     {
-        if (empty($authors)) {
+        if (empty($authorsArray)) {
             return [];
         }
-        
-        return array_map(function ($author) {
+        return array_map(function ($authorObj) {
             return [
                 'author' => [
-                    'name' => trim($author),
-                    'id' => null,
+                    'name' => trim($authorObj['name'] ?? ''),
+                    'id' => $authorObj['id'] ?? null,
                 ]
             ];
-        }, explode(',', $authors));
+        }, $authorsArray);
     }
 
     /**
-     * Format narrators string to a consistent format
+     * Format narrators array (from apiService's parsed data) to a consistent structure.
      */
-    protected function formatNarrators(?string $narrator): array
+    protected function formatNarrators(array $narratorsArray): array
     {
-        if (empty($narrator)) {
+        if (empty($narratorsArray)) {
             return [];
         }
-        
-        return array_map(function ($narrator) {
+        return array_map(function ($narratorObj) {
             return [
                 'author' => [
-                    'name' => trim($narrator),
-                    'id' => null,
+                    'name' => trim($narratorObj['name'] ?? ''),
+                    'id' => $narratorObj['id'] ?? null,
                 ]
             ];
-        }, explode(',', $narrator));
+        }, $narratorsArray);
     }
 
     /**
-     * Format categories array to a consistent format
+     * Format categories array to a consistent structure.
      */
-    protected function formatCategories(array $categories): array
+    protected function formatCategories(array $categoriesInput): array
     {
+        if (empty($categoriesInput)) {
+            return [];
+        }
         return array_map(function ($category) {
+            $categoryName = is_array($category) ? ($category['name'] ?? $category['genre'] ?? '') : $category;
             return [
                 'genre' => [
-                    'name' => $category,
+                    'name' => trim($categoryName),
                 ]
             ];
-        }, $categories);
+        }, $categoriesInput);
     }
 
     /**
-     * Check if the service is available
+     * Helper to parse duration string (e.g., "2h 30m", "PT2H30M") to seconds.
+     * This should ideally come from a more robust parser or be standardized in apiService if possible.
+     */
+    protected function parseDuration(?string $durationStr): ?int
+    {
+        if (empty($durationStr)) {
+            return null;
+        }
+        $duration = 0;
+        if (preg_match('/(\d+)\s*h(?:ours?)?/i', $durationStr, $matches)) {
+            $duration += (int)$matches[1] * 3600;
+        }
+        if (preg_match('/(\d+)\s*m(?:in(?:utes?)?)?/i', $durationStr, $matches)) {
+            $duration += (int)$matches[1] * 60;
+        }
+        if (preg_match('/(\d+)\s*s(?:ec(?:onds?)?)?/i', $durationStr, $matches)) {
+            $duration += (int)$matches[1];
+        }
+        // ISO8601 Duration PThHmMsS (basic support)
+        if ($duration === 0 && str_starts_with(strtoupper($durationStr), 'PT')) {
+            try {
+                $interval = new \DateInterval($durationStr);
+                $duration = ($interval->h * 3600) + ($interval->i * 60) + $interval->s;
+            } catch (\Exception $e) { /* Ignore if not valid DateInterval */
+            }
+        }
+        return $duration > 0 ? $duration : null;
+    }
+
+    /**
+     * Check if the service is available.
      */
     public function isAvailable(): bool
     {
-        return !empty($this->getAudiobookBayUsername()) && !empty($this->getAudiobookBayPassword());
+        return isset($this->apiService);
     }
 }

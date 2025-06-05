@@ -41,4 +41,11 @@ return [
         'key' => env('GOOGLE_BOOKS_API_KEY'),
     ],
 
+    'audiobook_bay' => [
+        'base_url' => env('AUDIOBOOK_BAY_BASE_URL', 'https://audiobookbay.lu'),
+        'username' => env('AUDIOBOOK_BAY_USERNAME'),
+        'password' => env('AUDIOBOOK_BAY_PASSWORD'),
+        'user_agent' => env('AUDIOBOOK_BAY_USER_AGENT', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'),
+    ],
+
 ];

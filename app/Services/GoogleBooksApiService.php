@@ -122,7 +122,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
             $merged['needsReview'] = true;
         }
         // Remove nulls and skip narrators/series/duration if not present
-        return array_filter($merged, function($v, $k) {
+        return array_filter($merged, function ($v, $k) {
             if (in_array($k, ['narrators', 'series', 'duration']) && $v === null) {
                 return false;
             }
@@ -139,7 +139,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
     public function __construct()
     {
         parent::__construct();
-        
+
         $this->client = new Client([
             'base_uri' => $this->baseUrl . '/',
             'timeout' => 10.0,
@@ -163,7 +163,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
     {
         $limit = $options['limit'] ?? $this->defaultLimit;
         $author = $options['author'] ?? null;
-        
+
         $queryParams = [
             'q' => $this->buildSearchQuery($query, $author),
             'maxResults' => $limit,
@@ -172,7 +172,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
 
         try {
             $response = $this->httpGet('volumes', $queryParams);
-            
+
             if (empty($response['items'])) {
                 Log::warning('No results found in Google Books API response', [
                     'query' => $query,
@@ -180,7 +180,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
                 ]);
                 return [];
             }
-            
+
             return $this->formatSearchResults($response['items']);
         } catch (\Exception $e) {
             Log::error('Google Books API search failed', [
@@ -215,17 +215,17 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
     protected function buildSearchQuery(string $query, ?string $author = null): string
     {
         $searchTerms = [];
-        
+
         // Add the main query
         if (!empty($query)) {
             $searchTerms[] = $query;
         }
-        
+
         // Add author filter if provided
         if (!empty($author)) {
             $searchTerms[] = "inauthor:\"{$author}\"";
         }
-        
+
         return implode('+', $searchTerms);
     }
 
@@ -235,15 +235,15 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
     protected function formatSearchResults(array $items): array
     {
         $results = [];
-        
+
         foreach ($items as $item) {
             if (!isset($item['id']) || !isset($item['volumeInfo'])) {
                 continue;
             }
-            
+
             $volumeInfo = $item['volumeInfo'];
             $imageLinks = $volumeInfo['imageLinks'] ?? [];
-            
+
             $results[] = [
                 'id' => $item['id'],
                 'title' => $volumeInfo['title'] ?? 'Unknown Title',
@@ -263,10 +263,10 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
                 'canonical_volume_link' => $volumeInfo['canonicalVolumeLink'] ?? null,
             ];
         }
-        
+
         return $results;
     }
-    
+
     /**
      * Format book details from Google Books API
      */
@@ -275,12 +275,12 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
         if (!isset($item['volumeInfo'])) {
             return [];
         }
-        
+
         $volumeInfo = $item['volumeInfo'];
         $imageLinks = $volumeInfo['imageLinks'] ?? [];
         $saleInfo = $item['saleInfo'] ?? [];
         $accessInfo = $item['accessInfo'] ?? [];
-        
+
         return [
             'id' => $item['id'],
             'title' => $volumeInfo['title'] ?? 'Unknown Title',
@@ -318,7 +318,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
             ],
         ];
     }
-    
+
     /**
      * Format authors array to a consistent format
      */
@@ -333,7 +333,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
             ];
         }, $authors);
     }
-    
+
     /**
      * Get the best available image URL from the image links
      */
@@ -355,7 +355,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
         if (isset($imageLinks['thumbnail'])) {
             return $imageLinks['thumbnail'];
         }
-        
+
         // Try to get any image URL if available
         return $imageLinks[array_key_first($imageLinks)] ?? null;
     }

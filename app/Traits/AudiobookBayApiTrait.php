@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Cache;
  */
 trait AudiobookBayApiTrait
 {
+    use BaseApiTrait;
     /**
      * Attempt to look up the book in AudiobookBay and return additional metadata.
      *
@@ -126,15 +127,13 @@ trait AudiobookBayApiTrait
             $merged['needsReview'] = true;
         }
         // Remove nulls and skip ISBN/pages if not present
-        return array_filter($merged, function($v, $k) {
+        return array_filter($merged, function ($v, $k) {
             if (in_array($k, ['isbn_10', 'isbn_13', 'pages']) && $v === null) {
                 return false;
             }
             return $v !== null;
         }, ARRAY_FILTER_USE_BOTH);
     }
-
-    use BaseApiTrait;
 
     protected ?string $username = null;
     protected ?string $password = null;
@@ -156,14 +155,14 @@ trait AudiobookBayApiTrait
     {
         $this->username = getenv('AUDIOBOOK_BAY_USERNAME') ?: config('services.audiobookbay.username');
         $this->password = getenv('AUDIOBOOK_BAY_PASSWORD') ?: config('services.audiobookbay.password');
-        
+
         if (isset($config['base_url'])) {
             $this->setBaseUrl($config['base_url']);
         }
         $this->userAgent = 'TestUA'; // Set for diagnostic purposes
         return $this;
     }
-    
+
     /**
      * Search for books
      */
@@ -171,7 +170,7 @@ trait AudiobookBayApiTrait
     {
         return $this->searchAudiobooks($query, $options) ?? [];
     }
-    
+
     /**
      * Get book details by ID
      */
@@ -179,7 +178,7 @@ trait AudiobookBayApiTrait
     {
         return $this->getAudiobookDetails($id) ?? [];
     }
-    
+
     /**
      * Login to AudiobookBay
      */
@@ -189,7 +188,7 @@ trait AudiobookBayApiTrait
             Log::warning('AudiobookBay credentials not fully configured');
             return false;
         }
-        
+
         // Implementation for login would go here
         return true;
     }
@@ -252,22 +251,22 @@ trait AudiobookBayApiTrait
             'orderby' => $options['sort'] ?? 'relevance',
             'order' => $options['order'] ?? 'desc',
         ];
-        
+
         if (isset($options['author'])) {
             $params['author'] = $options['author'];
         }
-        
+
         if (isset($options['narrator'])) {
             $params['narrator'] = $options['narrator'];
         }
-        
+
         $responseObject = $this->httpGet('/', $params);
-    
+
         if ($responseObject && $responseObject->successful()) {
             $htmlContent = $responseObject->body();
             return $this->parseSearchResults($htmlContent);
         }
-    
+
         return null;
     }
 
@@ -284,7 +283,7 @@ trait AudiobookBayApiTrait
         // In a real scenario with actual HTML, parsing would be needed here.
         return $response;
     }
-    
+
     /**
      * Get audiobooks by author
      */
@@ -292,7 +291,7 @@ trait AudiobookBayApiTrait
     {
         return $this->searchAudiobooks('', ['author' => $author, 'limit' => $limit]) ?? [];
     }
-    
+
     /**
      * Get audiobooks by narrator
      */
@@ -309,7 +308,7 @@ trait AudiobookBayApiTrait
         // Implementation for parsing search results
         return [];
     }
-    
+
     /**
      * Parse audiobook details from HTML (API version)
      */

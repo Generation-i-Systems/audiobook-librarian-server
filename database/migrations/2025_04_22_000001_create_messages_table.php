@@ -1,10 +1,12 @@
 <?php
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
-    public function up() {
+return new class () extends Migration {
+    public function up()
+    {
         Schema::dropIfExists('messages');
         Schema::create('messages', function (Blueprint $table) {
             $table->id();
@@ -18,7 +20,8 @@ return new class extends Migration {
             $table->foreign('from_user_id')->references('id')->on('users')->onDelete('set null');
         });
     }
-    public function down() {
+    public function down()
+    {
         Schema::dropIfExists('messages');
     }
 };

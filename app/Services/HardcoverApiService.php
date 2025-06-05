@@ -1,27 +1,21 @@
 <?php
 
-namespace App\Traits;
+namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-/**
- * Trait for interacting with the Hardcover.app GraphQL API
- */
-trait HardcoverApiTrait
+class HardcoverApiService
 {
-    /**
-     * Attempt to look up the book in Hardcover and return additional metadata.
-     *
-     * @param array $book
-     * @return array|null
-     */
-    /**
-     * Attempt to look up the book in Hardcover and return additional metadata.
-     *
-     * @param array $book
-     * @return array|null
-     */
+    protected string $apiUrl;
+    protected ?string $apiKey;
+
+    public function __construct(?string $apiKey = null, ?string $apiUrl = null)
+    {
+        $this->apiUrl = $apiUrl ?? config('services.hardcover.api_url', 'https://api.hardcover.app/v1/graphql');
+        $this->apiKey = $apiKey ?? config('services.hardcover.api_key');
+    }
+
     public function searchAndMerge(array $book): ?array
     {
         $title = $book['title'] ?? null;
@@ -34,19 +28,15 @@ trait HardcoverApiTrait
         if (!$results || empty($results)) {
             return null;
         }
-
-        // Try to find the best match by title and author similarity
         $bestMatch = null;
         $bestScore = 0;
         foreach ($results as $result) {
             $score = 0;
-            // Title similarity (case-insensitive, normalized)
             if (strcasecmp(trim($result['title']), trim($title)) === 0) {
                 $score += 2;
             } elseif (stripos($result['title'], $title) !== false) {
                 $score += 1;
             }
-            // Author match (if available)
             if (!empty($authors) && !empty($result['authors'])) {
                 foreach ($authors as $inputAuthor) {
                     foreach ($result['authors'] as $authorObj) {
@@ -66,8 +56,6 @@ trait HardcoverApiTrait
         if (!$bestMatch) {
             return null;
         }
-
-        // Optionally fetch more details by ID (if available)
         $details = null;
         if (!empty($bestMatch['id'])) {
             $details = $this->getBookDetails($bestMatch['id']);
@@ -83,67 +71,36 @@ trait HardcoverApiTrait
             'isbn_13' => $details['isbn_13'] ?? $bestMatch['isbn_13'] ?? null,
             'publisher' => $details['publisher']['name'] ?? $bestMatch['publisher']['name'] ?? null,
         ];
-        // Remove nulls
-        return array_filter($merged, fn($v) => $v !== null);
+        return array_filter($merged, fn ($v) => $v !== null);
     }
 
-    /**
-     * Base URL for the Hardcover API
-     *
-     * @var string
-     */
-    protected string $hardcoverApiUrl = 'https://api.hardcover.app/v1/graphql';
-
-    /**
-     * API key for authentication
-     * 
-     * @var string|null
-     */
-    protected ?string $hardcoverApiKey = null;
-
-    /**
-     * Set the API key for authentication
-     * 
-     * @param string $apiKey
-     * @return void
-     */
-    public function setHardcoverApiKey(string $apiKey): void
+    public function setApiKey(string $apiKey): void
     {
-        $this->hardcoverApiKey = $apiKey;
+        $this->apiKey = $apiKey;
     }
 
-    /**
-     * Make a GraphQL request to the Hardcover API
-     * 
-     * @param string $query
-     * @param array $variables
-     * @return array|null
-     */
     protected function makeGraphQlRequest(string $query, array $variables = []): ?array
     {
-        if (empty($this->hardcoverApiKey)) {
+        if (empty($this->apiKey)) {
             Log::error('Hardcover API key not set');
             return null;
         }
-
         try {
             $response = Http::withHeaders([
                 'Content-Type' => 'application/json',
-                'Authorization' => 'Bearer ' . $this->hardcoverApiKey,
-            ])->post($this->hardcoverApiUrl, [
+                'x-api-key' => $this->apiKey,
+            ])->post($this->apiUrl, [
                 'query' => $query,
                 'variables' => $variables,
             ]);
-
-            if ($response->successful()) {
-                return $response->json();
+            if ($response->failed()) {
+                Log::error('Hardcover API request failed', [
+                    'status' => $response->status(),
+                    'response' => $response->body(),
+                ]);
+                return null;
             }
-
-            Log::error('Hardcover API request failed', [
-                'status' => $response->status(),
-                'response' => $response->body(),
-            ]);
-            return null;
+            return $response->json();
         } catch (\Exception $e) {
             Log::error('Hardcover API request exception', [
                 'error' => $e->getMessage(),
@@ -152,13 +109,6 @@ trait HardcoverApiTrait
         }
     }
 
-    /**
-     * Search for books by title
-     * 
-     * @param string $title
-     * @param int $limit
-     * @return array|null
-     */
     public function searchBooksByTitle(string $title, int $limit = 10): ?array
     {
         $query = '
@@ -178,21 +128,13 @@ trait HardcoverApiTrait
                 }
             }
         ';
-
         $result = $this->makeGraphQlRequest($query, [
             'title' => "%$title%",
             'limit' => $limit,
         ]);
-
         return $result['data']['books'] ?? null;
     }
 
-    /**
-     * Get book details by ID
-     * 
-     * @param string $bookId
-     * @return array|null
-     */
     public function getBookDetails(string $bookId): ?array
     {
         $query = '
@@ -237,18 +179,10 @@ trait HardcoverApiTrait
                 }
             }
         ';
-
         $result = $this->makeGraphQlRequest($query, ['bookId' => $bookId]);
         return $result['data']['books_by_pk'] ?? null;
     }
 
-    /**
-     * Get books by author
-     * 
-     * @param string $authorName
-     * @param int $limit
-     * @return array|null
-     */
     public function getBooksByAuthor(string $authorName, int $limit = 10): ?array
     {
         $query = '
@@ -270,12 +204,10 @@ trait HardcoverApiTrait
                 }
             }
         ';
-
         $result = $this->makeGraphQlRequest($query, [
             'authorName' => $authorName,
             'limit' => $limit,
         ]);
-
         return $result['data']['books'] ?? null;
     }
 }

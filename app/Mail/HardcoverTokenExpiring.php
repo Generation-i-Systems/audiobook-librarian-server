@@ -9,7 +9,8 @@ use Illuminate\Support\Str;
 
 class HardcoverTokenExpiring extends Mailable
 {
-    use Queueable, SerializesModels;
+    use Queueable;
+    use SerializesModels;
 
     public $daysUntilExpiration;
 

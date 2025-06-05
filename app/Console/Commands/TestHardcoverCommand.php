@@ -31,29 +31,29 @@ class TestHardcoverCommand extends Command
         $author = $this->option('author');
 
         $this->info("Searching for books with title: {$title}" . ($author ? " by {$author}" : ''));
-        
+
         // Test search
         $books = $hardcoverService->searchBooks($title, $author);
-        
+
         if (empty($books)) {
             $this->error('No books found or API request failed');
             return 1;
         }
-        
+
         $this->info("\nFound " . count($books) . " books:");
-        
+
         foreach ($books as $index => $book) {
             $this->line("\n[{$index}] " . $book['title']);
             $this->line("    ID: " . $book['id']);
             $this->line("    Authors: " . implode(', ', array_column($book['authors'] ?? [], 'author.name')));
             $this->line("    Genres: " . implode(', ', array_column($book['genres'] ?? [], 'genre.name')));
             $this->line("    Cover: " . ($book['cover_image_url'] ?? 'N/A'));
-            
+
             if ($index === 0) {
                 // Get details for the first book
                 $this->info("\nGetting details for the first book...");
                 $details = $hardcoverService->getBookDetails($book['id']);
-                
+
                 if ($details) {
                     $this->line("    Description: " . substr($details['description'] ?? 'N/A', 0, 100) . '...');
                     $this->line("    Pages: " . ($details['pages'] ?? 'N/A'));
@@ -62,7 +62,7 @@ class TestHardcoverCommand extends Command
                 }
             }
         }
-        
+
         // Check token expiration
         $expiresAt = Config::get('hardcover.token_expires_at');
         if ($expiresAt) {
@@ -71,7 +71,7 @@ class TestHardcoverCommand extends Command
         } else {
             $this->warn("\nAPI token expiration date not set");
         }
-        
+
         return 0;
     }
 }

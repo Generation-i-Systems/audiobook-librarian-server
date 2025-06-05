@@ -32,8 +32,9 @@ class QueueController extends Controller
         $jobs = collect();
 
         foreach ($jobsDocs as $doc) {
-            if (!$doc->exists())
+            if (!$doc->exists()) {
                 continue;
+            }
             $job = $doc->data();
             $job['id'] = $doc->id(); // Ensure ID is present
 
