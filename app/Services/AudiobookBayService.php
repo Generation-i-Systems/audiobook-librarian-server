@@ -127,7 +127,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
     public function searchAndMerge(array $book): ?array
     {
         return $this->apiService->searchAndMerge($book);
-    }
+    } // Now uses improved logic in AudiobookBayApiService
 
     /**
      * Format book details (from apiService) to a consistent format for BookServiceInterface.

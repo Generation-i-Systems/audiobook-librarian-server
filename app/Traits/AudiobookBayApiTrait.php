@@ -1,16 +1,4 @@
-<?php
 
-namespace App\Traits;
-
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Cache;
-
-/**
- * Trait for interacting with the AudiobookBay API
- */
-trait AudiobookBayApiTrait
-{
     use BaseApiTrait;
     /**
      * Attempt to look up the book in AudiobookBay and return additional metadata.
@@ -46,24 +34,42 @@ trait AudiobookBayApiTrait
             return null;
         }
 
-        // Score and find best match
+        // Enhanced match: author name must be in the result title, non-author part of title must match search title, and any number in search must match exactly
+        function normalizeTitle($title)
+        {
+            // Remove author names and common stopwords, lower, trim
+            return preg_replace('/\s+/', ' ', strtolower(trim(preg_replace('/[^\w\d ]/', '', $title))));
+        }
+        function extractNumbers($str)
+        {
+            preg_match_all('/\d+/', $str, $matches);
+            return $matches[0] ?? [];
+        }
+        $searchNumbers = extractNumbers($inputTitle);
+        $normalizedSearchTitle = normalizeTitle(str_ireplace($inputAuthor, '', $inputTitle));
         $bestScore = 0;
         $bestMatch = null;
         foreach ($results as $result) {
             $score = 0;
-            if (!empty($result['title']) && stripos($result['title'], $inputTitle) !== false) {
-                $score += 3;
-            } elseif (!empty($result['title']) && similar_text(strtolower($result['title']), strtolower($inputTitle), $pct) && $pct > 80) {
-                $score += 2;
-            }
-            if (!empty($inputAuthor) && !empty($result['authors'])) {
-                foreach ($result['authors'] as $authorObj) {
-                    $authorName = is_array($authorObj['author'] ?? null) ? $authorObj['author']['name'] ?? '' : ($authorObj['author'] ?? '');
-                    if ($authorName && stripos($authorName, $inputAuthor) !== false) {
-                        $score += 2;
-                        break;
-                    }
-                }
+            $resultTitle = $result['title'] ?? '';
+            $normalizedResultTitle = normalizeTitle(str_ireplace($inputAuthor, '', $resultTitle));
+            $resultNumbers = extractNumbers($resultTitle);
+            // Author name must be in the result title
+            $authorInTitle = $inputAuthor && stripos($resultTitle, $inputAuthor) !== false;
+            // Title similarity (ignoring author)
+            similar_text($normalizedResultTitle, $normalizedSearchTitle, $pctTitle);
+            // All numbers in search must be in result (e.g. book numbers)
+            $numbersMatch = empty($searchNumbers) || !array_diff($searchNumbers, $resultNumbers);
+            if ($authorInTitle && $pctTitle > 80 && $numbersMatch) {
+                $score = 100 + $pctTitle; // strong match
+            } elseif ($authorInTitle && $pctTitle > 60 && $numbersMatch) {
+                $score = 80 + $pctTitle;
+            } elseif ($pctTitle > 80 && $numbersMatch) {
+                $score = 60 + $pctTitle;
+            } elseif ($authorInTitle && $numbersMatch) {
+                $score = 50;
+            } elseif ($pctTitle > 60) {
+                $score = 40 + $pctTitle;
             }
             if ($score > $bestScore) {
                 $bestScore = $score;
@@ -321,6 +327,14 @@ trait AudiobookBayApiTrait
     public function getAudiobooksByNarrator(string $narrator, int $limit = 10): array
     {
         return $this->searchAudiobooks('', ['narrator' => $narrator, 'limit' => $limit]) ?? [];
+    }
+
+    /**
+     * Backward compatible alias for parseSearchResultsHtml (for tests and internal calls)
+     */
+    protected function parseSearchResults(string $html): array
+    {
+        return $this->parseSearchResultsHtml($html);
     }
 
     /**
