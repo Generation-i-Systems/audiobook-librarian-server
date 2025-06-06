@@ -1,5 +1,7 @@
 <?php
 
+// AudiobookBayParserTrait removed. All logic integrated into AudiobookBayApiService.
+
 namespace App\Traits;
 
 use DOMDocument;

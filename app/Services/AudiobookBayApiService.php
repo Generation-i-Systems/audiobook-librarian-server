@@ -111,7 +111,7 @@ class AudiobookBayApiService
     /**
      * Parse audiobook details from AudiobookBay HTML
      */
-    public function parseAudiobookDetails(string $html): array
+    private function parseAudiobookDetails(string $html): array
     {
         $dom = new DOMDocument();
         @$dom->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'));
