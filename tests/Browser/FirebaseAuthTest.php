@@ -93,7 +93,7 @@ class FirebaseAuthTest extends DuskTestCase
             'created_at' => new \DateTime(),
             'updated_at' => new \DateTime(),
         ]);
-        
+
         $this->browse(function (Browser $browser) {
             $browser->visit('/login')
                 ->type('email', 'unverified@example.com')

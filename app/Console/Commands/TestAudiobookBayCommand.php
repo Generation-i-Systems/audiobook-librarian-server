@@ -2,8 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Traits\AudiobookBayApiTrait;
-use App\Traits\AudiobookBayParserTrait;
+use App\Services\AudiobookBayService;
 use DOMDocument;
 use DOMElement;
 use DOMXPath;
@@ -13,21 +12,20 @@ use Illuminate\Support\Facades\Log;
 
 class TestAudiobookBayCommand extends Command
 {
-    use AudiobookBayApiTrait;
-    use AudiobookBayParserTrait;
+    /**
+     * @var AudiobookBayService
+     */
+    protected AudiobookBayService $audiobookBayService;
 
     /**
      * Create a new command instance.
      *
      * @return void
      */
-    public function __construct()
+    public function __construct(AudiobookBayService $audiobookBayService)
     {
         parent::__construct();
-        $this->initAudiobookBay([
-            'username' => config('services.audiobookbay.username'),
-            'password' => config('services.audiobookbay.password'),
-        ]);
+        $this->audiobookBayService = $audiobookBayService;
     }
 
     /**
@@ -65,7 +63,7 @@ class TestAudiobookBayCommand extends Command
 
         // Test login
         $this->info("1. Testing login...");
-        $cookie = $this->getAudiobookBayCookie();
+        $cookie = $this->audiobookBayService->getApiService()->getAudiobookBayCookie();
 
         if (empty($cookie)) {
             $this->error("❌ Login failed. Please check your AUDIOBOOK_BAY_USERNAME and AUDIOBOOK_BAY_PASSWORD in .env");
@@ -91,7 +89,7 @@ class TestAudiobookBayCommand extends Command
 
         // Perform search
         $this->info("2. Searching for: {$query}");
-        $html = $this->audiobookBaySearch($query);
+        $html = $this->audiobookBayService->getApiService()->audiobookBaySearch($query);
 
         if (empty($html)) {
             $this->error("❌ Search failed or returned no results");
@@ -103,7 +101,7 @@ class TestAudiobookBayCommand extends Command
 
         // Parse results
         $this->info("3. Parsing search results...");
-        $results = $this->parseSearchResults($html);
+        $results = $this->audiobookBayService->getApiService()->parseSearchResults($html);
 
         if (empty($results)) {
             $this->warn("⚠️  No results found or failed to parse results");
@@ -136,82 +134,6 @@ class TestAudiobookBayCommand extends Command
         return 0;
     }
 
-    /**
-     * Parse search results from HTML
-     *
-     * @param string $html
-     * @return array
-     */
-    protected function parseSearchResults(string $html): array
-    {
-        $results = [];
-        libxml_use_internal_errors(true);
-
-        $dom = new DOMDocument();
-        libxml_use_internal_errors(true);
-        $dom->loadHTML($html);
-        $xpath = new DOMXPath($dom);
-
-        // Find all book entries
-        $entries = $xpath->query('//div[contains(@class, "post")]');
-
-        foreach ($entries as $entry) {
-            $result = [
-                'title' => '',
-                'author' => '',
-                'narrator' => '',
-                'size' => '',
-                'format' => '',
-                'link' => '',
-                'cover' => ''
-            ];
-
-            // Title and link
-            $titleNode = $xpath->query('.//h2/a', $entry)->item(0);
-            if ($titleNode instanceof DOMElement) {
-                $result['title'] = trim($titleNode->nodeValue);
-                $result['link'] = 'https://audiobookbay.lu' . $titleNode->getAttribute('href');
-            }
-
-            // Cover image
-            $imgNode = $xpath->query('.//div[contains(@class, "postImg")]//img', $entry)->item(0);
-            if ($imgNode instanceof DOMElement) {
-                $result['cover'] = $imgNode->getAttribute('src');
-            }
-
-            // Details (author, narrator, size, format)
-            $details = $xpath->query('.//div[contains(@class, "postInfo")]', $entry);
-            if ($details->length > 0) {
-                $text = $details->item(0)->nodeValue;
-
-                // Extract author (simplified)
-                if (preg_match('/Author:\s*(.+?)(?=\n|$)/i', $text, $matches)) {
-                    $result['author'] = trim($matches[1]);
-                }
-
-                // Extract narrator (simplified)
-                if (preg_match('/Narrated by:\s*(.+?)(?=\n|$)/i', $text, $matches)) {
-                    $result['narrator'] = trim($matches[1]);
-                }
-
-                // Extract size
-                if (preg_match('/Size:\s*(.+?)(?=\n|$)/i', $text, $matches)) {
-                    $result['size'] = trim($matches[1]);
-                }
-
-                // Extract format
-                if (preg_match('/Format:\s*(.+?)(?=\n|$)/i', $text, $matches)) {
-                    $result['format'] = trim($matches[1]);
-                }
-            }
-
-            if (!empty($result['title'])) {
-                $results[] = $result;
-            }
-        }
-
-        return $results;
-    }
 
     /**
      * Display search results in a table
@@ -256,7 +178,12 @@ class TestAudiobookBayCommand extends Command
 
         $this->info("Fetching details from: " . $url);
 
-        $book = $this->getAudiobookDetails($url);
+        // Use AudiobookBayService public method if available, fallback to apiService
+        if (method_exists($this->audiobookBayService, 'performGetBookDetails')) {
+            $book = $this->audiobookBayService->performGetBookDetails($url);
+        } else {
+            $book = $this->audiobookBayService->getApiService()->getAudiobookDetails($url);
+        }
 
         if (empty($book)) {
             $this->error("❌ Failed to fetch book details");

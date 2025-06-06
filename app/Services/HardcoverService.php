@@ -342,24 +342,66 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
     }
 
     /**
-     * Format genres array to a consistent format
-     */
-    protected function formatGenres(array $genres): array
+}
+
+// Check if the service is available
+public function isAvailable(): bool
+{
+    return !empty($this->apiToken) && !empty($this->apiUrl);
+}
+
+/**
+ * Search books by title (public API)
+ * @param string $title
+ * @param array $options
+ * @return array|null
+ */
+    public function searchBooks(string $title, array $options = []): ?array
     {
-        return array_map(function ($genre) {
-            return [
-                'genre' => [
-                    'name' => $genre['genre']['name'] ?? 'Unknown Genre',
-                ]
-            ];
-        }, $genres);
+        return $this->performSearch($title, $options);
     }
 
     /**
-     * Check if the service is available
+     * Get book details by ID (public API)
+     * @param string $id
+     * @return array|null
      */
-    public function isAvailable(): bool
+    public function getBookDetails(string $id): ?array
     {
-        return !empty($this->apiToken) && !empty($this->apiUrl);
+        return $this->performGetBookDetails($id);
+    }
+
+    /**
+     * Get books by author (public API)
+     * @param string $authorName
+     * @param int $limit
+     * @return array|null
+     */
+    public function getBooksByAuthor(string $authorName, int $limit = 10): ?array
+    {
+        $query = '
+        query GetBooksByAuthor($authorName: String!, $limit: Int!) {
+            books(
+                where: {
+                    contributions: {
+                        author: {name: {_eq: $authorName}},
+                        role: {_eq: "AUTHOR"}
+                    }
+                },
+                limit: $limit,
+                order_by: {release_date: desc}
+            ) {
+                id
+                title
+                release_date
+                cover_image_url: cover_image_url(size: SMALL)
+            }
+        }
+    ';
+        $result = $this->makeRequest($query, [
+            'authorName' => $authorName,
+            'limit' => $limit,
+        ]);
+        return $result['data']['books'] ?? null;
     }
 }

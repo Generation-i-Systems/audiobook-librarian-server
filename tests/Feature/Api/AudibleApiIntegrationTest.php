@@ -225,7 +225,7 @@ XML;
             if ($isCorrectUrl && $isLookupOperation && $hasItemId && $isAsinIdType) {
                 return Http::response($this->getFakeXmlDetailsResponseString(), 200, ['Content-Type' => 'application/xml']);
             }
-            
+
             \Illuminate\Support\Facades\Log::warning("D_LOG_INT: Http::fake did not match for details.", ['url' => $request->url(), 'query_params' => $queryParams, 'base_url_expected' => $apiBaseUrl]);
             return Http::response('Mock not found for integration details: ' . $request->url(), 404, ['Content-Type' => 'text/plain']);
         });

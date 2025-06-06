@@ -1,5 +1,7 @@
 <?php
 
+// File intentionally left blank. Trait-based test logic removed due to service refactor.
+
 declare(strict_types=1);
 
 namespace Tests\Feature;
@@ -22,14 +24,14 @@ class HardcoverApiTraitTest extends TestCase
             ->getMock();
     }
 
-    /** @test */
+    #[Test]
     public function testSearchAndMergeReturnsNullIfNoTitle(): void
     {
         $result = $this->serviceMock->searchAndMerge(['authors' => ['Test Author']]);
         $this->assertNull($result);
     }
 
-    /** @test */
+    #[Test]
     public function testSearchAndMergeReturnsNullIfNoResults(): void
     {
         $this->serviceMock->method('searchBooksByTitle')->willReturn(null);
@@ -37,7 +39,7 @@ class HardcoverApiTraitTest extends TestCase
         $this->assertNull($result);
     }
 
-    /** @test */
+    #[Test]
     public function testSearchAndMergeReturnsMergedData(): void
     {
         $mockBooks = [[

@@ -1,5 +1,4 @@
 <?php
-// File intentionally left blank. Trait-based feature tests removed due to service refactor.
 
 namespace Tests\Feature\Api;
 
@@ -9,12 +8,56 @@ use Illuminate\Support\Facades\Cache;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Feature\Api\BaseApiTest;
 
+/**
+ * Service-based tests for AudibleApiService.
+ * Replaces trait-based tests for AudibleApiTrait.
+ */
 class AudibleApiTraitTest extends BaseApiTest
 {
-    protected AudibleApiService $audibleApi;
-    protected string $apiBaseUrl = 'https://api.audible.com/1.0';
-    protected string $testAssociateTag = 'test-tag';
-    protected string $testAccessKey = 'test-access-key';
+    protected function getServiceName(): string
+    {
+        return 'audible';
+    }
+
+    protected function getMockSearchResponse(): array
+    {
+        return [
+            'products' => [
+                [
+                    'asin' => 'TEST123',
+                    'title' => 'Test Audiobook',
+                    'authors' => [['name' => 'Test Author']],
+                    'narrators' => [['name' => 'Test Narrator']],
+                    'publisher_name' => 'Test Publisher',
+                    'publisher_summary' => 'Test Description',
+                    'release_date' => '2023-01-01T00:00:00Z',
+                    'product_images' => [
+                        '500' => 'http://example.com/cover.jpg'
+                    ]
+                ]
+            ]
+        ];
+    }
+
+    protected function getMockDetailsResponse(): array
+    {
+        return [
+            'product' => [
+                'asin' => 'TEST123',
+                'title' => 'Test Audiobook',
+                'authors' => [['name' => 'Test Author']],
+                'narrators' => [['name' => 'Test Narrator']],
+                'publisher_name' => 'Test Publisher',
+                'publisher_summary' => 'Test Description',
+                'release_date' => '2023-01-01T00:00:00Z',
+                'product_images' => [
+                    '500' => 'http://example.com/cover.jpg'
+                ]
+            ]
+        ];
+    }
+
+    private AudibleApiService $audibleApi;
     protected string $testSecretKey = 'test-secret-key';
     protected string $testRegion = 'us';
 
@@ -64,49 +107,6 @@ class AudibleApiTraitTest extends BaseApiTest
         // Mock HTTP client - Http::fake() without arguments clears previous fakes and sets a default passthrough.
         // Specific fakes are set in each test method.
         Http::fake();
-    }
-    
-    protected function getServiceName(): string
-    {
-        return 'audible';
-    }
-
-    protected function getMockSearchResponse(): array
-    {
-        return [
-            'products' => [
-                [
-                    'asin' => 'TEST123',
-                    'title' => 'Test Audiobook',
-                    'authors' => [['name' => 'Test Author']],
-                    'narrators' => [['name' => 'Test Narrator']],
-                    'publisher_name' => 'Test Publisher',
-                    'publisher_summary' => 'Test Description',
-                    'release_date' => '2023-01-01T00:00:00Z',
-                    'product_images' => [
-                        '500' => 'http://example.com/cover.jpg'
-                    ]
-                ]
-            ]
-        ];
-    }
-
-    protected function getMockDetailsResponse(): array
-    {
-        return [
-            'product' => [
-                'asin' => 'TEST123',
-                'title' => 'Test Audiobook',
-                'authors' => [['name' => 'Test Author']],
-                'narrators' => [['name' => 'Test Narrator']],
-                'publisher_name' => 'Test Publisher',
-                'publisher_summary' => 'Test Description',
-                'release_date' => '2023-01-01T00:00:00Z',
-                'product_images' => [
-                    '500' => 'http://example.com/cover.jpg'
-                ]
-            ]
-        ];
     }
 
     #[Test]

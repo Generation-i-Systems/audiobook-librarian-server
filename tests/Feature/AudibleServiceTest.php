@@ -58,7 +58,7 @@ class AudibleServiceTest extends TestCase
     public function getBookDetails()
     {
         $mockBook = $this->getMockBookData();
-        
+
         // Mock the HTTP response
         Http::fake([
             'api.audible.com/1.0/catalog/products/TEST123*' => Http::response([

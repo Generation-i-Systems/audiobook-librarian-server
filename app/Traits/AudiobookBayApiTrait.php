@@ -21,7 +21,16 @@ trait AudiobookBayApiTrait
     public function searchAndMerge(array $book): ?array
     {
         $inputTitle = trim($book['title'] ?? '');
-        $inputAuthor = trim(($book['authors'][0]['author']['name'] ?? '') ?: ($book['author'] ?? ''));
+        $inputAuthor = '';
+        if (isset($book['authors'][0]['author']['name']) && is_string($book['authors'][0]['author']['name'])) {
+            $inputAuthor = trim($book['authors'][0]['author']['name']);
+        } elseif (isset($book['authors'][0]['author']) && is_string($book['authors'][0]['author'])) {
+            $inputAuthor = trim($book['authors'][0]['author']);
+        } elseif (isset($book['author']['name']) && is_string($book['author']['name'])) {
+            $inputAuthor = trim($book['author']['name']);
+        } elseif (isset($book['author']) && is_string($book['author'])) {
+            $inputAuthor = trim($book['author']);
+        }
         if (!$inputTitle) {
             return null;
         }
@@ -279,9 +288,23 @@ trait AudiobookBayApiTrait
         $url = str_starts_with($id, 'http') ? $id : "{$this->baseUrl}/book/{$id}";
         $response = $this->httpGet($url);
 
-        // For tests, $response is already the parsed data from Http::fake().
-        // In a real scenario with actual HTML, parsing would be needed here.
-        return $response;
+        // If the response is a Response object (from Http::fake or real HTTP), parse or handle accordingly
+        if ($response instanceof \Illuminate\Http\Client\Response) {
+            // If the body is HTML, parse it; if it's JSON, decode it
+            $body = $response->body();
+            // Try JSON decode first (for test fakes)
+            $data = json_decode($body, true);
+            if (is_array($data)) {
+                return $data;
+            }
+            // Otherwise, parse as HTML
+            if (is_string($body) && strlen($body) > 0) {
+                return $this->parseAudiobookDetails($body);
+            }
+            return null;
+        }
+        // If already array or null, return as is
+        return is_array($response) || is_null($response) ? $response : null;
     }
 
     /**

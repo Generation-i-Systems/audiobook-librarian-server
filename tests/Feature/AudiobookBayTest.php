@@ -155,7 +155,7 @@ class AudiobookBayTest extends TestCase
         // This structure should match what AudiobookBayParserTrait's parseAudiobookDetails produces
         $mockApiDetails = [
             'id' => $bookIdOrSlug, // Assuming apiService might add this or it's derived from URL
-            'title' => 'Detailed Test Book', 
+            'title' => 'Detailed Test Book',
             'subtitle' => 'The Subtitle of The Detailed Test Book',
             'authors' => [['name' => 'Author Detailed', 'id' => null]],
             'narrators' => [['name' => 'Narrator Detailed', 'id' => null]],
@@ -169,7 +169,7 @@ class AudiobookBayTest extends TestCase
             'url' => 'https://audiobookbay.lu/ab/test-book-detailed-slug',
             'metadata' => [
                 'source' => 'audiobookbay', // Added by parser
-                'format' => 'M4B - HQ', 
+                'format' => 'M4B - HQ',
                 'size' => '350 MB',
                 'duration' => 'PT8H15M30S', // ISO8601 Duration format
                 'downloads' => '1234 times',
@@ -205,10 +205,10 @@ class AudiobookBayTest extends TestCase
         $this->assertEquals($mockApiDetails['language'], $serviceDetails['language']);
         $this->assertEquals('Detailed Series #3', $serviceDetails['series']);
         $this->assertEquals('3', $serviceDetails['series_number']);
-        
+
         // Duration: PT8H15M30S = (8*3600) + (15*60) + 30 = 28800 + 900 + 30 = 29730 seconds
         $this->assertEquals(29730, $serviceDetails['duration_seconds']);
-        
+
         $this->assertArrayHasKey('source', $serviceDetails['metadata']);
         $this->assertEquals('AudiobookBay', $serviceDetails['metadata']['source']);
         $this->assertEquals($mockApiDetails['url'], $serviceDetails['metadata']['url']);

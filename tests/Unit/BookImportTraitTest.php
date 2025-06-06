@@ -13,7 +13,7 @@ class BookImportTraitTest extends TestCase
      */
     protected function getTraitObject()
     {
-        return new class {
+        return new class () {
             use BookImportTrait {
                 processDirPath as public;
             }
@@ -71,7 +71,7 @@ class BookImportTraitTest extends TestCase
         $trait = $this->getTraitObject();
         $dirPath = '/Fiction/Author Name/My Series/Book [01.5] Title';
         $book = $trait->processDirPath($dirPath);
-        
+
         $this->assertIsArray($book);
         $this->assertEquals(['Fiction'], $book['genre']);
         $this->assertEquals(['Author Name'], $book['author']);
@@ -87,7 +87,7 @@ class BookImportTraitTest extends TestCase
         $trait = $this->getTraitObject();
         $dirPath = '/Fiction/Author Name/My Series/Book (15) Title';
         $book = $trait->processDirPath($dirPath);
-        
+
         $this->assertIsArray($book);
         $this->assertEquals(['Fiction'], $book['genre']);
         $this->assertEquals(['Author Name'], $book['author']);

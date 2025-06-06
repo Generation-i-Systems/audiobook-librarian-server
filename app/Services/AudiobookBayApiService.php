@@ -225,7 +225,7 @@ class AudiobookBayApiService
     /**
      * Make an HTTP GET request (inlined from BaseApiTrait)
      */
-    protected function httpGet(string $endpoint, array $params = []): ?\Illuminate\Http\Client\Response
+    protected function httpGetResponse(string $endpoint, array $params = []): ?string
     {
         $cacheKey = $this->getCacheKey($endpoint, $params);
         return Cache::remember($cacheKey, $this->cacheTtl, function () use ($endpoint, $params) {
@@ -233,7 +233,7 @@ class AudiobookBayApiService
             $response = Http::withHeaders($this->getDefaultHeaders())
                 ->get($this->baseUrl . $endpoint, $params);
             if ($response->successful()) {
-                return $response;
+                return (string) $response->body(); // Always return a string
             }
             Log::error('API request failed', [
                 'service' => $this->serviceName,
@@ -242,6 +242,7 @@ class AudiobookBayApiService
                 'response' => $response->body(),
             ]);
             return null;
+            // Defensive: ensure closure always returns string|null
         });
     }
     /**
@@ -437,11 +438,20 @@ class AudiobookBayApiService
             // $params['author'] = $options['author']; // If there's a dedicated field
         }
 
-        $responseObject = $this->httpGet($endpoint, $params);
+        $responseObject = $this->httpGetResponse($endpoint, $params);
 
-        if ($responseObject && $responseObject->successful()) {
-            $htmlContent = $responseObject->body();
-            return $this->parseSearchResults($htmlContent); // From AudiobookBayParserTrait
+        Log::debug('AudiobookBayApiService:searchAudiobooks - httpGetResponse returned value', [
+            'type' => gettype($responseObject),
+            'class' => is_object($responseObject) ? get_class($responseObject) : null,
+            'value' => $responseObject
+        ]);
+        if (is_string($responseObject)) {
+            return $this->parseSearchResults($responseObject); // From AudiobookBayParserTrait
+        } elseif ($responseObject !== null) {
+            Log::error('AudiobookBayApiService:searchAudiobooks - httpGetResponse did not return a string', [
+                'type' => gettype($responseObject),
+                'value' => is_object($responseObject) ? get_class($responseObject) : $responseObject
+            ]);
         }
 
         Log::warning('AudiobookBayApiService:searchAudiobooks - Failed to fetch or parse search results.', ['query' => $query, 'options' => $options]);
@@ -466,11 +476,10 @@ class AudiobookBayApiService
             $endpoint = '/' . ltrim($idOrUrl, '/');
         }
 
-        $responseObject = $this->httpGet($endpoint);
+        $responseBody = $this->httpGetResponse($endpoint);
 
-        if ($responseObject && $responseObject->successful()) {
-            $htmlContent = $responseObject->body();
-            return $this->parseAudiobookDetails($htmlContent); // From AudiobookBayParserTrait
+        if (is_string($responseBody)) {
+            return $this->parseAudiobookDetails($responseBody); // From AudiobookBayParserTrait
         }
 
         Log::warning('AudiobookBayApiService:getAudiobookDetails - Failed to fetch or parse details.', ['idOrUrl' => $idOrUrl]);
@@ -497,8 +506,12 @@ class AudiobookBayApiService
      */
     public function searchAndMerge(array $book): ?array
     {
-        $inputTitle = trim($book['title'] ?? '');
-        $inputAuthor = trim(($book['authors'][0]['name'] ?? '') ?: ($book['author'] ?? '')); // Adjusted to match typical author structure
+        // Ensure title is a string
+        $inputTitle = trim($this->flattenToString($book['title'] ?? ''));
+        // Ensure author is a string
+        $authorName = $book['authors'][0]['name'] ?? '';
+        $authorString = $book['author'] ?? '';
+        $inputAuthor = trim($this->flattenToString($authorName ?: $authorString));
 
         if (empty($inputTitle)) {
             Log::info('AudiobookBayApiService:searchAndMerge - Input title is empty, skipping search.');
@@ -597,5 +610,22 @@ class AudiobookBayApiService
         }
 
         return array_filter($merged, fn ($value) => $value !== null && $value !== '' && (!is_array($value) || !empty($value)));
+    }
+
+    /**
+     * Recursively flatten a value to a space-separated string.
+     * @param mixed $value
+     * @return string
+     */
+    private function flattenToString($value): string
+    {
+        if (is_array($value)) {
+            $flat = [];
+            foreach ($value as $item) {
+                $flat[] = $this->flattenToString($item);
+            }
+            return implode(' ', array_filter($flat));
+        }
+        return (string)$value;
     }
 }

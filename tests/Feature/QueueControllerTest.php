@@ -30,7 +30,7 @@ class QueueControllerTest extends TestCase
         $mockCollection = Mockery::mock(CollectionReference::class);
         $mockCollection->shouldReceive('count')->andReturn(3);
         $mockFirestore->shouldReceive('getClient')->andReturn((object)[
-            'collection' => fn($name) => $mockCollection
+            'collection' => fn ($name) => $mockCollection
         ]);
         $this->app->instance(FirestoreService::class, $mockFirestore);
 
@@ -61,7 +61,7 @@ class QueueControllerTest extends TestCase
         $mockRef->shouldReceive('delete')->once();
         $mockCollection->shouldReceive('documents')->andReturn([$mockDoc]);
         $mockFirestore->shouldReceive('getClient')->andReturn((object)[
-            'collection' => fn($name) => $mockCollection
+            'collection' => fn ($name) => $mockCollection
         ]);
         $this->app->instance(FirestoreService::class, $mockFirestore);
 
@@ -78,9 +78,13 @@ class QueueControllerTest extends TestCase
         $mockBooksCollection = Mockery::mock(CollectionReference::class);
         $mockJobsCollection->shouldReceive('documents')->andReturn([]);
         $mockFirestore->shouldReceive('getClient')->andReturn((object)[
-            'collection' => function($name) use ($mockJobsCollection, $mockBooksCollection) {
-                if ($name === 'jobs') return $mockJobsCollection;
-                if ($name === 'books') return $mockBooksCollection;
+            'collection' => function ($name) use ($mockJobsCollection, $mockBooksCollection) {
+                if ($name === 'jobs') {
+                    return $mockJobsCollection;
+                }
+                if ($name === 'books') {
+                    return $mockBooksCollection;
+                }
             }
         ]);
         $mockBooksCollection->shouldReceive('where')->with('directory_path', '=', 'test/dir1')->andReturnSelf();

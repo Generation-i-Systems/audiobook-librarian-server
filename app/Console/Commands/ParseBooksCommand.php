@@ -127,11 +127,9 @@ class ParseBooksCommand extends Command
                         }
                     }
                     // AudiobookBay API
-                    if (in_array('abbay', $apis) && trait_exists('\App\Traits\AudiobookBayApiTrait')) {
-                        $trait = new class () {
-                            use \App\Traits\AudiobookBayApiTrait;
-                        };
-                        $result = $trait->searchAndMerge($book);
+                    if (in_array('abbay', $apis) && class_exists('\App\Services\AudiobookBayService')) {
+                        $abbayService = app(\App\Services\AudiobookBayService::class);
+                        $result = $abbayService->searchAndMerge($book);
                         if ($result) {
                             $book = array_merge($book, $result);
                             $this->info('  AudiobookBay: found and merged');
@@ -140,11 +138,9 @@ class ParseBooksCommand extends Command
                         }
                     }
                     // Hardcover API
-                    if (in_array('hardcover', $apis) && trait_exists('\App\Traits\HardcoverApiTrait')) {
-                        $trait = new class () {
-                            use \App\Traits\HardcoverApiTrait;
-                        };
-                        $result = $trait->searchAndMerge($book);
+                    if (in_array('hardcover', $apis) && class_exists('\App\Services\HardcoverApiService')) {
+                        $hardcoverService = app(\App\Services\HardcoverApiService::class);
+                        $result = $hardcoverService->searchAndMerge($book);
                         if ($result) {
                             $book = array_merge($book, $result);
                             $this->info('  Hardcover: found and merged');

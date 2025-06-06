@@ -9,17 +9,16 @@ use Tests\TestCase;
 
 class HardcoverServiceTest extends TestCase
 {
-
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Mock the HTTP client for all tests
         Http::fake();
-        
+
         // Fake mail sending
         Mail::fake();
-        
+
         // Set test configuration
         config([
             'hardcover.api_url' => 'https://api.hardcover.app/v1/graphql',
@@ -28,8 +27,8 @@ class HardcoverServiceTest extends TestCase
             'hardcover.notification_email' => 'test@example.com',
         ]);
     }
-    
-    /** @test */
+
+    #[Test]
     public function it_can_search_books_by_title()
     {
         // Create a partial mock of the service
@@ -71,8 +70,8 @@ class HardcoverServiceTest extends TestCase
         $this->assertEquals('Test Author', $results[0]['authors'][0]['author']['name']);
         $this->assertCount(2, $results[0]['genres']);
     }
-    
-    /** @test */
+
+    #[Test]
     public function it_handles_api_errors_gracefully()
     {
         // Mock error response
@@ -83,48 +82,48 @@ class HardcoverServiceTest extends TestCase
                 ]
             ], 401)
         ]);
-        
+
         $service = app(HardcoverService::class);
         $result = $service->searchBooks('Test Book');
-        
+
         $this->assertNull($result);
     }
-    
-    /** @test */
+
+    #[Test]
     public function it_sends_expiration_warning_when_token_is_about_to_expire()
     {
         // Set token to expire in 15 days
         config(['hardcover.token_expires_at' => now()->addDays(15)->toDateString()]);
-        
+
         $service = app(HardcoverService::class);
-        
+
         // This will trigger the expiration check
         $service->searchBooks('Test Book');
-        
+
         // Assert email was sent
         Mail::assertSent(\App\Mail\HardcoverTokenExpiring::class, function ($mail) {
             return $mail->daysUntilExpiration <= 30;
         });
     }
-    
-    /** @test */
+
+    #[Test]
     public function it_handles_token_expiration()
     {
         // Set token as expired
         config(['hardcover.token_expires_at' => now()->subDay()->toDateString()]);
-        
+
         $service = app(HardcoverService::class);
         $result = $service->searchBooks('Test Book');
-        
+
         $this->assertNull($result);
-        
+
         // Assert expiration email was sent
         Mail::assertSent(\App\Mail\HardcoverTokenExpiring::class, function ($mail) {
             return $mail->daysUntilExpiration === 0;
         });
     }
-    
-    /** @test */
+
+    #[Test]
     public function it_gets_book_details()
     {
         // Create a partial mock of the service

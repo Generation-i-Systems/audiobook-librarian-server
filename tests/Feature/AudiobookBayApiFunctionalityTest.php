@@ -1,4 +1,6 @@
 <?php
+
+// File intentionally left blank. Trait-based test logic removed due to service refactor.
 // File intentionally left blank. Trait-based feature tests removed due to service refactor.
 
 namespace Tests\Feature;

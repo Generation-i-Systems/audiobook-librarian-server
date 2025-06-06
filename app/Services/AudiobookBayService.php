@@ -119,6 +119,17 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
     }
 
     /**
+     * Attempt to look up the book in AudiobookBay and return additional metadata.
+     *
+     * @param array $book
+     * @return array|null
+     */
+    public function searchAndMerge(array $book): ?array
+    {
+        return $this->apiService->searchAndMerge($book);
+    }
+
+    /**
      * Format book details (from apiService) to a consistent format for BookServiceInterface.
      */
     protected function formatBookDetails(array $details): array
