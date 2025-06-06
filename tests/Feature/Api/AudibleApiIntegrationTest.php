@@ -3,7 +3,6 @@
 namespace Tests\Feature\Api;
 
 use App\Services\AudibleApiService;
-use App\Traits\BaseApiTrait;
 use Illuminate\Support\Facades\Http;
 use Tests\Feature\Api\BaseApiTest;
 use PHPUnit\Framework\Attributes\Test;
@@ -58,9 +57,9 @@ class AudibleApiIntegrationTest extends BaseApiTest
                 'EditorialReview' => [
                     [
                         'Source' => 'Product Description',
-                        'Content' => 'Test Description'
-                    ]
-                ]
+                        'Content' => 'Test Description',
+                    ],
+                ],
             ],
             'MediumImage' => ['URL' => 'http://example.com/cover.jpg'],
             'LargeImage' => ['URL' => 'http://example.com/cover_large.jpg'], // Added for completeness
@@ -72,10 +71,10 @@ class AudibleApiIntegrationTest extends BaseApiTest
                     'Ancestors' => [
                         'BrowseNode' => [
                             'BrowseNodeId' => '123',
-                            'Name' => 'Fiction'
-                        ]
-                    ]
-                ]
+                            'Name' => 'Fiction',
+                        ],
+                    ],
+                ],
             ],
             'CustomerReviews' => ['AverageRating' => '4.5', 'TotalCount' => 100],
             'DetailPageURL' => 'http://example.com/details/TEST123',
@@ -88,9 +87,9 @@ class AudibleApiIntegrationTest extends BaseApiTest
         return [
             'Items' => [
                 'Item' => [
-                    $this->getRawApiItem()
-                ]
-            ]
+                    $this->getRawApiItem(),
+                ],
+            ],
         ];
     }
 
@@ -98,8 +97,8 @@ class AudibleApiIntegrationTest extends BaseApiTest
     {
         return [
             'Items' => [
-                'Item' => $this->getRawApiItem()
-            ]
+                'Item' => $this->getRawApiItem(),
+            ],
         ];
     }
 

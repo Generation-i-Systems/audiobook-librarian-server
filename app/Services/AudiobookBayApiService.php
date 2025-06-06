@@ -21,6 +21,217 @@ class AudiobookBayApiService
     protected string $serviceName = '';
     // --- End inlined BaseApiTrait properties ---
 
+    // --- Begin inlined BaseParserTrait methods ---
+    private static function formatAuthors($authors): array
+    {
+        if (is_string($authors)) {
+            return array_map(function ($name) {
+                return [
+                    'author' => [
+                        'name' => trim($name),
+                    ],
+                ];
+            }, array_filter(explode(',', $authors)));
+        }
+        if (!is_array($authors)) {
+            return [];
+        }
+        return array_map(function ($author) {
+            if (is_string($author)) {
+                return [
+                    'author' => [
+                        'name' => $author,
+                    ],
+                ];
+            }
+            return [
+                'author' => [
+                    'id' => $author['id'] ?? null,
+                    'name' => $author['name'] ?? 'Unknown Author',
+                    'role' => $author['role'] ?? null,
+                ],
+            ];
+        }, $authors);
+    }
+    private static function formatNarrators($narrators): array
+    {
+        if (is_string($narrators)) {
+            return array_map(function ($name) {
+                return [
+                    'narrator' => [
+                        'name' => trim($name),
+                    ],
+                ];
+            }, array_filter(explode(',', $narrators)));
+        }
+        if (!is_array($narrators)) {
+            return [];
+        }
+        return array_map(function ($narrator) {
+            if (is_string($narrator)) {
+                return [
+                    'narrator' => [
+                        'name' => $narrator,
+                    ],
+                ];
+            }
+            return [
+                'narrator' => [
+                    'id' => $narrator['id'] ?? null,
+                    'name' => $narrator['name'] ?? 'Unknown Narrator',
+                ],
+            ];
+        }, $narrators);
+    }
+    private static function formatGenres($genres): array
+    {
+        if (is_string($genres)) {
+            return array_map(function ($name) {
+                return [
+                    'genre' => [
+                        'name' => trim($name),
+                    ],
+                ];
+            }, array_filter(explode(',', $genres)));
+        }
+        if (!is_array($genres)) {
+            return [];
+        }
+        return array_map(function ($genre) {
+            if (is_string($genre)) {
+                return [
+                    'genre' => [
+                        'name' => $genre,
+                    ],
+                ];
+            }
+            return [
+                'genre' => [
+                    'id' => $genre['id'] ?? null,
+                    'name' => $genre['name'] ?? 'Unknown Genre',
+                    'parent_id' => $genre['parent_id'] ?? null,
+                ],
+            ];
+        }, $genres);
+    }
+    private static function formatSeries($series, $number = null): array
+    {
+        if (empty($series)) {
+            return [];
+        }
+        if (is_string($series)) {
+            return [
+                [
+                    'series' => [
+                        'name' => $series,
+                        'number' => $number !== null ? (string) $number : null,
+                    ],
+                ],
+            ];
+        }
+        if (is_array($series)) {
+            if (isset($series['series'])) {
+                return [$series];
+            }
+            if (isset($series[0]) && is_array($series[0])) {
+                return array_map(function ($item) {
+                    return [
+                        'series' => [
+                            'id' => $item['id'] ?? null,
+                            'name' => $item['name'] ?? 'Unknown Series',
+                            'number' => $item['number'] ?? null,
+                        ],
+                    ];
+                }, $series);
+            }
+            return [
+                [
+                    'series' => [
+                        'id' => $series['id'] ?? null,
+                        'name' => $series['name'] ?? 'Unknown Series',
+                        'number' => $series['number'] ?? $number,
+                    ],
+                ],
+            ];
+        }
+        return [];
+    }
+    private static function formatBookData(array $data): array
+    {
+        return [
+            'id' => $data['id'] ?? null,
+            'title' => $data['title'] ?? 'Unknown Title',
+            'subtitle' => $data['subtitle'] ?? null,
+            'description' => $data['description'] ?? null,
+            'published_date' => $data['published_date'] ?? null,
+            'publisher' => $data['publisher'] ?? null,
+            'language' => $data['language'] ?? 'en',
+            'isbn' => $data['isbn'] ?? null,
+            'isbn13' => $data['isbn13'] ?? $data['isbn_13'] ?? null,
+            'asin' => $data['asin'] ?? null,
+            'page_count' => $data['page_count'] ?? $data['pages'] ?? null,
+            'format' => $data['format'] ?? null,
+            'edition' => $data['edition'] ?? null,
+            'cover_image_url' => $data['cover_image_url'] ?? $data['cover_url'] ?? $data['image_url'] ?? null,
+            'cover_image_thumbnail' => $data['cover_image_thumbnail'] ?? $data['thumbnail_url'] ?? null,
+            'authors' => self::formatAuthors($data['authors'] ?? []),
+            'narrators' => self::formatNarrators($data['narrators'] ?? []),
+            'series' => self::formatSeries($data['series'] ?? null, $data['series_number'] ?? null),
+            'genres' => self::formatGenres($data['genres'] ?? $data['categories'] ?? []),
+            'rating' => $data['rating'] ?? $data['average_rating'] ?? null,
+            'ratings_count' => $data['ratings_count'] ?? $data['ratingsCount'] ?? 0,
+            'metadata' => array_merge(
+                $data['metadata'] ?? [],
+                [
+                    'source' => $data['metadata']['source'] ?? 'unknown',
+                    'url' => $data['url'] ?? $data['metadata']['url'] ?? null,
+                    'created_at' => $data['created_at'] ?? now()->toDateTimeString(),
+                    'updated_at' => $data['updated_at'] ?? now()->toDateTimeString(),
+                ]
+            ),
+        ];
+    }
+    private static function formatSearchResults(array $items): array
+    {
+        return array_map(function ($item) {
+            return self::formatBookData($item);
+        }, $items);
+    }
+    private static function extractFirstName(string $fullName): string
+    {
+        $parts = explode(' ', trim($fullName));
+        return $parts[0] ?? '';
+    }
+    private static function extractLastName(string $fullName): string
+    {
+        $parts = explode(' ', trim($fullName));
+        return count($parts) > 1 ? end($parts) : '';
+    }
+    private static function normalizeString(?string $str): string
+    {
+        if ($str === null) {
+            return '';
+        }
+        return trim(mb_strtolower($str));
+    }
+    public static function calculateSimilarity(string $str1, string $str2): float
+    {
+        $str1 = self::normalizeString($str1);
+        $str2 = self::normalizeString($str2);
+        if ($str1 === $str2) {
+            return 1.0;
+        }
+        $len1 = mb_strlen($str1);
+        $len2 = mb_strlen($str2);
+        if ($len1 < 1 || $len2 < 1) {
+            return 0.0;
+        }
+        $maxLen = max($len1, $len2);
+        $distance = levenshtein($str1, $str2);
+        return 1 - ($distance / $maxLen);
+    }
+    // --- End inlined BaseParserTrait methods ---
+
     // --- Begin inlined AudiobookBayParserTrait methods ---
     /**
      * Parse search results from AudiobookBay HTML

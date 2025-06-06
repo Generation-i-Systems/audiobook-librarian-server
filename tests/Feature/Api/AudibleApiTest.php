@@ -18,7 +18,7 @@ class AudibleApiTest extends BaseApiTest
         parent::setUp();
         Http::fake();
 
-        // Mock Cache::remember() for BaseApiTrait::httpGet users
+        // Mock Cache::remember()
         Cache::shouldReceive('remember')
             ->andReturnUsing(function ($key, $ttl, $callback) {
                 return $callback(); // Execute the callback to simulate cache miss and fetch

@@ -4,10 +4,22 @@ namespace Tests\Unit;
 
 use App\Traits\BookImportTrait;
 use Illuminate\Support\Facades\Log;
-use PHPUnit\Framework\TestCase;
+use Illuminate\Foundation\Testing\TestCase;
 
 class BookImportTraitTest extends TestCase
 {
+    /**
+     * Creates the application.
+     *
+     * @return \Illuminate\Foundation\Application
+     */
+    public function createApplication()
+    {
+        $app = require __DIR__.'/../../bootstrap/app.php';
+        $app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+        return $app;
+    }
+
     /**
      * Helper class to access trait methods
      */
