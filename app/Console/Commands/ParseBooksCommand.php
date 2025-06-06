@@ -14,7 +14,7 @@ class ParseBooksCommand extends Command
      * @var string
      */
     protected $signature = 'books:parse
-                            {paths* : One or more directory paths to scan for books}
+                            {paths* : One or more directory paths to scan for books. Supports shell wildcards}
                             {--output= : Output format (json, table, csv, sql, array). Default: table}
                             {--limit=0 : Maximum number of books to process (0 for no limit)}
                             {--extensions= : Comma-separated list of file extensions to include}
@@ -42,6 +42,41 @@ class ParseBooksCommand extends Command
     public function handle(BookDirectoryParser $parser)
     {
         $paths = $this->argument('paths');
+        $bookStoragePath = rtrim(env('BOOK_STORAGE_PATH'), '/');
+        $expandedPaths = [];
+        foreach ($paths as $path) {
+            // Absolute path
+            if (strpos($path, '/') === 0) {
+                $pattern = $path;
+            } elseif (strpos($path, $bookStoragePath) === 0) {
+                // Already relative to storage root
+                $pattern = $path;
+            } else {
+                // Relative to storage root
+                $pattern = $bookStoragePath . '/' . ltrim($path, '/');
+            }
+            // Expand wildcards
+            if (strpbrk($pattern, '*?[]')) {
+                $matches = glob($pattern, GLOB_ONLYDIR | GLOB_BRACE);
+                if ($matches !== false && count($matches) > 0) {
+                    $expandedPaths = array_merge($expandedPaths, $matches);
+                } else {
+                    $this->warn("No matches found for pattern: $pattern");
+                    continue; // Don't add unmatched pattern to expandedPaths
+                }
+            } else {
+                $expandedPaths[] = $pattern;
+            }
+        }
+        // Remove duplicates and reindex
+        $paths = array_values(array_unique($expandedPaths));
+
+        // If no valid paths remain, show error and exit
+        if (empty($paths)) {
+            $this->error('No valid directories found to parse.');
+            return 1;
+        }
+
         $outputFormat = $this->option('output') ?: 'table';
         $limit = (int) $this->option('limit');
         $extensions = $this->option('extensions');
@@ -56,13 +91,26 @@ class ParseBooksCommand extends Command
         }
 
         // Validate all paths using resolved storage path
+        $validPaths = [];
         foreach ($paths as $inputPath) {
-            $resolvedPath = $parser->resolveStoragePath($inputPath);
-            if (!File::exists($resolvedPath) || !File::isDirectory($resolvedPath)) {
-                $this->error("The specified path does not exist or is not a directory: $inputPath (resolved: $resolvedPath)");
-                return 1;
+            // Only resolve storage path if not absolute
+            if (strpos($inputPath, '/') === 0) {
+                $resolvedPath = $inputPath;
+            } else {
+                $resolvedPath = $parser->resolveStoragePath($inputPath);
             }
+            if (!File::exists($resolvedPath) || !File::isDirectory($resolvedPath)) {
+                $this->warn("Skipping: $inputPath (resolved: $resolvedPath) does not exist or is not a directory.");
+                continue;
+            }
+            $validPaths[] = $resolvedPath;
         }
+        if (empty($validPaths)) {
+            $this->error('No valid directories found to parse after wildcard/path expansion.');
+            return 1;
+        }
+        $paths = $validPaths;
+
 
         // Configure the parser
         $config = [
@@ -164,7 +212,7 @@ class ParseBooksCommand extends Command
                             $this->error("Directory does not exist: $resolvedDir");
                             continue;
                         }
-                        $jsonPath = rtrim($resolvedDir, '/').'/'.$jsonFilename;
+                        $jsonPath = rtrim($resolvedDir, '/') . '/' . $jsonFilename;
                         $jsonData = json_encode($book, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
                         if (file_put_contents($jsonPath, $jsonData) !== false) {
                             $this->info("Saved JSON to $jsonPath");
@@ -172,7 +220,7 @@ class ParseBooksCommand extends Command
                             $this->error("Failed to write JSON to $jsonPath");
                         }
                     } else {
-                        $this->error("No directory_path for book: ".($book['title'] ?? '[unknown]'));
+                        $this->error("No directory_path for book: " . ($book['title'] ?? '[unknown]'));
                     }
                 }
             }

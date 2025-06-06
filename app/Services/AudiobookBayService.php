@@ -121,13 +121,96 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
     /**
      * Attempt to look up the book in AudiobookBay and return additional metadata.
      *
+     * Matching rules:
+     * - Author name must appear in the result title
+     * - Title (minus author) must closely match searched title
+     * - Numbers in the search (e.g. book number) must match exactly
+     *
      * @param array $book
      * @return array|null
      */
     public function searchAndMerge(array $book): ?array
     {
-        return $this->apiService->searchAndMerge($book);
-    } // Now uses improved logic in AudiobookBayApiService
+        $inputTitle = trim($book['title'] ?? '');
+        $inputAuthor = '';
+        if (isset($book['authors']) && is_array($book['authors']) && isset($book['authors'][0]['author']['name']) && is_string($book['authors'][0]['author']['name'])) {
+            $inputAuthor = trim($book['authors'][0]['author']['name']);
+        } elseif (isset($book['author']) && is_string($book['author'])) {
+            $inputAuthor = trim($book['author']);
+        }
+        $inputNumber = null;
+        if (isset($book['series']) && is_array($book['series']) && isset($book['series'][0]['series']['number'])) {
+            $inputNumber = $book['series'][0]['series']['number'];
+        }
+        if (!$inputTitle) {
+            return null;
+        }
+        $query = $inputTitle;
+        $options = ['limit' => 10];
+        $results = $this->apiService->searchAudiobooks($query, $options) ?? [];
+        if (empty($results)) {
+            return null;
+        }
+        $bestMatch = null;
+        $bestScore = 0;
+        foreach ($results as $result) {
+            $resultTitle = $result['title'] ?? '';
+            $resultAuthors = $result['authors'] ?? [];
+            $resultNumber = null;
+            if (isset($result['series']) && is_array($result['series']) && isset($result['series'][0]['series']['number'])) {
+                $resultNumber = $result['series'][0]['series']['number'];
+            }
+            // Author match: author name must appear in result title (case-insensitive)
+            if ($inputAuthor && stripos($resultTitle, $inputAuthor) === false) {
+                continue;
+            }
+            // Remove author from result title for comparison
+            $titleNoAuthor = $resultTitle;
+            if ($inputAuthor) {
+                $titleNoAuthor = trim(str_ireplace($inputAuthor, '', $resultTitle));
+            }
+            // Title similarity (Levenshtein or similar)
+            $sim = \App\Services\AudiobookBayApiService::calculateSimilarity($inputTitle, $titleNoAuthor);
+            if ($sim < 0.7) {
+                continue;
+            }
+            // Number match (if present)
+            if ($inputNumber !== null && $resultNumber !== null && $inputNumber != $resultNumber) {
+                continue;
+            }
+            // Prefer higher similarity
+            if ($sim > $bestScore) {
+                $bestScore = $sim;
+                $bestMatch = $result;
+            }
+        }
+        if (!$bestMatch) {
+            return null;
+        }
+        // Get full details for best match
+        $details = $this->apiService->getAudiobookDetails($bestMatch['id'] ?? $bestMatch['url'] ?? '');
+        if (!$details) {
+            return null;
+        }
+        // Merge fields: prefer existing book fields, but add/overwrite with ABB details if missing
+        $merged = array_merge($details, $book);
+        // Track which fields differ
+        $apiFields = [];
+        $needsReview = false;
+        foreach ($merged as $field => $newValue) {
+            if (array_key_exists($field, $book) && $book[$field] !== null && $newValue !== null && $book[$field] != $newValue) {
+                $apiFields[$field] = $newValue;
+                $needsReview = true;
+                $merged[$field] = $book[$field];
+            }
+        }
+        if ($needsReview) {
+            $merged['audiobookbay_fields'] = $apiFields;
+            $merged['needsReview'] = true;
+        }
+        // Remove nulls from array
+        return array_filter($merged, fn ($v) => $v !== null);
+    }
 
     /**
      * Format book details (from apiService) to a consistent format for BookServiceInterface.
@@ -243,5 +326,15 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
     public function isAvailable(): bool
     {
         return isset($this->apiService);
+    }
+
+    /**
+     * Expose the internal AudiobookBayApiService instance.
+     * Needed for legacy/test code compatibility.
+     * @return AudiobookBayApiService
+     */
+    public function getApiService(): AudiobookBayApiService
+    {
+        return $this->apiService;
     }
 }

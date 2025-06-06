@@ -340,93 +340,66 @@ class AudiobookBayApiService
             'metadata' => [],
             'language' => null,
         ];
-        // Extract title
-        $titleNode = $xpath->query('//div[contains(@class, "book-page-title")]')->item(0);
-        if ($titleNode instanceof \DOMNode) {
-            $book['title'] = trim($titleNode->textContent);
-            // Attempt to extract series from title if present
-            if (preg_match('/^(.*?),\s*(?:Book|Vol(?:\.|ume)?)\s*(\d+)(?:\s*-\s*(.*))?$/i', $book['title'], $matches)) {
-                $book['series'] = [
-                    'name' => trim($matches[1]),
-                    'number' => $matches[2],
-                ];
-                $book['title'] = trim($matches[3] ?? $book['title']);
+        // Extract title from main H1 if present
+        $title = '';
+        $h1Nodes = $xpath->query('//h1');
+        if ($h1Nodes && $h1Nodes->length > 0) {
+            $title = trim($h1Nodes->item(0)->textContent);
+        }
+        if (!$title) {
+            // Try fallback: first header node
+            $headerNodes = $xpath->query('//*[self::h1 or self::h2 or self::h3][1]');
+            if ($headerNodes && $headerNodes->length > 0) {
+                $title = trim($headerNodes->item(0)->textContent);
             }
         }
-        // Extract cover image
-        $imgNode = $xpath->query('//div[contains(@class, "book-page-cover")]//img')->item(0);
+        $book['title'] = $title;
+
+        // Extract description and author/narrator/format from main content block
+        $bodyText = '';
+        $bodyNodes = $xpath->query('//body');
+        if ($bodyNodes && $bodyNodes->length > 0) {
+            $bodyText = $bodyNodes->item(0)->textContent;
+        }
+        // TEMP DEBUG: log $bodyText for diagnosis
+        \Log::debug('AudiobookBay parse: $bodyText', ['bodyText' => $bodyText]);
+        // Use regex to extract author, narrator, format, bitrate, description
+        // Make regex tolerant of any whitespace, newlines, and missing intermediate words
+        if (preg_match('/Written by\s*([\s\S]+?)(?:Read by|Format:|Bitrate:|Unabridged|\n|\r|$)/i', $bodyText, $m)) {
+            $book['authors'][] = ['name' => trim($m[1])];
+        }
+        if (preg_match('/Read by\s*([\s\S]+?)(?:Format:|Bitrate:|Unabridged|\n|\r|$)/i', $bodyText, $m)) {
+            $book['narrators'][] = ['name' => trim($m[1])];
+        }
+        if (preg_match('/Format: ([^\n\r]+?)(?: Bitrate:| Unabridged|$)/i', $bodyText, $m)) {
+            $book['metadata']['format'] = trim($m[1]);
+        }
+        if (preg_match('/Bitrate: ([^\n\r]+?)(?: Unabridged|$)/i', $bodyText, $m)) {
+            $book['metadata']['bitrate'] = trim($m[1]);
+        }
+        // Description: grab paragraph after format/bitrate line
+        if (preg_match('/Unabridged\s*\n(.+?)(?:Torrent Free Downloads|Start Direct Download|Download Files Now|Top|$)/is', $bodyText, $m)) {
+            $book['description'] = trim($m[1]);
+        }
+        // Categories: look for [Category] links
+        if (preg_match_all('/\[([^\]]+)\]\(https:\/\/audiobookbay\.lu\/audio-books\/tag\/[^\)]+\)/', $bodyText, $catMatches)) {
+            $book['metadata']['categories'] = array_map('trim', $catMatches[1]);
+        }
+        // Language: look for [English] or similar
+        if (preg_match('/\[([A-Za-z]+)\]\(https:\/\/audiobookbay\.lu\/audio-books\/tag\/[a-z]+\)/', $bodyText, $langMatch)) {
+            $book['language'] = trim($langMatch[1]);
+        }
+        // Fallback: if still missing author/narrator, try to parse from any "Written by" or "Read by" line
+        if (empty($book['authors']) && preg_match('/Written by ([^\n\r]+?)(?:\.|$)/i', $bodyText, $m)) {
+            $book['authors'][] = ['name' => trim($m[1])];
+        }
+        if (empty($book['narrators']) && preg_match('/Read by ([^\n\r]+?)(?:\.|$)/i', $bodyText, $m)) {
+            $book['narrators'][] = ['name' => trim($m[1])];
+        }
+        // Extract cover image (if present in any img tag)
+        $imgNode = $xpath->query('//img[contains(@src,"we-hunt-monsters")]')->item(0);
         if ($imgNode instanceof \DOMElement && $imgNode->hasAttribute('src')) {
             $book['cover_image_url'] = $imgNode->getAttribute('src');
-        }
-        // Extract description
-        $descriptionNode = $xpath->query('//div[contains(@class, "book-page-description")]')->item(0);
-        if ($descriptionNode instanceof \DOMNode) {
-            $book['description'] = trim($descriptionNode->textContent);
-        }
-        // Extract metadata from info section
-        $metadataNodes = $xpath->query('//div[contains(@class, "book-page-meta")]//div[contains(@class, "row")]');
-        foreach ($metadataNodes as $node) {
-            if (!$node instanceof \DOMElement) {
-                continue;
-            }
-            $labelNode = $xpath->query('.//div[contains(@class, "label")]', $node)->item(0);
-            $valueNode = $xpath->query('.//div[contains(@class, "value")]', $node)->item(0);
-            if ($labelNode instanceof \DOMNode && $valueNode instanceof \DOMNode) {
-                $label = trim($labelNode->textContent, ": \t\n\r\0\x0B");
-                $value = trim($valueNode->textContent);
-                switch (strtolower($label)) {
-                    case 'author':
-                    case 'authors':
-                        $book['authors'][] = ['name' => $value];
-                        break;
-                    case 'narrator':
-                    case 'narrators':
-                        $book['narrators'][] = ['name' => $value];
-                        break;
-                    case 'published':
-                    case 'published date':
-                        if (($timestamp = strtotime($value)) !== false) {
-                            $book['published_date'] = date('Y-m-d', $timestamp);
-                        }
-                        break;
-                    case 'publisher':
-                        $book['publisher'] = $value;
-                        break;
-                    case 'category':
-                    case 'categories':
-                        $book['metadata']['categories'] = array_map('trim', explode(',', $value));
-                        break;
-                    case 'format':
-                        $book['metadata']['format'] = $value;
-                        break;
-                    case 'size':
-                        $book['metadata']['size'] = $value;
-                        break;
-                    case 'bitrate':
-                    case 'bit rate':
-                        $book['metadata']['bitrate'] = $value;
-                        break;
-                    case 'language':
-                        $book['language'] = $value;
-                        break;
-                    default:
-                        $book['metadata'][strtolower($label)] = $value;
-                }
-            }
-        }
-        // Extract download links
-        $downloadNodes = $xpath->query('//div[contains(@class, "download-links")]//a');
-        $downloads = [];
-        foreach ($downloadNodes as $node) {
-            if ($node instanceof \DOMElement && $node->hasAttribute('href')) {
-                $downloads[] = [
-                    'url' => 'https://audiobookbay.lu' . $node->getAttribute('href'),
-                    'text' => trim($node->textContent),
-                ];
-            }
-        }
-        if (!empty($downloads)) {
-            $book['metadata']['downloads'] = $downloads;
         }
         return $book;
     }
@@ -605,7 +578,7 @@ class AudiobookBayApiService
                     Log::error('AudiobookBayApiService: Authentication POST failed.', [
                         'status' => $response->status(),
                         'url' => $loginUrl,
-                        'response_body' => Str::limit($response->body(), 500)
+                        'response_body' => Str::limit($response->body(), 500),
                     ]);
                     return '';
                 }
@@ -623,7 +596,7 @@ class AudiobookBayApiService
             } catch (\Exception $e) {
                 Log::error('AudiobookBayApiService: Exception during authentication.', [
                     'message' => $e->getMessage(),
-                    'url' => $loginUrl
+                    'url' => $loginUrl,
                 ]);
                 return '';
             }
@@ -654,7 +627,7 @@ class AudiobookBayApiService
         Log::debug('AudiobookBayApiService:searchAudiobooks - httpGetResponse returned value', [
             'type' => gettype($responseObject),
             'class' => is_object($responseObject) ? get_class($responseObject) : null,
-            'value' => $responseObject
+            'value' => $responseObject,
         ]);
         if (is_string($responseObject)) {
             return $this->parseSearchResults($responseObject); // From AudiobookBayParserTrait
@@ -720,6 +693,26 @@ class AudiobookBayApiService
             }
             return implode(' ', array_filter($flat));
         }
-        return (string)$value;
+        return (string) $value;
+    }
+
+    /**
+     * Expose the authentication cookie for legacy/test code compatibility.
+     * @return string|null
+     */
+    public function getAudiobookBayCookie(): ?string
+    {
+        return $this->getAuthCookie();
+    }
+
+    /**
+     * Legacy/test compatibility: alias for searchAudiobooks.
+     * @param string $query
+     * @param array $options
+     * @return array|null
+     */
+    public function audiobookBaySearch(string $query, array $options = [])
+    {
+        return $this->searchAudiobooks($query, $options);
     }
 }

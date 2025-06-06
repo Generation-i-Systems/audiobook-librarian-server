@@ -101,7 +101,11 @@ class TestAudiobookBayCommand extends Command
 
         // Parse results
         $this->info("3. Parsing search results...");
-        $results = $this->audiobookBayService->getApiService()->parseSearchResults($html);
+        if (is_array($html)) {
+            $results = $html;
+        } else {
+            $results = $this->audiobookBayService->getApiService()->parseSearchResults($html);
+        }
 
         if (empty($results)) {
             $this->warn("⚠️  No results found or failed to parse results");
@@ -119,10 +123,68 @@ class TestAudiobookBayCommand extends Command
         // Display results
         $this->displayResults($results);
 
-        // If not in list-only mode, show details for the first result
-        if (!$listOnly && !empty($results[0]['link'])) {
-            $this->line("\n4. Fetching details for first result...");
-            return $this->handleBookDetails($results[0]['link'], $debug);
+        // Enrich logic: try to match as in searchAndMerge
+        if (!$listOnly) {
+            $inputTitle = $query;
+            $inputAuthor = '';
+            // Try to extract author from query if in 'title - author' format
+            if (strpos($query, ' - ') !== false) {
+                [$inputTitle, $inputAuthor] = array_map('trim', explode(' - ', $query, 2));
+            }
+            $inputNumber = null;
+            $bestMatch = null;
+            $bestScore = 0;
+            $matchReason = '';
+            foreach ($results as $result) {
+                $resultTitle = $result['title'] ?? '';
+                $resultAuthors = $result['author'] ?? ($result['authors'][0]['name'] ?? '');
+                $resultNumber = $result['number'] ?? null;
+                // Author match: author name must appear in result title (case-insensitive)
+                if ($inputAuthor && stripos($resultTitle, $inputAuthor) === false) {
+                    $matchReason = "Author '{$inputAuthor}' not found in result title '{$resultTitle}'";
+                    continue;
+                }
+                // Remove author from result title for comparison
+                $titleNoAuthor = $resultTitle;
+                if ($inputAuthor) {
+                    $titleNoAuthor = trim(str_ireplace($inputAuthor, '', $resultTitle));
+                }
+                // Title similarity
+                $sim = \App\Services\AudiobookBayApiService::calculateSimilarity($inputTitle, $titleNoAuthor);
+                if ($sim < 0.7) {
+                    $matchReason = "Title similarity too low (score: {$sim}) for '{$inputTitle}' vs '{$titleNoAuthor}'";
+                    continue;
+                }
+                // Number match (if present)
+                if ($inputNumber !== null && $resultNumber !== null && $inputNumber != $resultNumber) {
+                    $matchReason = "Book number mismatch: input {$inputNumber}, result {$resultNumber}";
+                    continue;
+                }
+                if ($sim > $bestScore) {
+                    $bestScore = $sim;
+                    $bestMatch = $result;
+                }
+            }
+            if ($bestMatch && !empty($bestMatch['url'])) {
+                $this->line("\n4. Enrich match found! Fetching details for best match...");
+                return $this->handleBookDetails($bestMatch['url'], $debug);
+            } else {
+                $this->warn("\nNo sufficiently similar result found for enrichment.");
+                $this->line("  Searched for: '{$inputTitle}'" . ($inputAuthor ? " by '{$inputAuthor}'" : ''));
+                if (!empty($results)) {
+                    $this->line("  Search results:");
+                    foreach ($results as $i => $r) {
+                        $sim = \App\Services\AudiobookBayApiService::calculateSimilarity($inputTitle, $r['title'] ?? '');
+                        $authorMatch = $inputAuthor ? (stripos(($r['title'] ?? ''), $inputAuthor) !== false ? 'yes' : 'no') : 'n/a';
+                        $this->line("    [{$i}] Title: '{$r['title']}' | Author match: {$authorMatch} | Similarity: {$sim}");
+                    }
+                } else {
+                    $this->line("  No results returned from search.");
+                }
+                if ($matchReason) {
+                    $this->line("  Last rejection reason: {$matchReason}");
+                }
+            }
         }
 
         // If debug mode, show raw HTML
@@ -149,11 +211,11 @@ class TestAudiobookBayCommand extends Command
         foreach ($results as $i => $result) {
             $rows[] = [
                 $i + 1,
-                $result['title'],
-                $result['author'],
-                $result['narrator'] ?: 'N/A',
-                $result['size'] ?: 'N/A',
-                $result['format'] ?: 'N/A',
+                $result['title'] ?? 'N/A',
+                $result['author'] ?? 'N/A',
+                $result['narrator'] ?? 'N/A',
+                $result['size'] ?? 'N/A',
+                $result['format'] ?? 'N/A',
             ];
         }
 
