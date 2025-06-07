@@ -487,6 +487,7 @@ class AudibleService extends BaseBookService
             }
 
             $results[] = [
+                'id' => $product['id'] ?? ($product['asin'] ?? null),
                 'title' => $product['title'] ?? '',
                 'authors' => $authors,
                 'narrators' => $narrators,
