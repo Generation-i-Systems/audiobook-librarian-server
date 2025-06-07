@@ -174,6 +174,10 @@ class AudibleService extends BaseBookService
      */
     protected function performSearch(string $query, array $options = []): ?array
     {
+        Log::debug('AudibleService performSearch', [
+            'query' => $query,
+            'options' => $options,
+        ]);
         $author = $options['author'] ?? null;
         $limit = $options['limit'] ?? 5;
 
@@ -198,6 +202,7 @@ class AudibleService extends BaseBookService
         }
 
         if (empty($response['products'])) {
+            return null;
             Log::error('Audible API search returned no results', [
                 'params' => $params,
                 'response' => $response,
@@ -205,7 +210,23 @@ class AudibleService extends BaseBookService
             return null;
         }
 
-        return $this->formatSearchResults($response['products']);
+        $products = $response['products'];
+        $noCache = !empty($options['no_cache']);
+        $enriched = [];
+        foreach ($products as $product) {
+            $asin = $product['asin'] ?? $product['id'] ?? null;
+            if ($asin) {
+                $details = $this->getBookDetails($asin, $options);
+                if ($details) {
+                    // Merge the enriched fields into the search product
+                    $product['description'] = $details['description'] ?? null;
+                    $product['cover_image_url'] = $details['cover_image_url'] ?? null;
+                    $product['series'] = $details['series'] ?? null;
+                }
+            }
+            $enriched[] = $product;
+        }
+        return $this->formatSearchResults($enriched);
     }
 
     /**
@@ -218,97 +239,91 @@ class AudibleService extends BaseBookService
             ['response_groups' => 'product_desc,contributors,product_attrs,media,reviews,rating,series']
         );
 
+        Log::debug('AudibleService performGetBookDetails', [
+            'response' => print_r($response, true),
+        ]);
+
         $book = $response['product'] ?? null;
         if (!$book) {
             Log::error('Audible API returned no book data', [
-                'response' => $response,
+                'id' => $id,
+                'response' => print_r($response, true),
             ]);
             return null;
         }
 
-        return $this->formatBookDetails($book);
-    }
-
-    /**
-     * Format search results from Audible API
-     */
-    protected function formatSearchResults(array $products): array
-    {
-        $results = [];
-
-        foreach ($products as $product) {
-            // Format authors
-            $authors = [];
-            if (!empty($product['authors'])) {
-                foreach ($product['authors'] as $author) {
-                    if (is_string($author)) {
-                        $authors[] = [
-                            'author' => [
-                                'name' => $author,
-                                'id' => null
-                            ]
-                        ];
-                    } elseif (is_array($author) && !empty($author['name'])) {
-                        $authors[] = [
-                            'author' => [
-                                'name' => $author['name'],
-                                'id' => $author['id'] ?? null
-                            ]
-                        ];
-                    }
-                }
-            }
-
-
-            // Format narrators
-            $narrators = [];
-            if (!empty($product['narrators'])) {
-                foreach ($product['narrators'] as $narrator) {
-                    if (is_string($narrator)) {
-                        $narrators[] = [
-                            'author' => [
-                                'name' => $narrator,
-                                'id' => null
-                            ]
-                        ];
-                    } elseif (is_array($narrator) && !empty($narrator['name'])) {
-                        $narrators[] = [
-                            'author' => [
-                                'name' => $narrator['name'],
-                                'id' => $narrator['id'] ?? null
-                            ]
-                        ];
-                    }
-                }
-            }
-
-            // Build the result array with null coalescing for all fields
-            $result = [
-                'id' => $product['asin'] ?? null,
-                'title' => $product['title'] ?? 'Unknown Title',
-                'subtitle' => $product['subtitle'] ?? null,
-                'authors' => $authors,
-                'narrators' => $narrators,
-                'cover_image_url' => $this->getBestImageUrl($product['product_images'] ?? []),
-                'release_date' => $product['release_date'] ?? null,
-                'publisher' => ['name' => $product['publisher_name'] ?? null],
-                'description' => $product['publisher_summary'] ?? null,
-                'language' => $product['language'] ?? 'english',
-            ];
-
-            // Handle duration if available
-            if (isset($product['runtime_length_min'])) {
-                $result['duration'] = $product['runtime_length_min'] . ':00';
-            } elseif (isset($product['runtime_length_min_max']) && is_numeric($product['runtime_length_min_max'])) {
-                $result['duration'] = $product['runtime_length_min_max'] . ':00';
-            } else {
-                $result['duration'] = null;
-            }
-
-            $results[] = $result;
+        // Parse description and strip <p> tags
+        // Prefer product_images (largest available)
+        $coverImage = null;
+        if (!empty($book['product_images']) && is_array($book['product_images'])) {
+            $coverImage = $this->getBestImageUrl($book['product_images']);
+        }
+        if (!$coverImage) {
+            $coverImage = $book['images']['cover500']['url'] ?? $book['images']['cover']['url'] ?? $book['image_url'] ?? null;
         }
 
-        return $results;
+        // Parse series and series number (prefer sequence)
+        $series = null;
+        $seriesNumber = null;
+        if (isset($book['series']) && is_array($book['series']) && count($book['series']) > 0) {
+            $seriesEntry = $book['series'][0];
+            if (is_array($seriesEntry)) {
+                $series = $seriesEntry['title'] ?? null;
+                $seriesNumber = $seriesEntry['sequence'] ?? null;
+                if ($seriesNumber === null && isset($seriesEntry['number'])) {
+                    $seriesNumber = $seriesEntry['number'];
+                }
+                if ($seriesNumber === null) {
+                    $seriesNumber = 1;
+                }
+            } elseif (is_string($seriesEntry)) {
+                $series = $seriesEntry;
+                $seriesNumber = 1;
+            }
+        }
+
+        // Format authors
+        $authors = [];
+        if (!empty($book['authors'])) {
+            foreach ($book['authors'] as $author) {
+                if (is_string($author)) {
+                    $authors[] = ['author' => ['name' => $author, 'id' => null]];
+                } elseif (is_array($author) && !empty($author['name'])) {
+                    $authors[] = ['author' => ['name' => $author['name'], 'id' => $author['id'] ?? null]];
+                }
+            }
+        }
+        // Format narrators
+        $narrators = [];
+        if (!empty($book['narrators'])) {
+            foreach ($book['narrators'] as $narrator) {
+                if (is_string($narrator)) {
+                    $narrators[] = ['author' => ['name' => $narrator, 'id' => null]];
+                } elseif (is_array($narrator) && !empty($narrator['name'])) {
+                    $narrators[] = ['author' => ['name' => $narrator['name'], 'id' => $narrator['id'] ?? null]];
+                }
+            }
+        }
+        // Ensure cover image is a string
+        $coverImage = $coverImage ?: '';
+        return [
+            'id' => $book['asin'] ?? $book['id'] ?? null,
+            'title' => $book['title'] ?? null,
+            'subtitle' => $book['subtitle'] ?? null,
+            'authors' => $authors,
+            'narrators' => $narrators,
+            'publisher' => $book['publisher'] ?? null,
+            'release_date' => $book['release_date'] ?? null,
+            'description' => $description,
+            'cover_image_url' => $coverImage ?: '',
+            'series' => $series,
+            'series_number' => $seriesNumber,
+            'categories' => !empty($book['categories']) ? $book['categories'] : ['Fiction'],
+            'language' => $book['language'] ?? null,
+            'duration' => (isset($book['runtime_length_min']) && is_numeric($book['runtime_length_min']))
+                ? ($book['runtime_length_min'] . ':00')
+                : ($book['duration'] ?? null),
+        ];
     }
 
     /**
@@ -338,38 +353,159 @@ class AudibleService extends BaseBookService
             }
         }
 
-        // Extract series information
-        $series = [];
+        // Extract series information and number (prefer sequence)
+        $series = null;
+        $seriesNumber = null;
         if (!empty($book['series'])) {
-            foreach ($book['series'] as $s) {
-                if (is_array($s) && !empty($s['title'])) {
-                    $series[$s['title']] = $s['sequence'] ?? 1;
+            $seriesEntry = $book['series'][0];
+            if (is_array($seriesEntry)) {
+                $series = $seriesEntry['title'] ?? null;
+                $seriesNumber = $seriesEntry['sequence'] ?? null;
+                if ($seriesNumber === null && isset($seriesEntry['number'])) {
+                    $seriesNumber = $seriesEntry['number'];
                 }
+                if ($seriesNumber === null) {
+                    $seriesNumber = 1;
+                }
+            } elseif (is_string($seriesEntry)) {
+                $series = $seriesEntry;
+                $seriesNumber = 1;
             }
         }
 
-        // Format the result
         return [
-            'id' => $book['asin'] ?? null,
-            'title' => $book['title'] ?? 'Unknown Title',
+            'id' => $book['asin'] ?? $book['id'] ?? null,
+            'title' => $book['title'] ?? null,
             'subtitle' => $book['subtitle'] ?? null,
             'authors' => $authors,
             'narrators' => $narrators,
-            'publisher' => ['name' => $book['publisher_name'] ?? null],
-            'published_date' => $book['release_date'] ?? null,
-            'description' => $book['publisher_summary'] ?? null,
-            'isbn' => $book['asin'] ?? null, // ASIN is used as ISBN for Audible
-            'page_count' => null, // Not typically available from Audible
-            'cover_image_url' => $this->getBestImageUrl($book['product_images'] ?? []),
-            'language' => strtolower($book['language'] ?? 'english'),
+            'publisher' => $book['publisher'] ?? null,
+            'release_date' => $book['release_date'] ?? null,
+            // Strip <p> tags from description if present
+            'description' => (isset($book['description']) && preg_match('/^<p>.*<\/p>$/i', trim($book['description'])))
+                ? preg_replace('/^<p>(.*?)<\/p>$/is', '$1', trim($book['description']))
+                : ($book['description'] ?? null),
+            // Prefer product_images for cover image
+            'cover_image_url' => $this->getBestImageUrl($book['product_images']) ?? ($book['cover_image_url'] ?? ($book['images']['cover500']['url'] ?? $book['images']['cover']['url'] ?? $book['image_url'] ?? null)),
             'series' => $series,
-            'categories' => $this->extractGenres($book['category_ladders'] ?? []),
-            'duration' => $book['runtime_length_min'] ? ($book['runtime_length_min'] . ':00') : null,
-            'rating' => $book['rating'] ?? null,
-            'ratings_count' => $book['ratings_count'] ?? null,
+            'language' => $book['language'] ?? null,
+            'duration' => $book['runtime_length_min'] ?? $book['duration'] ?? null,
             'sample_url' => $book['sample_url'] ?? null,
             'url' => $book['product_url'] ?? null
         ];
+    }
+
+    /**
+     * Format search results into a consistent format
+     */
+    protected function formatSearchResults(array $products): array
+    {
+        if (empty($products)) {
+            return [];
+        }
+        $results = [];
+
+        // make the dump pretty
+        Log::debug('AudibleService formatSearchResults', [
+            'products' => print_r($products, true),
+        ]);
+
+        foreach ($products as $product) {
+            // Format authors
+            $authors = [];
+            if (!empty($product['authors'])) {
+                foreach ($product['authors'] as $author) {
+                    if (is_string($author)) {
+                        $authors[] = [
+                            'author' => [
+                                'name' => $author,
+                                'id' => null,
+                            ],
+                        ];
+                    } elseif (is_array($author) && !empty($author['name'])) {
+                        $authors[] = [
+                            'author' => [
+                                'name' => $author['name'],
+                                'id' => $author['id'] ?? null
+                            ],
+                        ];
+                    }
+                }
+            }
+
+            // Format narrators
+            $narrators = [];
+            if (!empty($product['narrators'])) {
+                foreach ($product['narrators'] as $narrator) {
+                    if (is_string($narrator)) {
+                        $narrators[] = [
+                            'author' => [
+                                'name' => $narrator,
+                                'id' => null,
+                            ],
+                        ];
+                    } elseif (is_array($narrator) && !empty($narrator['name'])) {
+                        $narrators[] = [
+                            'author' => [
+                                'name' => $narrator['name'],
+                                'id' => $narrator['id'] ?? null
+                            ],
+                        ];
+                    }
+                }
+            }
+
+            // Extract series information and number (prefer sequence)
+            $series = null;
+            $seriesNumber = null;
+            if (!empty($product['series'])) {
+                $seriesEntry = $product['series'][0];
+                if (is_array($seriesEntry)) {
+                    $series = $seriesEntry['title'] ?? null;
+                    $seriesNumber = $seriesEntry['sequence'] ?? null;
+                    if ($seriesNumber === null && isset($seriesEntry['number'])) {
+                        $seriesNumber = $seriesEntry['number'];
+                    }
+                    if ($seriesNumber === null) {
+                        $seriesNumber = 1;
+                    }
+                } elseif (is_string($seriesEntry)) {
+                    $series = $seriesEntry;
+                    $seriesNumber = 1;
+                }
+            }
+
+            // Prefer product_images for cover image
+            $coverImage = null;
+            if (!empty($product['product_images']) && is_array($product['product_images'])) {
+                $coverImage = $this->getBestImageUrl($product['product_images']);
+            }
+            // The rest of this block should build a result array, not be inside the if!
+            $coverImage = null;
+            if (!empty($product['product_images']) && is_array($product['product_images'])) {
+                $coverImage = $this->getBestImageUrl($product['product_images']);
+            }
+
+            $results[] = [
+                'authors' => $authors,
+                'narrators' => $narrators,
+                'publisher' => $product['publisher'] ?? null,
+                'release_date' => $product['release_date'] ?? null,
+                'description' => (isset($product['description']) && preg_match('/^<p>.*<\/p>$/i', trim($product['description'])))
+                    ? preg_replace('/^<p>(.*?)<\/p>$/is', '$1', trim($product['description']))
+                    : ($product['description'] ?? null),
+                'cover_image_url' => $coverImage ?: '',
+                'series' => $series,
+                'series_number' => $seriesNumber,
+                'language' => $product['language'] ?? null,
+                'duration' => isset($product['runtime_length_min']) && is_numeric($product['runtime_length_min'])
+                    ? ($product['runtime_length_min'] . ':00')
+                    : null,
+                'sample_url' => $product['sample_url'] ?? null,
+                'url' => $product['product_url'] ?? null
+            ];
+        }
+        return $results;
     }
 
     /**
@@ -387,26 +523,6 @@ class AudibleService extends BaseBookService
                 'id' => $person['id'] ?? null
             ];
         }
-
-        return null;
-    }
-
-    /**
-     * Extract genres from category ladders
-     */
-    protected function extractGenres(array $ladders): array
-    {
-        $genres = [];
-        foreach ($ladders as $ladder_items) { // e.g., [['name' => 'Fiction'], ['name' => 'Sci-Fi']]
-            if (is_array($ladder_items)) {
-                foreach ($ladder_items as $item) { // e.g., ['name' => 'Fiction']
-                    if (is_array($item) && !empty($item['name'])) {
-                        $genres[] = $item['name'];
-                    }
-                }
-            }
-        }
-        return array_unique($genres);
     }
 
     /**
@@ -417,19 +533,23 @@ class AudibleService extends BaseBookService
         if (empty($images)) {
             return null;
         }
-
         // Prefer the largest available image
         $sizes = [
-            '2000x2000', '1600x1600', '1200x1200', '800x800',
-            '500x500', '400x400', '300x300', '200x200', '100x100'
+            '2000x2000',
+            '1600x1600',
+            '1200x1200',
+            '800x800',
+            '500x500',
+            '400x400',
+            '300x300',
+            '200x200',
+            '100x100',
         ];
-
         foreach ($sizes as $size) {
             if (!empty($images[$size])) {
                 return $this->ensureHttps($images[$size]);
             }
         }
-
         // If no specific size found, return the first available image
         return $this->ensureHttps(reset($images));
     }
@@ -442,11 +562,18 @@ class AudibleService extends BaseBookService
         if (strpos($url, 'http://') === 0) {
             return 'https://' . substr($url, 7);
         }
-
         if (strpos($url, '//') === 0) {
             return 'https:' . $url;
         }
-
         return $url;
+    }
+
+    /**
+     * Placeholder for cover image download (not implemented for AudibleService)
+     */
+    public function downloadCoverImage(string $imageUrl, string $directoryPath, string $targetBasename): ?string
+    {
+        Log::info('downloadCoverImage not implemented for AudibleService');
+        return null;
     }
 }
