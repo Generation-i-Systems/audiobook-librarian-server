@@ -478,14 +478,27 @@ class AudibleService extends BaseBookService
             }
 
             // Prefer product_images for cover image
-            $coverImage = null;
-            if (!empty($product['product_images']) && is_array($product['product_images'])) {
-                $coverImage = $this->getBestImageUrl($product['product_images']);
+            // Robust cover image extraction
+            $coverImage = $this->getBestImageUrl($product['product_images'] ?? []);
+            if (!$coverImage) {
+                $coverImage = $product['cover_image_url']
+                    ?? ($product['images']['cover500']['url'] ?? $product['images']['cover']['url'] ?? $product['image_url'] ?? '');
             }
-            // The rest of this block should build a result array, not be inside the if!
-            $coverImage = null;
-            if (!empty($product['product_images']) && is_array($product['product_images'])) {
-                $coverImage = $this->getBestImageUrl($product['product_images']);
+
+            // Robust series extraction for TestAudibleSearch
+            $series = null;
+            if (!empty($product['series'])) {
+                $seriesEntry = $product['series'][0];
+                if (is_array($seriesEntry) && !empty($seriesEntry['title'])) {
+                    $series = [[
+                        'name' => $seriesEntry['title'],
+                        'part' => $seriesEntry['sequence'] ?? ($seriesEntry['number'] ?? null)
+                    ]];
+                } elseif (is_string($seriesEntry)) {
+                    $series = [$seriesEntry];
+                } else {
+                    $series = $product['series'];
+                }
             }
 
             $results[] = [
