@@ -63,6 +63,7 @@ class AudibleService extends BaseBookService
         }
         // Use detail structure if available, fallback to search result
         $source = $details ?: $bestMatch;
+        error_log("searchAndMerge: ");
         $merged = [
             'audible_id' => $source['id'] ?? $source['asin'] ?? null,
             'title' => $source['title'] ?? null,
@@ -74,8 +75,8 @@ class AudibleService extends BaseBookService
             'publisher' => $source['publisher']['name'] ?? $source['publisher_name'] ?? null,
             'release_date' => $source['published_date'] ?? $source['release_date'] ?? null,
             'series' => is_array($source['series'] ?? null)
-    ? ($source['series'][0]['title'] ?? (is_string($source['series'][0] ?? null) ? $source['series'][0] : null))
-    : ($source['series'] ?? null),
+                ? ($source['series'][0]['title'] ?? (is_string($source['series'][0] ?? null) ? $source['series'][0] : null))
+                : ($source['series'] ?? null),
             'categories' => $source['categories'] ?? null,
             'duration' => $source['duration'] ?? ($source['runtime_length_min'] ? ($source['runtime_length_min'] . ':00') : null),
             'rating' => $source['rating'] ?? null,
@@ -214,20 +215,43 @@ class AudibleService extends BaseBookService
 
         $products = $response['products'];
         $noCache = !empty($options['no_cache']);
+        error_log('AudibleService: search API products: ' . json_encode($products));
         $enriched = [];
         foreach ($products as $product) {
             $asin = $product['asin'] ?? $product['id'] ?? null;
             if ($asin) {
                 $details = $this->getBookDetails($asin, $options);
-                if ($details) {
+                error_log("Details: " . json_encode($details));
+                if ($details && is_array($details) && count($details) > 0) {
                     // Merge the enriched fields into the search product
-                    $product['description'] = $details['description'] ?? null;
-                    $product['cover_image_url'] = $details['cover_image_url'] ?? null;
-                    $product['series'] = $details['series'] ?? null;
+                    $product['description'] = $details['description'] ?? $product['description'] ?? null;
+                    $product['series'] = $details['series'] ?? $product['series'] ?? null;
+                    // Always set cover_image_url to the largest image from product_images if present
+                    if (!empty($details['product_images']) && is_array($details['product_images'])) {
+                        error_log("performSearch product_images: " . json_encode($details['product_images']));
+                        $product['cover_image_url'] = $this->getBestImageUrl($details['product_images']);
+                    } elseif (!empty($product['product_images']) && is_array($product['product_images'])) {
+                        // Fallback to product_images from the search product
+                        $product['cover_image_url'] = $this->getBestImageUrl($product['product_images']);
+                    } else {
+                        $product['cover_image_url'] = $details['cover_image_url'] ?? $product['cover_image_url'] ?? null;
+                    }
+                } else {
+                    // No details found; fallback to product_images from the search product
+                    if (!empty($product['product_images']) && is_array($product['product_images'])) {
+                        $product['cover_image_url'] = $this->getBestImageUrl($product['product_images']);
+                    } else {
+                        // Always set cover_image_url from getBestImageUrl(product_images)
+                        $bestImageUrl = $this->getBestImageUrl(isset($product['product_images']) ? $product['product_images'] : []);
+                        error_log('Best image URL extracted: ' . $bestImageUrl);
+                        $product['cover_image_url'] = $bestImageUrl;
+                    }
+                    error_log('AudibleService: about to push product, cover_image_url=' . ($product['cover_image_url'] ?? 'NULL'));
+                    $enriched[] = $product;
                 }
             }
-            $enriched[] = $product;
         }
+        error_log('AudibleService: enriched products: ' . json_encode($enriched));
         return $this->formatSearchResults($enriched);
     }
 
@@ -309,6 +333,7 @@ class AudibleService extends BaseBookService
         // Ensure cover image is a string
         $coverImage = $coverImage ?: '';
         return [
+            'product_images' => $book['product_images'] ?? [],
             'id' => $book['asin'] ?? $book['id'] ?? null,
             'title' => $book['title'] ?? null,
             'subtitle' => $book['subtitle'] ?? null,
@@ -375,7 +400,9 @@ class AudibleService extends BaseBookService
             }
         }
 
+        error_log("formatBookDetails: ");
         return [
+            'product_images' => $book['product_images'] ?? [],
             'id' => $book['asin'] ?? $book['id'] ?? null,
             'title' => $book['title'] ?? null,
             'subtitle' => $book['subtitle'] ?? null,
@@ -402,6 +429,7 @@ class AudibleService extends BaseBookService
      */
     protected function formatSearchResults(array $products): array
     {
+        error_log('AudibleService: formatSearchResults incoming products: ' . json_encode($products));
         if (empty($products)) {
             return [];
         }
@@ -477,8 +505,7 @@ class AudibleService extends BaseBookService
                 }
             }
 
-            // Prefer product_images for cover image
-            // Robust cover image extraction
+            error_log("formatSearchResults product_images: " . json_encode($product['product_images']));
             $coverImage = $this->getBestImageUrl($product['product_images'] ?? []);
             if (!$coverImage) {
                 $coverImage = $product['cover_image_url']
@@ -492,63 +519,69 @@ class AudibleService extends BaseBookService
                 // Try to extract the part/number from the title
                 $part = null;
                 if (preg_match('/\b(\d{1,3})\b/', $product['title'] ?? '', $matches)) {
-                    $part = (int)$matches[1];
+                    $part = (int) $matches[1];
                 }
-                $series = [[
-                    'name' => $product['publication_name'],
-                    'part' => $part
-                ]];
+                $series = [
+                    [
+                        'name' => $product['publication_name'],
+                        'part' => $part,
+                    ],
+                ];
             } elseif (!empty($product['series'])) {
                 $seriesEntry = $product['series'][0];
                 if (is_array($seriesEntry) && !empty($seriesEntry['title'])) {
-                    $series = [[
-                        'name' => $seriesEntry['title'],
-                        'part' => $seriesEntry['sequence'] ?? ($seriesEntry['number'] ?? null)
-                    ]];
+                    $series = [
+                        [
+                            'name' => $seriesEntry['title'],
+                            'part' => $seriesEntry['sequence'] ?? ($seriesEntry['number'] ?? null)
+                        ],
+                    ];
                 } elseif (is_string($seriesEntry)) {
                     $series = [$seriesEntry];
                 } else {
                     $series = $product['series'];
                 }
             }
+            // error_log("detailsProductImages: " . json_encode($product['product_images'], JSON_PRETTY_PRINT));
+            // $coverImage = $this->getBestImageUrl($product['product_images'] ?? [])
+            //     ?? ($product['cover_image_url'] ?? ($coverImage ?: ''));
+            // error_log("coverImage: " . $coverImage);
 
+            // Only include products that have at least a title and a cover image URL
+        }
+        // error_log("detailsProductImages: " . json_encode($product['product_images'], JSON_PRETTY_PRINT));
+        // $coverImage = $this->getBestImageUrl($product['product_images'] ?? [])
+        //     ?? ($product['cover_image_url'] ?? ($coverImage ?: ''));
+        // error_log("coverImage: " . $coverImage);
+
+        // Only include products that have at least a title and a cover image URL
+        $coverImageUrl = $this->getBestImageUrl($product['product_images'] ?? [])
+            ?? ($product['cover_image_url'] ?? ($coverImage ?: ''));
+        $title = $product['title'] ?? '';
+        error_log('AudibleService: formatSearchResults candidate: ' . json_encode($product) . ' coverImageUrl=' . $coverImageUrl . ' title=' . $title);
+        if (empty($title)) {
+            $title = $product['id'] ?? $product['asin'] ?? '[NO TITLE]';
+            error_log('AudibleService: formatSearchResults fallback title used: ' . $title);
+        }
+        if (!empty($title) && !empty($coverImageUrl)) {
+            error_log('AudibleService: formatSearchResults adding result: ' . json_encode($product) . ' coverImageUrl=' . $coverImageUrl . ' title=' . $title);
             $results[] = [
                 'id' => $product['id'] ?? ($product['asin'] ?? null),
-                'title' => $product['title'] ?? '',
+                'title' => $title,
                 'authors' => $authors,
                 'narrators' => $narrators,
-                'publisher' => $product['publisher'] ?? null,
-                'release_date' => $product['release_date'] ?? null,
-                'description' => (isset($product['description']) && preg_match('/^<p>.*<\/p>$/i', trim($product['description'])))
-                    ? preg_replace('/^<p>(.*?)<\/p>$/is', '$1', trim($product['description']))
-                    : ($product['description'] ?? null),
-                'cover_image_url' => $coverImage ?: '',
                 'series' => $series,
                 'series_number' => $seriesNumber,
                 'language' => $product['language'] ?? null,
                 'duration' => isset($product['runtime_length_min']) && is_numeric($product['runtime_length_min'])
                     ? ($product['runtime_length_min'] . ':00')
                     : null,
-                'sample_url' => $product['sample_url'] ?? null,
-                'url' => $product['product_url'] ?? null
-            ];
-        }
-        return $results;
-    }
-
-    /**
-     * Extract person data from different possible structures
-     */
-    protected function extractPersonData($person): ?array
-    {
-        if (is_string($person)) {
-            return ['name' => $person, 'id' => null];
-        }
-
-        if (is_array($person)) {
-            return [
-                'name' => $person['name'] ?? null,
-                'id' => $person['id'] ?? null
+                'publisher' => $product['publisher'] ?? null,
+                'release_date' => $product['release_date'] ?? null,
+                'description' => (isset($product['description']) && preg_match('/^<p>.*<\/p>$/i', trim($product['description'])))
+                    ? preg_replace('/^<p>(.*?)<\/p>$/is', '$1', trim($product['description']))
+                    : ($product['description'] ?? null),
+                'cover_image_url' => $coverImageUrl,
             ];
         }
     }
@@ -556,30 +589,44 @@ class AudibleService extends BaseBookService
     /**
      * Get the best available image URL from the product images
      */
-    protected function getBestImageUrl(array $images): ?string
+    protected function getBestImageUrl($productImages)
     {
-        if (empty($images)) {
+        if (empty($productImages) || !is_array($productImages)) {
+            return null;
+        }
+        error_log("getBestImageUrl: " . json_encode($productImages));
+        if (empty($productImages)) {
             return null;
         }
         // Prefer the largest available image
         $sizes = [
             '2000x2000',
+            '2000',
             '1600x1600',
+            '1600',
             '1200x1200',
+            '1200',
             '800x800',
+            '800',
             '500x500',
+            '500',
             '400x400',
+            '400',
             '300x300',
+            '300',
             '200x200',
+            '200',
             '100x100',
+            '100',
         ];
         foreach ($sizes as $size) {
-            if (!empty($images[$size])) {
-                return $this->ensureHttps($images[$size]);
+            if (!empty($productImages[$size])) {
+                error_log("getBestImageUrl: Found size $size");
+                return $this->ensureHttps($productImages[$size]);
             }
         }
         // If no specific size found, return the first available image
-        return $this->ensureHttps(reset($images));
+        return $this->ensureHttps(reset($productImages));
     }
 
     /**
@@ -587,6 +634,7 @@ class AudibleService extends BaseBookService
      */
     protected function ensureHttps(string $url): string
     {
+        error_log("ensureHttps: $url");
         if (strpos($url, 'http://') === 0) {
             return 'https://' . substr($url, 7);
         }
