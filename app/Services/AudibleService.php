@@ -487,7 +487,18 @@ class AudibleService extends BaseBookService
 
             // Robust series extraction for TestAudibleSearch
             $series = null;
-            if (!empty($product['series'])) {
+            // Audible API search results may not have a 'series' key, but may have publication_name and a number in title
+            if (!empty($product['publication_name'])) {
+                // Try to extract the part/number from the title
+                $part = null;
+                if (preg_match('/\b(\d{1,3})\b/', $product['title'] ?? '', $matches)) {
+                    $part = (int)$matches[1];
+                }
+                $series = [[
+                    'name' => $product['publication_name'],
+                    'part' => $part
+                ]];
+            } elseif (!empty($product['series'])) {
                 $seriesEntry = $product['series'][0];
                 if (is_array($seriesEntry) && !empty($seriesEntry['title'])) {
                     $series = [[
