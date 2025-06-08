@@ -68,12 +68,14 @@ class AudibleService extends BaseBookService
             'title' => $source['title'] ?? null,
             'subtitle' => $source['subtitle'] ?? null,
             'description' => $source['description'] ?? $source['publisher_summary'] ?? null,
-            'cover_image' => $source['cover_image_url'] ?? ($source['product_images']['large'] ?? null),
+            'cover_image' => $this->getBestImageUrl($source['product_images'] ?? []) ?? ($source['cover_image_url'] ?? ($source['images']['cover500']['url'] ?? $source['images']['cover']['url'] ?? $source['image_url'] ?? null)),
             'authors' => $source['authors'] ?? null,
             'narrators' => $source['narrators'] ?? null,
             'publisher' => $source['publisher']['name'] ?? $source['publisher_name'] ?? null,
             'release_date' => $source['published_date'] ?? $source['release_date'] ?? null,
-            'series' => $source['series'] ?? null,
+            'series' => is_array($source['series'] ?? null)
+    ? ($source['series'][0]['title'] ?? (is_string($source['series'][0] ?? null) ? $source['series'][0] : null))
+    : ($source['series'] ?? null),
             'categories' => $source['categories'] ?? null,
             'duration' => $source['duration'] ?? ($source['runtime_length_min'] ? ($source['runtime_length_min'] . ':00') : null),
             'rating' => $source['rating'] ?? null,
