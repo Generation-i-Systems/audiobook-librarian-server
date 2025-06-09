@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Log;
 
 class TestAudibleLookup extends Command
 {
-    protected $signature = 'test:audible {asin} {--debug}';
+    protected $signature = 'test:audible {asin} {--debug} {--no-cache}';
     protected $description = 'Test Audible API lookup for a specific ASIN';
 
     protected $audibleService;
@@ -28,7 +28,11 @@ class TestAudibleLookup extends Command
 
         try {
             // Get book details
-            $book = $this->audibleService->getBookDetails($asin);
+            $options = [];
+            if ($this->option('no-cache')) {
+                $options['no_cache'] = true;
+            }
+            $book = $this->audibleService->getBookDetails($asin, $options);
 
             if (!$book) {
                 $this->error('No book found for the given ASIN');

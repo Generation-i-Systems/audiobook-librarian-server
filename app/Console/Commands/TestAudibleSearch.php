@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Log;
 
 class TestAudibleSearch extends Command
 {
-    protected $signature = 'test:audible:search {query} {--author=} {--limit=5}';
+    protected $signature = 'test:audible:search {query} {--author=} {--limit=5} {--no-cache}';
     protected $description = 'Test Audible API search functionality';
 
     protected $audibleService;

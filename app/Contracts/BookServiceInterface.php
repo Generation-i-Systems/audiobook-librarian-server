@@ -34,4 +34,14 @@ interface BookServiceInterface
      * @return bool
      */
     public function isAvailable(): bool;
+
+    /**
+     * Download a cover image for a book to the specified directory and basename.
+     *
+     * @param string $imageUrl URL of the image to download
+     * @param string $directoryPath Directory to save the image
+     * @param string $targetBasename Basename for the saved file (no extension)
+     * @return string|null Path to the saved file or null on failure
+     */
+    public function downloadCoverImage(string $imageUrl, string $directoryPath, string $targetBasename): ?string;
 }

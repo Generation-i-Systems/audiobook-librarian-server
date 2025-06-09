@@ -85,8 +85,11 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
     /**
      * @inheritDoc
      */
-    public function getBookDetails(string $id): ?array
+    public function getBookDetails(string $id, array $options = []): ?array
     {
+        Log::error('[AUDIOBOOKBAY-DETAIL] getBookDetails', [
+            'id' => $id,
+        ]);
         return $this->performGetBookDetails($id);
     }
 
@@ -97,25 +100,35 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
     {
         $cacheKey = 'audiobookbay_service_book_details_' . md5($idOrSlug);
 
-        return Cache::remember($cacheKey, $this->cacheTtl, function () use ($idOrSlug) {
-            try {
-                $details = $this->apiService->getAudiobookDetails($idOrSlug);
+        try {
+            Log::debug('[AUDIOBOOKBAY-DETAIL] performGetBookDetails', [
+                'idOrSlug' => $idOrSlug,
+            ]);
+            $details = $this->apiService->getAudiobookDetails($idOrSlug);
 
-                if (is_null($details)) {
-                    Log::warning('AudiobookBayService:performGetBookDetails - Null result from apiService->getAudiobookDetails', ['idOrSlug' => $idOrSlug]);
-                    return null;
-                }
-
-                return $this->formatBookDetails($details);
-
-            } catch (\Exception $e) {
-                Log::error('AudiobookBayService: Error in performGetBookDetails', [
-                    'idOrSlug' => $idOrSlug,
-                    'error' => $e->getMessage(),
-                ]);
+            if (is_null($details)) {
+                Log::warning('AudiobookBayService:performGetBookDetails - Null result from apiService->getAudiobookDetails', ['idOrSlug' => $idOrSlug]);
                 return null;
             }
-        });
+
+            return $this->formatBookDetails($details);
+
+        } catch (\Exception $e) {
+            Log::error('AudiobookBayService: Error in performGetBookDetails', [
+                'idOrSlug' => $idOrSlug,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Placeholder for cover image download (not implemented for AudiobookBayService)
+     */
+    public function downloadCoverImage(string $imageUrl, string $directoryPath, string $targetBasename): ?string
+    {
+        Log::info('downloadCoverImage not implemented for AudiobookBayService');
+        return null;
     }
 
     /**
@@ -249,7 +262,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
                 'author' => [
                     'name' => trim($authorObj['name'] ?? ''),
                     'id' => $authorObj['id'] ?? null,
-                ]
+                ],
             ];
         }, $authorsArray);
     }
@@ -267,7 +280,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
                 'author' => [
                     'name' => trim($narratorObj['name'] ?? ''),
                     'id' => $narratorObj['id'] ?? null,
-                ]
+                ],
             ];
         }, $narratorsArray);
     }
@@ -285,7 +298,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
             return [
                 'genre' => [
                     'name' => trim($categoryName),
-                ]
+                ],
             ];
         }, $categoriesInput);
     }
@@ -301,13 +314,13 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
         }
         $duration = 0;
         if (preg_match('/(\d+)\s*h(?:ours?)?/i', $durationStr, $matches)) {
-            $duration += (int)$matches[1] * 3600;
+            $duration += (int) $matches[1] * 3600;
         }
         if (preg_match('/(\d+)\s*m(?:in(?:utes?)?)?/i', $durationStr, $matches)) {
-            $duration += (int)$matches[1] * 60;
+            $duration += (int) $matches[1] * 60;
         }
         if (preg_match('/(\d+)\s*s(?:ec(?:onds?)?)?/i', $durationStr, $matches)) {
-            $duration += (int)$matches[1];
+            $duration += (int) $matches[1];
         }
         // ISO8601 Duration PThHmMsS (basic support)
         if ($duration === 0 && str_starts_with(strtoupper($durationStr), 'PT')) {

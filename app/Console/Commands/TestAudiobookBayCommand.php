@@ -33,18 +33,19 @@ class TestAudiobookBayCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'audiobookbay:test 
+    protected $signature = 'audiobookbay:test
         {query? : Search query}
         {--id= : Get details for a specific book ID}
         {--debug : Show raw API responses}
-        {--list : List results without showing details}';
+        {--list : List results without showing details}
+        {--get-images : Download cover images for matched books}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Test AudiobookBay API login and search functionality';
+    protected $description = 'Test AudiobookBay API login and search functionality. Use --get-images to download cover images.';
 
     /**
      * Execute the console command.
@@ -233,6 +234,7 @@ class TestAudiobookBayCommand extends Command
      */
     protected function handleBookDetails(string $bookIdOrUrl, bool $debug = false): int
     {
+        $getImages = $this->option('get-images');
         // If it's not a full URL, assume it's just the ID
         $url = filter_var($bookIdOrUrl, FILTER_VALIDATE_URL)
             ? $bookIdOrUrl
@@ -258,14 +260,16 @@ class TestAudiobookBayCommand extends Command
         // Display basic info
         $this->line("" . ($book['description'] ?? 'No description available') . "\n");
 
+        $this->line("Cover: " . ($book['cover_image_url'] ?? 'No cover image available'));
+
         $info = [
-            'Author' => $book['author'] ?? 'Unknown',
-            'Narrator' => $book['narrator'] ?? 'Unknown',
+            'Author' => $this->mapToString($book['authors'] ?? 'Unknown'),
+            'Narrator' => $this->mapToString($book['narrators'] ?? 'Unknown'),
             'Series' => isset($book['series']) ?
                 ($book['series'] . (isset($book['seriesNumber']) ? ' #' . $book['seriesNumber'] : '')) : 'N/A',
             'Published' => $book['datePublished'] ?? 'Unknown',
-            'Categories' => !empty($book['category']) ? implode(', ', $book['category']) : 'N/A',
-            'Keywords' => !empty($book['keywords']) ? implode(', ', $book['keywords']) : 'N/A',
+            'Genres' => !empty($book['genres']) ? implode(', ', $book['genres']) : 'N/A',
+            'Tags' => !empty($book['tags']) ? implode(', ', $book['tags']) : 'N/A',
         ];
 
         foreach ($info as $label => $value) {
@@ -275,6 +279,19 @@ class TestAudiobookBayCommand extends Command
         // Display cover image if available
         if (!empty($book['cover_image'])) {
             $this->line("\n📷 Cover: " . $book['cover_image']);
+            if ($getImages && !empty($book['cover_image_url']) && method_exists($this->audiobookBayService, 'downloadCoverImage')) {
+                $this->line("Attempting to download cover image...");
+                $coverPath = $this->audiobookBayService->downloadCoverImage(
+                    $book['cover_image_url'],
+                    storage_path('app/public/audiobookbay_covers'),
+                    preg_replace('/[^a-zA-Z0-9_-]/', '_', $book['title'] ?? 'cover')
+                );
+                if ($coverPath) {
+                    $this->info("✅ Cover image downloaded: $coverPath");
+                } else {
+                    $this->warn("⚠️  Failed to download cover image.");
+                }
+            }
         }
 
         // If debug mode, show raw data
@@ -284,5 +301,21 @@ class TestAudiobookBayCommand extends Command
         }
 
         return 0;
+    }
+
+    //utility method to dump a list of authors or narrators to a string
+    protected function mapToString(array $map): string
+    {
+        $result = '';
+        foreach ($map as $item) {
+            if (isset($item['author']) && isset($item['author']['name'])) {
+                $result = $item['author']['name'];
+            } elseif (isset($item['narrator']) && isset($item['narrator']['name'])) {
+                $result = $item['narrator']['name'];
+            } elseif (isset($item['name'])) {
+                $result .= $item['name'] . ', ';
+            }
+        }
+        return rtrim($result, ', ');
     }
 }

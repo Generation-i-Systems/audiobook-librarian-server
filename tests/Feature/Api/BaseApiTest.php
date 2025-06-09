@@ -9,6 +9,13 @@ use Tests\TestCase;
 
 abstract class BaseApiTest extends TestCase
 {
+    /**
+     * If true, tests will attempt to download images (cover art) from APIs.
+     * Enable by running PHPUnit with --get-images flag.
+     * Example: vendor/bin/phpunit -- --get-images
+     */
+    protected bool $getImages = false;
+
     protected string $apiBaseUrl;
     protected string $apiKey;
     protected string $testQuery = 'test';

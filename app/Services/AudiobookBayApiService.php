@@ -462,8 +462,9 @@ class AudiobookBayApiService
             Log::warning('API rate limit reached', ['service' => $this->serviceName]);
             throw new \RuntimeException("{$this->serviceName}API rate limit exceeded. Please try again later.");
         }
-        Cache::put($cacheKey, $count + 1, now()->addHour());
+        Cache::put($cacheKey, $count + 1, 3600);
     }
+
     /**
      * Generate a cache key for the request (inlined from BaseApiTrait)
      */

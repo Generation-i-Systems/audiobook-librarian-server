@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Services;
 
 use Illuminate\Support\Str;
@@ -174,7 +173,7 @@ class AudibleApiService
     /**
      * Search for audiobooks
      */
-    public function searchAudiobooks(string $query, array $options = []): ?array
+    public function searchBooks(string $query, array $options = []): array
     {
         $params = [
             'Operation' => 'ItemSearch',
@@ -479,7 +478,7 @@ class AudibleApiService
 
         // If it's an array of strings
         if (is_array($contributors) && isset($contributors[0]) && is_string($contributors[0])) {
-            return array_map(fn ($name) => ['name' => $name], $contributors);
+            return array_map(fn($name) => ['name' => $name], $contributors);
         }
 
         // If it's an array of ['Role' => ..., 'Contributor' => ...] or similar structures
@@ -591,7 +590,7 @@ class AudibleApiService
                         $genres[] = [
                             'id' => $ancestorNode['BrowseNodeId'],
                             'name' => $ancestorNode['Name'],
-                            'path' => $this->getBrowseNodePath($ancestorNode)
+                            'path' => $this->getBrowseNodePath($ancestorNode),
                         ];
                     }
                 }
@@ -663,5 +662,14 @@ class AudibleApiService
             $results[] = $formattedBook;
         }
         return $results;
+    }
+
+    /**
+     * Placeholder for cover image download (not implemented for AudibleApiService)
+     */
+    public function downloadCoverImage(string $imageUrl, string $directoryPath, string $targetBasename): ?string
+    {
+        Log::info('downloadCoverImage not implemented for AudibleApiService');
+        return null;
     }
 }

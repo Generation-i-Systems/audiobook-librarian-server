@@ -176,7 +176,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
             if (empty($response['items'])) {
                 Log::warning('No results found in Google Books API response', [
                     'query' => $query,
-                    'options' => $options
+                    'options' => $options,
                 ]);
                 return [];
             }
@@ -329,7 +329,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
                 'author' => [
                     'name' => $author,
                     'id' => null,
-                ]
+                ],
             ];
         }, $authors);
     }
@@ -358,5 +358,14 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
 
         // Try to get any image URL if available
         return $imageLinks[array_key_first($imageLinks)] ?? null;
+    }
+
+    /**
+     * Placeholder for cover image download (not implemented for GoogleBooksApiService)
+     */
+    public function downloadCoverImage(string $imageUrl, string $directoryPath, string $targetBasename): ?string
+    {
+        Log::info('downloadCoverImage not implemented for GoogleBooksApiService');
+        return null;
     }
 }

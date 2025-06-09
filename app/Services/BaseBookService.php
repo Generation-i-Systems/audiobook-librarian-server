@@ -37,20 +37,32 @@ abstract class BaseBookService implements BookServiceInterface
     /**
      * @inheritDoc
      */
-    public function searchBooks(string $query, array $options = []): ?array
+    public function searchBooks(string $query, array $options = []): array
     {
+        if (!empty($options['no_cache'])) {
+            try {
+                return $this->performSearch($query, $options) ?? [];
+            } catch (\Exception $e) {
+                Log::error("Search failed for {$this->getServiceName()} (no_cache)", [
+                    'query' => $query,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+                return [];
+            }
+        }
         $cacheKey = $this->getServiceName() . '_search_' . md5($query . json_encode($options));
-
         return Cache::remember($cacheKey, $this->cacheTtl, function () use ($query, $options) {
             try {
-                return $this->performSearch($query, $options);
+                $result = $this->performSearch($query, $options);
+                return empty($result) ? [] : $result;
             } catch (\Exception $e) {
                 Log::error("Search failed for {$this->getServiceName()}", [
                     'query' => $query,
                     'error' => $e->getMessage(),
                     'trace' => $e->getTraceAsString(),
                 ]);
-                return null;
+                return [];
             }
         });
     }
@@ -58,10 +70,21 @@ abstract class BaseBookService implements BookServiceInterface
     /**
      * @inheritDoc
      */
-    public function getBookDetails(string $id): ?array
+    public function getBookDetails(string $id, array $options = []): ?array
     {
+        if (!empty($options['no_cache'])) {
+            try {
+                return $this->performGetBookDetails($id);
+            } catch (\Exception $e) {
+                Log::error("Failed to get book details from {$this->getServiceName()} (no_cache)", [
+                    'id' => $id,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+                return [];
+            }
+        }
         $cacheKey = $this->getServiceName() . '_details_' . $id;
-
         return Cache::remember($cacheKey, $this->cacheTtl, function () use ($id) {
             try {
                 return $this->performGetBookDetails($id);
@@ -71,7 +94,7 @@ abstract class BaseBookService implements BookServiceInterface
                     'error' => $e->getMessage(),
                     'trace' => $e->getTraceAsString(),
                 ]);
-                return null;
+                return [];
             }
         });
     }
