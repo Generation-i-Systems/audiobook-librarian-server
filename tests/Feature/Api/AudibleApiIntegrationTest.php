@@ -192,7 +192,7 @@ XML;
             return Http::response('Mock not found for integration search: ' . $request->url(), 404, ['Content-Type' => 'text/plain']);
         });
 
-        $results = $this->audibleApi->searchAudiobooks('test');
+        $results = $this->audibleApi->searchBooks('test');
 
         $this->assertIsArray($results);
         $this->assertCount(1, $results);

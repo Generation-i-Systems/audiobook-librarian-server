@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Services\AudibleService;
 use Illuminate\Support\Facades\Http;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class AudibleServiceMockTest extends TestCase
@@ -62,9 +63,9 @@ class AudibleServiceMockTest extends TestCase
         $this->assertIsArray($book);
         $this->assertEquals('Test Book', $book['title']);
         $this->assertEquals('Test Author', $book['authors'][0]['author']['name']);
-        $this->assertEquals('Test Narrator', $book['narrators'][0]['author']['name']);
-        // The duration is in minutes, so 630 minutes = 10 hours and 30 minutes
-        $this->assertEquals('630:00', $book['duration']);
+        $this->assertEquals('Test Narrator', $book['narrators'][0]['narrator']['name']);
+        // The runtime is in minutes, so 630 minutes = 10 hours and 30 minutes
+        $this->assertEquals(630, $book['runtime']);
 
         // Check that the book has the expected structure
         $this->assertArrayHasKey('id', $book);
@@ -88,7 +89,7 @@ class AudibleServiceMockTest extends TestCase
         ]);
 
         $results = $this->service->searchBooks('Nonexistent Book');
-        $this->assertNull($results);
+        $this->assertEmpty($results);
 
         $book = $this->service->getBookDetails('INVALID123');
         $this->assertNull($book);
@@ -100,19 +101,16 @@ class AudibleServiceMockTest extends TestCase
             'asin' => 'TEST123',
             'title' => 'Test Book',
             'subtitle' => 'A Test Subtitle',
-            'authors' => [
-                ['name' => 'Test Author', 'asin' => 'AUTH123'],
-            ],
-            'narrators' => [
-                ['name' => 'Test Narrator', 'asin' => 'NARR123'],
+            'contributors' => [
+                ['role' => 'author', 'name' => 'Test Author', 'asin' => 'AUTH123'],
+                ['role' => 'narrator', 'name' => 'Test Narrator', 'asin' => 'NARR123'],
             ],
             'publisher_name' => 'Test Publisher',
             'release_date' => '2023-01-01T00:00:00.000Z',
             'publisher_summary' => 'This is a test book summary.',
             'merchandising_summary' => 'This is a test book description.',
             'product_images' => [
-                '_500x500' => 'https://example.com/image_500x500.jpg',
-                '_400x400' => 'https://example.com/image_400x400.jpg',
+                '500' => 'https://example.com/image_500x500.jpg',
             ],
             'category_ladders' => [
                 [

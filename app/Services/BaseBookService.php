@@ -3,9 +3,9 @@
 namespace App\Services;
 
 use App\Contracts\BookServiceInterface;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Cache;
 
 abstract class BaseBookService implements BookServiceInterface
 {
@@ -39,11 +39,29 @@ abstract class BaseBookService implements BookServiceInterface
      */
     public function searchBooks(string $query, array $options = []): array
     {
+        // Dedicated logger for this method's debug
+        $baseServiceLogPath = storage_path('logs/base_service_debug.log');
+        try {
+            $baseLogger = Log::build([
+                'driver' => 'single',
+                'path' => $baseServiceLogPath,
+                'level' => env('LOG_LEVEL', 'debug'),
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('BaseBookService: Failed to create baseLogger for searchBooks.', ['error' => $e->getMessage()]);
+            $baseLogger = Log::channel(); // Fallback
+        }
+
+        $baseLogger->info('BaseBookService: searchBooks called (using baseLogger).', ['query' => $query, 'options' => $options, 'service' => $this->getServiceName()]);
+        
         if (!empty($options['no_cache'])) {
             try {
-                return $this->performSearch($query, $options) ?? [];
+                $baseLogger->info('BaseBookService: About to call performSearch (no_cache path - using baseLogger).');
+                $result = $this->performSearch($query, $options);
+                $baseLogger->info('BaseBookService: performSearch returned (no_cache path - using baseLogger).', ['result_is_null' => is_null($result), 'result_count' => is_array($result) ? count($result) : 'N/A']);
+                return $result ?? [];
             } catch (\Exception $e) {
-                Log::error("Search failed for {$this->getServiceName()} (no_cache)", [
+                $baseLogger->error("Search failed for {$this->getServiceName()} (no_cache - using baseLogger)", [
                     'query' => $query,
                     'error' => $e->getMessage(),
                     'trace' => $e->getTraceAsString(),
@@ -51,13 +69,16 @@ abstract class BaseBookService implements BookServiceInterface
                 return [];
             }
         }
-        $cacheKey = $this->getServiceName() . '_search_' . md5($query . json_encode($options));
-        return Cache::remember($cacheKey, $this->cacheTtl, function () use ($query, $options) {
+        $baseLogger->info('BaseBookService: Using cache path (using baseLogger).');
+            $cacheKey = $this->getServiceName() . '_search_' . md5($query . json_encode($options));
+            return Cache::remember($cacheKey, $this->cacheTtl, function () use ($query, $options, $baseLogger) {
             try {
+                $baseLogger->info('BaseBookService: About to call performSearch (cache path - using baseLogger).');
                 $result = $this->performSearch($query, $options);
+                $baseLogger->info('BaseBookService: performSearch returned (cache path - using baseLogger).', ['result_is_null' => is_null($result), 'result_count' => is_array($result) ? count($result) : 'N/A']);
                 return empty($result) ? [] : $result;
             } catch (\Exception $e) {
-                Log::error("Search failed for {$this->getServiceName()}", [
+                $baseLogger->error("Search failed for {$this->getServiceName()} (cache path - using baseLogger)", [
                     'query' => $query,
                     'error' => $e->getMessage(),
                     'trace' => $e->getTraceAsString(),
@@ -127,14 +148,20 @@ abstract class BaseBookService implements BookServiceInterface
     /**
      * Make an HTTP GET request
      */
-    protected function httpGet(string $url, array $params = []): array
+    protected function httpGet(string $url, array $params = []): ?array
     {
         $response = Http::withHeaders($this->defaultHeaders)
             ->timeout(15)
             ->get($url, array_merge($this->defaultParams, $params));
 
         if (!$response->successful()) {
-            throw new \RuntimeException("HTTP request failed with status: " . $response->status());
+            Log::error('HTTP request failed', [
+                'url' => $url,
+                'params' => $params,
+                'status' => $response->status(),
+                'body' => $response->body(), // Log the body for debugging
+            ]);
+            return null; // Return null on failure
         }
 
         return $response->json() ?? [];

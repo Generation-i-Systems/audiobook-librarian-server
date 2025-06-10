@@ -167,7 +167,7 @@ XML;
         // $this->audibleApi is initialized in BaseApiTest::setUp()
         $this->mockSuccessfulSearchResponse();
 
-        $results = $this->audibleApi->searchAudiobooks($this->testQuery);
+        $results = $this->audibleApi->searchBooks($this->testQuery);
 
         $this->assertIsArray($results);
         $this->assertNotEmpty($results);
