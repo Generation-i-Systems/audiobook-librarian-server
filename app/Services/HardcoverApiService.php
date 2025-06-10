@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Log;
 class HardcoverApiService
 {
     protected string $apiUrl;
+
     protected ?string $apiKey;
 
     public function __construct(?string $apiKey = null, ?string $apiUrl = null)
@@ -20,12 +21,12 @@ class HardcoverApiService
     {
         $title = $book['title'] ?? null;
         $authors = $book['authors'] ?? [];
-        if (!$title) {
+        if (! $title) {
             return null;
         }
         $limit = 5;
         $results = $this->searchBooksByTitle($title, $limit);
-        if (!$results || empty($results)) {
+        if (! $results || empty($results)) {
             return null;
         }
         $bestMatch = null;
@@ -37,7 +38,7 @@ class HardcoverApiService
             } elseif (stripos($result['title'], $title) !== false) {
                 $score += 1;
             }
-            if (!empty($authors) && !empty($result['authors'])) {
+            if (! empty($authors) && ! empty($result['authors'])) {
                 foreach ($authors as $inputAuthor) {
                     foreach ($result['authors'] as $authorObj) {
                         $authorName = is_array($authorObj['author'] ?? null) ? $authorObj['author']['name'] ?? '' : ($authorObj['author'] ?? '');
@@ -53,11 +54,11 @@ class HardcoverApiService
                 $bestMatch = $result;
             }
         }
-        if (!$bestMatch) {
+        if (! $bestMatch) {
             return null;
         }
         $details = null;
-        if (!empty($bestMatch['id'])) {
+        if (! empty($bestMatch['id'])) {
             $details = $this->getBookDetails($bestMatch['id']);
         }
         $merged = [
@@ -71,6 +72,7 @@ class HardcoverApiService
             'isbn_13' => $details['isbn_13'] ?? $bestMatch['isbn_13'] ?? null,
             'publisher' => $details['publisher']['name'] ?? $bestMatch['publisher']['name'] ?? null,
         ];
+
         return array_filter($merged, fn ($v) => $v !== null);
     }
 
@@ -83,6 +85,7 @@ class HardcoverApiService
     {
         if (empty($this->apiKey)) {
             Log::error('Hardcover API key not set');
+
             return null;
         }
         try {
@@ -98,13 +101,16 @@ class HardcoverApiService
                     'status' => $response->status(),
                     'response' => $response->body(),
                 ]);
+
                 return null;
             }
+
             return $response->json();
         } catch (\Exception $e) {
             Log::error('Hardcover API request exception', [
                 'error' => $e->getMessage(),
             ]);
+
             return null;
         }
     }
@@ -132,6 +138,7 @@ class HardcoverApiService
             'title' => "%$title%",
             'limit' => $limit,
         ]);
+
         return $result['data']['books'] ?? null;
     }
 
@@ -180,6 +187,7 @@ class HardcoverApiService
             }
         ';
         $result = $this->makeGraphQlRequest($query, ['bookId' => $bookId]);
+
         return $result['data']['books_by_pk'] ?? null;
     }
 
@@ -208,6 +216,7 @@ class HardcoverApiService
             'authorName' => $authorName,
             'limit' => $limit,
         ]);
+
         return $result['data']['books'] ?? null;
     }
 }

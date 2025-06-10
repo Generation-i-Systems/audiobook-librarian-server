@@ -10,14 +10,14 @@ class FollowController extends Controller
 {
     public function follow(Request $request, $followableType, $followableId)
     {
-        //Validate input
+        // Validate input
         $request->validate([
             'followable_type' => 'required|in:author,series',
             'followable_id' => 'required|integer',
         ]);
 
         // No need to fetch author/series from Eloquent, just trust input (validated above)
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $firestore->getClient()->collection('follows')->add([
             'user_id' => Auth::id(),
             'followable_type' => $followableType,
@@ -29,13 +29,13 @@ class FollowController extends Controller
 
     public function unfollow(Request $request, $followableType, $followableId)
     {
-        //Validate input
+        // Validate input
         $request->validate([
             'followable_type' => 'required|in:author,series',
             'followable_id' => 'required|integer',
         ]);
         // No need to fetch author/series from Eloquent, just trust input (validated above)
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $follows = $firestore->getClient()->collection('follows')
             ->where('user_id', '=', Auth::id())
             ->where('followable_type', '=', $followableType)

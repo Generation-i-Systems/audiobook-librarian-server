@@ -4,8 +4,6 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Services\FirestoreService;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
 class MessageController extends Controller
@@ -31,10 +29,11 @@ class MessageController extends Controller
 
             return view('admin.messages.index', [
                 'messages' => $messages,
-                'users' => $users
+                'users' => $users,
             ]);
         } catch (\Exception $e) {
-            Log::error('Failed to fetch messages: ' . $e->getMessage());
+            Log::error('Failed to fetch messages: '.$e->getMessage());
+
             return back()->with('error', 'Failed to load messages. Please try again.');
         }
     }
@@ -42,7 +41,7 @@ class MessageController extends Controller
     /**
      * Acknowledge a message
      *
-     * @param string $messageId
+     * @param  string  $messageId
      * @return \Illuminate\Http\RedirectResponse
      */
     public function acknowledge($messageId)
@@ -56,7 +55,8 @@ class MessageController extends Controller
 
             return back()->with('error', 'Failed to acknowledge message.');
         } catch (\Exception $e) {
-            Log::error('Failed to acknowledge message: ' . $e->getMessage());
+            Log::error('Failed to acknowledge message: '.$e->getMessage());
+
             return back()->with('error', 'An error occurred while acknowledging the message.');
         }
     }

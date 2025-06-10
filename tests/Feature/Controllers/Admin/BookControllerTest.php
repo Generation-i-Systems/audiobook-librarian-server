@@ -2,17 +2,21 @@
 
 namespace Tests\Feature\Controllers\Admin;
 
-use Tests\TestCase;
 use Google\Cloud\Firestore\FirestoreClient;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Tests\TestCase;
 
 class BookControllerTest extends TestCase
 {
     protected $firestore;
+
     protected $booksCollection;
+
     protected $genresCollection;
+
     protected $seriesCollection;
+
     protected $admin;
 
     protected function setUp(): void
@@ -76,7 +80,7 @@ class BookControllerTest extends TestCase
         return $userRef->snapshot();
     }
 
-    public function testIndexReturnsBooks()
+    public function test_index_returns_books()
     {
         // Create test books
         $this->booksCollection->add([

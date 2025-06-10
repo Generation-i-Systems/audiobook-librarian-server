@@ -3,11 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Google\Cloud\Core\Timestamp as GoogleTimestamp;
 use App\Services\FirestoreService;
+use Google\Cloud\Core\Timestamp as GoogleTimestamp;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
@@ -38,7 +37,7 @@ class AuthController extends Controller
             ->where('email', '=', $request->email)
             ->documents();
 
-        if (!$existingUser->isEmpty()) {
+        if (! $existingUser->isEmpty()) {
             return response()->json(['email' => ['The email has already been taken.']], 400);
         }
 
@@ -48,7 +47,7 @@ class AuthController extends Controller
             ->where('username', '=', $request->username)
             ->documents();
 
-        if (!$existingUsername->isEmpty()) {
+        if (! $existingUsername->isEmpty()) {
             return response()->json(['username' => ['The username has already been taken.']], 400);
         }
 
@@ -59,8 +58,8 @@ class AuthController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'role' => 'unverified',
-            'created_at' => new GoogleTimestamp(new \DateTime()),
-            'updated_at' => new GoogleTimestamp(new \DateTime()),
+            'created_at' => new GoogleTimestamp(new \DateTime),
+            'updated_at' => new GoogleTimestamp(new \DateTime),
         ];
 
         $userRef = $this->firestore->getClient()
@@ -74,11 +73,11 @@ class AuthController extends Controller
             ->documents();
 
         $messagesRef = $this->firestore->getClient()->collection('messages');
-        $now = new GoogleTimestamp(new \DateTime());
+        $now = new GoogleTimestamp(new \DateTime);
         foreach ($adminUsers as $admin) {
             $messagesRef->add([
                 'user_id' => $admin->id(),
-                'content' => 'New user registered: ' . $request->name . ' (' . $request->email . ')',
+                'content' => 'New user registered: '.$request->name.' ('.$request->email.')',
                 'is_from_admin' => false,
                 'created_at' => $now,
                 'updated_at' => $now,
@@ -118,7 +117,7 @@ class AuthController extends Controller
                 ->documents();
         }
 
-        if ($users->isEmpty() || !Hash::check($request->password, $users->rows()[0]->data()['password'])) {
+        if ($users->isEmpty() || ! Hash::check($request->password, $users->rows()[0]->data()['password'])) {
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
 
@@ -132,14 +131,14 @@ class AuthController extends Controller
         }
 
         // Create a simple token (in a real app, use Laravel Sanctum/Passport)
-        $token = hash('sha256', $userId . now()->timestamp . uniqid());
+        $token = hash('sha256', $userId.now()->timestamp.uniqid());
 
         // Store the token in Firestore
         $client->collection('api_tokens')
             ->add([
                 'user_id' => $userId,
                 'token' => $token,
-                'created_at' => new GoogleTimestamp(new \DateTime()),
+                'created_at' => new GoogleTimestamp(new \DateTime),
                 'expires_at' => new GoogleTimestamp(now()->addDays(30)->toDateTime()),
             ]);
 

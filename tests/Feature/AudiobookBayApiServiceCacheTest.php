@@ -6,13 +6,12 @@ namespace Tests\Feature;
 
 use App\Services\AudiobookBayApiService;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\TestCase;
 
 #[\CoversClass(AudiobookBayApiService::class)]
 class AudiobookBayApiServiceCacheTest extends TestCase
 {
-    public function setUp(): void
+    protected function setUp(): void
     {
         parent::setUp();
         Cache::flush();

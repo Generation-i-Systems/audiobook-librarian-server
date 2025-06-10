@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Services\FirestoreService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use App\Services\FirestoreService;
 
 class MessagesController extends Controller
 {
@@ -13,7 +13,7 @@ class MessagesController extends Controller
     public function index()
     {
         $user = Auth::user();
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         // Get all messages for the current user, sort by is_read and created_at desc
         $messages = [];
         $docs = $firestore->getClient()->collection('messages')->where('to_user_id', '=', $user->id)->documents();
@@ -25,8 +25,10 @@ class MessagesController extends Controller
             if (($a['is_read'] ?? false) == ($b['is_read'] ?? false)) {
                 return strtotime($b['created_at'] ?? '') <=> strtotime($a['created_at'] ?? '');
             }
+
             return ($a['is_read'] ?? false) <=> ($b['is_read'] ?? false);
         });
+
         return view('admin.messages.index', compact('messages'));
     }
 
@@ -34,12 +36,13 @@ class MessagesController extends Controller
     public function show($id)
     {
         $user = Auth::user();
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $doc = $firestore->getClient()->collection('messages')->document($id)->snapshot();
-        if (!$doc->exists() || ($doc->data()['to_user_id'] ?? null) != $user->id) {
+        if (! $doc->exists() || ($doc->data()['to_user_id'] ?? null) != $user->id) {
             abort(404);
         }
         $message = $doc->data();
+
         return view('admin.messages.show', compact('message'));
     }
 
@@ -47,21 +50,23 @@ class MessagesController extends Controller
     public function markAsRead($id)
     {
         $user = Auth::user();
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $docRef = $firestore->getClient()->collection('messages')->document($id);
         $doc = $docRef->snapshot();
-        if (!$doc->exists() || ($doc->data()['to_user_id'] ?? null) != $user->id) {
+        if (! $doc->exists() || ($doc->data()['to_user_id'] ?? null) != $user->id) {
             return response()->json(['success' => false, 'error' => 'Message not found'], 404);
         }
         $docRef->update([['path' => 'is_read', 'value' => true]]);
+
         return response()->json(['success' => true]);
     }
 
     // Show create message form
     public function create()
     {
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $users = $firestore->getClient()->collection('users')->documents();
+
         return view('admin.messages.create', compact('users'));
     }
 
@@ -75,8 +80,9 @@ class MessagesController extends Controller
         ]);
         $data['from_user_id'] = Auth::id();
         $data['is_read'] = false;
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $firestore->getClient()->collection('messages')->add($data);
+
         return redirect()->route('admin.messages.index')->with('success', 'Message sent.');
     }
 }

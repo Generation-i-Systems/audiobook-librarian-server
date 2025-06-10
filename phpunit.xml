@@ -26,6 +26,7 @@
     <server name="TELESCOPE_ENABLED" value="false"/>
     <server name="FIREBASE_PROJECT_ID" value="ab-librarian"/>
     <server name="FIREBASE_CREDENTIALS" value="storage/app/private/ab-librarian-firebase-adminsdk-fbsvc-ba5d49c1fd.json"/>
+    <server name="GCLOUD_PROJECT" value="ab-librarian"/>
   </php>
   <source>
     <include>

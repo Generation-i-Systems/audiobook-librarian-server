@@ -1,13 +1,13 @@
 <?php
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BookApiController;
 use App\Http\Controllers\Api\BookRequestApiController;
 use App\Http\Controllers\Api\FollowApiController;
-use App\Http\Controllers\Api\ReadingProgressApiController;
 use App\Http\Controllers\Api\MessageApiController;
+use App\Http\Controllers\Api\ReadingProgressApiController;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
     Route::get('/books/{book}/cover', [BookApiController::class, 'cover']);
@@ -50,7 +50,7 @@ Route::prefix('v1')->group(function () {
         // Book Request Route
         Route::post('/book-requests', [BookRequestApiController::class, 'store']);
 
-        //Follow and Unfollow routes
+        // Follow and Unfollow routes
         Route::post('/follow/{followableType}/{followableId}', [FollowApiController::class, 'follow']);
         Route::delete('/unfollow/{followableType}/{followableId}', [FollowApiController::class, 'unfollow']);
 

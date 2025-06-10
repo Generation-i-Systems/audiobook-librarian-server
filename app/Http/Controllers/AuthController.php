@@ -10,11 +10,12 @@ use Illuminate\Support\Facades\Validator;
 class AuthController extends Controller
 {
     protected $firestore;
+
     protected $firestoreUserProvider;
 
     public function __construct()
     {
-        $this->firestore = new FirestoreService();
+        $this->firestore = new FirestoreService;
     }
 
     public function register(Request $request)

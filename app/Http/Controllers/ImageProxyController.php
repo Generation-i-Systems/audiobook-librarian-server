@@ -2,10 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use GuzzleHttp\Client;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Http\Request;
 
 class ImageProxyController extends Controller
 {
@@ -20,21 +18,22 @@ class ImageProxyController extends Controller
 
         $dir = $request->query('dir') ?? '.';
         $file = $request->query('file');
-        if (!$file) {
+        if (! $file) {
             abort(404);
         }
-        if ($dir !== '.' && is_dir(rtrim($storagePath, '/') . '/' . ltrim($dir, '/'))) {
-            $file = rtrim($dir, '/') . '/' . $file;
+        if ($dir !== '.' && is_dir(rtrim($storagePath, '/').'/'.ltrim($dir, '/'))) {
+            $file = rtrim($dir, '/').'/'.$file;
         }
 
-        if ($dir !== '.' && !is_dir(rtrim($storagePath, '/') . '/' . ltrim($dir, '/'))) {
+        if ($dir !== '.' && ! is_dir(rtrim($storagePath, '/').'/'.ltrim($dir, '/'))) {
             abort(404);
         }
-        $fullPath = rtrim($storagePath, '/') . '/' . ltrim($file, '/');
-        if (!file_exists($fullPath)) {
+        $fullPath = rtrim($storagePath, '/').'/'.ltrim($file, '/');
+        if (! file_exists($fullPath)) {
             abort(404);
         }
         $mime = mime_content_type($fullPath);
+
         return response()->file($fullPath, [
             'Content-Type' => $mime,
         ]);
@@ -47,11 +46,12 @@ class ImageProxyController extends Controller
     public function cover($path)
     {
         $storagePath = env('BOOK_STORAGE_PATH');
-        $fullPath = rtrim($storagePath, '/') . '/' . ltrim($path, '/');
-        if (!file_exists($fullPath)) {
+        $fullPath = rtrim($storagePath, '/').'/'.ltrim($path, '/');
+        if (! file_exists($fullPath)) {
             abort(404);
         }
         $mime = mime_content_type($fullPath);
+
         return response()->file($fullPath, [
             'Content-Type' => $mime,
         ]);
@@ -66,12 +66,13 @@ class ImageProxyController extends Controller
     {
         $url = base64_decode($encodedUrl);
         // Only allow books.google.com URLs
-        if (!preg_match('#^https?://books\\.google\\.com/#', $url)) {
+        if (! preg_match('#^https?://books\\.google\\.com/#', $url)) {
             abort(403, 'Invalid Google Books cover URL.');
         }
         $client = new Client(['verify' => false, 'timeout' => 10]);
         try {
             $response = $client->get($url, ['stream' => true]);
+
             return response($response->getBody(), 200)
                 ->header('Content-Type', $response->getHeaderLine('Content-Type'))
                 ->header('Cache-Control', 'public, max-age=86400');

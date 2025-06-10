@@ -1,18 +1,23 @@
 <?php
+
 namespace App\Services;
 
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class AudibleApiService
 {
     // --- Begin inlined BaseApiTrait properties ---
     protected string $baseUrl = '';
+
     protected ?string $apiKey = null;
+
     protected int $cacheTtl = 86400; // 24 hours in seconds
+
     protected int $rateLimit = 100; // Requests per hour
+
     protected string $serviceName = '';
     // --- End inlined BaseApiTrait properties ---
 
@@ -23,10 +28,11 @@ class AudibleApiService
     protected function httpGet(string $endpoint, array $params = []): ?\Illuminate\Http\Client\Response
     {
         $cacheKey = $this->getCacheKey($endpoint, $params);
+
         return Cache::remember($cacheKey, $this->cacheTtl, function () use ($endpoint, $params) {
             $this->checkRateLimit();
             $response = Http::withHeaders($this->getDefaultHeaders())
-                ->get($this->baseUrl . $endpoint, $params);
+                ->get($this->baseUrl.$endpoint, $params);
             if ($response->successful()) {
                 return $response;
             }
@@ -36,19 +42,22 @@ class AudibleApiService
                 'status' => $response->status(),
                 'response' => $response->body(),
             ]);
+
             return null;
         });
     }
+
     /**
      * Make an HTTP POST request (inlined from BaseApiTrait)
      */
     protected function httpPost(string $endpoint, array $data = []): ?\Illuminate\Http\Client\Response
     {
         $cacheKey = $this->getCacheKey($endpoint, $data);
+
         return Cache::remember($cacheKey, $this->cacheTtl, function () use ($endpoint, $data) {
             $this->checkRateLimit();
             $response = Http::withHeaders($this->getDefaultHeaders())
-                ->post($this->baseUrl . $endpoint, $data);
+                ->post($this->baseUrl.$endpoint, $data);
             if ($response->successful()) {
                 return $response;
             }
@@ -58,15 +67,17 @@ class AudibleApiService
                 'status' => $response->status(),
                 'response' => $response->body(),
             ]);
+
             return null;
         });
     }
+
     /**
      * Check and enforce rate limiting (inlined from BaseApiTrait)
      */
     protected function checkRateLimit(): void
     {
-        $cacheKey = "{$this->serviceName}_rate_limit_" . now()->format('YmdH');
+        $cacheKey = "{$this->serviceName}_rate_limit_".now()->format('YmdH');
         $count = Cache::get($cacheKey, 0);
         if ($count >= $this->rateLimit) {
             Log::warning('API rate limit reached', ['service' => $this->serviceName]);
@@ -74,51 +85,62 @@ class AudibleApiService
         }
         Cache::put($cacheKey, $count + 1, now()->addHour());
     }
+
     /**
      * Generate a cache key for the request (inlined from BaseApiTrait)
      */
     protected function getCacheKey(string $endpoint, array $params): string
     {
-        return "{$this->serviceName}_" . md5($endpoint . json_encode($params));
+        return "{$this->serviceName}_".md5($endpoint.json_encode($params));
     }
+
     /**
      * Set the API key (inlined from BaseApiTrait)
      */
     public function setApiKey(string $apiKey): self
     {
         $this->apiKey = $apiKey;
+
         return $this;
     }
+
     /**
      * Set the base URL (inlined from BaseApiTrait)
      */
     public function setBaseUrl(string $baseUrl): self
     {
         $this->baseUrl = rtrim($baseUrl, '/');
+
         return $this;
     }
+
     /**
      * Set the cache TTL in seconds (inlined from BaseApiTrait)
      */
     public function setCacheTtl(int $seconds): self
     {
         $this->cacheTtl = $seconds;
+
         return $this;
     }
+
     /**
      * Set the rate limit (requests per hour) (inlined from BaseApiTrait)
      */
     public function setRateLimit(int $requestsPerHour): self
     {
         $this->rateLimit = $requestsPerHour;
+
         return $this;
     }
+
     /**
      * Set the service name (inlined from BaseApiTrait)
      */
     public function setServiceName(string $serviceName): self
     {
         $this->serviceName = $serviceName;
+
         return $this;
     }
     // --- End inlined BaseApiTrait methods ---
@@ -133,15 +155,20 @@ class AudibleApiService
             'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36',
         ];
         if ($this->apiKey) {
-            $headers['Authorization'] = 'Bearer ' . $this->apiKey;
+            $headers['Authorization'] = 'Bearer '.$this->apiKey;
         }
+
         return $headers;
     }
 
     protected ?string $audibleAccessKey = null;
+
     protected ?string $audibleSecretKey = null;
+
     protected ?string $audibleAssociateTag = null;
+
     protected string $audibleRegion = 'us'; // Default region
+
     protected ?float $lastRequestTime = null;
 
     public function __construct(array $config = [])
@@ -152,9 +179,9 @@ class AudibleApiService
 
         // Ensure region defaults to 'us' if config provides an empty or null value
         $configuredRegion = $config['region'] ?? config('services.audible.region');
-        $this->audibleRegion = !empty($configuredRegion) ? $configuredRegion : 'us';
+        $this->audibleRegion = ! empty($configuredRegion) ? $configuredRegion : 'us';
 
-        $this->baseUrl = "https://api.audible." . $this->audibleRegion . "/1.0";
+        $this->baseUrl = 'https://api.audible.'.$this->audibleRegion.'/1.0';
 
         $this->serviceName = 'Audible'; // Set service name for BaseApiTrait
 
@@ -213,7 +240,7 @@ class AudibleApiService
         $isPayloadEmptyForSearch = empty($payload);
         $isItemSetInPayloadForSearch = isset($payload['Item']);
 
-        if ($isPayloadEmptyForSearch || !$isItemSetInPayloadForSearch) {
+        if ($isPayloadEmptyForSearch || ! $isItemSetInPayloadForSearch) {
             return [];
         }
 
@@ -246,7 +273,7 @@ class AudibleApiService
         $isPayloadEmptyForDetails = empty($payload);
         $isItemSetInPayloadForDetails = isset($payload['Item']);
 
-        if ($isPayloadEmptyForDetails || !$isItemSetInPayloadForDetails) {
+        if ($isPayloadEmptyForDetails || ! $isItemSetInPayloadForDetails) {
             return null;
         }
 
@@ -265,6 +292,7 @@ class AudibleApiService
                 'AudibleApiService: Failed to format audiobook details.',
                 ['asin' => $asin, 'response_item' => $itemToFormat]
             );
+
             return null;
         }
 
@@ -301,6 +329,7 @@ class AudibleApiService
         // Placeholder: Actual implementation would require BrowseNodeLookup or parsing from items.
         Log::info('AudibleApiService: getCategories() called.');
         Log::info('This is a placeholder and may not return live categories.');
+
         // Example: Fetch a popular item and extract its browse nodes as a starting point,
         // or use a known root node ID.
         // $params = [
@@ -319,6 +348,7 @@ class AudibleApiService
     {
         if (empty($this->audibleAccessKey) || empty($this->audibleSecretKey) || empty($this->audibleAssociateTag)) {
             Log::error('AudibleApiService: Attempted to make a signed request without complete API credentials.');
+
             return null;
         }
 
@@ -335,11 +365,11 @@ class AudibleApiService
 
         $canonicalQueryString = [];
         foreach ($params as $key => $value) {
-            $canonicalQueryString[] = $this->urlEncode($key) . '=' . $this->urlEncode($value);
+            $canonicalQueryString[] = $this->urlEncode($key).'='.$this->urlEncode($value);
         }
         $canonicalQueryString = implode('&', $canonicalQueryString);
 
-        $stringToSign = "GET\napi.audible." . $this->audibleRegion . "\n/1.0" . $path . "\n" . $canonicalQueryString;
+        $stringToSign = "GET\napi.audible.".$this->audibleRegion."\n/1.0".$path."\n".$canonicalQueryString;
         $signature = base64_encode(hash_hmac('sha256', $stringToSign, $this->audibleSecretKey, true));
         $params['Signature'] = $signature;
 
@@ -351,7 +381,7 @@ class AudibleApiService
      */
     protected function makeAudibleRequest(string $path, array $params): ?array
     {
-        $fullUrl = $this->baseUrl . $path;
+        $fullUrl = $this->baseUrl.$path;
         $cacheKey = $this->getCacheKey($fullUrl, $params); // Use BaseApiTrait's cache key generation
 
         $response = Cache::remember($cacheKey, $this->cacheTtl, function () use ($fullUrl, $params) {
@@ -369,8 +399,10 @@ class AudibleApiService
                     $xml = simplexml_load_string($httpResponse->body());
                     $json = json_encode($xml);
                     $decodedJson = json_decode($json, true);
+
                     return $decodedJson;
                 }
+
                 return $httpResponse->json();
             }
 
@@ -381,6 +413,7 @@ class AudibleApiService
                 'status' => $httpResponse->status(),
                 'response' => $httpResponse->body(),
             ]);
+
             return null;
         });
 
@@ -418,7 +451,7 @@ class AudibleApiService
             $description = $editorialReview['Content'];
         } elseif (is_string($editorialReview)) {
             $description = $editorialReview;
-        } elseif (is_array($editorialReview) && !empty($editorialReview)) {
+        } elseif (is_array($editorialReview) && ! empty($editorialReview)) {
             // If it's an array of reviews, pick the first one's content
             $firstReview = reset($editorialReview);
             if (is_array($firstReview) && isset($firstReview['Content'])) {
@@ -453,7 +486,7 @@ class AudibleApiService
             'url' => $item['DetailPageURL'] ?? null,
             'language' => $itemAttributes['Languages']['Language'][0]['Name'] ?? ($itemAttributes['Language'] ?? null),
             'format' => 'Audible Audiobook',
-            'series' => (isset($itemAttributes['SeriesSequence']) && !empty($itemAttributes['SeriesSequence']))
+            'series' => (isset($itemAttributes['SeriesSequence']) && ! empty($itemAttributes['SeriesSequence']))
                 ? [['name' => $itemAttributes['Title'] ?? 'N/A', 'part' => $itemAttributes['SeriesSequence']]]
                 : [],
             'tags' => [], // Audible API doesn't directly provide tags like user tags
@@ -478,7 +511,7 @@ class AudibleApiService
 
         // If it's an array of strings
         if (is_array($contributors) && isset($contributors[0]) && is_string($contributors[0])) {
-            return array_map(fn($name) => ['name' => $name], $contributors);
+            return array_map(fn ($name) => ['name' => $name], $contributors);
         }
 
         // If it's an array of ['Role' => ..., 'Contributor' => ...] or similar structures
@@ -501,8 +534,10 @@ class AudibleApiService
                 }
             }
         }
+
         return $extracted;
     }
+
     /**
      * Extract genres from browse nodes
      */
@@ -544,7 +579,7 @@ class AudibleApiService
      */
     protected function extractGenresRecursive(array $node, array &$genres): void
     {
-        if (!empty($node['Name'])) {
+        if (! empty($node['Name'])) {
             $genres[] = [
                 'id' => $node['BrowseNodeId'] ?? null,
                 'name' => $node['Name'],
@@ -552,7 +587,7 @@ class AudibleApiService
             ];
         }
 
-        if (!empty($node['Children']['BrowseNode'])) {
+        if (! empty($node['Children']['BrowseNode'])) {
             $childrenData = $node['Children']['BrowseNode'];
             $children = [];
             if (isset($childrenData[0]) && is_array($childrenData[0])) {
@@ -568,7 +603,7 @@ class AudibleApiService
             }
         }
 
-        if (!empty($node['Ancestors']['BrowseNode'])) {
+        if (! empty($node['Ancestors']['BrowseNode'])) {
             $ancestorsData = $node['Ancestors']['BrowseNode'];
             $ancestors = [];
             if (isset($ancestorsData[0]) && is_array($ancestorsData[0])) {
@@ -578,7 +613,7 @@ class AudibleApiService
             }
 
             foreach ($ancestors as $ancestorNode) {
-                if (is_array($ancestorNode) && !empty($ancestorNode['Name']) && !empty($ancestorNode['BrowseNodeId'])) {
+                if (is_array($ancestorNode) && ! empty($ancestorNode['Name']) && ! empty($ancestorNode['BrowseNodeId'])) {
                     $isAlreadyAdded = false;
                     foreach ($genres as $g) {
                         if (($g['id'] ?? null) === ($ancestorNode['BrowseNodeId'] ?? null)) {
@@ -586,7 +621,7 @@ class AudibleApiService
                             break;
                         }
                     }
-                    if (!$isAlreadyAdded) {
+                    if (! $isAlreadyAdded) {
                         $genres[] = [
                             'id' => $ancestorNode['BrowseNodeId'],
                             'name' => $ancestorNode['Name'],
@@ -605,7 +640,7 @@ class AudibleApiService
     {
         $path = [];
 
-        if (!empty($node['Ancestors']['BrowseNode'])) {
+        if (! empty($node['Ancestors']['BrowseNode'])) {
             $ancestorNodesData = $node['Ancestors']['BrowseNode'];
             $ancestors = [];
 
@@ -616,13 +651,13 @@ class AudibleApiService
             }
 
             foreach ($ancestors as $ancestor) {
-                if (is_array($ancestor) && !empty($ancestor['Name'])) {
+                if (is_array($ancestor) && ! empty($ancestor['Name'])) {
                     array_unshift($path, $ancestor['Name']);
                 }
             }
         }
 
-        if (!empty($node['Name'])) {
+        if (! empty($node['Name'])) {
             $path[] = $node['Name'];
         }
 
@@ -654,13 +689,14 @@ class AudibleApiService
 
         $results = [];
         foreach ($processedItems as $key => $singleItem) {
-            if (empty($singleItem) || !is_array($singleItem)) {
+            if (empty($singleItem) || ! is_array($singleItem)) {
                 // Optionally log a warning here if skipping items is unexpected in normal operation
                 continue;
             }
             $formattedBook = $this->formatBookResponse($singleItem);
             $results[] = $formattedBook;
         }
+
         return $results;
     }
 
@@ -670,6 +706,7 @@ class AudibleApiService
     public function downloadCoverImage(string $imageUrl, string $directoryPath, string $targetBasename): ?string
     {
         Log::info('downloadCoverImage not implemented for AudibleApiService');
+
         return null;
     }
 }

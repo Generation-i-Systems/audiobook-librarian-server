@@ -4,14 +4,13 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Monolog\Logger;
-use Monolog\Handler\StreamHandler;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class AudibleService extends BaseBookService
 {
     public int $apiCallCount = 0;
+
     protected string $baseUrl = 'https://api.audible.com/1.0/catalog';
 
     public function getServiceName(): string
@@ -22,39 +21,10 @@ class AudibleService extends BaseBookService
     protected function performSearch(string $query, array $options = []): ?array
     {
         Log::info(
-            'AudibleService: performSearch called (using Log facade).',
+            'AudibleService: performSearch called.',
             ['query' => $query, 'options' => $options]
-        );
-        error_log(
-            'AudibleService: performSearch called (using error_log). ' .
-            json_encode(['query' => $query, 'options' => $options])
         );
 
-        // Dedicated logger for this method's debug
-        $serviceLogPath = storage_path('logs/audible_service_debug.log');
-        $serviceLogger = null;
-        try {
-            $serviceLogger = new \Monolog\Logger('audible_service_debug');
-            $serviceLogger->pushHandler(new \Monolog\Handler\StreamHandler($serviceLogPath, \Monolog\Logger::DEBUG));
-            $serviceLogger->info(
-                'AudibleService: performSearch - Dedicated logger initialized.',
-                ['path' => $serviceLogPath]
-            );
-        } catch (\Exception $e) {
-            Log::error(
-                'AudibleService: Failed to create dedicated serviceLogger for performSearch. ' .
-                'Falling back to default Log.',
-                [
-                    'error' => $e->getMessage(),
-                ]
-            );
-            // Use the default Log facade if custom logger fails
-            $serviceLogger = Log::channel(); // Or simply use Log::info(), Log::error() directly
-        }
-        $serviceLogger->info(
-            'AudibleService: performSearch called (using serviceLogger).',
-            ['query' => $query, 'options' => $options]
-        );
         $this->apiCallCount++;
         $requestUrl = $this->baseUrl . '/products';
 
@@ -66,55 +36,29 @@ class AudibleService extends BaseBookService
             if (preg_match('/^(.*?)\s+by\s+(.+)$/i', $titleFromQuery, $matches)) {
                 $titleFromQuery = trim($matches[1]);
                 $authorFromOptions = trim($matches[2]);
-                $serviceLogger->info(
-                    'AudibleService: performSearch - Parsed author from query.',
-                    [
-                        'original_query' => $query,
-                        'parsed_title' => $titleFromQuery,
-                        'parsed_author' => $authorFromOptions,
-                    ]
-                );
             }
         }
 
         $params = [
             'title' => $titleFromQuery,
-            'response_groups' =>
-                'product_attrs,product_desc,product_extended_attrs,series,contributors,media',
+            'response_groups' => 'product_attrs,product_desc,product_extended_attrs,series,contributors,media',
         ];
 
         if (!empty($authorFromOptions)) {
             $params['author'] = $authorFromOptions;
         }
-        $serviceLogger->info(
-            'AudibleService: performSearch - Requesting URL.',
-            ['url' => $requestUrl, 'params' => $params]
-        );
+
         $response = Http::timeout(15)->get($requestUrl, $params);
 
-        $serviceLogger->info(
-            'AudibleService: performSearch - Raw API Response.',
-            [
-                'status' => $response->status(),
-                'body' => print_r($response->body(), true),
-            ]
-        );
-        Log::info(
-            'AudibleService: performSearch - Raw API Response.',
-            [
-                'status' => $response->status(),
-                'body' => print_r($response->body(), true),
-            ]
-        );
-
         if (!$response->successful()) {
-            $serviceLogger->error(
+            Log::error(
                 'Audible API search failed.',
                 [
                     'query' => $query,
                     'status' => $response->status(),
                 ]
             );
+
             return null;
         }
 
@@ -131,8 +75,7 @@ class AudibleService extends BaseBookService
     {
         $this->apiCallCount++;
         $response = Http::timeout(15)->get($this->baseUrl . '/products/' . $id, [
-            'response_groups' =>
-                'product_attrs,product_desc,product_extended_attrs,series,contributors,media,product_images',
+            'response_groups' => 'product_attrs,product_desc,product_extended_attrs,series,contributors,media,product_images',
         ]);
 
         if (!$response->successful()) {
@@ -140,6 +83,7 @@ class AudibleService extends BaseBookService
                 'Audible API get book details failed.',
                 ['id' => $id, 'status' => $response->status()]
             );
+
             return null;
         }
 
@@ -153,11 +97,14 @@ class AudibleService extends BaseBookService
 
     public function downloadCoverImage(string $imageUrl, string $asin, string $subDirectoryPrefix = 'covers'): ?string
     {
+        error_log("###### " . __LINE__);
         if (empty($imageUrl) || empty($asin)) {
+            error_log("###### " . __LINE__);
             Log::warning(
                 'AudibleService: downloadCoverImage called with empty imageUrl or asin.',
                 compact('imageUrl', 'asin')
             );
+
             return null;
         }
 
@@ -169,33 +116,47 @@ class AudibleService extends BaseBookService
                     'url' => $imageUrl,
                     'status' => $response->status(),
                 ]);
+
+                error_log("###### " . __LINE__);
                 return null;
             }
+            error_log("###### " . __LINE__);
 
             $imageContents = $response->body();
             $extension = $this->getImageExtension($response->header('Content-Type'), $imageUrl);
 
             $fileName = $asin . '.' . $extension;
             $fullDirectoryPath = ltrim(rtrim($subDirectoryPrefix, '/'), '/');
-            $filePath = ($fullDirectoryPath ? $fullDirectoryPath . '/' : '') . $fileName;
+            $filePath = ($fullDirectoryPath ? $fullDirectoryPath . '/' . $fileName : $fileName);
 
             if ($fullDirectoryPath && !Storage::disk('public')->exists($fullDirectoryPath)) {
                 Storage::disk('public')->makeDirectory($fullDirectoryPath);
             }
 
             if (Storage::disk('public')->put($filePath, $imageContents)) {
+                error_log("###### " . __LINE__);
+                Log::debug('AudibleService: Cover image downloaded successfully.');
+                error_log("###### " . __LINE__);
+
                 Log::info('AudibleService: Cover image downloaded successfully.', ['path' => $filePath]);
+                error_log("###### " . __LINE__);
+
                 return $filePath;
             }
 
             Log::error('AudibleService: Failed to save image to storage.', ['path' => $filePath]);
+
+            error_log("###### " . __LINE__);
             return null;
         } catch (\Exception $e) {
+            error_log("###### " . __LINE__ . " " . $e->getMessage());
             Log::error('AudibleService: Exception during downloadCoverImage.', [
                 'message' => $e->getMessage(),
                 'trace' => Str::limit($e->getTraceAsString(), 1000),
                 'url' => $imageUrl,
             ]);
+
+            error_log("###### " . __LINE__);
             return null;
         }
     }
@@ -213,7 +174,7 @@ class AudibleService extends BaseBookService
                         $authorsData[] = [
                             'author' => [
                                 'name' => $contributor['name'],
-                                'id' => $contributor['asin'] ?? null
+                                'id' => $contributor['asin'] ?? null,
                             ],
                         ];
                     }
@@ -221,7 +182,7 @@ class AudibleService extends BaseBookService
                         $narratorsData[] = [
                             'narrator' => [
                                 'name' => $contributor['name'],
-                                'id' => $contributor['asin'] ?? null
+                                'id' => $contributor['asin'] ?? null,
                             ],
                         ];
                     }
@@ -276,6 +237,7 @@ class AudibleService extends BaseBookService
             'release_date' => $book['release_date'] ?? null,
             'runtime' => $book['runtime_length_min'] ?? null,
             'publisher' => ['name' => $book['publisher_name'] ?? null],
+            'language' => $book['language'] ?? null,
         ];
     }
 
@@ -308,6 +270,7 @@ class AudibleService extends BaseBookService
             'AudibleService: Could not determine image extension, defaulting to jpg.',
             ['url' => $imageUrl, 'contentType' => $contentType]
         );
+
         return 'jpg';
     }
 }

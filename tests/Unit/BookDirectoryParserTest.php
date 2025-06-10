@@ -2,21 +2,21 @@
 
 namespace Tests\Unit;
 
+use App\Services\AudioFileAnalyzer;
 use App\Services\BookDirectoryParser;
 use App\Services\BookMetadataService;
 use Illuminate\Support\Facades\Config;
+use org\bovigo\vfs\vfsStream;
+use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\MockObject\MockObject;
 use Tests\TestCase;
-use org\bovigo\vfs\vfsStream;
-use App\Services\AudioFileAnalyzer;
-use PHPUnit\Framework\Attributes\Test;
 
 class BookDirectoryParserTest extends TestCase
 {
     #[Test]
-    public function testExtractAuthorFromPathWithGenreAndSubgenre()
+    public function test_extract_author_from_path_with_genre_and_subgenre()
     {
-        $parser = new BookDirectoryParser();
+        $parser = new BookDirectoryParser;
         // Patch: set genres so 'Fantasy' is recognized and skipped
         $reflection = new \ReflectionClass($parser);
         $genresProp = $reflection->getProperty('genres');
@@ -39,8 +39,11 @@ class BookDirectoryParserTest extends TestCase
     }
 
     private BookDirectoryParser $parser;
+
     private $root;
+
     private BookMetadataService|MockObject $mockMetadataService;
+
     private AudioFileAnalyzer|MockObject $mockAudioAnalyzer;
 
     protected function setUp(): void
@@ -82,14 +85,14 @@ class BookDirectoryParserTest extends TestCase
     }
 
     #[Test]
-    public function testParsesAuthorTitleDirectoryStructure()
+    public function test_parses_author_title_directory_structure()
     {
         // Skipping due to vfsStream/Symfony Finder incompatibility
         $this->markTestSkipped('parseDirectory cannot be tested with vfsStream due to Symfony Finder limitations.');
     }
 
     #[Test]
-    public function testParsesAuthorSeriesTitleDirectoryStructure()
+    public function test_parses_author_series_title_directory_structure()
     {
         // Create directory structure: /genre/author/series/title/
         $structure = [
@@ -100,10 +103,10 @@ class BookDirectoryParserTest extends TestCase
                             'The Way of Kings' => [
                                 'file1.mp3' => 'audio content',
                                 'file2.mp3' => 'audio content',
-                                'metadata.abs' => "title=The Way of Kings\n" .
-                                    "author=Brandon Sanderson\n" .
-                                    "series=The Stormlight Archive\n" .
-                                    "series_number=1"
+                                'metadata.abs' => "title=The Way of Kings\n".
+                                    "author=Brandon Sanderson\n".
+                                    "series=The Stormlight Archive\n".
+                                    'series_number=1',
                             ],
                         ],
                     ],
@@ -136,14 +139,14 @@ class BookDirectoryParserTest extends TestCase
     }
 
     #[Test]
-    public function testMarksBooksWithoutAuthorAsNeedingReview()
+    public function test_marks_books_without_author_as_needing_review()
     {
         // Skipping due to vfsStream/Symfony Finder incompatibility
         $this->markTestSkipped('parseDirectory cannot be tested with vfsStream due to Symfony Finder limitations.');
     }
 
     #[Test]
-    public function testSkipsDirectoriesWithoutAudioFiles()
+    public function test_skips_directories_without_audio_files()
     {
         // Create directory structure with a directory that has no audio files
         $structure = [
@@ -165,7 +168,7 @@ class BookDirectoryParserTest extends TestCase
     }
 
     #[Test]
-    public function testHandlesMetadataAbsFiles()
+    public function test_handles_metadata_abs_files()
     {
         // Create directory structure with metadata.abs file
         $structure = [
@@ -174,13 +177,13 @@ class BookDirectoryParserTest extends TestCase
                     'Frank Herbert' => [
                         'Dune' => [
                             'file1.mp3' => 'audio content',
-                            'metadata.abs' => ";ABMETADATA2\n" .
-                                "#audiobookshelf v2.4.4\n\n" .
-                                "title=Dune\n" .
-                                "author=Frank Herbert\n" .
-                                "series=Dune\n" .
-                                "series_number=1\n\n[description]\n" .
-                                "A brilliant science fiction novel.\n\n"
+                            'metadata.abs' => ";ABMETADATA2\n".
+                                "#audiobookshelf v2.4.4\n\n".
+                                "title=Dune\n".
+                                "author=Frank Herbert\n".
+                                "series=Dune\n".
+                                "series_number=1\n\n[description]\n".
+                                "A brilliant science fiction novel.\n\n",
                         ],
                     ],
                 ],
@@ -209,7 +212,7 @@ class BookDirectoryParserTest extends TestCase
     }
 
     #[Test]
-    public function testHandlesMultipleAudioFiles()
+    public function test_handles_multiple_audio_files()
     {
         // Create a book with multiple audio files
         $structure = [
@@ -221,10 +224,10 @@ class BookDirectoryParserTest extends TestCase
                                 'file1.mp3' => 'audio content',
                                 'file2.mp3' => 'audio content',
                                 'file3.mp3' => 'audio content',
-                                'metadata.abs' => "title=The Fellowship of the Ring\n" .
-                                    "author=J.R.R. Tolkien\n" .
-                                    "series=The Lord of the Rings\n" .
-                                    "series_number=1"
+                                'metadata.abs' => "title=The Fellowship of the Ring\n".
+                                    "author=J.R.R. Tolkien\n".
+                                    "series=The Lord of the Rings\n".
+                                    'series_number=1',
                             ],
                         ],
                     ],
@@ -242,7 +245,7 @@ class BookDirectoryParserTest extends TestCase
             ->willReturn([]);
 
         $filePath = 'testDir/books/Fantasy/J.R.R. Tolkien/The Lord of the Rings/'
-            . '01 - The Fellowship of the Ring/file1.mp3';
+            .'01 - The Fellowship of the Ring/file1.mp3';
         $file = vfsStream::url($filePath);
         $reflection = new \ReflectionClass($this->parser);
         $method = $reflection->getMethod('parseBookFile');
@@ -253,7 +256,7 @@ class BookDirectoryParserTest extends TestCase
     }
 
     #[Test]
-    public function testHandlesEmptyDirectoriesGracefully()
+    public function test_handles_empty_directories_gracefully()
     {
         // Create empty directory structure
         $structure = [
@@ -267,18 +270,18 @@ class BookDirectoryParserTest extends TestCase
     }
 
     #[Test]
-    public function testHandlesInvalidPathsGracefully()
+    public function test_handles_invalid_paths_gracefully()
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Directory does not exist');
 
         // Use a non-existent path that's guaranteed to not exist
-        $nonExistentPath = sys_get_temp_dir() . '/nonexistent_path_' . uniqid();
+        $nonExistentPath = sys_get_temp_dir().'/nonexistent_path_'.uniqid();
         $this->parser->parseDirectory($nonExistentPath);
     }
 
     #[Test]
-    public function readsMetadataFromAbsFile()
+    public function reads_metadata_from_abs_file()
     {
         // Configure the mock to return no metadata, forcing fallback to file
         $this->mockMetadataService->method('generateBookId')
@@ -290,7 +293,7 @@ class BookDirectoryParserTest extends TestCase
         // Create a metadata file in the virtual filesystem
 
         // Create a test metadata.abs file
-        $metadataContent = <<<EOT
+        $metadataContent = <<<'EOT'
 ;ABMETADATA2
 #audiobookshelf v2.4.4
 
@@ -317,8 +320,7 @@ EOT;
 
         // Call the method with the virtual directory path
         $directoryPath = vfsStream::url('testDir');
-        $metadataFilePath = $directoryPath . '/metadata.abs';
-
+        $metadataFilePath = $directoryPath.'/metadata.abs';
 
         $result = $this->parser->readMetadataFile($metadataFilePath);
 
@@ -339,7 +341,7 @@ EOT;
             ->willReturn([]);
 
         // Test with non-existent directory - should return array with empty values
-        $result = $this->parser->readMetadataFile(vfsStream::url('non_existent_dir') . '/metadata.abs');
+        $result = $this->parser->readMetadataFile(vfsStream::url('non_existent_dir').'/metadata.abs');
         $this->assertIsArray($result);
         $this->assertEquals([], $result);
 
@@ -359,7 +361,7 @@ EOT;
     }
 
     #[Test]
-    public function doesNotIncludeEmptyValues()
+    public function does_not_include_empty_values()
     {
         $metadataContent = "title=\nseries=Test Series\nnarrator=\nauthors=\ndescription=\npublishedYear=2023";
 
@@ -393,7 +395,7 @@ EOT;
     }
 
     #[Test]
-    public function handlesNestedDirectories()
+    public function handles_nested_directories()
     {
         // Create the full path for the nested directory
         $nestedPath = 'nested/dir/structure';
@@ -401,7 +403,7 @@ EOT;
         // Create each directory level separately
         $currentDir = $this->root;
         foreach (explode('/', $nestedPath) as $dir) {
-            if (!$currentDir->hasChild($dir)) {
+            if (! $currentDir->hasChild($dir)) {
                 $currentDir = vfsStream::newDirectory($dir, 0777)->at($currentDir);
             } else {
                 $currentDir = $currentDir->getChild($dir);
@@ -409,11 +411,11 @@ EOT;
         }
 
         // Create a metadata file in the nested directory
-        $metadataContent = ";ABMETADATA2\n" .
-            "title=Nested Book\n" .
-            "author=Nested Author\n" .
-            "series=Nested Series\n" .
-            "publishedYear=2023";
+        $metadataContent = ";ABMETADATA2\n".
+            "title=Nested Book\n".
+            "author=Nested Author\n".
+            "series=Nested Series\n".
+            'publishedYear=2023';
 
         // Create the metadata file
         $metadataFile = vfsStream::newFile('metadata.abs')
@@ -421,7 +423,7 @@ EOT;
             ->setContent($metadataContent);
 
         // Get the file path for testing
-        $filePath = vfsStream::url('testDir/' . $nestedPath . '/metadata.abs');
+        $filePath = vfsStream::url('testDir/'.$nestedPath.'/metadata.abs');
 
         // Configure the mock to return no metadata, forcing fallback to file
         $this->mockMetadataService->method('generateBookId')
@@ -431,9 +433,9 @@ EOT;
             ->willReturn([]);
 
         // Test with directory path
-        $dirPath = vfsStream::url('testDir/' . $nestedPath);
+        $dirPath = vfsStream::url('testDir/'.$nestedPath);
 
-        $metadataFilePath = $dirPath . '/metadata.abs';
+        $metadataFilePath = $dirPath.'/metadata.abs';
         $result = $this->parser->readMetadataFile($metadataFilePath);
 
         $this->assertArrayHasKey('title', $result, 'Title key is missing in directory result');
@@ -442,7 +444,7 @@ EOT;
         $this->assertEquals('Nested Series', $result['series'], 'Series does not match expected');
 
         // Also test with direct file path
-        $filePath = vfsStream::url('testDir/' . $nestedPath . '/metadata.abs');
+        $filePath = vfsStream::url('testDir/'.$nestedPath.'/metadata.abs');
 
         $result = $this->parser->readMetadataFile($filePath);
 
@@ -451,7 +453,7 @@ EOT;
     }
 
     #[Test]
-    public function handleSpecialCharactersInPaths()
+    public function handle_special_characters_in_paths()
     {
         $metadataContent = "title=Special Chars Test\nauthors=Author C";
 
@@ -471,18 +473,18 @@ EOT;
     }
 
     #[Test]
-    public function handleLargeMetadataFiles()
+    public function handle_large_metadata_files()
     {
         // Create a large metadata file with many lines
-        $metadataContent = "title=Large Metadata Test\n" .
-            "author=Test Author\n" .
-            "description=This is a long description line 1\n" .
-            "  This is a long description line 2\n" .
-            "  This is a long description line 3";
+        $metadataContent = "title=Large Metadata Test\n".
+            "author=Test Author\n".
+            "description=This is a long description line 1\n".
+            "  This is a long description line 2\n".
+            '  This is a long description line 3';
 
         // Add more lines to make it larger
         for ($i = 0; $i < 100; $i++) {
-            $metadataContent .= "\n  Additional description line " . ($i + 4);
+            $metadataContent .= "\n  Additional description line ".($i + 4);
         }
 
         // Log the metadata content for debugging
@@ -519,7 +521,7 @@ EOT;
     }
 
     #[Test]
-    public function handleDuplicateKeys()
+    public function handle_duplicate_keys()
     {
         $metadataContent = "title=First Title\ntitle=Second Title\nseries=Test Series";
 
@@ -542,12 +544,12 @@ EOT;
     }
 
     #[Test]
-    public function handleMixedLineEndings()
+    public function handle_mixed_line_endings()
     {
         $filename = 'metadata.abs';
-        $metadataContent = "title=Mixed Line Endings\n" .
-            "author=Author X\r\n" .
-            "series=Test Series\n" .
+        $metadataContent = "title=Mixed Line Endings\n".
+            "author=Author X\r\n".
+            "series=Test Series\n".
             "narrator=Narrator Y\r\n";
 
         // Log the content we're creating
@@ -562,8 +564,7 @@ EOT;
             ->setContent($metadataContent);
 
         $dirPath = vfsStream::url('testDir/testBook');
-        $filePath = $dirPath . '/' . $filename;
-
+        $filePath = $dirPath.'/'.$filename;
 
         $fileContents = file_get_contents($filePath);
 
@@ -584,7 +585,7 @@ EOT;
             $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
 
             // Pass the directory path, not the file path
-            $metadataFilePath = $dirPath . '/metadata.abs';
+            $metadataFilePath = $dirPath.'/metadata.abs';
             $result = $this->parser->readMetadataFile($dirPath);
 
             // Log the raw file contents that were read
@@ -603,7 +604,7 @@ EOT;
     }
 
     #[Test]
-    public function loadMetadataFromServiceFirst()
+    public function load_metadata_from_service_first()
     {
         $bookId = 'test-book-123';
         $directoryPath = vfsStream::url('testDir/test-book');
@@ -621,7 +622,7 @@ EOT;
         $result = $this->parser->readMetadataFile($directoryPath);
 
         // The parser should use the metadata from the service
-        $metadataFilePath = $directoryPath . '/metadata.abs';
+        $metadataFilePath = $directoryPath.'/metadata.abs';
         $result = $this->parser->readMetadataFile($directoryPath);
         $this->assertIsArray($result, 'Result should be an array');
         $this->assertEmpty($result, 'Result empty if metadata.abs missing (service not used by this specific method).');

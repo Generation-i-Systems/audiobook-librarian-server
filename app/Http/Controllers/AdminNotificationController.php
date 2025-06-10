@@ -18,7 +18,7 @@ class AdminNotificationController extends Controller
         $message = $request->input('message');
         $userId = $request->input('user_id');
 
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         if ($userId) {
             // Send to a specific user
             $userDoc = $firestore->getClient()->collection('users')->document($userId)->snapshot();
@@ -26,6 +26,7 @@ class AdminNotificationController extends Controller
                 $user = $userDoc->data();
                 $user['id'] = $userDoc->id();
                 $this->sendPushNotification($user, $message);
+
                 return back()->with('success', 'Notification sent to specific user!');
             } else {
                 return back()->withErrors(['user_id' => 'User not found.']);
@@ -40,6 +41,7 @@ class AdminNotificationController extends Controller
                     $this->sendPushNotification($user, $message);
                 }
             }
+
             return back()->with('success', 'Notification sent to all users!');
         }
     }

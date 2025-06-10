@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 class AdminController extends Controller
 {
@@ -14,13 +13,14 @@ class AdminController extends Controller
             'user_id' => 'required|string',
             'role' => 'required|in:regular,admin',
         ]);
-        $firestore = new \App\Services\FirestoreService();
+        $firestore = new \App\Services\FirestoreService;
         $userId = $request->input('user_id');
         $role = $request->input('role');
         // Assuming users are stored in a 'users' collection
         $firestore->getClient()->collection('users')->document($userId)->set([
             'role' => $role,
         ], ['merge' => true]);
+
         return back()->with('success', 'User role updated successfully!');
     }
 

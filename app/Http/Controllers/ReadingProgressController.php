@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\FirestoreService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use App\Services\FirestoreService;
 
 class ReadingProgressController extends Controller
 {
@@ -15,7 +15,7 @@ class ReadingProgressController extends Controller
             'current_position' => 'required|integer|min:0',
         ]);
         $user = Auth::user();
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $userId = $user->id;
         $bookId = $request->book_id;
         // Find or create reading progress document
@@ -41,6 +41,7 @@ class ReadingProgressController extends Controller
                 'current_position' => $request->current_position,
             ]);
         }
+
         return response()->json(['success' => true]);
     }
 
@@ -50,7 +51,7 @@ class ReadingProgressController extends Controller
             'book_id' => 'required|string',
         ]);
         $user = Auth::user();
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $userId = $user->id;
         $bookId = $request->book_id;
         $progressQuery = $firestore->getClient()->collection('reading_progress')
@@ -65,6 +66,7 @@ class ReadingProgressController extends Controller
                 break;
             }
         }
+
         return response()->json(['current_position' => $currentPosition]);
     }
 }

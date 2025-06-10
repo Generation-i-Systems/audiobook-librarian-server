@@ -2,35 +2,33 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Artisan;
-use Tests\TestCase;
-use Mockery;
 use App\Services\FirestoreService;
 use Google\Cloud\Firestore\CollectionReference;
 use Google\Cloud\Firestore\DocumentReference;
 use Google\Cloud\Firestore\DocumentSnapshot;
+use Illuminate\Support\Facades\Cache;
+use Mockery;
+use Tests\TestCase;
 
 class QueueControllerTest extends TestCase
 {
     // Disable middleware for feature tests
     protected $disableMiddlewareForAllTests = true;
 
-    public function setUp(): void
+    protected function setUp(): void
     {
         parent::setUp();
         // Optionally: $this->withoutMiddleware();
     }
 
-    public function testStatusReturnsWorkerAndPendingJobs()
+    public function test_status_returns_worker_and_pending_jobs()
     {
         Cache::shouldReceive('get')->with('queue_worker_heartbeat')->andReturn(true);
         $mockFirestore = Mockery::mock(FirestoreService::class);
         $mockCollection = Mockery::mock(CollectionReference::class);
         $mockCollection->shouldReceive('count')->andReturn(3);
-        $mockFirestore->shouldReceive('getClient')->andReturn((object)[
-            'collection' => fn ($name) => $mockCollection
+        $mockFirestore->shouldReceive('getClient')->andReturn((object) [
+            'collection' => fn ($name) => $mockCollection,
         ]);
         $this->app->instance(FirestoreService::class, $mockFirestore);
 
@@ -38,11 +36,11 @@ class QueueControllerTest extends TestCase
         $response->assertStatus(200)
             ->assertJson([
                 'worker_running' => true,
-                'pending_jobs' => 3
+                'pending_jobs' => 3,
             ]);
     }
 
-    public function testStartWorkerSetsHeartbeatAndReturnsStarted()
+    public function test_start_worker_sets_heartbeat_and_returns_started()
     {
         Cache::shouldReceive('put')->with('queue_worker_heartbeat', true, 60);
         $response = $this->post('/admin/queue/start-worker');
@@ -50,7 +48,7 @@ class QueueControllerTest extends TestCase
             ->assertJson(['started' => true]);
     }
 
-    public function testClearDeletesAllJobs()
+    public function test_clear_deletes_all_jobs()
     {
         $mockFirestore = Mockery::mock(FirestoreService::class);
         $mockCollection = Mockery::mock(CollectionReference::class);
@@ -60,8 +58,8 @@ class QueueControllerTest extends TestCase
         $mockDoc->shouldReceive('reference')->andReturn($mockRef);
         $mockRef->shouldReceive('delete')->once();
         $mockCollection->shouldReceive('documents')->andReturn([$mockDoc]);
-        $mockFirestore->shouldReceive('getClient')->andReturn((object)[
-            'collection' => fn ($name) => $mockCollection
+        $mockFirestore->shouldReceive('getClient')->andReturn((object) [
+            'collection' => fn ($name) => $mockCollection,
         ]);
         $this->app->instance(FirestoreService::class, $mockFirestore);
 
@@ -70,14 +68,14 @@ class QueueControllerTest extends TestCase
             ->assertJson(['success' => true]);
     }
 
-    public function testBulkImportBooksQueuesJobsAndSkipsExisting()
+    public function test_bulk_import_books_queues_jobs_and_skips_existing()
     {
         // This test focuses on logic, not actual Firestore or job dispatching
         $mockFirestore = Mockery::mock(FirestoreService::class);
         $mockJobsCollection = Mockery::mock(CollectionReference::class);
         $mockBooksCollection = Mockery::mock(CollectionReference::class);
         $mockJobsCollection->shouldReceive('documents')->andReturn([]);
-        $mockFirestore->shouldReceive('getClient')->andReturn((object)[
+        $mockFirestore->shouldReceive('getClient')->andReturn((object) [
             'collection' => function ($name) use ($mockJobsCollection, $mockBooksCollection) {
                 if ($name === 'jobs') {
                     return $mockJobsCollection;
@@ -85,7 +83,7 @@ class QueueControllerTest extends TestCase
                 if ($name === 'books') {
                     return $mockBooksCollection;
                 }
-            }
+            },
         ]);
         $mockBooksCollection->shouldReceive('where')->with('directory_path', '=', 'test/dir1')->andReturnSelf();
         $mockBooksCollection->shouldReceive('documents')->andReturn([]);
@@ -104,19 +102,19 @@ class QueueControllerTest extends TestCase
         ]);
         $response->assertStatus(200)
             ->assertJsonStructure([
-                'message', 'skipped', 'queued_dirs'
+                'message', 'skipped', 'queued_dirs',
             ]);
     }
 
-    public function testBulkImportBooksFromDirDispatchesJob()
+    public function test_bulk_import_books_from_dir_dispatches_job()
     {
         // This simply checks the endpoint returns the right response (job dispatching is not tested here)
         $response = $this->post('/admin/books/bulk-import-from-dir', [
-            'dir' => 'test'
+            'dir' => 'test',
         ]);
         $response->assertStatus(200)
             ->assertJson([
-                'message' => 'Queued job to scan and import all book directories.'
+                'message' => 'Queued job to scan and import all book directories.',
             ]);
     }
 }

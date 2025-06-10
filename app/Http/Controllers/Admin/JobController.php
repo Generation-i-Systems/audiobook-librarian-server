@@ -3,13 +3,11 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Support\Facades\Auth;
 use App\Services\FirestoreService;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class JobController extends Controller
@@ -23,9 +21,6 @@ class JobController extends Controller
 
     /**
      * Display a listing of the jobs.
-     *
-     * @param Request $request
-     * @return View
      */
     public function index(Request $request): View
     {
@@ -68,7 +63,7 @@ class JobController extends Controller
     {
         $job = $this->firestore->getJobStatus($id);
 
-        if (!$job) {
+        if (! $job) {
             abort(404);
         }
 
@@ -88,7 +83,7 @@ class JobController extends Controller
     {
         $job = $this->firestore->getJobStatus($id);
 
-        if (!$job) {
+        if (! $job) {
             abort(404);
         }
 
@@ -104,8 +99,8 @@ class JobController extends Controller
                 [
                     'timestamp' => now()->toDateTimeString(),
                     'level' => 'info',
-                    'message' => 'Job requeued for retry by ' . (Auth::check() ? Auth::user()->name : 'System'),
-                ]
+                    'message' => 'Job requeued for retry by '.(Auth::check() ? Auth::user()->name : 'System'),
+                ],
             ]
         );
 
@@ -126,12 +121,12 @@ class JobController extends Controller
     {
         $job = $this->firestore->getJobStatus($id);
 
-        if (!$job) {
+        if (! $job) {
             abort(404);
         }
 
         // Only allow cancelling queued or processing jobs
-        if (!in_array($job['status'] ?? null, ['queued', 'processing'])) {
+        if (! in_array($job['status'] ?? null, ['queued', 'processing'])) {
             return redirect()
                 ->route('admin.jobs.show', $id)
                 ->with('error', 'Only queued or processing jobs can be cancelled.');
@@ -143,14 +138,14 @@ class JobController extends Controller
             $job['type'],
             'cancelled',
             $job['data'] ?? [],
-            'Job was cancelled by ' . (Auth::check() ? Auth::user()->name : 'System'),
+            'Job was cancelled by '.(Auth::check() ? Auth::user()->name : 'System'),
             null,
             [
                 [
                     'timestamp' => now()->toDateTimeString(),
                     'level' => 'warning',
-                    'message' => 'Job was cancelled by ' . (Auth::check() ? Auth::user()->name : 'System'),
-                ]
+                    'message' => 'Job was cancelled by '.(Auth::check() ? Auth::user()->name : 'System'),
+                ],
             ]
         );
 
@@ -177,29 +172,27 @@ class JobController extends Controller
     {
         $job = $this->firestore->getJobStatus($id);
 
-        if (!$job) {
+        if (! $job) {
             return response()->json([
                 'success' => false,
-                'message' => 'Job not found'
+                'message' => 'Job not found',
             ], 404);
         }
 
         return response()->json([
             'success' => true,
-            'data' => $job
+            'data' => $job,
         ]);
     }
 
     /**
      * Get job logs.
      *
-     * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\JsonResponse
      */
     /**
      * Get job logs with filtering.
      *
-     * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function logs(Request $request)
@@ -218,7 +211,7 @@ class JobController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $jobs
+            'data' => $jobs,
         ]);
     }
 

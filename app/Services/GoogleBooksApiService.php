@@ -11,15 +11,12 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
 {
     /**
      * Attempt to look up the book in Google Books and return additional metadata.
-     *
-     * @param array $book
-     * @return array|null
      */
     public function searchAndMerge(array $book): ?array
     {
         $inputTitle = trim($book['title'] ?? '');
         $inputAuthor = trim(($book['authors'][0]['author']['name'] ?? '') ?: ($book['author'] ?? ''));
-        if (!$inputTitle) {
+        if (! $inputTitle) {
             return null;
         }
         $query = $inputTitle;
@@ -35,12 +32,12 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
         $bestMatch = null;
         foreach ($results as $result) {
             $score = 0;
-            if (!empty($result['title']) && stripos($result['title'], $inputTitle) !== false) {
+            if (! empty($result['title']) && stripos($result['title'], $inputTitle) !== false) {
                 $score += 3;
-            } elseif (!empty($result['title']) && similar_text(strtolower($result['title']), strtolower($inputTitle), $pct) && $pct > 80) {
+            } elseif (! empty($result['title']) && similar_text(strtolower($result['title']), strtolower($inputTitle), $pct) && $pct > 80) {
                 $score += 2;
             }
-            if (!empty($inputAuthor) && !empty($result['authors'])) {
+            if (! empty($inputAuthor) && ! empty($result['authors'])) {
                 foreach ($result['authors'] as $authorObj) {
                     $authorName = is_array($authorObj['author'] ?? null) ? $authorObj['author']['name'] ?? '' : ($authorObj['author'] ?? '');
                     if ($authorName && stripos($authorName, $inputAuthor) !== false) {
@@ -54,11 +51,11 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
                 $bestMatch = $result;
             }
         }
-        if (!$bestMatch) {
+        if (! $bestMatch) {
             return null;
         }
         $details = null;
-        if (!empty($bestMatch['id'])) {
+        if (! empty($bestMatch['id'])) {
             $details = $this->performGetBookDetails($bestMatch['id']);
         }
         $source = $details ?: $bestMatch;
@@ -80,11 +77,11 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
             'info_link' => $source['info_link'] ?? null,
         ];
         // Download cover image if present and directory_path is available
-        if (!empty($merged['cover_image']) && !empty($book['directory_path'])) {
+        if (! empty($merged['cover_image']) && ! empty($book['directory_path'])) {
             $coverUrl = $merged['cover_image'];
             $directory = rtrim($book['directory_path'], '/');
             $ext = pathinfo(parse_url($coverUrl, PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'jpg';
-            $localFilename = $directory . '/cover.' . $ext;
+            $localFilename = $directory.'/cover.'.$ext;
             try {
                 // Use Laravel's Http client if available, else fallback to file_get_contents
                 if (class_exists('Illuminate\\Support\\Facades\\Http')) {
@@ -121,19 +118,25 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
             $merged['googlebooks_fields'] = $apiFields;
             $merged['needsReview'] = true;
         }
+
         // Remove nulls and skip narrators/series/duration if not present
         return array_filter($merged, function ($v, $k) {
             if (in_array($k, ['narrators', 'series', 'duration']) && $v === null) {
                 return false;
             }
+
             return $v !== null;
         }, ARRAY_FILTER_USE_BOTH);
     }
 
     protected $client;
+
     protected $apiKey;
+
     protected string $baseUrl = 'https://www.googleapis.com/books/v1';
+
     protected int $defaultLimit = 5;
+
     protected int $cacheTtl = 129600; // 3 months in minutes
 
     public function __construct()
@@ -141,7 +144,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
         parent::__construct();
 
         $this->client = new Client([
-            'base_uri' => $this->baseUrl . '/',
+            'base_uri' => $this->baseUrl.'/',
             'timeout' => 10.0,
         ]);
 
@@ -149,7 +152,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public function getServiceName(): string
     {
@@ -157,7 +160,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected function performSearch(string $query, array $options = []): ?array
     {
@@ -178,6 +181,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
                     'query' => $query,
                     'options' => $options,
                 ]);
+
                 return [];
             }
 
@@ -188,23 +192,26 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
+
             return null;
         }
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected function performGetBookDetails(string $id): ?array
     {
         try {
             $response = $this->httpGet("volumes/{$id}", ['key' => $this->apiKey]);
+
             return $this->formatBookDetails($response);
         } catch (\Exception $e) {
             Log::error('Failed to get book details from Google Books API', [
                 'id' => $id,
                 'error' => $e->getMessage(),
             ]);
+
             return null;
         }
     }
@@ -217,12 +224,12 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
         $searchTerms = [];
 
         // Add the main query
-        if (!empty($query)) {
+        if (! empty($query)) {
             $searchTerms[] = $query;
         }
 
         // Add author filter if provided
-        if (!empty($author)) {
+        if (! empty($author)) {
             $searchTerms[] = "inauthor:\"{$author}\"";
         }
 
@@ -237,7 +244,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
         $results = [];
 
         foreach ($items as $item) {
-            if (!isset($item['id']) || !isset($item['volumeInfo'])) {
+            if (! isset($item['id']) || ! isset($item['volumeInfo'])) {
                 continue;
             }
 
@@ -272,7 +279,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
      */
     protected function formatBookDetails(array $item): array
     {
-        if (!isset($item['volumeInfo'])) {
+        if (! isset($item['volumeInfo'])) {
             return [];
         }
 
@@ -366,6 +373,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
     public function downloadCoverImage(string $imageUrl, string $directoryPath, string $targetBasename): ?string
     {
         Log::info('downloadCoverImage not implemented for GoogleBooksApiService');
+
         return null;
     }
 }

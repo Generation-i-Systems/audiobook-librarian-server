@@ -11,7 +11,7 @@ class AuthorController extends Controller
     public function index(Request $request)
     {
         $search = $request->input('search');
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $authors = $firestore->listAuthors();
         if ($search) {
             $authors = array_filter($authors, function ($author) use ($search) {
@@ -22,6 +22,7 @@ class AuthorController extends Controller
         usort($authors, function ($a, $b) {
             return strcmp($a['name'], $b['name']);
         });
+
         return view('admin.authors.index', ['authors' => $authors, 'search' => $search]);
     }
 
@@ -33,7 +34,7 @@ class AuthorController extends Controller
     public function store(Request $request)
     {
         $request->validate(['name' => 'required|string|max:255']);
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         // Check for duplicate
         foreach ($firestore->listAuthors() as $author) {
             if (strcasecmp($author['name'], $request->name) === 0) {
@@ -41,25 +42,27 @@ class AuthorController extends Controller
             }
         }
         $firestore->createAuthor(['name' => $request->name]);
+
         return redirect()->route('admin.authors.index')->with('success', 'Author created!');
     }
 
     public function edit($id)
     {
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $author = $firestore->getAuthor($id);
-        if (!$author) {
+        if (! $author) {
             abort(404);
         }
+
         return view('admin.authors.edit', compact('author'));
     }
 
     public function update(Request $request, $id)
     {
         $request->validate(['name' => 'required|string|max:255']);
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $author = $firestore->getAuthor($id);
-        if (!$author) {
+        if (! $author) {
             abort(404);
         }
         // Check for duplicate name
@@ -69,13 +72,15 @@ class AuthorController extends Controller
             }
         }
         $firestore->updateAuthor($id, ['name' => $request->name]);
+
         return redirect()->route('admin.authors.index')->with('success', 'Author updated!');
     }
 
     public function destroy($id)
     {
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $firestore->deleteAuthor($id);
+
         return redirect()->route('admin.authors.index')->with('success', 'Author deleted!');
     }
 
@@ -85,7 +90,7 @@ class AuthorController extends Controller
     public function ajax(Request $request)
     {
         $q = $request->input('q', '');
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $authors = $firestore->listAuthors();
         if ($q) {
             $authors = array_filter($authors, function ($author) use ($q) {
@@ -97,6 +102,7 @@ class AuthorController extends Controller
         usort($authors, function ($a, $b) {
             return strcmp($a['name'], $b['name']);
         });
+
         return response()->json(['data' => array_values($authors)]);
     }
 }

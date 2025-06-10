@@ -2,12 +2,12 @@
 
 namespace App\Queue;
 
-use Illuminate\Queue\Queue;
-use Illuminate\Contracts\Queue\Queue as QueueContract;
-use Illuminate\Support\Str;
-use Carbon\Carbon;
-use App\Services\FirestoreService;
 use App\Queue\Jobs\FirestoreJob;
+use App\Services\FirestoreService;
+use Carbon\Carbon;
+use Illuminate\Contracts\Queue\Queue as QueueContract;
+use Illuminate\Queue\Queue;
+use Illuminate\Support\Str;
 
 /**
  * @method int getSeconds(mixed $delay) Inherited from Illuminate\Queue\Queue
@@ -15,6 +15,7 @@ use App\Queue\Jobs\FirestoreJob;
 class FirestoreQueue extends Queue implements QueueContract
 {
     protected $firestore;
+
     protected $collection;
 
     public function __construct(FirestoreService $firestore, $collection)
@@ -45,6 +46,7 @@ class FirestoreQueue extends Queue implements QueueContract
             'reserved_at' => null,
             'attempts' => 0,
         ]);
+
         return $id;
     }
 
@@ -61,6 +63,7 @@ class FirestoreQueue extends Queue implements QueueContract
             'reserved_at' => null,
             'attempts' => 0,
         ]);
+
         return $id;
     }
 
@@ -81,6 +84,7 @@ class FirestoreQueue extends Queue implements QueueContract
                 ['path' => 'reserved_at', 'value' => $now],
                 ['path' => 'attempts', 'value' => ($document['attempts'] ?? 0) + 1],
             ]);
+
             return new FirestoreJob(
                 $this->container,
                 $this,
@@ -89,6 +93,7 @@ class FirestoreQueue extends Queue implements QueueContract
                 $queue
             );
         }
+
         return null;
     }
 

@@ -2,9 +2,9 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Log;
 use Google\Cloud\Firestore\FirestoreClient;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 
 class FirestoreService
 {
@@ -21,26 +21,24 @@ class FirestoreService
 
     /**
      * Get a document from any collection by ID (for debugging).
-     *
-     * @param string $collection
-     * @param string $docId
-     * @return array|null
      */
     public function getDocument(string $collection, string $docId): ?array
     {
         try {
-            if (!$this->db) {
+            if (! $this->db) {
                 return null;
             }
             $snap = $this->db->collection($collection)->document($docId)->snapshot();
-            if (!$snap->exists()) {
+            if (! $snap->exists()) {
                 return null;
             }
             $data = $snap->data();
             $data['id'] = $docId;
+
             return $data;
         } catch (\Throwable $e) {
-            Log::error("Firestore getDocument failed: " . $e->getMessage());
+            Log::error('Firestore getDocument failed: '.$e->getMessage());
+
             return null;
         }
     }
@@ -48,18 +46,20 @@ class FirestoreService
     public function getUserById($identifier)
     {
         try {
-            if (!$this->db) {
+            if (! $this->db) {
                 return null;
             }
             $snap = $this->db->collection('users')->document($identifier)->snapshot();
-            if (!$snap->exists()) {
+            if (! $snap->exists()) {
                 return null;
             }
             $user = $snap->data();
             $user['id'] = $identifier;
+
             return $user;
         } catch (\Throwable $e) {
-            Log::error('Firestore getUserById failed: ' . $e->getMessage());
+            Log::error('Firestore getUserById failed: '.$e->getMessage());
+
             return null;
         } finally {
             self::$inProviderCall = false;
@@ -68,18 +68,19 @@ class FirestoreService
 
     /**
      * Retrieve user by remember token.
-     * @param string $identifier
-     * @param string $token
+     *
+     * @param  string  $identifier
+     * @param  string  $token
      * @return array|null
      */
     public function getUserByRememberToken($identifier, $token)
     {
         try {
-            if (!$this->db) {
+            if (! $this->db) {
                 return null;
             }
             $snap = $this->db->collection('users')->document($identifier)->snapshot();
-            if (!$snap->exists()) {
+            if (! $snap->exists()) {
                 return null;
             }
             $user = $snap->data();
@@ -87,9 +88,11 @@ class FirestoreService
             if (($user['remember_token'] ?? null) === $token) {
                 return $user;
             }
+
             return null;
         } catch (\Throwable $e) {
-            Log::error('Firestore getUserByRememberToken failed: ' . $e->getMessage());
+            Log::error('Firestore getUserByRememberToken failed: '.$e->getMessage());
+
             return null;
         } finally {
             self::$inProviderCall = false;
@@ -98,8 +101,9 @@ class FirestoreService
 
     /**
      * Update the remember token for the user.
-     * @param string $identifier
-     * @param string $token
+     *
+     * @param  string  $identifier
+     * @param  string  $token
      * @return void
      */
     public function updateRememberToken($identifier, $token)
@@ -111,7 +115,8 @@ class FirestoreService
 
     /**
      * Retrieve user by credentials (e.g. email).
-     * @param array $credentials
+     *
+     * @param  array  $credentials
      * @return array|null
      */
     public function getUserByCredentials($credentials)
@@ -119,8 +124,9 @@ class FirestoreService
         try {
             // Only log which keys are being used, not values
             Log::debug('getUserByCredentials', ['credential_keys' => array_keys($credentials)]);
-            if (!$this->db) {
+            if (! $this->db) {
                 Log::error('getUserByCredentials: db not initialized');
+
                 return null;
             }
             $query = $this->db->collection('users');
@@ -128,20 +134,22 @@ class FirestoreService
                 if ($key === 'password') {
                     continue; // Never filter by password
                 }
-                Log::debug('getUserByCredentials: adding filter: ' . $key);
+                Log::debug('getUserByCredentials: adding filter: '.$key);
                 // For username/email, fetch all users and filter in PHP for case-insensitive match
                 if (in_array($key, ['username', 'email'])) {
                     $allDocs = $this->db->collection('users')->documents();
                     foreach ($allDocs as $doc) {
-                        if (!$doc->exists()) {
+                        if (! $doc->exists()) {
                             continue;
                         }
                         $data = $doc->data();
                         if (isset($data[$key]) && mb_strtolower($data[$key]) === mb_strtolower($value)) {
                             $data['id'] = $doc->id();
+
                             return $data;
                         }
                     }
+
                     return null;
                 } else {
                     $query = $query->where($key, '=', $value);
@@ -153,17 +161,19 @@ class FirestoreService
             }
             $user = $documents->rows()[0]->data();
             $user['id'] = $documents->rows()[0]->id();
+
             return $user;
         } catch (\Throwable $e) {
-            Log::error('Firestore getUserByCredentials failed: ' . $e->getMessage());
+            Log::error('Firestore getUserByCredentials failed: '.$e->getMessage());
+
             return null;
         }
     }
 
     /**
      * Validate user credentials (e.g. password).
-     * @param array|object $user
-     * @param array $credentials
+     *
+     * @param  array|object  $user
      * @return bool
      */
     public function validateUserCredentials($user, array $credentials)
@@ -172,24 +182,27 @@ class FirestoreService
         try {
             // FirestoreUser may be an object, so handle both
             $userArr = is_array($user) ? $user : (method_exists($user, 'getRawUser') ? $user->getRawUser() : []);
-            if (!isset($userArr['password']) || !isset($credentials['password'])) {
+            if (! isset($userArr['password']) || ! isset($credentials['password'])) {
                 Log::debug('Missing password field', ['userArr' => $userArr, 'credentials' => $credentials]);
+
                 return false;
             }
             $plain = $credentials['password'];
             $hash = $userArr['password'];
             $result = Hash::check($plain, $hash);
-            Log::debug('validateUserCredentials: plain: ' . $plain);
-            Log::debug('validateUserCredentials: hash: ' . $hash);
+            Log::debug('validateUserCredentials: plain: '.$plain);
+            Log::debug('validateUserCredentials: hash: '.$hash);
             Log::debug('Checking password', [
                 'plain' => $plain,
                 'hash' => $hash,
                 'result' => $result,
             ]);
-            Log::debug('validateUserCredentials result: ' . ($result ? 'true' : 'false'));
+            Log::debug('validateUserCredentials result: '.($result ? 'true' : 'false'));
+
             return $result;
         } catch (\Throwable $e) {
-            Log::error('Firestore validateUserCredentials failed: ' . $e->getMessage());
+            Log::error('Firestore validateUserCredentials failed: '.$e->getMessage());
+
             return false;
         }
     }
@@ -217,12 +230,15 @@ class FirestoreService
                     $users[] = $data;
                 }
             }
+
             return $users;
         } catch (\Throwable $e) {
-            error_log('Firestore dumpAllUsers error: ' . $e->getMessage());
+            error_log('Firestore dumpAllUsers error: '.$e->getMessage());
+
             return ['error' => $e->getMessage()];
         }
     }
+
     public static function dumpAllBooks()
     {
         try {
@@ -241,9 +257,11 @@ class FirestoreService
                     $books[] = $data;
                 }
             }
+
             return $books;
         } catch (\Throwable $e) {
-            error_log('Firestore dumpAllBooks error: ' . $e->getMessage());
+            error_log('Firestore dumpAllBooks error: '.$e->getMessage());
+
             return ['error' => $e->getMessage()];
         }
     }
@@ -259,7 +277,7 @@ class FirestoreService
             ]);
         } catch (\Throwable $e) {
             // Log error but do NOT trigger auth/user lookup!
-            Log::error('Firestore client init failed: ' . $e->getMessage());
+            Log::error('Firestore client init failed: '.$e->getMessage());
             $this->db = null;
         }
     }
@@ -267,7 +285,8 @@ class FirestoreService
     // QUEUE COLLECTION ACCESS
     /**
      * Get a Firestore collection reference for a queue.
-     * @param string $name
+     *
+     * @param  string  $name
      * @return \Google\Cloud\Firestore\CollectionReference
      */
     public function getQueueCollection($name)
@@ -278,24 +297,27 @@ class FirestoreService
     // USER CRUD
     public function createUser(array $data)
     {
-        if (!$this->db) {
+        if (! $this->db) {
             return null;
         }
         // Default role to 'preview' if not set
-        if (!isset($data['role'])) {
+        if (! isset($data['role'])) {
             $data['role'] = 'preview';
         }
         try {
             $docRef = $this->db->collection('users')->add($data);
+
             return $docRef->id();
         } catch (\Throwable $e) {
-            Log::error('Firestore createUser failed: ' . $e->getMessage());
+            Log::error('Firestore createUser failed: '.$e->getMessage());
+
             return null;
         }
     }
 
     /**
      * Get the global genre list from config/genres.php
+     *
      * @return array
      */
     public static function listGenres()
@@ -308,13 +330,13 @@ class FirestoreService
     /**
      * Create a new message in Firestore
      *
-     * @param array $messageData
      * @return string|null Returns the document ID or null on failure
      */
     public function createMessage(array $messageData): ?string
     {
-        if (!$this->db) {
+        if (! $this->db) {
             Log::error('Cannot create message: Firestore client not initialized');
+
             return null;
         }
 
@@ -323,9 +345,11 @@ class FirestoreService
             $messageData['updated_at'] = $this->getServerTimestamp();
 
             $docRef = $this->db->collection('messages')->add($messageData);
+
             return $docRef->id();
         } catch (\Exception $e) {
-            Log::error('Failed to create message: ' . $e->getMessage());
+            Log::error('Failed to create message: '.$e->getMessage());
+
             return null;
         }
     }
@@ -333,15 +357,15 @@ class FirestoreService
     /**
      * Get all messages, optionally filtered by user ID
      *
-     * @param string|null $userId Optional user ID to filter by
-     * @param bool $includeAcknowledged Whether to include acknowledged messages
-     * @param int $limit Maximum number of messages to return
-     * @return array
+     * @param  string|null  $userId  Optional user ID to filter by
+     * @param  bool  $includeAcknowledged  Whether to include acknowledged messages
+     * @param  int  $limit  Maximum number of messages to return
      */
     public function getMessages(?string $userId = null, bool $includeAcknowledged = false, int $limit = 100): array
     {
-        if (!$this->db) {
+        if (! $this->db) {
             Log::error('Cannot get messages: Firestore client not initialized');
+
             return [];
         }
 
@@ -352,7 +376,7 @@ class FirestoreService
                 $query = $query->where('to_user_id', '==', $userId);
             }
 
-            if (!$includeAcknowledged) {
+            if (! $includeAcknowledged) {
                 $query = $query->where('acknowledged_at', '==', null);
             }
 
@@ -370,28 +394,27 @@ class FirestoreService
 
             return $messages;
         } catch (\Exception $e) {
-            Log::error('Failed to get messages: ' . $e->getMessage());
+            Log::error('Failed to get messages: '.$e->getMessage());
+
             return [];
         }
     }
 
     /**
      * Get a single message by ID
-     *
-     * @param string $messageId
-     * @return array|null
      */
     public function getMessage(string $messageId): ?array
     {
-        if (!$this->db) {
+        if (! $this->db) {
             Log::error('Cannot get message: Firestore client not initialized');
+
             return null;
         }
 
         try {
             $snapshot = $this->db->collection('messages')->document($messageId)->snapshot();
 
-            if (!$snapshot->exists()) {
+            if (! $snapshot->exists()) {
                 return null;
             }
 
@@ -400,21 +423,20 @@ class FirestoreService
 
             return $message;
         } catch (\Exception $e) {
-            Log::error('Failed to get message: ' . $e->getMessage());
+            Log::error('Failed to get message: '.$e->getMessage());
+
             return null;
         }
     }
 
     /**
      * Acknowledge a message
-     *
-     * @param string $messageId
-     * @return bool
      */
     public function acknowledgeMessage(string $messageId): bool
     {
-        if (!$this->db) {
+        if (! $this->db) {
             Log::error('Cannot acknowledge message: Firestore client not initialized');
+
             return false;
         }
 
@@ -423,22 +445,23 @@ class FirestoreService
                 ['path' => 'acknowledged_at', 'value' => $this->getServerTimestamp()],
                 ['path' => 'updated_at', 'value' => $this->getServerTimestamp()],
             ]);
+
             return true;
         } catch (\Exception $e) {
-            Log::error('Failed to acknowledge message: ' . $e->getMessage());
+            Log::error('Failed to acknowledge message: '.$e->getMessage());
+
             return false;
         }
     }
 
     /**
      * Get all users for the admin message interface
-     *
-     * @return array
      */
     public function getUsersForMessaging(): array
     {
-        if (!$this->db) {
+        if (! $this->db) {
             Log::error('Cannot get users: Firestore client not initialized');
+
             return [];
         }
 
@@ -456,7 +479,8 @@ class FirestoreService
 
             return $users;
         } catch (\Exception $e) {
-            Log::error('Failed to get users: ' . $e->getMessage());
+            Log::error('Failed to get users: '.$e->getMessage());
+
             return [];
         }
     }
@@ -468,64 +492,68 @@ class FirestoreService
      */
     private function getServerTimestamp()
     {
-        return new \Google\Cloud\Firestore\FieldValue\ServerTimestampValue();
+        return new \Google\Cloud\Firestore\FieldValue\ServerTimestampValue;
     }
 
     // BOOKS CRUD
     /**
      * Create a new book in Firestore
-     * @param array $data
+     *
      * @return string|null Returns the document ID or null on failure
      */
     public function createBook(array $data): ?string
     {
-        if (!$this->db) {
+        if (! $this->db) {
             Log::error('Cannot create book: Firestore client not initialized');
+
             return null;
         }
         try {
             $docRef = $this->db->collection('books')->add($data);
+
             return $docRef->id();
         } catch (\Throwable $e) {
-            Log::error('Failed to create book: ' . $e->getMessage());
+            Log::error('Failed to create book: '.$e->getMessage());
+
             return null;
         }
     }
 
     // REVIEWS CRUD
     /**
-     * @param array $data
-     * @return string
-     */
-    /**
      * Create a new review in Firestore
-     * @param array $data
+     *
      * @return string|null Returns the document ID or null on failure
      */
     public function createReview(array $data): ?string
     {
-        if (!$this->db) {
+        if (! $this->db) {
             Log::error('Cannot create review: Firestore client not initialized');
+
             return null;
         }
         try {
             $docRef = $this->db->collection('reviews')->add($data);
+
             return $docRef->id();
         } catch (\Throwable $e) {
-            Log::error('Failed to create review: ' . $e->getMessage());
+            Log::error('Failed to create review: '.$e->getMessage());
+
             return null;
         }
     }
 
     /**
      * Get all books by author and genre
-     * @param string $authorId
-     * @param string $genreId
+     *
+     * @param  string  $authorId
+     * @param  string  $genreId
      * @return array
      */
     public function getBooksByAuthorAndGenre($author, $genre)
     {
         $books = $this->listBooks();
+
         return array_values(array_filter($books, function ($book) use ($author, $genre) {
             return (isset($book['author']) && $book['author'] === $author)
                 && (isset($book['genre']) && $book['genre'] === $genre);
@@ -540,11 +568,12 @@ class FirestoreService
     public function getBook(string $id)
     {
         $snapshot = $this->db->collection('books')->document($id)->snapshot();
-        if (!$snapshot->exists()) {
+        if (! $snapshot->exists()) {
             return null;
         }
         $data = $snapshot->data();
         $data['id'] = $id; // Ensure the ID is included in the returned data
+
         return $data;
     }
 
@@ -562,6 +591,7 @@ class FirestoreService
             $book['id'] = $doc->id();
             $books[] = $book;
         }
+
         return $books;
     }
 
@@ -595,28 +625,29 @@ class FirestoreService
     // }
 
     /**
-     * @param string $id
      * @return array|null
      */
     public function getAuthor(string $id)
     {
         $snap = $this->db->collection('authors')->document($id)->snapshot();
-        if (!$snap->exists()) {
+        if (! $snap->exists()) {
             return null;
         }
         $author = $snap->data();
         $author['id'] = $id;
+
         return $author;
     }
 
     /**
      * Get a list of unique authors that are currently being used in books
+     *
      * @return array
      */
     public function listAuthors()
     {
         try {
-            if (!$this->db) {
+            if (! $this->db) {
                 return [];
             }
             $allBooks = $this->db->collection('books')->documents();
@@ -632,14 +663,14 @@ class FirestoreService
                     }
                     if ($authorData) {
                         foreach ($authorData as $authorName) {
-                            if (is_string($authorName) && !empty($authorName)) {
+                            if (is_string($authorName) && ! empty($authorName)) {
                                 $authors[$authorName] = true;
                             }
                         }
                     } elseif (
                         isset($bookData['author']) &&
                         is_string($bookData['author']) &&
-                        !empty($bookData['author'])
+                        ! empty($bookData['author'])
                     ) {
                         $authors[$bookData['author']] = true;
                     }
@@ -647,9 +678,11 @@ class FirestoreService
             }
             $uniqueAuthors = array_keys($authors);
             sort($uniqueAuthors);
+
             return $uniqueAuthors;
         } catch (\Exception $e) {
-            Log::error('Firestore listAuthors failed: ' . $e->getMessage());
+            Log::error('Firestore listAuthors failed: '.$e->getMessage());
+
             return [];
         }
     }
@@ -657,7 +690,7 @@ class FirestoreService
     /**
      * Search for author names starting with a given term.
      *
-     * @param string $term The search term.
+     * @param  string  $term  The search term.
      * @return array A list of unique author names.
      */
     public function searchAuthorsByName(string $term): array
@@ -673,25 +706,17 @@ class FirestoreService
                 $matches[] = $authorName;
             }
         }
+
         // Firestore might return them sorted, but ensure sorting if listAuthors changes
         // sort($matches);
         return $matches;
     }
 
-    /**
-     * @param string $id
-     * @param array $data
-     * @return void
-     */
     public function updateAuthor(string $id, array $data): void
     {
         $this->db->collection('authors')->document($id)->set($data, ['merge' => true]);
     }
 
-    /**
-     * @param string $id
-     * @return void
-     */
     public function deleteAuthor(string $id): void
     {
         $this->db->collection('authors')->document($id)->delete();
@@ -699,19 +724,19 @@ class FirestoreService
 
     // GENRES CRUD
     /**
-     * @param array $data
      * @return string
      */
     public function createGenre(array $data)
     {
         $docRef = $this->db->collection('genres')->add($data);
+
         return $docRef->id();
     }
 
     // SERIES CRUD
     /**
      * Finds a series by name, or creates one if not found.
-     * @param string $name
+     *
      * @return array Series data including id
      */
     public function findOrCreateSeriesByName(string $name)
@@ -721,31 +746,38 @@ class FirestoreService
             if ($doc->exists()) {
                 $ser = $doc->data();
                 $ser['id'] = $doc->id();
+
                 return $ser;
             }
         }
         $id = $this->createSeries(['name' => $name]);
+
         return ['id' => $id, 'name' => $name];
     }
+
     public function createSeries(array $data)
     {
         $docRef = $this->db->collection('series')->add($data);
+
         return $docRef->id();
     }
+
     public function getSeries(string $id)
     {
         $snap = $this->db->collection('series')->document($id)->snapshot();
-        if (!$snap->exists()) {
+        if (! $snap->exists()) {
             return null;
         }
         $series = $snap->data();
         $series['id'] = $id;
+
         return $series;
     }
+
     public function listSeries()
     {
         try {
-            if (!$this->db) {
+            if (! $this->db) {
                 return [];
             }
             $allBooks = $this->db->collection('books')->documents();
@@ -756,7 +788,7 @@ class FirestoreService
                     if (isset($bookData['series']) && is_array($bookData['series'])) {
                         $seriesNames = array_keys($bookData['series']);
                         foreach ($seriesNames as $seriesName) {
-                            if (is_string($seriesName) && !empty($seriesName)) {
+                            if (is_string($seriesName) && ! empty($seriesName)) {
                                 $series[$seriesName] = true;
                             }
                         }
@@ -765,9 +797,11 @@ class FirestoreService
             }
             $uniqueSeries = array_keys($series);
             sort($uniqueSeries);
+
             return $uniqueSeries;
         } catch (\Exception $e) {
-            Log::error('Firestore listSeries failed: ' . $e->getMessage());
+            Log::error('Firestore listSeries failed: '.$e->getMessage());
+
             return [];
         }
     }
@@ -775,10 +809,9 @@ class FirestoreService
     /**
      * Search for series titles starting with a given term.
      *
-     * @param string $term The search term.
-     * Search for series titles starting with a given term.
-     *
-     * @param string $term The search term.
+     * @param  string  $term  The search term.
+     *                        Search for series titles starting with a given term.
+     * @param  string  $term  The search term.
      * @return array A list of unique series titles.
      */
     public function searchSeriesByName(string $term): array
@@ -794,6 +827,7 @@ class FirestoreService
                 $matches[] = $seriesName;
             }
         }
+
         // sort($matches);
         return $matches;
     }
@@ -801,7 +835,6 @@ class FirestoreService
     /**
      * Find a book by its directory path
      *
-     * @param string $directoryPath
      * @return array|null Returns book data if found, null otherwise
      */
     public function findBookByDirectoryPath(string $directoryPath): ?array
@@ -824,8 +857,6 @@ class FirestoreService
     // BOOK QUEUE (STUBS)
     /**
      * Get a user's book queue (stub: implement as needed)
-     * @param string $userId
-     * @return array
      */
     public function getBookQueue(string $userId): array
     {
@@ -836,9 +867,6 @@ class FirestoreService
 
     /**
      * Add a book to a user's queue (stub: implement as needed)
-     * @param string $userId
-     * @param string $bookId
-     * @return void
      */
     public function addBookToQueue(string $userId, string $bookId): void
     {
@@ -847,9 +875,6 @@ class FirestoreService
 
     /**
      * Remove a book from a user's queue (stub: implement as needed)
-     * @param string $userId
-     * @param string $bookId
-     * @return void
      */
     public function removeBookFromQueue(string $userId, string $bookId): void
     {
@@ -860,22 +885,19 @@ class FirestoreService
 
     /**
      * Create or update a job status in Firestore
-     * @param string $jobId
-     * @param string $type
-     * @param string $status
-     * @param array $data
+     *
      * @return string Job ID
      */
     /**
      * Create or update a job status in Firestore with detailed tracking
      *
-     * @param string $jobId Unique job identifier
-     * @param string $type Job type (e.g., 'book_import', 'directory_import')
-     * @param string $status Job status ('queued', 'processing', 'completed', 'failed')
-     * @param array $data Additional job data
-     * @param string|null $message Optional status message
-     * @param array $error Optional error details if job failed
-     * @param array $logs Optional array of log entries
+     * @param  string  $jobId  Unique job identifier
+     * @param  string  $type  Job type (e.g., 'book_import', 'directory_import')
+     * @param  string  $status  Job status ('queued', 'processing', 'completed', 'failed')
+     * @param  array  $data  Additional job data
+     * @param  string|null  $message  Optional status message
+     * @param  array  $error  Optional error details if job failed
+     * @param  array  $logs  Optional array of log entries
      * @return string Job ID
      */
     public function updateJobStatus(
@@ -923,30 +945,28 @@ class FirestoreService
         }
 
         // Append logs if provided
-        if (!empty($logs)) {
+        if (! empty($logs)) {
             $jobData['logs'] = array_merge($jobData['logs'] ?? [], $logs);
         }
 
         $this->db->collection('jobs')->document($jobId)->set($jobData, ['merge' => true]);
+
         return $jobId;
     }
 
     /**
      * Get job status
-     * @param string $jobId
-     * @return array|null
      */
     /**
      * Get job status by ID
      *
-     * @param string $jobId
      * @return array|null Job data or null if not found
      */
     public function getJobStatus(string $jobId): ?array
     {
         try {
             $doc = $this->db->collection('jobs')->document($jobId)->snapshot();
-            if (!$doc->exists()) {
+            if (! $doc->exists()) {
                 return null;
             }
 
@@ -955,27 +975,24 @@ class FirestoreService
 
             return $data;
         } catch (\Exception $e) {
-            Log::error("Failed to get job status: " . $e->getMessage());
+            Log::error('Failed to get job status: '.$e->getMessage());
+
             return null;
         }
     }
 
     /**
      * List jobs by type and/or status
-     * @param string|null $type
-     * @param string|null $status
-     * @param int $limit
-     * @return array
      */
     /**
      * List jobs with filtering and pagination
      *
-     * @param string|null $type Filter by job type
-     * @param string|null $status Filter by status
-     * @param int $limit Maximum number of results
-     * @param string $orderBy Field to order by
-     * @param string $direction Order direction ('ASC' or 'DESC')
-     * @param string|null $startAfterId Start after specific job ID for pagination
+     * @param  string|null  $type  Filter by job type
+     * @param  string|null  $status  Filter by status
+     * @param  int  $limit  Maximum number of results
+     * @param  string  $orderBy  Field to order by
+     * @param  string  $direction  Order direction ('ASC' or 'DESC')
+     * @param  string|null  $startAfterId  Start after specific job ID for pagination
      * @return array List of jobs with their data
      */
     public function listJobs(
@@ -1021,7 +1038,8 @@ class FirestoreService
 
             return $results;
         } catch (\Exception $e) {
-            Log::error('Failed to list jobs: ' . $e->getMessage());
+            Log::error('Failed to list jobs: '.$e->getMessage());
+
             return [];
         }
     }
@@ -1029,10 +1047,9 @@ class FirestoreService
     /**
      * Add a log entry to a job
      *
-     * @param string $jobId
-     * @param string $level Log level (info, warning, error, etc.)
-     * @param string $message Log message
-     * @param array $context Additional context data
+     * @param  string  $level  Log level (info, warning, error, etc.)
+     * @param  string  $message  Log message
+     * @param  array  $context  Additional context data
      * @return bool Success status
      */
     public function addJobLog(string $jobId, string $level, string $message, array $context = []): bool
@@ -1053,7 +1070,8 @@ class FirestoreService
 
             return true;
         } catch (\Exception $e) {
-            Log::error('Failed to add job log: ' . $e->getMessage());
+            Log::error('Failed to add job log: '.$e->getMessage());
+
             return false;
         }
     }
@@ -1061,10 +1079,9 @@ class FirestoreService
     /**
      * Update job progress
      *
-     * @param string $jobId
-     * @param int $current Current progress value
-     * @param int|null $total Total value (optional)
-     * @param string|null $message Optional status message
+     * @param  int  $current  Current progress value
+     * @param  int|null  $total  Total value (optional)
+     * @param  string|null  $message  Optional status message
      * @return bool Success status
      */
     public function updateJobProgress(string $jobId, int $current, ?int $total = null, ?string $message = null): bool
@@ -1092,7 +1109,8 @@ class FirestoreService
 
             return true;
         } catch (\Exception $e) {
-            Log::error('Failed to update job progress: ' . $e->getMessage());
+            Log::error('Failed to update job progress: '.$e->getMessage());
+
             return false;
         }
     }
@@ -1100,16 +1118,17 @@ class FirestoreService
     /**
      * Delete a job and its data
      *
-     * @param string $jobId
      * @return bool Success status
      */
     public function deleteJob(string $jobId): bool
     {
         try {
             $this->db->collection('jobs')->document($jobId)->delete();
+
             return true;
         } catch (\Exception $e) {
-            Log::error('Failed to delete job: ' . $e->getMessage());
+            Log::error('Failed to delete job: '.$e->getMessage());
+
             return false;
         }
     }
@@ -1117,8 +1136,8 @@ class FirestoreService
     /**
      * Clean up old completed/failed jobs
      *
-     * @param int $daysOld Delete jobs older than this many days
-     * @param int $batchSize Maximum number of jobs to delete in one operation
+     * @param  int  $daysOld  Delete jobs older than this many days
+     * @param  int  $batchSize  Maximum number of jobs to delete in one operation
      * @return int Number of jobs deleted
      */
     public function cleanupOldJobs(int $daysOld = 30, int $batchSize = 100): int
@@ -1141,7 +1160,8 @@ class FirestoreService
 
             return $deleted;
         } catch (\Exception $e) {
-            Log::error('Failed to clean up old jobs: ' . $e->getMessage());
+            Log::error('Failed to clean up old jobs: '.$e->getMessage());
+
             return 0;
         }
     }

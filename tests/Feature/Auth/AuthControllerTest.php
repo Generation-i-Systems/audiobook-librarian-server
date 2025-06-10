@@ -4,15 +4,17 @@
 
 namespace Tests\Feature\Auth;
 
-use Tests\TestCase;
 use Google\Cloud\Firestore\FirestoreClient;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Tests\TestCase;
 
 class AuthControllerTest extends TestCase
 {
     protected $firestore;
+
     protected $usersCollection;
+
     protected $tokensCollection;
 
     protected function setUp(): void
@@ -26,7 +28,7 @@ class AuthControllerTest extends TestCase
         // Initialize Firestore client
         $this->firestore = new FirestoreClient([
             'projectId' => config('firebase.project_id'),
-            'keyFilePath' => config('firebase.credentials.file')
+            'keyFilePath' => config('firebase.credentials.file'),
         ]);
 
         $this->usersCollection = $this->firestore->collection('users');
@@ -38,13 +40,13 @@ class AuthControllerTest extends TestCase
 
     /**
      * Helper to check if Firestore config is missing.
-     * @return bool
      */
     protected function shouldSkipFirestoreTests(): bool
     {
         $projectId = config('firebase.project_id');
         $keyFile = config('firebase.credentials.file');
-        return empty($projectId) || empty($keyFile) || !file_exists($keyFile);
+
+        return empty($projectId) || empty($keyFile) || ! file_exists($keyFile);
     }
 
     protected function tearDown(): void
@@ -81,7 +83,7 @@ class AuthControllerTest extends TestCase
 
         $response->assertStatus(201)
             ->assertJson([
-                'message' => 'Account created. Waiting for admin approval.'
+                'message' => 'Account created. Waiting for admin approval.',
             ]);
 
         // Verify user was created in Firestore
@@ -118,7 +120,7 @@ class AuthControllerTest extends TestCase
                 'email',
                 'username',
                 'role',
-                'token'
+                'token',
             ]);
     }
 
@@ -140,7 +142,7 @@ class AuthControllerTest extends TestCase
 
         $response->assertStatus(403)
             ->assertJson([
-                'message' => 'Account pending admin approval'
+                'message' => 'Account pending admin approval',
             ]);
     }
 
@@ -155,21 +157,21 @@ class AuthControllerTest extends TestCase
             'role' => 'user',
         ]);
 
-        $token = 'test_token_' . Str::random(32);
+        $token = 'test_token_'.Str::random(32);
         $this->tokensCollection->add([
             'user_id' => $userRef->id(),
             'token' => $token,
-            'created_at' => new \Google\Cloud\Core\Timestamp(new \DateTime()),
+            'created_at' => new \Google\Cloud\Core\Timestamp(new \DateTime),
             'expires_at' => new \Google\Cloud\Core\Timestamp(now()->addDays(30)),
         ]);
 
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer ' . $token,
+            'Authorization' => 'Bearer '.$token,
         ])->postJson('/api/logout');
 
         $response->assertStatus(200)
             ->assertJson([
-                'message' => 'Successfully logged out'
+                'message' => 'Successfully logged out',
             ]);
 
         // Verify token was deleted

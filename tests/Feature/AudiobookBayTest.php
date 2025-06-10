@@ -2,10 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Services\AudiobookBayService;
 use App\Services\AudiobookBayApiService;
+use App\Services\AudiobookBayService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Foundation\Testing\WithFaker;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Mockery;
@@ -16,6 +15,7 @@ class AudiobookBayTest extends TestCase
     // use RefreshDatabase; // Uncomment if database interactions are tested
 
     protected AudiobookBayService $service;
+
     protected $audiobookBayApiServiceMock; // Mockery objects don't always play nice with strict typing here
 
     /**
@@ -53,7 +53,7 @@ class AudiobookBayTest extends TestCase
     }
 
     /** @test */
-    public function testCanSearchAudiobooksAndFormatsResults()
+    public function test_can_search_audiobooks_and_formats_results()
     {
         $query = 'test query';
         $options = ['page' => 1]; // Example options passed to apiService
@@ -75,8 +75,8 @@ class AudiobookBayTest extends TestCase
                     'format' => 'MP3',
                     'source' => 'audiobookbay', // Added by parser
                     'categories' => ['Fiction'],
-                    'bitrate' => '64 kbps'
-                ]
+                    'bitrate' => '64 kbps',
+                ],
             ],
             [
                 'title' => 'Test Book 2 from API',
@@ -91,8 +91,8 @@ class AudiobookBayTest extends TestCase
                     'format' => 'M4B',
                     'source' => 'audiobookbay',
                     'categories' => ['Non-Fiction'],
-                    'bitrate' => '128 kbps'
-                ]
+                    'bitrate' => '128 kbps',
+                ],
             ],
         ];
 
@@ -128,7 +128,7 @@ class AudiobookBayTest extends TestCase
     }
 
     /** @test */
-    public function testPerformSearchReturnsEmptyArrayOnApiServiceFailure()
+    public function test_perform_search_returns_empty_array_on_api_service_failure()
     {
         $query = 'failing query';
         $options = ['page' => 1];
@@ -147,7 +147,7 @@ class AudiobookBayTest extends TestCase
     }
 
     /** @test */
-    public function testCanGetBookDetailsAndFormatsResult()
+    public function test_can_get_book_details_and_formats_result()
     {
         $bookIdOrSlug = 'test-book-detailed-slug';
 
@@ -173,8 +173,8 @@ class AudiobookBayTest extends TestCase
                 'size' => '350 MB',
                 'duration' => 'PT8H15M30S', // ISO8601 Duration format
                 'downloads' => '1234 times',
-                'categories' => ['Mystery', 'Thriller'] // Ensure consistency if categories are here too
-            ]
+                'categories' => ['Mystery', 'Thriller'], // Ensure consistency if categories are here too
+            ],
         ];
 
         $this->audiobookBayApiServiceMock
@@ -217,7 +217,7 @@ class AudiobookBayTest extends TestCase
     }
 
     /** @test */
-    public function testPerformGetBookDetailsReturnsNullOnApiServiceFailure()
+    public function test_perform_get_book_details_returns_null_on_api_service_failure()
     {
         $bookIdOrSlug = 'non-existent-slug';
 
@@ -233,7 +233,7 @@ class AudiobookBayTest extends TestCase
     }
 
     /** @test */
-    public function testIsAvailableReturnsTrueWhenServiceIsSet()
+    public function test_is_available_returns_true_when_service_is_set()
     {
         // In setUp, $this->service is initialized with a mock, so it should be available.
         $this->assertTrue($this->service->isAvailable());

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Auth\FirestoreUser;
 use App\Http\Controllers\Controller;
 use App\Services\FirestoreService;
 use Google\Cloud\Core\Timestamp;
@@ -10,7 +11,6 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
-use App\Auth\FirestoreUser;
 
 class RegisterController extends Controller
 {
@@ -46,7 +46,6 @@ class RegisterController extends Controller
     /**
      * Get a validator for an incoming registration request.
      *
-     * @param  array  $data
      * @return \Illuminate\Contracts\Validation\Validator
      */
     protected function validator(array $data)
@@ -59,15 +58,15 @@ class RegisterController extends Controller
                 'email',
                 'max:255',
                 function ($attribute, $value, $fail) {
-                    $firestore = new FirestoreService();
+                    $firestore = new FirestoreService;
                     $existingUser = $firestore->getClient()->collection('users')
                         ->where('email', '=', $value)
                         ->documents();
 
-                    if (!$existingUser->isEmpty()) {
+                    if (! $existingUser->isEmpty()) {
                         $fail('The email has already been taken.');
                     }
-                }
+                },
             ],
             'username' => [
                 'required',
@@ -75,15 +74,15 @@ class RegisterController extends Controller
                 'max:255',
                 'unique:users,username',
                 function ($attribute, $value, $fail) {
-                    $firestore = new FirestoreService();
+                    $firestore = new FirestoreService;
                     $existingUser = $firestore->getClient()->collection('users')
                         ->where('username', '=', $value)
                         ->documents();
 
-                    if (!$existingUser->isEmpty()) {
+                    if (! $existingUser->isEmpty()) {
                         $fail('The username has already been taken.');
                     }
-                }
+                },
             ],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
@@ -92,13 +91,12 @@ class RegisterController extends Controller
     /**
      * Create a new user instance after a valid registration.
      *
-     * @param  array  $data
      * @return \App\Auth\FirestoreUser
      */
     protected function create(array $data)
     {
         try {
-            $firestore = new FirestoreService();
+            $firestore = new FirestoreService;
 
             // Generate a unique ID for the user
             $userId = (string) Str::uuid();
@@ -111,8 +109,8 @@ class RegisterController extends Controller
                 'password' => Hash::make($data['password']),
                 'role' => 'unverified', // Default role for new users
                 'email_verified_at' => null,
-                'created_at' => new Timestamp(new \DateTime()),
-                'updated_at' => new Timestamp(new \DateTime()),
+                'created_at' => new Timestamp(new \DateTime),
+                'updated_at' => new Timestamp(new \DateTime),
             ];
 
             // Add the user to Firestore
@@ -125,7 +123,7 @@ class RegisterController extends Controller
             return new FirestoreUser($userData);
 
         } catch (\Exception $e) {
-            Log::error('Error creating user: ' . $e->getMessage());
+            Log::error('Error creating user: '.$e->getMessage());
             throw $e; // Let the exception bubble up to be handled by Laravel
         }
     }
@@ -133,8 +131,6 @@ class RegisterController extends Controller
     /**
      * Notify admins about a new user registration
      *
-     * @param FirestoreService $firestore
-     * @param array $userData
      * @return void
      */
     protected function notifyAdminsAboutNewUser(FirestoreService $firestore, array $userData)
@@ -157,8 +153,8 @@ class RegisterController extends Controller
                         ),
                         'is_from_admin' => false,
                         'is_read' => false,
-                        'created_at' => new Timestamp(new \DateTime()),
-                        'updated_at' => new Timestamp(new \DateTime()),
+                        'created_at' => new Timestamp(new \DateTime),
+                        'updated_at' => new Timestamp(new \DateTime),
                     ];
 
                     // Add the message to Firestore
@@ -166,7 +162,7 @@ class RegisterController extends Controller
                 }
             }
         } catch (\Exception $e) {
-            Log::error('Error notifying admins about new user: ' . $e->getMessage());
+            Log::error('Error notifying admins about new user: '.$e->getMessage());
         }
     }
 }

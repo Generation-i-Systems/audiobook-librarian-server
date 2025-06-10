@@ -3,8 +3,6 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 class RepairBooks extends Command
 {
@@ -25,8 +23,9 @@ class RepairBooks extends Command
         $repairCovers = $this->option('cover') || $this->option('all');
         $repairSeries = $this->option('series') || $this->option('all');
 
-        if (!$repairCovers && !$repairSeries) {
+        if (! $repairCovers && ! $repairSeries) {
             $this->error('Please specify at least one repair action (--cover, --series, or --all)');
+
             return Command::FAILURE;
         }
 
@@ -48,6 +47,7 @@ class RepairBooks extends Command
         }
 
         $this->info('Book repair process completed.');
+
         return Command::SUCCESS;
     }
 
@@ -68,6 +68,7 @@ class RepairBooks extends Command
         if ($this->option('force')) {
             return true;
         }
+
         return $this->confirm($message, $default);
     }
 }

@@ -22,7 +22,7 @@ class NewBookAdded
     /**
      * Create a new event instance.
      *
-     * @param array $book The book data from Firestore
+     * @param  array  $book  The book data from Firestore
      * @return void
      */
     public function __construct(array $book)

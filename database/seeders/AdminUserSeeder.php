@@ -2,12 +2,12 @@
 
 namespace Database\Seeders;
 
+use App\Services\FirestoreService;
+use Google\Cloud\Firestore\Timestamp as FirestoreTimestamp;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
-use App\Services\FirestoreService;
 use Illuminate\Support\Str;
-use Google\Cloud\Firestore\Timestamp as FirestoreTimestamp;
 
 class AdminUserSeeder extends Seeder
 {
@@ -35,11 +35,12 @@ class AdminUserSeeder extends Seeder
         ]);
 
         if ($validator->fails()) {
-            $this->command->error('Validation failed: ' . $validator->errors()->first());
+            $this->command->error('Validation failed: '.$validator->errors()->first());
+
             return;
         }
 
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
 
         // Generate a unique ID for the user
         $userId = (string) Str::uuid();

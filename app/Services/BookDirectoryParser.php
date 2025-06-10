@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use getID3;
+use App\Traits\BookImportTrait;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Str;
 use SplFileInfo;
 use Symfony\Component\Finder\Finder;
-use App\Traits\BookImportTrait;
 
 class BookDirectoryParser
 {
@@ -17,12 +15,14 @@ class BookDirectoryParser
 
     /**
      * List of genres loaded from config.
+     *
      * @var array<string>
      */
     protected array $genres = [];
 
     /**
      * List of sub-genres to skip.
+     *
      * @var array<string>
      */
     protected array $subGenres = ['VA', 'R', 'Antoologies'];
@@ -68,41 +68,35 @@ class BookDirectoryParser
         'aax_plus',
         'surgeon',
         'battlefield',
-        'kaiju' // Skip common words from titles
+        'kaiju', // Skip common words from titles
     ];
 
     /**
      * Storage root directory.
-     *
-     * @var string
      */
     protected string $storageRoot;
 
     /**
      * Audio file analyzer instance.
-     *
-     * @var AudioFileAnalyzer
      */
     protected AudioFileAnalyzer $audioAnalyzer;
 
     /**
      * Metadata service instance.
-     *
-     * @var BookMetadataService
      */
     protected BookMetadataService $metadataService;
 
     /**
      * Initialize a new BookDirectoryParser instance.
      *
-     * @param AudioFileAnalyzer|null $audioAnalyzer Audio file analyzer instance
-     * @param BookMetadataService|null $metadataService Metadata service instance
+     * @param  AudioFileAnalyzer|null  $audioAnalyzer  Audio file analyzer instance
+     * @param  BookMetadataService|null  $metadataService  Metadata service instance
      */
     public function __construct(
         ?AudioFileAnalyzer $audioAnalyzer = null,
         ?BookMetadataService $metadataService = null
     ) {
-        $this->audioAnalyzer = $audioAnalyzer ?? new AudioFileAnalyzer();
+        $this->audioAnalyzer = $audioAnalyzer ?? new AudioFileAnalyzer;
         $this->metadataService = $metadataService ?? app(BookMetadataService::class);
         $this->storageRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
     }
@@ -110,8 +104,6 @@ class BookDirectoryParser
     /**
      * Resolve a path to an absolute path within BOOK_STORAGE_PATH.
      * If already absolute, return as-is.
-     * @param string $path
-     * @return string
      */
     public function resolveStoragePath(string $path): string
     {
@@ -126,13 +118,14 @@ class BookDirectoryParser
         }
         // Treat any other path (even if starts with '/') as relative to storage root
         $relativePath = ltrim($path, '/');
-        return $storageRoot . '/' . $relativePath;
+
+        return $storageRoot.'/'.$relativePath;
     }
 
     /**
      * Extract author name from file path.
      *
-     * @param string $path The full path to the book file
+     * @param  string  $path  The full path to the book file
      * @return string The extracted author name, or 'Unknown Author' if not found
      */
     public function extractAuthorFromPath(string $path): string
@@ -143,7 +136,7 @@ class BookDirectoryParser
         $normalizedPath = str_replace('\\', '/', $path);
         $parts = explode('/', $normalizedPath);
         $parts = array_values(array_filter($parts, function ($part) {
-            return !empty($part);
+            return ! empty($part);
         }));
 
         $i = 0;
@@ -301,14 +294,14 @@ class BookDirectoryParser
      * Read and parse metadata from a metadata.abs file (or file at given path).
      * Only parses the file and returns normalized data. No merging or path logic.
      *
-     * @param string $path Path to the metadata.abs file or directory containing it
+     * @param  string  $path  Path to the metadata.abs file or directory containing it
      * @return array<string, mixed> Parsed metadata with expected keys, or empty array if file not found/unreadable
      */
     public function readMetadataFile(string $path): array
     {
         $path = $this->resolveStoragePath($path);
         $isFile = pathinfo($path, PATHINFO_EXTENSION) === 'abs' || is_file($path);
-        $metadataPath = $isFile ? $path : rtrim($path, '/') . '/metadata.abs';
+        $metadataPath = $isFile ? $path : rtrim($path, '/').'/metadata.abs';
 
         $fileMetadata = [];
         if (file_exists($metadataPath) && is_readable($metadataPath)) {
@@ -325,7 +318,7 @@ class BookDirectoryParser
                             continue;
                         }
                         if (str_contains($trimmedLine, '=')) {
-                            if (!empty($descriptionLines)) {
+                            if (! empty($descriptionLines)) {
                                 $metadata['description'] = implode("\n", $descriptionLines);
                                 $descriptionLines = [];
                             }
@@ -334,6 +327,7 @@ class BookDirectoryParser
                             $value = trim($value);
                             if ($key === 'description') {
                                 $descriptionLines[] = $value;
+
                                 continue;
                             }
                             if (array_key_exists($key, $metadata)) {
@@ -368,13 +362,14 @@ class BookDirectoryParser
                                 default:
                                     $metadata[$key] = $value;
                             }
+
                             continue;
                         }
-                        if (!empty($descriptionLines) || $trimmedLine !== '') {
+                        if (! empty($descriptionLines) || $trimmedLine !== '') {
                             $descriptionLines[] = $line;
                         }
                     }
-                    if (!empty($descriptionLines)) {
+                    if (! empty($descriptionLines)) {
                         $metadata['description'] = implode("\n", array_map('trim', $descriptionLines));
                     }
                     $fileMetadata = [
@@ -396,21 +391,20 @@ class BookDirectoryParser
                         ),
                         'description' => array_key_exists('description', $metadata)
                             ? preg_replace('/^\[description\]\s*/i', '', $metadata['description'])
-                            : ''
+                            : '',
                     ];
                 }
             } catch (\Exception $e) {
             }
         }
+
         return $fileMetadata;
     }
-
-
 
     /**
      * Parse author string into an array of authors.
      *
-     * @param string $authorsString String containing author names
+     * @param  string  $authorsString  String containing author names
      * @return array Array of author names
      */
     protected function parseAuthors(string $authorsString): array
@@ -428,7 +422,7 @@ class BookDirectoryParser
         $uniqueAuthors = [];
         foreach ($authors as $author) {
             $normalized = $this->normalizeAuthorName($author);
-            if (!empty($normalized) && !isset($uniqueAuthors[$normalized])) {
+            if (! empty($normalized) && ! isset($uniqueAuthors[$normalized])) {
                 $uniqueAuthors[$normalized] = $author;
             }
         }
@@ -439,7 +433,7 @@ class BookDirectoryParser
     /**
      * Normalize author name for comparison.
      *
-     * @param string $name Author name to normalize
+     * @param  string  $name  Author name to normalize
      * @return string Normalized name
      */
     protected function normalizeAuthorName(string $name): string
@@ -456,7 +450,7 @@ class BookDirectoryParser
     /**
      * Clean up text by removing special characters and extra spaces.
      *
-     * @param string $text Text to clean
+     * @param  string  $text  Text to clean
      * @return string Cleaned text
      */
     public function cleanText($text)
@@ -541,12 +535,12 @@ class BookDirectoryParser
     /**
      * Calculate total duration from audio files
      *
-     * @param array $audioFiles Array of audio files
+     * @param  array  $audioFiles  Array of audio files
      * @return array Total duration and first audio file metadata
      */
     public function getAudioFiles($directory): array
     {
-        $audioFiles = (new Finder())
+        $audioFiles = (new Finder)
             ->files()
             ->in($directory)
             ->name(['*.mp3', '*.m4b', '*.m4a', '*.aac', '*.flac', '*.wav', '*.ogg']);
@@ -592,18 +586,17 @@ class BookDirectoryParser
         ];
     }
 
-
     /**
      * Parse a single book file and extract metadata.
      *
-     * @param SplFileInfo $file The file to parse
-     * @param array $config Configuration options
+     * @param  SplFileInfo  $file  The file to parse
+     * @param  array  $config  Configuration options
      * @return array|null Book metadata or null if parsing fails
      */
     /**
      * Format duration in seconds to a human-readable string (HH:MM:SS)
      *
-     * @param int $seconds Duration in seconds
+     * @param  int  $seconds  Duration in seconds
      * @return string Formatted duration
      */
     protected function formatDuration(float $seconds): string
@@ -620,8 +613,8 @@ class BookDirectoryParser
      * Parse a single book file and extract metadata.
      * This is now a helper method used internally by parseDirectory.
      *
-     * @param \SplFileInfo $file The file to parse
-     * @param array $config Configuration options
+     * @param  \SplFileInfo  $file  The file to parse
+     * @param  array  $config  Configuration options
      * @return array|null Book metadata or null if parsing fails
      */
     protected function parseBookFile(\SplFileInfo $file, array $config = []): ?array
@@ -638,7 +631,7 @@ class BookDirectoryParser
             // Count all audio files in the directory
             $directory = $file->getPath();
             $audioExtensions = ['mp3', 'm4b', 'm4a', 'aac', 'flac', 'wav', 'ogg'];
-            $audioFiles = glob($directory . '/*.{mp3,m4b,m4a,aac,flac,wav,ogg}', GLOB_BRACE);
+            $audioFiles = glob($directory.'/*.{mp3,m4b,m4a,aac,flac,wav,ogg}', GLOB_BRACE);
             $audioFileCount = $audioFiles ? count($audioFiles) : 1;
 
             $book = [
@@ -662,25 +655,25 @@ class BookDirectoryParser
             $this->extractMetadata($book, $basename);
 
             // Try to read metadata from metadata file if it exists
-            $metadataPath = dirname($file->getPathname()) . '/metadata.abs';
+            $metadataPath = dirname($file->getPathname()).'/metadata.abs';
             if (file_exists($metadataPath)) {
                 $metadata = $this->readMetadataFile($metadataPath);
-                if (!empty($metadata['title'])) {
+                if (! empty($metadata['title'])) {
                     $book['title'] = $metadata['title'];
                 }
-                if (!empty($metadata['author'])) {
+                if (! empty($metadata['author'])) {
                     $book['author'] = $metadata['author'];
                 }
-                if (!empty($metadata['series'])) {
+                if (! empty($metadata['series'])) {
                     $book['series'] = $metadata['series'];
                 }
                 if (isset($metadata['series_number'])) {
                     $book['series_number'] = $metadata['series_number'];
                 }
-                if (!empty($metadata['year'])) {
+                if (! empty($metadata['year'])) {
                     $book['year'] = $metadata['year'];
-                } elseif (!empty($metadata['publishedYear'])) {
-                    $book['year'] = is_numeric($metadata['publishedYear']) ? (int)$metadata['publishedYear'] : $metadata['publishedYear'];
+                } elseif (! empty($metadata['publishedYear'])) {
+                    $book['year'] = is_numeric($metadata['publishedYear']) ? (int) $metadata['publishedYear'] : $metadata['publishedYear'];
                 }
                 if (isset($metadata['description'])) {
                     $book['description'] = $metadata['description'];
@@ -692,22 +685,23 @@ class BookDirectoryParser
             return null;
         }
     }
+
     /**
      * Parse a directory for book files and extract metadata.
      * Supports both scanning for book directories and treating the given directory as a book if it contains audio files.
      *
-     * @param string $directory The directory path to parse
-     * @param array $config Configuration options
+     * @param  string  $directory  The directory path to parse
+     * @param  array  $config  Configuration options
      * @return array Array of book metadata
      */
     public function parseDirectory(string $directory, array $config = []): array
     {
         $directory = $this->resolveStoragePath($directory);
-        if (!is_dir($directory) || !is_readable($directory)) {
+        if (! is_dir($directory) || ! is_readable($directory)) {
             throw new \InvalidArgumentException("Directory does not exist or is not readable: $directory");
         }
         $books = [];
-        $finder = new Finder();
+        $finder = new Finder;
         $baseDepth = count(explode('/', rtrim($directory, '/')));
 
         try {
@@ -720,7 +714,7 @@ class BookDirectoryParser
                 if (empty($bookPathInfo['skipped']) && empty($bookPathInfo['error'])) {
                     $seriesName = '';
                     $seriesNumber = null;
-                    if (!empty($bookPathInfo['series']) && is_array($bookPathInfo['series'])) {
+                    if (! empty($bookPathInfo['series']) && is_array($bookPathInfo['series'])) {
                         $seriesName = array_key_first($bookPathInfo['series']);
                         $seriesNumber = $bookPathInfo['series'][$seriesName] ?? null;
                     }
@@ -754,18 +748,18 @@ class BookDirectoryParser
                 $path = trim(str_replace($this->storageRoot, '', $dir->getPathname()), '/');
                 $bookPathInfo = $this->processDirPath($path);
 
-                if (!empty($bookPathInfo['skipped'])) {
+                if (! empty($bookPathInfo['skipped'])) {
                     continue;
                 }
-                if (!empty($bookPathInfo['error'])) {
+                if (! empty($bookPathInfo['error'])) {
                     continue;
                 }
 
                 // Skip if any direct subdirectory contains audio files (treat only leaf-most dirs as books)
-                $subdirs = iterator_to_array((new Finder())->directories()->in($this->storageRoot . '/' . $path)->depth('== 0'));
+                $subdirs = iterator_to_array((new Finder)->directories()->in($this->storageRoot.'/'.$path)->depth('== 0'));
                 $hasAudioInSubdir = false;
                 foreach ($subdirs as $subdir) {
-                    $audioFiles = (new Finder())->files()
+                    $audioFiles = (new Finder)->files()
                         ->in($subdir->getPathname())
                         ->name(['*.mp3', '*.m4b', '*.m4a', '*.aac', '*.flac', '*.wav', '*.ogg'])
                         ->depth('== 0');
@@ -779,7 +773,7 @@ class BookDirectoryParser
                 }
 
                 // Get audio file data
-                $audioFilesData = $this->getAudioFiles($this->storageRoot . '/' . $path);
+                $audioFilesData = $this->getAudioFiles($this->storageRoot.'/'.$path);
                 $audioFileCount = $audioFilesData['count'];
                 $totalDuration = $audioFilesData['totalDuration'];
                 $fileTags = $audioFilesData['fileTags'];
@@ -788,7 +782,7 @@ class BookDirectoryParser
                     continue;
                 }
 
-                if (!empty($bookPathInfo['series']) && is_array($bookPathInfo['series'])) {
+                if (! empty($bookPathInfo['series']) && is_array($bookPathInfo['series'])) {
                     $seriesName = array_key_first($bookPathInfo['series']);
                     $seriesNumber = $bookPathInfo['series'][$seriesName] ?? null;
                 } else {
@@ -827,12 +821,13 @@ class BookDirectoryParser
     /**
      * Build a map of series names to their canonical forms.
      *
-     * @param array<array<string, mixed>> $books Array of book data
+     * @param  array<array<string, mixed>>  $books  Array of book data
      * @return array<string, string> Map of series names to canonical forms
      */
     /**
      * Build a map of canonical series names (and variations) to the highest seriesNumber found for that series.
-     * @param array<array<string, mixed>> $books
+     *
+     * @param  array<array<string, mixed>>  $books
      * @return array<string, float|int|null> Map of canonical/variant series names to highest seriesNumber
      */
     public function buildSeriesMap(array $books): array
@@ -842,11 +837,11 @@ class BookDirectoryParser
 
         // Collect all seriesName => seriesNumber
         foreach ($books as $book) {
-            if (!empty($book['seriesName'])) {
+            if (! empty($book['seriesName'])) {
                 $series = $book['seriesName'];
                 $number = isset($book['seriesNumber']) ? $book['seriesNumber'] : null;
                 $normalized = $this->normalizeSeriesName($series);
-                if (!isset($seriesNumbers[$normalized]) || ($number !== null && $number > $seriesNumbers[$normalized])) {
+                if (! isset($seriesNumbers[$normalized]) || ($number !== null && $number > $seriesNumbers[$normalized])) {
                     $seriesNumbers[$normalized] = $number;
                 }
             }
@@ -862,10 +857,10 @@ class BookDirectoryParser
                 str_replace(' ', '-', $canonical),
                 str_replace(' and ', ' & ', $canonical),
                 preg_replace('/^The /i', '', $canonical),
-                'The ' . $canonical,
+                'The '.$canonical,
             ];
             foreach ($variations as $variation) {
-                if ($variation !== $canonical && !isset($seriesMap[$variation])) {
+                if ($variation !== $canonical && ! isset($seriesMap[$variation])) {
                     $seriesMap[$variation] = $seriesNumber;
                 }
             }
@@ -877,9 +872,6 @@ class BookDirectoryParser
     /**
      * Remove leading track numbers and separators from a directory-derived title.
      * E.g. '01 - The Fellowship of the Ring' => 'The Fellowship of the Ring'
-     *
-     * @param string $title
-     * @return string
      */
     protected function stripLeadingNumber(string $title): string
     {

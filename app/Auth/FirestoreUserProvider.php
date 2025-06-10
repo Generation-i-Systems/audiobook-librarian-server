@@ -2,9 +2,9 @@
 
 namespace App\Auth;
 
-use Illuminate\Contracts\Auth\UserProvider;
-use Illuminate\Contracts\Auth\Authenticatable;
 use App\Services\FirestoreService;
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Contracts\Auth\UserProvider;
 use Illuminate\Support\Facades\Log;
 
 class FirestoreUserProvider implements UserProvider
@@ -32,28 +32,22 @@ class FirestoreUserProvider implements UserProvider
     /**
      * Rehash the user's password if necessary. Laravel 11+ requirement.
      *
-     * @param \Illuminate\Contracts\Auth\Authenticatable $user
-     * @param string $password
-     * @return string
+     * @param  string  $password
      */
     /**
      * Rehash the user's password if necessary. Laravel 11+ requirement.
-     *
-     * @param \Illuminate\Contracts\Auth\Authenticatable $user
-     * @param array $credentials
-     * @param bool $force
-     * @return string
      */
     public function rehashPasswordIfRequired(Authenticatable $user, array $credentials, bool $force = false): string
     {
-        Log::debug('FirestoreUserProvider::rehashPasswordIfRequired called with user=' . print_r($user, true) .
-            ', credentials=' . print_r($credentials, true) . ', force=' . $force);
+        Log::debug('FirestoreUserProvider::rehashPasswordIfRequired called with user='.print_r($user, true).
+            ', credentials='.print_r($credentials, true).', force='.$force);
         // Get the plain password from credentials
         $plain = $credentials['password'] ?? null;
         $currentHash = $user->getAuthPassword();
         if ($plain && ($force || \Illuminate\Support\Facades\Hash::needsRehash($currentHash))) {
             return \Illuminate\Support\Facades\Hash::make($plain);
         }
+
         return $currentHash;
     }
 
@@ -61,18 +55,20 @@ class FirestoreUserProvider implements UserProvider
 
     public function __construct()
     {
-        $this->firestore = new FirestoreService();
+        $this->firestore = new FirestoreService;
     }
 
     public function retrieveById($identifier)
     {
         $user = $this->firestore->getUserById($identifier);
+
         return $user ? new FirestoreUser($user) : null;
     }
 
     public function retrieveByToken($identifier, $token)
     {
         $user = $this->firestore->getUserByRememberToken($identifier, $token);
+
         return $user ? new FirestoreUser($user) : null;
     }
 
@@ -88,6 +84,7 @@ class FirestoreUserProvider implements UserProvider
             return null;
         }
         $user = $this->firestore->getUserByCredentials($credentials);
+
         return $user ? new FirestoreUser($user) : null;
     }
 

@@ -4,11 +4,11 @@ namespace Tests;
 
 use Google\Cloud\Firestore\FirestoreClient;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
-use Illuminate\Support\Facades\Artisan;
 
 abstract class FirestoreTestCase extends BaseTestCase
 {
     protected $firestore;
+
     protected $collections = [];
 
     protected function setUp(): void
@@ -17,7 +17,7 @@ abstract class FirestoreTestCase extends BaseTestCase
 
         $this->firestore = new FirestoreClient([
             'projectId' => config('firebase.project_id'),
-            'keyFilePath' => config('firebase.credentials.file')
+            'keyFilePath' => config('firebase.credentials.file'),
         ]);
 
         // Clear test data before each test
@@ -46,6 +46,7 @@ abstract class FirestoreTestCase extends BaseTestCase
     protected function markAsTestDocument($documentRef)
     {
         $documentRef->update([['path' => '__test__', 'value' => true]]);
+
         return $documentRef;
     }
 }

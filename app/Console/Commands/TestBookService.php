@@ -32,7 +32,7 @@ class TestBookService extends Command
     {
         $query = $this->argument('query');
         $serviceName = $this->option('service');
-        $limit = (int)$this->option('limit');
+        $limit = (int) $this->option('limit');
         $fetchDetails = $this->option('details');
 
         $this->info("Searching for: {$query}");
@@ -41,14 +41,15 @@ class TestBookService extends Command
             $this->info("Using service: {$serviceName}");
             $services = [$serviceName => BookService::get($serviceName)];
 
-            if (!$services[$serviceName]) {
+            if (! $services[$serviceName]) {
                 $this->error("Service '{$serviceName}' not found.");
-                $this->line('Available services: ' . implode(', ', array_keys(BookService::all())));
+                $this->line('Available services: '.implode(', ', array_keys(BookService::all())));
+
                 return 1;
             }
         } else {
             $services = BookService::all();
-            $this->info('Using all available services: ' . implode(', ', array_keys($services)));
+            $this->info('Using all available services: '.implode(', ', array_keys($services)));
         }
 
         // Search for books
@@ -61,30 +62,31 @@ class TestBookService extends Command
 
                 if (empty($serviceResults)) {
                     $this->warn("No results from {$name}");
+
                     continue;
                 }
 
                 $results[$name] = $serviceResults;
-                $this->info(sprintf("Found %d result(s) from %s", count($serviceResults), $name));
+                $this->info(sprintf('Found %d result(s) from %s', count($serviceResults), $name));
 
                 // Display search results
                 $this->displayResults($serviceResults, $name);
 
                 // Fetch details for first result if requested
-                if ($fetchDetails && !empty($serviceResults)) {
+                if ($fetchDetails && ! empty($serviceResults)) {
                     $firstResult = $serviceResults[0];
-                    $this->info("\nFetching details for: " . ($firstResult['title'] ?? 'Unknown Title'));
+                    $this->info("\nFetching details for: ".($firstResult['title'] ?? 'Unknown Title'));
 
                     $details = $service->getBookDetails($firstResult['id']);
                     if ($details) {
                         $this->displayBookDetails($details);
                     } else {
-                        $this->warn("Failed to fetch details for this book.");
+                        $this->warn('Failed to fetch details for this book.');
                     }
                 }
 
             } catch (\Exception $e) {
-                $this->error("Error searching {$name}: " . $e->getMessage());
+                $this->error("Error searching {$name}: ".$e->getMessage());
                 if ($this->getOutput()->isVerbose()) {
                     $this->line($e->getTraceAsString());
                 }
@@ -92,7 +94,8 @@ class TestBookService extends Command
         }
 
         if (empty($results)) {
-            $this->warn("No results found from any service.");
+            $this->warn('No results found from any service.');
+
             return 1;
         }
 
@@ -130,35 +133,35 @@ class TestBookService extends Command
      */
     protected function displayBookDetails(array $book): void
     {
-        $this->line('"' . ($book['title'] ?? 'Unknown Title') . '"');
+        $this->line('"'.($book['title'] ?? 'Unknown Title').'"');
 
-        if (!empty($book['subtitle'])) {
+        if (! empty($book['subtitle'])) {
             $this->line("Subtitle: {$book['subtitle']}");
         }
 
         $this->line('');
 
-        $this->line("Authors: " . $this->formatPeople($book['authors'] ?? []));
+        $this->line('Authors: '.$this->formatPeople($book['authors'] ?? []));
 
-        if (!empty($book['narrators'])) {
-            $this->line("Narrators: " . $this->formatPeople($book['narrators'] ?? []));
+        if (! empty($book['narrators'])) {
+            $this->line('Narrators: '.$this->formatPeople($book['narrators'] ?? []));
         }
 
-        if (!empty($book['publisher']['name'])) {
+        if (! empty($book['publisher']['name'])) {
             $this->line("Publisher: {$book['publisher']['name']}");
         }
 
-        if (!empty($book['published_date'])) {
+        if (! empty($book['published_date'])) {
             $this->line("Published: {$book['published_date']}");
         }
 
-        if (!empty($book['description'])) {
-            $this->line("");
+        if (! empty($book['description'])) {
+            $this->line('');
             $this->line(wordwrap($book['description'], 80));
         }
 
-        if (!empty($book['cover_image_url'])) {
-            $this->line("");
+        if (! empty($book['cover_image_url'])) {
+            $this->line('');
             $this->line("Cover: {$book['cover_image_url']}");
         }
     }

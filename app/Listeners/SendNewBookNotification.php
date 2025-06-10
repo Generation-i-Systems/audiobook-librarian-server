@@ -24,7 +24,6 @@ class SendNewBookNotification implements ShouldQueue
     /**
      * Handle the event.
      *
-     * @param  \App\Events\NewBookAdded  $event
      * @return void
      */
     public function handle(NewBookAdded $event)
@@ -37,13 +36,13 @@ class SendNewBookNotification implements ShouldQueue
         $bookSeries = $book['series'] ?? [];
 
         // Ensure authors is always an array
-        if (!is_array($bookAuthors)) {
+        if (! is_array($bookAuthors)) {
             $bookAuthors = [$bookAuthors];
         }
 
         try {
             // Get all users who follow any of the book's authors
-            if (!empty($bookAuthors)) {
+            if (! empty($bookAuthors)) {
                 $authorFollowers = [];
                 foreach ($bookAuthors as $author) {
                     $followersQuery = $this->firestore->getClient()
@@ -62,7 +61,7 @@ class SendNewBookNotification implements ShouldQueue
             }
 
             // Get all users who follow the book's series
-            if (!empty($bookSeries)) {
+            if (! empty($bookSeries)) {
                 foreach (array_keys($bookSeries) as $seriesName) {
                     $seriesFollowers = $this->firestore->getClient()
                         ->collection('user_follows')
@@ -103,7 +102,7 @@ class SendNewBookNotification implements ShouldQueue
                 $bookTitle
             ));
         } catch (\Exception $e) {
-            Log::error('Error sending new book notifications: ' . $e->getMessage(), [
+            Log::error('Error sending new book notifications: '.$e->getMessage(), [
                 'book_id' => $bookId,
                 'book_title' => $bookTitle,
                 'exception' => $e->getTraceAsString(),
@@ -114,8 +113,8 @@ class SendNewBookNotification implements ShouldQueue
     /**
      * Send push notification to a user's device
      *
-     * @param array $user User data from Firestore
-     * @param array $book Book data from Firestore
+     * @param  array  $user  User data from Firestore
+     * @param  array  $book  Book data from Firestore
      */
     private function sendPushNotification(array $user, array $book)
     {
@@ -128,7 +127,7 @@ class SendNewBookNotification implements ShouldQueue
             $title = 'New Book Available';
             // Format authors for display
             $authors = $book['author'] ?? [];
-            $authorText = !empty($authors)
+            $authorText = ! empty($authors)
                 ? (is_array($authors) ? implode(', ', $authors) : $authors)
                 : 'an unknown author';
 
@@ -142,7 +141,7 @@ class SendNewBookNotification implements ShouldQueue
             $notification = Notification::create($title, $body);
 
             // Create message for each device token
-            foreach ((array)$user['fcm_tokens'] as $token) {
+            foreach ((array) $user['fcm_tokens'] as $token) {
                 $message = CloudMessage::withTarget('token', $token)
                     ->withNotification($notification)
                     ->withData([
@@ -162,7 +161,7 @@ class SendNewBookNotification implements ShouldQueue
                 ));
             }
         } catch (\Exception $e) {
-            Log::error('Error sending push notification: ' . $e->getMessage(), [
+            Log::error('Error sending push notification: '.$e->getMessage(), [
                 'user_id' => $user['id'] ?? 'unknown',
                 'book_id' => $book['id'] ?? 'unknown',
             ]);

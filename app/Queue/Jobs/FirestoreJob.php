@@ -2,15 +2,18 @@
 
 namespace App\Queue\Jobs;
 
-use Illuminate\Queue\Jobs\Job;
-use Illuminate\Contracts\Queue\Job as JobContract;
 use Illuminate\Container\Container;
+use Illuminate\Contracts\Queue\Job as JobContract;
+use Illuminate\Queue\Jobs\Job;
 
 class FirestoreJob extends Job implements JobContract
 {
     protected $firestoreQueue;
+
     protected $firestoreDoc;
+
     protected $queue;
+
     protected $rawBody;
 
     public function __construct(Container $container, $firestoreQueue, $firestoreDoc, $connectionName, $queue)
@@ -56,6 +59,7 @@ class FirestoreJob extends Job implements JobContract
 
     /**
      * Get the raw underlying job payload string.
+     *
      * @return string
      */
     public function getRawBody()

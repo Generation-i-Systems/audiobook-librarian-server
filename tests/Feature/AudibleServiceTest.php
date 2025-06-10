@@ -22,11 +22,11 @@ class AudibleServiceTest extends TestCase
                 return $callback();
             });
 
-        $this->service = new AudibleService();
+        $this->service = new AudibleService;
     }
 
     #[Test]
-    public function searchBooksByTitle()
+    public function search_books_by_title()
     {
         // Mock the HTTP response
         Http::fake([
@@ -55,7 +55,7 @@ class AudibleServiceTest extends TestCase
     }
 
     #[Test]
-    public function getBookDetails()
+    public function get_book_details()
     {
         $mockBook = $this->getMockBookData();
 
@@ -93,7 +93,7 @@ class AudibleServiceTest extends TestCase
     }
 
     #[Test]
-    public function handlesApiErrorsGracefully()
+    public function handles_api_errors_gracefully()
     {
         // Test search error
         Http::fake([
@@ -120,8 +120,6 @@ class AudibleServiceTest extends TestCase
 
     /**
      * Get mock book data for testing.
-     *
-     * @return array
      */
     private function getMockBookData(): array
     {

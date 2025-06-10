@@ -2,8 +2,8 @@
 
 namespace App\Queue;
 
-use Illuminate\Queue\Connectors\ConnectorInterface;
 use App\Services\FirestoreService;
+use Illuminate\Queue\Connectors\ConnectorInterface;
 
 class FirestoreQueueConnector implements ConnectorInterface
 {
@@ -11,6 +11,7 @@ class FirestoreQueueConnector implements ConnectorInterface
     {
         $firestore = app(FirestoreService::class);
         $collection = $config['queue'] ?? 'queue';
+
         return new FirestoreQueue($firestore, $collection);
     }
 }

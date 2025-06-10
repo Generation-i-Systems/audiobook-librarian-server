@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Services\FirestoreService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -9,8 +10,6 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use App\Jobs\ImportBookFromDirectoryJob;
-use App\Services\FirestoreService;
 
 class CreateImportJobsForDirectory implements ShouldQueue
 {
@@ -36,7 +35,7 @@ class CreateImportJobsForDirectory implements ShouldQueue
     /**
      * Create a new job instance.
      *
-     * @param string $dir The relative directory to scan for book directories
+     * @param  string  $dir  The relative directory to scan for book directories
      */
     public function __construct($dir)
     {
@@ -53,31 +52,31 @@ class CreateImportJobsForDirectory implements ShouldQueue
         $startTime = microtime(true);
         Log::info('[DIRECTORY_IMPORT] Starting directory import job', [
             'directory' => $this->dir,
-            'job_id' => $this->job ? $this->job->getJobId() : 'sync'
+            'job_id' => $this->job ? $this->job->getJobId() : 'sync',
         ]);
-        print "[DIRECTORY_IMPORT] Starting import for directory: " . $this->dir . "\n";
+        echo '[DIRECTORY_IMPORT] Starting import for directory: '.$this->dir."\n";
 
         $storagePath = env('BOOK_STORAGE_PATH');
         if (empty($storagePath)) {
             $error = 'BOOK_STORAGE_PATH is not set in environment';
-            Log::error('[DIRECTORY_IMPORT] ' . $error);
+            Log::error('[DIRECTORY_IMPORT] '.$error);
             throw new \RuntimeException($error);
         }
 
-        $absDir = rtrim($storagePath, '/') . '/' . ltrim($this->dir, '/');
-        if (!is_dir($absDir)) {
+        $absDir = rtrim($storagePath, '/').'/'.ltrim($this->dir, '/');
+        if (! is_dir($absDir)) {
             $error = "Directory not found for import: $absDir";
-            Log::error('[DIRECTORY_IMPORT] ' . $error);
+            Log::error('[DIRECTORY_IMPORT] '.$error);
             throw new \RuntimeException($error);
         }
 
         Log::debug('[DIRECTORY_IMPORT] Directory scan starting', [
             'storage_path' => $storagePath,
-            'absolute_path' => $absDir
+            'absolute_path' => $absDir,
         ]);
 
-        $firestore = new FirestoreService();
-        $jobId = 'import_dir_' . md5($this->dir . '_' . now()->timestamp);
+        $firestore = new FirestoreService;
+        $jobId = 'import_dir_'.md5($this->dir.'_'.now()->timestamp);
 
         try {
             // Update job status to processing
@@ -108,7 +107,7 @@ class CreateImportJobsForDirectory implements ShouldQueue
                 ['total_items' => $total]
             );
 
-            print "Looping through " . count($bookDirs) . " directories\n";
+            echo 'Looping through '.count($bookDirs)." directories\n";
             foreach ($bookDirs as $dirPath) {
                 $relDir = ltrim(str_replace($storagePath, '', $dirPath), '/');
                 $exists = false;
@@ -129,6 +128,7 @@ class CreateImportJobsForDirectory implements ShouldQueue
                         'processing',
                         ['skipped_items' => count($skipped)]
                     );
+
                     continue;
                 }
 
@@ -148,14 +148,14 @@ class CreateImportJobsForDirectory implements ShouldQueue
 
                     Log::debug('[DIRECTORY_IMPORT] Dispatching ImportBookFromDirectoryJob', [
                         'directory' => $relDir,
-                        'queue' => 'imports'
+                        'queue' => 'imports',
                     ]);
 
                     $dispatchId = (string) Str::uuid();
 
                     Log::debug('[DIRECTORY_IMPORT] About to dispatch job', [
                         'dispatch_id' => $dispatchId,
-                        'directory' => $relDir
+                        'directory' => $relDir,
                     ]);
 
                     dispatch($importJob);
@@ -163,21 +163,21 @@ class CreateImportJobsForDirectory implements ShouldQueue
                     Log::info('[DIRECTORY_IMPORT] Successfully queued job', [
                         'dispatch_id' => $dispatchId,
                         'directory' => $relDir,
-                        'queue' => 'imports'
+                        'queue' => 'imports',
                     ]);
 
-                    print sprintf("[DIRECTORY_IMPORT] Queued job %s for: %s\n", $dispatchId, $relDir);
+                    echo sprintf("[DIRECTORY_IMPORT] Queued job %s for: %s\n", $dispatchId, $relDir);
 
                     $queued[] = [
                         'dispatch_id' => $dispatchId,
                         'directory' => $relDir,
-                        'queued_at' => now()->toDateTimeString()
+                        'queued_at' => now()->toDateTimeString(),
                     ];
                 } catch (\Exception $e) {
                     Log::error('[DIRECTORY_IMPORT] Failed to queue job', [
                         'directory' => $relDir,
                         'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString()
+                        'trace' => $e->getTraceAsString(),
                     ]);
                     throw $e;
                 }
@@ -189,7 +189,7 @@ class CreateImportJobsForDirectory implements ShouldQueue
                     'processing',
                     [
                         'queued_items' => count($queued),
-                        'processed_items' => count($queued) + count($skipped)
+                        'processed_items' => count($queued) + count($skipped),
                     ]
                 );
             }
@@ -206,13 +206,13 @@ class CreateImportJobsForDirectory implements ShouldQueue
                 ]
             );
 
-            Log::info('Queued ' . count($queued) . ' book directories for import.', [
+            Log::info('Queued '.count($queued).' book directories for import.', [
                 'job_id' => $jobId,
                 'queued_dirs' => $queued,
                 'skipped_dirs' => $skipped,
             ]);
         } catch (\Exception $e) {
-            Log::error('Error in CreateImportJobsForDirectory: ' . $e->getMessage(), [
+            Log::error('Error in CreateImportJobsForDirectory: '.$e->getMessage(), [
                 'directory' => $this->dir,
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -245,11 +245,11 @@ class CreateImportJobsForDirectory implements ShouldQueue
             if ($item === '.' || $item === '..') {
                 continue;
             }
-            $path = $dir . '/' . $item;
+            $path = $dir.'/'.$item;
             if (is_dir($path)) {
                 // If directory contains audio files, treat as book dir
-                $audioFiles = glob($path . '/*.{mp3,m4b,m4a}', GLOB_BRACE);
-                if (!empty($audioFiles)) {
+                $audioFiles = glob($path.'/*.{mp3,m4b,m4a}', GLOB_BRACE);
+                if (! empty($audioFiles)) {
                     $results[] = $path;
                 } else {
                     // Recursively search subdirectories
@@ -257,6 +257,7 @@ class CreateImportJobsForDirectory implements ShouldQueue
                 }
             }
         }
+
         return $results;
     }
 }

@@ -17,16 +17,16 @@ class AudibleServiceMockTest extends TestCase
 
         // Mock the cache facade
         $cache = new \Illuminate\Cache\Repository(
-            new \Illuminate\Cache\ArrayStore()
+            new \Illuminate\Cache\ArrayStore
         );
         $this->app->instance('cache', $cache);
 
         // Create the service instance
-        $this->service = new AudibleService();
+        $this->service = new AudibleService;
     }
 
     #[Test]
-    public function testItCanSearchBooksByTitle()
+    public function test_it_can_search_books_by_title()
     {
         // Mock the HTTP response
         Http::fake([
@@ -47,7 +47,7 @@ class AudibleServiceMockTest extends TestCase
     }
 
     #[Test]
-    public function testItGetsBookDetails()
+    public function test_it_gets_book_details()
     {
         $mockBook = $this->getMockBookData();
 
@@ -79,7 +79,7 @@ class AudibleServiceMockTest extends TestCase
     }
 
     #[Test]
-    public function testItHandlesApiErrorsGracefully()
+    public function test_it_handles_api_errors_gracefully()
     {
         Http::fake([
             'api.audible.com/1.0/catalog/products*' => Http::response(

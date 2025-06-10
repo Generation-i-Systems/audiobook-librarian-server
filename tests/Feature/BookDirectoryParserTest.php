@@ -9,6 +9,7 @@ use Tests\TestCase;
 class BookDirectoryParserTest extends TestCase
 {
     protected string $testDataPath;
+
     protected BookDirectoryParser $parser;
 
     protected function setUp(): void
@@ -16,8 +17,8 @@ class BookDirectoryParserTest extends TestCase
         parent::setUp();
         // Skip tests if the required test directory does not exist or is not readable
         $testDir = '/tmp/ab-librarian-test-books/home/eric-shared/PhpstormProjects/ab5/storage/framework/testing/book_parser';
-        if (!is_dir($testDir) || !is_readable($testDir)) {
-            $this->markTestSkipped('Required test directory does not exist or is not readable: ' . $testDir);
+        if (! is_dir($testDir) || ! is_readable($testDir)) {
+            $this->markTestSkipped('Required test directory does not exist or is not readable: '.$testDir);
         }
         $this->parser = app(BookDirectoryParser::class);
         $this->testDataPath = storage_path('framework/testing/book_parser');
@@ -78,11 +79,11 @@ class BookDirectoryParserTest extends TestCase
     protected function createDirectories(string $basePath, array $structure): void
     {
         foreach ($structure as $name => $content) {
-            $path = $basePath . '/' . $name;
+            $path = $basePath.'/'.$name;
 
             if (is_array($content)) {
                 // It's a directory
-                if (!File::exists($path)) {
+                if (! File::exists($path)) {
                     File::makeDirectory($path, 0755, true);
                 }
                 $this->createDirectories($path, $content);

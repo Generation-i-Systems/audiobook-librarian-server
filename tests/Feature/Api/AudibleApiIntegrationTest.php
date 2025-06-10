@@ -4,7 +4,6 @@ namespace Tests\Feature\Api;
 
 use App\Services\AudibleApiService;
 use Illuminate\Support\Facades\Http;
-use Tests\Feature\Api\BaseApiTest;
 use PHPUnit\Framework\Attributes\Test;
 
 class AudibleApiIntegrationTest extends BaseApiTest
@@ -12,9 +11,13 @@ class AudibleApiIntegrationTest extends BaseApiTest
     private AudibleApiService $audibleApi;
 
     protected string $apiBaseUrl = 'https://api.audible.us/1.0'; // Aligned with 'us' region in service
+
     protected string $testAssociateTag = 'test-tag';
+
     protected string $testAccessKey = 'test-access-key';
+
     protected string $testSecretKey = 'test-secret-key';
+
     protected string $testRegion = 'us';
 
     protected function setUp(): void
@@ -78,7 +81,7 @@ class AudibleApiIntegrationTest extends BaseApiTest
             ],
             'CustomerReviews' => ['AverageRating' => '4.5', 'TotalCount' => 100],
             'DetailPageURL' => 'http://example.com/details/TEST123',
-            'AudioDetails' => ['Time' => 'PT1H23M45S'] // Added AudioDetails for duration
+            'AudioDetails' => ['Time' => 'PT1H23M45S'], // Added AudioDetails for duration
         ];
     }
 
@@ -166,7 +169,7 @@ XML;
     }
 
     #[Test]
-    public function testItCanSearchAudiobooks()
+    public function test_it_can_search_audiobooks()
     {
         $apiBaseUrl = $this->apiBaseUrl;
         $mockSearchResponse = $this->getMockSearchResponse();
@@ -176,7 +179,7 @@ XML;
             $queryString = $urlParts['query'] ?? '';
             parse_str($queryString, $queryParams);
 
-            $urlWithoutQuery = ($urlParts['scheme'] ?? 'http') . '://' . ($urlParts['host'] ?? '') . ($urlParts['path'] ?? '');
+            $urlWithoutQuery = ($urlParts['scheme'] ?? 'http').'://'.($urlParts['host'] ?? '').($urlParts['path'] ?? '');
             $rtrimmedUrlWithoutQuery = rtrim($urlWithoutQuery, '/');
             $rtrimmedApiBaseUrl = rtrim($apiBaseUrl, '/');
 
@@ -188,8 +191,9 @@ XML;
                 return Http::response($this->getFakeXmlSearchResponseString(), 200, ['Content-Type' => 'application/xml']);
             }
 
-            \Illuminate\Support\Facades\Log::warning("S_LOG_INT: Http::fake did not match for search.", ['url' => $request->url(), 'query_params' => $queryParams, 'base_url_expected' => $apiBaseUrl]);
-            return Http::response('Mock not found for integration search: ' . $request->url(), 404, ['Content-Type' => 'text/plain']);
+            \Illuminate\Support\Facades\Log::warning('S_LOG_INT: Http::fake did not match for search.', ['url' => $request->url(), 'query_params' => $queryParams, 'base_url_expected' => $apiBaseUrl]);
+
+            return Http::response('Mock not found for integration search: '.$request->url(), 404, ['Content-Type' => 'text/plain']);
         });
 
         $results = $this->audibleApi->searchBooks('test');
@@ -202,7 +206,7 @@ XML;
     }
 
     #[Test]
-    public function testItCanGetAudiobookDetails()
+    public function test_it_can_get_audiobook_details()
     {
         $apiBaseUrl = $this->apiBaseUrl;
         $mockDetailsResponse = $this->getMockDetailsResponse();
@@ -212,7 +216,7 @@ XML;
             $queryString = $urlParts['query'] ?? '';
             parse_str($queryString, $queryParams);
 
-            $urlWithoutQuery = ($urlParts['scheme'] ?? 'http') . '://' . ($urlParts['host'] ?? '') . ($urlParts['path'] ?? '');
+            $urlWithoutQuery = ($urlParts['scheme'] ?? 'http').'://'.($urlParts['host'] ?? '').($urlParts['path'] ?? '');
             $rtrimmedUrlWithoutQuery = rtrim($urlWithoutQuery, '/');
             $rtrimmedApiBaseUrl = rtrim($apiBaseUrl, '/');
 
@@ -225,8 +229,9 @@ XML;
                 return Http::response($this->getFakeXmlDetailsResponseString(), 200, ['Content-Type' => 'application/xml']);
             }
 
-            \Illuminate\Support\Facades\Log::warning("D_LOG_INT: Http::fake did not match for details.", ['url' => $request->url(), 'query_params' => $queryParams, 'base_url_expected' => $apiBaseUrl]);
-            return Http::response('Mock not found for integration details: ' . $request->url(), 404, ['Content-Type' => 'text/plain']);
+            \Illuminate\Support\Facades\Log::warning('D_LOG_INT: Http::fake did not match for details.', ['url' => $request->url(), 'query_params' => $queryParams, 'base_url_expected' => $apiBaseUrl]);
+
+            return Http::response('Mock not found for integration details: '.$request->url(), 404, ['Content-Type' => 'text/plain']);
         });
 
         $details = $this->audibleApi->getAudiobookDetails('TEST123');

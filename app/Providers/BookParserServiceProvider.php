@@ -18,7 +18,7 @@ class BookParserServiceProvider extends ServiceProvider
         );
 
         $this->app->singleton(BookDirectoryParser::class, function ($app) {
-            return new BookDirectoryParser();
+            return new BookDirectoryParser;
         });
     }
 

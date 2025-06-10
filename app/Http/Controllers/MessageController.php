@@ -19,7 +19,6 @@ class MessageController extends Controller
     /**
      * Store a new message from a user to admin
      *
-     * @param Request $request
      * @return \Illuminate\Http\RedirectResponse
      */
     public function store(Request $request)
@@ -45,7 +44,8 @@ class MessageController extends Controller
 
             return back()->with('error', 'Failed to send message. Please try again.');
         } catch (\Exception $e) {
-            Log::error('Failed to send message: ' . $e->getMessage());
+            Log::error('Failed to send message: '.$e->getMessage());
+
             return back()->with('error', 'An error occurred while sending your message.');
         }
     }
@@ -53,7 +53,6 @@ class MessageController extends Controller
     /**
      * Store a new message from admin to a user
      *
-     * @param Request $request
      * @return \Illuminate\Http\RedirectResponse
      */
     public function storeAdmin(Request $request)
@@ -80,7 +79,8 @@ class MessageController extends Controller
 
             return back()->with('error', 'Failed to send message. Please try again.');
         } catch (\Exception $e) {
-            Log::error('Failed to send admin message: ' . $e->getMessage());
+            Log::error('Failed to send admin message: '.$e->getMessage());
+
             return back()->with('error', 'An error occurred while sending the message.');
         }
     }

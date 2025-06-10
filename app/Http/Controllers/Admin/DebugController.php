@@ -3,13 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Services\FirestoreService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use App\Services\FirestoreService;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Session;
 
 class DebugController extends Controller
 {
@@ -50,6 +49,7 @@ class DebugController extends Controller
     public function auth(): JsonResponse
     {
         \App\Auth\FirestoreUserProvider::logAuthState();
+
         return response()->json([
             'auth_user' => Auth::user(),
             'auth_id' => Auth::id(),
@@ -57,7 +57,7 @@ class DebugController extends Controller
             'session_data' => session()->all(),
             'user_class' => Auth::user() ? get_class(Auth::user()) : null,
             'guard' => Auth::getDefaultDriver(),
-            'provider' => config('auth.guards.' . Auth::getDefaultDriver() . '.provider'),
+            'provider' => config('auth.guards.'.Auth::getDefaultDriver().'.provider'),
             'session_driver' => config('session.driver'),
             'session_cookie' => config('session.cookie'),
             'session_cookie_value' => request()->cookie(config('session.cookie')),
@@ -87,6 +87,7 @@ class DebugController extends Controller
         } catch (\Exception $e) {
             $row = $e->getMessage();
         }
+
         return response()->json([
             'session_id' => $sessionId,
             'db_row' => $row,
@@ -100,6 +101,7 @@ class DebugController extends Controller
     {
         Auth::logout();
         session()->invalidate();
+
         return response()->json(['status' => 'logged out']);
     }
 
@@ -109,6 +111,7 @@ class DebugController extends Controller
     public function sessionWrite(): JsonResponse
     {
         session(['foo' => 'bar']);
+
         return response()->json([
             'session_id' => session()->getId(),
             'session_data' => session()->all(),
@@ -121,6 +124,7 @@ class DebugController extends Controller
     public function firestoreUsersDump(): JsonResponse
     {
         $result = FirestoreService::dumpAllUsers();
+
         return response()->json($result);
     }
 
@@ -130,6 +134,7 @@ class DebugController extends Controller
     public function firestoreBooksDump(): JsonResponse
     {
         $result = FirestoreService::dumpAllBooks();
+
         return response()->json($result);
     }
 }

@@ -4,7 +4,6 @@ namespace App\Console\Commands;
 
 use App\Services\AudibleService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Http;
 
 class TestAudibleCommand extends Command
 {
@@ -29,20 +28,21 @@ class TestAudibleCommand extends Command
         $action = $this->argument('action');
         $query = $this->argument('query');
         $author = $this->option('author');
-        $limit = (int)$this->option('limit');
+        $limit = (int) $this->option('limit');
 
-        if (!in_array($action, ['search', 'details'])) {
+        if (! in_array($action, ['search', 'details'])) {
             $this->error('Action must be either "search" or "details"');
+
             return 1;
         }
 
         if ($action === 'search') {
-            if (!$query) {
+            if (! $query) {
                 $query = $this->ask('Enter search query:');
             }
             $this->handleSearch($query, $author, $limit);
         } else {
-            if (!$query) {
+            if (! $query) {
                 $query = $this->ask('Enter ASIN:');
             }
             $this->handleDetails($query);
@@ -53,24 +53,25 @@ class TestAudibleCommand extends Command
 
     private function handleSearch(string $query, ?string $author, int $limit): void
     {
-        $this->info("Searching for: {$query}" . ($author ? " by {$author}" : ''));
+        $this->info("Searching for: {$query}".($author ? " by {$author}" : ''));
 
         $books = $this->audibleService->searchBooks($query, $author, $limit);
 
         if (empty($books)) {
             $this->error('No books found or an error occurred.');
+
             return;
         }
 
-        $this->info("\nFound " . count($books) . " results:\n");
+        $this->info("\nFound ".count($books)." results:\n");
 
         foreach ($books as $index => $book) {
-            $this->line(($index + 1) . ". {$book['title']}");
-            $this->line("   Authors: " . implode(', ', array_column($book['authors'] ?? [], 'author.name')));
-            $this->line("   Narrators: " . implode(', ', array_column($book['narrators'] ?? [], 'author.name')));
-            $this->line("   Published: " . ($book['release_date'] ?? 'N/A'));
-            $this->line("   Cover: " . ($book['cover_image_url'] ?? 'N/A'));
-            $this->line("   ASIN: " . ($book['id'] ?? 'N/A'));
+            $this->line(($index + 1).". {$book['title']}");
+            $this->line('   Authors: '.implode(', ', array_column($book['authors'] ?? [], 'author.name')));
+            $this->line('   Narrators: '.implode(', ', array_column($book['narrators'] ?? [], 'author.name')));
+            $this->line('   Published: '.($book['release_date'] ?? 'N/A'));
+            $this->line('   Cover: '.($book['cover_image_url'] ?? 'N/A'));
+            $this->line('   ASIN: '.($book['id'] ?? 'N/A'));
             $this->line('');
         }
     }
@@ -81,25 +82,26 @@ class TestAudibleCommand extends Command
 
         $book = $this->audibleService->getBookDetails($asin);
 
-        if (!$book) {
+        if (! $book) {
             $this->error('Book not found or an error occurred.');
+
             return;
         }
 
         $this->info("\nTitle: {$book['title']}");
-        $this->line("Subtitle: " . ($book['subtitle'] ?? 'N/A'));
-        $this->line("Authors: " . implode(', ', array_column($book['authors'] ?? [], 'author.name')));
-        $this->line("Narrators: " . implode(', ', array_column($book['narrators'] ?? [], 'author.name')));
-        $this->line("Publisher: " . ($book['publisher']['name'] ?? 'N/A'));
-        $this->line("Published: " . ($book['release_date'] ?? 'N/A'));
-        $this->line("Duration: " . ($book['duration'] ?? 'N/A'));
+        $this->line('Subtitle: '.($book['subtitle'] ?? 'N/A'));
+        $this->line('Authors: '.implode(', ', array_column($book['authors'] ?? [], 'author.name')));
+        $this->line('Narrators: '.implode(', ', array_column($book['narrators'] ?? [], 'author.name')));
+        $this->line('Publisher: '.($book['publisher']['name'] ?? 'N/A'));
+        $this->line('Published: '.($book['release_date'] ?? 'N/A'));
+        $this->line('Duration: '.($book['duration'] ?? 'N/A'));
 
         // Handle genres
         $genres = array_map(function ($genre) {
             return $genre['genre']['name'] ?? null;
         }, $book['genres'] ?? []);
         $genres = array_filter($genres);
-        $this->line("Genres: " . (!empty($genres) ? implode(', ', $genres) : 'N/A'));
+        $this->line('Genres: '.(! empty($genres) ? implode(', ', $genres) : 'N/A'));
 
         // Handle rating safely
         $rating = null;
@@ -113,7 +115,7 @@ class TestAudibleCommand extends Command
             }
             if (isset($book['rating']['ratings_count'])) {
                 $ratingsCount = is_numeric($book['rating']['ratings_count'])
-                    ? (int)$book['rating']['ratings_count']
+                    ? (int) $book['rating']['ratings_count']
                     : 0;
             }
         }
@@ -126,12 +128,12 @@ class TestAudibleCommand extends Command
         $coverUrl = $book['cover_image_url'] ?? null;
         if ($coverUrl) {
             $this->line("Cover: $coverUrl");
-            $this->line("Cover (direct): " . str_replace('_SL500_', '_SL1000_', $coverUrl));
+            $this->line('Cover (direct): '.str_replace('_SL500_', '_SL1000_', $coverUrl));
         } else {
-            $this->line("Cover: N/A");
+            $this->line('Cover: N/A');
         }
 
-        if (!empty($book['description'])) {
+        if (! empty($book['description'])) {
             $this->line("\nDescription:");
             $this->line(wordwrap($book['description'], 80));
         }

@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\FirestoreService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use App\Services\FirestoreService;
 
 class ReviewController extends Controller
 {
@@ -16,7 +16,7 @@ class ReviewController extends Controller
             'content_rating' => 'required|string',
         ]);
 
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $firestore->createReview([
             'book_id' => $bookId,
             'user_id' => Auth::id(),

@@ -4,19 +4,22 @@
 
 namespace Tests\Feature;
 
-use Tests\TestCase;
-use Google\Cloud\Firestore\FirestoreClient;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Http\UploadedFile;
 use App\Traits\BookImportTrait;
+use Google\Cloud\Firestore\FirestoreClient;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Tests\TestCase;
 
 class BookImportTest extends TestCase
 {
     use BookImportTrait;
 
     protected $firestore;
+
     protected $booksCollection;
+
     protected $genresCollection;
+
     protected $seriesCollection;
 
     protected function setUp(): void
@@ -29,7 +32,7 @@ class BookImportTest extends TestCase
 
         $this->firestore = new FirestoreClient([
             'projectId' => config('firebase.project_id'),
-            'keyFilePath' => config('firebase.credentials.file')
+            'keyFilePath' => config('firebase.credentials.file'),
         ]);
 
         $this->booksCollection = $this->firestore->collection('books');
@@ -41,13 +44,13 @@ class BookImportTest extends TestCase
 
     /**
      * Helper to check if Firestore config is missing.
-     * @return bool
      */
     protected function shouldSkipFirestoreTests(): bool
     {
         $projectId = config('firebase.project_id');
         $keyFile = config('firebase.credentials.file');
-        return empty($projectId) || empty($keyFile) || !file_exists($keyFile);
+
+        return empty($projectId) || empty($keyFile) || ! file_exists($keyFile);
     }
 
     protected function tearDown(): void
@@ -119,7 +122,7 @@ class BookImportTest extends TestCase
 
         // Create test file
         $file = UploadedFile::fake()->create('test.mp3', 1024);
-        $path = 'test/path/' . $file->getClientOriginalName();
+        $path = 'test/path/'.$file->getClientOriginalName();
         Storage::put($path, file_get_contents($file->getPathname()));
 
         // Create test data
@@ -132,8 +135,8 @@ class BookImportTest extends TestCase
                     'path' => $path,
                     'name' => $file->getClientOriginalName(),
                     'size' => $file->getSize(),
-                ]
-            ]
+                ],
+            ],
         ];
 
         // Import the book

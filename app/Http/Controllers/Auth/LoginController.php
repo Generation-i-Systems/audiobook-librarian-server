@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Auth;
 
-use App\Http\Controllers\Controller;
 use App\Auth\FirestoreUser;
+use App\Http\Controllers\Controller;
 use App\Services\FirestoreService;
 use Google\Cloud\Core\Timestamp as GoogleTimestamp;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
@@ -37,13 +37,13 @@ class LoginController extends Controller
     /**
      * Get the needed authorization credentials from the request.
      *
-     * @param  \Illuminate\Http\Request  $request
      * @return array
      */
     protected function credentials(\Illuminate\Http\Request $request)
     {
         $login = $request->input('login');
         $field = filter_var($login, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
+
         return [
             $field => $login,
             'password' => $request->input('password'),
@@ -67,10 +67,10 @@ class LoginController extends Controller
         $this->middleware('guest')->except('logout');
         $this->middleware('auth')->only('logout');
     }
+
     /**
      * Called after user is authenticated.
      *
-     * @param  \Illuminate\Http\Request  $request
      * @param  mixed  $user
      * @return \Illuminate\Http\Response|\Illuminate\Http\RedirectResponse
      */
@@ -78,15 +78,15 @@ class LoginController extends Controller
     {
         // Update last login timestamp
         try {
-            $firestore = new FirestoreService();
+            $firestore = new FirestoreService;
             $firestore->getClient()->collection('users')
                 ->document($user->getAuthIdentifier())
                 ->update([
-                    ['path' => 'last_login_at', 'value' => new GoogleTimestamp(new \DateTime())],
-                    ['path' => 'updated_at', 'value' => new GoogleTimestamp(new \DateTime())],
+                    ['path' => 'last_login_at', 'value' => new GoogleTimestamp(new \DateTime)],
+                    ['path' => 'updated_at', 'value' => new GoogleTimestamp(new \DateTime)],
                 ]);
         } catch (\Exception $e) {
-            Log::error('Error updating last login time: ' . $e->getMessage());
+            Log::error('Error updating last login time: '.$e->getMessage());
         }
 
         return redirect()->intended($this->redirectPath());
@@ -110,15 +110,16 @@ class LoginController extends Controller
         try {
             $googleUser = Socialite::driver('google')->stateless()->user();
         } catch (\Exception $e) {
-            Log::error('Google login error: ' . $e->getMessage());
+            Log::error('Google login error: '.$e->getMessage());
+
             return redirect('/login')->withErrors(['google' => 'Unable to login with Google. Please try again.']);
         }
 
-        if (!$googleUser->getEmail()) {
+        if (! $googleUser->getEmail()) {
             return redirect('/login')->withErrors(['google' => 'No email provided by Google.']);
         }
 
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
 
         try {
             // Check if user exists
@@ -137,15 +138,15 @@ class LoginController extends Controller
             }
 
             // Create new user if not exists
-            if (!$userArr) {
+            if (! $userArr) {
                 $newUserData = [
                     'name' => $googleUser->getName() ?? $googleUser->getNickname() ?? explode('@', $googleUser->getEmail())[0],
                     'email' => $googleUser->getEmail(),
                     'password' => bcrypt(Str::random(32)), // random password, not used
                     'role' => 'user',
-                    'email_verified_at' => new GoogleTimestamp(new \DateTime()),
-                    'created_at' => new GoogleTimestamp(new \DateTime()),
-                    'updated_at' => new GoogleTimestamp(new \DateTime()),
+                    'email_verified_at' => new GoogleTimestamp(new \DateTime),
+                    'created_at' => new GoogleTimestamp(new \DateTime),
+                    'updated_at' => new GoogleTimestamp(new \DateTime),
                     'google_id' => $googleUser->getId(),
                     'avatar' => $googleUser->getAvatar(),
                 ];
@@ -165,7 +166,7 @@ class LoginController extends Controller
                     ->update([
                         ['path' => 'google_id', 'value' => $googleUser->getId()],
                         ['path' => 'avatar', 'value' => $googleUser->getAvatar()],
-                        ['path' => 'updated_at', 'value' => new GoogleTimestamp(new \DateTime())],
+                        ['path' => 'updated_at', 'value' => new GoogleTimestamp(new \DateTime)],
                     ]);
             }
 
@@ -186,7 +187,7 @@ class LoginController extends Controller
             return redirect()->intended($this->redirectPath());
 
         } catch (\Exception $e) {
-            Log::error('Error during Google authentication: ' . $e->getMessage(), [
+            Log::error('Error during Google authentication: '.$e->getMessage(), [
                 'exception' => $e,
                 'email' => $googleUser->getEmail(),
             ]);
@@ -199,7 +200,6 @@ class LoginController extends Controller
     /**
      * Log the user out of the application.
      *
-     * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\RedirectResponse
      */
     public function logout(\Illuminate\Http\Request $request)

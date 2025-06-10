@@ -1,20 +1,16 @@
 <?php
 
 use App\Http\Controllers\Admin;
-use App\Http\Controllers\ProfileController;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\AuthController;
-use App\Http\Controllers\BookController;
-use App\Http\Controllers\ReviewController;
-use App\Http\Controllers\BookQueueController;
-use App\Http\Controllers\FollowController;
-use App\Http\Controllers\ReadingProgressController;
 use App\Http\Controllers\AdminNotificationController;
-use App\Http\Controllers\MessageController;
+use App\Http\Controllers\BookController;
+use App\Http\Controllers\FollowController;
 use App\Http\Controllers\ImageProxyController;
-use App\Http\Controllers\Admin\JobController;
+use App\Http\Controllers\MessageController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ReadingProgressController;
+use App\Http\Controllers\ReviewController;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Session;
 
 // --- DEBUG AUTH/SESSION ROUTES (local only) ---
@@ -28,7 +24,6 @@ if (app()->environment('local')) {
 
     Route::get('/debug/logout', [Admin\DebugController::class, 'logout']);
     Route::get('/debug/session-write', [Admin\DebugController::class, 'sessionWrite']);
-
 
     // Dump all Firestore users/books via DebugController
     Route::get('/debug/firestore-users-dump', [Admin\DebugController::class, 'firestoreUsersDump']);

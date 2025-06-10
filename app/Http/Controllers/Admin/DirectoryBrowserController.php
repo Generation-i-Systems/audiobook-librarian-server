@@ -13,12 +13,14 @@ class DirectoryBrowserController extends Controller
     {
         $basePath = env('BOOK_STORAGE_PATH');
 
-        if (!$basePath) {
+        if (! $basePath) {
             Log::error('BOOK_STORAGE_PATH is not defined in the .env file.');
+
             return response()->json(['error' => 'The book store path is invalid. Verify the .env exists and the value is valid.'], 400);
         }
-        if (!is_dir($basePath)) {
+        if (! is_dir($basePath)) {
             Log::error('BOOK_STORAGE_4TH is not a directory');
+
             return response()->json(['error' => 'The book store path is invalid. Verify the is_dir function is not in a loop or another process.'], 400);
         }
 
@@ -26,17 +28,19 @@ class DirectoryBrowserController extends Controller
         $filterLetter = $request->input('filter_letter');
         $search = $request->input('search');
 
-        if (!is_dir($basePath . '/' . $path)) {
-            Log::error('Path: ' . $basePath . '/' . $path . ' is not a directory');
+        if (! is_dir($basePath.'/'.$path)) {
+            Log::error('Path: '.$basePath.'/'.$path.' is not a directory');
+
             return response()->json([
                 'error' => 'Invalid directory.',
             ], 400);
         }
 
-        $files = $this->scanDirectory($basePath . '/' . $path);
+        $files = $this->scanDirectory($basePath.'/'.$path);
 
         if ($files === false) {
             Log::error('Attempt to perform a scandir but failed to get value.');
+
             return response()->json([
                 'error' => 'The scan for all files has been invalid to be done.',
             ], 400);
@@ -59,16 +63,16 @@ class DirectoryBrowserController extends Controller
                 continue;
             }
 
-            $filePath = ltrim($path . '/' . $file, '/');
-            $isPotentialBookDirectory = $this->isPotentialBookDirectory($basePath . $filePath);
+            $filePath = ltrim($path.'/'.$file, '/');
+            $isPotentialBookDirectory = $this->isPotentialBookDirectory($basePath.$filePath);
 
-            if (is_dir($basePath . '/' . $filePath)) {
-                $firestore = new \App\Services\FirestoreService();
+            if (is_dir($basePath.'/'.$filePath)) {
+                $firestore = new \App\Services\FirestoreService;
                 $book = $firestore->findBookByDirectoryPath($filePath);
                 $bookId = $book['id'] ?? null;
 
-                if ($this->isPotentialBookDirectory($basePath . '/' . $filePath)) {
-                    if (!empty($bookId)) {
+                if ($this->isPotentialBookDirectory($basePath.'/'.$filePath)) {
+                    if (! empty($bookId)) {
                         $data[] = [
                             'type' => 'book',
                             'id' => $bookId,  // Include book ID for frontend reference
@@ -81,7 +85,7 @@ class DirectoryBrowserController extends Controller
                             'type' => 'directory',
                             'name' => $file,
                             'path' => $filePath,
-                            'create' => route('admin.books.create') . '?path=' . urlencode($filePath),
+                            'create' => route('admin.books.create').'?path='.urlencode($filePath),
                             'bulk_import' => route('admin.books.bulkImportDir', ['dir' => $filePath]),
                         ];
                     }
@@ -95,7 +99,7 @@ class DirectoryBrowserController extends Controller
                     ];
                 }
             } else {
-                $extension = pathinfo($basePath . $filePath, PATHINFO_EXTENSION);
+                $extension = pathinfo($basePath.$filePath, PATHINFO_EXTENSION);
 
                 if (in_array(strtolower($extension), ['mp3', 'm4b', 'm4a'])) {
                     $data[] = [
@@ -112,7 +116,7 @@ class DirectoryBrowserController extends Controller
 
     private function isPotentialBookDirectory($directoryPath): bool
     {
-        if (!is_dir($directoryPath)) {
+        if (! is_dir($directoryPath)) {
             return false; // It's a file, not a directory
         }
 
@@ -121,6 +125,7 @@ class DirectoryBrowserController extends Controller
 
         if ($files === false) {
             Log::error("Failed to scan directory: $directoryPath");
+
             return false;  // Return an empty array on failure
         }
 
@@ -128,17 +133,17 @@ class DirectoryBrowserController extends Controller
         $hasSubDirectories = false;
 
         foreach ($files as $file) {
-            if (pathinfo($file, PATHINFO_EXTENSION) === "mp3" || pathinfo($file, PATHINFO_EXTENSION) === "m4b") {
+            if (pathinfo($file, PATHINFO_EXTENSION) === 'mp3' || pathinfo($file, PATHINFO_EXTENSION) === 'm4b') {
                 $hasAudioFiles = true;
 
                 break;
-            } elseif (is_dir($directoryPath . '/' . $file) && !in_array(strtolower($file), ['mp3', 'm4b', 'm4a'])) {
+            } elseif (is_dir($directoryPath.'/'.$file) && ! in_array(strtolower($file), ['mp3', 'm4b', 'm4a'])) {
                 $hasSubDirectories = true;
                 break;
             }
         }
 
-        return $hasAudioFiles && !$hasSubDirectories;
+        return $hasAudioFiles && ! $hasSubDirectories;
     }
 
     private function scanDirectory($path)
@@ -152,8 +157,10 @@ class DirectoryBrowserController extends Controller
 
         if ($files === false) {
             Log::error("Failed to scan directory: $path");
+
             return [];  // Return an empty array on failure
         }
+
         return $files;
     }
 }

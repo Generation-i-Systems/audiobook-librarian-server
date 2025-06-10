@@ -4,10 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\FirestoreService;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use ZipArchive;
 
@@ -15,7 +15,7 @@ class BookApiController extends Controller
 {
     public function index(Request $request)
     {
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $books = $firestore->listBooks();
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
@@ -57,6 +57,7 @@ class BookApiController extends Controller
                 if ($date_added) {
                     $match = $match && (isset($book['date_added']) && strpos($book['date_added'], $date_added) === 0);
                 }
+
                 return $match;
             }
         );
@@ -69,6 +70,7 @@ class BookApiController extends Controller
         $books = array_map(function ($book) use ($withCover, $inlineCovers) {
             return $this->getBookWithCover($book, $withCover, $inlineCovers);
         }, $books);
+
         return response()->json([
             'data' => $books,
             'total' => $total,
@@ -77,18 +79,18 @@ class BookApiController extends Controller
         ]);
     }
 
-
     public function show($id, Request $request)
     {
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $book = $firestore->getBook($id);
-        if (!$book) {
+        if (! $book) {
             return response()->json([
                 'error' => 'Book not found or not authorized.',
             ], 404);
         }
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
+
         return response()->json(
             $this->getBookWithCover($book, $withCover, $inlineCovers)
         );
@@ -99,13 +101,13 @@ class BookApiController extends Controller
         $type = $request->input('type'); // 'genre', 'author', 'series'
         $perPage = $request->input('per_page', 100);
         $search = $request->input('search');
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $dataMap = [
             'genre' => $firestore->listGenres(),
             'author' => $firestore->listAuthors(),
             'series' => $firestore->listSeries(),
         ];
-        if (!isset($dataMap[$type])) {
+        if (! isset($dataMap[$type])) {
             return response()->json(['error' => 'Invalid browse type'], 400);
         }
         $items = $dataMap[$type];
@@ -118,6 +120,7 @@ class BookApiController extends Controller
         $total = count($items);
         $page = (int) $request->input('page', 1);
         $items = array_slice($items, ($page - 1) * $perPage, $perPage);
+
         return response()->json([
             'data' => $items,
             'total' => $total,
@@ -128,36 +131,38 @@ class BookApiController extends Controller
 
     public function cover($id)
     {
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $book = $firestore->getBook($id);
-        if (!$book) {
+        if (! $book) {
             return response()->json([
                 'error' => 'Book not found or not authorized.',
             ], 404);
         }
         Log::info(
-            'Cover image requested for book: ' .
-            ($book['title'] ?? '[unknown]') .
-            ' (' .
-            ($book['cover_image'] ?? '[none]') .
+            'Cover image requested for book: '.
+            ($book['title'] ?? '[unknown]').
+            ' ('.
+            ($book['cover_image'] ?? '[none]').
             ')'
         );
         if (
-            !empty($book['cover_image']) &&
+            ! empty($book['cover_image']) &&
             Storage::disk('books')->exists($book['cover_image'])
         ) {
             $mime = Storage::disk('books')->mimeType($book['cover_image']);
+
             return response(
                 Storage::disk('books')->get($book['cover_image']),
                 200
             )->header('Content-Type', $mime);
         }
+
         return response()->json(['error' => 'Cover image not found.'], 404);
     }
 
     public function search(Request $request)
     {
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $books = $firestore->listBooks();
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
@@ -187,6 +192,7 @@ class BookApiController extends Controller
                 if ($date_added) {
                     $match = $match && (isset($book['date_added']) && strpos($book['date_added'], $date_added) === 0);
                 }
+
                 return $match;
             }
         );
@@ -199,6 +205,7 @@ class BookApiController extends Controller
         $books = array_map(function ($book) use ($withCover, $inlineCovers) {
             return $this->getBookWithCover($book, $withCover, $inlineCovers);
         }, $books);
+
         return response()->json([
             'data' => $books,
             'total' => $total,
@@ -207,25 +214,24 @@ class BookApiController extends Controller
         ]);
     }
 
-
     public function download($id)
     {
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $book = $firestore->getBook($id);
-        if (!$book) {
+        if (! $book) {
             abort(404);
         }
         $directoryPath = $book['directory_path'] ?? null;
-        if (!$directoryPath || !Storage::disk('books')->exists($directoryPath)) {
+        if (! $directoryPath || ! Storage::disk('books')->exists($directoryPath)) {
             abort(404, 'Book directory not found.');
         }
         $files = Storage::disk('books')->files($directoryPath);
         if (empty($files)) {
             abort(404, 'No files found for this book.');
         }
-        $zipFileName = str_replace(' ', '_', $book['title']) . '.zip';
-        $zipPath = storage_path('app/public/temp/' . $zipFileName);
-        $zip = new ZipArchive();
+        $zipFileName = str_replace(' ', '_', $book['title']).'.zip';
+        $zipPath = storage_path('app/public/temp/'.$zipFileName);
+        $zip = new ZipArchive;
         if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
             abort(500, 'Failed to create zip archive.');
         }
@@ -233,30 +239,31 @@ class BookApiController extends Controller
             $zip->addFile(Storage::disk('books')->path($file), basename($file));
         }
         $zip->close();
+
         return response()->download($zipPath, $zipFileName)->deleteFileAfterSend(true);
     }
 
     public function queueDownload(Request $request)
     {
         $user = Auth::user();
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $queue = $firestore->getBookQueue($user->id);
         if (empty($queue)) {
             $queue = BookQueue::where('user_id', $user->id)->with('book')->get();
             if ($queue->isEmpty()) {
                 return response()->json(['error' => 'No books queued for download.'], 404);
             }
-            $zipName = 'bookqueue_' . $user->id . '_' . Str::random(8) . '.zip';
-            $zipPath = storage_path('app/public/' . $zipName);
+            $zipName = 'bookqueue_'.$user->id.'_'.Str::random(8).'.zip';
+            $zipPath = storage_path('app/public/'.$zipName);
 
-            $zip = new ZipArchive();
+            $zip = new ZipArchive;
             if ($zip->open($zipPath, ZipArchive::CREATE) === true) {
                 foreach ($queue as $item) {
                     $book = $item->book;
                     if ($book && $book->directory_path && Storage::exists($book->directory_path)) {
                         $files = Storage::files($book->directory_path);
                         foreach ($files as $file) {
-                            $localPath = storage_path('app/' . $file);
+                            $localPath = storage_path('app/'.$file);
                             if (file_exists($localPath)) {
                                 $zip->addFile($localPath, basename($file));
                             }
@@ -267,28 +274,32 @@ class BookApiController extends Controller
             } else {
                 return response()->json(['error' => 'Could not create zip file.'], 500);
             }
+
             // Optionally, store a record of the zip for later deletion/marking
-            return response()->json(['zip_id' => $zipName, 'download_url' => url('storage/' . $zipName)]);
+            return response()->json(['zip_id' => $zipName, 'download_url' => url('storage/'.$zipName)]);
         }
         // If Firestore queue is not empty, handle that logic here (implement if needed)
     }
 
     public function downloadQueuedZip($zipId)
     {
-        $zipPath = storage_path('app/public/' . $zipId);
-        if (!file_exists($zipPath)) {
+        $zipPath = storage_path('app/public/'.$zipId);
+        if (! file_exists($zipPath)) {
             return response()->json(['error' => 'Zip file not found.'], 404);
         }
+
         return response()->download($zipPath);
     }
 
     public function markZipDownloaded($zipId)
     {
-        $zipPath = storage_path('app/public/' . $zipId);
+        $zipPath = storage_path('app/public/'.$zipId);
         if (file_exists($zipPath)) {
             unlink($zipPath);
+
             return response()->json(['message' => 'Zip file deleted.']);
         }
+
         return response()->json(['error' => 'Zip file not found.'], 404);
     }
 
@@ -297,7 +308,7 @@ class BookApiController extends Controller
      */
     public function listGenres(Request $request)
     {
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $genres = $firestore->listGenres();
         usort($genres, function ($a, $b) {
             return strcmp($a['name'], $b['name']);
@@ -305,6 +316,7 @@ class BookApiController extends Controller
         $genres = array_map(function ($g) {
             return ['id' => $g['id'], 'name' => $g['name']];
         }, $genres);
+
         return response()->json($genres);
     }
 
@@ -313,11 +325,11 @@ class BookApiController extends Controller
      */
     public function authorsByGenre(Request $request, $genreId)
     {
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $perPage = $request->input('per_page', 20);
         $search = $request->input('search');
         $genre = $firestore->getGenre($genreId);
-        if (!$genre) {
+        if (! $genre) {
             return response()->json(['error' => 'Genre not found'], 404);
         }
         $books = array_filter($firestore->listBooks(), function ($book) use ($genreId) {
@@ -329,6 +341,7 @@ class BookApiController extends Controller
             if ($search) {
                 $match = $match && (stripos($author['name'], $search) !== false);
             }
+
             return $match;
         });
         $authors = array_values($authors);
@@ -338,6 +351,7 @@ class BookApiController extends Controller
         $total = count($authors);
         $page = (int) $request->input('page', 1);
         $authors = array_slice($authors, ($page - 1) * $perPage, $perPage);
+
         return response()->json([
             'data' => $authors,
             'total' => $total,
@@ -351,9 +365,9 @@ class BookApiController extends Controller
      */
     public function authorsByGenreSimple($genreId, Request $request)
     {
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $genre = $firestore->getGenre($genreId);
-        if (!$genre) {
+        if (! $genre) {
             return response()->json(['error' => 'Genre not found'], 404);
         }
         $books = array_filter($firestore->listBooks(), function ($book) use ($genreId) {
@@ -370,6 +384,7 @@ class BookApiController extends Controller
         $authors = array_map(function ($a) {
             return ['id' => $a['id'], 'name' => $a['name']];
         }, $authors);
+
         return response()->json([
             'genre' => ['id' => $genre['id'], 'name' => $genre['name']],
             'authors' => $authors,
@@ -381,12 +396,12 @@ class BookApiController extends Controller
      */
     public function booksBySeries($seriesId, Request $request)
     {
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $perPage = $request->input('per_page', 100);
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
         $series = $firestore->getSeries($seriesId);
-        if (!$series) {
+        if (! $series) {
             return response()->json(['error' => 'Series not found'], 404);
         }
         $books = array_filter($firestore->listBooks(), function ($book) use ($seriesId) {
@@ -399,6 +414,7 @@ class BookApiController extends Controller
         $books = array_map(function ($book) use ($withCover, $inlineCovers) {
             return $this->getBookWithCover($book, $withCover, $inlineCovers);
         }, $books);
+
         return response()->json([
             'series' => ['id' => $series['id'], 'name' => $series['name']],
             'books' => [
@@ -415,12 +431,12 @@ class BookApiController extends Controller
      */
     public function booksByAuthor($authorId, Request $request)
     {
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $perPage = $request->input('per_page', 100);
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
         $author = $firestore->getAuthor($authorId);
-        if (!$author) {
+        if (! $author) {
             return response()->json(['error' => 'Author not found'], 404);
         }
         $books = array_filter($firestore->listBooks(), function ($book) use ($authorId) {
@@ -433,6 +449,7 @@ class BookApiController extends Controller
         $books = array_map(function ($book) use ($withCover, $inlineCovers) {
             return $this->getBookWithCover($book, $withCover, $inlineCovers);
         }, $books);
+
         return response()->json([
             'author' => ['id' => $author['id'], 'name' => $author['name']],
             'books' => [
@@ -449,9 +466,9 @@ class BookApiController extends Controller
      */
     public function seriesByAuthor($authorId, Request $request)
     {
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $author = $firestore->getAuthor($authorId);
-        if (!$author) {
+        if (! $author) {
             return response()->json(['error' => 'Author not found'], 404);
         }
         $books = array_filter($firestore->listBooks(), function ($book) use ($authorId) {
@@ -468,6 +485,7 @@ class BookApiController extends Controller
         $series = array_map(function ($s) {
             return ['id' => $s['id'], 'name' => $s['name']];
         }, $series);
+
         return response()->json([
             'author' => ['id' => $author['id'], 'name' => $author['name']],
             'series' => $series,
@@ -482,16 +500,15 @@ class BookApiController extends Controller
         $perPage = $request->input('per_page', 100);
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
-        Log::info('booksByAuthorAndGenre called for author: ' . $authorId . ' and genre: ' . $genreId);
-        Log::info('booksByAuthorAndGenre ' . json_encode($_POST));
-        Log::info('booksByAuthorAndGenre ' . json_encode($_GET));
-
+        Log::info('booksByAuthorAndGenre called for author: '.$authorId.' and genre: '.$genreId);
+        Log::info('booksByAuthorAndGenre '.json_encode($_POST));
+        Log::info('booksByAuthorAndGenre '.json_encode($_GET));
 
         $firestore = app(FirestoreService::class);
         $author = $firestore->getAuthor($authorId);
         $genre = $firestore->getGenre($genreId);
         $books = $firestore->getBooksByAuthorAndGenre($authorId, $genreId);
-        if (!$author || !$genre) {
+        if (! $author || ! $genre) {
             return response()->json([
                 'error' => 'Author or Genre not found.',
             ], 404);
@@ -508,6 +525,7 @@ class BookApiController extends Controller
             if ($numA !== $numB) {
                 return $numA <=> $numB;
             }
+
             return strcmp($a['title'] ?? '', $b['title'] ?? '');
         });
         // Paginate manually
@@ -518,6 +536,7 @@ class BookApiController extends Controller
         $paginatedBooks = array_map(function ($book) use ($withCover, $inlineCovers) {
             return $this->getBookWithCover($book, $withCover, $inlineCovers);
         }, $paginatedBooks);
+
         return response()->json([
             'data' => $paginatedBooks,
             'total' => $total,
@@ -529,7 +548,7 @@ class BookApiController extends Controller
     private function getBookWithCover($book, $withCover = false, $inlineCovers = false)
     {
         $arr = $book;
-        if ($withCover && !empty($book['cover_image']) && Storage::disk('books')->exists($book['cover_image'])) {
+        if ($withCover && ! empty($book['cover_image']) && Storage::disk('books')->exists($book['cover_image'])) {
             if ($inlineCovers) {
                 $coverPath = Storage::disk('books')->path($book['cover_image']);
                 $arr['cover'] = [
@@ -538,12 +557,13 @@ class BookApiController extends Controller
                     'data' => base64_encode(Storage::disk('books')->get($book['cover_image'])),
                 ];
             } else {
-                $arr['cover_url'] = url('/api/v1/books/' . ($book['id'] ?? '') . '/cover');
+                $arr['cover_url'] = url('/api/v1/books/'.($book['id'] ?? '').'/cover');
             }
         } else {
             $arr['cover_url'] = null;
         }
         unset($arr['cover_image_content']);
+
         return $arr;
     }
 }

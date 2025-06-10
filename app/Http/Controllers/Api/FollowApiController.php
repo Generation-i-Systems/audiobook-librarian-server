@@ -11,13 +11,13 @@ class FollowApiController extends Controller
 {
     public function follow(Request $request, $followableType, $followableId)
     {
-        //Validate input
+        // Validate input
         $request->validate([
             'followable_type' => 'required|in:author,series',
             'followable_id' => 'required|integer',
         ]);
 
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $userId = Auth::id();
         $followableId = $followableId;
         if ($userId === $followableId) {
@@ -38,18 +38,19 @@ class FollowApiController extends Controller
             'followable_type' => $followableType,
             'followable_id' => $followableId,
         ]);
+
         return response()->json(['message' => 'Followed successfully.'], 201);
     }
 
     public function unfollow(Request $request, $followableType, $followableId)
     {
-        //Validate input
+        // Validate input
         $request->validate([
             'followable_type' => 'required|in:author,series',
             'followable_id' => 'required|integer',
         ]);
 
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $follows = $firestore->getClient()->collection('follows')
             ->where('user_id', '=', Auth::id())
             ->where('followable_type', '=', $followableType)
@@ -58,6 +59,7 @@ class FollowApiController extends Controller
         foreach ($follows as $follow) {
             $follow->reference()->delete();
         }
+
         return response()->json(['message' => 'Successfully unfollowed!'], 200);
     }
 }

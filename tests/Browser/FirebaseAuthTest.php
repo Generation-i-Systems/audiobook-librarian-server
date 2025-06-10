@@ -10,6 +10,7 @@ use Tests\DuskTestCase;
 class FirebaseAuthTest extends DuskTestCase
 {
     protected $firestore;
+
     protected $usersCollection;
 
     protected function setUp(): void
@@ -18,7 +19,7 @@ class FirebaseAuthTest extends DuskTestCase
 
         $this->firestore = new FirestoreClient([
             'projectId' => config('firebase.project_id'),
-            'keyFilePath' => config('firebase.credentials.file')
+            'keyFilePath' => config('firebase.credentials.file'),
         ]);
 
         $this->usersCollection = $this->firestore->collection('users');
@@ -35,7 +36,7 @@ class FirebaseAuthTest extends DuskTestCase
     {
         $users = $this->usersCollection->where('email', 'in', [
             'test@example.com',
-            'unverified@example.com'
+            'unverified@example.com',
         ])->documents();
 
         foreach ($users as $user) {
@@ -51,9 +52,9 @@ class FirebaseAuthTest extends DuskTestCase
             'email' => 'test@example.com',
             'password' => Hash::make('password'),
             'role' => 'user',
-            'email_verified_at' => new \DateTime(),
-            'created_at' => new \DateTime(),
-            'updated_at' => new \DateTime(),
+            'email_verified_at' => new \DateTime,
+            'created_at' => new \DateTime,
+            'updated_at' => new \DateTime,
         ]);
 
         return $docRef->id();
@@ -61,10 +62,8 @@ class FirebaseAuthTest extends DuskTestCase
 
     /**
      * Test user can login with valid credentials.
-     *
-     * @return void
      */
-    public function testUserCanLogin(): void
+    public function test_user_can_login(): void
     {
         $this->createTestUser();
 
@@ -79,10 +78,8 @@ class FirebaseAuthTest extends DuskTestCase
 
     /**
      * Test unverified user cannot login.
-     *
-     * @return void
      */
-    public function testUnverifiedUserCannotLogin(): void
+    public function test_unverified_user_cannot_login(): void
     {
         $this->usersCollection->add([
             'name' => 'Unverified User',
@@ -90,8 +87,8 @@ class FirebaseAuthTest extends DuskTestCase
             'email' => 'unverified@example.com',
             'password' => Hash::make('password'),
             'role' => 'unverified',
-            'created_at' => new \DateTime(),
-            'updated_at' => new \DateTime(),
+            'created_at' => new \DateTime,
+            'updated_at' => new \DateTime,
         ]);
 
         $this->browse(function (Browser $browser) {

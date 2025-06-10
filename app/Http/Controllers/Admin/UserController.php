@@ -11,7 +11,7 @@ class UserController extends Controller
 {
     public function index()
     {
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $users = $firestore->getClient()->collection('users')->documents();
         $userList = [];
         foreach ($users as $userDoc) {
@@ -21,6 +21,7 @@ class UserController extends Controller
                 $userList[] = $user;
             }
         }
+
         return view('admin.users.index', ['users' => $userList]);
     }
 
@@ -31,7 +32,7 @@ class UserController extends Controller
 
     public function store(Request $request)
     {
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:255',
@@ -60,24 +61,26 @@ class UserController extends Controller
         unset($validated['password_confirmation']);
         $validated['password'] = Hash::make($validated['password']);
         $firestore->getClient()->collection('users')->add($validated);
+
         return redirect()->route('admin.users.index')->with('success', 'User created successfully.');
     }
 
     public function edit($id)
     {
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $userDoc = $firestore->getClient()->collection('users')->document($id)->snapshot();
-        if (!$userDoc->exists()) {
+        if (! $userDoc->exists()) {
             abort(404);
         }
         $user = $userDoc->data();
         $user['id'] = $userDoc->id();
+
         return view('admin.users.edit', compact('user'));
     }
 
     public function update(Request $request, $id)
     {
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:255',
@@ -104,19 +107,21 @@ class UserController extends Controller
         }
         // Never store password_confirmation on user record
         unset($validated['password_confirmation']);
-        if (!empty($validated['password'])) {
+        if (! empty($validated['password'])) {
             $validated['password'] = Hash::make($validated['password']);
         } else {
             unset($validated['password']);
         }
         $firestore->getClient()->collection('users')->document($id)->set($validated, ['merge' => true]);
+
         return redirect()->route('admin.users.index')->with('success', 'User updated successfully.');
     }
 
     public function destroy($id)
     {
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $firestore->getClient()->collection('users')->document($id)->delete();
+
         return redirect()->route('admin.users.index')->with('success', 'User deleted successfully.');
     }
 }

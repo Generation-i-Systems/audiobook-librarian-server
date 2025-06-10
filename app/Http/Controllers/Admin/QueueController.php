@@ -2,15 +2,14 @@
 
 namespace App\Http\Controllers\Admin;
 
-use Illuminate\Http\Request;
-use App\Services\FirestoreService;
-use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Process;
 use App\Jobs\CreateImportJobsForDirectory;
+use App\Services\FirestoreService;
 use App\Traits\BookImportTrait;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Process;
 
 class QueueController extends Controller
 {
@@ -24,7 +23,7 @@ class QueueController extends Controller
     public function list(Request $request)
     {
         $typeFilter = $request->query('type');
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $jobsDocs = $firestore->getClient()->collection('jobs')->documents();
 
         $jobTypeCounts = [];
@@ -32,7 +31,7 @@ class QueueController extends Controller
         $jobs = collect();
 
         foreach ($jobsDocs as $doc) {
-            if (!$doc->exists()) {
+            if (! $doc->exists()) {
                 continue;
             }
             $job = $doc->data();
@@ -42,7 +41,7 @@ class QueueController extends Controller
             $dir = $job['data']['directory_path'] ?? null;
 
             $jobTypeCounts[$jobType] = ($jobTypeCounts[$jobType] ?? 0) + 1;
-            if (!in_array($jobType, $jobTypes)) {
+            if (! in_array($jobType, $jobTypes)) {
                 $jobTypes[] = $jobType;
             }
 
@@ -72,13 +71,15 @@ class QueueController extends Controller
 
     public function remove($id)
     {
-        (new FirestoreService())->getClient()->collection('jobs')->document($id)->delete();
+        (new FirestoreService)->getClient()->collection('jobs')->document($id)->delete();
+
         return response()->json(['success' => true]);
     }
 
     public function retry($id)
     {
-        (new FirestoreService())->getClient()->collection('jobs')->document($id)->delete();
+        (new FirestoreService)->getClient()->collection('jobs')->document($id)->delete();
+
         return response()->json(['success' => true]);
     }
 
@@ -86,7 +87,8 @@ class QueueController extends Controller
     {
         // Check for running worker (simple: look for process, or use a cache heartbeat)
         $running = Cache::get('queue_worker_heartbeat') ? true : false;
-        $pending = (new FirestoreService())->getClient()->collection('jobs')->count();
+        $pending = (new FirestoreService)->getClient()->collection('jobs')->count();
+
         return response()->json(['worker_running' => $running, 'pending_jobs' => $pending]);
     }
 
@@ -98,17 +100,19 @@ class QueueController extends Controller
         exec('php artisan queue:work --daemon > /dev/null 2>&1 &', $output, $result);
         // Optionally set a cache heartbeat
         Cache::put('queue_worker_heartbeat', true, 60);
+
         return response()->json(['started' => true]);
     }
 
     public function clear()
     {
-        $docs = (new FirestoreService())->getClient()->collection('jobs')->documents();
+        $docs = (new FirestoreService)->getClient()->collection('jobs')->documents();
         foreach ($docs as $doc) {
             if ($doc->exists()) {
                 $doc->reference()->delete();
             }
         }
+
         return response()->json(['success' => true]);
     }
 
@@ -119,8 +123,8 @@ class QueueController extends Controller
     {
         $root = $request->input('dir');
         $storagePath = env('BOOK_STORAGE_PATH');
-        $absRoot = rtrim($storagePath, '/') . '/' . ltrim($root, '/');
-        if (!is_dir($absRoot)) {
+        $absRoot = rtrim($storagePath, '/').'/'.ltrim($root, '/');
+        if (! is_dir($absRoot)) {
             return response()->json([
                 'error' => 'Invalid Google Books API response.',
             ], 422);
@@ -128,7 +132,7 @@ class QueueController extends Controller
         // Use BookImportTrait's findBookDirectories
         $bookDirs = $this->findBookDirectories($absRoot);
         $queued = [];
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $jobsCollection = $firestore->getClient()->collection('jobs');
         $jobsDocs = $jobsCollection->documents();
         $pendingJobs = collect($jobsDocs)->map(function ($doc) {
@@ -162,14 +166,15 @@ class QueueController extends Controller
             if ($bookExists) {
                 $alreadyQueued = true;
             }
-            if (!$alreadyQueued) {
+            if (! $alreadyQueued) {
                 \App\Jobs\ImportBookFromDirectoryJob::dispatch($relDir);
                 $queued[] = $relDir;
             }
         }
+
         return response()->json(
             [
-                'message' => 'Queued ' . count($queued) . ' book directories for import.',
+                'message' => 'Queued '.count($queued).' book directories for import.',
                 'skipped' => count($bookDirs) - count($queued),
                 'queued_dirs' => $queued,
             ],
@@ -188,7 +193,8 @@ class QueueController extends Controller
         Log::info("Bulk importing books from directory: $dir");
 
         $out = CreateImportJobsForDirectory::dispatch($dir);
-        Log::info("Bulk import job dispatched: " . print_r($out, true));
+        Log::info('Bulk import job dispatched: '.print_r($out, true));
+
         return response()->json(
             [
                 'message' => 'Queued job to scan and import all book directories.',

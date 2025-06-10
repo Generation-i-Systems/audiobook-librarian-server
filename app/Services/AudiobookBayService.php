@@ -3,14 +3,13 @@
 namespace App\Services;
 
 use App\Contracts\BookServiceInterface;
-use App\Services\AudiobookBayApiService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 class AudiobookBayService extends BaseBookService implements BookServiceInterface
 {
     protected int $defaultLimit = 10;
+
     protected int $cacheTtl = 86400; // 24 hours in seconds
 
     protected AudiobookBayApiService $apiService;
@@ -21,7 +20,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public function getServiceName(): string
     {
@@ -29,14 +28,14 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public function performSearch(string $query, array $options = []): ?array
     {
         $limit = $options['limit'] ?? $this->defaultLimit;
         $page = $options['page'] ?? 1;
 
-        $cacheKey = 'audiobookbay_service_search_' . md5($query . '_' . $limit . '_' . $page);
+        $cacheKey = 'audiobookbay_service_search_'.md5($query.'_'.$limit.'_'.$page);
 
         return Cache::remember($cacheKey, $this->cacheTtl, function () use ($query, $options, $limit) {
             try {
@@ -48,6 +47,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
 
                 if (is_null($results)) {
                     Log::warning('AudiobookBayService:performSearch - Null result from apiService->searchAudiobooks', ['query' => $query, 'options' => $searchOptions]);
+
                     return [];
                 }
 
@@ -63,7 +63,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
                         'link' => $resultItem['url'] ?? '',
                         'cover' => $resultItem['cover_image_url'] ?? '',
                         'description' => $resultItem['description'] ?? '',
-                        'metadata' => $resultItem['metadata'] ?? []
+                        'metadata' => $resultItem['metadata'] ?? [],
                     ];
                 }
 
@@ -77,28 +77,30 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
                     'query' => $query,
                     'error' => $e->getMessage(),
                 ]);
+
                 return [];
             }
         });
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public function getBookDetails(string $id, array $options = []): ?array
     {
         Log::error('[AUDIOBOOKBAY-DETAIL] getBookDetails', [
             'id' => $id,
         ]);
+
         return $this->performGetBookDetails($id);
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public function performGetBookDetails(string $idOrSlug): ?array
     {
-        $cacheKey = 'audiobookbay_service_book_details_' . md5($idOrSlug);
+        $cacheKey = 'audiobookbay_service_book_details_'.md5($idOrSlug);
 
         try {
             Log::debug('[AUDIOBOOKBAY-DETAIL] performGetBookDetails', [
@@ -108,6 +110,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
 
             if (is_null($details)) {
                 Log::warning('AudiobookBayService:performGetBookDetails - Null result from apiService->getAudiobookDetails', ['idOrSlug' => $idOrSlug]);
+
                 return null;
             }
 
@@ -118,6 +121,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
                 'idOrSlug' => $idOrSlug,
                 'error' => $e->getMessage(),
             ]);
+
             return null;
         }
     }
@@ -128,6 +132,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
     public function downloadCoverImage(string $imageUrl, string $directoryPath, string $targetBasename): ?string
     {
         Log::info('downloadCoverImage not implemented for AudiobookBayService');
+
         return null;
     }
 
@@ -138,9 +143,6 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
      * - Author name must appear in the result title
      * - Title (minus author) must closely match searched title
      * - Numbers in the search (e.g. book number) must match exactly
-     *
-     * @param array $book
-     * @return array|null
      */
     public function searchAndMerge(array $book): ?array
     {
@@ -155,7 +157,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
         if (isset($book['series']) && is_array($book['series']) && isset($book['series'][0]['series']['number'])) {
             $inputNumber = $book['series'][0]['series']['number'];
         }
-        if (!$inputTitle) {
+        if (! $inputTitle) {
             return null;
         }
         $query = $inputTitle;
@@ -197,12 +199,12 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
                 $bestMatch = $result;
             }
         }
-        if (!$bestMatch) {
+        if (! $bestMatch) {
             return null;
         }
         // Get full details for best match
         $details = $this->apiService->getAudiobookDetails($bestMatch['id'] ?? $bestMatch['url'] ?? '');
-        if (!$details) {
+        if (! $details) {
             return null;
         }
         // Merge fields: prefer existing book fields, but add/overwrite with ABB details if missing
@@ -221,6 +223,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
             $merged['audiobookbay_fields'] = $apiFields;
             $merged['needsReview'] = true;
         }
+
         // Remove nulls from array
         return array_filter($merged, fn ($v) => $v !== null);
     }
@@ -242,7 +245,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
             'cover_image_url' => $details['cover_image_url'] ?? null,
             'categories' => $this->formatCategories($details['categories'] ?? ($details['metadata']['categories'] ?? [])),
             'language' => $details['language'] ?? null,
-            'series' => (!empty($details['series']['name'])) ? ($details['series']['name'] . (!empty($details['series']['number']) ? ' #' . $details['series']['number'] : '')) : null,
+            'series' => (! empty($details['series']['name'])) ? ($details['series']['name'].(! empty($details['series']['number']) ? ' #'.$details['series']['number'] : '')) : null,
             'series_number' => $details['series']['number'] ?? null,
             'duration_seconds' => $this->parseDuration($details['metadata']['duration'] ?? $details['duration'] ?? null),
             'metadata' => array_merge($details['metadata'] ?? [], ['source' => 'AudiobookBay', 'url' => $details['url'] ?? null]),
@@ -257,6 +260,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
         if (empty($authorsArray)) {
             return [];
         }
+
         return array_map(function ($authorObj) {
             return [
                 'author' => [
@@ -275,6 +279,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
         if (empty($narratorsArray)) {
             return [];
         }
+
         return array_map(function ($narratorObj) {
             return [
                 'author' => [
@@ -293,8 +298,10 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
         if (empty($categoriesInput)) {
             return [];
         }
+
         return array_map(function ($category) {
             $categoryName = is_array($category) ? ($category['name'] ?? $category['genre'] ?? '') : $category;
+
             return [
                 'genre' => [
                     'name' => trim($categoryName),
@@ -330,6 +337,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
             } catch (\Exception $e) { /* Ignore if not valid DateInterval */
             }
         }
+
         return $duration > 0 ? $duration : null;
     }
 
@@ -344,7 +352,6 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
     /**
      * Expose the internal AudiobookBayApiService instance.
      * Needed for legacy/test code compatibility.
-     * @return AudiobookBayApiService
      */
     public function getApiService(): AudiobookBayApiService
     {

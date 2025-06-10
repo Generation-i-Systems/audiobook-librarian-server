@@ -3,18 +3,22 @@
 namespace App\Services;
 
 use App\Contracts\BookServiceInterface;
+use App\Mail\HardcoverTokenExpiring;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
-use App\Mail\HardcoverTokenExpiring;
-use Carbon\Carbon;
 
 class HardcoverService extends BaseBookService implements BookServiceInterface
 {
     protected string $apiUrl;
+
     protected ?string $apiToken;
+
     protected ?string $tokenExpiresAt;
+
     protected string $notificationEmail;
+
     protected int $expirationWarningDays = 30;
 
     public function __construct()
@@ -35,7 +39,7 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
         try {
             $response = Http::withHeaders([
                 'Content-Type' => 'application/json',
-                'Authorization' => 'Bearer ' . $this->apiToken,
+                'Authorization' => 'Bearer '.$this->apiToken,
             ])->post($this->apiUrl, [
                 'query' => $query,
                 'variables' => $variables,
@@ -47,6 +51,7 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
 
             if ($response->status() === 401) {
                 $this->handleTokenExpiration();
+
                 return null;
             }
 
@@ -54,12 +59,14 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
                 'status' => $response->status(),
                 'response' => $response->body(),
             ]);
+
             return null;
         } catch (\Exception $e) {
             Log::error('Hardcover API request exception', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
+
             return null;
         }
     }
@@ -69,7 +76,7 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
      */
     protected function checkTokenExpiration(): void
     {
-        if (!$this->tokenExpiresAt) {
+        if (! $this->tokenExpiresAt) {
             return;
         }
 
@@ -80,6 +87,7 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
         // If token is expired
         if ($daysUntilExpiration < 0) {
             $this->handleTokenExpiration();
+
             return;
         }
 
@@ -130,7 +138,7 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     public function getServiceName(): string
     {
@@ -138,7 +146,7 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected function performSearch(string $query, array $options = []): ?array
     {
@@ -198,8 +206,9 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
         if (empty($books)) {
             Log::warning('No results found in Hardcover API response', [
                 'query' => $query,
-                'options' => $options
+                'options' => $options,
             ]);
+
             return [];
         }
 
@@ -207,7 +216,7 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     protected function performGetBookDetails(string $id): ?array
     {
@@ -250,8 +259,9 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
         $result = $this->makeRequest($query, ['bookId' => $id]);
         $book = $result['data']['books_by_pk'] ?? null;
 
-        if (!$book) {
+        if (! $book) {
             Log::warning('Book not found in Hardcover API', ['id' => $id]);
+
             return null;
         }
 
@@ -321,7 +331,7 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
                 'author' => [
                     'id' => $author['author']['id'] ?? null,
                     'name' => $author['author']['name'] ?? 'Unknown Author',
-                ]
+                ],
             ];
         }, $authors);
     }
@@ -336,7 +346,7 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
                 'author' => [
                     'id' => $narrator['author']['id'] ?? null,
                     'name' => $narrator['author']['name'] ?? 'Unknown Narrator',
-                ]
+                ],
             ];
         }, $narrators);
     }
@@ -351,11 +361,8 @@ public function isAvailable(): bool
 }
 
 /**
- * Search books by title (public API)
- * @param string $title
- * @param array $options
- * @return array|null
- */
+     * Search books by title (public API)
+     */
     public function searchBooks(string $title, array $options = []): ?array
     {
         return $this->performSearch($title, $options);
@@ -363,8 +370,6 @@ public function isAvailable(): bool
 
     /**
      * Get book details by ID (public API)
-     * @param string $id
-     * @return array|null
      */
     public function getBookDetails(string $id): ?array
     {
@@ -373,9 +378,6 @@ public function isAvailable(): bool
 
     /**
      * Get books by author (public API)
-     * @param string $authorName
-     * @param int $limit
-     * @return array|null
      */
     public function getBooksByAuthor(string $authorName, int $limit = 10): ?array
     {
@@ -402,6 +404,7 @@ public function isAvailable(): bool
             'authorName' => $authorName,
             'limit' => $limit,
         ]);
+
         return $result['data']['books'] ?? null;
     }
 }

@@ -18,7 +18,7 @@ class AudioFileAnalyzer
      * @var array
      */
     protected $supportedExtensions = [
-        'mp3', 'm4a', 'm4b', 'm4p', 'mp4', 'aac', 'ogg', 'oga', 'wav', 'flac', 'wma'
+        'mp3', 'm4a', 'm4b', 'm4p', 'mp4', 'aac', 'ogg', 'oga', 'wav', 'flac', 'wma',
     ];
 
     /**
@@ -26,7 +26,7 @@ class AudioFileAnalyzer
      */
     public function __construct()
     {
-        $this->getID3 = new getID3();
+        $this->getID3 = new getID3;
         // Disable writing tags to files
         $this->getID3->option_tag_id3v1 = false;
         $this->getID3->option_tag_id3v2 = false;
@@ -37,17 +37,16 @@ class AudioFileAnalyzer
     /**
      * Get the duration of an audio file in seconds
      *
-     * @param string $filePath
      * @return float|null Duration in seconds, or null if not an audio file or error
      */
     public function getAudioDuration(string $filePath): ?float
     {
-        if (!file_exists($filePath) || !is_file($filePath)) {
+        if (! file_exists($filePath) || ! is_file($filePath)) {
             return null;
         }
 
         $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
-        if (!in_array($extension, $this->supportedExtensions)) {
+        if (! in_array($extension, $this->supportedExtensions)) {
             return null;
         }
 
@@ -69,9 +68,6 @@ class AudioFileAnalyzer
 
     /**
      * Format seconds into HH:MM:SS format
-     *
-     * @param float $seconds
-     * @return string
      */
     public function formatDuration(float $seconds): string
     {
@@ -85,7 +81,6 @@ class AudioFileAnalyzer
     /**
      * Get total duration of all audio files in a directory (recursively)
      *
-     * @param string $directory
      * @return array ['total_seconds' => float, 'formatted' => string, 'file_count' => int]
      */
     public function getDirectoryAudioDuration(string $directory): array
@@ -109,7 +104,7 @@ class AudioFileAnalyzer
         return [
             'total_seconds' => $totalSeconds,
             'formatted' => $this->formatDuration($totalSeconds),
-            'file_count' => $fileCount
+            'file_count' => $fileCount,
         ];
     }
 }

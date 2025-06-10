@@ -17,7 +17,7 @@ class ReadingProgressApiController extends Controller
 
         $user = Auth::user();
 
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $userId = Auth::id();
         $bookId = $request->input('book_id');
         $progressDocs = $firestore->getClient()->collection('reading_progress')
@@ -33,13 +33,14 @@ class ReadingProgressApiController extends Controller
                 $found = true;
             }
         }
-        if (!$found) {
+        if (! $found) {
             $firestore->getClient()->collection('reading_progress')->add([
                 'user_id' => $userId,
                 'book_id' => $bookId,
                 'current_position' => $request->current_position,
             ]);
         }
+
         return response()->json(['success' => true], 200);
     }
 
@@ -47,7 +48,7 @@ class ReadingProgressApiController extends Controller
     {
         $user = Auth::user();
 
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $userId = Auth::id();
         $bookId = $request->input('book_id');
         $progressDocs = $firestore->getClient()->collection('reading_progress')
@@ -59,6 +60,7 @@ class ReadingProgressApiController extends Controller
                 $doc->reference()->delete();
             }
         }
+
         return response()->json(['message' => 'Progress reset.']);
     }
 
@@ -66,7 +68,7 @@ class ReadingProgressApiController extends Controller
     {
         $user = Auth::user();
 
-        $firestore = new FirestoreService();
+        $firestore = new FirestoreService;
         $userId = Auth::id();
         $bookId = $request->input('book_id');
         $progressDocs = $firestore->getClient()->collection('reading_progress')
@@ -81,6 +83,7 @@ class ReadingProgressApiController extends Controller
                 break;
             }
         }
+
         return response()->json(['progress' => $progress]);
     }
 }

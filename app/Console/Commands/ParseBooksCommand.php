@@ -53,7 +53,7 @@ class ParseBooksCommand extends Command
                 $pattern = $path;
             } else {
                 // Relative to storage root
-                $pattern = $bookStoragePath . '/' . ltrim($path, '/');
+                $pattern = $bookStoragePath.'/'.ltrim($path, '/');
             }
             // Expand wildcards
             if (strpbrk($pattern, '*?[]')) {
@@ -62,6 +62,7 @@ class ParseBooksCommand extends Command
                     $expandedPaths = array_merge($expandedPaths, $matches);
                 } else {
                     $this->warn("No matches found for pattern: $pattern");
+
                     continue; // Don't add unmatched pattern to expandedPaths
                 }
             } else {
@@ -74,6 +75,7 @@ class ParseBooksCommand extends Command
         // If no valid paths remain, show error and exit
         if (empty($paths)) {
             $this->error('No valid directories found to parse.');
+
             return 1;
         }
 
@@ -99,18 +101,19 @@ class ParseBooksCommand extends Command
             } else {
                 $resolvedPath = $parser->resolveStoragePath($inputPath);
             }
-            if (!File::exists($resolvedPath) || !File::isDirectory($resolvedPath)) {
+            if (! File::exists($resolvedPath) || ! File::isDirectory($resolvedPath)) {
                 $this->warn("Skipping: $inputPath (resolved: $resolvedPath) does not exist or is not a directory.");
+
                 continue;
             }
             $validPaths[] = $resolvedPath;
         }
         if (empty($validPaths)) {
             $this->error('No valid directories found to parse after wildcard/path expansion.');
+
             return 1;
         }
         $paths = $validPaths;
-
 
         // Configure the parser
         $config = [
@@ -208,11 +211,12 @@ class ParseBooksCommand extends Command
                     $dirPath = $book['directory_path'] ?? null;
                     if ($dirPath) {
                         $resolvedDir = $parser->resolveStoragePath($dirPath);
-                        if (!is_dir($resolvedDir)) {
+                        if (! is_dir($resolvedDir)) {
                             $this->error("Directory does not exist: $resolvedDir");
+
                             continue;
                         }
-                        $jsonPath = rtrim($resolvedDir, '/') . '/' . $jsonFilename;
+                        $jsonPath = rtrim($resolvedDir, '/').'/'.$jsonFilename;
                         $jsonData = json_encode($book, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
                         if (file_put_contents($jsonPath, $jsonData) !== false) {
                             $this->info("Saved JSON to $jsonPath");
@@ -220,7 +224,7 @@ class ParseBooksCommand extends Command
                             $this->error("Failed to write JSON to $jsonPath");
                         }
                     } else {
-                        $this->error("No directory_path for book: " . ($book['title'] ?? '[unknown]'));
+                        $this->error('No directory_path for book: '.($book['title'] ?? '[unknown]'));
                     }
                 }
             }
@@ -232,20 +236,20 @@ class ParseBooksCommand extends Command
 
                 if (isset($book['author'])) {
                     if (is_array($book['author'])) {
-                        $hasValidAuthor = !empty(array_filter($book['author'], function ($author) {
-                            return !empty(trim($author)) && !str_contains($author, 'Unknown');
+                        $hasValidAuthor = ! empty(array_filter($book['author'], function ($author) {
+                            return ! empty(trim($author)) && ! str_contains($author, 'Unknown');
                         }));
                     } else {
-                        $hasValidAuthor = !empty(trim($book['author'])) && !str_contains($book['author'], 'Unknown');
+                        $hasValidAuthor = ! empty(trim($book['author'])) && ! str_contains($book['author'], 'Unknown');
                     }
                 }
 
-                if (!$hasValidAuthor) {
+                if (! $hasValidAuthor) {
                     // Use the directory path from the book data if available, otherwise use the path from the book file
                     $pathToUse = $book['directory_path'] ?? $book['path'] ?? '';
 
                     // If we don't have a path, try to get it from the full_path
-                    if (empty($pathToUse) && !empty($book['full_path'])) {
+                    if (empty($pathToUse) && ! empty($book['full_path'])) {
                         $pathToUse = dirname($book['full_path']);
                     }
 
@@ -258,13 +262,13 @@ class ParseBooksCommand extends Command
                 $hasNoAuthor = false;
                 if (is_array($book['author'])) {
                     $hasNoAuthor = empty(array_filter($book['author'], function ($a) {
-                        return !empty(trim($a)) && $a !== 'Unknown Author';
+                        return ! empty(trim($a)) && $a !== 'Unknown Author';
                     }));
                 } else {
                     $hasNoAuthor = empty($book['author']) || $book['author'] === 'Unknown Author';
                 }
 
-                if ($hasNoAuthor && !empty($book['full_path'])) {
+                if ($hasNoAuthor && ! empty($book['full_path'])) {
                     $parentDir = dirname($book['full_path']);
                     $this->info("Trying parent directory for author: $parentDir");
                     $author = $this->extractAuthorFromPath($parentDir);
@@ -272,12 +276,12 @@ class ParseBooksCommand extends Command
                 }
 
                 // Clean up title
-                if (!empty($book['title'])) {
+                if (! empty($book['title'])) {
                     $book['title'] = ucfirst(trim($book['title']));
                 }
 
                 // Clean up series - don't use author name as series
-                if (!empty($book['seriesName'])) {
+                if (! empty($book['seriesName'])) {
                     $series = $book['seriesName'];
                     $seriesNumber = $book['seriesNumber'];
 
@@ -309,7 +313,7 @@ class ParseBooksCommand extends Command
             $seriesMap = $parser->buildSeriesMap($allBooks);
             foreach ($allBooks as &$book) {
                 // Fix series names using fuzzy matching
-                if (!empty($book['seriesName'])) {
+                if (! empty($book['seriesName'])) {
                     $book['seriesName'] = $parser->normalizeSeriesName($book['seriesName']);
                 }
 
@@ -324,7 +328,7 @@ class ParseBooksCommand extends Command
                 if ($cleanupResult['metadata']['needs_review'] ?? false) {
                     $book['needs_review'] = true;
                     $book['review_reason'] = 'Title may need manual review';
-                    if (!empty($cleanupResult['metadata']['applied_corrections'])) {
+                    if (! empty($cleanupResult['metadata']['applied_corrections'])) {
                         $book['applied_corrections'] = $cleanupResult['metadata']['applied_corrections'];
                     }
                 }
@@ -354,10 +358,10 @@ class ParseBooksCommand extends Command
                     }
 
                     // Then by series (case-insensitive, empty series last)
-                    $seriesA = !empty($a['seriesName'])
+                    $seriesA = ! empty($a['seriesName'])
                         ? strtolower($a['seriesName'])
                         : 'zzz_no_series';
-                    $seriesB = !empty($b['seriesName'])
+                    $seriesB = ! empty($b['seriesName'])
                         ? strtolower($b['seriesName'])
                         : 'zzz_no_series';
                     $cmp = strnatcasecmp($seriesA, $seriesB);
@@ -367,8 +371,8 @@ class ParseBooksCommand extends Command
                     }
 
                     // Then by series number (handle null/empty values)
-                    $aNum = !empty($a['seriesNumber']) ? (float) $a['seriesNumber'] : 0;
-                    $bNum = !empty($b['seriesNumber']) ? (float) $b['seriesNumber'] : 0;
+                    $aNum = ! empty($a['seriesNumber']) ? (float) $a['seriesNumber'] : 0;
+                    $bNum = ! empty($b['seriesNumber']) ? (float) $b['seriesNumber'] : 0;
                     if ($aNum != $bNum) {
                         return $aNum <=> $bNum;
                     }
@@ -390,6 +394,7 @@ class ParseBooksCommand extends Command
 
             if (empty($allBooks)) {
                 $this->warn('No books found matching the criteria.');
+
                 return 0;
             }
 
@@ -415,10 +420,6 @@ class ParseBooksCommand extends Command
 
     /**
      * Output the results in the specified format.
-     *
-     * @param array $books
-     * @param string $format
-     * @return void
      */
     protected function outputResults(array $books, string $format): void
     {
@@ -447,9 +448,6 @@ class ParseBooksCommand extends Command
 
     /**
      * Output books as a table.
-     *
-     * @param array $books
-     * @return void
      */
     protected function outputTable(array $books): void
     {
@@ -472,8 +470,9 @@ class ParseBooksCommand extends Command
             }
 
             // If same series, compare series numbers (treat empty as 0)
-            $aNum = !empty($a['seriesNumber']) ? (float) $a['seriesNumber'] : 0;
-            $bNum = !empty($b['seriesNumber']) ? (float) $b['seriesNumber'] : 0;
+            $aNum = ! empty($a['seriesNumber']) ? (float) $a['seriesNumber'] : 0;
+            $bNum = ! empty($b['seriesNumber']) ? (float) $b['seriesNumber'] : 0;
+
             return $aNum <=> $bNum;
         });
 
@@ -485,7 +484,7 @@ class ParseBooksCommand extends Command
             $author = $book['author'] ?? '';
             if (is_array($author)) {
                 $author = implode(', ', array_filter($author, function ($a) {
-                    return !empty(trim($a));
+                    return ! empty(trim($a));
                 }));
             }
 
@@ -510,9 +509,6 @@ class ParseBooksCommand extends Command
 
     /**
      * Output books as CSV.
-     *
-     * @param array $books
-     * @return void
      */
     protected function outputCsv(array $books): void
     {
@@ -544,9 +540,6 @@ class ParseBooksCommand extends Command
 
     /**
      * Output books as SQL INSERT statements.
-     *
-     * @param array $books
-     * @return void
      */
     protected function outputSql(array $books): void
     {
@@ -567,7 +560,7 @@ class ParseBooksCommand extends Command
                 } elseif (is_null($value)) {
                     $value = 'NULL';
                 } else {
-                    $value = "'" . addslashes((string) $value) . "'";
+                    $value = "'".addslashes((string) $value)."'";
                 }
 
                 $values[$key] = $value;
@@ -585,9 +578,6 @@ class ParseBooksCommand extends Command
 
     /**
      * Output verbose information about the parsing results
-     *
-     * @param array $books
-     * @return void
      */
     protected function outputVerboseInfo(array $books): void
     {
@@ -602,13 +592,13 @@ class ParseBooksCommand extends Command
             $authors[$author] = ($authors[$author] ?? 0) + 1;
 
             // Track books that need review
-            if (!empty($book['needs_review'])) {
+            if (! empty($book['needs_review'])) {
                 $needsReview[] = [
                     'title' => $book['title'] ?? 'Unknown Title',
                     'author' => $author,
                     'reason' => $book['review_reason'] ?? 'Unknown reason',
                     'original_title' => $book['metadata']['original_title'] ?? $book['title'] ?? 'Unknown',
-                    'applied_corrections' => $book['applied_corrections'] ?? []
+                    'applied_corrections' => $book['applied_corrections'] ?? [],
                 ];
             }
         }
@@ -622,13 +612,13 @@ class ParseBooksCommand extends Command
         // Count by series
         $series = [];
         foreach ($books as $book) {
-            if (!empty($book['series'])) {
+            if (! empty($book['series'])) {
                 $series[$book['series']] = ($series[$book['series']] ?? 0) + 1;
             }
         }
         arsort($series);
 
-        if (!empty($series)) {
+        if (! empty($series)) {
             $this->line('\n<comment>Books by series:</comment>');
             foreach ($series as $seriesName => $count) {
                 $this->line("  $seriesName: $count");
@@ -636,7 +626,7 @@ class ParseBooksCommand extends Command
         }
 
         // Show books that need review
-        if (!empty($needsReview)) {
+        if (! empty($needsReview)) {
             $this->line('\n<comment>=== Titles Needing Review ===</comment>');
             $this->line(sprintf('  Found %d title(s) that may need manual review:', count($needsReview)));
 
@@ -646,7 +636,7 @@ class ParseBooksCommand extends Command
                 $this->line(sprintf('     Reason: %s', $book['reason']));
                 $this->line(sprintf('     Original: %s', $book['original_title']));
 
-                if (!empty($book['applied_corrections'])) {
+                if (! empty($book['applied_corrections'])) {
                     $this->line('     Applied corrections:');
                     foreach ($book['applied_corrections'] as $correction) {
                         $this->line("       - $correction");

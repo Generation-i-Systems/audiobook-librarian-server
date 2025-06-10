@@ -46,6 +46,7 @@ class BookService extends Facade
     public static function get(string $serviceName): ?BookServiceInterface
     {
         $services = static::all();
+
         return $services[$serviceName] ?? null;
     }
 
@@ -55,6 +56,7 @@ class BookService extends Facade
     public static function firstAvailable(): ?BookServiceInterface
     {
         $services = static::all();
+
         return reset($services) ?: null;
     }
 
@@ -86,12 +88,13 @@ class BookService extends Facade
     /**
      * Get book details from a specific service or try all services
      */
-    public static function getBookDetails(string $id, string $serviceName = null): ?array
+    public static function getBookDetails(string $id, ?string $serviceName = null): ?array
     {
         if ($serviceName) {
             if ($service = static::get($serviceName)) {
                 return $service->getBookDetails($id);
             }
+
             return null;
         }
 
@@ -103,7 +106,7 @@ class BookService extends Facade
                 }
             } catch (\Exception $e) {
                 // Log error but continue with other services
-                \Log::error("Failed to get book details from service", [
+                \Log::error('Failed to get book details from service', [
                     'error' => $e->getMessage(),
                     'id' => $id,
                 ]);

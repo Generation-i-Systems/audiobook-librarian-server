@@ -50,14 +50,14 @@ class HardcoverServiceTest extends TestCase
                             'cover_image_url' => 'https://example.com/cover.jpg',
                             'genres' => [
                                 ['genre' => ['name' => 'Science Fiction']],
-                                ['genre' => ['name' => 'Adventure']]
+                                ['genre' => ['name' => 'Adventure']],
                             ],
                             'authors' => [
-                                ['author' => ['name' => 'Test Author']]
-                            ]
-                        ]
-                    ]
-                ]
+                                ['author' => ['name' => 'Test Author']],
+                            ],
+                        ],
+                    ],
+                ],
             ]);
 
         // Call the method we want to test
@@ -78,9 +78,9 @@ class HardcoverServiceTest extends TestCase
         Http::fake([
             'api.hardcover.app/v1/graphql' => Http::response([
                 'errors' => [
-                    ['message' => 'Invalid token']
-                ]
-            ], 401)
+                    ['message' => 'Invalid token'],
+                ],
+            ], 401),
         ]);
 
         $service = app(HardcoverService::class);
@@ -143,16 +143,16 @@ class HardcoverServiceTest extends TestCase
                         'cover_image_url' => 'https://example.com/cover.jpg',
                         'publisher' => ['name' => 'Test Publisher'],
                         'authors' => [
-                            ['author' => ['name' => 'Test Author']]
+                            ['author' => ['name' => 'Test Author']],
                         ],
                         'narrators' => [
-                            ['author' => ['name' => 'Test Narrator']]
+                            ['author' => ['name' => 'Test Narrator']],
                         ],
                         'genres' => [
-                            ['genre' => ['name' => 'Science Fiction']]
-                        ]
-                    ]
-                ]
+                            ['genre' => ['name' => 'Science Fiction']],
+                        ],
+                    ],
+                ],
             ]);
 
         // Call the method we want to test

@@ -2,22 +2,24 @@
 
 namespace App\Services;
 
+use DOMDocument;
+use DOMXPath;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use DOMDocument;
-use DOMXPath;
-use Exception;
-use Illuminate\Http\Client\Response as IlluminateResponse;
 
 class AudiobookBayApiService
 {
     // --- Begin inlined BaseApiTrait properties ---
     protected string $baseUrl = '';
+
     protected ?string $apiKey = null;
+
     protected int $cacheTtl = 86400; // 24 hours in seconds
+
     protected int $rateLimit = 100; // Requests per hour
+
     protected string $serviceName = '';
     // --- End inlined BaseApiTrait properties ---
 
@@ -33,9 +35,10 @@ class AudiobookBayApiService
                 ];
             }, array_filter(explode(',', $authors)));
         }
-        if (!is_array($authors)) {
+        if (! is_array($authors)) {
             return [];
         }
+
         return array_map(function ($author) {
             if (is_string($author)) {
                 return [
@@ -44,6 +47,7 @@ class AudiobookBayApiService
                     ],
                 ];
             }
+
             return [
                 'author' => [
                     'id' => $author['id'] ?? null,
@@ -53,6 +57,7 @@ class AudiobookBayApiService
             ];
         }, $authors);
     }
+
     private static function formatNarrators($narrators): array
     {
         if (is_string($narrators)) {
@@ -64,9 +69,10 @@ class AudiobookBayApiService
                 ];
             }, array_filter(explode(',', $narrators)));
         }
-        if (!is_array($narrators)) {
+        if (! is_array($narrators)) {
             return [];
         }
+
         return array_map(function ($narrator) {
             if (is_string($narrator)) {
                 return [
@@ -75,6 +81,7 @@ class AudiobookBayApiService
                     ],
                 ];
             }
+
             return [
                 'narrator' => [
                     'id' => $narrator['id'] ?? null,
@@ -83,6 +90,7 @@ class AudiobookBayApiService
             ];
         }, $narrators);
     }
+
     private static function formatGenres($genres): array
     {
         if (is_string($genres)) {
@@ -94,9 +102,10 @@ class AudiobookBayApiService
                 ];
             }, array_filter(explode(',', $genres)));
         }
-        if (!is_array($genres)) {
+        if (! is_array($genres)) {
             return [];
         }
+
         return array_map(function ($genre) {
             if (is_string($genre)) {
                 return [
@@ -105,6 +114,7 @@ class AudiobookBayApiService
                     ],
                 ];
             }
+
             return [
                 'genre' => [
                     'id' => $genre['id'] ?? null,
@@ -114,6 +124,7 @@ class AudiobookBayApiService
             ];
         }, $genres);
     }
+
     private static function formatSeries($series, $number = null): array
     {
         if (empty($series)) {
@@ -144,6 +155,7 @@ class AudiobookBayApiService
                     ];
                 }, $series);
             }
+
             return [
                 [
                     'series' => [
@@ -154,8 +166,10 @@ class AudiobookBayApiService
                 ],
             ];
         }
+
         return [];
     }
+
     private static function formatBookData(array $data): array
     {
         return [
@@ -191,29 +205,37 @@ class AudiobookBayApiService
             ),
         ];
     }
+
     private static function formatSearchResults(array $items): array
     {
         return array_map(function ($item) {
             return self::formatBookData($item);
         }, $items);
     }
+
     private static function extractFirstName(string $fullName): string
     {
         $parts = explode(' ', trim($fullName));
+
         return $parts[0] ?? '';
     }
+
     private static function extractLastName(string $fullName): string
     {
         $parts = explode(' ', trim($fullName));
+
         return count($parts) > 1 ? end($parts) : '';
     }
+
     private static function normalizeString(?string $str): string
     {
         if ($str === null) {
             return '';
         }
+
         return trim(mb_strtolower($str));
     }
+
     public static function calculateSimilarity(string $str1, string $str2): float
     {
         $str1 = self::normalizeString($str1);
@@ -228,6 +250,7 @@ class AudiobookBayApiService
         }
         $maxLen = max($len1, $len2);
         $distance = levenshtein($str1, $str2);
+
         return 1 - ($distance / $maxLen);
     }
     // --- End inlined BaseParserTrait methods ---
@@ -238,7 +261,7 @@ class AudiobookBayApiService
      */
     public function parseSearchResults(string $html): array
     {
-        $dom = new DOMDocument();
+        $dom = new DOMDocument;
         @$dom->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'));
         $xpath = new DOMXPath($dom);
         $results = [];
@@ -259,7 +282,7 @@ class AudiobookBayApiService
             $titleNode = $xpath->query('.//div[contains(@class, "postTitle")]//a', $item)->item(0);
             if ($titleNode instanceof \DOMElement && $titleNode->hasAttribute('href')) {
                 $result['title'] = trim($titleNode->textContent);
-                $result['url'] = 'https://audiobookbay.lu' . $titleNode->getAttribute('href');
+                $result['url'] = 'https://audiobookbay.lu'.$titleNode->getAttribute('href');
             }
             // Extract cover image
             $imgNode = $xpath->query('.//div[contains(@class, "postImg")]//img', $item)->item(0);
@@ -312,10 +335,11 @@ class AudiobookBayApiService
                     $result['metadata']['bitrate'] = $matches[1];
                 }
             }
-            if (!empty($result['title'])) {
+            if (! empty($result['title'])) {
                 $results[] = $result;
             }
         }
+
         return $results;
     }
 
@@ -324,7 +348,7 @@ class AudiobookBayApiService
      */
     private function parseAudiobookDetails(string $html): array
     {
-        $dom = new DOMDocument();
+        $dom = new DOMDocument;
         @$dom->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'));
         $xpath = new DOMXPath($dom);
         $book = [
@@ -346,7 +370,7 @@ class AudiobookBayApiService
         if ($h1Nodes && $h1Nodes->length > 0) {
             $title = trim($h1Nodes->item(0)->textContent);
         }
-        if (!$title) {
+        if (! $title) {
             // Try fallback: first header node
             $headerNodes = $xpath->query('//*[self::h1 or self::h2 or self::h3][1]');
             if ($headerNodes && $headerNodes->length > 0) {
@@ -401,6 +425,7 @@ class AudiobookBayApiService
         if ($imgNode instanceof \DOMElement && $imgNode->hasAttribute('src')) {
             $book['cover_image_url'] = $imgNode->getAttribute('src');
         }
+
         return $book;
     }
     // --- End inlined AudiobookBayParserTrait methods ---
@@ -412,10 +437,11 @@ class AudiobookBayApiService
     protected function httpGetResponse(string $endpoint, array $params = []): ?string
     {
         $cacheKey = $this->getCacheKey($endpoint, $params);
+
         return Cache::remember($cacheKey, $this->cacheTtl, function () use ($endpoint, $params) {
             $this->checkRateLimit();
             $response = Http::withHeaders($this->getDefaultHeaders())
-                ->get($this->baseUrl . $endpoint, $params);
+                ->get($this->baseUrl.$endpoint, $params);
             if ($response->successful()) {
                 return (string) $response->body(); // Always return a string
             }
@@ -425,20 +451,23 @@ class AudiobookBayApiService
                 'status' => $response->status(),
                 'response' => $response->body(),
             ]);
+
             return null;
             // Defensive: ensure closure always returns string|null
         });
     }
+
     /**
      * Make an HTTP POST request (inlined from BaseApiTrait)
      */
     protected function httpPost(string $endpoint, array $data = []): ?\Illuminate\Http\Client\Response
     {
         $cacheKey = $this->getCacheKey($endpoint, $data);
+
         return Cache::remember($cacheKey, $this->cacheTtl, function () use ($endpoint, $data) {
             $this->checkRateLimit();
             $response = Http::withHeaders($this->getDefaultHeaders())
-                ->post($this->baseUrl . $endpoint, $data);
+                ->post($this->baseUrl.$endpoint, $data);
             if ($response->successful()) {
                 return $response;
             }
@@ -448,15 +477,17 @@ class AudiobookBayApiService
                 'status' => $response->status(),
                 'response' => $response->body(),
             ]);
+
             return null;
         });
     }
+
     /**
      * Check and enforce rate limiting (inlined from BaseApiTrait)
      */
     protected function checkRateLimit(): void
     {
-        $cacheKey = "{$this->serviceName}_rate_limit_" . now()->format('YmdH');
+        $cacheKey = "{$this->serviceName}_rate_limit_".now()->format('YmdH');
         $count = Cache::get($cacheKey, 0);
         if ($count >= $this->rateLimit) {
             Log::warning('API rate limit reached', ['service' => $this->serviceName]);
@@ -470,53 +501,66 @@ class AudiobookBayApiService
      */
     protected function getCacheKey(string $endpoint, array $params): string
     {
-        return "{$this->serviceName}_" . md5($endpoint . json_encode($params));
+        return "{$this->serviceName}_".md5($endpoint.json_encode($params));
     }
+
     /**
      * Set the API key (inlined from BaseApiTrait)
      */
     public function setApiKey(string $apiKey): self
     {
         $this->apiKey = $apiKey;
+
         return $this;
     }
+
     /**
      * Set the base URL (inlined from BaseApiTrait)
      */
     public function setBaseUrl(string $baseUrl): self
     {
         $this->baseUrl = rtrim($baseUrl, '/');
+
         return $this;
     }
+
     /**
      * Set the cache TTL in seconds (inlined from BaseApiTrait)
      */
     public function setCacheTtl(int $seconds): self
     {
         $this->cacheTtl = $seconds;
+
         return $this;
     }
+
     /**
      * Set the rate limit (requests per hour) (inlined from BaseApiTrait)
      */
     public function setRateLimit(int $requestsPerHour): self
     {
         $this->rateLimit = $requestsPerHour;
+
         return $this;
     }
+
     /**
      * Set the service name (inlined from BaseApiTrait)
      */
     public function setServiceName(string $serviceName): self
     {
         $this->serviceName = $serviceName;
+
         return $this;
     }
     // --- End inlined BaseApiTrait methods ---
 
     protected ?string $username = null;
+
     protected ?string $password = null;
+
     protected ?string $cookie = null;
+
     // User-Agent for AudiobookBay login and general requests
     protected string $userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36';
 
@@ -558,13 +602,14 @@ class AudiobookBayApiService
 
         if (empty($this->username) || empty($this->password)) {
             Log::error('AudiobookBayApiService: Cannot get auth cookie without username and password.');
+
             return ''; // Cannot authenticate
         }
 
-        $cacheKey = $this->serviceName . '_auth_cookie_' . md5($this->username);
+        $cacheKey = $this->serviceName.'_auth_cookie_'.md5($this->username);
         $this->cookie = Cache::remember($cacheKey, 3500, function () { // Cache for slightly less than an hour
             // AudiobookBay login POST uses a specific User-Agent and form data structure
-            $loginUrl = rtrim($this->baseUrl, '/') . '/member/login.php';
+            $loginUrl = rtrim($this->baseUrl, '/').'/member/login.php';
 
             try {
                 $response = Http::asForm()
@@ -575,23 +620,25 @@ class AudiobookBayApiService
                         'login' => 'Login',
                     ]);
 
-                if (!$response->successful()) {
+                if (! $response->successful()) {
                     Log::error('AudiobookBayApiService: Authentication POST failed.', [
                         'status' => $response->status(),
                         'url' => $loginUrl,
                         'response_body' => Str::limit($response->body(), 500),
                     ]);
+
                     return '';
                 }
 
                 $cookies = $response->cookies();
                 if (empty($cookies)) {
                     Log::error('AudiobookBayApiService: No cookies found in authentication response.');
+
                     return '';
                 }
 
                 return collect($cookies)
-                    ->map(fn ($cookie) => $cookie->getName() . '=' . $cookie->getValue())
+                    ->map(fn ($cookie) => $cookie->getName().'='.$cookie->getValue())
                     ->implode('; ');
 
             } catch (\Exception $e) {
@@ -599,6 +646,7 @@ class AudiobookBayApiService
                     'message' => $e->getMessage(),
                     'url' => $loginUrl,
                 ]);
+
                 return '';
             }
         });
@@ -635,11 +683,12 @@ class AudiobookBayApiService
         } elseif ($responseObject !== null) {
             Log::error('AudiobookBayApiService:searchAudiobooks - httpGetResponse did not return a string', [
                 'type' => gettype($responseObject),
-                'value' => is_object($responseObject) ? get_class($responseObject) : $responseObject
+                'value' => is_object($responseObject) ? get_class($responseObject) : $responseObject,
             ]);
         }
 
         Log::warning('AudiobookBayApiService:searchAudiobooks - Failed to fetch or parse search results.', ['query' => $query, 'options' => $options]);
+
         return null;
     }
 
@@ -652,13 +701,14 @@ class AudiobookBayApiService
                 $endpoint = substr($idOrUrl, strlen($this->baseUrl));
             } else {
                 Log::error('AudiobookBayApiService:getAudiobookDetails - URL does not match base URL.', ['url' => $idOrUrl, 'baseUrl' => $this->baseUrl]);
+
                 return null; // Cannot make request to an arbitrary URL with current httpGet setup
             }
         } else {
             // Assume it's an ID or slug that needs to be appended to a base path like /audio-books/slug or /ab/slug
             // This needs to be verified with actual AudiobookBay URL structure for detail pages.
             // For now, assuming the $idOrUrl is the direct path segment after base.
-            $endpoint = '/' . ltrim($idOrUrl, '/');
+            $endpoint = '/'.ltrim($idOrUrl, '/');
         }
 
         $responseBody = $this->httpGetResponse($endpoint);
@@ -668,6 +718,7 @@ class AudiobookBayApiService
         }
 
         Log::warning('AudiobookBayApiService:getAudiobookDetails - Failed to fetch or parse details.', ['idOrUrl' => $idOrUrl]);
+
         return null;
     }
 
@@ -676,12 +727,14 @@ class AudiobookBayApiService
         // AudiobookBay might not have a direct author search via query param.
         // Often, author searches are done by including the author's name in the general search query.
         $searchQuery = $author; // Simple approach: search for author's name
+
         return $this->searchAudiobooks($searchQuery, ['limit' => $limit]) ?? [];
     }
 
     public function getAudiobooksByNarrator(string $narrator, int $limit = 10): array
     {
         $searchQuery = $narrator; // Simple approach: search for narrator's name
+
         return $this->searchAudiobooks($searchQuery, ['limit' => $limit]) ?? [];
     }
 
@@ -692,14 +745,15 @@ class AudiobookBayApiService
             foreach ($value as $item) {
                 $flat[] = $this->flattenToString($item);
             }
+
             return implode(' ', array_filter($flat));
         }
+
         return (string) $value;
     }
 
     /**
      * Expose the authentication cookie for legacy/test code compatibility.
-     * @return string|null
      */
     public function getAudiobookBayCookie(): ?string
     {
@@ -708,8 +762,7 @@ class AudiobookBayApiService
 
     /**
      * Legacy/test compatibility: alias for searchAudiobooks.
-     * @param string $query
-     * @param array $options
+     *
      * @return array|null
      */
     public function audiobookBaySearch(string $query, array $options = [])
