@@ -505,16 +505,17 @@ class FirestoreService
     {
         if (! $this->db) {
             Log::error('Cannot create book: Firestore client not initialized');
-
             return null;
         }
         try {
+            // Ensure dateAdded is set (should be set by caller, fallback to server timestamp)
+            if (!isset($data['dateAdded'])) {
+                $data['dateAdded'] = $this->getServerTimestamp();
+            }
             $docRef = $this->db->collection('books')->add($data);
-
             return $docRef->id();
         } catch (\Throwable $e) {
             Log::error('Failed to create book: '.$e->getMessage());
-
             return null;
         }
     }
@@ -843,33 +844,33 @@ class FirestoreService
             if (!$this->db) {
                 return null;
             }
-            
+
             // First try with camelCase field name
             $query = $this->db->collection('books')
                 ->where('directoryPath', '=', $directoryPath)
                 ->limit(1);
-                
+
             $documents = $query->documents();
-            
+
             foreach ($documents as $document) {
                 if ($document->exists()) {
                     return array_merge(['id' => $document->id()], $document->data());
                 }
             }
-            
+
             // If not found, try with snake_case field name for backward compatibility
             $query = $this->db->collection('books')
                 ->where('directory_path', '=', $directoryPath)
                 ->limit(1);
-                
+
             $documents = $query->documents();
-            
+
             foreach ($documents as $document) {
                 if ($document->exists()) {
                     return array_merge(['id' => $document->id()], $document->data());
                 }
             }
-            
+
             return null;
         } catch (\Exception $e) {
             Log::error('Firestore findBookByDirectoryPath failed: ' . $e->getMessage());
