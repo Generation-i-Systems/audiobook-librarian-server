@@ -30,7 +30,7 @@ class CreateAdminUser extends Command
      */
     public function handle()
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         // Check if admin user exists in Firestore
         $adminUsers = $firestore->getClient()->collection('users')->where('role', '=', 'admin')->documents();
         foreach ($adminUsers as $doc) {

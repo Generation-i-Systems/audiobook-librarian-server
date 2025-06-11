@@ -10,7 +10,7 @@ class AccountRequestController extends Controller
 {
     public function index()
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $accountRequests = $firestore->getClient()->collection('account_requests')->where('status', '=', 'pending')->documents();
         $requests = [];
         foreach ($accountRequests as $doc) {
@@ -26,7 +26,7 @@ class AccountRequestController extends Controller
 
     public function approve($id)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $accountRequestDoc = $firestore->getClient()->collection('account_requests')->document($id)->snapshot();
         if (! $accountRequestDoc->exists()) {
             return back()->withErrors(['error' => 'Account request not found.']);
@@ -49,7 +49,7 @@ class AccountRequestController extends Controller
 
     public function reject($id)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $firestore->getClient()->collection('account_requests')->document($id)->set([
             'status' => 'rejected',
         ], ['merge' => true]);

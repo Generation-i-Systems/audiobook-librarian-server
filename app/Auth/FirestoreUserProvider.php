@@ -55,7 +55,7 @@ class FirestoreUserProvider implements UserProvider
 
     public function __construct()
     {
-        $this->firestore = new FirestoreService;
+        $this->firestore = new FirestoreService();
     }
 
     public function retrieveById($identifier)

@@ -31,7 +31,7 @@ class BookController extends Controller
 
     public function index(Request $request)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $books = $firestore->listBooks();
 
         // Filtering

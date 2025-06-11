@@ -77,18 +77,18 @@ class MigrateBooksCamelCaseCommand extends Command
             // Get all books from Firestore
             $books = $this->firestoreService->listBooks();
             $this->info('Found ' . count($books) . ' books to process');
-    
+
             $bar = $this->output->createProgressBar(count($books));
             $bar->start();
-    
+
             $updated = 0;
             $skipped = 0;
             $errors = 0;
-    
+
             foreach ($books as $book) {
                 $bookId = $book['id'];
                 $updatedBook = $this->convertToCamelCase($book);
-        
+
                 // Only update if changes were made
                 if ($updatedBook !== $book) {
                     try {
@@ -103,18 +103,18 @@ class MigrateBooksCamelCaseCommand extends Command
                 } else {
                     $skipped++;
                 }
-        
+
                 $bar->advance();
             }
-    
+
             $bar->finish();
             $this->newLine(2);
-    
+
             $this->info("Migration completed:");
             $this->info("- Updated: {$updated} books");
             $this->info("- Skipped: {$skipped} books (already in camelCase)");
             $this->info("- Errors: {$errors} books");
-    
+
             return Command::SUCCESS;
         } catch (\Exception $e) {
             $this->error('Migration failed: ' . $e->getMessage());
@@ -143,7 +143,7 @@ class MigrateBooksCamelCaseCommand extends Command
                     $updatedBook[$camelCase] = $book[$snakeCase];
                     $changed = true;
                 }
-        
+
                 // Remove the snake_case field
                 unset($updatedBook[$snakeCase]);
                 $changed = true;

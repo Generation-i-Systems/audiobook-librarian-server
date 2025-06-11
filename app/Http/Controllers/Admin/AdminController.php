@@ -13,7 +13,7 @@ class AdminController extends Controller
             'user_id' => 'required|string',
             'role' => 'required|in:regular,admin',
         ]);
-        $firestore = new \App\Services\FirestoreService;
+        $firestore = new \App\Services\FirestoreService();
         $userId = $request->input('user_id');
         $role = $request->input('role');
         // Assuming users are stored in a 'users' collection
