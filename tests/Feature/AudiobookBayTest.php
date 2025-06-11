@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Mockery;
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\Test;
+
 
 class AudiobookBayTest extends TestCase
 {
@@ -52,8 +54,8 @@ class AudiobookBayTest extends TestCase
         parent::tearDown();
     }
 
-    /** @test */
-    public function test_can_search_audiobooks_and_formats_results()
+    #[Test]
+    public function testCanSearchAudiobooksAndFormatsResults()
     {
         $query = 'test query';
         $options = ['page' => 1]; // Example options passed to apiService
@@ -127,8 +129,8 @@ class AudiobookBayTest extends TestCase
         $this->assertEquals($firstApiResult['metadata'], $firstServiceResult['metadata']);
     }
 
-    /** @test */
-    public function test_perform_search_returns_empty_array_on_api_service_failure()
+    #[Test]
+    public function testPerformSearchReturnsEmptyArrayOnApiServiceFailure()
     {
         $query = 'failing query';
         $options = ['page' => 1];
@@ -146,8 +148,8 @@ class AudiobookBayTest extends TestCase
         $this->assertEmpty($serviceResults);
     }
 
-    /** @test */
-    public function test_can_get_book_details_and_formats_result()
+    #[Test]
+    public function testCanGetBookDetailsAndFormatsResult()
     {
         $bookIdOrSlug = 'test-book-detailed-slug';
 
@@ -216,8 +218,8 @@ class AudiobookBayTest extends TestCase
         $this->assertEquals($mockApiDetails['metadata']['size'], $serviceDetails['metadata']['size']);
     }
 
-    /** @test */
-    public function test_perform_get_book_details_returns_null_on_api_service_failure()
+    #[Test]
+    public function testPerformGetBookDetailsReturnsNullOnApiServiceFailure()
     {
         $bookIdOrSlug = 'non-existent-slug';
 
@@ -232,8 +234,8 @@ class AudiobookBayTest extends TestCase
         $this->assertNull($serviceDetails);
     }
 
-    /** @test */
-    public function test_is_available_returns_true_when_service_is_set()
+    #[Test]
+    public function testIsAvailableReturnsTrueWhenServiceIsSet()
     {
         // In setUp, $this->service is initialized with a mock, so it should be available.
         $this->assertTrue($this->service->isAvailable());

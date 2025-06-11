@@ -46,7 +46,7 @@ class AuthControllerTest extends TestCase
         $projectId = config('firebase.project_id');
         $keyFile = config('firebase.credentials.file');
 
-        return empty($projectId) || empty($keyFile) || ! file_exists($keyFile);
+        return empty($projectId) || empty($keyFile) || !file_exists($keyFile);
     }
 
     protected function tearDown(): void
@@ -71,7 +71,7 @@ class AuthControllerTest extends TestCase
         }
     }
 
-    public function test_user_can_register()
+    public function testUserCanRegister()
     {
         $response = $this->postJson('/api/register', [
             'name' => 'Test User',
@@ -97,7 +97,7 @@ class AuthControllerTest extends TestCase
         $this->assertTrue(Hash::check('password', $user['password']));
     }
 
-    public function test_user_can_login()
+    public function testUserCanLogin()
     {
         // Create a test user
         $this->usersCollection->add([
@@ -124,7 +124,7 @@ class AuthControllerTest extends TestCase
             ]);
     }
 
-    public function test_unverified_user_cannot_login()
+    public function testUnverifiedUserCannotLogin()
     {
         // Create an unverified test user
         $this->usersCollection->add([
@@ -146,7 +146,7 @@ class AuthControllerTest extends TestCase
             ]);
     }
 
-    public function test_user_can_logout()
+    public function testUserCanLogout()
     {
         // Create a test user and token
         $userRef = $this->usersCollection->add([
@@ -157,7 +157,7 @@ class AuthControllerTest extends TestCase
             'role' => 'user',
         ]);
 
-        $token = 'test_token_'.Str::random(32);
+        $token = 'test_token_' . Str::random(32);
         $this->tokensCollection->add([
             'user_id' => $userRef->id(),
             'token' => $token,
@@ -166,7 +166,7 @@ class AuthControllerTest extends TestCase
         ]);
 
         $response = $this->withHeaders([
-            'Authorization' => 'Bearer '.$token,
+            'Authorization' => 'Bearer ' . $token,
         ])->postJson('/api/logout');
 
         $response->assertStatus(200)
