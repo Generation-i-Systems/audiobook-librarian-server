@@ -119,7 +119,7 @@ class BookDirectoryParser
         // Treat any other path (even if starts with '/') as relative to storage root
         $relativePath = ltrim($path, '/');
 
-        return $storageRoot.'/'.$relativePath;
+        return $storageRoot . '/' . $relativePath;
     }
 
     /**
@@ -136,7 +136,7 @@ class BookDirectoryParser
         $normalizedPath = str_replace('\\', '/', $path);
         $parts = explode('/', $normalizedPath);
         $parts = array_values(array_filter($parts, function ($part) {
-            return ! empty($part);
+            return !empty($part);
         }));
 
         $i = 0;
@@ -301,7 +301,7 @@ class BookDirectoryParser
     {
         $path = $this->resolveStoragePath($path);
         $isFile = pathinfo($path, PATHINFO_EXTENSION) === 'abs' || is_file($path);
-        $metadataPath = $isFile ? $path : rtrim($path, '/').'/metadata.abs';
+        $metadataPath = $isFile ? $path : rtrim($path, '/') . '/metadata.abs';
 
         $fileMetadata = [];
         if (file_exists($metadataPath) && is_readable($metadataPath)) {
@@ -318,7 +318,7 @@ class BookDirectoryParser
                             continue;
                         }
                         if (str_contains($trimmedLine, '=')) {
-                            if (! empty($descriptionLines)) {
+                            if (!empty($descriptionLines)) {
                                 $metadata['description'] = implode("\n", $descriptionLines);
                                 $descriptionLines = [];
                             }
@@ -365,11 +365,11 @@ class BookDirectoryParser
 
                             continue;
                         }
-                        if (! empty($descriptionLines) || $trimmedLine !== '') {
+                        if (!empty($descriptionLines) || $trimmedLine !== '') {
                             $descriptionLines[] = $line;
                         }
                     }
-                    if (! empty($descriptionLines)) {
+                    if (!empty($descriptionLines)) {
                         $metadata['description'] = implode("\n", array_map('trim', $descriptionLines));
                     }
                     $fileMetadata = [
@@ -384,10 +384,10 @@ class BookDirectoryParser
                             : (array_key_exists('seriesIndex', $metadata) && is_numeric($metadata['seriesIndex']) ? (int) $metadata['seriesIndex'] : null),
                         'year' => (
                             (array_key_exists('year', $metadata) && is_numeric($metadata['year']))
-                                ? (int) $metadata['year']
-                                : ((array_key_exists('publishedYear', $metadata) && is_numeric($metadata['publishedYear']))
-                                    ? (int) $metadata['publishedYear']
-                                    : null)
+                            ? (int) $metadata['year']
+                            : ((array_key_exists('publishedYear', $metadata) && is_numeric($metadata['publishedYear']))
+                                ? (int) $metadata['publishedYear']
+                                : null)
                         ),
                         'description' => array_key_exists('description', $metadata)
                             ? preg_replace('/^\[description\]\s*/i', '', $metadata['description'])
@@ -422,7 +422,7 @@ class BookDirectoryParser
         $uniqueAuthors = [];
         foreach ($authors as $author) {
             $normalized = $this->normalizeAuthorName($author);
-            if (! empty($normalized) && ! isset($uniqueAuthors[$normalized])) {
+            if (!empty($normalized) && !isset($uniqueAuthors[$normalized])) {
                 $uniqueAuthors[$normalized] = $author;
             }
         }
@@ -631,7 +631,7 @@ class BookDirectoryParser
             // Count all audio files in the directory
             $directory = $file->getPath();
             $audioExtensions = ['mp3', 'm4b', 'm4a', 'aac', 'flac', 'wav', 'ogg'];
-            $audioFiles = glob($directory.'/*.{mp3,m4b,m4a,aac,flac,wav,ogg}', GLOB_BRACE);
+            $audioFiles = glob($directory . '/*.{mp3,m4b,m4a,aac,flac,wav,ogg}', GLOB_BRACE);
             $audioFileCount = $audioFiles ? count($audioFiles) : 1;
 
             $book = [
@@ -655,24 +655,24 @@ class BookDirectoryParser
             $this->extractMetadata($book, $basename);
 
             // Try to read metadata from metadata file if it exists
-            $metadataPath = dirname($file->getPathname()).'/metadata.abs';
+            $metadataPath = dirname($file->getPathname()) . '/metadata.abs';
             if (file_exists($metadataPath)) {
                 $metadata = $this->readMetadataFile($metadataPath);
-                if (! empty($metadata['title'])) {
+                if (!empty($metadata['title'])) {
                     $book['title'] = $metadata['title'];
                 }
-                if (! empty($metadata['author'])) {
+                if (!empty($metadata['author'])) {
                     $book['author'] = $metadata['author'];
                 }
-                if (! empty($metadata['series'])) {
+                if (!empty($metadata['series'])) {
                     $book['series'] = $metadata['series'];
                 }
                 if (isset($metadata['series_number'])) {
                     $book['series_number'] = $metadata['series_number'];
                 }
-                if (! empty($metadata['year'])) {
+                if (!empty($metadata['year'])) {
                     $book['year'] = $metadata['year'];
-                } elseif (! empty($metadata['publishedYear'])) {
+                } elseif (!empty($metadata['publishedYear'])) {
                     $book['year'] = is_numeric($metadata['publishedYear']) ? (int) $metadata['publishedYear'] : $metadata['publishedYear'];
                 }
                 if (isset($metadata['description'])) {
@@ -697,11 +697,11 @@ class BookDirectoryParser
     public function parseDirectory(string $directory, array $config = []): array
     {
         $directory = $this->resolveStoragePath($directory);
-        if (! is_dir($directory) || ! is_readable($directory)) {
+        if (!is_dir($directory) || !is_readable($directory)) {
             throw new \InvalidArgumentException("Directory does not exist or is not readable: $directory");
         }
         $books = [];
-        $finder = new Finder;
+        $finder = new Finder();
         $baseDepth = count(explode('/', rtrim($directory, '/')));
 
         try {
@@ -714,7 +714,7 @@ class BookDirectoryParser
                 if (empty($bookPathInfo['skipped']) && empty($bookPathInfo['error'])) {
                     $seriesName = '';
                     $seriesNumber = null;
-                    if (! empty($bookPathInfo['series']) && is_array($bookPathInfo['series'])) {
+                    if (!empty($bookPathInfo['series']) && is_array($bookPathInfo['series'])) {
                         $seriesName = array_key_first($bookPathInfo['series']);
                         $seriesNumber = $bookPathInfo['series'][$seriesName] ?? null;
                     }
@@ -748,15 +748,15 @@ class BookDirectoryParser
                 $path = trim(str_replace($this->storageRoot, '', $dir->getPathname()), '/');
                 $bookPathInfo = $this->processDirPath($path);
 
-                if (! empty($bookPathInfo['skipped'])) {
+                if (!empty($bookPathInfo['skipped'])) {
                     continue;
                 }
-                if (! empty($bookPathInfo['error'])) {
+                if (!empty($bookPathInfo['error'])) {
                     continue;
                 }
 
                 // Skip if any direct subdirectory contains audio files (treat only leaf-most dirs as books)
-                $subdirs = iterator_to_array((new Finder)->directories()->in($this->storageRoot.'/'.$path)->depth('== 0'));
+                $subdirs = iterator_to_array((new Finder)->directories()->in($this->storageRoot . '/' . $path)->depth('== 0'));
                 $hasAudioInSubdir = false;
                 foreach ($subdirs as $subdir) {
                     $audioFiles = (new Finder)->files()
@@ -773,7 +773,7 @@ class BookDirectoryParser
                 }
 
                 // Get audio file data
-                $audioFilesData = $this->getAudioFiles($this->storageRoot.'/'.$path);
+                $audioFilesData = $this->getAudioFiles($this->storageRoot . '/' . $path);
                 $audioFileCount = $audioFilesData['count'];
                 $totalDuration = $audioFilesData['totalDuration'];
                 $fileTags = $audioFilesData['fileTags'];
@@ -782,7 +782,7 @@ class BookDirectoryParser
                     continue;
                 }
 
-                if (! empty($bookPathInfo['series']) && is_array($bookPathInfo['series'])) {
+                if (!empty($bookPathInfo['series']) && is_array($bookPathInfo['series'])) {
                     $seriesName = array_key_first($bookPathInfo['series']);
                     $seriesNumber = $bookPathInfo['series'][$seriesName] ?? null;
                 } else {
@@ -837,11 +837,11 @@ class BookDirectoryParser
 
         // Collect all seriesName => seriesNumber
         foreach ($books as $book) {
-            if (! empty($book['seriesName'])) {
+            if (!empty($book['seriesName'])) {
                 $series = $book['seriesName'];
                 $number = isset($book['seriesNumber']) ? $book['seriesNumber'] : null;
                 $normalized = $this->normalizeSeriesName($series);
-                if (! isset($seriesNumbers[$normalized]) || ($number !== null && $number > $seriesNumbers[$normalized])) {
+                if (!isset($seriesNumbers[$normalized]) || ($number !== null && $number > $seriesNumbers[$normalized])) {
                     $seriesNumbers[$normalized] = $number;
                 }
             }
@@ -857,10 +857,10 @@ class BookDirectoryParser
                 str_replace(' ', '-', $canonical),
                 str_replace(' and ', ' & ', $canonical),
                 preg_replace('/^The /i', '', $canonical),
-                'The '.$canonical,
+                'The ' . $canonical,
             ];
             foreach ($variations as $variation) {
-                if ($variation !== $canonical && ! isset($seriesMap[$variation])) {
+                if ($variation !== $canonical && !isset($seriesMap[$variation])) {
                     $seriesMap[$variation] = $seriesNumber;
                 }
             }
