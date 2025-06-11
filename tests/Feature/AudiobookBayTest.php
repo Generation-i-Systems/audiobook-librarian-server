@@ -4,8 +4,6 @@ namespace Tests\Feature;
 
 use App\Services\AudiobookBayApiService;
 use App\Services\AudiobookBayService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Mockery;
 use Tests\TestCase;

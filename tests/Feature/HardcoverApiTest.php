@@ -22,7 +22,7 @@ class HardcoverApiTest extends TestCase
             'https://api.hardcover.app/*' => function ($request) {
                 $body = json_decode($request->body(), true);
                 $query = $body['query'] ?? '';
-                file_put_contents('/tmp/hardcover_test_debug.log', "==== REQUEST ====\n".print_r($body, true)."\nQUERY:\n".$query."\n\n", FILE_APPEND);
+                file_put_contents('/tmp/hardcover_test_debug.log', "==== REQUEST ====\n" . print_r($body, true) . "\nQUERY:\n" . $query . "\n\n", FILE_APPEND);
                 if (str_contains($query, 'SearchBooks')) {
                     return Http::response([
                         'data' => [
@@ -89,7 +89,7 @@ class HardcoverApiTest extends TestCase
                     ]);
                 }
                 // Fallback for debugging
-                throw new \Exception('No HTTP fake matched for query: '.$query);
+                throw new \Exception('No HTTP fake matched for query: ' . $query);
             },
         ]);
         $this->hardcoverApiService = new HardcoverApiService(
@@ -99,7 +99,7 @@ class HardcoverApiTest extends TestCase
     }
 
     #[Test]
-    public function test_search_books_by_title()
+    public function testSearchBooksByTitle()
     {
 
         $results = $this->hardcoverApiService->searchBooksByTitle('Test');
@@ -111,7 +111,7 @@ class HardcoverApiTest extends TestCase
     }
 
     #[Test]
-    public function test_search_and_merge()
+    public function testSearchAndMerge()
     {
         $book = [
             'title' => 'Test Book',
@@ -153,7 +153,7 @@ class HardcoverApiTest extends TestCase
         ]);
         $result = $this->hardcoverApiService->searchAndMerge($book);
         $this->assertIsArray($result);
-        if (! isset($result['authors'])) {
+        if (!isset($result['authors'])) {
             $result['authors'] = [['author' => ['name' => 'Test Author']]];
         }
         $this->assertEquals('Test Book', $result['title']);
@@ -161,7 +161,7 @@ class HardcoverApiTest extends TestCase
     }
 
     #[Test]
-    public function test_get_book_details()
+    public function testGetBookDetails()
     {
         Http::fake([
             'https://api.hardcover.app/v1/graphql' => Http::response([
@@ -197,7 +197,7 @@ class HardcoverApiTest extends TestCase
     }
 
     #[Test]
-    public function test_get_books_by_author()
+    public function testGetBooksByAuthor()
     {
         // Mock successful author books response
         Http::fake([
@@ -241,7 +241,7 @@ class HardcoverApiTest extends TestCase
     }
 
     #[Test]
-    public function test_get_service_name(): void
+    public function testGetServiceName(): void
     {
         $this->assertEquals('hardcover', method_exists($this->hardcoverApiService, 'getServiceName') ? $this->hardcoverApiService->getServiceName() : 'hardcover');
     }
@@ -278,8 +278,8 @@ class HardcoverApiTest extends TestCase
         ];
     }
 
-    /** @test */
-    public function test_can_get_book_details()
+    #[Test]
+    public function testCanGetBookDetails()
     {
         Http::fake([
             'https://hardcover.app/api/graphql' => Http::response([

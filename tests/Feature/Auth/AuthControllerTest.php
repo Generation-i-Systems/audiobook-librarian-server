@@ -8,6 +8,7 @@ use Google\Cloud\Firestore\FirestoreClient;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\Test;
 
 class AuthControllerTest extends TestCase
 {
@@ -71,6 +72,7 @@ class AuthControllerTest extends TestCase
         }
     }
 
+    #[Test]
     public function testUserCanRegister()
     {
         $response = $this->postJson('/api/register', [
@@ -97,6 +99,7 @@ class AuthControllerTest extends TestCase
         $this->assertTrue(Hash::check('password', $user['password']));
     }
 
+    #[Test]
     public function testUserCanLogin()
     {
         // Create a test user
@@ -124,6 +127,7 @@ class AuthControllerTest extends TestCase
             ]);
     }
 
+    #[Test]
     public function testUnverifiedUserCannotLogin()
     {
         // Create an unverified test user
@@ -146,6 +150,7 @@ class AuthControllerTest extends TestCase
             ]);
     }
 
+    #[Test]
     public function testUserCanLogout()
     {
         // Create a test user and token
