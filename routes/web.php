@@ -40,10 +40,16 @@ Route::get('/', function () {
 Auth::routes();
 
 // Google Sign-In
-Route::get('login/google', [App\Http\Controllers\Auth\LoginController::class, 'redirectToGoogle'])->name('login.google');
-Route::get('login/google/callback', [App\Http\Controllers\Auth\LoginController::class, 'handleGoogleCallback']);
+Route::get(
+    'login/google',
+    [App\Http\Controllers\Auth\LoginController::class, 'redirectToGoogle']
+)->name('login.google');
+Route::get(
+    'login/google/callback',
+    [App\Http\Controllers\Auth\LoginController::class, 'handleGoogleCallback']
+);
 
-Route::get('/home', function() {
+Route::get('/home', function () {
     return redirect()->route('books.index')->with('status', 'Welcome to your audiobook library!');
 })->name('home');
 
@@ -76,12 +82,21 @@ Route::middleware(['auth'])->group(function () {
 
 Route::post('/messages', [MessageController::class, 'store'])->name('messages.store');
 
-Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
+// Regular book routes
+Route::get('/books', [BookController::class, 'index'])->name('books.index');
+Route::get('/books/{id?}', [BookController::class, 'show'])->name('books.show');
+
+// JSON API endpoints for AJAX requests
+Route::get('/api/books/json', [BookController::class, 'jsonIndex'])->name('api.books.json');
+Route::get('/api/books/recent/json', [BookController::class, 'jsonRecent'])->name('api.books.recent.json');
+Route::get('/books/{id}/download', [BookController::class, 'download'])->name('books.download');
+Route::post('/books/set-preference', [BookController::class, 'setPreference'])->name('books.set-preference');
 Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
 Route::put(
     '/profile/change-password',
     [ProfileController::class, 'changePassword']
 )->name('profile.changePassword');
+Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
 Route::post(
     '/profile/request-admin',
     [ProfileController::class, 'requestAdminPermissions']

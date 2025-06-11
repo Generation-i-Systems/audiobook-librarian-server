@@ -5,6 +5,11 @@ namespace App\Http\Controllers;
 use App\Services\FirestoreService;
 use App\Services\GoogleBooksApiService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Session;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Response;
 
 class BookController extends Controller
 {
@@ -15,183 +20,412 @@ class BookController extends Controller
         $this->googleBooksApiService = $googleBooksApiService;
     }
 
-    // ... Other methods...
-
+    /**
+     * Display the main books index page
+     *
+     * @param Request $request
+     * @return \Illuminate\View\View
+     */
     public function index(Request $request)
     {
         $firestore = new FirestoreService();
         $books = $firestore->listBooks();
+        Log::debug('Books fetched from Firestore: ' . count($books));
 
         // Extract unique genres from books
         $genres = [];
         foreach ($books as $book) {
             if (isset($book['genre']) && !empty($book['genre'])) {
                 foreach ((array)$book['genre'] as $genre) {
-                    if (!empty($genre)) {
-                        $genreId = md5($genre); // Create a consistent ID from genre name
-                        $genres[$genreId] = ['id' => $genreId, 'name' => $genre];
-                    }
+                    $genreId = md5($genre);
+                    $genres[$genreId] = $genre;
                 }
             }
         }
-        $genres = array_values($genres);
-        usort($genres, function ($a, $b) {
-            return strcasecmp($a['name'], $b['name']);
-        });
+        asort($genres);
 
         // Extract unique authors from books
         $authors = [];
         foreach ($books as $book) {
             if (isset($book['author']) && !empty($book['author'])) {
                 foreach ((array)$book['author'] as $author) {
-                    if (!empty($author)) {
-                        $authorId = md5($author); // Create a consistent ID from author name
-                        $authors[$authorId] = ['id' => $authorId, 'name' => $author];
-                    }
+                    $authorId = md5($author);
+                    $authors[$authorId] = $author;
                 }
             }
         }
-        $authors = array_values($authors);
-        usort($authors, function ($a, $b) {
-            return strcasecmp($a['name'], $b['name']);
+        asort($authors);
+
+        // Extract unique series from books
+        $series = [];
+        foreach ($books as $book) {
+            if (isset($book['series']) && !empty($book['series'])) {
+                if (is_array($book['series'])) {
+                    foreach ($book['series'] as $seriesName => $seriesNumber) {
+                        $series[$seriesName] = $seriesName;
+                    }
+                } else {
+                    $series[$book['series']] = $book['series'];
+                }
+            }
+        }
+        asort($series);
+
+        // Get recent books (sorted by date_added)
+        $recentBooks = $books;
+        usort($recentBooks, function ($a, $b) {
+            $dateA = isset($a['dateAdded']) ? strtotime($a['dateAdded']) : 0;
+            $dateB = isset($b['dateAdded']) ? strtotime($b['dateAdded']) : 0;
+            return $dateB - $dateA; // Descending order
+        });
+        $recentBooks = array_slice($recentBooks, 0, 10);
+        $recentBooks = array_map([$this, 'ensureBookFields'], $recentBooks);
+
+        // Get view preferences from session
+        $mainViewType = session('main_view_type', 'grid');
+        $mainPerPage = session('main_per_page', 24);
+
+        return view('books.index', compact(
+            'books',
+            'genres',
+            'authors',
+            'series',
+            'recentBooks',
+            'mainViewType',
+            'mainPerPage'
+        ));
+    }
+
+    /**
+     * JSON API endpoint for main books AJAX loading
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function jsonIndex(Request $request)
+    {
+        $firestore = new FirestoreService();
+        $books = $firestore->listBooks();
+        Log::debug('JSON API: Books fetched from Firestore: ' . count($books));
+
+        return $this->handleMainBooksAjaxRequest($request, $books);
+    }
+
+    /**
+     * JSON API endpoint for recent books AJAX loading
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function jsonRecent(Request $request)
+    {
+        $firestore = new FirestoreService();
+        $books = $firestore->listBooks();
+        Log::debug('JSON API: Recent books fetched from Firestore: ' . count($books));
+
+        // Force sorting by date_added for recent books
+        $request->merge([
+            'sort' => 'date_added',
+            'order' => 'desc'
+        ]);
+
+        return $this->handleMainBooksAjaxRequest($request, $books);
+    }
+
+    /**
+     * Display a specific book
+     *
+     * @param Request $request
+     * @param string|null $id
+     * @return \Illuminate\View\View
+     */
+    public function show(Request $request, $id = null)
+    {
+        if (!$id) {
+            return redirect()->route('books.index');
+        }
+
+        $firestore = new FirestoreService();
+        $book = $firestore->getBook($id);
+
+        if (!$book) {
+            return redirect()->route('books.index')->with('error', 'Book not found');
+        }
+
+        // Ensure all required fields are present
+        $book = $this->ensureBookFields($book);
+
+        // Get related books (same author or series)
+        $relatedBooks = $firestore->listBooks();
+        $relatedBooks = array_filter($relatedBooks, function ($relatedBook) use ($book, $id) {
+            // Skip the current book
+            if ($relatedBook['id'] === $id) {
+                return false;
+            }
+
+            // Check if same author
+            if (isset($relatedBook['author']) && isset($book['author'])) {
+                $authors = (array)$relatedBook['author'];
+                $bookAuthors = (array)$book['author'];
+                if (count(array_intersect($authors, $bookAuthors)) > 0) {
+                    return true;
+                }
+            }
+
+            // Check if same series
+            if (isset($relatedBook['series']) && isset($book['series'])) {
+                if (is_array($relatedBook['series']) && is_array($book['series'])) {
+                    $seriesNames = array_keys($relatedBook['series']);
+                    $bookSeriesNames = array_keys($book['series']);
+                    if (count(array_intersect($seriesNames, $bookSeriesNames)) > 0) {
+                        return true;
+                    }
+                } elseif (!is_array($relatedBook['series']) && !is_array($book['series'])) {
+                    if ($relatedBook['series'] === $book['series']) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         });
 
-        // Apply filters if provided
-        if ($request->has('search')) {
-            $search = $request->input('search');
+        // Limit to 6 related books
+        $relatedBooks = array_slice($relatedBooks, 0, 6);
+        $relatedBooks = array_map([$this, 'ensureBookFields'], $relatedBooks);
+
+        return view('books.show', compact('book', 'relatedBooks'));
+    }
+
+    /**
+     * Download a book file
+     *
+     * @param Request $request
+     * @param string $id
+     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse|\Illuminate\Http\RedirectResponse
+     */
+    public function download(Request $request, $id)
+    {
+        $firestore = new FirestoreService();
+        $book = $firestore->getBook($id);
+
+        if (!$book || !isset($book['file_path'])) {
+            return redirect()->route('books.index')->with('error', 'Book file not found');
+        }
+
+        $filePath = $book['file_path'];
+        $fileName = basename($filePath);
+
+        // Check if file exists in storage
+        if (!Storage::exists($filePath)) {
+            return redirect()->route('books.show', $id)->with('error', 'Book file not found on server');
+        }
+
+        // Log download
+        Log::info('Book downloaded', [
+            'book_id' => $id,
+            'title' => $book['title'] ?? 'Unknown',
+            'user_id' => auth()->id() ?? 'guest',
+            'ip' => $request->ip()
+        ]);
+
+        // Return file download response
+        return Response::download(storage_path('app/' . $filePath), $fileName);
+    }
+
+    /**
+     * Set user preference for view type or items per page
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function setPreference(Request $request)
+    {
+        $type = $request->input('type');
+        $value = $request->input('value');
+
+        if ($type === 'view_type') {
+            session(['main_view_type' => $value]);
+        } elseif ($type === 'per_page') {
+            session(['main_per_page' => (int)$value]);
+        }
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Handle AJAX request for main books listing with filtering, sorting, and pagination
+     *
+     * @param Request $request
+     * @param array $books
+     * @return \Illuminate\Http\JsonResponse
+     */
+    protected function handleMainBooksAjaxRequest(Request $request, array $books)
+    {
+        // Get view type from session or request
+        $viewType = $request->input('view_type', session('main_view_type', 'grid'));
+        session(['main_view_type' => $viewType]);
+
+        // Apply search filter if provided
+        if ($request->has('search') && !empty($request->input('search'))) {
+            $search = strtolower($request->input('search'));
             $books = array_filter($books, function ($book) use ($search) {
                 // Search in title
                 if (isset($book['title']) && stripos($book['title'], $search) !== false) {
                     return true;
                 }
 
-                // Search in authors
-                if (isset($book['author']) && is_array($book['author'])) {
-                    foreach ($book['author'] as $author) {
+                // Search in author
+                if (isset($book['author'])) {
+                    foreach ((array)$book['author'] as $author) {
                         if (stripos($author, $search) !== false) {
                             return true;
                         }
                     }
                 }
 
-                return false;
-            });
-        }
-
-        if ($request->has('genre_id')) {
-            $genreId = $request->input('genre_id');
-            $books = array_filter($books, function ($book) use ($genreId, $genres) {
-                if (!isset($book['genre']) || !is_array($book['genre'])) {
-                    return false;
-                }
-
-                // Find the genre name from the ID
-                $genreName = '';
-                foreach ($genres as $genre) {
-                    if ($genre['id'] === $genreId) {
-                        $genreName = $genre['name'];
-                        break;
-                    }
-                }
-
-                // Check if the book has this genre
-                return in_array($genreName, $book['genre']);
-            });
-        }
-
-        if ($request->has('author_id')) {
-            $authorId = $request->input('author_id');
-            $books = array_filter($books, function ($book) use ($authorId, $authors) {
-                if (!isset($book['author']) || !is_array($book['author'])) {
-                    return false;
-                }
-
-                // Find the author name from the ID
-                $authorName = '';
-                foreach ($authors as $author) {
-                    if ($author['id'] === $authorId) {
-                        $authorName = $author['name'];
-                        break;
-                    }
-                }
-
-                // Check if the book has this author
-                return in_array($authorName, $book['author']);
-            });
-        }
-
-        if ($request->has('series')) {
-            $seriesName = $request->input('series');
-            $books = array_filter($books, function ($book) use ($seriesName) {
-                return isset($book['series']) && stripos($book['series'], $seriesName) !== false;
-            });
-        }
-
-        // Get recent books (only if not filtering)
-        $recentBooks = [];
-        if (!$request->has('search') && !$request->has('genre_id') && !$request->has('author_id') && !$request->has('series')) {
-            $recentBooks = array_slice(array_reverse($books), 0, 5);
-        }
-
-        // Convert the filtered books array to a paginator
-        $perPage = 12;
-        $currentPage = $request->input('page', 1);
-        $offset = ($currentPage - 1) * $perPage;
-        $paginatedBooks = array_slice($books, $offset, $perPage, true);
-        $totalBooks = count($books);
-        $paginatedBooks = new \Illuminate\Pagination\LengthAwarePaginator(
-            $paginatedBooks,
-            $totalBooks,
-            $perPage,
-            $currentPage,
-            ['path' => $request->url(), 'query' => $request->query()]
-        );
-
-        return view('books.index', compact('paginatedBooks', 'genres', 'authors', 'recentBooks'));
-    }
-
-    public function show($id)
-    {
-        $firestore = new FirestoreService();
-        $book = $firestore->getBook($id);
-        if (!$book) {
-            abort(404, 'Book not found');
-        }
-
-        $book = $this->ensureBookFields($book);
-
-        // Get related books by the same author
-        $relatedBooks = [];
-        if (isset($book['author']) && is_array($book['author']) && !empty($book['author'])) {
-            $allBooks = $firestore->listBooks();
-            $authorBooks = array_filter($allBooks, function ($relatedBook) use ($book) {
-                // Skip if this is the current book
-                if ($relatedBook['id'] == $book['id']) {
-                    return false;
-                }
-
-                // Skip if the related book has no authors
-                if (!isset($relatedBook['author']) || !is_array($relatedBook['author']) || empty($relatedBook['author'])) {
-                    return false;
-                }
-
-                // Check if any author from the current book matches any author from the related book
-                foreach ($book['author'] as $currentAuthor) {
-                    if (in_array($currentAuthor, $relatedBook['author'])) {
+                // Search in series
+                if (isset($book['series'])) {
+                    if (is_array($book['series'])) {
+                        foreach (array_keys($book['series']) as $series) {
+                            if (stripos($series, $search) !== false) {
+                                return true;
+                            }
+                        }
+                    } elseif (stripos($book['series'], $search) !== false) {
                         return true;
                     }
                 }
 
                 return false;
             });
-            $relatedBooks = array_slice($authorBooks, 0, 3); // Limit to 3 related books
         }
 
-        return view('books.show', compact('book', 'relatedBooks'));
+        // Apply genre filter if provided
+        if ($request->has('genre_id') && !empty($request->input('genre_id'))) {
+            $genreId = $request->input('genre_id');
+            $books = array_filter($books, function ($book) use ($genreId) {
+                if (!isset($book['genre']) || empty($book['genre'])) {
+                    return false;
+                }
+
+                foreach ((array)$book['genre'] as $genre) {
+                    if (md5($genre) === $genreId) {
+                        return true;
+                    }
+                }
+
+                return false;
+            });
+        }
+
+        // Apply author filter if provided
+        if ($request->has('author_id') && !empty($request->input('author_id'))) {
+            $authorId = $request->input('author_id');
+            $books = array_filter($books, function ($book) use ($authorId) {
+                if (!isset($book['author']) || empty($book['author'])) {
+                    return false;
+                }
+
+                foreach ((array)$book['author'] as $author) {
+                    if (md5($author) === $authorId) {
+                        return true;
+                    }
+                }
+
+                return false;
+            });
+        }
+
+        // Apply series filter if provided
+        if ($request->has('series_id') && !empty($request->input('series_id'))) {
+            $seriesId = $request->input('series_id');
+            $books = array_filter($books, function ($book) use ($seriesId) {
+                if (!isset($book['series']) || empty($book['series'])) {
+                    return false;
+                }
+
+                if (is_array($book['series'])) {
+                    foreach (array_keys($book['series']) as $series) {
+                        if (md5($series) === $seriesId) {
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+
+                return md5($book['series']) === $seriesId;
+            });
+        }
+
+        // Apply sorting
+        $sort = $request->input('sort', 'title');
+        $order = $request->input('order', 'asc');
+
+        usort($books, function ($a, $b) use ($sort, $order) {
+            $result = 0;
+
+            switch ($sort) {
+                case 'title':
+                    $result = strcasecmp($a['title'] ?? '', $b['title'] ?? '');
+                    break;
+                case 'author':
+                    $authorA = isset($a['author']) && !empty($a['author']) ? (is_array($a['author']) ? $a['author'][0] : $a['author']) : '';
+                    $authorB = isset($b['author']) && !empty($b['author']) ? (is_array($b['author']) ? $b['author'][0] : $b['author']) : '';
+                    $result = strcasecmp($authorA, $authorB);
+                    break;
+                case 'date_added':
+                    $dateA = isset($a['dateAdded']) ? strtotime($a['dateAdded']) : 0;
+                    $dateB = isset($b['dateAdded']) ? strtotime($b['dateAdded']) : 0;
+                    $result = $dateA - $dateB;
+                    break;
+                default:
+                    $result = strcasecmp($a['title'] ?? '', $b['title'] ?? '');
+            }
+
+            return $order === 'desc' ? -$result : $result;
+        });
+
+        // Apply pagination
+        $page = max(1, (int)$request->input('page', 1));
+        $perPage = (int)$request->input('per_page', session('main_per_page', 24));
+        session(['main_per_page' => $perPage]);
+
+        $total = count($books);
+        $offset = ($page - 1) * $perPage;
+        $paginatedBooks = array_slice($books, $offset, $perPage);
+
+        // Ensure all required fields are present in each book
+        $paginatedBooks = array_map([$this, 'ensureBookFields'], $paginatedBooks);
+
+        // Return the books as JSON with pagination info
+        return response()->json([
+            'books' => $paginatedBooks,
+            'pagination' => [
+                'total' => $total,
+                'per_page' => $perPage,
+                'current_page' => $page,
+                'last_page' => ceil($total / $perPage),
+            ],
+            'view_type' => $viewType
+        ]);
     }
 
     /**
-     * Ensure book has all required fields to prevent view errors
+     * Load main books via AJAX for JavaScript-based pagination and view switching
+     * @deprecated Use the jsonIndex method instead
+     *
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function loadMainBooks(Request $request)
+    {
+        Log::warning('Deprecated endpoint loadMainBooks called. Use jsonIndex instead.');
+        return redirect()->route('api.books.json', $request->all());
+    }
+
+    /**
+     * Ensure all required fields are present in a book array
      *
      * @param array $book
      * @return array
@@ -199,91 +433,41 @@ class BookController extends Controller
     protected function ensureBookFields(array $book): array
     {
         $defaults = [
+            'id' => '',
             'title' => 'Unknown Title',
-            'author' => [],
-            'description' => 'No description available.',
-            'coverImage' => null,
+            'author' => ['Unknown Author'],
             'genre' => [],
-            'series' => null,
-            'series_number' => null,
-            'reviews' => [],
+            'cover' => '/images/default-cover.jpg',
+            'description' => 'No description available.',
+            'dateAdded' => date('Y-m-d'),
+            'duration' => '00:00:00',
+            'narrator' => ['Unknown Narrator'],
+            'series' => []
         ];
 
-        $result = array_merge($defaults, $book);
+        foreach ($defaults as $key => $value) {
+            if (!isset($book[$key]) || empty($book[$key])) {
+                $book[$key] = $value;
+            }
+        }
 
         // Ensure author is always an array
-        if (!is_array($result['author'])) {
-            $result['author'] = empty($result['author']) ? [] : [$result['author']];
+        if (!is_array($book['author'])) {
+            $book['author'] = [$book['author']];
         }
 
         // Ensure genre is always an array
-        if (!is_array($result['genre'])) {
-            $result['genre'] = empty($result['genre']) ? [] : [$result['genre']];
+        if (!is_array($book['genre'])) {
+            $book['genre'] = $book['genre'] ? [$book['genre']] : [];
         }
 
-        return $result;
-    }
-
-    public function download($id)
-    {
-        $firestore = new FirestoreService();
-        $book = $firestore->getBook($id);
-        if (!$book) {
-            abort(404, 'Book not found');
+        // Ensure narrator is always an array
+        if (!isset($book['narrator'])) {
+            $book['narrator'] = ['Unknown Narrator'];
+        } elseif (!is_array($book['narrator'])) {
+            $book['narrator'] = [$book['narrator']];
         }
 
-        $directoryPath = $book['directory_path'] ?? null;
-        if (!$directoryPath || !\Storage::disk('books')->exists($directoryPath)) {
-            abort(404, 'Book directory not found.');
-        }
-
-        // Filter for audio files only
-        $files = \Storage::disk('books')->files($directoryPath);
-        $audioFiles = array_filter($files, function ($file) {
-            $extension = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-            return in_array($extension, ['mp3', 'm4a', 'm4b', 'ogg', 'wav', 'aac', 'flac']);
-        });
-
-        if (empty($audioFiles)) {
-            abort(404, 'No audio files found for this book.');
-        }
-
-        // Create a directory for temporary files if it doesn't exist
-        $tempDir = storage_path('app/public/temp');
-        if (!file_exists($tempDir)) {
-            mkdir($tempDir, 0755, true);
-        }
-
-        // Create a sanitized filename for the zip
-        $zipFileName = str_replace(' ', '_', $book['title']) . '.zip';
-        $zipFileName = preg_replace('/[^A-Za-z0-9._-]/', '', $zipFileName);
-        $zipPath = $tempDir . '/' . $zipFileName;
-
-        $zip = new \ZipArchive();
-        if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
-            abort(500, 'Failed to create zip archive.');
-        }
-
-        foreach ($audioFiles as $file) {
-            $zip->addFile(\Storage::disk('books')->path($file), basename($file));
-        }
-
-        // Add a metadata file with book information
-        $metadataContent = "Title: {$book['title']}\n";
-        $metadataContent .= "Author: " . (isset($book['author']) && !empty($book['author']) ? implode(', ', $book['author']) : 'Unknown') . "\n";
-        if (isset($book['series']) && !empty($book['series'])) {
-            $metadataContent .= "Series: {$book['series']}\n";
-            if (isset($book['series_number'])) {
-                $metadataContent .= "Series Number: {$book['series_number']}\n";
-            }
-        }
-        if (isset($book['description']) && !empty($book['description'])) {
-            $metadataContent .= "\nDescription:\n{$book['description']}\n";
-        }
-
-        $zip->addFromString('book_info.txt', $metadataContent);
-        $zip->close();
-
-        return response()->download($zipPath, $zipFileName)->deleteFileAfterSend(true);
+        return $book;
     }
 }
