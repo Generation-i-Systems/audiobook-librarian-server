@@ -97,9 +97,7 @@ class AudibleService extends BaseBookService
 
     public function downloadCoverImage(string $imageUrl, string $asin, string $subDirectoryPrefix = 'covers'): ?string
     {
-        error_log("###### " . __LINE__);
         if (empty($imageUrl) || empty($asin)) {
-            error_log("###### " . __LINE__);
             Log::warning(
                 'AudibleService: downloadCoverImage called with empty imageUrl or asin.',
                 compact('imageUrl', 'asin')
@@ -117,10 +115,8 @@ class AudibleService extends BaseBookService
                     'status' => $response->status(),
                 ]);
 
-                error_log("###### " . __LINE__);
                 return null;
             }
-            error_log("###### " . __LINE__);
 
             $imageContents = $response->body();
             $extension = $this->getImageExtension($response->header('Content-Type'), $imageUrl);
@@ -134,29 +130,22 @@ class AudibleService extends BaseBookService
             }
 
             if (Storage::disk('public')->put($filePath, $imageContents)) {
-                error_log("###### " . __LINE__);
                 Log::debug('AudibleService: Cover image downloaded successfully.');
-                error_log("###### " . __LINE__);
-
                 Log::info('AudibleService: Cover image downloaded successfully.', ['path' => $filePath]);
-                error_log("###### " . __LINE__);
 
                 return $filePath;
             }
 
             Log::error('AudibleService: Failed to save image to storage.', ['path' => $filePath]);
 
-            error_log("###### " . __LINE__);
             return null;
         } catch (\Exception $e) {
-            error_log("###### " . __LINE__ . " " . $e->getMessage());
             Log::error('AudibleService: Exception during downloadCoverImage.', [
                 'message' => $e->getMessage(),
                 'trace' => Str::limit($e->getTraceAsString(), 1000),
                 'url' => $imageUrl,
             ]);
 
-            error_log("###### " . __LINE__);
             return null;
         }
     }

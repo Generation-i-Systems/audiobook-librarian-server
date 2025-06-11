@@ -27,17 +27,6 @@ ebook-archive/  (Root directory)
         │   │   │   ├── TrimStrings.php
         │   │   │   └── TrustProxies.php
         │   │   └── Kernel.php
-│   ├── Models/
-        │   │   ├── AccountRequest.php (Represents account requests)
-        │   │   ├── Author.php (Represent authors)
-        │   │   ├── Book.php (Represents a book)
-        │   │   ├── BookQueue.php (Represents an entry in the book queue)
-        │   │   ├── Follow.php (Represents a user following an author/series)
-        │   │   ├── Genre.php (Represents a book genre)
-        │   │   ├── ReadingProgress.php (Represents a user's reading progress)
-        │   │   ├── Review.php (Represents a book review)
-        │   │   ├── Series.php (Represent a series)
-        │   │   └── User.php (Represents a user)
 │   ├── Providers/
         │   │   ├── AppServiceProvider.php
         │   │   ├── AuthServiceProvider.php

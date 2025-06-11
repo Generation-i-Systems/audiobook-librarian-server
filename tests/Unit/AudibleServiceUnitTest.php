@@ -13,6 +13,13 @@ use Psr\Log\LoggerInterface;
 use Tests\TestCase;
 use PHPUnit\Framework\Attributes\Test;
 
+/**
+ * AudibleService Unit Tests
+ *
+ * @method void assertExists(string $path)
+ * @method void assertMissing(string $path)
+ */
+
 class AudibleServiceUnitTest extends TestCase
 {
     protected AudibleService $audibleService;
@@ -66,29 +73,21 @@ class AudibleServiceUnitTest extends TestCase
     #[Test]
     public function testDownloadsCoverImageSuccessfullyWithContentTypeExtension()
     {
-        error_log("----------------" . __LINE__);
-
         Storage::fake('public');
         $imageUrl = 'https://m.media-amazon.com/images/I/51Q42D63G5L.jpg';
         $asin = 'B002V1O1QK';
         $imageContent = 'fake-image-data';
 
-        error_log("----------------" . __LINE__);
         Http::fake([$imageUrl => Http::response($imageContent, 200, ['Content-Type' => 'image/jpeg'])]);
         // No need to set log expectations with Log::fake()
 
-        error_log("----------------" . __LINE__);
         $filePath = $this->audibleService->downloadCoverImage($imageUrl, $asin);
 
-        error_log("----------------" . __LINE__);
         $this->assertNotNull($filePath);
         $this->assertEquals('covers/' . $asin . '.jpg', $filePath);
-        error_log("----------------" . __LINE__);
         Storage::disk('public')->assertExists($filePath);
         Storage::disk('public')->assertMissing('covers/' . $asin . '.png');
         $this->assertEquals($imageContent, Storage::disk('public')->get($filePath));
-
-        error_log("----------------" . __LINE__);
     }
 
     #[Test]
