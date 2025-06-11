@@ -2,57 +2,87 @@
 
 @section('content')
     <div class="container">
-        <h1>{{ $book->title }}</h1>
+        <h1>{{ $book['title'] }}</h1>
 
         <div class="row">
             <div class="col-md-4">
                 @php
-                    $cover = $book->cover_image ? url('cover/' . $book->cover_image) : url('images/placeholder.png');
+                    $cover = isset($book['coverImage']) && $book['coverImage'] ? route('cover.proxy', ['path' => $book['coverImage']]) : url('images/placeholder.png');
                 @endphp
-                <img src="{{ $cover }}" alt="{{ $book->title }}" class="img-fluid">
+                <img src="{{ $cover }}" alt="{{ $book['title'] }}" class="img-fluid">
             </div>
             <div class="col-md-8">
-                <p><strong>Author:</strong> {{ $book->author->name }}</p>
+                <p><strong>Author:</strong>
+                    @if(isset($book['author']) && is_array($book['author']) && !empty($book['author']))
+                        {{ implode(', ', $book['author']) }}
+                    @else
+                        Unknown
+                    @endif
+                </p>
                 @php
                     $hasSeries = false;
-                    if ($book->series && is_object($book->series) && !empty($book->series->name)) {
-                        $hasSeries = true;
-                    } elseif ($book->series && is_array($book->series) && isset($book->series['name']) && !empty($book->series['name'])) {
-                        $hasSeries = true;
-                    } elseif ($book->series && is_string($book->series) && trim($book->series) !== '') {
+                    if (isset($book['series']) && !empty($book['series'])) {
                         $hasSeries = true;
                     }
                 @endphp
                 @if($hasSeries)
                 <p><strong>Series:</strong>
-                    @if(is_object($book->series))
-                        {{ $book->series->name }}@if($book->series_number) (Book {{ $book->series_number }})@endif
-                    @elseif(is_array($book->series) && isset($book->series['name']))
-                        {{ $book->series['name'] }}@if($book->series_number) (Book {{ $book->series_number }})@endif
-                    @else
-                        {{ $book->series }}@if($book->series_number) (Book {{ $book->series_number }})@endif
-                    @endif
+                    {{ $book['series'] }}@if(isset($book['series_number'])) (Book {{ $book['series_number'] }})@endif
                 </p>
                 @endif
-                <p><strong>Genre:</strong> {{ $book->genre->name }}</p>
-                <p>{{ $book->description }}</p>
+                <p><strong>Genre:</strong>
+                    @if(isset($book['genre']) && is_array($book['genre']) && !empty($book['genre']))
+                        {{ implode(', ', $book['genre']) }}
+                    @else
+                        Unknown
+                    @endif
+                </p>
+                <p>{{ isset($book['description']) ? $book['description'] : 'No description available.' }}</p>
 
-                <a href="{{ route('books.download', $book) }}" class="btn btn-primary">Download</a>
+                <a href="{{ route('books.download', $book['id']) }}" class="btn btn-primary">Download</a>
 
                 <hr>
 
-                <h2>Reviews</h2>
-                @foreach($book->reviews as $review)
-                    <div class="card mb-3">
-                        <div class="card-body">
-                            <p>{{ $review->comment }}</p>
-                            <p><strong>Age Rating:</strong> {{ $review->age_rating }}</p>
-                            <p><strong>Content Rating:</strong> {{ $review->content_rating }}</p>
+                @if(!empty($relatedBooks))
+                <h2>Related Books</h2>
+                <div class="row">
+                    @foreach($relatedBooks as $relatedBook)
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100">
+                                @php
+                                    $relatedCover = isset($relatedBook['coverImage']) && $relatedBook['coverImage'] ?
+                                        route('cover.proxy', ['path' => $relatedBook['coverImage']]) :
+                                        url('images/placeholder.png');
+                                @endphp
+                                <img src="{{ $relatedCover }}" class="card-img-top" alt="{{ $relatedBook['title'] }}"
+                                     style="height: 150px; object-fit: contain;">
+                                <div class="card-body">
+                                    <h5 class="card-title">{{ $relatedBook['title'] }}</h5>
+                                    <a href="{{ route('books.show', $relatedBook['id']) }}" class="btn btn-sm btn-primary">View</a>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                @endforeach
+                    @endforeach
+                </div>
+                <hr>
+                @endif
 
-                <form action="{{ route('reviews.store', $book) }}" method="POST">
+                <h2>Reviews</h2>
+                @if(isset($book['reviews']) && is_array($book['reviews']))
+                    @foreach($book['reviews'] as $review)
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <p>{{ isset($review['comment']) ? $review['comment'] : '' }}</p>
+                                <p><strong>Age Rating:</strong> {{ isset($review['age_rating']) ? $review['age_rating'] : 'N/A' }}</p>
+                                <p><strong>Content Rating:</strong> {{ isset($review['content_rating']) ? $review['content_rating'] : 'N/A' }}</p>
+                            </div>
+                        </div>
+                    @endforeach
+                @else
+                    <p>No reviews available.</p>
+                @endif
+
+                <form action="{{ route('reviews.store', $book['id']) }}" method="POST">
                     @csrf
                     <div class="form-group">
                         <label for="comment">Add a Review:</label>

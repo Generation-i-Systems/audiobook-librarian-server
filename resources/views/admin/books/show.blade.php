@@ -39,11 +39,11 @@
 @section('content')
 <div class="container">
     @php
-        $coverImage = $book['coverImage'] ?? $book['cover_image'] ?? null;
+        $coverImage = $book['coverImage'] ?? null;
     @endphp
     @if($coverImage)
         <div class="mb-3">
-            <img src="{{ url('cover/' . (is_array($coverImage) ? ($coverImage['path'] ?? '') : $coverImage)) }}" alt="Book Cover" style="max-height: 200px; border:1px solid #ccc;">
+            <img src="{{ route('cover.proxy', ['path' => (is_array($coverImage) ? ($coverImage['path'] ?? '') : $coverImage)]) }}" alt="Book Cover" style="max-height: 200px; border:1px solid #ccc;">
         </div>
     @endif
     <h1>{{ is_array($book['title'] ?? null) ? ($book['title'][0] ?? 'No Title') : ($book['title'] ?? 'No Title') }}</h1>

@@ -31,6 +31,9 @@ if (app()->environment('local')) {
 }
 
 Route::get('/', function () {
+    if (Auth::check()) {
+        return redirect()->route('books.index')->with('status', 'Welcome to your audiobook library!');
+    }
     return view('welcome');
 });
 
@@ -40,10 +43,12 @@ Auth::routes();
 Route::get('login/google', [App\Http\Controllers\Auth\LoginController::class, 'redirectToGoogle'])->name('login.google');
 Route::get('login/google/callback', [App\Http\Controllers\Auth\LoginController::class, 'handleGoogleCallback']);
 
-Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
+Route::get('/home', function() {
+    return redirect()->route('books.index')->with('status', 'Welcome to your audiobook library!');
+})->name('home');
 
-Route::middleware(['auth', 'standard'])->group(function () {
-    Route::resource('books', BookController::class)->only(['index', 'show', 'download', 'create']);
+Route::middleware(['auth'])->group(function () {
+    Route::resource('books', BookController::class)->only(['index', 'show']);
     Route::get('/books/create', [
         \App\Http\Controllers\Admin\BookController::class,
         'showCreateForm',

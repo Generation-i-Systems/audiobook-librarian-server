@@ -225,8 +225,8 @@
             </div>
         </div>
         @php
-            $dirPath = isset($book) && !empty($book['directoryPath']) ? $book['directoryPath'] : (isset($book) && !empty($book['directory_path']) ? $book['directory_path'] : ($directoryPath ?? ($initial['directoryPath'] ?? $initial['directory_path'] ?? null)));
-            $coverImg = isset($book) && !empty($book['coverImage']) ? $book['coverImage'] : (isset($book) && !empty($book['cover_image']) ? $book['cover_image'] : ($initial['coverImage'] ?? $initial['cover_image'] ?? null));
+            $dirPath = isset($book) && !empty($book['directoryPath']) ? $book['directoryPath'] : ($directoryPath ?? ($initial['directoryPath'] ?? null));
+            $coverImg = isset($book) && !empty($book['coverImage']) ? $book['coverImage'] : ($initial['coverImage'] ?? null);
             $coverAuto = $coverAuto ?? null;
             $coverCandidates = $coverCandidates ?? [];
             $coverOptions = [];
@@ -240,7 +240,7 @@
                 $coverOptions[] = [
                     'type' => 'current',
                     'value' => $currentCoverFilename,
-                    'src' => route('image.proxy', ['dir' => $dirPath, 'file' => $currentCoverFilename]),
+                    'src' => route('cover.proxy', ['path' => $dirPath . '/' . $currentCoverFilename]),
                     'label' => 'Current Cover',
                     'display_name' => $currentCoverFilename,
                 ];
@@ -252,7 +252,7 @@
                 $coverOptions[] = [
                     'type' => 'google',
                     'value' => $coverAuto,
-                    'src' => route('image.proxy', ['dir' => $dirPath, 'file' => $coverAuto]),
+                    'src' => route('cover.proxy', ['path' => $dirPath . '/' . $coverAuto]),
                     'label' => 'Google Books',
                     'display_name' => $coverAuto,
                 ];
@@ -266,7 +266,7 @@
                         $coverOptions[] = [
                             'type' => 'candidate',
                             'value' => $candidate,
-                            'src' => route('image.proxy', ['dir' => $dirPath, 'file' => $candidate]),
+                            'src' => route('cover.proxy', ['path' => $dirPath . '/' . $candidate]),
                             'label' => 'Candidate',
                             'display_name' => $candidate,
                         ];

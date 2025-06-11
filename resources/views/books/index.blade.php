@@ -21,21 +21,21 @@
                     <div class="row m-0">
                         @foreach($recentBooks as $book)
                             <div class="col-md-4 mb-4">
-                                <a href="{{ route('books.show', $book) }}" class="text-decoration-none card-link" style="color:inherit">
+                                <a href="{{ route('books.show', $book['id']) }}" class="text-decoration-none card-link" style="color:inherit">
                                     <div class="card h-100 book-card-hover" style="cursor:pointer;">
                                         @php
-                                            $cover = $book->cover_image ? route('image.proxy', ['file' => $book->cover_image]) : url('images/placeholder.png');
+                                            $cover = isset($book['coverImage']) && $book['coverImage'] ? route('cover.proxy', ['path' => $book['coverImage']]) : url('images/placeholder.png');
                                         @endphp
                                         <img src="{{ $cover }}"
-                                             class="card-img-top book-cover-thumb" alt="{{ $book->title }}"
-                                             style="height: 200px; width: auto; max-width: 100%; object-fit: contain; background: #f8f9fa; display: block; margin-left: auto; margin-right: auto;">
+                                             class="card-img-top book-cover-thumb" alt="{{ $book['title'] }}"
+                                             style="height: 200px; width: auto; max-width: 100%; object-fit: contain; background: #f8f9fa; display: block; margin-left: auto; margin-right: auto; padding-top: 15px;">
                                         <div class="card-body">
-                                            <h5 class="card-title">{{ $book->title }}</h5>
-                                            <p class="card-text">By {{ $book->author && $book->author->name ? $book->author->name : 'Unknown' }}</p>
-                                            <p class="card-text"><strong>Date Added:</strong> {{ ($book->date_added instanceof \Carbon\Carbon) ? $book->date_added->format('Y-m-d') : ($book->date_added ? $book->date_added : 'N/A') }}</p>
+                                            <h5 class="card-title">{{ $book['title'] }}</h5>
+                                            <p class="card-text">By {{ isset($book['author']) && is_array($book['author']) && !empty($book['author']) ? $book['author'][0] : 'Unknown' }}</p>
+                                            <p class="card-text"><strong>Date Added:</strong> {{ isset($book['date_added']) ? $book['date_added'] : 'N/A' }}</p>
                                             <p class="card-text"><strong>Publication Date:</strong>
-                                                {{ ($book->publication_date instanceof \Carbon\Carbon) ? $book->publication_date->format('Y-m-d') : ($book->publication_date ? $book->publication_date : 'N/A') }}</p>
-                                            <a href="{{ route('books.show', $book) }}" class="btn btn-primary d-none d-md-inline">View Details</a>
+                                                {{ isset($book['publication_date']) ? $book['publication_date'] : 'N/A' }}</p>
+                                            <a href="{{ route('books.show', $book['id']) }}" class="btn btn-primary d-none d-md-inline">View Details</a>
                                         </div>
                                     </div>
                                 </a>
@@ -53,26 +53,33 @@
                 <input type="text" class="form-control" id="search" name="search" value="{{ request('search') }}">
             </div>
 
-            <div class="form-group">
-                <label for="genre_id">Genre:</label>
-                <select class="form-control" id="genre_id" name="genre_id">
-                    <option value="">All Genres</option>
-                    @foreach ($genres as $genre)
-                        <option value="{{ $genre->id }}" {{ request('genre_id') == $genre->id ? 'selected' : '' }}>
-                            {{ $genre->name }}</option>
-                    @endforeach
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label for="author_id">Author:</label>
-                <select class="form-control" id="author_id" name="author_id">
-                    <option value="">All Authors</option>
-                    @foreach ($authors as $author)
-                        <option value="{{ $author->id }}" {{ request('author_id') == $author->id ? 'selected' : '' }}>
-                            {{ $author->name }}</option>
-                    @endforeach
-                </select>
+            <div class="form-row">
+                <div class="form-group col-md-3">
+                    <label for="genre_id">Genre</label>
+                    <select name="genre_id" id="genre_id" class="form-control">
+                        <option value="">All Genres</option>
+                        @foreach ($genres as $genre)
+                            <option value="{{ $genre['id'] }}" {{ request('genre_id') == $genre['id'] ? 'selected' : '' }}>
+                                {{ $genre['name'] }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="form-group col-md-3">
+                    <label for="author_id">Author</label>
+                    <select name="author_id" id="author_id" class="form-control">
+                        <option value="">All Authors</option>
+                        @foreach ($authors as $author)
+                            <option value="{{ $author['id'] }}" {{ request('author_id') == $author['id'] ? 'selected' : '' }}>
+                                {{ $author['name'] }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="form-group col-md-3">
+                    <label for="series">Series</label>
+                    <input type="text" class="form-control" id="series" name="series" value="{{ request('series') }}" placeholder="Filter by series">
+                </div>
             </div>
 
             <button type="submit" class="btn btn-primary">Filter</button>
@@ -80,20 +87,20 @@
         </form>
 
         <div class="row">
-            @foreach ($books as $book)
+            @foreach ($paginatedBooks as $book)
                 <div class="col-md-4 mb-4">
-                    <a href="{{ route('books.show', $book) }}" class="text-decoration-none card-link" style="color:inherit">
+                    <a href="{{ route('books.show', $book['id']) }}" class="text-decoration-none card-link" style="color:inherit">
                         <div class="card h-100 book-card-hover" style="cursor:pointer;">
                             @php
-                                $cover = $book->cover_image ? route('image.proxy', ['file' => $book->cover_image]) : url('images/placeholder.png');
+                                $cover = isset($book['coverImage']) && $book['coverImage'] ? route('cover.proxy', ['path' => $book['coverImage']]) : url('images/placeholder.png');
                             @endphp
                             <img src="{{ $cover }}"
-                                 class="card-img-top book-cover-thumb" alt="{{ $book->title }}"
-                                 style="height: 200px; width: auto; max-width: 100%; object-fit: contain; background: #f8f9fa; display: block; margin-left: auto; margin-right: auto;">
+                                 class="card-img-top book-cover-thumb" alt="{{ $book['title'] }}"
+                                 style="height: 200px; width: auto; max-width: 100%; object-fit: contain; background: #f8f9fa; display: block; margin-left: auto; margin-right: auto; padding-top: 15px;">
                             <div class="card-body">
-                                <h5 class="card-title">{{ $book->title }}</h5>
-                                <p class="card-text">By {{ $book->author && $book->author->name ? $book->author->name : 'Unknown' }}</p>
-                                <a href="{{ route('books.show', $book) }}" class="btn btn-primary d-none d-md-inline">View Details</a>
+                                <h5 class="card-title">{{ $book['title'] }}</h5>
+                                <p class="card-text">By {{ isset($book['author']) && is_array($book['author']) && !empty($book['author']) ? $book['author'][0] : 'Unknown' }}</p>
+                                <a href="{{ route('books.show', $book['id']) }}" class="btn btn-primary d-none d-md-inline">View Details</a>
                             </div>
                         </div>
                     </a>
@@ -103,7 +110,7 @@
 
         <div class="d-flex justify-content-center">
             <div class="pagination">
-                {{ $books->links() }}
+                {{ $paginatedBooks->links() }}
             </div>
         </div>
 

@@ -46,9 +46,9 @@
                     <tr class="{{ $loop->iteration % 2 == 0 ? 'table-secondary' : '' }}">
                         <td style="vertical-align: middle; text-align: center;">
                             @php
-                                $coverImage = $book['cover_image'] ?? null;
-                                $coverProxyUrl = $coverImage && Storage::disk('books')->exists($coverImage)
-                                    ? url('/cover/' . ltrim($coverImage, '/'))
+                                $coverImage = $book['coverImage'] ?? null;
+                                $coverProxyUrl = $coverImage
+                                    ? route('cover.proxy', ['path' => $coverImage])
                                     : asset('images/placeholder.png');
                             @endphp
                             <img src="{{ $coverProxyUrl }}" alt="cover"
