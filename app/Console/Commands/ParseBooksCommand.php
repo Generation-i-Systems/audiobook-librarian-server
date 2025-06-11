@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Services\BookDirectoryParser;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
+use App\Services\FirestoreService;
 
 class ParseBooksCommand extends Command
 {
@@ -25,7 +26,9 @@ class ParseBooksCommand extends Command
                             {--save-json : Save output JSON into each book directory}
                             {--json-filename= : Filename for saved JSON (default: librarian.json)}
                             {--enrich : Lookup and enrich metadata from selected APIs}
-                            {--apis= : Comma-separated list of APIs to use with --enrich (google,audible,abbay,hardcover)}';
+                            {--apis= : Comma-separated list of APIs to use with --enrich (google,audible,abbay,hardcover)}
+                            {--store-firestore : Store parsed book data to Firestore}
+                            {--update-existing : Update existing books in Firestore instead of skipping them}';
 
     /**
      * The console command description.
@@ -39,21 +42,22 @@ class ParseBooksCommand extends Command
      *
      * @return int
      */
-    public function handle(BookDirectoryParser $parser)
+    public function handle(BookDirectoryParser $parser, FirestoreService $firestoreService)
     {
         $paths = $this->argument('paths');
         $bookStoragePath = rtrim(env('BOOK_STORAGE_PATH'), '/');
         $expandedPaths = [];
         foreach ($paths as $path) {
-            // Absolute path
-            if (strpos($path, '/') === 0) {
+            // Absolute path that exists directly
+            if (strpos($path, '/') === 0 && File::exists($path) && File::isDirectory($path)) {
                 $pattern = $path;
+                $this->info("Using absolute path: $pattern");
             } elseif (strpos($path, $bookStoragePath) === 0) {
                 // Already relative to storage root
                 $pattern = $path;
             } else {
                 // Relative to storage root
-                $pattern = $bookStoragePath.'/'.ltrim($path, '/');
+                $pattern = $bookStoragePath . '/' . ltrim($path, '/');
             }
             // Expand wildcards
             if (strpbrk($pattern, '*?[]')) {
@@ -133,7 +137,24 @@ class ParseBooksCommand extends Command
         try {
             foreach ($paths as $path) {
                 $this->info("\nScanning: $path");
+                $this->info("Debug: Using storage root: {$parser->getStorageRoot()}");
+
+                // Debug directory structure
+                $this->info("Debug: Directory structure:");
+                $finder = new \Symfony\Component\Finder\Finder();
+                $finder->files()->in($path);
+                foreach ($finder as $file) {
+                    $this->info("Debug: Found file: {$file->getRelativePathname()} ({$file->getExtension()})");
+                }
+
+                // Add a custom debug function to the parser
+                $debugCallback = function ($message) {
+                    $this->line("<fg=yellow>DEBUG:</> $message");
+                };
+                $parser->setDebugCallback($debugCallback);
+
                 $books = $parser->parseDirectory($path, $config);
+                $this->info("Debug: Found " . count($books) . " books in directory");
                 $allBooks = array_merge($allBooks, $books);
             }
 
@@ -208,7 +229,7 @@ class ParseBooksCommand extends Command
             $jsonFilename = $this->option('json-filename') ?: 'librarian.json';
             if ($saveJson) {
                 foreach ($allBooks as $book) {
-                    $dirPath = $book['directory_path'] ?? null;
+                    $dirPath = $book['directoryPath'] ?? null;
                     if ($dirPath) {
                         $resolvedDir = $parser->resolveStoragePath($dirPath);
                         if (! is_dir($resolvedDir)) {
@@ -216,15 +237,15 @@ class ParseBooksCommand extends Command
 
                             continue;
                         }
-                        $jsonPath = rtrim($resolvedDir, '/').'/'.$jsonFilename;
+                        $jsonPath = rtrim($resolvedDir, '/') . '/' . $jsonFilename;
                         $jsonData = json_encode($book, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
                         if (file_put_contents($jsonPath, $jsonData) !== false) {
-                            $this->info("Saved JSON to $jsonPath");
+                            $this->info("Saved JSON to " . $jsonPath);
                         } else {
-                            $this->error("Failed to write JSON to $jsonPath");
+                            $this->error("Failed to write JSON to " . $jsonPath);
                         }
                     } else {
-                        $this->error('No directory_path for book: '.($book['title'] ?? '[unknown]'));
+                        $this->error('No directoryPath for book: ' . ($book['title'] ?? '[unknown]'));
                     }
                 }
             }
@@ -246,7 +267,7 @@ class ParseBooksCommand extends Command
 
                 if (! $hasValidAuthor) {
                     // Use the directory path from the book data if available, otherwise use the path from the book file
-                    $pathToUse = $book['directory_path'] ?? $book['path'] ?? '';
+                    $pathToUse = $book['directoryPath'] ?? $book['path'] ?? '';
 
                     // If we don't have a path, try to get it from the full_path
                     if (empty($pathToUse) && ! empty($book['full_path'])) {
@@ -392,6 +413,11 @@ class ParseBooksCommand extends Command
                 $duration
             ));
 
+            // Store to Firestore if requested
+            if ($this->option('store-firestore') && !$dryRun) {
+                $this->storeToFirestore($allBooks, $firestoreService);
+            }
+
             if (empty($allBooks)) {
                 $this->warn('No books found matching the criteria.');
 
@@ -492,15 +518,15 @@ class ParseBooksCommand extends Command
                 $index + 1,
                 $book['title'] ?? '',
                 $author,
-                $book['duration_formatted'] ?? 'N/A',
-                $book['audio_file_count'] ?? 0,
+                $book['durationFormatted'] ?? $book['durationFormatted'] ?? 'N/A',
+                $book['audioFileCount'] ?? $book['audioFileCount'] ?? 0,
                 $book['seriesName'] ?? '',
                 $book['seriesNumber'] ?? '',
                 $book['narrator'] ?? '',
                 $book['edition'] ?? '',
-                $book['path'] ?? '',
-                $book['cover_image'] ?? '',
-                $book['needs_review'] ? 'Yes' : 'No',
+                $book['directoryPath'] ?? $book['directoryPath'] ?? $book['path'] ?? '',
+                $book['coverImage'] ?? $book['coverImage'] ?? '',
+                ($book['needsReview'] ?? $book['needsReview'] ?? false) ? 'Yes' : 'No',
             ];
         }
 
@@ -560,7 +586,7 @@ class ParseBooksCommand extends Command
                 } elseif (is_null($value)) {
                     $value = 'NULL';
                 } else {
-                    $value = "'".addslashes((string) $value)."'";
+                    $value = "'" . addslashes((string) $value) . "'";
                 }
 
                 $values[$key] = $value;
@@ -574,6 +600,72 @@ class ParseBooksCommand extends Command
 
             $this->line("INSERT INTO `$table` ($columns) VALUES ($values);");
         }
+    }
+
+    /**
+     * Store books to Firestore.
+     *
+     * @param array $books The books to store
+     * @param \App\Services\FirestoreService $firestoreService The Firestore service
+     * @return void
+     */
+    protected function storeToFirestore(array $books, \App\Services\FirestoreService $firestoreService): void
+    {
+        $this->info('\nStoring books to Firestore...');
+        $updateExisting = $this->option('update-existing');
+
+        $bar = $this->output->createProgressBar(count($books));
+        $bar->start();
+
+        $created = 0;
+        $updated = 0;
+        $skipped = 0;
+        $errors = 0;
+
+        foreach ($books as $book) {
+            try {
+                // Check if book already exists in Firestore by directory path
+                $directoryPath = $book['directoryPath'] ?? null;
+
+                if (!$directoryPath) {
+                    if ($this->getOutput()->isVerbose()) {
+                        $this->warn('Skipping book with no directoryPath: ' . ($book['title'] ?? '[unknown]'));
+                    }
+                    $skipped++;
+                    $bar->advance();
+                    continue;
+                }
+
+                $existingBook = $firestoreService->findBookByDirectoryPath($directoryPath);
+
+                if ($existingBook && !$updateExisting) {
+                    // Skip existing books if not updating
+                    $skipped++;
+                } elseif ($existingBook) {
+                    // Update existing book
+                    $firestoreService->updateBook($existingBook['id'], $book);
+                    $updated++;
+                } else {
+                    // Create new book
+                    $firestoreService->createBook($book);
+                    $created++;
+                }
+            } catch (\Exception $e) {
+                $errors++;
+                if ($this->getOutput()->isVerbose()) {
+                    $this->error('Error storing book: ' . ($book['title'] ?? '[unknown]') . ' - ' . $e->getMessage());
+                }
+            }
+            $bar->advance();
+        }
+        $bar->finish();
+        $this->newLine(2);
+
+        $this->info('Firestore storage completed:');
+        $this->info("- Created: {$created} books");
+        $this->info("- Updated: {$updated} books");
+        $this->info("- Skipped: {$skipped} books");
+        $this->info("- Errors: {$errors} books");
     }
 
     /**
@@ -629,7 +721,6 @@ class ParseBooksCommand extends Command
         if (! empty($needsReview)) {
             $this->line('\n<comment>=== Titles Needing Review ===</comment>');
             $this->line(sprintf('  Found %d title(s) that may need manual review:', count($needsReview)));
-
             foreach ($needsReview as $index => $book) {
                 $this->line(sprintf('\n  <fg=yellow>%d. %s</>', $index + 1, $book['title']));
                 $this->line(sprintf('     Author: %s', $book['author']));

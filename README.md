@@ -239,8 +239,8 @@ GET /api/v1/books?page=2&per_page=10
 ### `php artisan books:repair`
 Repairs book covers and series numbers in the database.
 - **Options:**
-  - `book_id`: Only repair the book with this ID.
-  - `directory_path`: Only repair books in this directory path.
+  - `id`: Only repair the book with this ID.
+  - `directoryPath`: Only repair books in this directory path.
 - **Behavior:**
   - Scans for books with missing/placeholder covers or series numbers.
   - Attempts to extract covers from storage or embedded in `.m4b` files.

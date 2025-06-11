@@ -21,7 +21,7 @@
             'genreList' => $genreList,
             'coverCandidates' => $coverCandidates,
             'coverAuto' => $coverAuto,
-            'directory_path' => $book['directory_path'] ?? null,
+            'directoryPath' => $book['directoryPath'] ?? $book['directory_path'] ?? null,
             'isModal' => $isModal ?? false
         ])
 

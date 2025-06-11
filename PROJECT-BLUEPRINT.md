@@ -29,11 +29,11 @@ Audiobook Librarian is a Laravel-based web app for managing audiobooks, supporti
     "Cosmere": 15
   },
   "description": "Epic fantasy novel...",
-  "cover_image": "covers/way-of-kings.jpg",
-  "directory_path": "audiobooks/way-of-kings",
+  "coverImage": "covers/way-of-kings.jpg",
+  "directoryPath": "audiobooks/way-of-kings",
   "genre": ["Fantasy", "Epic"],
-  "created_at": "2025-05-20T14:00:00Z",
-  "updated_at": "2025-05-20T14:00:00Z",
+  "createdAt": "2025-05-20T14:00:00Z",
+  "updatedAt": "2025-05-20T14:00:00Z",
   // ...other metadata fields
 }
 ```

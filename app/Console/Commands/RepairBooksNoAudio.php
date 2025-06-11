@@ -19,7 +19,7 @@ class RepairBooksNoAudio extends Command
         //     $parent = $this->argument('parent_path');
         //     $books = Book::query();
         //     if ($parent) {
-        //         $books->where('directory_path', 'like', $parent . '%');
+        //         $books->where('directoryPath', 'like', $parent . '%');
         //     }
         //     if ($this->option('verbose')) {
         //         $sql = $books->toRawSql();
@@ -28,7 +28,7 @@ class RepairBooksNoAudio extends Command
         //     $books = $books->get();
         //     $noAudioBooks = [];
         //     foreach ($books as $book) {
-        //         $dir = $book->directory_path;
+        //         $dir = $book->directoryPath;
         //         if ($this->option('verbose')) {
         //             $this->info("Checking book: {$book->title} ({$dir})");
         //         }

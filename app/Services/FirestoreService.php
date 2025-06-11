@@ -839,19 +839,42 @@ class FirestoreService
      */
     public function findBookByDirectoryPath(string $directoryPath): ?array
     {
-        $query = $this->db->collection('books')
-            ->where('directory_path', '=', $directoryPath)
-            ->limit(1);
-
-        $documents = $query->documents();
-
-        foreach ($documents as $document) {
-            if ($document->exists()) {
-                return array_merge(['id' => $document->id()], $document->data());
+        try {
+            if (!$this->db) {
+                return null;
             }
+            
+            // First try with camelCase field name
+            $query = $this->db->collection('books')
+                ->where('directoryPath', '=', $directoryPath)
+                ->limit(1);
+                
+            $documents = $query->documents();
+            
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    return array_merge(['id' => $document->id()], $document->data());
+                }
+            }
+            
+            // If not found, try with snake_case field name for backward compatibility
+            $query = $this->db->collection('books')
+                ->where('directory_path', '=', $directoryPath)
+                ->limit(1);
+                
+            $documents = $query->documents();
+            
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    return array_merge(['id' => $document->id()], $document->data());
+                }
+            }
+            
+            return null;
+        } catch (\Exception $e) {
+            Log::error('Firestore findBookByDirectoryPath failed: ' . $e->getMessage());
+            return null;
         }
-
-        return null;
     }
 
     // BOOK QUEUE (STUBS)

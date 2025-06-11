@@ -75,7 +75,8 @@ class AudibleService extends BaseBookService
     {
         $this->apiCallCount++;
         $response = Http::timeout(15)->get($this->baseUrl . '/products/' . $id, [
-            'response_groups' => 'product_attrs,product_desc,product_extended_attrs,series,contributors,media,product_images',
+            'response_groups' => 'product_attrs,product_desc,product_extended_attrs,series,contributors,'
+                . 'media,product_images',
         ]);
 
         if (!$response->successful()) {
@@ -154,26 +155,34 @@ class AudibleService extends BaseBookService
     {
         $authorsData = [];
         $narratorsData = [];
+        $audibleAuthors = [];
+        $audibleNarrators = [];
+        $narratorsList = [];
 
         // Prioritize 'contributors' if present
         if (isset($book['contributors']) && is_array($book['contributors'])) {
             foreach ($book['contributors'] as $contributor) {
                 if (isset($contributor['role'], $contributor['name'])) {
+                    $id = $contributor['asin'] ?? md5($contributor['name']);
+
                     if (strtolower($contributor['role']) === 'author') {
                         $authorsData[] = [
                             'author' => [
                                 'name' => $contributor['name'],
-                                'id' => $contributor['asin'] ?? null,
+                                'id' => $id,
                             ],
                         ];
+                        $audibleAuthors[$id] = $contributor['name'];
                     }
                     if (strtolower($contributor['role']) === 'narrator') {
                         $narratorsData[] = [
                             'narrator' => [
                                 'name' => $contributor['name'],
-                                'id' => $contributor['asin'] ?? null,
+                                'id' => $id,
                             ],
                         ];
+                        $audibleNarrators[$id] = $contributor['name'];
+                        $narratorsList[] = $contributor['name'];
                     }
                 }
             }
@@ -183,7 +192,9 @@ class AudibleService extends BaseBookService
         if (empty($authorsData) && isset($book['authors']) && is_array($book['authors'])) {
             foreach ($book['authors'] as $author) {
                 if (isset($author['name'])) {
-                    $authorsData[] = ['author' => ['name' => $author['name'], 'id' => $author['asin'] ?? null]];
+                    $id = $author['asin'] ?? md5($author['name']);
+                    $authorsData[] = ['author' => ['name' => $author['name'], 'id' => $id]];
+                    $audibleAuthors[$id] = $author['name'];
                 }
             }
         }
@@ -192,8 +203,10 @@ class AudibleService extends BaseBookService
         if (empty($narratorsData) && isset($book['narrators']) && is_array($book['narrators'])) {
             foreach ($book['narrators'] as $narrator) {
                 if (isset($narrator['name'])) {
-                    // Direct 'narrators' key from API log did not show 'asin'
-                    $narratorsData[] = ['narrator' => ['name' => $narrator['name'], 'id' => $narrator['asin'] ?? null]];
+                    $id = $narrator['asin'] ?? md5($narrator['name']);
+                    $narratorsData[] = ['narrator' => ['name' => $narrator['name'], 'id' => $id]];
+                    $audibleNarrators[$id] = $narrator['name'];
+                    $narratorsList[] = $narrator['name'];
                 }
             }
         }
@@ -205,29 +218,146 @@ class AudibleService extends BaseBookService
             $book['image_url'] ?? // A common fallback key
             null;
 
-        $seriesInfo = null;
+        // Format series data as {seriesName: seriesNumber}
+        $series = null;
         if (!empty($book['series']) && is_array($book['series']) && isset($book['series'][0])) {
             $firstSeries = $book['series'][0]; // Assuming the first series is the primary one
-            $seriesInfo = [
-                'name' => $firstSeries['title'] ?? null,
-                'part' => $firstSeries['sequence'] ?? ($firstSeries['part'] ?? null),
-            ];
+            $seriesName = $firstSeries['title'] ?? null;
+            $seriesNumber = $firstSeries['sequence'] ?? ($firstSeries['part'] ?? null);
+
+            if ($seriesName) {
+                $series = [$seriesName => $seriesNumber];
+            }
+        }
+
+        // Clean description - strip HTML tags
+        $description = $book['merchandising_summary'] ?? $book['publisher_summary'] ?? null;
+        if ($description) {
+            // Remove HTML tags
+            $description = strip_tags($description);
+            // Remove leading <p> tags
+            $description = preg_replace('/^<p>/', '', $description);            // Trim whitespace
+            $description = trim($description);
         }
 
         return [
             'source' => $this->getServiceName(),
             'id' => $book['asin'] ?? null,
             'title' => $book['title'] ?? null,
-            'authors' => $authorsData,
-            'narrators' => $narratorsData,
-            'cover_image_url' => $coverUrl,
-            'description' => $book['merchandising_summary'] ?? $book['publisher_summary'] ?? null,
-            'series' => $seriesInfo,
-            'release_date' => $book['release_date'] ?? null,
-            'runtime' => $book['runtime_length_min'] ?? null,
-            'publisher' => ['name' => $book['publisher_name'] ?? null],
+            'audibleAuthors' => $audibleAuthors,
+            'audibleNarrators' => $audibleNarrators,
+            'narrator' => array_values($audibleNarrators),
+            'audibleCoverImageUrl' => $coverUrl,
+            'description' => $description,
+            'series' => $series,
+            'releaseDate' => $book['release_date'] ?? null,
+            'runtime' => isset($book['runtime_length_min']) ? round($book['runtime_length_min']) : null,
+            'publisher' => $book['publisher_name'] ?? null,
             'language' => $book['language'] ?? null,
         ];
+    }
+
+    /**
+     * Search for a book and merge the results with the existing book data
+     *
+     * @param array $book The existing book data
+     * @return array|null The merged book data or null if no match found
+     */
+    public function searchAndMerge(array $book): ?array
+    {
+        $query = $book['title'] ?? '';
+        $author = $book['author'] ?? '';
+
+        if (empty($query)) {
+            Log::warning('AudibleService: Empty query for searchAndMerge');
+            return null;
+        }
+
+        $options = [];
+        if (!empty($author)) {
+            $options['author'] = $author;
+        }
+
+        $results = $this->performSearch($query, $options);
+
+        if (empty($results)) {
+            return null;
+        }
+
+        // Use the first result as the best match
+        $bestMatch = $results[0];
+
+        // Download cover image if available
+        if (!empty($bestMatch['audibleCoverImageUrl']) && !empty($bestMatch['id'])) {
+            $coverPath = $this->downloadCoverImage(
+                $bestMatch['audibleCoverImageUrl'],
+                $bestMatch['id']
+            );
+
+            if ($coverPath) {
+                $bestMatch['audibleCoverPath'] = $coverPath;
+            }
+        }
+
+        // Use the audibleAuthors if available
+        if (!empty($bestMatch['audibleAuthors']) && is_array($bestMatch['audibleAuthors'])) {
+            // Already in the right format
+        } elseif (!empty($bestMatch['authorsMap']) && is_array($bestMatch['authorsMap'])) {
+            $bestMatch['audibleAuthors'] = $bestMatch['authorsMap'];
+        } elseif (!empty($bestMatch['authors']) && is_array($bestMatch['authors'])) {
+            // Fallback to extracting from authors array
+            $audibleAuthors = [];
+            foreach ($bestMatch['authors'] as $authorData) {
+                if (isset($authorData['author']['name'], $authorData['author']['id'])) {
+                    $id = $authorData['author']['id'];
+                    $audibleAuthors[$id] = $authorData['author']['name'];
+                }
+            }
+            if (!empty($audibleAuthors)) {
+                $bestMatch['audibleAuthors'] = $audibleAuthors;
+            }
+        }
+
+        // Use the audibleNarrators if available
+        if (!empty($bestMatch['audibleNarrators']) && is_array($bestMatch['audibleNarrators'])) {
+            // Already in the right format
+            $bestMatch['narrator'] = array_values($bestMatch['audibleNarrators']);
+        } elseif (!empty($bestMatch['narratorsMap']) && is_array($bestMatch['narratorsMap'])) {
+            $bestMatch['audibleNarrators'] = $bestMatch['narratorsMap'];
+            $bestMatch['narrator'] = array_values($bestMatch['narratorsMap']);
+        } elseif (!empty($bestMatch['narrators']) && is_array($bestMatch['narrators'])) {
+            // Fallback to extracting from narrators array
+            $audibleNarrators = [];
+            foreach ($bestMatch['narrators'] as $narratorData) {
+                if (isset($narratorData['narrator']['name'], $narratorData['narrator']['id'])) {
+                    $id = $narratorData['narrator']['id'];
+                    $name = $narratorData['narrator']['name'];
+                    $audibleNarrators[$id] = $name;
+                }
+            }
+            if (!empty($audibleNarrators)) {
+                $bestMatch['audibleNarrators'] = $audibleNarrators;
+                $bestMatch['narrator'] = array_values($audibleNarrators);
+            }
+        }
+
+        // Format series information as {seriesName: seriesNumber}
+        if (!empty($bestMatch['series'])) {
+            if (is_array($bestMatch['series']) && isset($bestMatch['series']['name'])) {
+                $seriesName = $bestMatch['series']['name'];
+                $seriesNumber = $bestMatch['series']['part'];
+                $bestMatch['series'] = [$seriesName => $seriesNumber];
+            }
+        }
+
+        // Simplify publisher
+        if (isset($bestMatch['publisher']) && is_array($bestMatch['publisher'])) {
+            if (isset($bestMatch['publisher']['name'])) {
+                $bestMatch['publisher'] = $bestMatch['publisher']['name'];
+            }
+        }
+
+        return $bestMatch;
     }
 
     private function getImageExtension(?string $contentType, string $imageUrl): string

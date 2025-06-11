@@ -27,10 +27,10 @@
         @if(isset($book))
             @method('PUT')
         @endif
-        @if(isset($book) && !empty($book['directory_path']))
-            <input type="hidden" name="original_directory_path" value="{{ $book['directory_path'] }}">
-        @elseif(old('directory_path'))
-            <input type="hidden" name="original_directory_path" value="{{ old('directory_path') }}">
+        @if(isset($book) && !empty($book['directoryPath'] ?? $book['directoryPath'] ?? ''))
+            <input type="hidden" name="originalDirectoryPath" value="{{ $book['directoryPath'] ?? $book['directoryPath'] ?? '' }}">
+        @elseif(old('directoryPath') || old('directoryPath'))
+            <input type="hidden" name="originalDirectoryPath" value="{{ old('directoryPath', old('directoryPath')) }}">
         @endif
         <button type="button" class="btn btn-info mb-3" id="autofill-btn"><i class="fas fa-search"></i> Autofill from
             Google Books</button>
@@ -74,7 +74,7 @@
                 @php
                     $seriesList = [];
                     $oldSeries = old('series', []);
-                    $oldSeriesNumbers = old('series_number', []);
+                    $oldSeriesNumbers = old('seriesNumber', old('seriesNumber', []));
 
                     // Log the raw series data for debugging
                     Log::debug('Series Data:', [
@@ -100,7 +100,7 @@
                         else if (is_string($book['series'])) {
                             $seriesList[] = [
                                 'name' => $book['series'],
-                                'number' => $book['series_number'] ?? ''
+                                'number' => $book['seriesNumber'] ?? $book['seriesNumber'] ?? ''
                             ];
                         }
                     }
@@ -133,7 +133,7 @@
                         } else if (is_string($initial['series'])) {
                             $seriesList[] = [
                                 'name' => $initial['series'],
-                                'number' => $initial['series_number'] ?? ''
+                                'number' => $initial['seriesNumber'] ?? $initial['seriesNumber'] ?? ''
                             ];
                         }
                     }
@@ -161,7 +161,7 @@
                     <div class="input-group series-row align-items-start mb-3">
                         <input type="text" name="series[]" class="form-control w-auto series-autocomplete" style="max-width:200px; height:32px;"
                             placeholder="Series Name" value="{{ $name }}">
-                        <input type="number" name="series_number[]" class="form-control w-auto"
+                        <input type="number" name="seriesNumber[]" class="form-control w-auto"
                             style="max-width:100px; height:32px;" placeholder="Number" value="{{ $number }}" min="1" step="any">
                         <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
                             <button type="button" class="btn btn-outline-danger btn-sm remove-series p-0 mb-0"
@@ -180,7 +180,7 @@
             <label>Genres</label>
             <div id="genres-group">
                 @php
-                    $genres = old('genre', isset($book) && !empty($book['genre']) ? (is_array($book['genre']) ? $book['genre'] : [$book['genre']]) : ($initial['genre'] ?? []));
+                    $genres = old('genre', old('genre', isset($book) && !empty($book['genre']) ? (is_array($book['genre']) ? $book['genre'] : [$book['genre']]) : ($initial['genre'] ?? [])));
                     if (!is_array($genres))
                         $genres = [$genres];
                 @endphp
@@ -206,11 +206,11 @@
             </div>
         </div>
         <div class="form-group">
-            <label for="published_year">Published Year (Optional):</label>
-            <input type="number" class="form-control @error('published_year') is-invalid @enderror" id="published_year"
-                name="published_year" min="1000" max="9999"
-                value="{{ old('published_year', isset($book) && !empty($book['published_year']) ? $book['published_year'] : ($initial['published_year'] ?? null)) }}">
-            @error('published_year')
+            <label for="publishedYear">Published Year (Optional):</label>
+            <input type="number" class="form-control @error('publishedYear') is-invalid @enderror" id="publishedYear"
+                name="publishedYear" min="1000" max="9999"
+                value="{{ old('publishedYear', old('publishedYear', isset($book) && !empty($book['publishedYear']) ? $book['publishedYear'] : (isset($book) && !empty($book['published_year']) ? $book['published_year'] : ($initial['publishedYear'] ?? $initial['published_year'] ?? null)))) }}">
+            @error('publishedYear')
                 <span class="invalid-feedback d-block">{{ $message }}</span>
             @enderror
         </div>
@@ -225,8 +225,8 @@
             </div>
         </div>
         @php
-            $dirPath = isset($book) && !empty($book['directory_path']) ? $book['directory_path'] : ($directory_path ?? ($initial['directory_path'] ?? null));
-            $coverImg = isset($book) && !empty($book['cover_image']) ? $book['cover_image'] : ($initial['cover_image'] ?? null);
+            $dirPath = isset($book) && !empty($book['directoryPath']) ? $book['directoryPath'] : (isset($book) && !empty($book['directory_path']) ? $book['directory_path'] : ($directoryPath ?? ($initial['directoryPath'] ?? $initial['directory_path'] ?? null)));
+            $coverImg = isset($book) && !empty($book['coverImage']) ? $book['coverImage'] : (isset($book) && !empty($book['cover_image']) ? $book['cover_image'] : ($initial['coverImage'] ?? $initial['cover_image'] ?? null));
             $coverAuto = $coverAuto ?? null;
             $coverCandidates = $coverCandidates ?? [];
             $coverOptions = [];
@@ -283,7 +283,7 @@
                 @foreach($coverOptions as $option)
                 <div class="text-center">
                     <label class="d-flex flex-column align-items-center">
-                        <input type="radio" name="cover_image_candidate" value="{{ $option['value'] }}"
+                        <input type="radio" name="coverImageCandidate" value="{{ $option['value'] }}"
                             @if((isset($biggestCover) && $biggestCover === $option['value']) || (empty($biggestCover) && $option['type'] === 'current')) checked @endif class="mb-2">
                                                 <img src="{{ $option['src'] }}" alt="{{ $option['label'] }}"
                                                     style="max-width:100px;max-height:140px;border:1px solid #ccc;">
@@ -315,10 +315,10 @@
         </div>
 
         <div class="form-group">
-            <label for="cover_image">Cover Image (Optional):</label>
-            <input type="file" class="form-control-file @error('cover_image') is-invalid @enderror" id="cover_image"
-                name="cover_image">
-            @error('cover_image')
+            <label for="coverImage">Cover Image (Optional):</label>
+            <input type="file" class="form-control-file @error('coverImage') is-invalid @enderror" id="coverImage"
+                name="coverImage">
+            @error('coverImage')
                 <span class="invalid-feedback d-block">{{ $message }}</span>
             @enderror
         </div>
@@ -332,10 +332,10 @@
             @enderror
         </div>
         <div class="form-group">
-            <label for="book_files">Directory Path:</label>
-            <input type="text" class="form-control @error('directory_path') is-invalid @enderror" id="directory_path"
-                name="directory_path" value="{{ old('directory_path', $dirPath ?? (isset($book) && !empty($book['directory_path']) ? $book['directory_path'] : ($initial['directory_path'] ?? ''))) }}">
-            @error('directory_path')
+            <label for="bookFiles">Directory Path:</label>
+            <input type="text" class="form-control @error('directoryPath') is-invalid @enderror" id="directoryPath"
+                name="directoryPath" value="{{ old('directoryPath', old('directory_path', $dirPath ?? '')) }}">
+            @error('directoryPath')
                 <span class="invalid-feedback d-block">{{ $message }}</span>
             @enderror
         </div>

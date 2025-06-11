@@ -120,6 +120,7 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::resource('genres', Admin\GenreController::class);
     Route::resource('authors', Admin\AuthorController::class);
     Route::resource('books', Admin\BookController::class);
+    Route::get('books/{id}/raw-json', [Admin\BookController::class, 'getRawJson'])->name('books.rawJson');
 
     // Autocomplete routes for Book form
     Route::get('/books/autocomplete/authors', [

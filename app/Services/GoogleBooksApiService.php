@@ -15,7 +15,19 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
     public function searchAndMerge(array $book): ?array
     {
         $inputTitle = trim($book['title'] ?? '');
-        $inputAuthor = trim(($book['authors'][0]['author']['name'] ?? '') ?: ($book['author'] ?? ''));
+        
+        // Handle different author formats safely
+        $inputAuthor = '';
+        if (isset($book['authors']) && is_array($book['authors'])) {
+            if (isset($book['authors'][0]['author']['name'])) {
+                $inputAuthor = trim($book['authors'][0]['author']['name']);
+            } elseif (isset($book['authors'][0]) && is_string($book['authors'][0])) {
+                $inputAuthor = trim($book['authors'][0]);
+            }
+        } elseif (isset($book['author']) && is_string($book['author'])) {
+            $inputAuthor = trim($book['author']);
+        }
+        
         if (! $inputTitle) {
             return null;
         }
