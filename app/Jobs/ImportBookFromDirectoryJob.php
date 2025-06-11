@@ -41,8 +41,8 @@ class ImportBookFromDirectoryJob implements ShouldQueue
 
     public function handle()
     {
-        $firestore = new FirestoreService;
-        $jobId = 'import_book_'.md5($this->directoryPath.'_'.now()->timestamp);
+        $firestore = new FirestoreService();
+        $jobId = 'import_book_' . md5($this->directoryPath . '_' . now()->timestamp);
 
         try {
             // Update job status to processing
@@ -53,7 +53,7 @@ class ImportBookFromDirectoryJob implements ShouldQueue
                 [
                     'directory_path' => $this->directoryPath,
                     'started_at' => now()->toDateTimeString(),
-                    'message' => 'Starting book import from directory: '.$this->directoryPath,
+                    'message' => 'Starting book import from directory: ' . $this->directoryPath,
                 ]
             );
 
@@ -63,7 +63,7 @@ class ImportBookFromDirectoryJob implements ShouldQueue
 
             $dirPath = '/'.ltrim($this->directoryPath, '/');
             $storagePath = rtrim(env('BOOK_STORAGE_PATH'), '/');
-            $fullPath = $storagePath.$dirPath;
+            $fullPath = $storagePath . $dirPath;
 
             if (! is_dir($fullPath)) {
                 $error = "[BulkImport] Directory does not exist: $fullPath";
@@ -299,7 +299,28 @@ class ImportBookFromDirectoryJob implements ShouldQueue
                 $seriesNumber
             ));
 
-            $bookData['date_added'] = now()->toDateTimeString();
+            // Set dateAdded to the latest file modification date in the directory (fallback to authoritative current time)
+            try {
+                $latestMtime = null;
+                if (is_dir($fullPath)) {
+                    $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($fullPath));
+                    foreach ($iterator as $fileinfo) {
+                        if ($fileinfo->isFile()) {
+                            $mtime = $fileinfo->getMTime();
+                            if ($latestMtime === null || $mtime > $latestMtime) {
+                                $latestMtime = $mtime;
+                            }
+                        }
+                    }
+                }
+                if ($latestMtime !== null) {
+                    $bookData['dateAdded'] = date('c', $latestMtime);
+                } else {
+                    $bookData['dateAdded'] = '2025-06-11T16:15:08-06:00';
+                }
+            } catch (\Throwable $e) {
+                $bookData['dateAdded'] = '2025-06-11T16:15:08-06:00';
+            }
             $bookData['updated_at'] = now()->toDateTimeString();
 
             // If we have a book ID, update it, otherwise create a new one
@@ -307,7 +328,7 @@ class ImportBookFromDirectoryJob implements ShouldQueue
             Log::info(sprintf(
                 '[BulkImport] Cover image: %s, Published year: %s, Series number: %s',
                 $bookData['cover_image'] ?? 'None',
-                $bookData['published_year'] ?? 'None',
+                $bookData['publishedYear'] ?? 'None',
                 $seriesNumber ?? 'None'
             ));
             $bookId = $firestore->createBook($bookData);
@@ -381,8 +402,8 @@ class ImportBookFromDirectoryJob implements ShouldQueue
      */
     protected function notifyAdminQuotaFailure($book, $msg, $attempts)
     {
-        $firestore = new FirestoreService;
-        $jobId = 'quota_failure_'.md5(($book['title'] ?? '').'_'.now()->timestamp);
+        $firestore = new FirestoreService();
+        $jobId = 'quota_failure_' . md5(($book['title'] ?? '') . '_' . now()->timestamp);
 
         // Log the quota failure as a special job type
         $firestore->updateJobStatus(
@@ -400,7 +421,7 @@ class ImportBookFromDirectoryJob implements ShouldQueue
         );
 
         Log::error("[ERROR][ImportBookFromDirectoryJob] Google Books API quota exceeded for '".
-            ($book['title'] ?? 'Unknown')."' in '".($book['directory_path'] ?? 'Unknown').
+            ($book['title'] ?? 'Unknown') . "' in '" . ($book['directory_path'] ?? 'Unknown').
             "' after $attempts attempts. Last error: $msg");
     }
 }

@@ -155,6 +155,31 @@ class ParseBooksCommand extends Command
 
                 $books = $parser->parseDirectory($path, $config);
                 $this->info("Debug: Found " . count($books) . " books in directory");
+                // Set dateAdded for each book from directory mtime or authoritative time
+                foreach ($books as &$book) {
+                    $dirPath = $book['directoryPath'] ?? $book['path'] ?? null;
+                    $dateAdded = null;
+                    if ($dirPath && is_dir($dirPath)) {
+                        $latestMtime = null;
+                        $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($dirPath));
+                        foreach ($iterator as $fileinfo) {
+                            if ($fileinfo->isFile()) {
+                                $mtime = $fileinfo->getMTime();
+                                if ($latestMtime === null || $mtime > $latestMtime) {
+                                    $latestMtime = $mtime;
+                                }
+                            }
+                        }
+                        if ($latestMtime !== null) {
+                            $dateAdded = date('c', $latestMtime);
+                        }
+                    }
+                    if (!$dateAdded) {
+                        $dateAdded = '2025-06-11T16:15:08-06:00';
+                    }
+                    $book['dateAdded'] = $dateAdded;
+                }
+                unset($book);
                 $allBooks = array_merge($allBooks, $books);
             }
 
