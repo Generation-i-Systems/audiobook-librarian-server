@@ -52,9 +52,9 @@ class FirebaseAuthTest extends DuskTestCase
             'email' => 'test@example.com',
             'password' => Hash::make('password'),
             'role' => 'user',
-            'email_verified_at' => new \DateTime,
-            'created_at' => new \DateTime,
-            'updated_at' => new \DateTime,
+            'email_verified_at' => new \DateTime(),
+            'created_at' => new \DateTime(),
+            'updated_at' => new \DateTime(),
         ]);
 
         return $docRef->id();
@@ -87,8 +87,8 @@ class FirebaseAuthTest extends DuskTestCase
             'email' => 'unverified@example.com',
             'password' => Hash::make('password'),
             'role' => 'unverified',
-            'created_at' => new \DateTime,
-            'updated_at' => new \DateTime,
+            'created_at' => new \DateTime(),
+            'updated_at' => new \DateTime(),
         ]);
 
         $this->browse(function (Browser $browser) {

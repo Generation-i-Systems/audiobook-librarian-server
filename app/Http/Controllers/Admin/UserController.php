@@ -11,7 +11,7 @@ class UserController extends Controller
 {
     public function index()
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $users = $firestore->getClient()->collection('users')->documents();
         $userList = [];
         foreach ($users as $userDoc) {
@@ -32,7 +32,7 @@ class UserController extends Controller
 
     public function store(Request $request)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:255',
@@ -67,7 +67,7 @@ class UserController extends Controller
 
     public function edit($id)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $userDoc = $firestore->getClient()->collection('users')->document($id)->snapshot();
         if (! $userDoc->exists()) {
             abort(404);
@@ -80,7 +80,7 @@ class UserController extends Controller
 
     public function update(Request $request, $id)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:255',
@@ -119,7 +119,7 @@ class UserController extends Controller
 
     public function destroy($id)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $firestore->getClient()->collection('users')->document($id)->delete();
 
         return redirect()->route('admin.users.index')->with('success', 'User deleted successfully.');

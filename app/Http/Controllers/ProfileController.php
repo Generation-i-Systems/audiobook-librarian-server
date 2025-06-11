@@ -11,7 +11,7 @@ class ProfileController extends Controller
 {
     public function index()
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $userId = Auth::id();
         $userDoc = $firestore->getClient()->collection('users')->document($userId)->snapshot();
         $user = $userDoc->exists() ? $userDoc->data() : null;
@@ -29,7 +29,7 @@ class ProfileController extends Controller
             'email' => 'required|string|email|max:255|unique:users,email,'.Auth::id(),
         ]);
 
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $userId = Auth::id();
         $firestore->getClient()->collection('users')->document($userId)->set([
             'name' => $request->name,
@@ -46,7 +46,7 @@ class ProfileController extends Controller
             'password' => 'required|string|min:8|confirmed',
         ]);
 
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $userId = Auth::id();
         $userDoc = $firestore->getClient()->collection('users')->document($userId)->snapshot();
         $user = $userDoc->exists() ? $userDoc->data() : null;
@@ -66,7 +66,7 @@ class ProfileController extends Controller
             'content' => 'required|string',
         ]);
 
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $userId = Auth::id();
         $firestore->getClient()->collection('messages')->add([
             'user_id' => $userId,

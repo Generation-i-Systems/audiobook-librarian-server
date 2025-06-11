@@ -40,7 +40,7 @@ class AdminUserSeeder extends Seeder
             return;
         }
 
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
 
         // Generate a unique ID for the user
         $userId = (string) Str::uuid();

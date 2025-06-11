@@ -16,7 +16,7 @@ class FirebaseAuth
         }
 
         $idToken = $matches[1];
-        $firebaseAuth = new FirebaseAuthService;
+        $firebaseAuth = new FirebaseAuthService();
         $uid = $firebaseAuth->verifyIdToken($idToken);
         if (! $uid) {
             return response()->json(['error' => 'Invalid or expired Firebase token'], 401);

@@ -75,7 +75,7 @@ class CreateImportJobsForDirectory implements ShouldQueue
             'absolute_path' => $absDir,
         ]);
 
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $jobId = 'import_dir_'.md5($this->dir.'_'.now()->timestamp);
 
         try {

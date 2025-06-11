@@ -15,7 +15,7 @@ class BookApiController extends Controller
 {
     public function index(Request $request)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $books = $firestore->listBooks();
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
@@ -81,7 +81,7 @@ class BookApiController extends Controller
 
     public function show($id, Request $request)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $book = $firestore->getBook($id);
         if (! $book) {
             return response()->json([
@@ -101,7 +101,7 @@ class BookApiController extends Controller
         $type = $request->input('type'); // 'genre', 'author', 'series'
         $perPage = $request->input('per_page', 100);
         $search = $request->input('search');
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $dataMap = [
             'genre' => $firestore->listGenres(),
             'author' => $firestore->listAuthors(),
@@ -131,7 +131,7 @@ class BookApiController extends Controller
 
     public function cover($id)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $book = $firestore->getBook($id);
         if (! $book) {
             return response()->json([
@@ -162,7 +162,7 @@ class BookApiController extends Controller
 
     public function search(Request $request)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $books = $firestore->listBooks();
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
@@ -216,7 +216,7 @@ class BookApiController extends Controller
 
     public function download($id)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $book = $firestore->getBook($id);
         if (! $book) {
             abort(404);
@@ -231,7 +231,7 @@ class BookApiController extends Controller
         }
         $zipFileName = str_replace(' ', '_', $book['title']).'.zip';
         $zipPath = storage_path('app/public/temp/'.$zipFileName);
-        $zip = new ZipArchive;
+        $zip = new ZipArchive();
         if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
             abort(500, 'Failed to create zip archive.');
         }
@@ -246,7 +246,7 @@ class BookApiController extends Controller
     public function queueDownload(Request $request)
     {
         $user = Auth::user();
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $queue = $firestore->getBookQueue($user->id);
         if (empty($queue)) {
             $queue = BookQueue::where('user_id', $user->id)->with('book')->get();
@@ -256,7 +256,7 @@ class BookApiController extends Controller
             $zipName = 'bookqueue_'.$user->id.'_'.Str::random(8).'.zip';
             $zipPath = storage_path('app/public/'.$zipName);
 
-            $zip = new ZipArchive;
+            $zip = new ZipArchive();
             if ($zip->open($zipPath, ZipArchive::CREATE) === true) {
                 foreach ($queue as $item) {
                     $book = $item->book;
@@ -308,7 +308,7 @@ class BookApiController extends Controller
      */
     public function listGenres(Request $request)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $genres = $firestore->listGenres();
         usort($genres, function ($a, $b) {
             return strcmp($a['name'], $b['name']);
@@ -325,7 +325,7 @@ class BookApiController extends Controller
      */
     public function authorsByGenre(Request $request, $genreId)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $perPage = $request->input('per_page', 20);
         $search = $request->input('search');
         $genre = $firestore->getGenre($genreId);
@@ -365,7 +365,7 @@ class BookApiController extends Controller
      */
     public function authorsByGenreSimple($genreId, Request $request)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $genre = $firestore->getGenre($genreId);
         if (! $genre) {
             return response()->json(['error' => 'Genre not found'], 404);
@@ -396,7 +396,7 @@ class BookApiController extends Controller
      */
     public function booksBySeries($seriesId, Request $request)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $perPage = $request->input('per_page', 100);
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
@@ -431,7 +431,7 @@ class BookApiController extends Controller
      */
     public function booksByAuthor($authorId, Request $request)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $perPage = $request->input('per_page', 100);
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
@@ -466,7 +466,7 @@ class BookApiController extends Controller
      */
     public function seriesByAuthor($authorId, Request $request)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $author = $firestore->getAuthor($authorId);
         if (! $author) {
             return response()->json(['error' => 'Author not found'], 404);

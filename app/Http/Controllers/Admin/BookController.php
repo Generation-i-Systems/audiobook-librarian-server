@@ -116,7 +116,7 @@ class BookController extends Controller
 
     public function create(Request $request)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $initial = [
             'directory_path' => $request->path,
         ];
@@ -175,7 +175,7 @@ class BookController extends Controller
                 }
             }
         }
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $genreList = $firestore->listGenres();
         $book = []; // Initialize empty book array
 
@@ -219,7 +219,7 @@ class BookController extends Controller
 
     public function store(Request $request)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
 
         $validated = $request->validate(
             [
@@ -399,7 +399,7 @@ class BookController extends Controller
 
     public function show($id)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $book = $firestore->getBook($id);
         if (! $book) {
             abort(404);
@@ -410,7 +410,7 @@ class BookController extends Controller
 
     public function edit($id, Request $request)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $book = $firestore->getBook($id);
         if (! $book) {
             abort(404);
@@ -556,7 +556,7 @@ class BookController extends Controller
 
     public function update(Request $request, $id)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $book = $firestore->getBook($id);
         if (! $book) {
             abort(404);
@@ -666,7 +666,7 @@ class BookController extends Controller
      */
     public function destroy($id)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $firestore->deleteBook($id);
 
         return redirect()->route('admin.books.index')->with('success', 'Book deleted successfully.');
@@ -674,7 +674,7 @@ class BookController extends Controller
 
     public function download($id)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $book = $firestore->getBook($id);
         $directoryPath = $book['directoryPath'];
 
@@ -693,7 +693,7 @@ class BookController extends Controller
             'app/public/temp/'.$zipFileName
         );  // Temporary storage
 
-        $zip = new ZipArchive;
+        $zip = new ZipArchive();
 
         if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
             abort(500, 'Failed to create zip archive.');

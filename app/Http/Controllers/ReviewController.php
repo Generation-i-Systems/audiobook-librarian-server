@@ -16,7 +16,7 @@ class ReviewController extends Controller
             'content_rating' => 'required|string',
         ]);
 
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $firestore->createReview([
             'book_id' => $bookId,
             'user_id' => Auth::id(),

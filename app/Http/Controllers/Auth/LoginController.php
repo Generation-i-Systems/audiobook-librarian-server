@@ -78,12 +78,12 @@ class LoginController extends Controller
     {
         // Update last login timestamp
         try {
-            $firestore = new FirestoreService;
+            $firestore = new FirestoreService();
             $firestore->getClient()->collection('users')
                 ->document($user->getAuthIdentifier())
                 ->update([
-                    ['path' => 'last_login_at', 'value' => new GoogleTimestamp(new \DateTime)],
-                    ['path' => 'updated_at', 'value' => new GoogleTimestamp(new \DateTime)],
+                    ['path' => 'last_login_at', 'value' => new GoogleTimestamp(new \DateTime())],
+                    ['path' => 'updated_at', 'value' => new GoogleTimestamp(new \DateTime())],
                 ]);
         } catch (\Exception $e) {
             Log::error('Error updating last login time: '.$e->getMessage());
@@ -119,7 +119,7 @@ class LoginController extends Controller
             return redirect('/login')->withErrors(['google' => 'No email provided by Google.']);
         }
 
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
 
         try {
             // Check if user exists
@@ -144,9 +144,9 @@ class LoginController extends Controller
                     'email' => $googleUser->getEmail(),
                     'password' => bcrypt(Str::random(32)), // random password, not used
                     'role' => 'user',
-                    'email_verified_at' => new GoogleTimestamp(new \DateTime),
-                    'created_at' => new GoogleTimestamp(new \DateTime),
-                    'updated_at' => new GoogleTimestamp(new \DateTime),
+                    'email_verified_at' => new GoogleTimestamp(new \DateTime()),
+                    'created_at' => new GoogleTimestamp(new \DateTime()),
+                    'updated_at' => new GoogleTimestamp(new \DateTime()),
                     'google_id' => $googleUser->getId(),
                     'avatar' => $googleUser->getAvatar(),
                 ];
@@ -166,7 +166,7 @@ class LoginController extends Controller
                     ->update([
                         ['path' => 'google_id', 'value' => $googleUser->getId()],
                         ['path' => 'avatar', 'value' => $googleUser->getAvatar()],
-                        ['path' => 'updated_at', 'value' => new GoogleTimestamp(new \DateTime)],
+                        ['path' => 'updated_at', 'value' => new GoogleTimestamp(new \DateTime())],
                     ]);
             }
 

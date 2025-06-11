@@ -13,7 +13,7 @@ class HardcoverServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(HardcoverService::class, function ($app) {
-            $service = new HardcoverService;
+            $service = new HardcoverService();
 
             // Additional service configuration can be done here if needed
             return $service;

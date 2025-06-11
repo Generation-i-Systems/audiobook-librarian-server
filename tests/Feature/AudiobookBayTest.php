@@ -9,7 +9,6 @@ use Mockery;
 use Tests\TestCase;
 use PHPUnit\Framework\Attributes\Test;
 
-
 class AudiobookBayTest extends TestCase
 {
     // use RefreshDatabase; // Uncomment if database interactions are tested

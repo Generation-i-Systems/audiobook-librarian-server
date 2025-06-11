@@ -58,7 +58,7 @@ class RegisterController extends Controller
                 'email',
                 'max:255',
                 function ($attribute, $value, $fail) {
-                    $firestore = new FirestoreService;
+                    $firestore = new FirestoreService();
                     $existingUser = $firestore->getClient()->collection('users')
                         ->where('email', '=', $value)
                         ->documents();
@@ -74,7 +74,7 @@ class RegisterController extends Controller
                 'max:255',
                 'unique:users,username',
                 function ($attribute, $value, $fail) {
-                    $firestore = new FirestoreService;
+                    $firestore = new FirestoreService();
                     $existingUser = $firestore->getClient()->collection('users')
                         ->where('username', '=', $value)
                         ->documents();
@@ -96,7 +96,7 @@ class RegisterController extends Controller
     protected function create(array $data)
     {
         try {
-            $firestore = new FirestoreService;
+            $firestore = new FirestoreService();
 
             // Generate a unique ID for the user
             $userId = (string) Str::uuid();
@@ -109,8 +109,8 @@ class RegisterController extends Controller
                 'password' => Hash::make($data['password']),
                 'role' => 'unverified', // Default role for new users
                 'email_verified_at' => null,
-                'created_at' => new Timestamp(new \DateTime),
-                'updated_at' => new Timestamp(new \DateTime),
+                'created_at' => new Timestamp(new \DateTime()),
+                'updated_at' => new Timestamp(new \DateTime()),
             ];
 
             // Add the user to Firestore
@@ -153,8 +153,8 @@ class RegisterController extends Controller
                         ),
                         'is_from_admin' => false,
                         'is_read' => false,
-                        'created_at' => new Timestamp(new \DateTime),
-                        'updated_at' => new Timestamp(new \DateTime),
+                        'created_at' => new Timestamp(new \DateTime()),
+                        'updated_at' => new Timestamp(new \DateTime()),
                     ];
 
                     // Add the message to Firestore

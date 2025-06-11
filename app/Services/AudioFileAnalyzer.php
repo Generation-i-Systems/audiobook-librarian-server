@@ -26,7 +26,7 @@ class AudioFileAnalyzer
      */
     public function __construct()
     {
-        $this->getID3 = new getID3;
+        $this->getID3 = new getID3();
         // Disable writing tags to files
         $this->getID3->option_tag_id3v1 = false;
         $this->getID3->option_tag_id3v2 = false;

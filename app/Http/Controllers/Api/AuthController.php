@@ -58,8 +58,8 @@ class AuthController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'role' => 'unverified',
-            'created_at' => new GoogleTimestamp(new \DateTime),
-            'updated_at' => new GoogleTimestamp(new \DateTime),
+            'created_at' => new GoogleTimestamp(new \DateTime()),
+            'updated_at' => new GoogleTimestamp(new \DateTime()),
         ];
 
         $userRef = $this->firestore->getClient()
@@ -73,7 +73,7 @@ class AuthController extends Controller
             ->documents();
 
         $messagesRef = $this->firestore->getClient()->collection('messages');
-        $now = new GoogleTimestamp(new \DateTime);
+        $now = new GoogleTimestamp(new \DateTime());
         foreach ($adminUsers as $admin) {
             $messagesRef->add([
                 'user_id' => $admin->id(),
@@ -138,7 +138,7 @@ class AuthController extends Controller
             ->add([
                 'user_id' => $userId,
                 'token' => $token,
-                'created_at' => new GoogleTimestamp(new \DateTime),
+                'created_at' => new GoogleTimestamp(new \DateTime()),
                 'expires_at' => new GoogleTimestamp(now()->addDays(30)->toDateTime()),
             ]);
 

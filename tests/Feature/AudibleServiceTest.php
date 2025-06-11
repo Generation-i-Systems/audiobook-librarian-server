@@ -22,7 +22,7 @@ class AudibleServiceTest extends TestCase
                 return $callback();
             });
 
-        $this->service = new AudibleService;
+        $this->service = new AudibleService();
     }
 
     #[Test]

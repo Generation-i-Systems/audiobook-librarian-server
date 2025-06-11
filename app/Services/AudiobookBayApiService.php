@@ -261,7 +261,7 @@ class AudiobookBayApiService
      */
     public function parseSearchResults(string $html): array
     {
-        $dom = new DOMDocument;
+        $dom = new DOMDocument();
         @$dom->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'));
         $xpath = new DOMXPath($dom);
         $results = [];
@@ -348,7 +348,7 @@ class AudiobookBayApiService
      */
     private function parseAudiobookDetails(string $html): array
     {
-        $dom = new DOMDocument;
+        $dom = new DOMDocument();
         @$dom->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'));
         $xpath = new DOMXPath($dom);
         $book = [

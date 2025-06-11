@@ -26,8 +26,7 @@ class BookImportTraitTest extends TestCase
      */
     protected function getTraitObject()
     {
-        return new class
-        {
+        return new class () {
             use BookImportTrait {
                 processDirPath as public;
             }

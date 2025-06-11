@@ -17,7 +17,7 @@ class FollowApiController extends Controller
             'followable_id' => 'required|integer',
         ]);
 
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $userId = Auth::id();
         $followableId = $followableId;
         if ($userId === $followableId) {
@@ -50,7 +50,7 @@ class FollowApiController extends Controller
             'followable_id' => 'required|integer',
         ]);
 
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $follows = $firestore->getClient()->collection('follows')
             ->where('user_id', '=', Auth::id())
             ->where('followable_type', '=', $followableType)

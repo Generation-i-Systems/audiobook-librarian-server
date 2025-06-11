@@ -17,7 +17,7 @@ class ReadingProgressApiController extends Controller
 
         $user = Auth::user();
 
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $userId = Auth::id();
         $bookId = $request->input('book_id');
         $progressDocs = $firestore->getClient()->collection('reading_progress')
@@ -48,7 +48,7 @@ class ReadingProgressApiController extends Controller
     {
         $user = Auth::user();
 
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $userId = Auth::id();
         $bookId = $request->input('book_id');
         $progressDocs = $firestore->getClient()->collection('reading_progress')
@@ -68,7 +68,7 @@ class ReadingProgressApiController extends Controller
     {
         $user = Auth::user();
 
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $userId = Auth::id();
         $bookId = $request->input('book_id');
         $progressDocs = $firestore->getClient()->collection('reading_progress')

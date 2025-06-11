@@ -11,7 +11,7 @@ class BookQueueController extends Controller
     public function index()
     {
         $user = Auth::user();
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $queue = $firestore->getBookQueue($user->id);
 
         return view('queue.index', compact('queue'));
@@ -20,7 +20,7 @@ class BookQueueController extends Controller
     public function add($bookId)
     {
         $user = Auth::user();
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $queue = $firestore->getBookQueue($user->id);
         foreach ($queue as $item) {
             if ($item['book_id'] == $bookId) {
@@ -35,7 +35,7 @@ class BookQueueController extends Controller
     public function remove($bookId)
     {
         $user = Auth::user();
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $firestore->removeBookFromQueue($user->id, $bookId);
         $this->reorderQueue($user->id);
 
@@ -50,7 +50,7 @@ class BookQueueController extends Controller
             'queue.*.order' => 'required|integer',
         ]);
         $user = Auth::user();
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
 
         // Implement: update the order of books in queue in Firestore
         // (You may want to add a method in FirestoreService for this)

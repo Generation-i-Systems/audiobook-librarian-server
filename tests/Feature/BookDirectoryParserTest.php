@@ -237,18 +237,18 @@ class BookDirectoryParserTest extends TestCase
         $this->assertCount(10, $books);
 
         // Test a few specific books
-        $wayOfKings = collect($books)->first(fn($book) => str_contains($book['title'], 'Way of Kings'));
+        $wayOfKings = collect($books)->first(fn ($book) => str_contains($book['title'], 'Way of Kings'));
         $this->assertNotNull($wayOfKings, 'Should find The Way of Kings');
         $this->assertEquals('Brandon Sanderson', $wayOfKings['author']);
         $this->assertEquals('The Stormlight Archive', $wayOfKings['series']);
 
-        $mistborn1 = collect($books)->first(fn($book) => str_contains($book['title'], 'Final Empire'));
+        $mistborn1 = collect($books)->first(fn ($book) => str_contains($book['title'], 'Final Empire'));
         $this->assertEquals(1, $mistborn1['series_number'], 'Should parse series number from filename');
 
-        $martian = collect($books)->first(fn($book) => str_contains($book['title'], 'Martian'));
+        $martian = collect($books)->first(fn ($book) => str_contains($book['title'], 'Martian'));
         $this->assertEquals('R.C. Bray', $martian['narrator'], 'Should parse narrator from brackets');
 
-        $hailMary = collect($books)->first(fn($book) => str_contains($book['title'], 'Project Hail Mary'));
+        $hailMary = collect($books)->first(fn ($book) => str_contains($book['title'], 'Project Hail Mary'));
         $this->assertEquals('Ray Porter', $hailMary['narrator'], 'Should parse narrator from "narrated by" pattern');
     }
 
@@ -259,7 +259,7 @@ class BookDirectoryParserTest extends TestCase
 
         // Check that Lord of the Rings series is correctly parsed with series numbers
         $lotrBooks = collect($books)
-            ->filter(fn($book) => str_contains($book['series'] ?? '', 'Lord of the Rings'))
+            ->filter(fn ($book) => str_contains($book['series'] ?? '', 'Lord of the Rings'))
             ->sortBy('series_number')
             ->values()
             ->all();
@@ -275,7 +275,7 @@ class BookDirectoryParserTest extends TestCase
     {
         $books = $this->parser->parseDirectory($this->testDataPath);
 
-        $rhythmOfWar = collect($books)->first(fn($book) => str_contains($book['title'] ?? '', 'Rhythm of War'));
+        $rhythmOfWar = collect($books)->first(fn ($book) => str_contains($book['title'] ?? '', 'Rhythm of War'));
         $this->assertEquals('Graphic Audio', $rhythmOfWar['edition']);
     }
 }

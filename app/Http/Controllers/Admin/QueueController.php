@@ -23,7 +23,7 @@ class QueueController extends Controller
     public function list(Request $request)
     {
         $typeFilter = $request->query('type');
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $jobsDocs = $firestore->getClient()->collection('jobs')->documents();
 
         $jobTypeCounts = [];
@@ -71,14 +71,14 @@ class QueueController extends Controller
 
     public function remove($id)
     {
-        (new FirestoreService)->getClient()->collection('jobs')->document($id)->delete();
+        (new FirestoreService())->getClient()->collection('jobs')->document($id)->delete();
 
         return response()->json(['success' => true]);
     }
 
     public function retry($id)
     {
-        (new FirestoreService)->getClient()->collection('jobs')->document($id)->delete();
+        (new FirestoreService())->getClient()->collection('jobs')->document($id)->delete();
 
         return response()->json(['success' => true]);
     }
@@ -87,7 +87,7 @@ class QueueController extends Controller
     {
         // Check for running worker (simple: look for process, or use a cache heartbeat)
         $running = Cache::get('queue_worker_heartbeat') ? true : false;
-        $pending = (new FirestoreService)->getClient()->collection('jobs')->count();
+        $pending = (new FirestoreService())->getClient()->collection('jobs')->count();
 
         return response()->json(['worker_running' => $running, 'pending_jobs' => $pending]);
     }
@@ -106,7 +106,7 @@ class QueueController extends Controller
 
     public function clear()
     {
-        $docs = (new FirestoreService)->getClient()->collection('jobs')->documents();
+        $docs = (new FirestoreService())->getClient()->collection('jobs')->documents();
         foreach ($docs as $doc) {
             if ($doc->exists()) {
                 $doc->reference()->delete();
@@ -132,7 +132,7 @@ class QueueController extends Controller
         // Use BookImportTrait's findBookDirectories
         $bookDirs = $this->findBookDirectories($absRoot);
         $queued = [];
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $jobsCollection = $firestore->getClient()->collection('jobs');
         $jobsDocs = $jobsCollection->documents();
         $pendingJobs = collect($jobsDocs)->map(function ($doc) {

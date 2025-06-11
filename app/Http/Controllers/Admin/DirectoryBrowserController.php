@@ -67,7 +67,7 @@ class DirectoryBrowserController extends Controller
             $isPotentialBookDirectory = $this->isPotentialBookDirectory($basePath.$filePath);
 
             if (is_dir($basePath.'/'.$filePath)) {
-                $firestore = new \App\Services\FirestoreService;
+                $firestore = new \App\Services\FirestoreService();
                 $book = $firestore->findBookByDirectoryPath($filePath);
                 $bookId = $book['id'] ?? null;
 

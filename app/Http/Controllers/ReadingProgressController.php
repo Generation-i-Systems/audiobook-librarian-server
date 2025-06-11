@@ -15,7 +15,7 @@ class ReadingProgressController extends Controller
             'current_position' => 'required|integer|min:0',
         ]);
         $user = Auth::user();
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $userId = $user->id;
         $bookId = $request->book_id;
         // Find or create reading progress document
@@ -51,7 +51,7 @@ class ReadingProgressController extends Controller
             'book_id' => 'required|string',
         ]);
         $user = Auth::user();
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $userId = $user->id;
         $bookId = $request->book_id;
         $progressQuery = $firestore->getClient()->collection('reading_progress')

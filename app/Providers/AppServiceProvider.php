@@ -27,12 +27,12 @@ class AppServiceProvider extends ServiceProvider
     {
         // Register custom Firestore user provider
         Auth::provider('firestore', function ($app, array $config) {
-            return new \App\Auth\FirestoreUserProvider;
+            return new \App\Auth\FirestoreUserProvider();
         });
 
         // Register Firestore queue driver
         Queue::extend('firestore', function ($app) {
-            return new \App\Queue\FirestoreQueueConnector;
+            return new \App\Queue\FirestoreQueueConnector();
         });
     }
 }

@@ -20,7 +20,7 @@ class BookRequestApiController extends Controller
         ]);
 
         $userId = Auth::id();
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $docRef = $firestore->getClient()->collection('book_requests')->add([
             'user_id' => $userId,
             'book_id' => $request->input('book_id'),

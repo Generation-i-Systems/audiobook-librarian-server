@@ -15,7 +15,7 @@ class MessageApiController extends Controller
         // Messages from mobile apps will not have an authenticated user
         $userId = auth()->check() ? auth()->id() : null;
 
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $firestore->getClient()->collection('messages')->add([
             'user_id' => $userId,
             'content' => $request->input('content'),

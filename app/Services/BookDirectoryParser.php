@@ -954,7 +954,7 @@ class BookDirectoryParser
                 'needsReview' => false,
                 'coverImage' => $coverImage ?? null,
             ];
-            
+
             return $book;
         } catch (\Exception $e) {
             $this->debug("Error creating book metadata: " . $e->getMessage());

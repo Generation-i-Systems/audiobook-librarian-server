@@ -44,7 +44,7 @@ if ($foundBook) {
     $book['title'] = 'Updated Test Book';
     $result = $firestoreService->updateBook($foundBook['id'], $book);
     echo "Update result: " . ($result ? "Success" : "Failed") . "\n";
-    
+
     // Verify update
     $updatedBook = $firestoreService->findBookByDirectoryPath('/tmp/test_path');
     echo "Updated book title: " . ($updatedBook ? $updatedBook['title'] : 'Not found') . "\n";

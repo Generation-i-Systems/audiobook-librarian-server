@@ -16,12 +16,12 @@ class BookServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton('book.services', function ($app) {
-            return new \SplObjectStorage;
+            return new \SplObjectStorage();
         });
 
         // Register each book service
         $this->registerBookService('audible', function () {
-            return new AudibleService;
+            return new AudibleService();
         });
 
         // TODO: Register other services once they're updated to use the interface

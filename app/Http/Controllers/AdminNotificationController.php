@@ -18,7 +18,7 @@ class AdminNotificationController extends Controller
         $message = $request->input('message');
         $userId = $request->input('user_id');
 
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         if ($userId) {
             // Send to a specific user
             $userDoc = $firestore->getClient()->collection('users')->document($userId)->snapshot();

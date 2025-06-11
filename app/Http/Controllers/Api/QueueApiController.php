@@ -11,7 +11,7 @@ class QueueApiController extends Controller
     public function index()
     {
         $user = Auth::user();
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $queue = $firestore->getBookQueue($user->id);
 
         return response()->json($queue);

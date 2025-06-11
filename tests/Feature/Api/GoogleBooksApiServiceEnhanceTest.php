@@ -23,7 +23,7 @@ class GoogleBooksApiServiceEnhanceTest extends TestCase
     protected function tearDown(): void
     {
         if (is_dir($this->testDir)) {
-            $fs = new Filesystem;
+            $fs = new Filesystem();
             $fs->deleteDirectory($this->testDir);
         }
         parent::tearDown();
@@ -32,7 +32,7 @@ class GoogleBooksApiServiceEnhanceTest extends TestCase
     #[Test]
     public function cover_image_is_downloaded_and_path_is_set()
     {
-        $service = new GoogleBooksApiService;
+        $service = new GoogleBooksApiService();
         $coverUrl = 'https://via.placeholder.com/150';
         $book = [
             'title' => 'Test Book',

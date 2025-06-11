@@ -13,7 +13,7 @@ class MessagesController extends Controller
     public function index()
     {
         $user = Auth::user();
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         // Get all messages for the current user, sort by is_read and created_at desc
         $messages = [];
         $docs = $firestore->getClient()->collection('messages')->where('to_user_id', '=', $user->id)->documents();
@@ -36,7 +36,7 @@ class MessagesController extends Controller
     public function show($id)
     {
         $user = Auth::user();
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $doc = $firestore->getClient()->collection('messages')->document($id)->snapshot();
         if (! $doc->exists() || ($doc->data()['to_user_id'] ?? null) != $user->id) {
             abort(404);
@@ -50,7 +50,7 @@ class MessagesController extends Controller
     public function markAsRead($id)
     {
         $user = Auth::user();
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $docRef = $firestore->getClient()->collection('messages')->document($id);
         $doc = $docRef->snapshot();
         if (! $doc->exists() || ($doc->data()['to_user_id'] ?? null) != $user->id) {
@@ -64,7 +64,7 @@ class MessagesController extends Controller
     // Show create message form
     public function create()
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $users = $firestore->getClient()->collection('users')->documents();
 
         return view('admin.messages.create', compact('users'));
@@ -80,7 +80,7 @@ class MessagesController extends Controller
         ]);
         $data['from_user_id'] = Auth::id();
         $data['is_read'] = false;
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $firestore->getClient()->collection('messages')->add($data);
 
         return redirect()->route('admin.messages.index')->with('success', 'Message sent.');

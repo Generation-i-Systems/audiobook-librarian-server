@@ -17,7 +17,7 @@ class BookRequestController extends Controller
             'description' => 'nullable|string',
         ]);
 
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $firestore->getClient()->collection('book_requests')->add([
             'user_id' => Auth::id(),
             'title' => $request->title,

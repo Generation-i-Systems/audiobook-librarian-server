@@ -166,7 +166,7 @@ class AuthControllerTest extends TestCase
         $this->tokensCollection->add([
             'user_id' => $userRef->id(),
             'token' => $token,
-            'created_at' => new \Google\Cloud\Core\Timestamp(new \DateTime),
+            'created_at' => new \Google\Cloud\Core\Timestamp(new \DateTime()),
             'expires_at' => new \Google\Cloud\Core\Timestamp(now()->addDays(30)),
         ]);
 

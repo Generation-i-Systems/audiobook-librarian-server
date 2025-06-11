@@ -492,7 +492,7 @@ class FirestoreService
      */
     private function getServerTimestamp()
     {
-        return new \Google\Cloud\Firestore\FieldValue\ServerTimestampValue;
+        return new \Google\Cloud\Firestore\FieldValue\ServerTimestampValue();
     }
 
     // BOOKS CRUD
