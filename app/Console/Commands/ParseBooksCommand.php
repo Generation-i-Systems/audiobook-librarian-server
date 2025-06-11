@@ -137,7 +137,7 @@ class ParseBooksCommand extends Command
         try {
             foreach ($paths as $path) {
                 $this->info("\nScanning: $path");
-                $this->info("Debug: Using storage root: {$parser->getStorageRoot()}");
+                $this->info("Debug: Using path: $path");
 
                 // Debug directory structure
                 $this->info("Debug: Directory structure:");
@@ -158,26 +158,69 @@ class ParseBooksCommand extends Command
                 // Set dateAdded for each book from directory mtime or authoritative time
                 foreach ($books as &$book) {
                     $dirPath = $book['directoryPath'] ?? $book['path'] ?? null;
+                    $storageRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
+                    if ($dirPath && strpos($dirPath, '/') !== 0) {
+                        $fullPath = $storageRoot . '/' . ltrim($dirPath, '/');
+                    } else {
+                        $fullPath = $dirPath;
+                    }
+
                     $dateAdded = null;
-                    if ($dirPath && is_dir($dirPath)) {
+                    $dateAddedDebug = null;
+                    $dateAddedFile = null;
+                    if ($fullPath && is_dir($fullPath)) {
                         $latestMtime = null;
-                        $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($dirPath));
+                        $latestFile = null;
+                        $audioExtensions = ['mp3', 'm4b', 'flac', 'ogg', 'wav', 'aac'];
+                        $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($fullPath));
                         foreach ($iterator as $fileinfo) {
                             if ($fileinfo->isFile()) {
-                                $mtime = $fileinfo->getMTime();
-                                if ($latestMtime === null || $mtime > $latestMtime) {
-                                    $latestMtime = $mtime;
+                                $ext = strtolower($fileinfo->getExtension());
+                                if (in_array($ext, $audioExtensions, true)) {
+                                    $mtime = $fileinfo->getMTime();
+                                    if ($latestMtime === null || $mtime > $latestMtime) {
+                                        $latestMtime = $mtime;
+                                        $latestFile = $fileinfo->getPathname();
+                                    }
                                 }
                             }
                         }
                         if ($latestMtime !== null) {
                             $dateAdded = date('c', $latestMtime);
+                            $dateAddedDebug = "Using audio file for dateAdded: $latestFile (mtime: $dateAdded)";
                         }
                     }
                     if (!$dateAdded) {
-                        $dateAdded = '2025-06-11T16:15:08-06:00';
+                        // Debug: no audio file found, list directory contents
+                        $this->error("No audio files found for dateAdded in directory: " . realpath($fullPath));
+                        $dateAdded = date('c');
+                    }
+                    $coverImage = null;
+                    $coverCandidates = [];
+                    $coverExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+                    $dirCoverPrefix = rtrim($fullPath, '/') . '/';
+                    foreach ($coverExtensions as $ext) {
+                        foreach (["cover.$ext", "folder.$ext", "front.$ext"] as $name) {
+                            if (file_exists($dirCoverPrefix . $name)) {
+                                $coverCandidates[] = $name;
+                            }
+                        }
+                    }
+                    if (!empty($coverCandidates)) {
+                        $coverImage = rtrim($dirPath, '/') . '/' . $coverCandidates[0];
+                    } elseif (!empty($book['audibleCoverPath']) && file_exists($book['audibleCoverPath'])) {
+                        $audibleExt = pathinfo($book['audibleCoverPath'], PATHINFO_EXTENSION);
+                        $audibleTarget = rtrim($fullPath, '/') . '/audible.' . $audibleExt;
+                        if (@copy($book['audibleCoverPath'], $audibleTarget)) {
+                            $coverImage = rtrim($dirPath, '/') . '/audible.' . $audibleExt;
+                            unset($book['audibleCoverPath']);
+                        }
+                    }
+                    if ($coverImage) {
+                        $book['coverImage'] = $coverImage;
                     }
                     $book['dateAdded'] = $dateAdded;
+
                 }
                 unset($book);
                 $allBooks = array_merge($allBooks, $books);

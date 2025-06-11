@@ -151,13 +151,13 @@ class ImportBookFromDirectoryJob implements ShouldQueue
             ];
 
             [$coverAuto, $coverCandidates] = $this->findCoverImageCandidate($dirPath);
-            Log::info('[BulkImport] Found cover candidates: '.json_encode($coverCandidates));
+            Log::info('[BulkImport] Found cover candidates: ' . json_encode($coverCandidates));
             $m4bs = is_dir($fullPath) ? array_values(array_filter(scandir($fullPath), function ($f) use ($fullPath) {
-                return is_file($fullPath.'/'.$f) && strtolower(pathinfo($f, PATHINFO_EXTENSION)) === 'm4b';
+                return is_file($fullPath . '/' . $f) && strtolower(pathinfo($f, PATHINFO_EXTENSION)) === 'm4b';
             })) : [];
             $tags = [];
             if ($m4bs) {
-                $firstM4b = $fullPath.'/'.$m4bs[0];
+                $firstM4b = $fullPath . '/' . $m4bs[0];
                 $tags = $this->extractTagData($firstM4b);
                 if (empty($coverAuto) && empty($coverCandidates)) {
                     $coverAuto = $this->extractCoverFromM4B($firstM4b, $fullPath);
@@ -177,9 +177,9 @@ class ImportBookFromDirectoryJob implements ShouldQueue
             } elseif (! empty($coverCandidates)) {
                 $bookData['cover_image'] = ltrim($this->directoryPath, '/').'/'.$coverCandidates[0];
             }
-            Log::info('[BulkImport] Cover image: '.($bookData['cover_image'] ?? ''));
-            Log::info('[BulkImport] Description: '.($bookData['description'] ?? ''));
-            Log::info('[BulkImport] Published year: '.($bookData['published_year'] ?? ''));
+            Log::info('[BulkImport] Cover image: ' . ($bookData['cover_image'] ?? ''));
+            Log::info('[BulkImport] Description: ' . ($bookData['description'] ?? ''));
+            Log::info('[BulkImport] Published year: ' . ($bookData['published_year'] ?? ''));
 
             try {
                 $shouldSearchGoogle = empty($bookData['cover_image']) ||
@@ -234,16 +234,25 @@ class ImportBookFromDirectoryJob implements ShouldQueue
 
                     if ($closeMatch) {
                         $info = $closeMatch['volumeInfo'];
-                        $bookData['published_year'] = getPublishedYear($info);
+                        $bookData['publishedYear'] = getPublishedYear($info);
                         $bookData['description'] = $info['description'] ?? '';
 
-                        if (empty($bookData['cover_image']) && ! empty($info['imageLinks']['thumbnail'])) {
+                        if (empty($bookData['coverImage']) && ! empty($info['imageLinks']['thumbnail'])) {
                             $coverImage = $info['imageLinks']['thumbnail'];
                             Log::info('[BulkImport] Cover image from Google Books: '.$coverImage);
-                            $bookData['cover_image'] = $this->importCoverImageFromUrl(
+                            $coverImagePath = $this->importCoverImageFromUrl(
                                 $coverImage,
-                                $bookData['directory_path']
+                                $bookData['directoryPath']
                             );
+                            $storageRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
+                            if ($coverImagePath && strpos($coverImagePath, $storageRoot) === 0) {
+                                $coverImagePath = ltrim(substr($coverImagePath, strlen($storageRoot)), '/');
+                            }
+                            // Ensure path is directoryPath/filename for Firestore
+                            if ($coverImagePath && strpos($coverImagePath, $bookData['directoryPath']) === false) {
+                                $coverImagePath = rtrim($bookData['directoryPath'], '/') . '/' . ltrim(basename($coverImagePath), '/');
+                            }
+                            $bookData['coverImage'] = $coverImagePath;
                         }
                     } else {
                         Log::error('[BulkImport] No close match found for: '.$bookData['title'].
@@ -301,40 +310,54 @@ class ImportBookFromDirectoryJob implements ShouldQueue
 
             // Set dateAdded to the latest file modification date in the directory (fallback to authoritative current time)
             try {
+                $dirPath = $bookData['directory_path'] ?? $bookData['directoryPath'] ?? null;
+                $storageRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
+                if ($dirPath && strpos($dirPath, '/') !== 0) {
+                    $scanPath = $storageRoot . '/' . ltrim($dirPath, '/');
+                } else {
+                    $scanPath = $dirPath;
+                }
+
                 $latestMtime = null;
-                if (is_dir($fullPath)) {
-                    $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($fullPath));
+                $latestFile = null;
+                if (is_dir($scanPath)) {
+                    $audioExtensions = ['mp3', 'm4b', 'flac', 'ogg', 'wav', 'aac'];
+                    $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($scanPath));
                     foreach ($iterator as $fileinfo) {
                         if ($fileinfo->isFile()) {
-                            $mtime = $fileinfo->getMTime();
-                            if ($latestMtime === null || $mtime > $latestMtime) {
-                                $latestMtime = $mtime;
+                            $ext = strtolower($fileinfo->getExtension());
+                            if (in_array($ext, $audioExtensions, true)) {
+                                $mtime = $fileinfo->getMTime();
+                                if ($latestMtime === null || $mtime > $latestMtime) {
+                                    $latestMtime = $mtime;
+                                    $latestFile = $fileinfo->getPathname();
+                                }
                             }
                         }
                     }
                 }
                 if ($latestMtime !== null) {
                     $bookData['dateAdded'] = date('c', $latestMtime);
+
                 } else {
-                    $bookData['dateAdded'] = '2025-06-11T16:15:08-06:00';
+                    $bookData['dateAdded'] = date('c');
                 }
             } catch (\Throwable $e) {
-                $bookData['dateAdded'] = '2025-06-11T16:15:08-06:00';
+                $bookData['dateAdded'] = date('c');
             }
-            $bookData['updated_at'] = now()->toDateTimeString();
 
             // If we have a book ID, update it, otherwise create a new one
 
             Log::info(sprintf(
                 '[BulkImport] Cover image: %s, Published year: %s, Series number: %s',
-                $bookData['cover_image'] ?? 'None',
+                $bookData['coverImage'] ?? 'None',
                 $bookData['publishedYear'] ?? 'None',
                 $seriesNumber ?? 'None'
             ));
             $bookId = $firestore->createBook($bookData);
             Log::info("[BulkImport] Created new book: {$bookData['title']} (ID: {$bookId})");
 
-            $dirPath = $bookData['directory_path'];
+            $dirPath = $bookData['directoryPath'];
             $storagePath = env('BOOK_STORAGE_PATH');
             $candidates = [];
             if ($dirPath && $storagePath && Storage::disk('public')->exists($dirPath)) {
@@ -354,12 +377,21 @@ class ImportBookFromDirectoryJob implements ShouldQueue
                     return $b['size'] <=> $a['size'];
                 });
                 // Update cover_image in Firestore
-                $firestore->updateBook($bookId, ['cover_image' => $candidates[0]['path']]);
+                $coverImagePath = $candidates[0]['path'];
+                $storageRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
+                if ($coverImagePath && strpos($coverImagePath, $storageRoot) === 0) {
+                    $coverImagePath = ltrim(substr($coverImagePath, strlen($storageRoot)), '/');
+                }
+                // Ensure path is directoryPath/filename for Firestore
+                if ($coverImagePath && strpos($coverImagePath, $bookData['directoryPath']) === false) {
+                    $coverImagePath = rtrim($bookData['directoryPath'], '/') . '/' . ltrim(basename($coverImagePath), '/');
+                }
+                $firestore->updateBook($bookId, ['coverImage' => $coverImagePath]);
             }
 
             Log::info(
-                '[BulkImport] Book imported: '.($bookData['title'] ?? '')." ({$bookId}) ".
-                ($bookData['directory_path'] ?? '')
+                '[BulkImport] Book imported: ' . ($bookData['title'] ?? '')." ({$bookId}) ".
+                ($bookData['directoryPath'] ?? '')
             );
 
             // Update job status to completed
@@ -388,7 +420,7 @@ class ImportBookFromDirectoryJob implements ShouldQueue
                 [
                     'error' => $e->getMessage(),
                     'failed_at' => now()->toDateTimeString(),
-                    'message' => 'Failed to import book: '.$e->getMessage(),
+                    'message' => 'Failed to import book: ' . $e->getMessage(),
                 ]
             );
 
@@ -412,7 +444,7 @@ class ImportBookFromDirectoryJob implements ShouldQueue
             'failed',
             [
                 'book_title' => $book['title'] ?? 'Unknown',
-                'directory_path' => $book['directory_path'] ?? 'Unknown',
+                'directoryPath' => $book['directoryPath'] ?? 'Unknown',
                 'attempts' => $attempts,
                 'error' => $msg,
                 'occurred_at' => now()->toDateTimeString(),
@@ -421,7 +453,7 @@ class ImportBookFromDirectoryJob implements ShouldQueue
         );
 
         Log::error("[ERROR][ImportBookFromDirectoryJob] Google Books API quota exceeded for '".
-            ($book['title'] ?? 'Unknown') . "' in '" . ($book['directory_path'] ?? 'Unknown').
+            ($book['title'] ?? 'Unknown') . "' in '" . ($book['directoryPath'] ?? 'Unknown') .
             "' after $attempts attempts. Last error: $msg");
     }
 }
