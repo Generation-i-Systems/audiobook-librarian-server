@@ -321,7 +321,7 @@ class ImportBookFromDirectoryJob implements ShouldQueue
                 $latestMtime = null;
                 $latestFile = null;
                 if (is_dir($scanPath)) {
-                    $audioExtensions = ['mp3', 'm4b', 'flac', 'ogg', 'wav', 'aac'];
+                    $audioExtensions = ['mp3', 'm4b', 'm4a', 'flac', 'ogg', 'wav', 'aac'];
                     $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($scanPath));
                     foreach ($iterator as $fileinfo) {
                         if ($fileinfo->isFile()) {
