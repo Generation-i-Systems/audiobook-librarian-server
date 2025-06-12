@@ -30,7 +30,7 @@ class GoogleBooksApiServiceEnhanceTest extends TestCase
     }
 
     #[Test]
-    public function cover_image_is_downloaded_and_path_is_set()
+    public function coverImageIsDownloadedAndPathIsSet()
     {
         $service = new GoogleBooksApiService();
         $coverUrl = 'https://via.placeholder.com/150';

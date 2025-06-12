@@ -24,7 +24,7 @@ class FirestoreTest extends TestCase
     /**
      * Test Firestore integration.
      */
-    public function test_firestore_integration()
+    public function testFirestoreIntegration()
     {
         // Create a test book record
         $book = [

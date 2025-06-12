@@ -6,6 +6,7 @@ use Google\Cloud\Firestore\FirestoreClient;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\Test;
 
 class BookControllerTest extends TestCase
 {
@@ -80,7 +81,8 @@ class BookControllerTest extends TestCase
         return $userRef->snapshot();
     }
 
-    public function test_index_returns_books()
+    #[Test]
+    public function testIndexReturnsBooks()
     {
         // Create test books
         $this->booksCollection->add([
@@ -103,8 +105,8 @@ class BookControllerTest extends TestCase
             ->assertSee('Test Book 2');
     }
 
-    #[\PHPUnit\Framework\Attributes\Test]
-    public function test_store_creates_book(): void
+    #[Test]
+    public function testStoreCreatesBook(): void
     {
         $genreRef = $this->genresCollection->add(['name' => 'Fiction']);
         $seriesRef = $this->seriesCollection->add(['name' => 'Test Series']);
@@ -136,8 +138,8 @@ class BookControllerTest extends TestCase
         $this->assertEquals(1, $book['series_number'][0] ?? $book['series_number'] ?? null);
     }
 
-    #[\PHPUnit\Framework\Attributes\Test]
-    public function test_store_validation_error(): void
+    #[Test]
+    public function testStoreValidationError(): void
     {
         $response = $this->actingAs($this->admin->data())
             ->post(route('admin.books.store'), [
@@ -149,7 +151,7 @@ class BookControllerTest extends TestCase
         $response->assertSessionHasErrors(['title', 'author', 'genre']);
     }
 
-    public function test_update_modifies_book(): void
+    public function testUpdateModifiesBook(): void
     {
         // Create a test book
         $bookRef = $this->booksCollection->add([
@@ -179,7 +181,7 @@ class BookControllerTest extends TestCase
         $this->assertEquals('New Genre', $book['genre']);
     }
 
-    public function test_destroy_deletes_book(): void
+    public function testDestroyDeletesBook(): void
     {
         // Create a test book
         $bookRef = $this->booksCollection->add([

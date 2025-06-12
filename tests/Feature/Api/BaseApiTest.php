@@ -36,8 +36,8 @@ abstract class BaseApiTest extends TestCase
         // HTTP faking will be handled by specific test methods or their own setUp.
 
         // Set up test API key by directly setting the config value
-        $testApiKey = 'test_api_key_for_'.$this->getServiceName();
-        Config::set('services.'.$this->getServiceName().'.key', $testApiKey);
+        $testApiKey = 'test_api_key_for_' . $this->getServiceName();
+        Config::set('services.' . $this->getServiceName() . '.key', $testApiKey);
         $this->apiKey = $testApiKey;
     }
 
@@ -46,14 +46,14 @@ abstract class BaseApiTest extends TestCase
     protected function mockSuccessfulSearchResponse(): void
     {
         Http::fake([
-            $this->apiBaseUrl.'*' => Http::response($this->getMockSearchResponse()),
+            $this->apiBaseUrl . '*' => Http::response($this->getMockSearchResponse()),
         ]);
     }
 
     protected function mockSuccessfulDetailsResponse(): void
     {
         Http::fake([
-            $this->apiBaseUrl.'*' => Http::response($this->getMockDetailsResponse()),
+            $this->apiBaseUrl . '*' => Http::response($this->getMockDetailsResponse()),
         ]);
     }
 

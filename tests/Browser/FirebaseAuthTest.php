@@ -63,7 +63,7 @@ class FirebaseAuthTest extends DuskTestCase
     /**
      * Test user can login with valid credentials.
      */
-    public function test_user_can_login(): void
+    public function testUserCanLogin(): void
     {
         $this->createTestUser();
 
@@ -79,7 +79,7 @@ class FirebaseAuthTest extends DuskTestCase
     /**
      * Test unverified user cannot login.
      */
-    public function test_unverified_user_cannot_login(): void
+    public function testUnverifiedUserCannotLogin(): void
     {
         $this->usersCollection->add([
             'name' => 'Unverified User',

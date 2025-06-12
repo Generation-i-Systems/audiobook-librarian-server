@@ -26,7 +26,7 @@ class AudibleServiceMockTest extends TestCase
     }
 
     #[Test]
-    public function test_it_can_search_books_by_title()
+    public function testItCanSearchBooksByTitle()
     {
         // Mock the HTTP response
         Http::fake([
@@ -47,7 +47,7 @@ class AudibleServiceMockTest extends TestCase
     }
 
     #[Test]
-    public function test_it_gets_book_details()
+    public function testItGetsBookDetails()
     {
         $mockBook = $this->getMockBookData();
 
@@ -79,7 +79,7 @@ class AudibleServiceMockTest extends TestCase
     }
 
     #[Test]
-    public function test_it_handles_api_errors_gracefully()
+    public function testHandlesApiErrorsGracefully()
     {
         Http::fake([
             'api.audible.com/1.0/catalog/products*' => Http::response(

@@ -1,7 +1,5 @@
 <?php
 
-// NOTE: Firestore project configuration is missing, causing ValidationException in tests. All tests will be skipped if Firestore is not configured.
-
 namespace Tests\Feature;
 
 use App\Traits\BookImportTrait;
@@ -50,7 +48,7 @@ class BookImportTest extends TestCase
         $projectId = config('firebase.project_id');
         $keyFile = config('firebase.credentials.file');
 
-        return empty($projectId) || empty($keyFile) || ! file_exists($keyFile);
+        return empty($projectId) || empty($keyFile) || !file_exists($keyFile);
     }
 
     protected function tearDown(): void
@@ -83,8 +81,8 @@ class BookImportTest extends TestCase
         }
     }
 
-    #[\PHPUnit\Framework\Attributes\Test]
-    public function test_process_dir_path_with_series(): void
+    #[Test]
+    public function testProcessDirPathWithSeries(): void
     {
         // Create test genre and series
         $genreRef = $this->genresCollection->add(['name' => 'Test Genre']);
@@ -100,8 +98,8 @@ class BookImportTest extends TestCase
         $this->assertEquals(1, $result['series_number']);
     }
 
-    #[\PHPUnit\Framework\Attributes\Test]
-    public function test_process_dir_path_without_series(): void
+    #[Test]
+    public function testProcessDirPathWithoutSeries(): void
     {
         $genreRef = $this->genresCollection->add(['name' => 'Test Genre']);
 
@@ -115,14 +113,14 @@ class BookImportTest extends TestCase
         $this->assertArrayNotHasKey('series_number', $result);
     }
 
-    #[\PHPUnit\Framework\Attributes\Test]
-    public function test_import_book_from_path(): void
+    #[Test]
+    public function testImportBookFromPath(): void
     {
         Storage::fake('local');
 
         // Create test file
         $file = UploadedFile::fake()->create('test.mp3', 1024);
-        $path = 'test/path/'.$file->getClientOriginalName();
+        $path = 'test/path/' . $file->getClientOriginalName();
         Storage::put($path, file_get_contents($file->getPathname()));
 
         // Create test data

@@ -43,13 +43,13 @@ class BookMetadataServiceTest extends TestCase
     }
 
     #[Test]
-    public function test_saves_and_loads_metadata_locally()
+    public function testSavesAndLoadsMetadataLocally()
     {
         $bookId = 'test-book-123';
-        $directoryPath = $this->testDir.'/test-book';
+        $directoryPath = $this->testDir . '/test-book';
 
         // Create the directory
-        if (! File::exists($directoryPath)) {
+        if (!File::exists($directoryPath)) {
             File::makeDirectory($directoryPath, 0755, true);
         }
 
@@ -58,7 +58,7 @@ class BookMetadataServiceTest extends TestCase
         $this->assertTrue($result);
 
         // Verify the file was created
-        $metadataPath = $directoryPath.'/librarian.json';
+        $metadataPath = $directoryPath . '/librarian.json';
         $this->assertFileExists($metadataPath);
 
         // Test loading metadata
@@ -72,10 +72,10 @@ class BookMetadataServiceTest extends TestCase
     }
 
     #[Test]
-    public function test_handle_missing_metadata_file()
+    public function testHandleMissingMetadataFile()
     {
         $bookId = 'non-existent-book';
-        $directoryPath = $this->testDir.'/non-existent-book';
+        $directoryPath = $this->testDir . '/non-existent-book';
 
         // Test loading non-existent metadata
         $metadata = $this->service->loadMetadata($bookId, $directoryPath);
@@ -83,7 +83,7 @@ class BookMetadataServiceTest extends TestCase
     }
 
     #[Test]
-    public function test_generates_consistent_book_ids()
+    public function testGeneratesConsistentBookIds()
     {
         $path1 = '/path/to/book';
         $path2 = '/path/to/book';
@@ -104,18 +104,18 @@ class BookMetadataServiceTest extends TestCase
     }
 
     #[Test]
-    public function test_handles_invalid_metadata()
+    public function testHandlesInvalidMetadata()
     {
         $bookId = 'invalid-metadata-test';
-        $directoryPath = $this->testDir.'/invalid-metadata';
+        $directoryPath = $this->testDir . '/invalid-metadata';
 
         // Create the directory
-        if (! File::exists($directoryPath)) {
+        if (!File::exists($directoryPath)) {
             File::makeDirectory($directoryPath, 0755, true);
         }
 
         // Create an invalid JSON file
-        $metadataPath = $directoryPath.'/librarian.json';
+        $metadataPath = $directoryPath . '/librarian.json';
         file_put_contents($metadataPath, 'invalid-json');
 
         // Should handle invalid JSON gracefully

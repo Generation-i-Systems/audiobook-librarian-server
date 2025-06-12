@@ -29,7 +29,7 @@ class HardcoverServiceTest extends TestCase
     }
 
     #[Test]
-    public function it_can_search_books_by_title()
+    public function itCanSearchBooksByTitle()
     {
         // Create a partial mock of the service
         $mock = $this->getMockBuilder(HardcoverService::class)
@@ -72,7 +72,7 @@ class HardcoverServiceTest extends TestCase
     }
 
     #[Test]
-    public function it_handles_api_errors_gracefully()
+    public function itHandlesApiErrorsGracefully()
     {
         // Mock error response
         Http::fake([
@@ -90,7 +90,7 @@ class HardcoverServiceTest extends TestCase
     }
 
     #[Test]
-    public function it_sends_expiration_warning_when_token_is_about_to_expire()
+    public function itSendsExpirationWarningWhenTokenIsAboutToExpire()
     {
         // Set token to expire in 15 days
         config(['hardcover.token_expires_at' => now()->addDays(15)->toDateString()]);
@@ -107,7 +107,7 @@ class HardcoverServiceTest extends TestCase
     }
 
     #[Test]
-    public function it_handles_token_expiration()
+    public function itHandlesTokenExpiration()
     {
         // Set token as expired
         config(['hardcover.token_expires_at' => now()->subDay()->toDateString()]);
@@ -124,7 +124,7 @@ class HardcoverServiceTest extends TestCase
     }
 
     #[Test]
-    public function it_gets_book_details()
+    public function itGetsBookDetails()
     {
         // Create a partial mock of the service
         $mock = $this->getMockBuilder(HardcoverService::class)

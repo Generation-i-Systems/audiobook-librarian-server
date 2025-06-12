@@ -45,7 +45,7 @@ class BookImportTraitTest extends TestCase
     /**
      * Test processing a directory path with a full series number.
      */
-    public function test_process_dir_path_with_full_series_number_path()
+    public function testProcessDirPathWithFullSeriesNumberPath()
     {
         $trait = $this->getTraitObject();
         $dirPath = '/Fiction/Author Name/My Series/15 Book Title';
@@ -62,7 +62,7 @@ class BookImportTraitTest extends TestCase
     /**
      * Test processing a directory path with series number in brackets.
      */
-    public function test_process_dir_path_with_series_number_in_brackets()
+    public function testProcessDirPathWithSeriesNumberInBrackets()
     {
         $trait = $this->getTraitObject();
         $dirPath = '/Fiction/Author Name/My Series/Book Title [15]';
@@ -79,7 +79,7 @@ class BookImportTraitTest extends TestCase
     /**
      * Test processing a directory path with series number in brackets in the middle.
      */
-    public function test_process_dir_path_with_series_number_in_brackets_in_middle()
+    public function testProcessDirPathWithSeriesNumberInBracketsInMiddle()
     {
         $trait = $this->getTraitObject();
         $dirPath = '/Fiction/Author Name/My Series/Book [01.5] Title';
@@ -95,7 +95,7 @@ class BookImportTraitTest extends TestCase
     /**
      * Test processing a directory path with series number in parentheses.
      */
-    public function test_process_dir_path_with_series_number_in_parens()
+    public function testProcessDirPathWithSeriesNumberInParens()
     {
         $trait = $this->getTraitObject();
         $dirPath = '/Fiction/Author Name/My Series/Book (15) Title';
@@ -111,7 +111,7 @@ class BookImportTraitTest extends TestCase
     /**
      * Test processing a directory path with VA (various artists) subgenre.
      */
-    public function test_process_dir_path_with_va_subgenre()
+    public function testProcessDirPathWithVaSubgenre()
     {
         $trait = $this->getTraitObject();
         $dirPath = '/Fiction/VA/Author Name/My Series/15 Book Title';
@@ -129,7 +129,7 @@ class BookImportTraitTest extends TestCase
     /**
      * Test processing a directory path with multiple authors separated by comma.
      */
-    public function test_process_dir_path_with_multiple_authors_comma()
+    public function testProcessDirPathWithMultipleAuthorsComma()
     {
         $trait = $this->getTraitObject();
         $dirPath = '/Fiction/Author 1, Author 2/My Series/15 Book Title';
@@ -145,7 +145,7 @@ class BookImportTraitTest extends TestCase
     /**
      * Test processing a directory path with multiple authors separated by ampersand.
      */
-    public function test_process_dir_path_with_multiple_authors_ampersand()
+    public function testProcessDirPathWithMultipleAuthorsAmpersand()
     {
         $trait = $this->getTraitObject();
         $dirPath = '/Fiction/Author 1 & Author 2/My Series/15 Book Title';
@@ -161,7 +161,7 @@ class BookImportTraitTest extends TestCase
     /**
      * Test processing an invalid directory path.
      */
-    public function test_process_dir_path_with_invalid_path()
+    public function testProcessDirPathWithInvalidPath()
     {
         $trait = $this->getTraitObject();
         $dirPath = '/Invalid/Path';
@@ -177,7 +177,7 @@ class BookImportTraitTest extends TestCase
     /**
      * Test processing an empty directory path.
      */
-    public function test_process_dir_path_with_empty_path()
+    public function testProcessDirPathWithEmptyPath()
     {
         $trait = $this->getTraitObject();
         $dirPath = '';
@@ -193,7 +193,7 @@ class BookImportTraitTest extends TestCase
     /**
      * Test processing a VA (various artists) directory.
      */
-    public function test_process_dir_path_with_va_directory()
+    public function testProcessDirPathWithVaDirectory()
     {
         $trait = $this->getTraitObject();
         $dirPath = '/VA/Directory';
@@ -208,7 +208,7 @@ class BookImportTraitTest extends TestCase
     /**
      * Test processing a directory path with a rated subdirectory.
      */
-    public function test_process_dir_path_with_rated_directory()
+    public function testProcessDirPathWithRatedDirectory()
     {
         $trait = $this->getTraitObject();
         $dirPath = '/Fiction/R/Author Name/Book Title';

@@ -11,7 +11,7 @@ class LoginTest extends DuskTestCase
 {
     use DatabaseMigrations;
 
-    public function test_user_can_login()
+    public function testUserCanLogin()
     {
         $user = User::factory()->create([
             'email' => 'test@example.com',

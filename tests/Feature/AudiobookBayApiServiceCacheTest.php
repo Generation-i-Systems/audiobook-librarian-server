@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Services\AudiobookBayApiService;
 use Illuminate\Support\Facades\Cache;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\Test;
 
 #[\CoversClass(AudiobookBayApiService::class)]
 class AudiobookBayApiServiceCacheTest extends TestCase
@@ -17,8 +18,8 @@ class AudiobookBayApiServiceCacheTest extends TestCase
         Cache::flush();
     }
 
-    #[\Test]
-    public function searchAudiobooks_handles_invalid_cache_value_gracefully(): void
+    #[Test]
+    public function searchAudiobooksHandlesInvalidCacheValueGracefully(): void
     {
         $service = app(AudiobookBayApiService::class);
         $endpoint = '/test';

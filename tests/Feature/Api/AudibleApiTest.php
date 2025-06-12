@@ -77,7 +77,7 @@ class AudibleApiTest extends BaseApiTest
     }
 
     #[Test]
-    public function can_search_books(): void
+    public function canSearchBooks(): void
     {
         Http::fake([
             'https://api.audible.com/1.0/catalog/products*' => Http::response($this->getMockSearchResponse(), 200),
@@ -91,7 +91,7 @@ class AudibleApiTest extends BaseApiTest
     }
 
     #[Test]
-    public function can_get_book_details(): void
+    public function canGetBookDetails(): void
     {
         Http::fake([
             'https://api.audible.com/1.0/catalog/products/*' => Http::response($this->getMockDetailsResponse(), 200),

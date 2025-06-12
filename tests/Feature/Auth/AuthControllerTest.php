@@ -1,7 +1,5 @@
 <?php
 
-// NOTE: Firestore project configuration is missing, causing ValidationException in tests. Consider skipping or marking these tests as incomplete if Firestore is not configured.
-
 namespace Tests\Feature\Auth;
 
 use Google\Cloud\Firestore\FirestoreClient;
@@ -47,7 +45,7 @@ class AuthControllerTest extends TestCase
         $projectId = config('firebase.project_id');
         $keyFile = config('firebase.credentials.file');
 
-        return empty($projectId) || empty($keyFile) || ! file_exists($keyFile);
+        return empty($projectId) || empty($keyFile) || !file_exists($keyFile);
     }
 
     protected function tearDown(): void
@@ -73,7 +71,7 @@ class AuthControllerTest extends TestCase
     }
 
     #[Test]
-    public function test_user_can_register()
+    public function testUserCanRegister()
     {
         $response = $this->postJson('/api/register', [
             'name' => 'Test User',
@@ -100,7 +98,7 @@ class AuthControllerTest extends TestCase
     }
 
     #[Test]
-    public function test_user_can_login()
+    public function testUserCanLogin()
     {
         // Create a test user
         $this->usersCollection->add([
@@ -128,7 +126,7 @@ class AuthControllerTest extends TestCase
     }
 
     #[Test]
-    public function test_unverified_user_cannot_login()
+    public function testUnverifiedUserCannotLogin()
     {
         // Create an unverified test user
         $this->usersCollection->add([
@@ -151,7 +149,7 @@ class AuthControllerTest extends TestCase
     }
 
     #[Test]
-    public function test_user_can_logout()
+    public function testUserCanLogout()
     {
         // Create a test user and token
         $userRef = $this->usersCollection->add([

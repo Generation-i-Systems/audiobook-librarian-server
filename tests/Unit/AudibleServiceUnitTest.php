@@ -70,7 +70,7 @@ class AudibleServiceUnitTest extends TestCase
     }
 
     #[Test]
-    public function test_downloads_cover_image_successfully_with_content_type_extension()
+    public function testDownloadsCoverImageSuccessfullyWithContentTypeExtension()
     {
         Storage::fake('public');
         $imageUrl = 'https://m.media-amazon.com/images/I/51Q42D63G5L.jpg';
@@ -90,7 +90,7 @@ class AudibleServiceUnitTest extends TestCase
     }
 
     #[Test]
-    public function test_downloads_cover_image_successfully_with_url_extension()
+    public function testDownloadsCoverImageSuccessfullyWithUrlExtension()
     {
         Storage::fake('public');
         $imageUrl = 'https://m.media-amazon.com/images/I/51Q42D63G5L.png';
@@ -108,7 +108,7 @@ class AudibleServiceUnitTest extends TestCase
     }
 
     #[Test]
-    public function test_creates_directory_if_not_exists()
+    public function testCreatesDirectoryIfNotExists()
     {
         Storage::fake('public');
         $imageUrl = 'https://m.media-amazon.com/images/I/51Q42D63G5L.jpg';
@@ -129,7 +129,7 @@ class AudibleServiceUnitTest extends TestCase
     }
 
     #[Test]
-    public function test_handles_http_error_gracefully()
+    public function testHandlesHttpErrorGracefully()
     {
         Storage::fake('public');
         $imageUrl = 'https://m.media-amazon.com/images/I/invalid.jpg';
@@ -145,7 +145,7 @@ class AudibleServiceUnitTest extends TestCase
     }
 
     #[Test]
-    public function test_handles_storage_put_failure()
+    public function testHandlesStoragePutFailure()
     {
         $imageUrl = 'https://m.media-amazon.com/images/I/51Q42D63G5L.jpg';
         $asin = 'B002V1O1QK';
@@ -167,7 +167,7 @@ class AudibleServiceUnitTest extends TestCase
     }
 
     #[Test]
-    public function test_defaults_to_jpg_when_extension_is_unknown()
+    public function testDefaultsToJpgWhenExtensionIsUnknown()
     {
         Storage::fake('public');
         $imageUrl = 'https://m.media-amazon.com/images/I/51Q42D63G5L';
@@ -182,7 +182,7 @@ class AudibleServiceUnitTest extends TestCase
     }
 
     #[Test]
-    public function test_perform_search_successful()
+    public function testPerformSearchSuccessful()
     {
         // Create a partial mock of AudibleService to override only the performSearch method
         $mockService = $this->getMockBuilder(AudibleService::class)
@@ -231,7 +231,7 @@ class AudibleServiceUnitTest extends TestCase
     }
 
     #[Test]
-    public function test_perform_search_api_failure()
+    public function testPerformSearchApiFailure()
     {
         // Create a partial mock of AudibleService to override only the performSearch method
         $mockService = $this->getMockBuilder(AudibleService::class)
@@ -258,7 +258,7 @@ class AudibleServiceUnitTest extends TestCase
     }
 
     #[Test]
-    public function test_get_book_details_successful()
+    public function testPerformGetBookDetailsSuccessful()
     {
         $asin = 'B002V1O1QK';
 
@@ -307,7 +307,7 @@ class AudibleServiceUnitTest extends TestCase
     }
 
     #[Test]
-    public function test_get_book_details_api_failure()
+    public function testPerformGetBookDetailsApiFailure()
     {
         $asin = 'B002V1O1QK';
 
