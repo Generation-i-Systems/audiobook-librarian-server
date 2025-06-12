@@ -337,7 +337,7 @@ trait BookImportTrait
             if (str_contains($author, ',') || stripos($author, ' and ') !== false || str_contains($author, '&')) {
                 $author = str_replace([' and ', ' & '], ',', $author);
                 $authors = array_map('trim', explode(',', $author));
-                $book['author'] = array_values(array_filter($authors, fn($a) => strlen(trim($a)) > 4));
+                $book['author'] = array_values(array_filter($authors, fn ($a) => strlen(trim($a)) > 4));
             } else {
                 $book['author'] = [trim($author)];
             }

@@ -36,6 +36,158 @@
         @endif
         <button type="button" class="btn btn-info mb-3" id="autofill-modal-btn"><i class="fas fa-magic"></i> Autofill Book Metadata</button>
 
+<!-- Dynamic Author/Series/Genre Groups Start -->
+        <div class="mb-3">
+            <label class="form-label">Authors</label>
+            <div id="authors-group">
+                @php
+                    $authors = old('author', isset($book) && !empty($book['author']) ? (is_array($book['author']) ? $book['author'] : [$book['author']]) : ($initial['author'] ?? []));
+                    if (!is_array($authors))
+                        $authors = [$authors];
+                @endphp
+                @php $authorsCount = count($authors); @endphp
+                @foreach($authors as $idx => $author)
+                    <div class="input-group author-row align-items-start mb-3">
+                        <input type="text" name="author[]" class="form-control w-auto author-autocomplete" style="max-width:300px; height:32px;"
+                            value="{{ $author }}" required>
+                        <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
+                            <button type="button" class="btn btn-outline-danger btn-sm remove-author p-0 mb-0"
+                                style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
+                            @if($idx === $authorsCount - 1)
+                                <button type="button" class="btn btn-primary btn-sm add-author-row p-0 mt-1"
+                                    style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
+                            @endif
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Series</label>
+            <div id="series-group">
+                @php
+                    $seriesList = [];
+                    $oldSeries = old('series', []);
+                    $oldSeriesNumbers = old('seriesNumber', old('seriesNumber', []));
+                    // Log the raw series data for debugging
+                    Log::debug('Series Data:', [
+                        'book_series' => isset($book) && !empty($book['series']) ? $book['series'] : null,
+                        'old_series' => $oldSeries,
+                        'old_series_numbers' => $oldSeriesNumbers,
+                    ]);
+                    // Handle existing book data
+                    if (isset($book) && !empty($book['series'])) {
+                        if (is_array($book['series'])) {
+                            foreach ($book['series'] as $name => $number) {
+                                if (!empty($name)) {
+                                    $seriesList[] = [
+                                        'name' => $name,
+                                        'number' => $number
+                                    ];
+                                }
+                            }
+                        }
+                        // Handle single series as string (legacy format)
+                        else if (is_string($book['series'])) {
+                            $seriesList[] = [
+                                'name' => $book['series'],
+                                'number' => $book['seriesNumber'] ?? $book['seriesNumber'] ?? ''
+                            ];
+                        }
+                    }
+                    // Handle old input (validation errors)
+                    if (!empty($oldSeries)) {
+                        $seriesList = []; // Reset to use old input
+                        foreach ($oldSeries as $i => $seriesName) {
+                            if (!empty($seriesName)) {
+                                $seriesList[] = [
+                                    'name' => $seriesName,
+                                    'number' => $oldSeriesNumbers[$i] ?? ''
+                                ];
+                            }
+                        }
+                    }
+                    // Handle initial data if no series found yet
+                    if (empty($seriesList) && !empty($initial['series'])) {
+                        if (is_array($initial['series'])) {
+                            foreach ($initial['series'] as $name => $number) {
+                                if (!empty($name)) {
+                                    $seriesList[] = [
+                                        'name' => $name,
+                                        'number' => $number
+                                    ];
+                                }
+                            }
+                        } else if (is_string($initial['series'])) {
+                            $seriesList[] = [
+                                'name' => $initial['series'],
+                                'number' => $initial['seriesNumber'] ?? $initial['seriesNumber'] ?? ''
+                            ];
+                        }
+                    }
+                    // Ensure we have at least one empty series row
+                    if (empty($seriesList)) {
+                        $seriesList[] = ['name' => '', 'number' => ''];
+                    }
+                    $seriesCount = count($seriesList);
+                @endphp
+                @foreach($seriesList as $idx => $series)
+                    @php
+                        $name = isset($series['name']) ? $series['name'] : '';
+                        $number = isset($series['number']) ? $series['number'] : '';
+                        \Log::debug('Rendering series input', [
+                            'series' => $series,
+                            'name' => $name,
+                            'number' => $number,
+                            'debug_backtrace' => array_map(function($t) {
+                                return ($t['file'] ?? 'unknown') . ':' . ($t['line'] ?? '?') . ' ' . ($t['function'] ?? '?');
+                            }, array_slice(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 5), 0, 3))
+                        ]);
+                    @endphp
+                    <div class="input-group series-row align-items-start mb-3">
+                        <input type="text" name="series[]" class="form-control w-auto series-autocomplete" style="max-width:200px; height:32px;"
+                            placeholder="Series Name" value="{{ $name }}">
+                        <input type="number" name="seriesNumber[]" class="form-control w-auto"
+                            style="max-width:100px; height:32px;" placeholder="Number" value="{{ $number }}" min="1" step="any">
+                        <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
+                            <button type="button" class="btn btn-outline-danger btn-sm remove-series p-0 mb-0"
+                                style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
+                            @if($idx === $seriesCount - 1)
+                                <button type="button" class="btn btn-primary btn-sm add-series-row p-0 mt-1"
+                                    style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
+                            @endif
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+
+                @php
+                    $genres = old('genre', old('genre', isset($book) && !empty($book['genre']) ? (is_array($book['genre']) ? $book['genre'] : [$book['genre']]) : ($initial['genre'] ?? [])));
+                    if (!is_array($genres))
+                        $genres = [$genres];
+                @endphp
+                @php $genresCount = count($genres); @endphp
+                @foreach($genres as $idx => $genre)
+                    <div class="input-group genre-row align-items-start mb-3">
+                        <select name="genre[]" class="form-select w-auto" style="max-width:200px; height:32px;" required>
+                            <option value="">Select a genre</option>
+                            @foreach(config('genres.list', []) as $g)
+                                <option value="{{ $g }}" {{ $genre === $g ? 'selected' : '' }}>{{ $g }}</option>
+                            @endforeach
+                        </select>
+                        <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
+                            <button type="button" class="btn btn-outline-danger btn-sm remove-genre p-0 mb-0"
+                                style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
+                            @if($idx === $genresCount - 1)
+                                <button type="button" class="btn btn-primary btn-sm add-genre-row p-0 mt-1"
+                                    style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
+                            @endif
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+<!-- Dynamic Author/Series/Genre Groups End -->
 <!-- Autofill Modal -->
 <div class="modal fade" id="autofillModal" tabindex="-1" aria-labelledby="autofillModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">
@@ -226,35 +378,6 @@
                 @endforeach
             </div>
 
-        </div>
-        <div class="form-group">
-            <label>Genres</label>
-            <div id="genres-group">
-                @php
-                    $genres = old('genre', old('genre', isset($book) && !empty($book['genre']) ? (is_array($book['genre']) ? $book['genre'] : [$book['genre']]) : ($initial['genre'] ?? [])));
-                    if (!is_array($genres))
-                        $genres = [$genres];
-                @endphp
-                @php $genresCount = count($genres); @endphp
-                @foreach($genres as $idx => $genre)
-                    <div class="input-group genre-row align-items-start mb-3">
-                        <select name="genre[]" class="form-select w-auto" style="max-width:200px; height:32px;" required>
-                            <option value="">Select a genre</option>
-                            @foreach(config('genres.list', []) as $g)
-                                <option value="{{ $g }}" {{ $genre === $g ? 'selected' : '' }}>{{ $g }}</option>
-                            @endforeach
-                        </select>
-                        <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
-                            <button type="button" class="btn btn-outline-danger btn-sm remove-genre p-0 mb-0"
-                                style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
-                            @if($idx === $genresCount - 1)
-                                <button type="button" class="btn btn-primary btn-sm add-genre-row p-0 mt-1"
-                                    style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
-                            @endif
-                        </div>
-                    </div>
-                @endforeach
-            </div>
         </div>
         <div class="form-group">
             <label for="publishedYear">Published Year (Optional):</label>

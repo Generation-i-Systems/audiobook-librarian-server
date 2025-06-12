@@ -4,15 +4,20 @@ window.googleBooksMoreMatches = false;
 window.googleBooksMatches = [];
 
 // Function to update the + button position to always be on the last row
-function updateAddRowButtons($container, groupSelector, rowSelector, buttonClass) {
-    console.log('updateAddRowButtons called. Container:', $container);
+function updateAddRowButtons(
+    $container,
+    groupSelector,
+    rowSelector,
+    buttonClass,
+) {
+    console.log("updateAddRowButtons called. Container:", $container);
     const group = $container.find(groupSelector)[0];
     if (!group) return;
     const rows = group.querySelectorAll(rowSelector);
 
     // Hide all add buttons first
-    group.querySelectorAll(buttonClass).forEach(btn => {
-        btn.style.display = 'none';
+    group.querySelectorAll(buttonClass).forEach((btn) => {
+        btn.style.display = "none";
     });
 
     // Show add button only on the last row
@@ -20,18 +25,18 @@ function updateAddRowButtons($container, groupSelector, rowSelector, buttonClass
         const lastRow = rows[rows.length - 1];
         const addButton = lastRow.querySelector(buttonClass);
         if (addButton) {
-            addButton.style.display = 'flex';
+            addButton.style.display = "flex";
         }
     }
 }
 
 // Function to add a new author row
-function addAuthorRow($container, authorName = '') {
-    console.log('addAuthorRow called. Container:', $container);
-    const group = $container.find('#authors-group')[0];
+function addAuthorRow($container, authorName = "") {
+    console.log("addAuthorRow called. Container:", $container);
+    const group = $container.find("#authors-group")[0];
     if (!group) return;
-    const div = document.createElement('div');
-    div.className = 'input-group author-row align-items-start mb-3';
+    const div = document.createElement("div");
+    div.className = "input-group author-row align-items-start mb-3";
     div.innerHTML = `
         <input type="text" name="author[]" class="form-control w-auto author-autocomplete" value="${authorName}" style="max-width:300px; height:32px;" required>
         <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
@@ -39,22 +44,30 @@ function addAuthorRow($container, authorName = '') {
             <button type="button" class="btn btn-primary btn-sm add-author-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
         </div>`;
     group.appendChild(div);
-        // Re-initialize autocomplete for the new element
-    if (typeof initializeAutocomplete === 'function') {
-        initializeAutocomplete($(div), '.author-autocomplete', window.BOOK_FORM_ROUTES.authorsAutocomplete);
+    // Re-initialize autocomplete for the new element
+    if (typeof initializeAutocomplete === "function") {
+        initializeAutocomplete(
+            $(div),
+            ".author-autocomplete",
+            window.BOOK_FORM_ROUTES.authorsAutocomplete,
+        );
     }
-    updateAddRowButtons($container, '#authors-group', '.author-row', '.add-author-row');
+    updateAddRowButtons(
+        $container,
+        "#authors-group",
+        ".author-row",
+        ".add-author-row",
+    );
 }
 window.addAuthorRow = addAuthorRow;
 
-
 // Function to add a new series row
-function addSeriesRow($container, seriesName = '', seriesNumber = '') {
-    console.log('addSeriesRow called. Container:', $container);
-    const group = $container.find('#series-group')[0];
+function addSeriesRow($container, seriesName = "", seriesNumber = "") {
+    console.log("addSeriesRow called. Container:", $container);
+    const group = $container.find("#series-group")[0];
     if (!group) return;
-    const div = document.createElement('div');
-    div.className = 'input-group series-row align-items-start mb-3';
+    const div = document.createElement("div");
+    div.className = "input-group series-row align-items-start mb-3";
     div.innerHTML = `
         <input type="text" name="series[]" class="form-control w-auto series-autocomplete" style="max-width:200px; height:32px;" placeholder="Series Name" value="${seriesName}">
         <input type="number" name="series_number[]" class="form-control w-auto" style="max-width:100px; height:32px;" placeholder="Number" value="${seriesNumber}" min="1" step="any">
@@ -63,25 +76,33 @@ function addSeriesRow($container, seriesName = '', seriesNumber = '') {
             <button type="button" class="btn btn-primary btn-sm add-series-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
         </div>`;
     group.appendChild(div);
-        // Re-initialize autocomplete for the new element
-    if (typeof initializeAutocomplete === 'function') {
-        initializeAutocomplete($(div), '.series-autocomplete', window.BOOK_FORM_ROUTES.seriesAutocomplete);
+    // Re-initialize autocomplete for the new element
+    if (typeof initializeAutocomplete === "function") {
+        initializeAutocomplete(
+            $(div),
+            ".series-autocomplete",
+            window.BOOK_FORM_ROUTES.seriesAutocomplete,
+        );
     }
-    updateAddRowButtons($container, '#series-group', '.series-row', '.add-series-row');
+    updateAddRowButtons(
+        $container,
+        "#series-group",
+        ".series-row",
+        ".add-series-row",
+    );
 }
 window.addSeriesRow = addSeriesRow;
 
-
 // Function to add a new genre row
-function addGenreRow($container, selectedGenre = '') {
-    console.log('addGenreRow called. Container:', $container);
-    const group = $container.find('#genres-group')[0];
+function addGenreRow($container, selectedGenre = "") {
+    console.log("addGenreRow called. Container:", $container);
+    const group = $container.find("#genres-group")[0];
     if (!group) return;
-    const div = document.createElement('div');
-    div.className = 'input-group genre-row align-items-start mb-3';
+    const div = document.createElement("div");
+    div.className = "input-group genre-row align-items-start mb-3";
     let optionsHtml = '<option value="">Select a genre</option>';
-    (window.GENRE_OPTIONS || []).forEach(g => {
-        optionsHtml += `<option value="${g}" ${selectedGenre === g ? 'selected' : ''}>${g}</option>`;
+    (window.GENRE_OPTIONS || []).forEach((g) => {
+        optionsHtml += `<option value="${g}" ${selectedGenre === g ? "selected" : ""}>${g}</option>`;
     });
     div.innerHTML = `
         <select name="genre[]" class="form-select w-auto" style="max-width:200px; height:32px;" required>
@@ -92,41 +113,49 @@ function addGenreRow($container, selectedGenre = '') {
             <button type="button" class="btn btn-primary btn-sm add-genre-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
         </div>`;
     group.appendChild(div);
-    updateAddRowButtons($container, '#genres-group', '.genre-row', '.add-genre-row');
+    updateAddRowButtons(
+        $container,
+        "#genres-group",
+        ".genre-row",
+        ".add-genre-row",
+    );
 }
 window.addGenreRow = addGenreRow;
 
 // Helper function to initialize jQuery UI Autocomplete
 function initializeAutocomplete($container, selector, sourceUrl) {
-    console.log('initializeAutocomplete called. Container:', $container);
-    $container.on('focus', selector, function() {
-        console.log('Input field focused. Selector:', selector);
+    console.log("initializeAutocomplete called. Container:", $container);
+    $container.on("focus", selector, function () {
+        console.log("Input field focused. Selector:", selector);
         const $inputField = $(this); // Capture 'this' to use in callbacks
 
         // Check if autocomplete has already been initialized on this element
-        if (!$inputField.data('autocomplete-initialized')) {
-            console.log('Initializing autocomplete for selector:', selector);
+        if (!$inputField.data("autocomplete-initialized")) {
+            console.log("Initializing autocomplete for selector:", selector);
             $inputField.autocomplete({
                 minLength: 2,
-                source: function(request, responseCallback) {
-                    console.log('AJAX request for autocomplete. URL:', sourceUrl);
+                source: function (request, responseCallback) {
+                    console.log(
+                        "AJAX request for autocomplete. URL:",
+                        sourceUrl,
+                    );
                     // request.term is the current value in the input field
                     $.ajax({
                         url: sourceUrl,
                         dataType: "json",
                         data: {
-                            term: request.term // Pass the search term to the server
+                            term: request.term, // Pass the search term to the server
                         },
                         async: true, // Explicitly ensure the request is asynchronous
-                        success: function(data) {
+                        success: function (data) {
                             responseCallback(data); // Provide the data to jQuery UI
                         },
-                        error: function(jqXHR, textStatus, errorThrown) {
+                        error: function (jqXHR, textStatus, errorThrown) {
                             responseCallback([]); // Call with empty array on error
-                        }
+                        },
                     });
                 },
-                select: function(event, ui) {
+                select: function (event, ui) {
                     $inputField.val(ui.item.value); // Set the input field's value to the selected item
                     // You might want to trigger a 'change' event if other parts of your code listen for it
                     // $inputField.trigger('change');
@@ -139,9 +168,9 @@ function initializeAutocomplete($container, selector, sourceUrl) {
                     //         .append('<div>' + item.label + '</div>') // Adjust 'item.label' based on your server response
                     //         .appendTo(ul);
                     // };
-                }
+                },
             });
-            $inputField.data('autocomplete-initialized', true); // Mark as initialized
+            $inputField.data("autocomplete-initialized", true); // Mark as initialized
         }
     });
 }
@@ -260,20 +289,20 @@ function initializeAutocomplete($container, selector, sourceUrl) {
                 $container.find('#title').after('<span class="invalid-feedback d-block">Failed to fetch book info.</span>');
             });
 */
-                // All AJAX autofill modal logic is now inside the event handler where $container is defined.
-                // No orphaned $container code remains here. Lint errors fixed.
-
+// All AJAX autofill modal logic is now inside the event handler where $container is defined.
+// No orphaned $container code remains here. Lint errors fixed.
 
 // Helper for proxying Google Books cover images
 function googleBooksProxyUrl(url) {
     if (url && url.match(/^https?:\/\/books\.google\.com\//)) {
         try {
-            const encodedUrl = typeof btoa === 'function'
-                ? btoa(encodeURIComponent(url))
-                : Buffer.from(url).toString('base64'); // Node.js fallback, not for browser
-            return (window.APP_URL || '') + '/google-books-cover/' + encodedUrl;
+            const encodedUrl =
+                typeof btoa === "function"
+                    ? btoa(encodeURIComponent(url))
+                    : Buffer.from(url).toString("base64"); // Node.js fallback, not for browser
+            return (window.APP_URL || "") + "/google-books-cover/" + encodedUrl;
         } catch (e) {
-            console.error('Error encoding URL:', e);
+            console.error("Error encoding URL:", e);
             return url;
         }
     }
@@ -282,192 +311,343 @@ function googleBooksProxyUrl(url) {
 window.googleBooksProxyUrl = googleBooksProxyUrl;
 
 function loadDirectoryFiles($container) {
-    console.log('loadDirectoryFiles called. Container:', $container);
-    const dirPath = $container.find('#directoryPath').val();
-    const filesList = $container.find('#directory-files-list');
-    const $viewFilesBtn = $container.find('#show-files-link');
+    console.log("loadDirectoryFiles called. Container:", $container);
+    const dirPath = $container.find("#directoryPath").val();
+    const filesList = $container.find("#directory-files-list");
+    const $viewFilesBtn = $container.find("#show-files-link");
 
     if (!dirPath) {
-        filesList.html('<div class="p-3 text-danger">Please select a directory first.</div>').show(); // Or slideDown()
+        filesList
+            .html(
+                '<div class="p-3 text-danger">Please select a directory first.</div>',
+            )
+            .show(); // Or slideDown()
         return;
     }
     const originalBtnHtml = $viewFilesBtn.html();
-    $viewFilesBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-1"></i>Loading...');
-    filesList.html('<div class="text-center p-3"><div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div> Loading files...</div>').show(); // Or slideDown()
+    $viewFilesBtn
+        .prop("disabled", true)
+        .html('<i class="fas fa-spinner fa-spin me-1"></i>Loading...');
+    filesList
+        .html(
+            '<div class="text-center p-3"><div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div> Loading files...</div>',
+        )
+        .show(); // Or slideDown()
 
-    const filesAjaxUrl = window.BOOK_FORM_ROUTES.filesAjax || '/admin/books/files-ajax'; // Fallback
+    const filesAjaxUrl =
+        window.BOOK_FORM_ROUTES.filesAjax || "/admin/books/files-ajax"; // Fallback
 
     $.ajax({
         url: filesAjaxUrl,
-        method: 'GET',
+        method: "GET",
         data: { directory: dirPath },
-        dataType: 'json',
-        success: function(response) {
-            $viewFilesBtn.prop('disabled', false).html(originalBtnHtml);
-            let html = '';
+        dataType: "json",
+        success: function (response) {
+            $viewFilesBtn.prop("disabled", false).html(originalBtnHtml);
+            let html = "";
             let files = [];
-            if (typeof response === 'string') try { response = JSON.parse(response); } catch (e) { console.error('Error parsing response:', e); }
-            if (response && response.files && Array.isArray(response.files)) files = response.files;
+            if (typeof response === "string")
+                try {
+                    response = JSON.parse(response);
+                } catch (e) {
+                    console.error("Error parsing response:", e);
+                }
+            if (response && response.files && Array.isArray(response.files))
+                files = response.files;
             else if (response && Array.isArray(response)) files = response;
-            else if (response && response.data && Array.isArray(response.data)) files = response.data;
+            else if (response && response.data && Array.isArray(response.data))
+                files = response.data;
 
             if (files && files.length > 0) {
                 html = '<div class="list-group list-group-flush">';
-                files.forEach(function(file) {
+                files.forEach(function (file) {
                     if (!file) return;
-                    const filename = typeof file === 'string' ? file : (file.name || file.filename || '');
+                    const filename =
+                        typeof file === "string"
+                            ? file
+                            : file.name || file.filename || "";
                     if (!filename) return;
-                    const isImage = /(\.(jpg|jpeg|png|gif|webp))$/i.test(filename);
-                    const isAudio = /(\.(mp3|m4b|m4a|ogg|wav|flac))$/i.test(filename);
-                    let icon = '📄';
-                    if (isImage) icon = '🖼️';
-                    else if (isAudio) icon = '🔊';
+                    const isImage = /(\.(jpg|jpeg|png|gif|webp))$/i.test(
+                        filename,
+                    );
+                    const isAudio = /(\.(mp3|m4b|m4a|ogg|wav|flac))$/i.test(
+                        filename,
+                    );
+                    let icon = "📄";
+                    if (isImage) icon = "🖼️";
+                    else if (isAudio) icon = "🔊";
                     html += `<div class="list-group-item p-2"><div class="d-flex align-items-center"><span class="me-2">${icon}</span><span class="text-truncate">${filename}</span></div></div>`;
                 });
-                html += '</div>';
+                html += "</div>";
             } else {
-                html = '<div class="p-3 text-muted text-center">No files found in this directory.</div>';
+                html =
+                    '<div class="p-3 text-muted text-center">No files found in this directory.</div>';
             }
             filesList.html(html).show(); // Or slideDown()
         },
-        error: function(xhr, status, error) {
-            $viewFilesBtn.prop('disabled', false).html(originalBtnHtml);
-            filesList.html('<div class="p-3 text-danger">Error loading files. Please check the console.</div>').show(); // Or slideDown()
-        }
+        error: function (xhr, status, error) {
+            $viewFilesBtn.prop("disabled", false).html(originalBtnHtml);
+            filesList
+                .html(
+                    '<div class="p-3 text-danger">Error loading files. Please check the console.</div>',
+                )
+                .show(); // Or slideDown()
+        },
     });
 }
 window.loadDirectoryFiles = loadDirectoryFiles; // Expose if called by onclick
 
-window.initBookForm = function(formContainerSelector) {
-    console.log('initBookForm - BOOK_FORM_ROUTES:', window.BOOK_FORM_ROUTES);
+// DEBUG: Log all clicks inside #book-form to test event bubbling
+$(document).on('click', '#book-form', function(e) {
+    console.log('book-form clicked:', e.target, 'classList:', e.target.classList ? Array.from(e.target.classList) : '');
+});
+
+window.initBookForm = function (formContainerSelector) {
+    console.log("initBookForm - BOOK_FORM_ROUTES:", window.BOOK_FORM_ROUTES);
     const $container = $(formContainerSelector); // Scope all operations to this container
+
+    // Log DOM structure for debug
+    console.log(
+        "initBookForm: #authors-group children:",
+        $container.find("#authors-group").html(),
+    );
+    console.log(
+        "initBookForm: #series-group children:",
+        $container.find("#series-group").html(),
+    );
+    console.log(
+        "initBookForm: #genres-group children:",
+        $container.find("#genres-group").html(),
+    );
+
     // Initialize dynamic row buttons
-    updateAddRowButtons($container, '#authors-group', '.author-row', '.add-author-row');
-    updateAddRowButtons($container, '#series-group', '.series-row', '.add-series-row');
-    updateAddRowButtons($container, '#genres-group', '.genre-row', '.add-genre-row');
+    updateAddRowButtons(
+        $container,
+        "#authors-group",
+        ".author-row",
+        ".add-author-row",
+    );
+    updateAddRowButtons(
+        $container,
+        "#series-group",
+        ".series-row",
+        ".add-series-row",
+    );
+    updateAddRowButtons(
+        $container,
+        "#genres-group",
+        ".genre-row",
+        ".add-genre-row",
+    );
 
     // Initialize autocomplete for all author and series fields on page load
-    if (typeof initializeAutocomplete === 'function') {
-        initializeAutocomplete($container, '.author-autocomplete', window.BOOK_FORM_ROUTES.authorsAutocomplete);
-        initializeAutocomplete($container, '.series-autocomplete', window.BOOK_FORM_ROUTES.seriesAutocomplete);
+    if (typeof initializeAutocomplete === "function") {
+        initializeAutocomplete(
+            $container,
+            ".author-autocomplete",
+            window.BOOK_FORM_ROUTES.authorsAutocomplete,
+        );
+        initializeAutocomplete(
+            $container,
+            ".series-autocomplete",
+            window.BOOK_FORM_ROUTES.seriesAutocomplete,
+        );
     }
 
     // Event delegation for add row buttons
-    $container.off('click', '.add-author-row').on('click', '.add-author-row', function() { addAuthorRow($container); });
-    $container.off('click', '.add-series-row').on('click', '.add-series-row', function() { addSeriesRow($container); });
-    $container.off('click', '.add-genre-row').on('click', '.add-genre-row', function() { addGenreRow($container); });
+    $container
+        .off("click", ".add-author-row")
+        .on("click", ".add-author-row", function () {
+            console.log("add-author-row clicked");
+            addAuthorRow($container);
+        });
+    $container
+        .off("click", ".add-series-row")
+        .on("click", ".add-series-row", function () {
+            console.log("add-series-row clicked");
+            addSeriesRow($container);
+        });
+    $container
+        .off("click", ".add-genre-row")
+        .on("click", ".add-genre-row", function () {
+            console.log("add-genre-row clicked");
+            addGenreRow($container);
+        });
 
     // Event delegation for remove row buttons
-    $container.off('click', '.remove-author').on('click', '.remove-author', function() {
-        $(this).closest('.author-row').remove();
-        updateAddRowButtons($container, '#authors-group', '.author-row', '.add-author-row');
-    });
-    $container.off('click', '.remove-series').on('click', '.remove-series', function() {
-        $(this).closest('.series-row').remove();
-        updateAddRowButtons($container, '#series-group', '.series-row', '.add-series-row');
-    });
-    $container.off('click', '.remove-genre').on('click', '.remove-genre', function() {
-        $(this).closest('.genre-row').remove();
-        updateAddRowButtons($container, '#genres-group', '.genre-row', '.add-genre-row');
-    });
+    $container
+        .off("click", ".remove-author")
+        .on("click", ".remove-author", function () {
+            console.log("remove-author clicked");
+            $(this).closest(".author-row").remove();
+            updateAddRowButtons(
+                $container,
+                "#authors-group",
+                ".author-row",
+                ".add-author-row",
+            );
+        });
+    $container
+        .off("click", ".remove-series")
+        .on("click", ".remove-series", function () {
+            console.log("remove-series clicked");
+            $(this).closest(".series-row").remove();
+            updateAddRowButtons(
+                $container,
+                "#series-group",
+                ".series-row",
+                ".add-series-row",
+            );
+        });
+    $container
+        .off("click", ".remove-genre")
+        .on("click", ".remove-genre", function () {
+            console.log("remove-genre clicked");
+            $(this).closest(".genre-row").remove();
+            updateAddRowButtons(
+                $container,
+                "#genres-group",
+                ".genre-row",
+                ".add-genre-row",
+            );
+        });
 
     // Event listener for viewing directory files
-    $container.off('click', '#show-files-link').on('click', '#show-files-link', function(e) {
-        e.preventDefault(); // Prevent the default anchor behavior
-        console.log('#show-files-link clicked. Container:', $container);
-        loadDirectoryFiles($container);
-    });
+    $container
+        .off("click", "#show-files-link")
+        .on("click", "#show-files-link", function (e) {
+            e.preventDefault(); // Prevent the default anchor behavior
+            console.log("#show-files-link clicked. Container:", $container);
+            loadDirectoryFiles($container);
+        });
 };
 
-
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener("DOMContentLoaded", function () {
     // Always bind autofill modal button globally after DOM is ready
 
-
-    const $bookForm = $('#book-form');
+    const $bookForm = $("#book-form");
     if ($bookForm.length) {
         // Check if it's part of a modal
-        if (!$bookForm.closest('.modal').length) {
-            console.log('DOMContentLoaded: Initializing #book-form (not in a modal).');
+        if (!$bookForm.closest(".modal").length) {
+            console.log(
+                "DOMContentLoaded: Initializing #book-form (not in a modal).",
+            );
             initBookForm($bookForm); // Pass the jQuery object for #book-form
         } else {
-            console.log('DOMContentLoaded: #book-form found, but it is inside a modal. Initialization will be handled by modal events.');
+            console.log(
+                "DOMContentLoaded: #book-form found, but it is inside a modal. Initialization will be handled by modal events.",
+            );
             // For modals, initBookForm is typically called when the modal is shown.
             // Ensure that logic exists elsewhere if this form can also be in a modal.
         }
     } else {
-        console.log('DOMContentLoaded: #book-form not found.');
+        console.log("DOMContentLoaded: #book-form not found.");
     }
 
     // Form validation
-    const form = document.getElementById('book-form'); // Ensure your form has id="book-form"
+    const form = document.getElementById("book-form"); // Ensure your form has id="book-form"
     if (form) {
-        form.addEventListener('submit', function (e) {
+        form.addEventListener("submit", function (e) {
             // Clear previous validation
-            form.querySelectorAll('.is-invalid').forEach(field => field.classList.remove('is-invalid'));
-            form.querySelectorAll('.invalid-feedback.d-block').forEach(msg => msg.remove());
+            form.querySelectorAll(".is-invalid").forEach((field) =>
+                field.classList.remove("is-invalid"),
+            );
+            form.querySelectorAll(".invalid-feedback.d-block").forEach((msg) =>
+                msg.remove(),
+            );
 
             let hasError = false;
 
-            const dirPathInput = form.querySelector('input[name="directoryPath"]');
+            const dirPathInput = form.querySelector(
+                'input[name="directoryPath"]',
+            );
             if (dirPathInput && dirPathInput.value) {
-                dirPathInput.value = dirPathInput.value.replace(/^\/+/, '');
+                dirPathInput.value = dirPathInput.value.replace(/^\/+/, "");
             }
 
             const titleInput = form.querySelector('input[name="title"]');
             if (!titleInput || !titleInput.value.trim()) {
-                titleInput.classList.add('is-invalid');
-                $(titleInput).after('<span class="invalid-feedback d-block">Title is required.</span>');
+                titleInput.classList.add("is-invalid");
+                $(titleInput).after(
+                    '<span class="invalid-feedback d-block">Title is required.</span>',
+                );
                 hasError = true;
             }
 
-            const authorInputs = form.querySelectorAll('input[name="author[]"]');
+            const authorInputs = form.querySelectorAll(
+                'input[name="author[]"]',
+            );
             let hasAuthor = false;
-            authorInputs.forEach(input => { if (input.value.trim()) hasAuthor = true; });
+            authorInputs.forEach((input) => {
+                if (input.value.trim()) hasAuthor = true;
+            });
             if (!hasAuthor && authorInputs.length > 0) {
-                authorInputs[0].classList.add('is-invalid');
-                $(authorInputs[0].closest('.input-group')).after('<span class="invalid-feedback d-block">At least one author is required.</span>');
+                authorInputs[0].classList.add("is-invalid");
+                $(authorInputs[0].closest(".input-group")).after(
+                    '<span class="invalid-feedback d-block">At least one author is required.</span>',
+                );
                 hasError = true;
-            } else if (authorInputs.length === 0) { // No author input fields at all
-                 const authorsGroup = document.getElementById('authors-group');
-                 $(authorsGroup).after('<span class="invalid-feedback d-block">At least one author is required.</span>');
-                 hasError = true;
+            } else if (authorInputs.length === 0) {
+                // No author input fields at all
+                const authorsGroup = document.getElementById("authors-group");
+                $(authorsGroup).after(
+                    '<span class="invalid-feedback d-block">At least one author is required.</span>',
+                );
+                hasError = true;
             }
 
-            const genreSelects = form.querySelectorAll('select[name="genre[]"]');
+            const genreSelects = form.querySelectorAll(
+                'select[name="genre[]"]',
+            );
             let hasGenre = false;
-            genreSelects.forEach(select => { if (select.value) hasGenre = true; });
+            genreSelects.forEach((select) => {
+                if (select.value) hasGenre = true;
+            });
             if (!hasGenre && genreSelects.length > 0) {
-                genreSelects[0].classList.add('is-invalid');
-                 $(genreSelects[0].closest('.input-group')).after('<span class="invalid-feedback d-block">At least one genre is required.</span>');
+                genreSelects[0].classList.add("is-invalid");
+                $(genreSelects[0].closest(".input-group")).after(
+                    '<span class="invalid-feedback d-block">At least one genre is required.</span>',
+                );
                 hasError = true;
             } else if (genreSelects.length === 0) {
-                const genresGroup = document.getElementById('genres-group');
-                $(genresGroup).after('<span class="invalid-feedback d-block">At least one genre is required.</span>');
+                const genresGroup = document.getElementById("genres-group");
+                $(genresGroup).after(
+                    '<span class="invalid-feedback d-block">At least one genre is required.</span>',
+                );
                 hasError = true;
             }
 
             if (hasError) {
                 e.preventDefault();
-                const firstError = form.querySelector('.is-invalid');
-                if (firstError) firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                const firstError = form.querySelector(".is-invalid");
+                if (firstError)
+                    firstError.scrollIntoView({
+                        behavior: "smooth",
+                        block: "center",
+                    });
                 return false;
             }
 
             // Handle AJAX form submission if in modal
             var $form = $(this);
-            var $modal = $form.closest('.modal');
+            var $modal = $form.closest(".modal");
             if ($modal.length) {
                 e.preventDefault();
-                var url = $form.attr('action');
-                var method = $form.find('input[name="_method"]').val() || 'POST';
+                var url = $form.attr("action");
+                var method =
+                    $form.find('input[name="_method"]').val() || "POST";
                 var formData = new FormData(this);
 
-                const submitButton = form.querySelector('button[type="submit"]');
-                const originalButtonText = submitButton ? submitButton.innerHTML : '';
+                const submitButton = form.querySelector(
+                    'button[type="submit"]',
+                );
+                const originalButtonText = submitButton
+                    ? submitButton.innerHTML
+                    : "";
                 if (submitButton) {
                     submitButton.disabled = true;
-                    submitButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
+                    submitButton.innerHTML =
+                        '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
                 }
 
                 $.ajax({
@@ -476,7 +656,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     data: formData,
                     processData: false,
                     contentType: false,
-                    headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
+                    headers: {
+                        "X-CSRF-TOKEN": $('meta[name="csrf-token"]').attr(
+                            "content",
+                        ),
+                    },
                     success: function (data) {
                         if (submitButton) {
                             submitButton.disabled = false;
@@ -485,10 +669,13 @@ document.addEventListener('DOMContentLoaded', function () {
                         var modalEl = $modal[0];
                         var bsModal = bootstrap.Modal.getInstance(modalEl);
                         if (bsModal) bsModal.hide();
-                        $(document).trigger('book:updated', data); // Custom event for other parts of app to listen to
-                        if (window.BOOK_FORM_ROUTES && window.BOOK_FORM_ROUTES.index) {
-                           // Optionally redirect or refresh part of the page
-                           // Example: if (data.redirect_url) window.location.href = data.redirect_url;
+                        $(document).trigger("book:updated", data); // Custom event for other parts of app to listen to
+                        if (
+                            window.BOOK_FORM_ROUTES &&
+                            window.BOOK_FORM_ROUTES.index
+                        ) {
+                            // Optionally redirect or refresh part of the page
+                            // Example: if (data.redirect_url) window.location.href = data.redirect_url;
                         }
                     },
                     error: function (xhr) {
@@ -496,24 +683,53 @@ document.addEventListener('DOMContentLoaded', function () {
                             submitButton.disabled = false;
                             submitButton.innerHTML = originalButtonText;
                         }
-                        let msg = 'Failed to save book.';
-                        if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                        let msg = "Failed to save book.";
+                        if (xhr.responseJSON && xhr.responseJSON.message)
+                            msg = xhr.responseJSON.message;
                         if (xhr.responseJSON && xhr.responseJSON.errors) {
                             // Display validation errors
-                            $.each(xhr.responseJSON.errors, function(key, value) {
-                                const inputField = form.querySelector(`[name^="${key}"]`);
-                                if (inputField) {
-                                    inputField.classList.add('is-invalid');
-                                    $(inputField.closest('.input-group') || inputField).after('<span class="invalid-feedback d-block">' + value[0] + '</span>');
-                                }
-                            });
+                            $.each(
+                                xhr.responseJSON.errors,
+                                function (key, value) {
+                                    const inputField = form.querySelector(
+                                        `[name^="${key}"]`,
+                                    );
+                                    if (inputField) {
+                                        inputField.classList.add("is-invalid");
+                                        $(
+                                            inputField.closest(
+                                                ".input-group",
+                                            ) || inputField,
+                                        ).after(
+                                            '<span class="invalid-feedback d-block">' +
+                                                value[0] +
+                                                "</span>",
+                                        );
+                                    }
+                                },
+                            );
                         } else {
-                            $form.find('#title').addClass('is-invalid').next('.invalid-feedback.d-block').remove();
-                            $form.find('#title').after('<span class="invalid-feedback d-block">' + msg + '</span>');
+                            $form
+                                .find("#title")
+                                .addClass("is-invalid")
+                                .next(".invalid-feedback.d-block")
+                                .remove();
+                            $form
+                                .find("#title")
+                                .after(
+                                    '<span class="invalid-feedback d-block">' +
+                                        msg +
+                                        "</span>",
+                                );
                         }
-                         const firstErrorField = form.querySelector('.is-invalid');
-                        if (firstErrorField) firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }
+                        const firstErrorField =
+                            form.querySelector(".is-invalid");
+                        if (firstErrorField)
+                            firstErrorField.scrollIntoView({
+                                behavior: "smooth",
+                                block: "center",
+                            });
+                    },
                 });
                 return false;
             }
@@ -521,19 +737,22 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Bootstrap modal cancel button specific handler if needed
-    if (typeof window.bootstrap !== 'undefined') {
-        document.querySelectorAll('.modal .btn-close, .modal [data-bs-dismiss="modal"]').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const modalEl = this.closest('.modal');
-                if (modalEl) {
-                    var bsModal = bootstrap.Modal.getInstance(modalEl);
-                    if (bsModal && bsModal._isShown) {
-                        // bsModal.hide(); // Already handled by data-bs-dismiss
+    if (typeof window.bootstrap !== "undefined") {
+        document
+            .querySelectorAll(
+                '.modal .btn-close, .modal [data-bs-dismiss="modal"]',
+            )
+            .forEach((btn) => {
+                btn.addEventListener("click", function () {
+                    const modalEl = this.closest(".modal");
+                    if (modalEl) {
+                        var bsModal = bootstrap.Modal.getInstance(modalEl);
+                        if (bsModal && bsModal._isShown) {
+                            // bsModal.hide(); // Already handled by data-bs-dismiss
+                        }
                     }
-                }
+                });
             });
-        });
     }
-
 });
-console.log('Form JS loaded 5');
+console.log("Form JS loaded 5");
