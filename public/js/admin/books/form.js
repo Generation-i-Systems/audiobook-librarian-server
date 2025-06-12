@@ -312,9 +312,40 @@ window.googleBooksProxyUrl = googleBooksProxyUrl;
 
 function loadDirectoryFiles($container) {
     console.log("loadDirectoryFiles called. Container:", $container);
-    const dirPath = $container.find("#directoryPath").val();
     const filesList = $container.find("#directory-files-list");
-    const $viewFilesBtn = $container.find("#show-files-link");
+    if (!filesList.length) {
+        console.error('[DEBUG] #directory-files-list not found in container');
+        return;
+    }
+    let $viewFilesBtn = $container.find("#show-files-link");
+    if (!$viewFilesBtn.length) {
+        console.error('[DEBUG] #show-files-link not found in container');
+        return;
+    }
+    // Store original button HTML if not already stored
+    if (!$viewFilesBtn.data('originalHtml')) {
+        $viewFilesBtn.data('originalHtml', $viewFilesBtn.html());
+    }
+    // Toggle: If visible, hide and return
+    if (filesList.is(":visible")) {
+        filesList.slideUp();
+        let origHtml = $viewFilesBtn.data('originalHtml');
+        if (!origHtml) origHtml = '<i class="fas fa-folder"></i> View Directory Files';
+        $viewFilesBtn.html(origHtml);
+        console.log('[DEBUG] Directory files box hidden (toggle off), button text reset');
+        return;
+    }
+    // Show: set button text to Hide Directory Files
+    $viewFilesBtn.html('<i class="fas fa-folder-open"></i> Hide Directory Files');
+    // Debug: Print all inputs with id directoryPath in container
+    const $dirInput = $container.find("#directoryPath");
+    console.log('[DEBUG] loadDirectoryFiles: #directoryPath inputs found:', $dirInput.length);
+    if ($dirInput.length > 0) {
+        console.log('[DEBUG] loadDirectoryFiles: #directoryPath value:', $dirInput.val());
+    } else {
+        console.warn('[DEBUG] loadDirectoryFiles: #directoryPath not found in container');
+    }
+    const dirPath = $dirInput.val();
 
     if (!dirPath) {
         filesList
@@ -358,7 +389,7 @@ function loadDirectoryFiles($container) {
             else if (response && response.data && Array.isArray(response.data))
                 files = response.data;
 
-            if (files && files.length > 0) {
+            if (files.length > 0) {
                 html = '<div class="list-group list-group-flush">';
                 files.forEach(function (file) {
                     if (!file) return;
@@ -397,10 +428,6 @@ function loadDirectoryFiles($container) {
 }
 window.loadDirectoryFiles = loadDirectoryFiles; // Expose if called by onclick
 
-// DEBUG: Log all clicks inside #book-form to test event bubbling
-$(document).on('click', '#book-form', function(e) {
-    console.log('book-form clicked:', e.target, 'classList:', e.target.classList ? Array.from(e.target.classList) : '');
-});
 
 window.initBookForm = function (formContainerSelector) {
     console.log("initBookForm - BOOK_FORM_ROUTES:", window.BOOK_FORM_ROUTES);
@@ -517,8 +544,28 @@ window.initBookForm = function (formContainerSelector) {
         .off("click", "#show-files-link")
         .on("click", "#show-files-link", function (e) {
             e.preventDefault(); // Prevent the default anchor behavior
-            console.log("#show-files-link clicked. Container:", $container);
+            console.log('[DEBUG] #show-files-link clicked');
             loadDirectoryFiles($container);
+        }); // Confirm handler attached
+
+    // Attach event handler for Autofill Modal button
+    $container
+        .off('click', '#autofill-modal-btn')
+        .on('click', '#autofill-modal-btn', function (e) {
+            e.preventDefault();
+            console.log('[DEBUG] #autofill-modal-btn clicked');
+            if (typeof bootstrap !== 'undefined') {
+                var modalEl = document.getElementById('autofillModal');
+                if (modalEl) {
+                    var bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                    bsModal.show();
+                    console.log('[DEBUG] Autofill modal shown');
+                } else {
+                    console.error('[DEBUG] #autofillModal element not found');
+                }
+            } else {
+                console.error('[DEBUG] Bootstrap JS not loaded');
+            }
         });
 };
 
