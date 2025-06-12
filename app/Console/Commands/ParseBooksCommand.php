@@ -251,9 +251,12 @@ class ParseBooksCommand extends Command
                             $book = array_merge($book, $result);
                             $this->info('  Audible: found and merged');
                         } else {
-                            $this->info('  Audible: no match');
+                            $titleQuery = $book['title'] ?? '[unknown]';
+                            $authorQuery = is_array($book['author'] ?? null) ? implode(', ', $book['author']) : ($book['author'] ?? '[unknown]');
+                            $this->info('  Audible: no match (query: "' . $titleQuery . '" by "' . $authorQuery . '")');
                         }
                     }
+
                     // AudiobookBay API
                     if (in_array('abbay', $apis) && class_exists('\App\Services\AudiobookBayService')) {
                         $abbayService = app(\App\Services\AudiobookBayService::class);

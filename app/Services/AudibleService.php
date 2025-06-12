@@ -9,6 +9,71 @@ use Illuminate\Support\Str;
 
 class AudibleService extends BaseBookService
 {
+    /**
+     * @var \Psr\Log\LoggerInterface|null
+     */
+    protected $customLogger = null;
+
+    /**
+     * @var string
+     */
+    protected string $logLevel = 'info';
+
+    /**
+     * Set a custom logger for this instance.
+     * @param \Psr\Log\LoggerInterface $logger
+     */
+    public function setLogger($logger): void
+    {
+        $this->customLogger = $logger;
+    }
+
+    /**
+     * Set the log level for this instance.
+     * @param string $level
+     */
+    public function setLogLevel(string $level): void
+    {
+        $this->logLevel = $level;
+    }
+
+    /**
+     * Get the logger for this instance.
+     * @return \Psr\Log\LoggerInterface
+     */
+    protected function getLogger()
+    {
+        return $this->customLogger ?: Log::channel('stack');
+    }
+
+    /**
+     * Log with the instance's log level.
+     * @param string $message
+     * @param array $context
+     */
+    protected function log($message, array $context = [])
+    {
+        $logger = $this->getLogger();
+        $level = $this->logLevel;
+        if (method_exists($logger, $level)) {
+            $logger->$level($message, $context);
+        } else {
+            $logger->info($message, $context);
+        }
+    }
+
+    /**
+     * Log debug messages regardless of logLevel.
+     * @param string $message
+     * @param array $context
+     */
+    protected function logDebug($message, array $context = [])
+    {
+        $logger = $this->getLogger();
+        if (method_exists($logger, 'debug')) {
+            $logger->debug($message, $context);
+        }
+    }
     public int $apiCallCount = 0;
 
     protected string $baseUrl = 'https://api.audible.com/1.0/catalog';
@@ -20,11 +85,8 @@ class AudibleService extends BaseBookService
 
     protected function performSearch(string $query, array $options = []): ?array
     {
-        Log::info(
-            'AudibleService: performSearch called.',
-            ['query' => $query, 'options' => $options]
-        );
-
+        $this->log('AudibleService: performSearch called.', ['query' => $query, 'options' => $options]);
+        $this->logDebug('AudibleService: performSearch RAW QUERY', ['query' => $query, 'options' => $options]);
         $this->apiCallCount++;
         $requestUrl = $this->baseUrl . '/products';
 
@@ -50,24 +112,27 @@ class AudibleService extends BaseBookService
 
         $response = Http::timeout(15)->get($requestUrl, $params);
 
+        $this->logDebug('AudibleService: performSearch RAW RESPONSE', ['body' => $response->body(), 'status' => $response->status()]);
+
         if (!$response->successful()) {
-            Log::error(
+            $this->getLogger()->error(
                 'Audible API search failed.',
                 [
                     'query' => $query,
                     'status' => $response->status(),
+                    'body' => $response->body(),
                 ]
             );
-
             return null;
         }
 
         $products = $response->json()['products'] ?? [];
+        $this->log('AudibleService: performSearch products: ' . count($products));
         $results = [];
         foreach ($products as $book) {
             $results[] = $this->transform($book);
         }
-
+        $this->logDebug('AudibleService: performSearch results', ['results' => $results]);
         return $results;
     }
 
