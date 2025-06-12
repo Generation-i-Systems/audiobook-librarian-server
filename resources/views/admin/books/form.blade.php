@@ -32,8 +32,57 @@
         @elseif(old('directoryPath') || old('directoryPath'))
             <input type="hidden" name="originalDirectoryPath" value="{{ old('directoryPath', old('directoryPath')) }}">
         @endif
-        <button type="button" class="btn btn-info mb-3" id="autofill-btn"><i class="fas fa-search"></i> Autofill from
-            Google Books</button>
+        <button type="button" class="btn btn-info mb-3" id="autofill-modal-btn"><i class="fas fa-magic"></i> Autofill Book Metadata</button>
+
+<!-- Autofill Modal -->
+<div class="modal fade" id="autofillModal" tabindex="-1" aria-labelledby="autofillModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="autofillModalLabel">Autofill Book Metadata</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="autofill-flash-message" class="alert alert-danger d-none" role="alert"></div>
+        <form id="autofill-search-form" class="mb-3">
+          <div class="row g-2">
+            <div class="col-md-5">
+              <input type="text" class="form-control" name="title" placeholder="Title" required>
+            </div>
+            <div class="col-md-4">
+              <input type="text" class="form-control" name="author" placeholder="Author">
+            </div>
+            <div class="col-md-3">
+              <input type="text" class="form-control" name="series" placeholder="Series (optional)">
+            </div>
+          </div>
+          <div class="mt-3 text-end">
+            <button type="submit" class="btn btn-primary">Search</button>
+          </div>
+        </form>
+        <div id="autofill-results-section" style="display:none;">
+          <label>Matches:</label>
+          <table class="table table-bordered table-sm" id="autofill-results-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>Title</th>
+                <th>Authors</th>
+                <th>Year</th>
+                <th>Source</th>
+                <th>Cover</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
         <div class="mb-3">
             <label for="title">Title:</label>
             <input type="text" class="form-control @error('title') is-invalid @enderror" id="title" name="title"
@@ -331,14 +380,79 @@
                 <span class="invalid-feedback d-block">{{ $message }}</span>
             @enderror
         </div>
-        <div class="form-group">
-            <label for="bookFiles">Directory Path:</label>
-            <input type="text" class="form-control @error('directoryPath') is-invalid @enderror" id="directoryPath"
-                name="directoryPath" value="{{ old('directoryPath', old('directory_path', $dirPath ?? '')) }}">
+        <div class="form-group d-flex align-items-center">
+            <label for="directoryPath" class="me-2">Directory Path:</label>
+            <input type="text" class="form-control @error('directoryPath') is-invalid @enderror me-2" id="directoryPath"
+                name="directoryPath" value="{{ old('directoryPath', old('directory_path', $dirPath ?? '')) }}" style="max-width: 400px;">
+            <button type="button" class="btn btn-outline-secondary" id="resync-path-btn" title="Resync title, author, and series from path">
+                <i class="fas fa-sync-alt"></i> Resync Title/Author/Series
+            </button>
             @error('directoryPath')
-                <span class="invalid-feedback d-block">{{ $message }}</span>
+                <span class="invalid-feedback d-block ms-2">{{ $message }}</span>
             @enderror
         </div>
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const resyncBtn = document.getElementById('resync-path-btn');
+            if (resyncBtn) {
+                resyncBtn.addEventListener('click', function() {
+                    const path = document.getElementById('directoryPath').value;
+                    if (!path) {
+                        alert('Please enter a directory path first.');
+                        return;
+                    }
+                    resyncBtn.disabled = true;
+                    resyncBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Resyncing...';
+                    fetch('/admin/books/resync-from-path', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('input[name=_token]').value
+                        },
+                        body: JSON.stringify({ directoryPath: path })
+                    })
+                    .then(resp => resp.json())
+                    .then(data => {
+                        if (data.success) {
+                            if (data.title) document.getElementById('title').value = data.title;
+                            if (data.authors && Array.isArray(data.authors)) {
+                                const authorsGroup = document.getElementById('authors-group');
+                                if (authorsGroup) {
+                                    authorsGroup.innerHTML = '';
+                                    data.authors.forEach((author, idx) => {
+                                        const div = document.createElement('div');
+                                        div.className = 'input-group author-row align-items-start mb-3';
+                                        div.innerHTML = `<input type="text" name="author[]" class="form-control w-auto author-autocomplete" style="max-width:300px; height:32px;" value="${author}" required>`;
+                                        authorsGroup.appendChild(div);
+                                    });
+                                }
+                            }
+                            if (data.series && Array.isArray(data.series)) {
+                                const seriesGroup = document.getElementById('series-group');
+                                if (seriesGroup) {
+                                    seriesGroup.innerHTML = '';
+                                    data.series.forEach((item, idx) => {
+                                        const div = document.createElement('div');
+                                        div.className = 'input-group series-row align-items-start mb-3';
+                                        div.innerHTML = `<input type="text" name="series[]" class="form-control w-auto series-autocomplete" style="max-width:200px; height:32px;" placeholder="Series Name" value="${item.name}">
+                                            <input type="number" name="seriesNumber[]" class="form-control w-auto" style="max-width:100px; height:32px;" placeholder="Number" value="${item.number}" min="1" step="any">`;
+                                        seriesGroup.appendChild(div);
+                                    });
+                                }
+                            }
+                        } else {
+                            alert(data.message || 'Failed to reparse directory.');
+                        }
+                    })
+                    .catch(() => alert('Error contacting server.'))
+                    .finally(() => {
+                        resyncBtn.disabled = false;
+                        resyncBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Resync Title/Author/Series';
+                    });
+                });
+            }
+        });
+        </script>
         <div id="directory-files-list" class="mt-2 mb-3" style="display:none; border: 1px solid #ddd; padding: 10px; border-radius: 4px;">
             {{-- Files will be listed here by JavaScript --}}
         </div>

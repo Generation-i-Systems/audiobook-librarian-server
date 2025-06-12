@@ -14,7 +14,56 @@ use ZipArchive;
 
 class BookController extends Controller
 {
+    // Register in routes/web.php:
+    // Route::post('/admin/books/resync-from-path', [BookController::class, 'resyncFromPath'])->name('admin.books.resyncFromPath');
     use BookImportTrait;
+    /**
+     * AJAX: Resync title, author, and series from a directory path.
+     * POST /admin/books/resync-from-path
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function resyncFromPath(Request $request)
+    {
+        $request->validate([
+            'directoryPath' => 'required|string',
+        ]);
+        $directoryPath = $request->input('directoryPath');
+        try {
+            $parser = app(\App\Services\BookDirectoryParser::class);
+            $storagePath = env('BOOK_STORAGE_PATH');
+            $absPath = $parser->resolveStoragePath($directoryPath);
+            if (!is_dir($absPath)) {
+                return response()->json(['success' => false, 'message' => 'Directory does not exist.'], 404);
+            }
+            $parsed = $parser->parseDirectory($absPath);
+            $book = is_array($parsed) && count($parsed) > 0 ? $parsed[0] : null;
+            if (!$book) {
+                return response()->json(['success' => false, 'message' => 'Could not parse directory.']);
+            }
+            // Normalize output for JS
+            $authors = [];
+            if (!empty($book['author'])) {
+                $authors = is_array($book['author']) ? $book['author'] : [$book['author']];
+            }
+            $series = [];
+            if (!empty($book['series']) && is_array($book['series'])) {
+                foreach ($book['series'] as $name => $number) {
+                    $series[] = ['name' => $name, 'number' => $number];
+                }
+            } elseif (!empty($book['series'])) {
+                $series[] = ['name' => $book['series'], 'number' => $book['seriesNumber'] ?? ''];
+            }
+            return response()->json([
+                'success' => true,
+                'title' => $book['title'] ?? '',
+                'authors' => $authors,
+                'series' => $series,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Error: ' . $e->getMessage()], 500);
+        }
+    }
 
     protected $googleBooksApiService;
 

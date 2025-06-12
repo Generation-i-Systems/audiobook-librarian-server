@@ -133,13 +133,6 @@ function initializeAutocomplete($container, selector, sourceUrl) {
         }
     });
 }
-// Autofill handler - ensure it is always bound after TomSelect
-function bindAutofillBtn($container) {
-    $container.find('#autofill-btn').off('click').on('click', function () {
-        const title = $container.find('#title').val().trim();
-        const authorInputs = $container.find('input[name="author[]"]').filter(function() {
-            return $(this).val().trim() !== '';
-        });
 
         if (!title) {
             $container.find('#title').addClass('is-invalid').next('.invalid-feedback').remove();
@@ -342,10 +335,8 @@ window.initBookForm = function(formContainerSelector) {
     updateAddRowButtons($container, '#series-group', '.series-row', '.add-series-row');
     updateAddRowButtons($container, '#genres-group', '.genre-row', '.add-genre-row');
 
-    // Re-bind autofill button
-    if (typeof bindAutofillBtn === 'function') {
-        bindAutofillBtn($container);
-    }
+    // Autofill Modal Handler - API agnostic
+    bindAutofillModalBtn($container);
 
     // Any additional initialization (e.g., autocomplete)
     if (typeof initializeAutocomplete === 'function') {
