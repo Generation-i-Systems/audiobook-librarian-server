@@ -1,0 +1,8 @@
+{
+    "preset": "psr12",
+    "rules": {
+        "new_with_braces": true,
+        "not_operator_with_successor_space": true,
+        "concat_space": {"spacing": "one"}
+    }
+}

@@ -77,7 +77,7 @@ class AuthController extends Controller
         foreach ($adminUsers as $admin) {
             $messagesRef->add([
                 'user_id' => $admin->id(),
-                'content' => 'New user registered: '.$request->name.' ('.$request->email.')',
+                'content' => 'New user registered: ' . $request->name . ' (' . $request->email . ')',
                 'is_from_admin' => false,
                 'created_at' => $now,
                 'updated_at' => $now,
@@ -131,7 +131,7 @@ class AuthController extends Controller
         }
 
         // Create a simple token (in a real app, use Laravel Sanctum/Passport)
-        $token = hash('sha256', $userId.now()->timestamp.uniqid());
+        $token = hash('sha256', $userId . now()->timestamp . uniqid());
 
         // Store the token in Firestore
         $client->collection('api_tokens')

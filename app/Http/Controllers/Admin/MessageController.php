@@ -32,7 +32,7 @@ class MessageController extends Controller
                 'users' => $users,
             ]);
         } catch (\Exception $e) {
-            Log::error('Failed to fetch messages: '.$e->getMessage());
+            Log::error('Failed to fetch messages: ' . $e->getMessage());
 
             return back()->with('error', 'Failed to load messages. Please try again.');
         }
@@ -55,7 +55,7 @@ class MessageController extends Controller
 
             return back()->with('error', 'Failed to acknowledge message.');
         } catch (\Exception $e) {
-            Log::error('Failed to acknowledge message: '.$e->getMessage());
+            Log::error('Failed to acknowledge message: ' . $e->getMessage());
 
             return back()->with('error', 'An error occurred while acknowledging the message.');
         }

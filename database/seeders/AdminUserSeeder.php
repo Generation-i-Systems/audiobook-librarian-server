@@ -35,7 +35,7 @@ class AdminUserSeeder extends Seeder
         ]);
 
         if ($validator->fails()) {
-            $this->command->error('Validation failed: '.$validator->errors()->first());
+            $this->command->error('Validation failed: ' . $validator->errors()->first());
 
             return;
         }

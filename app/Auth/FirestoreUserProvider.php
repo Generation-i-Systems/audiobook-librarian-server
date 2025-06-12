@@ -39,8 +39,8 @@ class FirestoreUserProvider implements UserProvider
      */
     public function rehashPasswordIfRequired(Authenticatable $user, array $credentials, bool $force = false): string
     {
-        Log::debug('FirestoreUserProvider::rehashPasswordIfRequired called with user='.print_r($user, true).
-            ', credentials='.print_r($credentials, true).', force='.$force);
+        Log::debug('FirestoreUserProvider::rehashPasswordIfRequired called with user=' .
+            print_r($user, true) . ', credentials=' . print_r($credentials, true) . ', force=' . $force);
         // Get the plain password from credentials
         $plain = $credentials['password'] ?? null;
         $currentHash = $user->getAuthPassword();

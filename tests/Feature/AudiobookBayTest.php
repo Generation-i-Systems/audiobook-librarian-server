@@ -6,8 +6,8 @@ use App\Services\AudiobookBayApiService;
 use App\Services\AudiobookBayService;
 use Illuminate\Support\Facades\Log;
 use Mockery;
-use Tests\TestCase;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
 
 class AudiobookBayTest extends TestCase
 {
@@ -52,7 +52,7 @@ class AudiobookBayTest extends TestCase
     }
 
     #[Test]
-    public function testCanSearchAudiobooksAndFormatsResults()
+    public function test_can_search_audiobooks_and_formats_results()
     {
         $query = 'test query';
         $options = ['page' => 1]; // Example options passed to apiService
@@ -127,7 +127,7 @@ class AudiobookBayTest extends TestCase
     }
 
     #[Test]
-    public function testPerformSearchReturnsEmptyArrayOnApiServiceFailure()
+    public function test_perform_search_returns_empty_array_on_api_service_failure()
     {
         $query = 'failing query';
         $options = ['page' => 1];
@@ -146,7 +146,7 @@ class AudiobookBayTest extends TestCase
     }
 
     #[Test]
-    public function testCanGetBookDetailsAndFormatsResult()
+    public function test_can_get_book_details_and_formats_result()
     {
         $bookIdOrSlug = 'test-book-detailed-slug';
 
@@ -216,7 +216,7 @@ class AudiobookBayTest extends TestCase
     }
 
     #[Test]
-    public function testPerformGetBookDetailsReturnsNullOnApiServiceFailure()
+    public function test_perform_get_book_details_returns_null_on_api_service_failure()
     {
         $bookIdOrSlug = 'non-existent-slug';
 
@@ -232,7 +232,7 @@ class AudiobookBayTest extends TestCase
     }
 
     #[Test]
-    public function testIsAvailableReturnsTrueWhenServiceIsSet()
+    public function test_is_available_returns_true_when_service_is_set()
     {
         // In setUp, $this->service is initialized with a mock, so it should be available.
         $this->assertTrue($this->service->isAvailable());

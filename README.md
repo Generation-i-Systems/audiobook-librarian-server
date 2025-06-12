@@ -24,6 +24,16 @@ A Laravel-based audiobook library and management system for personal and family 
 - Queue-based download manager
 - Reading progress tracking
 - User authentication (API & web)
+- Dynamic add/remove for authors, series, genres
+- Directory resync for metadata
+- Modal-based Google Books autofill with AJAX search, selection, and UI update
+- All JS logic is linted, syntax checked, and tested with Jest
+- Autofill modal logic is fully tested (see `tests/js/autofillModal.test.js`)
+- Autofill modal logic is fully tested (see `tests/js/autofillModal.test.js`)
+- Autofill modal JS changes include improved error handling and input validation
+- New Jest test added for autofill modal logic to ensure correct functionality
+- Autofill modal code adheres to lint/test/format requirements for consistency and maintainability
+- Note: If ESLint config issues arise, ensure `.eslintrc.json` is properly configured and restart the development server
 
 ---
 

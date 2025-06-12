@@ -39,7 +39,7 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
         try {
             $response = Http::withHeaders([
                 'Content-Type' => 'application/json',
-                'Authorization' => 'Bearer '.$this->apiToken,
+                'Authorization' => 'Bearer ' . $this->apiToken,
             ])->post($this->apiUrl, [
                 'query' => $query,
                 'variables' => $variables,

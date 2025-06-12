@@ -16,12 +16,22 @@ class DirectoryBrowserController extends Controller
         if (!$basePath) {
             Log::error('BOOK_STORAGE_PATH is not defined in the .env file.');
 
-            return response()->json(['error' => 'The book store path is invalid. Verify the .env exists and the value is valid.'], 400);
+            return response()->json(
+                [
+                    'error' => 'The book store path is invalid. Verify the .env exists and the value is valid.',
+                ],
+                400
+            );
         }
         if (!is_dir($basePath)) {
-            Log::error('BOOK_STORAGE_4TH is not a directory');
+            Log::error('BOOK_STORAGE_PATH is not a directory');
 
-            return response()->json(['error' => 'The book store path is invalid. Verify the is_dir function is not in a loop or another process.'], 400);
+            return response()->json(
+                [
+                    'error' => 'The book store path is invalid. Verify the is_dir function is not in a loop.',
+                ],
+                400
+            );
         }
 
         $path = $request->input('path', $basePath);

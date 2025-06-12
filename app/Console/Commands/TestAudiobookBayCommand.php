@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Services\AudiobookBayService;
+use App\Services\AudiobookBayApiService;
 use Illuminate\Console\Command;
 
 class TestAudiobookBayCommand extends Command
@@ -37,7 +38,8 @@ class TestAudiobookBayCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Test AudiobookBay API login and search functionality. Use --get-images to download cover images.';
+    protected $description =
+        'Test AudiobookBay API login and search functionality. Use --get-images to download cover images.';
 
     /**
      * Execute the console command.
@@ -74,7 +76,7 @@ class TestAudiobookBayCommand extends Command
         }
 
         // If no query provided, show help
-        if (! $query) {
+        if (!$query) {
             $this->info("No search query provided. Here's an example search:");
             $this->line("  php artisan audiobookbay:test 'stephen king'");
             $this->line('  php artisan audiobookbay:test --id=book-id-123');
@@ -120,7 +122,7 @@ class TestAudiobookBayCommand extends Command
         $this->displayResults($results);
 
         // Enrich logic: try to match as in searchAndMerge
-        if (! $listOnly) {
+        if (!$listOnly) {
             $inputTitle = $query;
             $inputAuthor = '';
             // Try to extract author from query if in 'title - author' format
@@ -164,19 +166,22 @@ class TestAudiobookBayCommand extends Command
                     $bestMatch = $result;
                 }
             }
-            if ($bestMatch && ! empty($bestMatch['url'])) {
+            if ($bestMatch && !empty($bestMatch['url'])) {
                 $this->line("\n4. Enrich match found! Fetching details for best match...");
 
                 return $this->handleBookDetails($bestMatch['url'], $debug);
             } else {
                 $this->warn("\nNo sufficiently similar result found for enrichment.");
-                $this->line("  Searched for: '{$inputTitle}'".($inputAuthor ? " by '{$inputAuthor}'" : ''));
-                if (! empty($results)) {
+                $this->line("  Searched for: '{$inputTitle}'" . ($inputAuthor ? " by '{$inputAuthor}'" : ''));
+                if (!empty($results)) {
                     $this->line('  Search results:');
                     foreach ($results as $i => $r) {
-                        $sim = \App\Services\AudiobookBayApiService::calculateSimilarity($inputTitle, $r['title'] ?? '');
-                        $authorMatch = $inputAuthor ? (stripos(($r['title'] ?? ''), $inputAuthor) !== false ? 'yes' : 'no') : 'n/a';
-                        $this->line("    [{$i}] Title: '{$r['title']}' | Author match: {$authorMatch} | Similarity: {$sim}");
+                        $sim = AudiobookBayApiService::calculateSimilarity($inputTitle, $r['title'] ?? '');
+                        $authorMatch = $inputAuthor ? (stripos($r['title'] ?? '', $inputAuthor) !== false ?
+                            'yes' : 'no') : 'n/a';
+                        $this->line(
+                            "    [{$i}] Title: '{$r['title']}' | Author match: {$authorMatch} | Similarity: {$sim}"
+                        );
                     }
                 } else {
                     $this->line('  No results returned from search.');
@@ -233,9 +238,9 @@ class TestAudiobookBayCommand extends Command
         // If it's not a full URL, assume it's just the ID
         $url = filter_var($bookIdOrUrl, FILTER_VALIDATE_URL)
             ? $bookIdOrUrl
-            : 'https://audiobookbay.lu/audiobook/'.$bookIdOrUrl;
+            : 'https://audiobookbay.lu/audiobook/' . $bookIdOrUrl;
 
-        $this->info('Fetching details from: '.$url);
+        $this->info('Fetching details from: ' . $url);
 
         // Use AudiobookBayService public method if available, fallback to apiService
         if (method_exists($this->audiobookBayService, 'performGetBookDetails')) {
@@ -250,22 +255,22 @@ class TestAudiobookBayCommand extends Command
             return 1;
         }
 
-        $this->info("\n📚 ".($book['title'] ?? 'No Title'));
+        $this->info("\n📚 " . ($book['title'] ?? 'No Title'));
         $this->line(str_repeat('=', 80));
 
         // Display basic info
-        $this->line(''.($book['description'] ?? 'No description available')."\n");
+        $this->line('' . ($book['description'] ?? 'No description available') . "\n");
 
-        $this->line('Cover: '.($book['cover_image_url'] ?? 'No cover image available'));
+        $this->line('Cover: ' . ($book['cover_image_url'] ?? 'No cover image available'));
 
         $info = [
             'Author' => $this->mapToString($book['authors'] ?? 'Unknown'),
             'Narrator' => $this->mapToString($book['narrators'] ?? 'Unknown'),
             'Series' => isset($book['series']) ?
-                ($book['series'].(isset($book['seriesNumber']) ? ' #'.$book['seriesNumber'] : '')) : 'N/A',
+                ($book['series'] . (isset($book['seriesNumber']) ? ' #' . $book['seriesNumber'] : '')) : 'N/A',
             'Published' => $book['datePublished'] ?? 'Unknown',
-            'Genres' => ! empty($book['genres']) ? implode(', ', $book['genres']) : 'N/A',
-            'Tags' => ! empty($book['tags']) ? implode(', ', $book['tags']) : 'N/A',
+            'Genres' => !empty($book['genres']) ? implode(', ', $book['genres']) : 'N/A',
+            'Tags' => !empty($book['tags']) ? implode(', ', $book['tags']) : 'N/A',
         ];
 
         foreach ($info as $label => $value) {
@@ -273,9 +278,13 @@ class TestAudiobookBayCommand extends Command
         }
 
         // Display cover image if available
-        if (! empty($book['cover_image'])) {
-            $this->line("\n📷 Cover: ".$book['cover_image']);
-            if ($getImages && ! empty($book['cover_image_url']) && method_exists($this->audiobookBayService, 'downloadCoverImage')) {
+        if (!empty($book['cover_image'])) {
+            $this->line("\n📷 Cover: " . $book['cover_image']);
+            if (
+                $getImages &&
+                !empty($book['cover_image_url']) &&
+                method_exists($this->audiobookBayService, 'downloadCoverImage')
+            ) {
                 $this->line('Attempting to download cover image...');
                 $coverPath = $this->audiobookBayService->downloadCoverImage(
                     $book['cover_image_url'],
@@ -309,7 +318,7 @@ class TestAudiobookBayCommand extends Command
             } elseif (isset($item['narrator']) && isset($item['narrator']['name'])) {
                 $result = $item['narrator']['name'];
             } elseif (isset($item['name'])) {
-                $result .= $item['name'].', ';
+                $result .= $item['name'] . ', ';
             }
         }
 

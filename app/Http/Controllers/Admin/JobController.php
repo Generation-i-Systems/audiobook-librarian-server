@@ -99,7 +99,7 @@ class JobController extends Controller
                 [
                     'timestamp' => now()->toDateTimeString(),
                     'level' => 'info',
-                    'message' => 'Job requeued for retry by '.(Auth::check() ? Auth::user()->name : 'System'),
+                    'message' => 'Job requeued for retry by ' . (Auth::check() ? Auth::user()->name : 'System'),
                 ],
             ]
         );
@@ -138,13 +138,13 @@ class JobController extends Controller
             $job['type'],
             'cancelled',
             $job['data'] ?? [],
-            'Job was cancelled by '.(Auth::check() ? Auth::user()->name : 'System'),
+            'Job was cancelled by ' . (Auth::check() ? Auth::user()->name : 'System'),
             null,
             [
                 [
                     'timestamp' => now()->toDateTimeString(),
                     'level' => 'warning',
-                    'message' => 'Job was cancelled by '.(Auth::check() ? Auth::user()->name : 'System'),
+                    'message' => 'Job was cancelled by ' . (Auth::check() ? Auth::user()->name : 'System'),
                 ],
             ]
         );

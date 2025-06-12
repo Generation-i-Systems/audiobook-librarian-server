@@ -477,5 +477,10 @@
     window.APP_URL = "{{ config('app.url') }}";
     window.GENRE_OPTIONS = @json(config('genres.list', []));
 </script>
+<script>
+// Debug: Confirm jQuery and jQuery UI are loaded before form.js
+console.log('window.jQuery:', typeof window.jQuery, window.jQuery ? 'OK' : 'MISSING');
+console.log('$.fn.autocomplete:', typeof $.fn.autocomplete, $.fn.autocomplete ? 'OK' : 'MISSING');
+</script>
 <script src="{{ asset('js/admin/books/form.js') }}"></script>
 @endsection

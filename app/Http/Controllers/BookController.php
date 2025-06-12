@@ -6,10 +6,9 @@ use App\Services\FirestoreService;
 use App\Services\GoogleBooksApiService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Session;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Response;
+use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Storage;
 
 class BookController extends Controller
 {
@@ -23,7 +22,6 @@ class BookController extends Controller
     /**
      * Display the main books index page
      *
-     * @param Request $request
      * @return \Illuminate\View\View
      */
     public function index(Request $request)
@@ -36,7 +34,7 @@ class BookController extends Controller
         $genres = [];
         foreach ($books as $book) {
             if (isset($book['genre']) && !empty($book['genre'])) {
-                foreach ((array)$book['genre'] as $genre) {
+                foreach ((array) $book['genre'] as $genre) {
                     $genreId = md5($genre);
                     $genres[$genreId] = $genre;
                 }
@@ -48,7 +46,7 @@ class BookController extends Controller
         $authors = [];
         foreach ($books as $book) {
             if (isset($book['author']) && !empty($book['author'])) {
-                foreach ((array)$book['author'] as $author) {
+                foreach ((array) $book['author'] as $author) {
                     $authorId = md5($author);
                     $authors[$authorId] = $author;
                 }
@@ -76,6 +74,7 @@ class BookController extends Controller
         usort($recentBooks, function ($a, $b) {
             $dateA = isset($a['dateAdded']) ? strtotime($a['dateAdded']) : 0;
             $dateB = isset($b['dateAdded']) ? strtotime($b['dateAdded']) : 0;
+
             return $dateB - $dateA; // Descending order
         });
         $recentBooks = array_slice($recentBooks, 0, 10);
@@ -99,7 +98,6 @@ class BookController extends Controller
     /**
      * JSON API endpoint for main books AJAX loading
      *
-     * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function jsonIndex(Request $request)
@@ -114,7 +112,6 @@ class BookController extends Controller
     /**
      * JSON API endpoint for recent books AJAX loading
      *
-     * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function jsonRecent(Request $request)
@@ -126,7 +123,7 @@ class BookController extends Controller
         // Force sorting by date_added for recent books
         $request->merge([
             'sort' => 'date_added',
-            'order' => 'desc'
+            'order' => 'desc',
         ]);
 
         return $this->handleMainBooksAjaxRequest($request, $books);
@@ -135,8 +132,7 @@ class BookController extends Controller
     /**
      * Display a specific book
      *
-     * @param Request $request
-     * @param string|null $id
+     * @param  string|null  $id
      * @return \Illuminate\View\View
      */
     public function show(Request $request, $id = null)
@@ -165,8 +161,8 @@ class BookController extends Controller
 
             // Check if same author
             if (isset($relatedBook['author']) && isset($book['author'])) {
-                $authors = (array)$relatedBook['author'];
-                $bookAuthors = (array)$book['author'];
+                $authors = (array) $relatedBook['author'];
+                $bookAuthors = (array) $book['author'];
                 if (count(array_intersect($authors, $bookAuthors)) > 0) {
                     return true;
                 }
@@ -200,8 +196,7 @@ class BookController extends Controller
     /**
      * Download a book file
      *
-     * @param Request $request
-     * @param string $id
+     * @param  string  $id
      * @return \Symfony\Component\HttpFoundation\BinaryFileResponse|\Illuminate\Http\RedirectResponse
      */
     public function download(Request $request, $id)
@@ -226,7 +221,7 @@ class BookController extends Controller
             'book_id' => $id,
             'title' => $book['title'] ?? 'Unknown',
             'user_id' => auth()->id() ?? 'guest',
-            'ip' => $request->ip()
+            'ip' => $request->ip(),
         ]);
 
         // Return file download response
@@ -236,7 +231,6 @@ class BookController extends Controller
     /**
      * Set user preference for view type or items per page
      *
-     * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function setPreference(Request $request)
@@ -247,7 +241,7 @@ class BookController extends Controller
         if ($type === 'view_type') {
             session(['main_view_type' => $value]);
         } elseif ($type === 'per_page') {
-            session(['main_per_page' => (int)$value]);
+            session(['main_per_page' => (int) $value]);
         }
 
         return response()->json(['success' => true]);
@@ -256,8 +250,6 @@ class BookController extends Controller
     /**
      * Handle AJAX request for main books listing with filtering, sorting, and pagination
      *
-     * @param Request $request
-     * @param array $books
      * @return \Illuminate\Http\JsonResponse
      */
     protected function handleMainBooksAjaxRequest(Request $request, array $books)
@@ -277,7 +269,7 @@ class BookController extends Controller
 
                 // Search in author
                 if (isset($book['author'])) {
-                    foreach ((array)$book['author'] as $author) {
+                    foreach ((array) $book['author'] as $author) {
                         if (stripos($author, $search) !== false) {
                             return true;
                         }
@@ -302,14 +294,14 @@ class BookController extends Controller
         }
 
         // Apply genre filter if provided
-        if ($request->has('genre_id') && !empty($request->input('genre_id'))) {
+        if ($request->has('genre_id') && ! empty($request->input('genre_id'))) {
             $genreId = $request->input('genre_id');
             $books = array_filter($books, function ($book) use ($genreId) {
                 if (!isset($book['genre']) || empty($book['genre'])) {
                     return false;
                 }
 
-                foreach ((array)$book['genre'] as $genre) {
+                foreach ((array) $book['genre'] as $genre) {
                     if (md5($genre) === $genreId) {
                         return true;
                     }
@@ -320,14 +312,14 @@ class BookController extends Controller
         }
 
         // Apply author filter if provided
-        if ($request->has('author_id') && !empty($request->input('author_id'))) {
+        if ($request->has('author_id') && ! empty($request->input('author_id'))) {
             $authorId = $request->input('author_id');
             $books = array_filter($books, function ($book) use ($authorId) {
                 if (!isset($book['author']) || empty($book['author'])) {
                     return false;
                 }
 
-                foreach ((array)$book['author'] as $author) {
+                foreach ((array) $book['author'] as $author) {
                     if (md5($author) === $authorId) {
                         return true;
                     }
@@ -338,7 +330,7 @@ class BookController extends Controller
         }
 
         // Apply series filter if provided
-        if ($request->has('series_id') && !empty($request->input('series_id'))) {
+        if ($request->has('series_id') && ! empty($request->input('series_id'))) {
             $seriesId = $request->input('series_id');
             $books = array_filter($books, function ($book) use ($seriesId) {
                 if (!isset($book['series']) || empty($book['series'])) {
@@ -351,6 +343,7 @@ class BookController extends Controller
                             return true;
                         }
                     }
+
                     return false;
                 }
 
@@ -387,8 +380,8 @@ class BookController extends Controller
         });
 
         // Apply pagination
-        $page = max(1, (int)$request->input('page', 1));
-        $perPage = (int)$request->input('per_page', session('main_per_page', 24));
+        $page = max(1, (int) $request->input('page', 1));
+        $perPage = (int) $request->input('per_page', session('main_per_page', 24));
         session(['main_per_page' => $perPage]);
 
         $total = count($books);
@@ -407,28 +400,26 @@ class BookController extends Controller
                 'current_page' => $page,
                 'last_page' => ceil($total / $perPage),
             ],
-            'view_type' => $viewType
+            'view_type' => $viewType,
         ]);
     }
 
     /**
      * Load main books via AJAX for JavaScript-based pagination and view switching
+     *
      * @deprecated Use the jsonIndex method instead
      *
-     * @param \Illuminate\Http\Request $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function loadMainBooks(Request $request)
     {
         Log::warning('Deprecated endpoint loadMainBooks called. Use jsonIndex instead.');
+
         return redirect()->route('api.books.json', $request->all());
     }
 
     /**
      * Ensure all required fields are present in a book array
-     *
-     * @param array $book
-     * @return array
      */
     protected function ensureBookFields(array $book): array
     {
@@ -442,7 +433,7 @@ class BookController extends Controller
             'dateAdded' => date('Y-m-d'),
             'duration' => '00:00:00',
             'narrator' => ['Unknown Narrator'],
-            'series' => []
+            'series' => [],
         ];
 
         foreach ($defaults as $key => $value) {

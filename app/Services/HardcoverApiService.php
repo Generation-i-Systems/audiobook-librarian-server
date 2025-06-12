@@ -21,12 +21,12 @@ class HardcoverApiService
     {
         $title = $book['title'] ?? null;
         $authors = $book['authors'] ?? [];
-        if (! $title) {
+        if (!$title) {
             return null;
         }
         $limit = 5;
         $results = $this->searchBooksByTitle($title, $limit);
-        if (! $results || empty($results)) {
+        if (!$results || empty($results)) {
             return null;
         }
         $bestMatch = null;
@@ -38,10 +38,11 @@ class HardcoverApiService
             } elseif (stripos($result['title'], $title) !== false) {
                 $score += 1;
             }
-            if (! empty($authors) && ! empty($result['authors'])) {
+            if (!empty($authors) && !empty($result['authors'])) {
                 foreach ($authors as $inputAuthor) {
                     foreach ($result['authors'] as $authorObj) {
-                        $authorName = is_array($authorObj['author'] ?? null) ? $authorObj['author']['name'] ?? '' : ($authorObj['author'] ?? '');
+                        $authorName = is_array($authorObj['author'] ?? null) ? $authorObj['author']['name'] ?? '' :
+                            ($authorObj['author'] ?? '');
                         if ($authorName && stripos($authorName, $inputAuthor) !== false) {
                             $score += 2;
                             break 2;
@@ -54,11 +55,11 @@ class HardcoverApiService
                 $bestMatch = $result;
             }
         }
-        if (! $bestMatch) {
+        if (!$bestMatch) {
             return null;
         }
         $details = null;
-        if (! empty($bestMatch['id'])) {
+        if (!empty($bestMatch['id'])) {
             $details = $this->getBookDetails($bestMatch['id']);
         }
         $merged = [
@@ -73,7 +74,7 @@ class HardcoverApiService
             'publisher' => $details['publisher']['name'] ?? $bestMatch['publisher']['name'] ?? null,
         ];
 
-        return array_filter($merged, fn ($v) => $v !== null);
+        return array_filter($merged, fn($v) => $v !== null);
     }
 
     public function setApiKey(string $apiKey): void
@@ -93,9 +94,9 @@ class HardcoverApiService
                 'Content-Type' => 'application/json',
                 'x-api-key' => $this->apiKey,
             ])->post($this->apiUrl, [
-                'query' => $query,
-                'variables' => $variables,
-            ]);
+                        'query' => $query,
+                        'variables' => $variables,
+                    ]);
             if ($response->failed()) {
                 Log::error('Hardcover API request failed', [
                     'status' => $response->status(),

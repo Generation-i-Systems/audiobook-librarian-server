@@ -6,9 +6,9 @@
             'genreList' => $genreList,
             'coverCandidates' => $coverCandidates,
             'coverAuto' => $coverAuto,
-            'directory_path' => $directory_path,
+            'directoryPath' => $directoryPath,
             'initial' => $initial,
             'isModal' => $isModal ?? false
         ])
-        </div>
+            </div>
 @endsection

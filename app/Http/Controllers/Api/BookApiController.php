@@ -83,7 +83,7 @@ class BookApiController extends Controller
     {
         $firestore = new FirestoreService();
         $book = $firestore->getBook($id);
-        if (! $book) {
+        if (!$book) {
             return response()->json([
                 'error' => 'Book not found or not authorized.',
             ], 404);
@@ -107,7 +107,7 @@ class BookApiController extends Controller
             'author' => $firestore->listAuthors(),
             'series' => $firestore->listSeries(),
         ];
-        if (! isset($dataMap[$type])) {
+        if (!isset($dataMap[$type])) {
             return response()->json(['error' => 'Invalid browse type'], 400);
         }
         $items = $dataMap[$type];
@@ -133,20 +133,17 @@ class BookApiController extends Controller
     {
         $firestore = new FirestoreService();
         $book = $firestore->getBook($id);
-        if (! $book) {
+        if (!$book) {
             return response()->json([
                 'error' => 'Book not found or not authorized.',
             ], 404);
         }
         Log::info(
-            'Cover image requested for book: '.
-            ($book['title'] ?? '[unknown]').
-            ' ('.
-            ($book['cover_image'] ?? '[none]').
-            ')'
+            'Cover image requested for book: ' . ($book['title'] ?? '[unknown]') . ' (' .
+            ($book['cover_image'] ?? '[none]') . ')'
         );
         if (
-            ! empty($book['cover_image']) &&
+            !empty($book['cover_image']) &&
             Storage::disk('books')->exists($book['cover_image'])
         ) {
             $mime = Storage::disk('books')->mimeType($book['cover_image']);
@@ -218,19 +215,19 @@ class BookApiController extends Controller
     {
         $firestore = new FirestoreService();
         $book = $firestore->getBook($id);
-        if (! $book) {
+        if (!$book) {
             abort(404);
         }
         $directoryPath = $book['directory_path'] ?? null;
-        if (! $directoryPath || ! Storage::disk('books')->exists($directoryPath)) {
+        if (!$directoryPath || !Storage::disk('books')->exists($directoryPath)) {
             abort(404, 'Book directory not found.');
         }
         $files = Storage::disk('books')->files($directoryPath);
         if (empty($files)) {
             abort(404, 'No files found for this book.');
         }
-        $zipFileName = str_replace(' ', '_', $book['title']).'.zip';
-        $zipPath = storage_path('app/public/temp/'.$zipFileName);
+        $zipFileName = str_replace(' ', '_', $book['title']) . '.zip';
+        $zipPath = storage_path('app/public/temp/' . $zipFileName);
         $zip = new ZipArchive();
         if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
             abort(500, 'Failed to create zip archive.');
@@ -253,8 +250,8 @@ class BookApiController extends Controller
             if ($queue->isEmpty()) {
                 return response()->json(['error' => 'No books queued for download.'], 404);
             }
-            $zipName = 'bookqueue_'.$user->id.'_'.Str::random(8).'.zip';
-            $zipPath = storage_path('app/public/'.$zipName);
+            $zipName = 'bookqueue_' . $user->id . '_' . Str::random(8) . '.zip';
+            $zipPath = storage_path('app/public/' . $zipName);
 
             $zip = new ZipArchive();
             if ($zip->open($zipPath, ZipArchive::CREATE) === true) {
@@ -263,7 +260,7 @@ class BookApiController extends Controller
                     if ($book && $book->directory_path && Storage::exists($book->directory_path)) {
                         $files = Storage::files($book->directory_path);
                         foreach ($files as $file) {
-                            $localPath = storage_path('app/'.$file);
+                            $localPath = storage_path('app/' . $file);
                             if (file_exists($localPath)) {
                                 $zip->addFile($localPath, basename($file));
                             }
@@ -276,15 +273,15 @@ class BookApiController extends Controller
             }
 
             // Optionally, store a record of the zip for later deletion/marking
-            return response()->json(['zip_id' => $zipName, 'download_url' => url('storage/'.$zipName)]);
+            return response()->json(['zip_id' => $zipName, 'download_url' => url('storage/' . $zipName)]);
         }
         // If Firestore queue is not empty, handle that logic here (implement if needed)
     }
 
     public function downloadQueuedZip($zipId)
     {
-        $zipPath = storage_path('app/public/'.$zipId);
-        if (! file_exists($zipPath)) {
+        $zipPath = storage_path('app/public/' . $zipId);
+        if (!file_exists($zipPath)) {
             return response()->json(['error' => 'Zip file not found.'], 404);
         }
 
@@ -293,7 +290,7 @@ class BookApiController extends Controller
 
     public function markZipDownloaded($zipId)
     {
-        $zipPath = storage_path('app/public/'.$zipId);
+        $zipPath = storage_path('app/public/' . $zipId);
         if (file_exists($zipPath)) {
             unlink($zipPath);
 
@@ -329,7 +326,7 @@ class BookApiController extends Controller
         $perPage = $request->input('per_page', 20);
         $search = $request->input('search');
         $genre = $firestore->getGenre($genreId);
-        if (! $genre) {
+        if (!$genre) {
             return response()->json(['error' => 'Genre not found'], 404);
         }
         $books = array_filter($firestore->listBooks(), function ($book) use ($genreId) {
@@ -367,7 +364,7 @@ class BookApiController extends Controller
     {
         $firestore = new FirestoreService();
         $genre = $firestore->getGenre($genreId);
-        if (! $genre) {
+        if (!$genre) {
             return response()->json(['error' => 'Genre not found'], 404);
         }
         $books = array_filter($firestore->listBooks(), function ($book) use ($genreId) {
@@ -401,7 +398,7 @@ class BookApiController extends Controller
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
         $series = $firestore->getSeries($seriesId);
-        if (! $series) {
+        if (!$series) {
             return response()->json(['error' => 'Series not found'], 404);
         }
         $books = array_filter($firestore->listBooks(), function ($book) use ($seriesId) {
@@ -436,7 +433,7 @@ class BookApiController extends Controller
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
         $author = $firestore->getAuthor($authorId);
-        if (! $author) {
+        if (!$author) {
             return response()->json(['error' => 'Author not found'], 404);
         }
         $books = array_filter($firestore->listBooks(), function ($book) use ($authorId) {
@@ -468,7 +465,7 @@ class BookApiController extends Controller
     {
         $firestore = new FirestoreService();
         $author = $firestore->getAuthor($authorId);
-        if (! $author) {
+        if (!$author) {
             return response()->json(['error' => 'Author not found'], 404);
         }
         $books = array_filter($firestore->listBooks(), function ($book) use ($authorId) {
@@ -500,15 +497,15 @@ class BookApiController extends Controller
         $perPage = $request->input('per_page', 100);
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
-        Log::info('booksByAuthorAndGenre called for author: '.$authorId.' and genre: '.$genreId);
-        Log::info('booksByAuthorAndGenre '.json_encode($_POST));
-        Log::info('booksByAuthorAndGenre '.json_encode($_GET));
+        Log::info('booksByAuthorAndGenre called for author: ' . $authorId . ' and genre: ' . $genreId);
+        Log::info('booksByAuthorAndGenre ' . json_encode($_POST));
+        Log::info('booksByAuthorAndGenre ' . json_encode($_GET));
 
         $firestore = app(FirestoreService::class);
         $author = $firestore->getAuthor($authorId);
         $genre = $firestore->getGenre($genreId);
         $books = $firestore->getBooksByAuthorAndGenre($authorId, $genreId);
-        if (! $author || ! $genre) {
+        if (!$author || !$genre) {
             return response()->json([
                 'error' => 'Author or Genre not found.',
             ], 404);
@@ -548,7 +545,7 @@ class BookApiController extends Controller
     private function getBookWithCover($book, $withCover = false, $inlineCovers = false)
     {
         $arr = $book;
-        if ($withCover && ! empty($book['cover_image']) && Storage::disk('books')->exists($book['cover_image'])) {
+        if ($withCover && !empty($book['cover_image']) && Storage::disk('books')->exists($book['cover_image'])) {
             if ($inlineCovers) {
                 $coverPath = Storage::disk('books')->path($book['cover_image']);
                 $arr['cover'] = [
@@ -557,7 +554,7 @@ class BookApiController extends Controller
                     'data' => base64_encode(Storage::disk('books')->get($book['cover_image'])),
                 ];
             } else {
-                $arr['cover_url'] = url('/api/v1/books/'.($book['id'] ?? '').'/cover');
+                $arr['cover_url'] = url('/api/v1/books/' . ($book['id'] ?? '') . '/cover');
             }
         } else {
             $arr['cover_url'] = null;

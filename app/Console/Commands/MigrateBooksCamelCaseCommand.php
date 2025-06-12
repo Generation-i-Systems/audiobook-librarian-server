@@ -20,7 +20,8 @@ class MigrateBooksCamelCaseCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Migrate all book records in Firestore from snake_case to camelCase and remove snake_case fields';
+    protected $description =
+        'Migrate all book records in Firestore from snake_case to camelCase and remove snake_case fields';
 
     /**
      * The Firestore service instance.
@@ -55,7 +56,6 @@ class MigrateBooksCamelCaseCommand extends Command
     /**
      * Create a new command instance.
      *
-     * @param  FirestoreService  $firestoreService
      * @return void
      */
     public function __construct(FirestoreService $firestoreService)
@@ -71,7 +71,9 @@ class MigrateBooksCamelCaseCommand extends Command
      */
     public function handle()
     {
-        $this->info('Starting migration of book records from snake_case to camelCase and removing snake_case fields...');
+        $this->info(
+            'Starting migration of book records from snake_case to camelCase and removing snake_case fields...'
+        );
 
         try {
             // Get all books from Firestore
@@ -110,7 +112,7 @@ class MigrateBooksCamelCaseCommand extends Command
             $bar->finish();
             $this->newLine(2);
 
-            $this->info("Migration completed:");
+            $this->info('Migration completed:');
             $this->info("- Updated: {$updated} books");
             $this->info("- Skipped: {$skipped} books (already in camelCase)");
             $this->info("- Errors: {$errors} books");
@@ -119,6 +121,7 @@ class MigrateBooksCamelCaseCommand extends Command
         } catch (\Exception $e) {
             $this->error('Migration failed: ' . $e->getMessage());
             Log::error('Book camelCase migration failed: ' . $e->getMessage());
+
             return Command::FAILURE;
         }
     }
@@ -126,7 +129,6 @@ class MigrateBooksCamelCaseCommand extends Command
     /**
      * Convert book data from snake_case to camelCase.
      *
-     * @param  array  $book
      * @return array
      */
     protected function convertToCamelCase(array $book)
@@ -139,7 +141,10 @@ class MigrateBooksCamelCaseCommand extends Command
             // If snake_case exists, convert to camelCase
             if (isset($book[$snakeCase])) {
                 // Only set camelCase if it doesn't exist or if snake_case value is different
-                if (!isset($book[$camelCase]) || $book[$camelCase] !== $book[$snakeCase]) {
+                if (
+                    !isset($book[$camelCase]) ||
+                    $book[$camelCase] !== $book[$snakeCase]
+                ) {
                     $updatedBook[$camelCase] = $book[$snakeCase];
                     $changed = true;
                 }

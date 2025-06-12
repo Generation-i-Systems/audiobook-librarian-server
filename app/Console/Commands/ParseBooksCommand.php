@@ -3,9 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Services\BookDirectoryParser;
+use App\Services\FirestoreService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
-use App\Services\FirestoreService;
 
 class ParseBooksCommand extends Command
 {
@@ -26,7 +26,7 @@ class ParseBooksCommand extends Command
                             {--save-json : Save output JSON into each book directory}
                             {--json-filename= : Filename for saved JSON (default: librarian.json)}
                             {--enrich : Lookup and enrich metadata from selected APIs}
-                            {--apis= : Comma-separated list of APIs to use with --enrich (google,audible,abbay,hardcover)}
+                            {--apis= : Comma-separated list of APIs for --enrich (google,audible,abbay,hardcover)}
                             {--store-firestore : Store parsed book data to Firestore}
                             {--update-existing : Update existing books in Firestore instead of skipping them}';
 
@@ -149,7 +149,7 @@ class ParseBooksCommand extends Command
                 $parser->setDebugCallback($debugCallback);
 
                 $books = $parser->parseDirectory($path, $config);
-                $this->info("Found " . count($books) . " books in directory");
+                $this->info('Found ' . count($books) . ' books in directory');
                 // Set dateAdded for each book from directory mtime or authoritative time
                 foreach ($books as &$book) {
                     $dirPath = $book['directoryPath'] ?? $book['path'] ?? null;
@@ -179,7 +179,7 @@ class ParseBooksCommand extends Command
                         }
                     }
                     if (!$dateAdded) {
-                        $this->error("No audio files found for dateAdded in directory: " . realpath($fullPath));
+                        $this->error('No audio files found for dateAdded in directory: ' . realpath($fullPath));
                         $dateAdded = date('c');
                     }
                     $coverImage = null;
@@ -207,7 +207,6 @@ class ParseBooksCommand extends Command
                         $book['coverImage'] = $coverImage;
                     }
                     $book['dateAdded'] = $dateAdded;
-
                 }
                 unset($book);
                 $allBooks = array_merge($allBooks, $books);
@@ -224,7 +223,10 @@ class ParseBooksCommand extends Command
                 'abbay' => 'AudiobookBay',
                 'hardcover' => 'Hardcover',
             ];
-            $apis = $apisOpt ? array_intersect(array_keys($apiMap), array_map('trim', explode(',', strtolower($apisOpt)))) : array_keys($apiMap);
+            $apis = $apisOpt ? array_intersect(
+                array_keys($apiMap),
+                array_map('trim', explode(',', strtolower($apisOpt)))
+            ) : array_keys($apiMap);
             if ($enrich) {
                 foreach ($allBooks as &$book) {
                     $title = $book['title'] ?? '';
@@ -252,8 +254,9 @@ class ParseBooksCommand extends Command
                             $this->info('  Audible: found and merged');
                         } else {
                             $titleQuery = $book['title'] ?? '[unknown]';
-                            $authorQuery = is_array($book['author'] ?? null) ? implode(', ', $book['author']) : ($book['author'] ?? '[unknown]');
-                            $this->info('  Audible: no match (query: "' . $titleQuery . '" by "' . $authorQuery . '")');
+                            $authorQuery = is_array($book['author'] ?? null) ? implode(', ', $book['author']) :
+                                ($book['author'] ?? '[unknown]');
+                            $this->info("  Audible: no match (query: '$titleQuery' by '$authorQuery')");
                         }
                     }
 
@@ -300,9 +303,9 @@ class ParseBooksCommand extends Command
                         $jsonPath = rtrim($resolvedDir, '/') . '/' . $jsonFilename;
                         $jsonData = json_encode($book, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
                         if (file_put_contents($jsonPath, $jsonData) !== false) {
-                            $this->info("Saved JSON to " . $jsonPath);
+                            $this->info('Saved JSON to ' . $jsonPath);
                         } else {
-                            $this->error("Failed to write JSON to " . $jsonPath);
+                            $this->error('Failed to write JSON to ' . $jsonPath);
                         }
                     } else {
                         $this->error('No directoryPath for book: ' . ($book['title'] ?? '[unknown]'));
@@ -376,7 +379,7 @@ class ParseBooksCommand extends Command
                             }
                         }
                     } else {
-                        $seriesMatchesAuthor = strtolower($series) === strtolower(trim($book['author'] ?? '')); // $book['author'] is always an array, but this fallback is safe
+                        $seriesMatchesAuthor = strtolower($series) === strtolower(trim($book['author'] ?? ''));
                     }
 
                     if ($seriesMatchesAuthor) {
@@ -492,7 +495,6 @@ class ParseBooksCommand extends Command
             }
 
             return 0;
-
         } catch (\Exception $e) {
             $this->error('An error occurred while parsing the directory:');
             $this->error($e->getMessage());
@@ -562,16 +564,27 @@ class ParseBooksCommand extends Command
             return $aNum <=> $bNum;
         });
 
-        $headers = ['#', 'Title', 'Author', 'Duration', 'Files', 'Series', 'Number', 'Narrator', 'Edition', 'Path', 'Cover', 'Needs Review'];
+        $headers = [
+            '#',
+            'Title',
+            'Author',
+            'Duration',
+            'Files',
+            'Series',
+            'Number',
+            'Narrator',
+            'Edition',
+            'Path',
+            'Cover',
+            'Needs Review',
+        ];
 
         $rows = [];
         foreach ($books as $index => $book) {
             // Handle author as array or string
             $author = $book['author'] ?? '';
             if (is_array($author)) {
-                $author = implode(', ', array_filter($author, function ($a) {
-                    return !empty(trim($a));
-                }));
+                $author = implode(', ', array_filter($author, fn($a) => !empty(trim($a))));
             }
 
             // Ensure all values are scalars or strings (no arrays)
@@ -703,9 +716,8 @@ class ParseBooksCommand extends Command
     /**
      * Store books to Firestore.
      *
-     * @param array $books The books to store
-     * @param \App\Services\FirestoreService $firestoreService The Firestore service
-     * @return void
+     * @param  array  $books  The books to store
+     * @param  \App\Services\FirestoreService  $firestoreService  The Firestore service
      */
     protected function storeToFirestore(array $books, \App\Services\FirestoreService $firestoreService): void
     {
@@ -731,6 +743,7 @@ class ParseBooksCommand extends Command
                     }
                     $skipped++;
                     $bar->advance();
+
                     continue;
                 }
 

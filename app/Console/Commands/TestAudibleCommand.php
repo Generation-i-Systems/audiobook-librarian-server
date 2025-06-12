@@ -7,7 +7,7 @@ use Illuminate\Console\Command;
 
 class TestAudibleCommand extends Command
 {
-    protected $signature = 'test:audible 
+    protected $signature = 'test:audible
                             {action : search or details}
                             {query? : Search query or ASIN for details}
                             {--a|author= : Filter by author}
@@ -53,7 +53,7 @@ class TestAudibleCommand extends Command
 
     private function handleSearch(string $query, ?string $author, int $limit): void
     {
-        $this->info("Searching for: {$query}".($author ? " by {$author}" : ''));
+        $this->info("Searching for: {$query}" . ($author ? " by {$author}" : ''));
 
         $books = $this->audibleService->searchBooks($query, $author, $limit);
 
@@ -63,15 +63,15 @@ class TestAudibleCommand extends Command
             return;
         }
 
-        $this->info("\nFound ".count($books)." results:\n");
+        $this->info("\nFound " . count($books) . " results:\n");
 
         foreach ($books as $index => $book) {
-            $this->line(($index + 1).". {$book['title']}");
-            $this->line('   Authors: '.implode(', ', array_column($book['authors'] ?? [], 'author.name')));
-            $this->line('   Narrators: '.implode(', ', array_column($book['narrators'] ?? [], 'author.name')));
-            $this->line('   Published: '.($book['release_date'] ?? 'N/A'));
-            $this->line('   Cover: '.($book['cover_image_url'] ?? 'N/A'));
-            $this->line('   ASIN: '.($book['id'] ?? 'N/A'));
+            $this->line(($index + 1) . ". {$book['title']}");
+            $this->line('   Authors: ' . implode(', ', array_column($book['authors'] ?? [], 'author.name')));
+            $this->line('   Narrators: ' . implode(', ', array_column($book['narrators'] ?? [], 'author.name')));
+            $this->line('   Published: ' . ($book['releaseDate'] ?? 'N/A'));
+            $this->line('   Cover: ' . ($book['coverImageUrl'] ?? 'N/A'));
+            $this->line('   ASIN: ' . ($book['asin'] ?? 'N/A'));
             $this->line('');
         }
     }
@@ -89,19 +89,19 @@ class TestAudibleCommand extends Command
         }
 
         $this->info("\nTitle: {$book['title']}");
-        $this->line('Subtitle: '.($book['subtitle'] ?? 'N/A'));
-        $this->line('Authors: '.implode(', ', array_column($book['authors'] ?? [], 'author.name')));
-        $this->line('Narrators: '.implode(', ', array_column($book['narrators'] ?? [], 'author.name')));
-        $this->line('Publisher: '.($book['publisher']['name'] ?? 'N/A'));
-        $this->line('Published: '.($book['release_date'] ?? 'N/A'));
-        $this->line('Duration: '.($book['duration'] ?? 'N/A'));
+        $this->line('Subtitle: ' . ($book['subtitle'] ?? 'N/A'));
+        $this->line('Authors: ' . implode(', ', array_column($book['authors'] ?? [], 'author.name')));
+        $this->line('Narrators: ' . implode(', ', array_column($book['narrators'] ?? [], 'author.name')));
+        $this->line('Publisher: ' . ($book['publisher']['name'] ?? 'N/A'));
+        $this->line('Published: ' . ($book['releaseDate'] ?? 'N/A'));
+        $this->line('Duration: ' . ($book['duration'] ?? 'N/A'));
 
         // Handle genres
         $genres = array_map(function ($genre) {
             return $genre['genre']['name'] ?? null;
         }, $book['genres'] ?? []);
         $genres = array_filter($genres);
-        $this->line('Genres: '.(! empty($genres) ? implode(', ', $genres) : 'N/A'));
+        $this->line('Genres: ' . (! empty($genres) ? implode(', ', $genres) : 'N/A'));
 
         // Handle rating safely
         $rating = null;
@@ -125,10 +125,10 @@ class TestAudibleCommand extends Command
         $this->line("Rating: $ratingDisplay$ratingsDisplay");
 
         // Handle cover image
-        $coverUrl = $book['cover_image_url'] ?? null;
+        $coverUrl = $book['coverImageUrl'] ?? null;
         if ($coverUrl) {
             $this->line("Cover: $coverUrl");
-            $this->line('Cover (direct): '.str_replace('_SL500_', '_SL1000_', $coverUrl));
+            $this->line('Cover (direct): ' . str_replace('_SL500_', '_SL1000_', $coverUrl));
         } else {
             $this->line('Cover: N/A');
         }

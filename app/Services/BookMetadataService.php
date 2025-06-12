@@ -62,7 +62,7 @@ class BookMetadataService
      */
     protected function saveToLocalFile(string $directoryPath, array $metadata): bool
     {
-        $filePath = rtrim($directoryPath, '/').'/'.$this->localFilename;
+        $filePath = rtrim($directoryPath, '/') . '/' . $this->localFilename;
 
         try {
             $json = json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -91,7 +91,7 @@ class BookMetadataService
      */
     protected function loadFromLocalFile(string $directoryPath): array
     {
-        $filePath = rtrim($directoryPath, '/').'/'.$this->localFilename;
+        $filePath = rtrim($directoryPath, '/') . '/' . $this->localFilename;
 
         if (! file_exists($filePath) || ! is_readable($filePath)) {
             return [];

@@ -57,7 +57,7 @@ class DebugController extends Controller
             'session_data' => session()->all(),
             'user_class' => Auth::user() ? get_class(Auth::user()) : null,
             'guard' => Auth::getDefaultDriver(),
-            'provider' => config('auth.guards.'.Auth::getDefaultDriver().'.provider'),
+            'provider' => config('auth.guards.' . Auth::getDefaultDriver() . '.provider'),
             'session_driver' => config('session.driver'),
             'session_cookie' => config('session.cookie'),
             'session_cookie_value' => request()->cookie(config('session.cookie')),

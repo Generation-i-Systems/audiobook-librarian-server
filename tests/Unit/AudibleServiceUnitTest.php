@@ -9,9 +9,9 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Mockery;
 use Mockery\MockInterface;
+use PHPUnit\Framework\Attributes\Test;
 use Psr\Log\LoggerInterface;
 use Tests\TestCase;
-use PHPUnit\Framework\Attributes\Test;
 
 /**
  * AudibleService Unit Tests
@@ -19,7 +19,6 @@ use PHPUnit\Framework\Attributes\Test;
  * @method void assertExists(string $path)
  * @method void assertMissing(string $path)
  */
-
 class AudibleServiceUnitTest extends TestCase
 {
     protected AudibleService $audibleService;
@@ -71,7 +70,7 @@ class AudibleServiceUnitTest extends TestCase
     }
 
     #[Test]
-    public function testDownloadsCoverImageSuccessfullyWithContentTypeExtension()
+    public function test_downloads_cover_image_successfully_with_content_type_extension()
     {
         Storage::fake('public');
         $imageUrl = 'https://m.media-amazon.com/images/I/51Q42D63G5L.jpg';
@@ -91,7 +90,7 @@ class AudibleServiceUnitTest extends TestCase
     }
 
     #[Test]
-    public function testDownloadsCoverImageSuccessfullyWithUrlExtension()
+    public function test_downloads_cover_image_successfully_with_url_extension()
     {
         Storage::fake('public');
         $imageUrl = 'https://m.media-amazon.com/images/I/51Q42D63G5L.png';
@@ -109,7 +108,7 @@ class AudibleServiceUnitTest extends TestCase
     }
 
     #[Test]
-    public function testCreatesDirectoryIfNotExists()
+    public function test_creates_directory_if_not_exists()
     {
         Storage::fake('public');
         $imageUrl = 'https://m.media-amazon.com/images/I/51Q42D63G5L.jpg';
@@ -130,7 +129,7 @@ class AudibleServiceUnitTest extends TestCase
     }
 
     #[Test]
-    public function testHandlesHttpErrorGracefully()
+    public function test_handles_http_error_gracefully()
     {
         Storage::fake('public');
         $imageUrl = 'https://m.media-amazon.com/images/I/invalid.jpg';
@@ -146,7 +145,7 @@ class AudibleServiceUnitTest extends TestCase
     }
 
     #[Test]
-    public function testHandlesStoragePutFailure()
+    public function test_handles_storage_put_failure()
     {
         $imageUrl = 'https://m.media-amazon.com/images/I/51Q42D63G5L.jpg';
         $asin = 'B002V1O1QK';
@@ -168,7 +167,7 @@ class AudibleServiceUnitTest extends TestCase
     }
 
     #[Test]
-    public function testDefaultsToJpgWhenExtensionIsUnknown()
+    public function test_defaults_to_jpg_when_extension_is_unknown()
     {
         Storage::fake('public');
         $imageUrl = 'https://m.media-amazon.com/images/I/51Q42D63G5L';
@@ -183,7 +182,7 @@ class AudibleServiceUnitTest extends TestCase
     }
 
     #[Test]
-    public function testPerformSearchSuccessful()
+    public function test_perform_search_successful()
     {
         // Create a partial mock of AudibleService to override only the performSearch method
         $mockService = $this->getMockBuilder(AudibleService::class)
@@ -232,7 +231,7 @@ class AudibleServiceUnitTest extends TestCase
     }
 
     #[Test]
-    public function testPerformSearchApiFailure()
+    public function test_perform_search_api_failure()
     {
         // Create a partial mock of AudibleService to override only the performSearch method
         $mockService = $this->getMockBuilder(AudibleService::class)
@@ -259,7 +258,7 @@ class AudibleServiceUnitTest extends TestCase
     }
 
     #[Test]
-    public function testGetBookDetailsSuccessful()
+    public function test_get_book_details_successful()
     {
         $asin = 'B002V1O1QK';
 
@@ -308,7 +307,7 @@ class AudibleServiceUnitTest extends TestCase
     }
 
     #[Test]
-    public function testGetBookDetailsApiFailure()
+    public function test_get_book_details_api_failure()
     {
         $asin = 'B002V1O1QK';
 

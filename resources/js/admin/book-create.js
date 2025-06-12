@@ -6,7 +6,8 @@
 jQuery(function () {
     const directoryBrowser = $('#directory-browser');
 
-    function escapeHtml(text) {
+    function escapeHtml(text)
+    {
         var map = {
             '&': '&amp;',
             '<': '&lt;',
@@ -14,10 +15,12 @@ jQuery(function () {
             '"': '&quot;',
             "'": '&#039;'
         };
-        return text.replace(/[&<>"']/g, function (m) { return map[m]; });
+        return text.replace(/[&<>"']/g, function (m) {
+            return map[m]; });
     }
 
-    function updateBreadcrumbs(path) {
+    function updateBreadcrumbs(path)
+    {
         let pathParts = path.split('/');
         var html = '';
 
@@ -26,11 +29,15 @@ jQuery(function () {
         }
 
         for (let i = 0; i < pathParts.length; i++) {
-            if (pathParts[i] === "" || pathParts[i] === null || pathParts[i] === undefined || pathParts[i] == '/') continue;
+            if (pathParts[i] === "" || pathParts[i] === null || pathParts[i] === undefined || pathParts[i] == '/') {
+                continue;
+            }
             let crumbPath = '';
 
             for (let j = 0; j <= i; j++) {
-                if (pathParts[j] === "" || pathParts[j] === null || pathParts[j] === undefined || pathParts[j] == '/') continue;
+                if (pathParts[j] === "" || pathParts[j] === null || pathParts[j] === undefined || pathParts[j] == '/') {
+                    continue;
+                }
                 crumbPath += "/" + pathParts[j];
             }
 
@@ -39,7 +46,8 @@ jQuery(function () {
         $('#directory-path-breadcrumbs').html(html);
 
     }
-    function loadDirectory(path) {
+    function loadDirectory(path)
+    {
         $.ajax({
             url: '{{ route("admin.directoryBrowser") }}',
             type: 'GET',
@@ -75,7 +83,8 @@ jQuery(function () {
             }
         });
     }
-    function attachDirectoryLinkHandlers(path) {
+    function attachDirectoryLinkHandlers(path)
+    {
         $(".directory-link").on("click", function (e) {
             e.preventDefault();
             const newPath = $(this).data('path');

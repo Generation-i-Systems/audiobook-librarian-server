@@ -33,10 +33,12 @@ class HardcoverTokenExpiring extends Mailable
     public function build()
     {
         $subject = $this->daysUntilExpiration > 0
-            ? "Hardcover API Token Expiring in {$this->daysUntilExpiration} ".Str::plural('day', $this->daysUntilExpiration)
+            ? "Hardcover API Token Expiring in {$this->daysUntilExpiration} " . Str::plural(
+                'day',
+                $this->daysUntilExpiration
+            )
             : 'Hardcover API Token Has Expired';
 
-        return $this->subject($subject)
-            ->view('emails.hardcover.token-expiring');
+        return $this->subject($subject)->view('emails.hardcover.token-expiring');
     }
 }

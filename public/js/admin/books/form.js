@@ -5,6 +5,7 @@ window.googleBooksMatches = [];
 
 // Function to update the + button position to always be on the last row
 function updateAddRowButtons($container, groupSelector, rowSelector, buttonClass) {
+    console.log('updateAddRowButtons called. Container:', $container);
     const group = $container.find(groupSelector)[0];
     if (!group) return;
     const rows = group.querySelectorAll(rowSelector);
@@ -282,7 +283,7 @@ window.googleBooksProxyUrl = googleBooksProxyUrl;
 
 function loadDirectoryFiles($container) {
     console.log('loadDirectoryFiles called. Container:', $container);
-    const dirPath = $container.find('#directory_path').val();
+    const dirPath = $container.find('#directoryPath').val();
     const filesList = $container.find('#directory-files-list');
     const $viewFilesBtn = $container.find('#show-files-link');
 
@@ -535,4 +536,4 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
 });
-console.log('Form JS loaded 4');
+console.log('Form JS loaded 5');

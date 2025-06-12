@@ -123,7 +123,7 @@ class QueueController extends Controller
     {
         $root = $request->input('dir');
         $storagePath = env('BOOK_STORAGE_PATH');
-        $absRoot = rtrim($storagePath, '/').'/'.ltrim($root, '/');
+        $absRoot = rtrim($storagePath, '/') . '/' . ltrim($root, '/');
         if (! is_dir($absRoot)) {
             return response()->json([
                 'error' => 'Invalid Google Books API response.',
@@ -174,7 +174,7 @@ class QueueController extends Controller
 
         return response()->json(
             [
-                'message' => 'Queued '.count($queued).' book directories for import.',
+                'message' => 'Queued ' . count($queued) . ' book directories for import.',
                 'skipped' => count($bookDirs) - count($queued),
                 'queued_dirs' => $queued,
             ],
@@ -193,7 +193,7 @@ class QueueController extends Controller
         Log::info("Bulk importing books from directory: $dir");
 
         $out = CreateImportJobsForDirectory::dispatch($dir);
-        Log::info('Bulk import job dispatched: '.print_r($out, true));
+        Log::info('Bulk import job dispatched: ' . print_r($out, true));
 
         return response()->json(
             [

@@ -27,7 +27,7 @@ class HardcoverServiceProvider extends ServiceProvider
     {
         // Publish the config file
         $this->publishes([
-            __DIR__.'/../../config/hardcover.php' => config_path('hardcover.php'),
+            __DIR__ . '/../../config/hardcover.php' => config_path('hardcover.php'),
         ], 'config');
     }
 }

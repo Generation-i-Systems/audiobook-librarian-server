@@ -102,7 +102,7 @@ class SendNewBookNotification implements ShouldQueue
                 $bookTitle
             ));
         } catch (\Exception $e) {
-            Log::error('Error sending new book notifications: '.$e->getMessage(), [
+            Log::error('Error sending new book notifications: ' . $e->getMessage(), [
                 'book_id' => $bookId,
                 'book_title' => $bookTitle,
                 'exception' => $e->getTraceAsString(),
@@ -161,7 +161,7 @@ class SendNewBookNotification implements ShouldQueue
                 ));
             }
         } catch (\Exception $e) {
-            Log::error('Error sending push notification: '.$e->getMessage(), [
+            Log::error('Error sending push notification: ' . $e->getMessage(), [
                 'user_id' => $user['id'] ?? 'unknown',
                 'book_id' => $book['id'] ?? 'unknown',
             ]);

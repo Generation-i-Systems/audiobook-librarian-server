@@ -42,14 +42,14 @@ class TestAudibleLookup extends Command
 
             // Display book information
             $this->info("\nBook Details:");
-            $this->info('Title: '.($book['title'] ?? 'N/A'));
-            $this->info('Subtitle: '.($book['subtitle'] ?? 'N/A'));
+            $this->info('Title: ' . ($book['title'] ?? 'N/A'));
+            $this->info('Subtitle: ' . ($book['subtitle'] ?? 'N/A'));
 
             // Display authors
             $this->info("\nAuthors:");
             if (! empty($book['authors'])) {
                 foreach ($book['authors'] as $author) {
-                    $this->info('- '.($author['author']['name'] ?? 'Unknown').
+                    $this->info('- ' . ($author['author']['name'] ?? 'Unknown') .
                         (isset($author['author']['id']) ? " (ID: {$author['author']['id']})" : ''));
                 }
             } else {
@@ -60,7 +60,7 @@ class TestAudibleLookup extends Command
             $this->info("\nNarrators:");
             if (! empty($book['narrators'])) {
                 foreach ($book['narrators'] as $narrator) {
-                    $this->info('- '.($narrator['author']['name'] ?? 'Unknown').
+                    $this->info('- ' . ($narrator['author']['name'] ?? 'Unknown') .
                         (isset($narrator['author']['id']) ? " (ID: {$narrator['author']['id']})" : ''));
                 }
             } else {
@@ -74,10 +74,9 @@ class TestAudibleLookup extends Command
             }
 
             return 0;
-
         } catch (\Exception $e) {
-            $this->error('Error: '.$e->getMessage());
-            $this->error('Stack trace: '.$e->getTraceAsString());
+            $this->error('Error: ' . $e->getMessage());
+            $this->error('Stack trace: ' . $e->getTraceAsString());
 
             return 1;
         }

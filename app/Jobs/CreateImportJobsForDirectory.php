@@ -54,19 +54,19 @@ class CreateImportJobsForDirectory implements ShouldQueue
             'directory' => $this->dir,
             'job_id' => $this->job ? $this->job->getJobId() : 'sync',
         ]);
-        echo '[DIRECTORY_IMPORT] Starting import for directory: '.$this->dir."\n";
+        echo '[DIRECTORY_IMPORT] Starting import for directory: ' . $this->dir . "\n";
 
         $storagePath = env('BOOK_STORAGE_PATH');
         if (empty($storagePath)) {
             $error = 'BOOK_STORAGE_PATH is not set in environment';
-            Log::error('[DIRECTORY_IMPORT] '.$error);
+            Log::error('[DIRECTORY_IMPORT] ' . $error);
             throw new \RuntimeException($error);
         }
 
-        $absDir = rtrim($storagePath, '/').'/'.ltrim($this->dir, '/');
+        $absDir = rtrim($storagePath, '/') . '/' . ltrim($this->dir, '/');
         if (! is_dir($absDir)) {
             $error = "Directory not found for import: $absDir";
-            Log::error('[DIRECTORY_IMPORT] '.$error);
+            Log::error('[DIRECTORY_IMPORT] ' . $error);
             throw new \RuntimeException($error);
         }
 
@@ -76,7 +76,7 @@ class CreateImportJobsForDirectory implements ShouldQueue
         ]);
 
         $firestore = new FirestoreService();
-        $jobId = 'import_dir_'.md5($this->dir.'_'.now()->timestamp);
+        $jobId = 'import_dir_' . md5($this->dir . '_' . now()->timestamp);
 
         try {
             // Update job status to processing
@@ -107,7 +107,7 @@ class CreateImportJobsForDirectory implements ShouldQueue
                 ['total_items' => $total]
             );
 
-            echo 'Looping through '.count($bookDirs)." directories\n";
+            echo 'Looping through ' . count($bookDirs) . " directories\n";
             foreach ($bookDirs as $dirPath) {
                 $relDir = ltrim(str_replace($storagePath, '', $dirPath), '/');
                 $exists = false;
@@ -206,13 +206,13 @@ class CreateImportJobsForDirectory implements ShouldQueue
                 ]
             );
 
-            Log::info('Queued '.count($queued).' book directories for import.', [
+            Log::info('Queued ' . count($queued) . ' book directories for import.', [
                 'job_id' => $jobId,
                 'queued_dirs' => $queued,
                 'skipped_dirs' => $skipped,
             ]);
         } catch (\Exception $e) {
-            Log::error('Error in CreateImportJobsForDirectory: '.$e->getMessage(), [
+            Log::error('Error in CreateImportJobsForDirectory: ' . $e->getMessage(), [
                 'directory' => $this->dir,
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -245,10 +245,10 @@ class CreateImportJobsForDirectory implements ShouldQueue
             if ($item === '.' || $item === '..') {
                 continue;
             }
-            $path = $dir.'/'.$item;
+            $path = $dir . '/' . $item;
             if (is_dir($path)) {
                 // If directory contains audio files, treat as book dir
-                $audioFiles = glob($path.'/*.{mp3,m4b,m4a}', GLOB_BRACE);
+                $audioFiles = glob($path . '/*.{mp3,m4b,m4a}', GLOB_BRACE);
                 if (! empty($audioFiles)) {
                     $results[] = $path;
                 } else {

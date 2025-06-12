@@ -16,7 +16,7 @@ class GoogleBooksApiServiceEnhanceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->testDir = sys_get_temp_dir().'/gbapi_enhance_'.uniqid();
+        $this->testDir = sys_get_temp_dir() . '/gbapi_enhance_' . uniqid();
         mkdir($this->testDir, 0777, true);
     }
 
@@ -54,13 +54,13 @@ class GoogleBooksApiServiceEnhanceTest extends TestCase
         ];
         // Actually call the searchAndMerge logic
         // Pre-create a dummy cover image to ensure the assertion passes if HTTP download is skipped or fails
-        file_put_contents($this->testDir.'/cover.jpg', 'dummy image data');
+        file_put_contents($this->testDir . '/cover.jpg', 'dummy image data');
         $result = $service->searchAndMerge([
             ...$book,
             // force cover_image_url through the mock
         ]);
-        $coverPath = $this->testDir.'/cover.jpg';
-        $this->assertTrue(file_exists($coverPath) || file_exists($this->testDir.'/cover.png'));
+        $coverPath = $this->testDir . '/cover.jpg';
+        $this->assertTrue(file_exists($coverPath) || file_exists($this->testDir . '/cover.png'));
         $this->assertArrayHasKey('cover_image', $result);
         $this->assertStringContainsString($this->testDir, $result['cover_image']);
     }

@@ -44,7 +44,7 @@ class MessageController extends Controller
 
             return back()->with('error', 'Failed to send message. Please try again.');
         } catch (\Exception $e) {
-            Log::error('Failed to send message: '.$e->getMessage());
+            Log::error('Failed to send message: ' . $e->getMessage());
 
             return back()->with('error', 'An error occurred while sending your message.');
         }
@@ -79,7 +79,7 @@ class MessageController extends Controller
 
             return back()->with('error', 'Failed to send message. Please try again.');
         } catch (\Exception $e) {
-            Log::error('Failed to send admin message: '.$e->getMessage());
+            Log::error('Failed to send admin message: ' . $e->getMessage());
 
             return back()->with('error', 'An error occurred while sending the message.');
         }

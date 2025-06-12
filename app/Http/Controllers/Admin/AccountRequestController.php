@@ -11,7 +11,8 @@ class AccountRequestController extends Controller
     public function index()
     {
         $firestore = new FirestoreService();
-        $accountRequests = $firestore->getClient()->collection('account_requests')->where('status', '=', 'pending')->documents();
+        $accountRequests = $firestore->getClient()->collection('account_requests')
+            ->where('status', '=', 'pending')->documents();
         $requests = [];
         foreach ($accountRequests as $doc) {
             if ($doc->exists()) {
@@ -28,7 +29,7 @@ class AccountRequestController extends Controller
     {
         $firestore = new FirestoreService();
         $accountRequestDoc = $firestore->getClient()->collection('account_requests')->document($id)->snapshot();
-        if (! $accountRequestDoc->exists()) {
+        if (!$accountRequestDoc->exists()) {
             return back()->withErrors(['error' => 'Account request not found.']);
         }
         $accountRequest = $accountRequestDoc->data();

@@ -121,9 +121,8 @@ class RegisterController extends Controller
 
             // Return a FirestoreUser instance for authentication
             return new FirestoreUser($userData);
-
         } catch (\Exception $e) {
-            Log::error('Error creating user: '.$e->getMessage());
+            Log::error('Error creating user: ' . $e->getMessage());
             throw $e; // Let the exception bubble up to be handled by Laravel
         }
     }
@@ -162,7 +161,7 @@ class RegisterController extends Controller
                 }
             }
         } catch (\Exception $e) {
-            Log::error('Error notifying admins about new user: '.$e->getMessage());
+            Log::error('Error notifying admins about new user: ' . $e->getMessage());
         }
     }
 }

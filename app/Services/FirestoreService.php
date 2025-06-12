@@ -37,7 +37,7 @@ class FirestoreService
 
             return $data;
         } catch (\Throwable $e) {
-            Log::error('Firestore getDocument failed: '.$e->getMessage());
+            Log::error('Firestore getDocument failed: ' . $e->getMessage());
 
             return null;
         }
@@ -58,7 +58,7 @@ class FirestoreService
 
             return $user;
         } catch (\Throwable $e) {
-            Log::error('Firestore getUserById failed: '.$e->getMessage());
+            Log::error('Firestore getUserById failed: ' . $e->getMessage());
 
             return null;
         } finally {
@@ -91,7 +91,7 @@ class FirestoreService
 
             return null;
         } catch (\Throwable $e) {
-            Log::error('Firestore getUserByRememberToken failed: '.$e->getMessage());
+            Log::error('Firestore getUserByRememberToken failed: ' . $e->getMessage());
 
             return null;
         } finally {
@@ -134,7 +134,7 @@ class FirestoreService
                 if ($key === 'password') {
                     continue; // Never filter by password
                 }
-                Log::debug('getUserByCredentials: adding filter: '.$key);
+                Log::debug('getUserByCredentials: adding filter: ' . $key);
                 // For username/email, fetch all users and filter in PHP for case-insensitive match
                 if (in_array($key, ['username', 'email'])) {
                     $allDocs = $this->db->collection('users')->documents();
@@ -164,7 +164,7 @@ class FirestoreService
 
             return $user;
         } catch (\Throwable $e) {
-            Log::error('Firestore getUserByCredentials failed: '.$e->getMessage());
+            Log::error('Firestore getUserByCredentials failed: ' . $e->getMessage());
 
             return null;
         }
@@ -190,18 +190,18 @@ class FirestoreService
             $plain = $credentials['password'];
             $hash = $userArr['password'];
             $result = Hash::check($plain, $hash);
-            Log::debug('validateUserCredentials: plain: '.$plain);
-            Log::debug('validateUserCredentials: hash: '.$hash);
+            Log::debug('validateUserCredentials: plain: ' . $plain);
+            Log::debug('validateUserCredentials: hash: ' . $hash);
             Log::debug('Checking password', [
                 'plain' => $plain,
                 'hash' => $hash,
                 'result' => $result,
             ]);
-            Log::debug('validateUserCredentials result: '.($result ? 'true' : 'false'));
+            Log::debug('validateUserCredentials result: ' . ($result ? 'true' : 'false'));
 
             return $result;
         } catch (\Throwable $e) {
-            Log::error('Firestore validateUserCredentials failed: '.$e->getMessage());
+            Log::error('Firestore validateUserCredentials failed: ' . $e->getMessage());
 
             return false;
         }
@@ -233,7 +233,7 @@ class FirestoreService
 
             return $users;
         } catch (\Throwable $e) {
-            error_log('Firestore dumpAllUsers error: '.$e->getMessage());
+            error_log('Firestore dumpAllUsers error: ' . $e->getMessage());
 
             return ['error' => $e->getMessage()];
         }
@@ -260,7 +260,7 @@ class FirestoreService
 
             return $books;
         } catch (\Throwable $e) {
-            error_log('Firestore dumpAllBooks error: '.$e->getMessage());
+            error_log('Firestore dumpAllBooks error: ' . $e->getMessage());
 
             return ['error' => $e->getMessage()];
         }
@@ -277,7 +277,7 @@ class FirestoreService
             ]);
         } catch (\Throwable $e) {
             // Log error but do NOT trigger auth/user lookup!
-            Log::error('Firestore client init failed: '.$e->getMessage());
+            Log::error('Firestore client init failed: ' . $e->getMessage());
             $this->db = null;
         }
     }
@@ -309,7 +309,7 @@ class FirestoreService
 
             return $docRef->id();
         } catch (\Throwable $e) {
-            Log::error('Firestore createUser failed: '.$e->getMessage());
+            Log::error('Firestore createUser failed: ' . $e->getMessage());
 
             return null;
         }
@@ -348,7 +348,7 @@ class FirestoreService
 
             return $docRef->id();
         } catch (\Exception $e) {
-            Log::error('Failed to create message: '.$e->getMessage());
+            Log::error('Failed to create message: ' . $e->getMessage());
 
             return null;
         }
@@ -394,7 +394,7 @@ class FirestoreService
 
             return $messages;
         } catch (\Exception $e) {
-            Log::error('Failed to get messages: '.$e->getMessage());
+            Log::error('Failed to get messages: ' . $e->getMessage());
 
             return [];
         }
@@ -423,7 +423,7 @@ class FirestoreService
 
             return $message;
         } catch (\Exception $e) {
-            Log::error('Failed to get message: '.$e->getMessage());
+            Log::error('Failed to get message: ' . $e->getMessage());
 
             return null;
         }
@@ -448,7 +448,7 @@ class FirestoreService
 
             return true;
         } catch (\Exception $e) {
-            Log::error('Failed to acknowledge message: '.$e->getMessage());
+            Log::error('Failed to acknowledge message: ' . $e->getMessage());
 
             return false;
         }
@@ -479,7 +479,7 @@ class FirestoreService
 
             return $users;
         } catch (\Exception $e) {
-            Log::error('Failed to get users: '.$e->getMessage());
+            Log::error('Failed to get users: ' . $e->getMessage());
 
             return [];
         }
@@ -505,17 +505,20 @@ class FirestoreService
     {
         if (! $this->db) {
             Log::error('Cannot create book: Firestore client not initialized');
+
             return null;
         }
         try {
             // Ensure dateAdded is set (should be set by caller, fallback to server timestamp)
-            if (!isset($data['dateAdded'])) {
+            if (! isset($data['dateAdded'])) {
                 $data['dateAdded'] = $this->getServerTimestamp();
             }
             $docRef = $this->db->collection('books')->add($data);
+
             return $docRef->id();
         } catch (\Throwable $e) {
-            Log::error('Failed to create book: '.$e->getMessage());
+            Log::error('Failed to create book: ' . $e->getMessage());
+
             return null;
         }
     }
@@ -538,7 +541,7 @@ class FirestoreService
 
             return $docRef->id();
         } catch (\Throwable $e) {
-            Log::error('Failed to create review: '.$e->getMessage());
+            Log::error('Failed to create review: ' . $e->getMessage());
 
             return null;
         }
@@ -682,7 +685,7 @@ class FirestoreService
 
             return $uniqueAuthors;
         } catch (\Exception $e) {
-            Log::error('Firestore listAuthors failed: '.$e->getMessage());
+            Log::error('Firestore listAuthors failed: ' . $e->getMessage());
 
             return [];
         }
@@ -801,7 +804,7 @@ class FirestoreService
 
             return $uniqueSeries;
         } catch (\Exception $e) {
-            Log::error('Firestore listSeries failed: '.$e->getMessage());
+            Log::error('Firestore listSeries failed: ' . $e->getMessage());
 
             return [];
         }
@@ -841,7 +844,7 @@ class FirestoreService
     public function findBookByDirectoryPath(string $directoryPath): ?array
     {
         try {
-            if (!$this->db) {
+            if (! $this->db) {
                 return null;
             }
 
@@ -874,6 +877,7 @@ class FirestoreService
             return null;
         } catch (\Exception $e) {
             Log::error('Firestore findBookByDirectoryPath failed: ' . $e->getMessage());
+
             return null;
         }
     }
@@ -999,7 +1003,7 @@ class FirestoreService
 
             return $data;
         } catch (\Exception $e) {
-            Log::error('Failed to get job status: '.$e->getMessage());
+            Log::error('Failed to get job status: ' . $e->getMessage());
 
             return null;
         }
@@ -1062,7 +1066,7 @@ class FirestoreService
 
             return $results;
         } catch (\Exception $e) {
-            Log::error('Failed to list jobs: '.$e->getMessage());
+            Log::error('Failed to list jobs: ' . $e->getMessage());
 
             return [];
         }
@@ -1094,7 +1098,7 @@ class FirestoreService
 
             return true;
         } catch (\Exception $e) {
-            Log::error('Failed to add job log: '.$e->getMessage());
+            Log::error('Failed to add job log: ' . $e->getMessage());
 
             return false;
         }
@@ -1133,7 +1137,7 @@ class FirestoreService
 
             return true;
         } catch (\Exception $e) {
-            Log::error('Failed to update job progress: '.$e->getMessage());
+            Log::error('Failed to update job progress: ' . $e->getMessage());
 
             return false;
         }
@@ -1151,7 +1155,7 @@ class FirestoreService
 
             return true;
         } catch (\Exception $e) {
-            Log::error('Failed to delete job: '.$e->getMessage());
+            Log::error('Failed to delete job: ' . $e->getMessage());
 
             return false;
         }
@@ -1184,7 +1188,7 @@ class FirestoreService
 
             return $deleted;
         } catch (\Exception $e) {
-            Log::error('Failed to clean up old jobs: '.$e->getMessage());
+            Log::error('Failed to clean up old jobs: ' . $e->getMessage());
 
             return 0;
         }

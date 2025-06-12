@@ -13,7 +13,7 @@ class BookParserServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(
-            __DIR__.'/../../config/bookparser.php',
+            __DIR__ . '/../../config/bookparser.php',
             'bookparser'
         );
 
@@ -28,7 +28,7 @@ class BookParserServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->publishes([
-            __DIR__.'/../../config/bookparser.php' => config_path('bookparser.php'),
+            __DIR__ . '/../../config/bookparser.php' => config_path('bookparser.php'),
         ], 'config');
     }
 }

@@ -34,6 +34,7 @@ Route::get('/', function () {
     if (Auth::check()) {
         return redirect()->route('books.index')->with('status', 'Welcome to your audiobook library!');
     }
+
     return view('welcome');
 });
 

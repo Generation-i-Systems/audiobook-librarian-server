@@ -53,13 +53,20 @@ abstract class BaseBookService implements BookServiceInterface
             $baseLogger = Log::channel(); // Fallback
         }
 
-        $baseLogger->info('BaseBookService: searchBooks called (using baseLogger).', ['query' => $query, 'options' => $options, 'service' => $this->getServiceName()]);
+        $baseLogger->info('BaseBookService: searchBooks called (using baseLogger).', [
+            'query' => $query,
+            'options' => $options,
+            'service' => $this->getServiceName(),
+        ]);
 
-        if (! empty($options['no_cache'])) {
+        if (!empty($options)) {
             try {
                 $baseLogger->info('BaseBookService: About to call performSearch (no_cache path - using baseLogger).');
                 $result = $this->performSearch($query, $options);
-                $baseLogger->info('BaseBookService: performSearch returned (no_cache path - using baseLogger).', ['result_is_null' => is_null($result), 'result_count' => is_array($result) ? count($result) : 'N/A']);
+                $baseLogger->info('BaseBookService: performSearch returned (no_cache path - using baseLogger).', [
+                    'result_is_null' => is_null($result),
+                    'result_count' => is_array($result) ? count($result) : 'N/A'
+                ]);
 
                 return $result ?? [];
             } catch (\Exception $e) {
@@ -73,13 +80,16 @@ abstract class BaseBookService implements BookServiceInterface
             }
         }
         $baseLogger->info('BaseBookService: Using cache path (using baseLogger).');
-        $cacheKey = $this->getServiceName().'_search_'.md5($query.json_encode($options));
+        $cacheKey = $this->getServiceName() . '_search_' . md5($query . json_encode($options));
 
         return Cache::remember($cacheKey, $this->cacheTtl, function () use ($query, $options, $baseLogger) {
             try {
                 $baseLogger->info('BaseBookService: About to call performSearch (cache path - using baseLogger).');
                 $result = $this->performSearch($query, $options);
-                $baseLogger->info('BaseBookService: performSearch returned (cache path - using baseLogger).', ['result_is_null' => is_null($result), 'result_count' => is_array($result) ? count($result) : 'N/A']);
+                $baseLogger->info('BaseBookService: performSearch returned (cache path - using baseLogger).', [
+                    'result_is_null' => is_null($result),
+                    'result_count' => is_array($result) ? count($result) : 'N/A',
+                ]);
 
                 return empty($result) ? [] : $result;
             } catch (\Exception $e) {
@@ -99,7 +109,7 @@ abstract class BaseBookService implements BookServiceInterface
      */
     public function getBookDetails(string $id, array $options = []): ?array
     {
-        if (! empty($options['no_cache'])) {
+        if (!empty($options)) {
             try {
                 return $this->performGetBookDetails($id);
             } catch (\Exception $e) {
@@ -112,7 +122,7 @@ abstract class BaseBookService implements BookServiceInterface
                 return [];
             }
         }
-        $cacheKey = $this->getServiceName().'_details_'.$id;
+        $cacheKey = $this->getServiceName() . '_details_' . $id;
 
         return Cache::remember($cacheKey, $this->cacheTtl, function () use ($id) {
             try {
@@ -156,7 +166,7 @@ abstract class BaseBookService implements BookServiceInterface
             ->timeout(15)
             ->get($url, array_merge($this->defaultParams, $params));
 
-        if (! $response->successful()) {
+        if (!$response->successful()) {
             Log::error('HTTP request failed', [
                 'url' => $url,
                 'params' => $params,

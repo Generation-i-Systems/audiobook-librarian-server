@@ -14,14 +14,12 @@ class AudibleService extends BaseBookService
      */
     protected $customLogger = null;
 
-    /**
-     * @var string
-     */
     protected string $logLevel = 'info';
 
     /**
      * Set a custom logger for this instance.
-     * @param \Psr\Log\LoggerInterface $logger
+     *
+     * @param  \Psr\Log\LoggerInterface  $logger
      */
     public function setLogger($logger): void
     {
@@ -30,7 +28,6 @@ class AudibleService extends BaseBookService
 
     /**
      * Set the log level for this instance.
-     * @param string $level
      */
     public function setLogLevel(string $level): void
     {
@@ -39,6 +36,7 @@ class AudibleService extends BaseBookService
 
     /**
      * Get the logger for this instance.
+     *
      * @return \Psr\Log\LoggerInterface
      */
     protected function getLogger()
@@ -48,8 +46,8 @@ class AudibleService extends BaseBookService
 
     /**
      * Log with the instance's log level.
-     * @param string $message
-     * @param array $context
+     *
+     * @param  string  $message
      */
     protected function log($message, array $context = [])
     {
@@ -64,8 +62,8 @@ class AudibleService extends BaseBookService
 
     /**
      * Log debug messages regardless of logLevel.
-     * @param string $message
-     * @param array $context
+     *
+     * @param  string  $message
      */
     protected function logDebug($message, array $context = [])
     {
@@ -74,6 +72,7 @@ class AudibleService extends BaseBookService
             $logger->debug($message, $context);
         }
     }
+
     public int $apiCallCount = 0;
 
     protected string $baseUrl = 'https://api.audible.com/1.0/catalog';
@@ -112,7 +111,10 @@ class AudibleService extends BaseBookService
 
         $response = Http::timeout(15)->get($requestUrl, $params);
 
-        $this->logDebug('AudibleService: performSearch RAW RESPONSE', ['body' => $response->body(), 'status' => $response->status()]);
+        $this->logDebug('AudibleService: performSearch RAW RESPONSE', [
+            'body' => $response->body(),
+            'status' => $response->status(),
+        ]);
 
         if (!$response->successful()) {
             $this->getLogger()->error(
@@ -123,6 +125,7 @@ class AudibleService extends BaseBookService
                     'body' => $response->body(),
                 ]
             );
+
             return null;
         }
 
@@ -133,6 +136,7 @@ class AudibleService extends BaseBookService
             $results[] = $this->transform($book);
         }
         $this->logDebug('AudibleService: performSearch results', ['results' => $results]);
+
         return $results;
     }
 
@@ -140,8 +144,8 @@ class AudibleService extends BaseBookService
     {
         $this->apiCallCount++;
         $response = Http::timeout(15)->get($this->baseUrl . '/products/' . $id, [
-            'response_groups' => 'product_attrs,product_desc,product_extended_attrs,series,contributors,'
-                . 'media,product_images',
+            'response_groups' => 'product_attrs,product_desc,product_extended_attrs,series,contributors,media,' .
+                'product_images',
         ]);
 
         if (!$response->successful()) {
@@ -301,7 +305,8 @@ class AudibleService extends BaseBookService
             // Remove HTML tags
             $description = strip_tags($description);
             // Remove leading <p> tags
-            $description = preg_replace('/^<p>/', '', $description);            // Trim whitespace
+            $description = preg_replace('/^<p>/', '', $description);
+            // Trim whitespace
             $description = trim($description);
         }
 
@@ -325,7 +330,7 @@ class AudibleService extends BaseBookService
     /**
      * Search for a book and merge the results with the existing book data
      *
-     * @param array $book The existing book data
+     * @param  array  $book  The existing book data
      * @return array|null The merged book data or null if no match found
      */
     public function searchAndMerge(array $book): ?array
@@ -335,6 +340,7 @@ class AudibleService extends BaseBookService
 
         if (empty($query)) {
             Log::warning('AudibleService: Empty query for searchAndMerge');
+
             return null;
         }
 

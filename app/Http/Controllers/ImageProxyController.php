@@ -21,14 +21,14 @@ class ImageProxyController extends Controller
         if (! $file) {
             abort(404);
         }
-        if ($dir !== '.' && is_dir(rtrim($storagePath, '/').'/'.ltrim($dir, '/'))) {
-            $file = rtrim($dir, '/').'/'.$file;
+        if ($dir !== '.' && is_dir(rtrim($storagePath, '/') . '/' . ltrim($dir, '/'))) {
+            $file = rtrim($dir, '/') . '/' . $file;
         }
 
-        if ($dir !== '.' && ! is_dir(rtrim($storagePath, '/').'/'.ltrim($dir, '/'))) {
+        if ($dir !== '.' && ! is_dir(rtrim($storagePath, '/') . '/' . ltrim($dir, '/'))) {
             abort(404);
         }
-        $fullPath = rtrim($storagePath, '/').'/'.ltrim($file, '/');
+        $fullPath = rtrim($storagePath, '/') . '/' . ltrim($file, '/');
         if (! file_exists($fullPath)) {
             abort(404);
         }
@@ -46,7 +46,7 @@ class ImageProxyController extends Controller
     public function cover($path)
     {
         $storagePath = env('BOOK_STORAGE_PATH');
-        $fullPath = rtrim($storagePath, '/').'/'.ltrim($path, '/');
+        $fullPath = rtrim($storagePath, '/') . '/' . ltrim($path, '/');
         if (! file_exists($fullPath)) {
             abort(404);
         }

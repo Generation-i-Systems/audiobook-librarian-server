@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Services\BookDirectoryParser;
 use Illuminate\Support\Facades\File;
-use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -22,7 +21,7 @@ class BookDirectoryParserTest extends TestCase
         $this->testDataPath = storage_path('framework/testing/book_parser');
 
         // Create the directory if it doesn't exist
-        if (!File::exists($this->testDataPath)) {
+        if (! File::exists($this->testDataPath)) {
             File::makeDirectory($this->testDataPath, 0755, true);
         }
 
@@ -67,8 +66,6 @@ class BookDirectoryParserTest extends TestCase
 
     /**
      * Create a mock BookDirectoryParser that doesn't rely on external dependencies
-     *
-     * @return BookDirectoryParser
      */
     protected function createMockParser(): BookDirectoryParser
     {
@@ -87,8 +84,6 @@ class BookDirectoryParserTest extends TestCase
 
     /**
      * Get test book data
-     *
-     * @return array
      */
     protected function getTestBooks(): array
     {
@@ -218,7 +213,7 @@ class BookDirectoryParserTest extends TestCase
 
             if (is_array($content)) {
                 // It's a directory
-                if (!File::exists($path)) {
+                if (! File::exists($path)) {
                     File::makeDirectory($path, 0755, true);
                 }
                 $this->createDirectories($path, $content);
@@ -230,7 +225,7 @@ class BookDirectoryParserTest extends TestCase
     }
 
     #[Test]
-    public function testParseDirectoryWithDefaultOptions()
+    public function test_parse_directory_with_default_options()
     {
         $books = $this->parser->parseDirectory($this->testDataPath);
 
@@ -253,7 +248,7 @@ class BookDirectoryParserTest extends TestCase
     }
 
     #[Test]
-    public function testParseWithSeriesExtraction()
+    public function test_parse_with_series_extraction()
     {
         $books = $this->parser->parseDirectory($this->testDataPath);
 
@@ -271,7 +266,7 @@ class BookDirectoryParserTest extends TestCase
     }
 
     #[Test]
-    public function testParseWithEditionExtraction()
+    public function test_parse_with_edition_extraction()
     {
         $books = $this->parser->parseDirectory($this->testDataPath);
 

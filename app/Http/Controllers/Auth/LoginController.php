@@ -86,7 +86,7 @@ class LoginController extends Controller
                     ['path' => 'updated_at', 'value' => new GoogleTimestamp(new \DateTime())],
                 ]);
         } catch (\Exception $e) {
-            Log::error('Error updating last login time: '.$e->getMessage());
+            Log::error('Error updating last login time: ' . $e->getMessage());
         }
 
         return redirect()->intended($this->redirectPath());
@@ -110,12 +110,12 @@ class LoginController extends Controller
         try {
             $googleUser = Socialite::driver('google')->stateless()->user();
         } catch (\Exception $e) {
-            Log::error('Google login error: '.$e->getMessage());
+            Log::error('Google login error: ' . $e->getMessage());
 
             return redirect('/login')->withErrors(['google' => 'Unable to login with Google. Please try again.']);
         }
 
-        if (! $googleUser->getEmail()) {
+        if (!$googleUser->getEmail()) {
             return redirect('/login')->withErrors(['google' => 'No email provided by Google.']);
         }
 
@@ -138,9 +138,10 @@ class LoginController extends Controller
             }
 
             // Create new user if not exists
-            if (! $userArr) {
+            if (!$userArr) {
                 $newUserData = [
-                    'name' => $googleUser->getName() ?? $googleUser->getNickname() ?? explode('@', $googleUser->getEmail())[0],
+                    'name' => $googleUser->getName() ?? $googleUser->getNickname() ??
+                        explode('@', $googleUser->getEmail())[0],
                     'email' => $googleUser->getEmail(),
                     'password' => bcrypt(Str::random(32)), // random password, not used
                     'role' => 'user',
@@ -185,15 +186,16 @@ class LoginController extends Controller
 
             // Redirect to intended URL or home
             return redirect()->intended($this->redirectPath());
-
         } catch (\Exception $e) {
-            Log::error('Error during Google authentication: '.$e->getMessage(), [
+            Log::error('Error during Google authentication: ' . $e->getMessage(), [
                 'exception' => $e,
                 'email' => $googleUser->getEmail(),
             ]);
 
             return redirect('/login')
-                ->withErrors(['google' => 'An error occurred during authentication. Please try again or contact support.']);
+                ->withErrors([
+                    'google' => 'An error occurred during authentication. Please try again or contact support.',
+                ]);
         }
     }
 

@@ -15,7 +15,8 @@ use ZipArchive;
 class BookController extends Controller
 {
     // Register in routes/web.php:
-    // Route::post('/admin/books/resync-from-path', [BookController::class, 'resyncFromPath'])->name('admin.books.resyncFromPath');
+    // Route::post('/admin/books/resync-from-path', [BookController::class, 'resyncFromPath'])
+    // ->name('admin.books.resyncFromPath');
     use BookImportTrait;
 
     /**
@@ -31,28 +32,28 @@ class BookController extends Controller
         ]);
         $directoryPath = $request->input('directoryPath');
         try {
-            $parser = app(\App\Services\BookDirectoryParser::class);
+            $parser = new \App\Services\BookDirectoryParser();
             $storagePath = env('BOOK_STORAGE_PATH');
             $absPath = $parser->resolveStoragePath($directoryPath);
-            if (! is_dir($absPath)) {
-                return response()->json(['success' => false, 'message' => 'Directory does not exist.'], 404);
+            if (!is_dir($absPath)) {
+                return response()->json(['success' => false, 'message' => 'Directory does not exist . '], 404);
             }
             $parsed = $parser->parseDirectory($absPath);
             $book = is_array($parsed) && count($parsed) > 0 ? $parsed[0] : null;
-            if (! $book) {
-                return response()->json(['success' => false, 'message' => 'Could not parse directory.']);
+            if (!$book) {
+                return response()->json(['success' => false, 'message' => 'Could not parse directory . ']);
             }
             // Normalize output for JS
             $authors = [];
-            if (! empty($book['author'])) {
+            if (!empty($book['author'])) {
                 $authors = is_array($book['author']) ? $book['author'] : [$book['author']];
             }
             $series = [];
-            if (! empty($book['series']) && is_array($book['series'])) {
+            if (!empty($book['series']) && is_array($book['series'])) {
                 foreach ($book['series'] as $name => $number) {
                     $series[] = ['name' => $name, 'number' => $number];
                 }
-            } elseif (! empty($book['series'])) {
+            } elseif (!empty($book['series'])) {
                 $series[] = ['name' => $book['series'], 'number' => $book['seriesNumber'] ?? ''];
             }
 
@@ -63,7 +64,7 @@ class BookController extends Controller
                 'series' => $series,
             ]);
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => 'Error: '.$e->getMessage()], 500);
+            return response()->json(['success' => false, 'message' => 'Error: ' . $e->getMessage()], 500);
         }
     }
 
@@ -82,7 +83,7 @@ class BookController extends Controller
 
     public function index(Request $request)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $books = $firestore->listBooks();
 
         // Filtering
@@ -167,7 +168,7 @@ class BookController extends Controller
 
     public function create(Request $request)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         // Always initialize author and genre as arrays for the form
         $initial = [
             'directory_path' => $request->path,
@@ -185,39 +186,39 @@ class BookController extends Controller
             if (is_array($dirMeta)) {
                 $initial = array_merge($initial, $dirMeta);
                 // Ensure author and genre are arrays
-                if (empty($initial['author']) || ! is_array($initial['author'])) {
+                if (empty($initial['author']) || !is_array($initial['author'])) {
                     $initial['author'] = [''];
                 }
-                if (empty($initial['genre']) || ! is_array($initial['genre'])) {
+                if (empty($initial['genre']) || !is_array($initial['genre'])) {
                     $initial['genre'] = [''];
                 }
             }
             [$coverAuto, $coverCandidates] = $this->findCoverImageCandidate($directoryPath);
             // If no cover and no images, try m4b extraction
             if (empty($coverAuto) && empty($coverCandidates)) {
-                $dir = rtrim($this->storagePath, '/').'/'.ltrim($directoryPath, '/');
+                $dir = rtrim($this->storagePath, '/') . '/' . ltrim($directoryPath, '/');
                 if (is_dir($dir)) {
                     $m4bs = array_values(array_filter(scandir($dir), function ($f) use ($dir) {
-                        return is_file($dir.'/'.$f) && strtolower(pathinfo($f, PATHINFO_EXTENSION)) === 'm4b';
+                        return is_file($dir . '/' . $f) && strtolower(pathinfo($f, PATHINFO_EXTENSION)) === 'm4b';
                     }));
                     if ($m4bs) {
-                        $firstM4b = $dir.'/'.$m4bs[0];
+                        $firstM4b = $dir . '/' . $m4bs[0];
                         $coverFile = $this->extractCoverFromM4B($firstM4b, $dir);
                         if ($coverFile) {
                             $coverAuto = $coverFile;
                         }
                         $tags = $this->extractTagData($firstM4b);
-                        if (! empty($tags['description'])) {
+                        if (!empty($tags['description'])) {
                             $initial['description'] = $tags['description'];
                         }
                     }
                     // Also check metadata.abs for description and year
                     $meta = $this->extractMetadataAbs($dir);
-                    if (! empty($meta['description']) && empty($initial['description'])) {
+                    if (!empty($meta['description']) && empty($initial['description'])) {
                         $initial['description'] = $meta['description'];
                     }
-                    if (! empty($meta['year']) && empty($initial['published_year'])) {
-                        $initial['published_year'] = $meta['year'];
+                    if (!empty($meta['year']) && empty($initial['publishedYear'])) {
+                        $initial['publishedYear'] = $meta['year'];
                     }
                 }
             }
@@ -238,19 +239,19 @@ class BookController extends Controller
         }
         // Always fetch genreList as array for the form
         $genreList = $firestore->listGenres();
-        if (! is_array($genreList)) {
+        if (!is_array($genreList)) {
             $genreList = [];
         }
         // Guarantee initial['author'] and initial['genre'] are arrays for JS and Blade
-        if (empty($initial['author']) || ! is_array($initial['author'])) {
+        if (empty($initial['author']) || !is_array($initial['author'])) {
             $initial['author'] = [''];
         }
-        if (empty($initial['genre']) || ! is_array($initial['genre'])) {
+        if (empty($initial['genre']) || !is_array($initial['genre'])) {
             $initial['genre'] = [''];
         }
         $book = []; // Initialize empty book array
 
-        if (! isset($initial['directoryPath'])) {
+        if (!isset($initial['directoryPath'])) {
             $initial['directoryPath'] = '';
         }
 
@@ -296,9 +297,9 @@ class BookController extends Controller
      */
     public function edit($id)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $book = $firestore->getBook($id);
-        if (! $book) {
+        if (!$book) {
             abort(404, 'Book not found');
         }
         $genreList = $firestore->listGenres();
@@ -330,7 +331,7 @@ class BookController extends Controller
     {
         \Log::debug('BookController@store called', ['input' => $request->all()]);
         try {
-            $firestore = new FirestoreService;
+            $firestore = new FirestoreService();
 
             $validated = $request->validate(
                 [
@@ -361,7 +362,7 @@ class BookController extends Controller
             $book['publishedYear'] = $validated['publishedYear'] ?? null;
             // Handle series as an associative array with name as key and number as value
             $book['series'] = [];
-            if (! empty($validated['series'])) {
+            if (!empty($validated['series'])) {
                 foreach ($validated['series'] as $i => $seriesName) {
                     $seriesName = trim($seriesName);
                     if ($seriesName === '') {
@@ -379,45 +380,46 @@ class BookController extends Controller
 
             // Remove any empty series entries
             $book['series'] = array_filter($book['series'], function ($name) {
-                return ! empty($name);
+                return !empty($name);
             }, ARRAY_FILTER_USE_KEY);
 
             $dirPath = $validated['directoryPath'] ?? null;
             if (empty($dirPath)) {
-                if (! empty($validated['series'])) {
+                if (!empty($validated['series'])) {
                     $series = $validated['series'];
-                    $genreName = ! empty($validated['genre'][0]);
+                    $genreName = !empty($validated['genre'][0]);
                     // generate authorName from author array by implodeing with ' & ' and removing any empty values
                     $authorName = implode(' & ', array_filter($validated['author']));
                     // generate series name from the first series in the series array
-                    $seriesName = ! empty($validated['series'][0]);
-                    // generate the dir path from genre, author, series, and series number and title (author/series/[series number] title) or author/title
+                    $seriesName = !empty($validated['series'][0]);
+                    // generate the dir path from genre, author, series, and series number and title
+                    // (author/series/[series number] title) or author/title
                     if ($series) {
-                        $dirPath = '/'.implode('/', [
+                        $dirPath = '/' . implode('/', [
                             $genreName,
                             $authorName,
                             $series,
-                            ($validated['seriesNumber'] ? $validated['seriesNumber'].' ' : '').$validated['title'],
+                            ($validated['seriesNumber'] ? $validated['seriesNumber'] . ' ' : '') . $validated['title'],
                         ]);
                     } else {
-                        $dirPath = '/'.implode('/', [
+                        $dirPath = '/' . implode('/', [
                             $genreName,
                             $authorName,
                             $validated['title'],
                         ]);
                     }
                 } else {
-                    $genreName = ! empty($validated['genre'][0]);
+                    $genreName = !empty($validated['genre'][0]);
                     // generate authorName from author array by implodeing with ' & ' and removing any empty values
                     $authorName = implode(' & ', array_filter($validated['author']));
-                    $dirPath = '/'.implode('/', [
+                    $dirPath = '/' . implode('/', [
                         $genreName,
                         $authorName,
                         $validated['title'],
                     ]);
                 }
                 if ($this->storagePath && $dirPath) {
-                    Storage::makeDirectory($this->storagePath.'/'.ltrim($dirPath, '/'));
+                    Storage::makeDirectory($this->storagePath . '/' . ltrim($dirPath, '/'));
                 }
             }
             $book['directoryPath'] = $dirPath;
@@ -426,7 +428,8 @@ class BookController extends Controller
             $coverImagePath = null;
             if ($request->hasFile('coverImage')) {
                 $ext = $request->file('coverImage')->getClientOriginalExtension();
-                $coverImagePath = ($validated['directoryPath'] ? trim($validated['directoryPath'], '/').'/' : '').'cover.'.$ext;
+                $coverImagePath = ($validated['directoryPath'] ? trim($validated['directoryPath'], '/') . '/' : '') .
+                    'cover . ' . $ext;
                 Storage::disk('books')->put(
                     $coverImagePath,
                     file_get_contents($request->file('coverImage')->getRealPath())
@@ -442,12 +445,11 @@ class BookController extends Controller
                 }
             } elseif ($request->filled('coverImageCandidate')) {
                 $candidate = $request->input('coverImageCandidate');
-                $book['coverImage'] = ltrim($book['directoryPath'], '/').'/'.
-                    $candidate;
+                $book['coverImage'] = ltrim($book['directoryPath'], '/') . '/' . $candidate;
             }
 
             // Generate dirPath if not provided
-            \Log::debug('BookController@store book data', ['book' => $book]);
+            Log::debug('BookController@store book data', ['book' => $book]);
 
             // Store the book record in Firestore
             $bookId = $firestore->createBook($book);
@@ -462,16 +464,16 @@ class BookController extends Controller
             }
 
             // Handle Book File Uploads and directory creation
-            if (! $this->storagePath) {
+            if (!$this->storagePath) {
                 Log::error('BOOK_STORAGE_PATH is not defined in the .env file.');
 
-                return back()->withErrors(['error' => 'Configuration error: BOOK_STORAGE_PATH is not defined.']);
+                return back()->withErrors(['error' => 'Configuration error: BOOK_STORAGE_PATH is not defined . ']);
             }
             // Make sure the directory exists (create or rename if necessary)
             $bookDirectory = $book['directoryPath'] ?? null;
             if ($bookDirectory) {
-                $absPath = $this->storagePath.'/'.ltrim($bookDirectory, '/');
-                if (! is_dir($absPath)) {
+                $absPath = $this->storagePath . '/' . ltrim($bookDirectory, '/');
+                if (!is_dir($absPath)) {
                     Storage::makeDirectory($absPath);
                 }
             }
@@ -479,7 +481,7 @@ class BookController extends Controller
                 $files = $request->file('book_files');
                 foreach ($files as $file) {
                     $filename = $file->getClientOriginalName();
-                    $file->storeAs($this->storagePath.'/'.$bookDirectory, $filename);
+                    $file->storeAs($this->storagePath . '/' . $bookDirectory, $filename);
                 }
             }
 
@@ -510,10 +512,17 @@ class BookController extends Controller
 
             return redirect()->route('admin.books.index')->with('success', 'Book created successfully!');
         } catch (\Illuminate\Validation\ValidationException $e) {
-            \Log::error('BookController@store validation error', ['errors' => $e->errors(), 'input' => $request->all()]);
+            Log::error('BookController@store validation error', [
+                'errors' => $e->errors(),
+                'input' => $request->all(),
+            ]);
             throw $e;
         } catch (\Throwable $e) {
-            \Log::error('BookController@store exception', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString(), 'input' => $request->all()]);
+            Log::error('BookController@store exception', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'input' => $request->all(),
+            ]);
             throw $e;
         }
     }
@@ -523,7 +532,7 @@ class BookController extends Controller
      */
     public function destroy($id)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $firestore->deleteBook($id);
 
         return redirect()->route('admin.books.index')->with('success', 'Book deleted successfully.');
@@ -531,11 +540,11 @@ class BookController extends Controller
 
     public function download($id)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $book = $firestore->getBook($id);
         $directoryPath = $book['directoryPath'];
 
-        if (! $directoryPath || ! Storage::disk('books')->exists($directoryPath)) {
+        if (!$directoryPath || !Storage::disk('books')->exists($directoryPath)) {
             abort(404, 'Book directory not found.');
         }
 
@@ -545,12 +554,12 @@ class BookController extends Controller
             abort(404, 'No files found for this book.');
         }
 
-        $zipFileName = str_replace(' ', '_', $book['title']).'.zip';  // Sanitize filename
+        $zipFileName = str_replace(' ', '_', $book['title']) . '.zip';  // Sanitize filename
         $zipPath = storage_path(
-            'app/public/temp/'.$zipFileName
+            'app/public/temp/' . $zipFileName
         );  // Temporary storage
 
-        $zip = new ZipArchive;
+        $zip = new ZipArchive();
 
         if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
             abort(500, 'Failed to create zip archive.');
@@ -575,7 +584,7 @@ class BookController extends Controller
         $series = $request->query('series', '');
         $seriesNumber = $request->query('series_number', '');
 
-        if (! $title || ! $author) {
+        if (!$title || !$author) {
             return response()->json([
                 'error' => 'Title and author are required.',
             ], 400);
@@ -591,7 +600,7 @@ class BookController extends Controller
 
         $more = $request->query('more');
         $limit = min((int) $request->query('limit', 10), 40); // Default 10, max 40
-        if ($closeMatch && ! $more) {
+        if ($closeMatch && !$more) {
             $info = $closeMatch['volumeInfo'];
             $autofill = [
                 'title' => $info['title'] ?? '',
@@ -641,9 +650,9 @@ class BookController extends Controller
     public function previewImage($book, $filename)
     {
         $storagePath = env('BOOK_STORAGE_PATH');
-        $dir = rtrim($storagePath, '/').'/'.ltrim($book['directoryPath'], '/');
-        $fullPath = $dir.'/'.$filename;
-        if (! file_exists($fullPath)) {
+        $dir = rtrim($storagePath, '/') . '/' . ltrim($book['directoryPath'], '/');
+        $fullPath = $dir . '/' . $filename;
+        if (!file_exists($fullPath)) {
             abort(404);
         }
         $mime = mime_content_type($fullPath);
@@ -660,7 +669,7 @@ class BookController extends Controller
     public function seriesAjax(Request $request)
     {
         $q = $request->input('q', '');
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $series = $firestore->listSeries();
         if ($q) {
             $series = array_filter($series, function ($item) use ($q) {
@@ -686,11 +695,11 @@ class BookController extends Controller
             'new_name' => 'required|string', // new name only, not path
         ]);
         $relPath = trim($request->input('path'), '/');
-        $path = $this->storagePath.'/'.$relPath;
+        $path = $this->storagePath . '/' . $relPath;
         $newName = $request->input('new_name');
 
         $dir = dirname($path);
-        $newPath = $dir.DIRECTORY_SEPARATOR.$newName;
+        $newPath = $dir . DIRECTORY_SEPARATOR . $newName;
 
         Log::info("{$path} -> {$newPath}");
 
@@ -698,7 +707,7 @@ class BookController extends Controller
         $newRel = str_replace($this->storagePath, '', $newPath);
         Log::info("({$this->storagePath}) {$oldRel} -> {$newRel}");
 
-        if (! file_exists($path)) {
+        if (!file_exists($path)) {
             return response()->json(['error' => 'Original file/folder does not exist.'], 404);
         }
         if (file_exists($newPath)) {
@@ -714,7 +723,7 @@ class BookController extends Controller
                 $newRel = str_replace($this->storagePath, '', $newPath);
                 Log::info("({$this->storagePath}) {$oldRel} -> {$newRel}");
                 // Update Firestore books whose directoryPath matches $oldRel
-                $firestore = new FirestoreService;
+                $firestore = new FirestoreService();
                 $booksToUpdate = array_filter($firestore->listBooks(), function ($book) use ($oldRel) {
                     return isset($book['directoryPath']) && $book['directoryPath'] === $oldRel;
                 });
@@ -744,7 +753,7 @@ class BookController extends Controller
         $directory = $request->input('directory');
         $showAll = $request->boolean('show_all', false);
         $storagePath = env('BOOK_STORAGE_PATH');
-        $dir = rtrim($storagePath, '/').'/'.ltrim($directory, '/');
+        $dir = rtrim($storagePath, '/') . '/' . ltrim($directory, '/');
         $files = [];
         if (is_dir($dir)) {
             $allFiles = scandir($dir);
@@ -753,8 +762,8 @@ class BookController extends Controller
                 if ($file === '.' || $file === '..') {
                     continue;
                 }
-                $path = $dir.'/'.$file;
-                if (! is_file($path)) {
+                $path = $dir . '/' . $file;
+                if (!is_file($path)) {
                     continue;
                 }
                 $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
@@ -803,9 +812,9 @@ class BookController extends Controller
      */
     public function getRawJson($id)
     {
-        $firestore = new FirestoreService;
+        $firestore = new FirestoreService();
         $book = $firestore->getBook($id);
-        if (! $book) {
+        if (!$book) {
             abort(404);
         }
 

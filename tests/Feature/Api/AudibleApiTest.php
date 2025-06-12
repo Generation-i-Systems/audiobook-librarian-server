@@ -3,7 +3,6 @@
 namespace Tests\Feature\Api;
 
 use App\Services\AudibleService;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
 
@@ -30,10 +29,6 @@ class AudibleApiTest extends BaseApiTest
     {
         return 'B002V8L3F4'; // Example ASIN
     }
-
-
-
-
 
     protected function getMockSearchResponse(): array
     {

@@ -104,7 +104,7 @@ class BookControllerTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
-    public function testStoreCreatesBook(): void
+    public function test_store_creates_book(): void
     {
         $genreRef = $this->genresCollection->add(['name' => 'Fiction']);
         $seriesRef = $this->seriesCollection->add(['name' => 'Test Series']);
@@ -118,8 +118,8 @@ class BookControllerTest extends TestCase
                 'author' => ['Test Author'],
                 'genre' => ['Fiction'],
                 'series' => ['Test Series'],
-                'series_number' => [1],
-                'cover_image' => $file,
+                'seriesNumber' => [1],
+                'coverImage' => $file,
                 'description' => 'Test description',
             ]);
 
@@ -137,7 +137,7 @@ class BookControllerTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
-    public function testStoreValidationError(): void
+    public function test_store_validation_error(): void
     {
         $response = $this->actingAs($this->admin->data())
             ->post(route('admin.books.store'), [
@@ -149,8 +149,7 @@ class BookControllerTest extends TestCase
         $response->assertSessionHasErrors(['title', 'author', 'genre']);
     }
 
-
-    public function test_update_modifies_book()
+    public function test_update_modifies_book(): void
     {
         // Create a test book
         $bookRef = $this->booksCollection->add([
@@ -180,7 +179,7 @@ class BookControllerTest extends TestCase
         $this->assertEquals('New Genre', $book['genre']);
     }
 
-    public function test_destroy_deletes_book()
+    public function test_destroy_deletes_book(): void
     {
         // Create a test book
         $bookRef = $this->booksCollection->add([

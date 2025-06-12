@@ -99,7 +99,7 @@ class HardcoverApiTest extends TestCase
     }
 
     #[Test]
-    public function testSearchBooksByTitle()
+    public function test_search_books_by_title()
     {
 
         $results = $this->hardcoverApiService->searchBooksByTitle('Test');
@@ -111,7 +111,7 @@ class HardcoverApiTest extends TestCase
     }
 
     #[Test]
-    public function testSearchAndMerge()
+    public function test_search_and_merge()
     {
         $book = [
             'title' => 'Test Book',
@@ -153,7 +153,7 @@ class HardcoverApiTest extends TestCase
         ]);
         $result = $this->hardcoverApiService->searchAndMerge($book);
         $this->assertIsArray($result);
-        if (!isset($result['authors'])) {
+        if (! isset($result['authors'])) {
             $result['authors'] = [['author' => ['name' => 'Test Author']]];
         }
         $this->assertEquals('Test Book', $result['title']);
@@ -161,7 +161,7 @@ class HardcoverApiTest extends TestCase
     }
 
     #[Test]
-    public function testGetBookDetails()
+    public function test_get_book_details()
     {
         Http::fake([
             'https://api.hardcover.app/v1/graphql' => Http::response([
@@ -197,7 +197,7 @@ class HardcoverApiTest extends TestCase
     }
 
     #[Test]
-    public function testGetBooksByAuthor()
+    public function test_get_books_by_author()
     {
         // Mock successful author books response
         Http::fake([
@@ -241,7 +241,7 @@ class HardcoverApiTest extends TestCase
     }
 
     #[Test]
-    public function testGetServiceName(): void
+    public function test_get_service_name(): void
     {
         $this->assertEquals('hardcover', method_exists($this->hardcoverApiService, 'getServiceName') ? $this->hardcoverApiService->getServiceName() : 'hardcover');
     }
@@ -279,7 +279,7 @@ class HardcoverApiTest extends TestCase
     }
 
     #[Test]
-    public function testCanGetBookDetails()
+    public function test_can_get_book_details()
     {
         Http::fake([
             'https://hardcover.app/api/graphql' => Http::response([

@@ -19,7 +19,7 @@ trait BookImportTrait
     private function scanDirectory(string $path): array
     {
         $storagePath = env('BOOK_STORAGE_PATH');
-        if (! $storagePath) {
+        if (!$storagePath) {
             throw new RuntimeException('BOOK_STORAGE_PATH is not defined in the .env file');
         }
 
@@ -40,7 +40,7 @@ trait BookImportTrait
     private function extractTagData(string $filePath): array
     {
         $storagePath = env('BOOK_STORAGE_PATH');
-        if (! $storagePath) {
+        if (!$storagePath) {
             throw new RuntimeException('BOOK_STORAGE_PATH is not defined in the .env file');
         }
         $directoryPath = dirname($filePath);
@@ -55,7 +55,7 @@ trait BookImportTrait
 
         $process->run();
 
-        if (! $process->isSuccessful()) {
+        if (!$process->isSuccessful()) {
             return []; // Return empty array if FFmpeg fails
         }
 
@@ -78,11 +78,11 @@ trait BookImportTrait
         // Check if tags match the directory structure
         $tagMatch = true;
 
-        if ($artist && ! str_contains(strtolower($directoryPath), strtolower($artist))) {
+        if ($artist && !str_contains(strtolower($directoryPath), strtolower($artist))) {
             $tagMatch = false;
         }
 
-        if ($album && ! str_contains(strtolower($directoryPath), strtolower($album))) {
+        if ($album && !str_contains(strtolower($directoryPath), strtolower($album))) {
             $tagMatch = false;
         }
 
@@ -101,7 +101,7 @@ trait BookImportTrait
      */
     private function extractCoverFromM4B($m4bPath, $outputDir)
     {
-        $outputImage = rtrim($outputDir, '/').'/cover.jpg';
+        $outputImage = rtrim($outputDir, '/') . '/cover.jpg';
         $process = new Process([
             'ffmpeg',
             '-y',
@@ -126,9 +126,9 @@ trait BookImportTrait
      */
     private function extractMetadataAbs($dir)
     {
-        $file = rtrim($dir, '/').'/metadata.abs';
+        $file = rtrim($dir, '/') . '/metadata.abs';
         $result = [];
-        if (! file_exists($file)) {
+        if (!file_exists($file)) {
             return $result;
         }
         $lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
@@ -177,8 +177,8 @@ trait BookImportTrait
     protected function findCoverImageCandidate(string $directoryPath): array
     {
         $storagePath = env('BOOK_STORAGE_PATH');
-        $dir = rtrim($storagePath, '/').'/'.ltrim($directoryPath, '/');
-        if (! is_dir($dir)) {
+        $dir = rtrim($storagePath, '/') . '/' . ltrim($directoryPath, '/');
+        if (!is_dir($dir)) {
             return [null, []];
         }
         $images = [];
@@ -187,16 +187,16 @@ trait BookImportTrait
             if ($file === '.' || $file === '..') {
                 continue;
             }
-            $full = $dir.'/'.$file;
-            if (! is_file($full)) {
+            $full = $dir . '/' . $file;
+            if (!is_file($full)) {
                 continue;
             }
             $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-            if (! in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
+            if (!in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
                 continue;
             }
             $images[] = $file;
-            if (! $selected && stripos($file, 'cover') !== false) {
+            if (!$selected && stripos($file, 'cover') !== false) {
                 $selected = $file;
             }
         }
@@ -232,7 +232,10 @@ trait BookImportTrait
      * Process a directory path and extract book metadata.
      *
      * @param  string  $directoryPath  The directory path to process
-     * @return array{genre: array, author: array, series?: array, title: string, directory_path: string, skipped?: bool, error?: string}
+     * @return array{
+     *      genre: array, author: array, series?: array, title: string, directory_path: string, skipped?: bool,
+     *      error?: string
+     * }
      *
      * @throws InvalidArgumentException If the directory path is invalid
      */
@@ -253,7 +256,7 @@ trait BookImportTrait
             // Debug output
             if (method_exists($this, 'debug')) {
                 $this->debug("Processing directory path: {$directoryPath}");
-                $this->debug("Path parts: " . json_encode($parts));
+                $this->debug('Path parts: ' . json_encode($parts));
             }
 
             // Handle empty or invalid paths
@@ -268,7 +271,10 @@ trait BookImportTrait
                     $pathParts = explode('/', trim($directoryPath, '/'));
 
                     // Look for common patterns in test directories
-                    if (count($pathParts) >= 3 && (in_array('Fiction', $pathParts) || in_array('NonFiction', $pathParts))) {
+                    if (
+                        count($pathParts) >= 3 && (in_array('Fiction', $pathParts) ||
+                            in_array('NonFiction', $pathParts))
+                    ) {
                         // Find the index of Fiction or NonFiction
                         $genreIndex = array_search('Fiction', $pathParts);
                         if ($genreIndex === false) {
@@ -280,8 +286,10 @@ trait BookImportTrait
                             $book['author'] = [$pathParts[$genreIndex + 1]];
                             $book['title'] = $pathParts[$genreIndex + 2];
                             if (method_exists($this, 'debug')) {
-                                $this->debug("Extracted from absolute path: Genre={$pathParts[$genreIndex]}, Author={$pathParts[$genreIndex + 1]}, Title={$pathParts[$genreIndex + 2]}");
+                                $this->debug("Extracted from absolute path: Genre={$pathParts[$genreIndex]}, " .
+                                    "Author={$pathParts[$genreIndex + 1]}, Title={$pathParts[$genreIndex + 2]}");
                             }
+
                             return $book;
                         }
                     }
@@ -326,7 +334,7 @@ trait BookImportTrait
             if (str_contains($author, ',') || stripos($author, ' and ') !== false || str_contains($author, '&')) {
                 $author = str_replace([' and ', ' & '], ',', $author);
                 $authors = array_map('trim', explode(',', $author));
-                $book['author'] = array_values(array_filter($authors, fn ($a) => strlen(trim($a)) > 4));
+                $book['author'] = array_values(array_filter($authors, fn($a) => strlen(trim($a)) > 4));
             } else {
                 $book['author'] = [trim($author)];
             }
@@ -346,11 +354,11 @@ trait BookImportTrait
                 $title = array_pop($parts);
                 $seriesCandidate = array_pop($parts);
                 // Only set series if the folder is not numeric
-                if (! is_numeric($seriesCandidate)) {
+                if (!is_numeric($seriesCandidate)) {
                     $series = $seriesCandidate;
                 } else {
                     // If the folder is numeric, treat it as part of the title (prepend to title)
-                    $title = $seriesCandidate.' '.$title;
+                    $title = $seriesCandidate . ' ' . $title;
                     $series = null;
                 }
                 // Try to extract series number from title
@@ -370,14 +378,13 @@ trait BookImportTrait
             }
 
             // Set series data if we have a valid series name (string, not numeric)
-            if (! empty($series) && is_string($series)) {
+            if (!empty($series) && is_string($series)) {
                 $book['series'] = empty($seriesNumber) ? [$series => null] : [$series => $seriesNumber];
             }
 
             $book['title'] = trim($title);
-
         } catch (\Exception $e) {
-            Log::error("Error processing directory path {$directoryPath}: ".$e->getMessage());
+            Log::error("Error processing directory path {$directoryPath}: " . $e->getMessage());
             $book['error'] = $e->getMessage();
             $book['skipped'] = true;
         }
@@ -394,7 +401,7 @@ trait BookImportTrait
      */
     private function importCoverImageFromUrl($url, $directoryPath = null): ?string
     {
-        if (! $url) {
+        if (!$url) {
             Log::error("Invalid URL: {$url}");
 
             return null;
@@ -402,15 +409,15 @@ trait BookImportTrait
 
         try {
             $storagePath = env('BOOK_STORAGE_PATH'); // absolute path
-            if (! $storagePath) {
+            if (!$storagePath) {
                 Log::error('BOOK_STORAGE_PATH is not defined.');
 
                 return null;
             }
 
-            $fullDir = rtrim($storagePath, '/').'/'.ltrim($directoryPath, '/');
-            if (! is_dir($fullDir)) {
-                if (! mkdir($fullDir, 0775, true) && ! is_dir($fullDir)) {
+            $fullDir = rtrim($storagePath, '/') . '/' . ltrim($directoryPath, '/');
+            if (!is_dir($fullDir)) {
+                if (!mkdir($fullDir, 0775, true) && !is_dir($fullDir)) {
                     Log::error("importCoverImageFromUrl error: Unable to create directory at $fullDir");
 
                     return null;
@@ -424,14 +431,13 @@ trait BookImportTrait
             curl_setopt(
                 $ch,
                 CURLOPT_USERAGENT,
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '.
-                'Chrome/58.0.3029.110 Safari/537.3'
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) ' . 'Chrome/58.0.3029.110 Safari/537.3'
             );
             $contents = curl_exec($ch);
             $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
             curl_close($ch);
 
-            if ($contents === false || ! $contents) {
+            if ($contents === false || !$contents) {
                 Log::error("importCoverImageFromUrl error: Unable to fetch image from {$url}");
 
                 return null;
@@ -447,8 +453,8 @@ trait BookImportTrait
                 $ext = 'jpg';
             }
 
-            $filename = 'cover.'.$ext;
-            $fullPath = $fullDir.'/'.$filename;
+            $filename = 'cover.' . $ext;
+            $fullPath = $fullDir . '/' . $filename;
             if (file_put_contents($fullPath, $contents) === false) {
                 Log::error("importCoverImageFromUrl error: Unable to write file $fullPath");
 
@@ -456,10 +462,9 @@ trait BookImportTrait
             }
 
             // Return only the path relative to BOOK_STORAGE_PATH
-            return ltrim($directoryPath, '/').'/'.$filename;
-
+            return ltrim($directoryPath, '/') . '/' . $filename;
         } catch (\Exception $e) {
-            Log::error('importCoverImageFromUrl error: '.$e->getMessage());
+            Log::error('importCoverImageFromUrl error: ' . $e->getMessage());
 
             return null;
         }
@@ -675,12 +680,12 @@ trait BookImportTrait
         }
 
         // Check for numbers at beginning or end of title without a series
-        if (! $series && (preg_match('/^\d+\s+/', $title) || preg_match('/\s+\d+$/', $title))) {
+        if (!$series && (preg_match('/^\d+\s+/', $title) || preg_match('/\s+\d+$/', $title))) {
             $reasons[] = "Title has numbers at beginning or end: $title";
         }
 
         // Return reasons if any, otherwise null
-        return ! empty($reasons) ? $reasons : null;
+        return !empty($reasons) ? $reasons : null;
     }
 
     /**

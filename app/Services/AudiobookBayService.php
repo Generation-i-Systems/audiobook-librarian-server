@@ -35,7 +35,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
         $limit = $options['limit'] ?? $this->defaultLimit;
         $page = $options['page'] ?? 1;
 
-        $cacheKey = 'audiobookbay_service_search_'.md5($query.'_'.$limit.'_'.$page);
+        $cacheKey = 'audiobookbay_service_search_' . md5($query . '_' . $limit . '_' . $page);
 
         return Cache::remember($cacheKey, $this->cacheTtl, function () use ($query, $options, $limit) {
             try {
@@ -100,7 +100,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
      */
     public function performGetBookDetails(string $idOrSlug): ?array
     {
-        $cacheKey = 'audiobookbay_service_book_details_'.md5($idOrSlug);
+        $cacheKey = 'audiobookbay_service_book_details_' . md5($idOrSlug);
 
         try {
             Log::debug('[AUDIOBOOKBAY-DETAIL] performGetBookDetails', [
@@ -115,7 +115,6 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
             }
 
             return $this->formatBookDetails($details);
-
         } catch (\Exception $e) {
             Log::error('AudiobookBayService: Error in performGetBookDetails', [
                 'idOrSlug' => $idOrSlug,
@@ -148,7 +147,10 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
     {
         $inputTitle = trim($book['title'] ?? '');
         $inputAuthor = '';
-        if (isset($book['authors']) && is_array($book['authors']) && isset($book['authors'][0]['author']['name']) && is_string($book['authors'][0]['author']['name'])) {
+        if (
+            isset($book['authors']) && is_array($book['authors']) && isset($book['authors'][0]['author']['name']) &&
+            is_string($book['authors'][0]['author']['name'])
+        ) {
             $inputAuthor = trim($book['authors'][0]['author']['name']);
         } elseif (isset($book['author']) && is_string($book['author'])) {
             $inputAuthor = trim($book['author']);
@@ -157,7 +159,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
         if (isset($book['series']) && is_array($book['series']) && isset($book['series'][0]['series']['number'])) {
             $inputNumber = $book['series'][0]['series']['number'];
         }
-        if (! $inputTitle) {
+        if (!$inputTitle) {
             return null;
         }
         $query = $inputTitle;
@@ -172,7 +174,10 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
             $resultTitle = $result['title'] ?? '';
             $resultAuthors = $result['authors'] ?? [];
             $resultNumber = null;
-            if (isset($result['series']) && is_array($result['series']) && isset($result['series'][0]['series']['number'])) {
+            if (
+                isset($result['series']) && is_array($result['series']) &&
+                isset($result['series'][0]['series']['number'])
+            ) {
                 $resultNumber = $result['series'][0]['series']['number'];
             }
             // Author match: author name must appear in result title (case-insensitive)
@@ -199,12 +204,12 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
                 $bestMatch = $result;
             }
         }
-        if (! $bestMatch) {
+        if (!$bestMatch) {
             return null;
         }
         // Get full details for best match
         $details = $this->apiService->getAudiobookDetails($bestMatch['id'] ?? $bestMatch['url'] ?? '');
-        if (! $details) {
+        if (!$details) {
             return null;
         }
         // Merge fields: prefer existing book fields, but add/overwrite with ABB details if missing
@@ -213,7 +218,10 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
         $apiFields = [];
         $needsReview = false;
         foreach ($merged as $field => $newValue) {
-            if (array_key_exists($field, $book) && $book[$field] !== null && $newValue !== null && $book[$field] != $newValue) {
+            if (
+                array_key_exists($field, $book) && $book[$field] !== null && $newValue !== null &&
+                $book[$field] != $newValue
+            ) {
                 $apiFields[$field] = $newValue;
                 $needsReview = true;
                 $merged[$field] = $book[$field];
@@ -225,7 +233,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
         }
 
         // Remove nulls from array
-        return array_filter($merged, fn ($v) => $v !== null);
+        return array_filter($merged, fn($v) => $v !== null);
     }
 
     /**
@@ -243,12 +251,22 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
             'published_date' => $details['published_date'] ?? null,
             'publisher' => $details['publisher'] ?? null,
             'cover_image_url' => $details['cover_image_url'] ?? null,
-            'categories' => $this->formatCategories($details['categories'] ?? ($details['metadata']['categories'] ?? [])),
+            'categories' => $this->formatCategories($details['categories'] ??
+                ($details['metadata']['categories'] ?? [])),
             'language' => $details['language'] ?? null,
-            'series' => (! empty($details['series']['name'])) ? ($details['series']['name'].(! empty($details['series']['number']) ? ' #'.$details['series']['number'] : '')) : null,
+            'series' => (!empty($details['series']['name'])) ?
+                ($details['series']['name'] . (!empty($details['series']['number']) ?
+                    ' #' . $details['series']['number'] : '')) :
+                null,
             'series_number' => $details['series']['number'] ?? null,
-            'duration_seconds' => $this->parseDuration($details['metadata']['duration'] ?? $details['duration'] ?? null),
-            'metadata' => array_merge($details['metadata'] ?? [], ['source' => 'AudiobookBay', 'url' => $details['url'] ?? null]),
+            'duration_seconds' => $this->parseDuration($details['metadata']['duration'] ??
+                $details['duration'] ?? null),
+            'metadata' => array_merge($details['metadata'] ??
+                [], [
+                'source' => 'AudiobookBay',
+                'url' => $details['url'] ??
+                    null
+            ]),
         ];
     }
 
