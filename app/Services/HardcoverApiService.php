@@ -74,7 +74,7 @@ class HardcoverApiService
             'publisher' => $details['publisher']['name'] ?? $bestMatch['publisher']['name'] ?? null,
         ];
 
-        return array_filter($merged, fn($v) => $v !== null);
+        return array_filter($merged, fn ($v) => $v !== null);
     }
 
     public function setApiKey(string $apiKey): void

@@ -241,7 +241,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
         }
 
         // Remove nulls from array
-        return array_filter($merged, fn($v) => $v !== null);
+        return array_filter($merged, fn ($v) => $v !== null);
     }
 
     /**

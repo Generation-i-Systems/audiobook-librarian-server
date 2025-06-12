@@ -584,7 +584,7 @@ class ParseBooksCommand extends Command
             // Handle author as array or string
             $author = $book['author'] ?? '';
             if (is_array($author)) {
-                $author = implode(', ', array_filter($author, fn($a) => !empty(trim($a))));
+                $author = implode(', ', array_filter($author, fn ($a) => !empty(trim($a))));
             }
 
             // Ensure all values are scalars or strings (no arrays)
