@@ -483,6 +483,17 @@
 // Debug: Confirm jQuery and jQuery UI are loaded before form.js
 console.log('window.jQuery:', typeof window.jQuery, window.jQuery ? 'OK' : 'MISSING');
 console.log('$.fn.autocomplete:', typeof $.fn.autocomplete, $.fn.autocomplete ? 'OK' : 'MISSING');
+
+// Always call initBookForm on DOM ready for this form
+$(function() {
+    var formSelector = '#book-form';
+    if (typeof window.initBookForm === 'function') {
+        console.log('Calling initBookForm for selector', formSelector);
+        window.initBookForm(formSelector);
+    } else {
+        console.error('initBookForm is not defined!');
+    }
+});
 </script>
 <script src="{{ asset('js/admin/books/form.js') }}"></script>
 @endsection
