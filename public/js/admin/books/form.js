@@ -37,8 +37,10 @@ function addAuthorRow($container, authorName = '') {
             <button type="button" class="btn btn-primary btn-sm add-author-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
         </div>`;
     group.appendChild(div);
-    // Re-initialize autocomplete for the new element if needed, or rely on delegation
-    // $(div).find('.author-autocomplete').autocomplete({ source: window.BOOK_FORM_ROUTES.authorsAutocomplete });
+        // Re-initialize autocomplete for the new element
+    if (typeof initializeAutocomplete === 'function') {
+        initializeAutocomplete($container, '.author-autocomplete', window.BOOK_FORM_ROUTES.authorsAutocomplete);
+    }
     updateAddRowButtons($container, '#authors-group', '.author-row', '.add-author-row');
 }
 window.addAuthorRow = addAuthorRow;
@@ -58,8 +60,10 @@ function addSeriesRow($container, seriesName = '', seriesNumber = '') {
             <button type="button" class="btn btn-primary btn-sm add-series-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
         </div>`;
     group.appendChild(div);
-    // Re-initialize autocomplete for the new element if needed, or rely on delegation
-    // $(div).find('.series-autocomplete').autocomplete({ source: window.BOOK_FORM_ROUTES.seriesAutocomplete });
+        // Re-initialize autocomplete for the new element
+    if (typeof initializeAutocomplete === 'function') {
+        initializeAutocomplete($container, '.series-autocomplete', window.BOOK_FORM_ROUTES.seriesAutocomplete);
+    }
     updateAddRowButtons($container, '#series-group', '.series-row', '.add-series-row');
 }
 window.addSeriesRow = addSeriesRow;
@@ -334,7 +338,11 @@ window.initBookForm = function(formContainerSelector) {
     updateAddRowButtons($container, '#series-group', '.series-row', '.add-series-row');
     updateAddRowButtons($container, '#genres-group', '.genre-row', '.add-genre-row');
 
-
+    // Initialize autocomplete for all author and series fields on page load
+    if (typeof initializeAutocomplete === 'function') {
+        initializeAutocomplete($container, '.author-autocomplete', window.BOOK_FORM_ROUTES.authorsAutocomplete);
+        initializeAutocomplete($container, '.series-autocomplete', window.BOOK_FORM_ROUTES.seriesAutocomplete);
+    }
 
     // Any additional initialization (e.g., autocomplete)
     if (typeof initializeAutocomplete === 'function') {
