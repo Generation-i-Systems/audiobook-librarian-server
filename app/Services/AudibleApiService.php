@@ -480,7 +480,7 @@ class AudibleApiService
             'published_date' => $itemAttributes['PublicationDate'] ?? null,
             'description' => $description,
             'duration' => $runningTime, // Or $itemAttributes['RunningTime'] directly
-            'cover_image_url' => $coverImageUrl,
+            'coverImageUrl' => $coverImageUrl,
             'genres' => $this->extractGenres($item['BrowseNodes'] ?? []),
             'rating' => $item['CustomerReviews']['AverageRating'] ?? ($itemAttributes['AverageRating'] ?? null),
             'rating_count' => $item['CustomerReviews']['TotalReviews'] ?? ($itemAttributes['TotalReviews'] ?? 0),
@@ -491,8 +491,8 @@ class AudibleApiService
                 ? [['name' => $itemAttributes['Title'] ?? 'N/A', 'part' => $itemAttributes['SeriesSequence']]]
                 : [],
             'tags' => [], // Audible API doesn't directly provide tags like user tags
-            'source_api' => 'Audible',
-            'raw_response' => $item, // Optionally include for debugging or further processing
+            'sourceApi' => 'Audible',
+            'rawAudibleResponse' => $item, // Optionally include for debugging or further processing
         ];
     }
 
@@ -512,7 +512,7 @@ class AudibleApiService
 
         // If it's an array of strings
         if (is_array($contributors) && isset($contributors[0]) && is_string($contributors[0])) {
-            return array_map(fn ($name) => ['name' => $name], $contributors);
+            return array_map(fn($name) => ['name' => $name], $contributors);
         }
 
         // If it's an array of ['Role' => ..., 'Contributor' => ...] or similar structures
