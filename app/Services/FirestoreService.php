@@ -25,11 +25,11 @@ class FirestoreService
     public function getDocument(string $collection, string $docId): ?array
     {
         try {
-            if (! $this->db) {
+            if (!$this->db) {
                 return null;
             }
             $snap = $this->db->collection($collection)->document($docId)->snapshot();
-            if (! $snap->exists()) {
+            if (!$snap->exists()) {
                 return null;
             }
             $data = $snap->data();
@@ -46,11 +46,11 @@ class FirestoreService
     public function getUserById($identifier)
     {
         try {
-            if (! $this->db) {
+            if (!$this->db) {
                 return null;
             }
             $snap = $this->db->collection('users')->document($identifier)->snapshot();
-            if (! $snap->exists()) {
+            if (!$snap->exists()) {
                 return null;
             }
             $user = $snap->data();
@@ -76,11 +76,11 @@ class FirestoreService
     public function getUserByRememberToken($identifier, $token)
     {
         try {
-            if (! $this->db) {
+            if (!$this->db) {
                 return null;
             }
             $snap = $this->db->collection('users')->document($identifier)->snapshot();
-            if (! $snap->exists()) {
+            if (!$snap->exists()) {
                 return null;
             }
             $user = $snap->data();
@@ -124,7 +124,7 @@ class FirestoreService
         try {
             // Only log which keys are being used, not values
             Log::debug('getUserByCredentials', ['credential_keys' => array_keys($credentials)]);
-            if (! $this->db) {
+            if (!$this->db) {
                 Log::error('getUserByCredentials: db not initialized');
 
                 return null;
@@ -139,7 +139,7 @@ class FirestoreService
                 if (in_array($key, ['username', 'email'])) {
                     $allDocs = $this->db->collection('users')->documents();
                     foreach ($allDocs as $doc) {
-                        if (! $doc->exists()) {
+                        if (!$doc->exists()) {
                             continue;
                         }
                         $data = $doc->data();
@@ -182,7 +182,7 @@ class FirestoreService
         try {
             // FirestoreUser may be an object, so handle both
             $userArr = is_array($user) ? $user : (method_exists($user, 'getRawUser') ? $user->getRawUser() : []);
-            if (! isset($userArr['password']) || ! isset($credentials['password'])) {
+            if (!isset($userArr['password']) || !isset($credentials['password'])) {
                 Log::debug('Missing password field', ['userArr' => $userArr, 'credentials' => $credentials]);
 
                 return false;
@@ -297,11 +297,11 @@ class FirestoreService
     // USER CRUD
     public function createUser(array $data)
     {
-        if (! $this->db) {
+        if (!$this->db) {
             return null;
         }
         // Default role to 'preview' if not set
-        if (! isset($data['role'])) {
+        if (!isset($data['role'])) {
             $data['role'] = 'preview';
         }
         try {
@@ -334,7 +334,7 @@ class FirestoreService
      */
     public function createMessage(array $messageData): ?string
     {
-        if (! $this->db) {
+        if (!$this->db) {
             Log::error('Cannot create message: Firestore client not initialized');
 
             return null;
@@ -363,7 +363,7 @@ class FirestoreService
      */
     public function getMessages(?string $userId = null, bool $includeAcknowledged = false, int $limit = 100): array
     {
-        if (! $this->db) {
+        if (!$this->db) {
             Log::error('Cannot get messages: Firestore client not initialized');
 
             return [];
@@ -376,7 +376,7 @@ class FirestoreService
                 $query = $query->where('to_user_id', '==', $userId);
             }
 
-            if (! $includeAcknowledged) {
+            if (!$includeAcknowledged) {
                 $query = $query->where('acknowledged_at', '==', null);
             }
 
@@ -405,7 +405,7 @@ class FirestoreService
      */
     public function getMessage(string $messageId): ?array
     {
-        if (! $this->db) {
+        if (!$this->db) {
             Log::error('Cannot get message: Firestore client not initialized');
 
             return null;
@@ -414,7 +414,7 @@ class FirestoreService
         try {
             $snapshot = $this->db->collection('messages')->document($messageId)->snapshot();
 
-            if (! $snapshot->exists()) {
+            if (!$snapshot->exists()) {
                 return null;
             }
 
@@ -434,7 +434,7 @@ class FirestoreService
      */
     public function acknowledgeMessage(string $messageId): bool
     {
-        if (! $this->db) {
+        if (!$this->db) {
             Log::error('Cannot acknowledge message: Firestore client not initialized');
 
             return false;
@@ -459,7 +459,7 @@ class FirestoreService
      */
     public function getUsersForMessaging(): array
     {
-        if (! $this->db) {
+        if (!$this->db) {
             Log::error('Cannot get users: Firestore client not initialized');
 
             return [];
@@ -503,14 +503,14 @@ class FirestoreService
      */
     public function createBook(array $data): ?string
     {
-        if (! $this->db) {
+        if (!$this->db) {
             Log::error('Cannot create book: Firestore client not initialized');
 
             return null;
         }
         try {
             // Ensure dateAdded is set (should be set by caller, fallback to server timestamp)
-            if (! isset($data['dateAdded'])) {
+            if (!isset($data['dateAdded'])) {
                 $data['dateAdded'] = $this->getServerTimestamp();
             }
             $docRef = $this->db->collection('books')->add($data);
@@ -531,7 +531,7 @@ class FirestoreService
      */
     public function createReview(array $data): ?string
     {
-        if (! $this->db) {
+        if (!$this->db) {
             Log::error('Cannot create review: Firestore client not initialized');
 
             return null;
@@ -572,7 +572,7 @@ class FirestoreService
     public function getBook(string $id)
     {
         $snapshot = $this->db->collection('books')->document($id)->snapshot();
-        if (! $snapshot->exists()) {
+        if (!$snapshot->exists()) {
             return null;
         }
         $data = $snapshot->data();
@@ -634,7 +634,7 @@ class FirestoreService
     public function getAuthor(string $id)
     {
         $snap = $this->db->collection('authors')->document($id)->snapshot();
-        if (! $snap->exists()) {
+        if (!$snap->exists()) {
             return null;
         }
         $author = $snap->data();
@@ -651,7 +651,7 @@ class FirestoreService
     public function listAuthors()
     {
         try {
-            if (! $this->db) {
+            if (!$this->db) {
                 return [];
             }
             $allBooks = $this->db->collection('books')->documents();
@@ -667,14 +667,14 @@ class FirestoreService
                     }
                     if ($authorData) {
                         foreach ($authorData as $authorName) {
-                            if (is_string($authorName) && ! empty($authorName)) {
+                            if (is_string($authorName) && !empty($authorName)) {
                                 $authors[$authorName] = true;
                             }
                         }
                     } elseif (
                         isset($bookData['author']) &&
                         is_string($bookData['author']) &&
-                        ! empty($bookData['author'])
+                        !empty($bookData['author'])
                     ) {
                         $authors[$bookData['author']] = true;
                     }
@@ -769,7 +769,7 @@ class FirestoreService
     public function getSeries(string $id)
     {
         $snap = $this->db->collection('series')->document($id)->snapshot();
-        if (! $snap->exists()) {
+        if (!$snap->exists()) {
             return null;
         }
         $series = $snap->data();
@@ -781,7 +781,7 @@ class FirestoreService
     public function listSeries()
     {
         try {
-            if (! $this->db) {
+            if (!$this->db) {
                 return [];
             }
             $allBooks = $this->db->collection('books')->documents();
@@ -792,7 +792,7 @@ class FirestoreService
                     if (isset($bookData['series']) && is_array($bookData['series'])) {
                         $seriesNames = array_keys($bookData['series']);
                         foreach ($seriesNames as $seriesName) {
-                            if (is_string($seriesName) && ! empty($seriesName)) {
+                            if (is_string($seriesName) && !empty($seriesName)) {
                                 $series[$seriesName] = true;
                             }
                         }
@@ -844,7 +844,7 @@ class FirestoreService
     public function findBookByDirectoryPath(string $directoryPath): ?array
     {
         try {
-            if (! $this->db) {
+            if (!$this->db) {
                 return null;
             }
 
@@ -973,7 +973,7 @@ class FirestoreService
         }
 
         // Append logs if provided
-        if (! empty($logs)) {
+        if (!empty($logs)) {
             $jobData['logs'] = array_merge($jobData['logs'] ?? [], $logs);
         }
 
@@ -994,7 +994,7 @@ class FirestoreService
     {
         try {
             $doc = $this->db->collection('jobs')->document($jobId)->snapshot();
-            if (! $doc->exists()) {
+            if (!$doc->exists()) {
                 return null;
             }
 

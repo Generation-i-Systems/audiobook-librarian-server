@@ -18,7 +18,17 @@ class AudioFileAnalyzer
      * @var array
      */
     protected $supportedExtensions = [
-        'mp3', 'm4a', 'm4b', 'm4p', 'mp4', 'aac', 'ogg', 'oga', 'wav', 'flac', 'wma',
+        'mp3',
+        'm4a',
+        'm4b',
+        'm4p',
+        'mp4',
+        'aac',
+        'ogg',
+        'oga',
+        'wav',
+        'flac',
+        'wma',
     ];
 
     /**
@@ -41,12 +51,12 @@ class AudioFileAnalyzer
      */
     public function getAudioDuration(string $filePath): ?float
     {
-        if (! file_exists($filePath) || ! is_file($filePath)) {
+        if (!file_exists($filePath) || !is_file($filePath)) {
             return null;
         }
 
         $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
-        if (! in_array($extension, $this->supportedExtensions)) {
+        if (!in_array($extension, $this->supportedExtensions)) {
             return null;
         }
 

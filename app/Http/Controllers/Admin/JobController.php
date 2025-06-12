@@ -63,7 +63,7 @@ class JobController extends Controller
     {
         $job = $this->firestore->getJobStatus($id);
 
-        if (! $job) {
+        if (!$job) {
             abort(404);
         }
 
@@ -83,7 +83,7 @@ class JobController extends Controller
     {
         $job = $this->firestore->getJobStatus($id);
 
-        if (! $job) {
+        if (!$job) {
             abort(404);
         }
 
@@ -121,12 +121,12 @@ class JobController extends Controller
     {
         $job = $this->firestore->getJobStatus($id);
 
-        if (! $job) {
+        if (!$job) {
             abort(404);
         }
 
         // Only allow cancelling queued or processing jobs
-        if (! in_array($job['status'] ?? null, ['queued', 'processing'])) {
+        if (!in_array($job['status'] ?? null, ['queued', 'processing'])) {
             return redirect()
                 ->route('admin.jobs.show', $id)
                 ->with('error', 'Only queued or processing jobs can be cancelled.');
@@ -172,7 +172,7 @@ class JobController extends Controller
     {
         $job = $this->firestore->getJobStatus($id);
 
-        if (! $job) {
+        if (!$job) {
             return response()->json([
                 'success' => false,
                 'message' => 'Job not found',

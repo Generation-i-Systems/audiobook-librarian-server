@@ -102,9 +102,9 @@ class TestAudibleSearch extends Command
                     $this->line('Release Date: ' . $releaseDate);
                 }
 
-                if (!empty($book['cover_image_url'])) {
-                    $coverImage = is_array($book['cover_image_url']) ? implode(', ', $book['cover_image_url']) :
-                        $book['cover_image_url'];
+                if (!empty($book['coverImageUrl'])) {
+                    $coverImage = is_array($book['coverImageUrl']) ? implode(', ', $book['coverImageUrl']) :
+                        $book['coverImageUrl'];
                     $this->line('Cover: ' . $coverImage);
                 }
 

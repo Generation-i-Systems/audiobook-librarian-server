@@ -50,7 +50,7 @@ class AuthorController extends Controller
     {
         $firestore = new FirestoreService();
         $author = $firestore->getAuthor($id);
-        if (! $author) {
+        if (!$author) {
             abort(404);
         }
 
@@ -62,7 +62,7 @@ class AuthorController extends Controller
         $request->validate(['name' => 'required|string|max:255']);
         $firestore = new FirestoreService();
         $author = $firestore->getAuthor($id);
-        if (! $author) {
+        if (!$author) {
             abort(404);
         }
         // Check for duplicate name

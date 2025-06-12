@@ -64,7 +64,7 @@ class CreateImportJobsForDirectory implements ShouldQueue
         }
 
         $absDir = rtrim($storagePath, '/') . '/' . ltrim($this->dir, '/');
-        if (! is_dir($absDir)) {
+        if (!is_dir($absDir)) {
             $error = "Directory not found for import: $absDir";
             Log::error('[DIRECTORY_IMPORT] ' . $error);
             throw new \RuntimeException($error);
@@ -114,7 +114,7 @@ class CreateImportJobsForDirectory implements ShouldQueue
                 $books = $firestore->listBooks();
 
                 foreach ($books as $book) {
-                    if (($book['directory_path'] ?? null) === $relDir) {
+                    if (($book['directoryPath'] ?? null) === $relDir) {
                         $exists = true;
                         break;
                     }
@@ -249,7 +249,7 @@ class CreateImportJobsForDirectory implements ShouldQueue
             if (is_dir($path)) {
                 // If directory contains audio files, treat as book dir
                 $audioFiles = glob($path . '/*.{mp3,m4b,m4a}', GLOB_BRACE);
-                if (! empty($audioFiles)) {
+                if (!empty($audioFiles)) {
                     $results[] = $path;
                 } else {
                     // Recursively search subdirectories

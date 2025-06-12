@@ -69,7 +69,7 @@ class UserController extends Controller
     {
         $firestore = new FirestoreService();
         $userDoc = $firestore->getClient()->collection('users')->document($id)->snapshot();
-        if (! $userDoc->exists()) {
+        if (!$userDoc->exists()) {
             abort(404);
         }
         $user = $userDoc->data();
@@ -107,7 +107,7 @@ class UserController extends Controller
         }
         // Never store password_confirmation on user record
         unset($validated['password_confirmation']);
-        if (! empty($validated['password'])) {
+        if (!empty($validated['password'])) {
             $validated['password'] = Hash::make($validated['password']);
         } else {
             unset($validated['password']);

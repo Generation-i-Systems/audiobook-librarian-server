@@ -31,17 +31,17 @@ class QueueController extends Controller
         $jobs = collect();
 
         foreach ($jobsDocs as $doc) {
-            if (! $doc->exists()) {
+            if (!$doc->exists()) {
                 continue;
             }
             $job = $doc->data();
             $job['id'] = $doc->id(); // Ensure ID is present
 
             $jobType = $job['type'] ?? 'Unknown';
-            $dir = $job['data']['directory_path'] ?? null;
+            $dir = $job['data']['directoryPath'] ?? null;
 
             $jobTypeCounts[$jobType] = ($jobTypeCounts[$jobType] ?? 0) + 1;
-            if (! in_array($jobType, $jobTypes)) {
+            if (!in_array($jobType, $jobTypes)) {
                 $jobTypes[] = $jobType;
             }
 
@@ -51,8 +51,8 @@ class QueueController extends Controller
                 'directory' => $dir,
                 'status' => $job['status'] ?? '',
                 'attempts' => $job['data']['attempts'] ?? 0,
-                'available_at' => $job['started_at'] ?? '',
-                'created_at' => $job['started_at'] ?? '',
+                'availableAt' => $job['startedAt'] ?? '',
+                'createdAt' => $job['startedAt'] ?? '',
                 'message' => $job['data']['message'] ?? '',
             ]);
         }
@@ -63,9 +63,9 @@ class QueueController extends Controller
 
         return response()->json([
             'jobs' => $jobs,
-            'job_type_counts' => $jobTypeCounts,
-            'job_types' => $jobTypes,
-            'selected_type' => $typeFilter,
+            'jobTypeCounts' => $jobTypeCounts,
+            'jobTypes' => $jobTypes,
+            'selectedType' => $typeFilter,
         ]);
     }
 
@@ -86,10 +86,10 @@ class QueueController extends Controller
     public function status()
     {
         // Check for running worker (simple: look for process, or use a cache heartbeat)
-        $running = Cache::get('queue_worker_heartbeat') ? true : false;
+        $running = Cache::get('queueWorkerHeartbeat') ? true : false;
         $pending = (new FirestoreService())->getClient()->collection('jobs')->count();
 
-        return response()->json(['worker_running' => $running, 'pending_jobs' => $pending]);
+        return response()->json(['workerRunning' => $running, 'pendingJobs' => $pending]);
     }
 
     public function startWorker()
@@ -124,7 +124,7 @@ class QueueController extends Controller
         $root = $request->input('dir');
         $storagePath = env('BOOK_STORAGE_PATH');
         $absRoot = rtrim($storagePath, '/') . '/' . ltrim($root, '/');
-        if (! is_dir($absRoot)) {
+        if (!is_dir($absRoot)) {
             return response()->json([
                 'error' => 'Invalid Google Books API response.',
             ], 422);
@@ -156,7 +156,7 @@ class QueueController extends Controller
             // Check for existing book record in Firestore
             $bookExists = false;
             $booksCollection = $firestore->getClient()->collection('books');
-            $bookDocs = $booksCollection->where('directory_path', '=', $relDir)->documents();
+            $bookDocs = $booksCollection->where('directoryPath', '=', $relDir)->documents();
             foreach ($bookDocs as $doc) {
                 if ($doc->exists()) {
                     $bookExists = true;
@@ -166,7 +166,7 @@ class QueueController extends Controller
             if ($bookExists) {
                 $alreadyQueued = true;
             }
-            if (! $alreadyQueued) {
+            if (!$alreadyQueued) {
                 \App\Jobs\ImportBookFromDirectoryJob::dispatch($relDir);
                 $queued[] = $relDir;
             }

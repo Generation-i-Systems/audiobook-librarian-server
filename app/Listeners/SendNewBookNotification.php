@@ -36,13 +36,13 @@ class SendNewBookNotification implements ShouldQueue
         $bookSeries = $book['series'] ?? [];
 
         // Ensure authors is always an array
-        if (! is_array($bookAuthors)) {
+        if (!is_array($bookAuthors)) {
             $bookAuthors = [$bookAuthors];
         }
 
         try {
             // Get all users who follow any of the book's authors
-            if (! empty($bookAuthors)) {
+            if (!empty($bookAuthors)) {
                 $authorFollowers = [];
                 foreach ($bookAuthors as $author) {
                     $followersQuery = $this->firestore->getClient()
@@ -61,7 +61,7 @@ class SendNewBookNotification implements ShouldQueue
             }
 
             // Get all users who follow the book's series
-            if (! empty($bookSeries)) {
+            if (!empty($bookSeries)) {
                 foreach (array_keys($bookSeries) as $seriesName) {
                     $seriesFollowers = $this->firestore->getClient()
                         ->collection('user_follows')
@@ -127,7 +127,7 @@ class SendNewBookNotification implements ShouldQueue
             $title = 'New Book Available';
             // Format authors for display
             $authors = $book['author'] ?? [];
-            $authorText = ! empty($authors)
+            $authorText = !empty($authors)
                 ? (is_array($authors) ? implode(', ', $authors) : $authors)
                 : 'an unknown author';
 

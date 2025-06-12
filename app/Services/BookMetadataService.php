@@ -93,7 +93,7 @@ class BookMetadataService
     {
         $filePath = rtrim($directoryPath, '/') . '/' . $this->localFilename;
 
-        if (! file_exists($filePath) || ! is_readable($filePath)) {
+        if (!file_exists($filePath) || !is_readable($filePath)) {
             return [];
         }
 

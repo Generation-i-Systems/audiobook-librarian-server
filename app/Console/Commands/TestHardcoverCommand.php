@@ -54,7 +54,7 @@ class TestHardcoverCommand extends Command
                 $book['genres'] ?? [],
                 'genre.name'
             )));
-            $this->line('    Cover: ' . ($book['cover_image_url'] ?? 'N/A'));
+            $this->line('    Cover: ' . ($book['coverImageUrl'] ?? 'N/A'));
 
             if ($index === 0) {
                 // Get details for the first book

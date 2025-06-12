@@ -50,7 +50,7 @@ class ProfileController extends Controller
         $userId = Auth::id();
         $userDoc = $firestore->getClient()->collection('users')->document($userId)->snapshot();
         $user = $userDoc->exists() ? $userDoc->data() : null;
-        if (! $user || ! Hash::check($request->current_password, $user['password'])) {
+        if (!$user || !Hash::check($request->current_password, $user['password'])) {
             return back()->withErrors(['current_password' => 'Incorrect current password.']);
         }
         $firestore->getClient()->collection('users')->document($userId)->set([

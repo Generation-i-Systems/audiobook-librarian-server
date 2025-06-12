@@ -409,7 +409,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             let hasError = false;
 
-            const dirPathInput = form.querySelector('input[name="directory_path"]');
+            const dirPathInput = form.querySelector('input[name="directoryPath"]');
             if (dirPathInput && dirPathInput.value) {
                 dirPathInput.value = dirPathInput.value.replace(/^\/+/, '');
             }

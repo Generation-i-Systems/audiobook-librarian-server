@@ -41,9 +41,9 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
                 'Content-Type' => 'application/json',
                 'Authorization' => 'Bearer ' . $this->apiToken,
             ])->post($this->apiUrl, [
-                'query' => $query,
-                'variables' => $variables,
-            ]);
+                        'query' => $query,
+                        'variables' => $variables,
+                    ]);
 
             if ($response->successful()) {
                 return $response->json();
@@ -76,7 +76,7 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
      */
     protected function checkTokenExpiration(): void
     {
-        if (! $this->tokenExpiresAt) {
+        if (!$this->tokenExpiresAt) {
             return;
         }
 
@@ -259,7 +259,7 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
         $result = $this->makeRequest($query, ['bookId' => $id]);
         $book = $result['data']['books_by_pk'] ?? null;
 
-        if (! $book) {
+        if (!$book) {
             Log::warning('Book not found in Hardcover API', ['id' => $id]);
 
             return null;

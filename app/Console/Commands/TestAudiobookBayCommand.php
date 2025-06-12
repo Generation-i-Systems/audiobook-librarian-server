@@ -261,7 +261,7 @@ class TestAudiobookBayCommand extends Command
         // Display basic info
         $this->line('' . ($book['description'] ?? 'No description available') . "\n");
 
-        $this->line('Cover: ' . ($book['cover_image_url'] ?? 'No cover image available'));
+        $this->line('Cover: ' . ($book['coverImageUrl'] ?? 'No cover image available'));
 
         $info = [
             'Author' => $this->mapToString($book['authors'] ?? 'Unknown'),
@@ -278,16 +278,16 @@ class TestAudiobookBayCommand extends Command
         }
 
         // Display cover image if available
-        if (!empty($book['cover_image'])) {
-            $this->line("\n📷 Cover: " . $book['cover_image']);
+        if (!empty($book['coverImage'])) {
+            $this->line("\n📷 Cover: " . $book['coverImage']);
             if (
                 $getImages &&
-                !empty($book['cover_image_url']) &&
+                !empty($book['coverImageUrl']) &&
                 method_exists($this->audiobookBayService, 'downloadCoverImage')
             ) {
                 $this->line('Attempting to download cover image...');
                 $coverPath = $this->audiobookBayService->downloadCoverImage(
-                    $book['cover_image_url'],
+                    $book['coverImageUrl'],
                     storage_path('app/public/audiobookbay_covers'),
                     preg_replace('/[^a-zA-Z0-9_-]/', '_', $book['title'] ?? 'cover')
                 );

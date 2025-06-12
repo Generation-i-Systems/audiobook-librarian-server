@@ -64,7 +64,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
                         'size' => $resultItem['metadata']['size'] ?? '',
                         'format' => $resultItem['metadata']['format'] ?? '',
                         'link' => $resultItem['url'] ?? '',
-                        'cover' => $resultItem['cover_image_url'] ?? '',
+                        'cover' => $resultItem['coverImageUrl'] ?? '',
                         'description' => $resultItem['description'] ?? '',
                         'metadata' => $resultItem['metadata'] ?? [],
                     ];
@@ -241,7 +241,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
         }
 
         // Remove nulls from array
-        return array_filter($merged, fn ($v) => $v !== null);
+        return array_filter($merged, fn($v) => $v !== null);
     }
 
     /**
@@ -258,7 +258,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
             'description' => $details['description'] ?? null,
             'published_date' => $details['published_date'] ?? null,
             'publisher' => $details['publisher'] ?? null,
-            'cover_image_url' => $details['cover_image_url'] ?? null,
+            'coverImageUrl' => $details['coverImageUrl'] ?? null,
             'categories' => $this->formatCategories($details['categories'] ??
                 ($details['metadata']['categories'] ?? [])),
             'language' => $details['language'] ?? null,
@@ -266,8 +266,8 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
                 ($details['series']['name'] . (!empty($details['series']['number']) ?
                     ' #' . $details['series']['number'] : '')) :
                 null,
-            'series_number' => $details['series']['number'] ?? null,
-            'duration_seconds' => $this->parseDuration($details['metadata']['duration'] ??
+            'seriesNumber' => $details['series']['number'] ?? null,
+            'durationSeconds' => $this->parseDuration($details['metadata']['duration'] ??
                 $details['duration'] ?? null),
             'metadata' => array_merge(
                 $details['metadata'] ?? [],

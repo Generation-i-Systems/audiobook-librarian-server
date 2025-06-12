@@ -56,7 +56,7 @@ class BookImportTraitTest extends TestCase
         $this->assertEquals(['Author Name'], $book['author']);
         $this->assertEquals(['My Series' => '15'], $book['series']);
         $this->assertEquals('Book Title', $book['title']);
-        $this->assertArrayHasKey('directory_path', $book);
+        $this->assertArrayHasKey('directoryPath', $book);
     }
 
     /**
@@ -73,7 +73,7 @@ class BookImportTraitTest extends TestCase
         $this->assertEquals(['Author Name'], $book['author']);
         $this->assertEquals(['My Series' => '15'], $book['series']);
         $this->assertEquals('Book Title [15]', $book['title']);
-        $this->assertArrayHasKey('directory_path', $book);
+        $this->assertArrayHasKey('directoryPath', $book);
     }
 
     /**
@@ -120,7 +120,7 @@ class BookImportTraitTest extends TestCase
         $this->assertIsArray($book);
         $this->assertTrue($book['skipped'] ?? false);
         $this->assertEquals('VA directory', $book['reason'] ?? '');
-        $this->assertEquals($dirPath, $book['directory_path']);
+        $this->assertEquals($dirPath, $book['directoryPath']);
         $this->assertEmpty($book['genre']);
         $this->assertEmpty($book['author']);
         $this->assertEmpty($book['title']);
@@ -202,7 +202,7 @@ class BookImportTraitTest extends TestCase
         $this->assertIsArray($book);
         $this->assertTrue($book['skipped'] ?? false);
         $this->assertEquals('VA directory', $book['reason'] ?? '');
-        $this->assertEquals($dirPath, $book['directory_path']);
+        $this->assertEquals($dirPath, $book['directoryPath']);
     }
 
     /**

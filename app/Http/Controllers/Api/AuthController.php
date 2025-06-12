@@ -37,7 +37,7 @@ class AuthController extends Controller
             ->where('email', '=', $request->email)
             ->documents();
 
-        if (! $existingUser->isEmpty()) {
+        if (!$existingUser->isEmpty()) {
             return response()->json(['email' => ['The email has already been taken.']], 400);
         }
 
@@ -47,7 +47,7 @@ class AuthController extends Controller
             ->where('username', '=', $request->username)
             ->documents();
 
-        if (! $existingUsername->isEmpty()) {
+        if (!$existingUsername->isEmpty()) {
             return response()->json(['username' => ['The username has already been taken.']], 400);
         }
 
@@ -117,7 +117,7 @@ class AuthController extends Controller
                 ->documents();
         }
 
-        if ($users->isEmpty() || ! Hash::check($request->password, $users->rows()[0]->data()['password'])) {
+        if ($users->isEmpty() || !Hash::check($request->password, $users->rows()[0]->data()['password'])) {
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
 

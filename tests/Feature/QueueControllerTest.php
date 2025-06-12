@@ -85,7 +85,7 @@ class QueueControllerTest extends TestCase
                 }
             },
         ]);
-        $mockBooksCollection->shouldReceive('where')->with('directory_path', '=', 'test/dir1')->andReturnSelf();
+        $mockBooksCollection->shouldReceive('where')->with('directoryPath', '=', 'test/dir1')->andReturnSelf();
         $mockBooksCollection->shouldReceive('documents')->andReturn([]);
         $this->app->instance(FirestoreService::class, $mockFirestore);
 

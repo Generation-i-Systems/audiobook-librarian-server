@@ -63,18 +63,18 @@ class HardcoverApiService
             $details = $this->getBookDetails($bestMatch['id']);
         }
         $merged = [
-            'hardcover_id' => $bestMatch['id'] ?? null,
+            'hardcoverId' => $bestMatch['id'] ?? null,
             'title' => $bestMatch['title'] ?? null,
             'description' => $details['description'] ?? $bestMatch['description'] ?? null,
-            'cover_image' => $details['cover_image_url'] ?? $bestMatch['cover_image_url'] ?? null,
+            'coverImage' => $details['cover_image_url'] ?? $bestMatch['cover_image_url'] ?? null,
             'pages' => $details['pages'] ?? $bestMatch['pages'] ?? null,
-            'release_date' => $details['release_date'] ?? $bestMatch['release_date'] ?? null,
+            'releaseDate' => $details['release_date'] ?? $bestMatch['release_date'] ?? null,
             'isbn_10' => $details['isbn_10'] ?? $bestMatch['isbn_10'] ?? null,
             'isbn_13' => $details['isbn_13'] ?? $bestMatch['isbn_13'] ?? null,
             'publisher' => $details['publisher']['name'] ?? $bestMatch['publisher']['name'] ?? null,
         ];
 
-        return array_filter($merged, fn ($v) => $v !== null);
+        return array_filter($merged, fn($v) => $v !== null);
     }
 
     public function setApiKey(string $apiKey): void

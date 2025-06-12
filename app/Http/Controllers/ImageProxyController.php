@@ -18,18 +18,18 @@ class ImageProxyController extends Controller
 
         $dir = $request->query('dir') ?? '.';
         $file = $request->query('file');
-        if (! $file) {
+        if (!$file) {
             abort(404);
         }
         if ($dir !== '.' && is_dir(rtrim($storagePath, '/') . '/' . ltrim($dir, '/'))) {
             $file = rtrim($dir, '/') . '/' . $file;
         }
 
-        if ($dir !== '.' && ! is_dir(rtrim($storagePath, '/') . '/' . ltrim($dir, '/'))) {
+        if ($dir !== '.' && !is_dir(rtrim($storagePath, '/') . '/' . ltrim($dir, '/'))) {
             abort(404);
         }
         $fullPath = rtrim($storagePath, '/') . '/' . ltrim($file, '/');
-        if (! file_exists($fullPath)) {
+        if (!file_exists($fullPath)) {
             abort(404);
         }
         $mime = mime_content_type($fullPath);
@@ -47,7 +47,7 @@ class ImageProxyController extends Controller
     {
         $storagePath = env('BOOK_STORAGE_PATH');
         $fullPath = rtrim($storagePath, '/') . '/' . ltrim($path, '/');
-        if (! file_exists($fullPath)) {
+        if (!file_exists($fullPath)) {
             abort(404);
         }
         $mime = mime_content_type($fullPath);
@@ -66,7 +66,7 @@ class ImageProxyController extends Controller
     {
         $url = base64_decode($encodedUrl);
         // Only allow books.google.com URLs
-        if (! preg_match('#^https?://books\\.google\\.com/#', $url)) {
+        if (!preg_match('#^https?://books\\.google\\.com/#', $url)) {
             abort(403, 'Invalid Google Books cover URL.');
         }
         $client = new Client(['verify' => false, 'timeout' => 10]);

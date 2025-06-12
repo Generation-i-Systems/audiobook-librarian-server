@@ -23,7 +23,7 @@ class RepairBooks extends Command
         $repairCovers = $this->option('cover') || $this->option('all');
         $repairSeries = $this->option('series') || $this->option('all');
 
-        if (! $repairCovers && ! $repairSeries) {
+        if (!$repairCovers && !$repairSeries) {
             $this->error('Please specify at least one repair action (--cover, --series, or --all)');
 
             return Command::FAILURE;

@@ -37,7 +37,7 @@ class GoogleBooksApiServiceEnhanceTest extends TestCase
         $book = [
             'title' => 'Test Book',
             'authors' => [['author' => ['name' => 'Test Author']]],
-            'directory_path' => $this->testDir,
+            'directoryPath' => $this->testDir,
         ];
         $enriched = [
             'id' => 'test_id',

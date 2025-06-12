@@ -78,26 +78,26 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
         }
         $source = $details ?: $bestMatch;
         $merged = [
-            'googlebooks_id' => $source['id'] ?? null,
+            'googlebooksId' => $source['id'] ?? null,
             'title' => $source['title'] ?? null,
             'subtitle' => $source['subtitle'] ?? null,
             'description' => $source['description'] ?? null,
-            'cover_image' => $source['cover_image_url'] ?? null,
+            'coverImageUrl' => $source['cover_image_url'] ?? null,
             'authors' => $source['authors'] ?? null,
             'publisher' => $source['publisher']['name'] ?? $source['publisher_name'] ?? null,
-            'release_date' => $source['published_date'] ?? $source['release_date'] ?? null,
+            'releaseDate' => $source['published_date'] ?? $source['release_date'] ?? null,
             'categories' => $source['categories'] ?? null,
-            'page_count' => $source['page_count'] ?? null,
+            'pageCount' => $source['page_count'] ?? null,
             'isbn_10' => $source['isbn_10'] ?? null,
             'isbn_13' => $source['isbn_13'] ?? null,
             'language' => $source['language'] ?? null,
             'preview_link' => $source['preview_link'] ?? null,
             'info_link' => $source['info_link'] ?? null,
         ];
-        // Download cover image if present and directory_path is available
-        if (!empty($merged['cover_image']) && !empty($book['directory_path'])) {
-            $coverUrl = $merged['cover_image'];
-            $directory = rtrim($book['directory_path'], '/');
+        // Download cover image if present and directoryPath is available
+        if (!empty($merged['coverImage']) && !empty($book['directoryPath'])) {
+            $coverUrl = $merged['coverImage'];
+            $directory = rtrim($book['directoryPath'], '/');
             $ext = pathinfo(parse_url($coverUrl, PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'jpg';
             $localFilename = $directory . '/cover.' . $ext;
             try {
@@ -106,13 +106,13 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
                     $response = \Illuminate\Support\Facades\Http::withOptions(['verify' => false])->get($coverUrl);
                     if ($response->successful()) {
                         file_put_contents($localFilename, $response->body());
-                        $merged['cover_image'] = $localFilename;
+                        $merged['coverImage'] = $localFilename;
                     }
                 } else {
                     $imageData = @file_get_contents($coverUrl);
                     if ($imageData !== false) {
                         file_put_contents($localFilename, $imageData);
-                        $merged['cover_image'] = $localFilename;
+                        $merged['coverImage'] = $localFilename;
                     }
                 }
             } catch (\Exception $e) {
@@ -121,7 +121,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
                     'url' => $coverUrl,
                     'error' => $e->getMessage(),
                 ]);
-                // leave cover_image as original URL
+                // leave coverImage as original URL
             }
         }
         $apiFields = [];
@@ -139,7 +139,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
             }
         }
         if ($needsReview) {
-            $merged['googlebooks_fields'] = $apiFields;
+            $merged['googlebooksFields'] = $apiFields;
             $merged['needsReview'] = true;
         }
 

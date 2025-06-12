@@ -27,10 +27,12 @@
         @if(isset($book))
             @method('PUT')
         @endif
-        @if(isset($book) && !empty($book['directoryPath'] ?? $book['directoryPath'] ?? ''))
-            <input type="hidden" name="originalDirectoryPath" value="{{ $book['directoryPath'] ?? $book['directoryPath'] ?? '' }}">
-        @elseif(old('directoryPath') || old('directoryPath'))
-            <input type="hidden" name="originalDirectoryPath" value="{{ old('directoryPath', old('directoryPath')) }}">
+        @if(isset($book) && !empty($book['directoryPath']))
+            <input type="hidden" name="originalDirectoryPath" value="{{ $book['directoryPath'] }}">
+        @elseif(old('directoryPath'))
+            <input type="hidden" name="originalDirectoryPath" value="{{ old('directoryPath') }}">
+        @elseif(isset($initial['directoryPath']) && !empty($initial['directoryPath']))
+            <input type="hidden" name="originalDirectoryPath" value="{{ $initial['directoryPath'] }}">
         @endif
         <button type="button" class="btn btn-info mb-3" id="autofill-modal-btn"><i class="fas fa-magic"></i> Autofill Book Metadata</button>
 
@@ -274,7 +276,7 @@
             </div>
         </div>
         @php
-            $dirPath = isset($book) && !empty($book['directoryPath']) ? $book['directoryPath'] : ($directoryPath ?? ($initial['directoryPath'] ?? null));
+            $directoryPath = isset($book) && !empty($book['directoryPath']) ? $book['directoryPath'] : ($directoryPath ?? ($initial['directoryPath'] ?? null));
             $coverImg = isset($book) && !empty($book['coverImage']) ? $book['coverImage'] : ($initial['coverImage'] ?? null);
             $coverAuto = $coverAuto ?? null;
             $coverCandidates = $coverCandidates ?? [];
@@ -289,7 +291,7 @@
                 $coverOptions[] = [
                     'type' => 'current',
                     'value' => $currentCoverFilename,
-                    'src' => route('cover.proxy', ['path' => $dirPath . '/' . $currentCoverFilename]),
+                    'src' => route('cover.proxy', ['path' => $directoryPath . '/' . $currentCoverFilename]),
                     'label' => 'Current Cover',
                     'display_name' => $currentCoverFilename,
                 ];
@@ -301,7 +303,7 @@
                 $coverOptions[] = [
                     'type' => 'google',
                     'value' => $coverAuto,
-                    'src' => route('cover.proxy', ['path' => $dirPath . '/' . $coverAuto]),
+                    'src' => route('cover.proxy', ['path' => $directoryPath . '/' . $coverAuto]),
                     'label' => 'Google Books',
                     'display_name' => $coverAuto,
                 ];
@@ -315,7 +317,7 @@
                         $coverOptions[] = [
                             'type' => 'candidate',
                             'value' => $candidate,
-                            'src' => route('cover.proxy', ['path' => $dirPath . '/' . $candidate]),
+                            'src' => route('cover.proxy', ['path' => $directoryPath . '/' . $candidate]),
                             'label' => 'Candidate',
                             'display_name' => $candidate,
                         ];
@@ -383,7 +385,7 @@
         <div class="form-group d-flex align-items-center">
             <label for="directoryPath" class="me-2">Directory Path:</label>
             <input type="text" class="form-control @error('directoryPath') is-invalid @enderror me-2" id="directoryPath"
-                name="directoryPath" value="{{ old('directoryPath', old('directory_path', $dirPath ?? '')) }}" style="max-width: 400px;">
+                name="directoryPath" value="{{ old('directoryPath', $directoryPath ?? ($initial['directoryPath'] ?? '')) }}" style="max-width: 400px;">
             <button type="button" class="btn btn-outline-secondary" id="resync-path-btn" title="Resync title, author, and series from path">
                 <i class="fas fa-sync-alt"></i> Resync Title/Author/Series
             </button>

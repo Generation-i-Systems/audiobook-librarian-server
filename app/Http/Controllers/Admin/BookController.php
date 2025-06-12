@@ -171,7 +171,7 @@ class BookController extends Controller
         $firestore = new FirestoreService();
         // Always initialize author and genre as arrays for the form
         $initial = [
-            'directory_path' => $request->path,
+            'directoryPath' => $request->path,
             'author' => [''],
             'genre' => [''],
         ];
@@ -305,7 +305,7 @@ class BookController extends Controller
         $genreList = $firestore->listGenres();
         $coverCandidates = [];
         $coverAuto = null;
-        $directoryPath = $book['directoryPath'] ?? $book['directory_path'] ?? null;
+        $directoryPath = $book['directoryPath'] ?? null;
         // Find cover candidates for this directory
         if ($directoryPath && Storage::disk('books')->exists($directoryPath)) {
             $files = Storage::disk('books')->files($directoryPath);

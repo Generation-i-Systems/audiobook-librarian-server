@@ -21,7 +21,7 @@
                     'genreList' => $genreList ?? [],
                     'coverCandidates' => $coverCandidates ?? [],
                     'coverAuto' => $coverAuto ?? null,
-                    'directory_path' => $directory_path ?? null,
+                    'directoryPath' => $directoryPath ?? null,
                     'isModal' => $isModal ?? false
                 ])
             </div>

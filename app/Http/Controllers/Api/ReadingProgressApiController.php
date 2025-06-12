@@ -33,7 +33,7 @@ class ReadingProgressApiController extends Controller
                 $found = true;
             }
         }
-        if (! $found) {
+        if (!$found) {
             $firestore->getClient()->collection('reading_progress')->add([
                 'user_id' => $userId,
                 'book_id' => $bookId,

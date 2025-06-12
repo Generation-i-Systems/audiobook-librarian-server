@@ -34,7 +34,7 @@ class TestAudibleLookup extends Command
             }
             $book = $this->audibleService->getBookDetails($asin, $options);
 
-            if (! $book) {
+            if (!$book) {
                 $this->error('No book found for the given ASIN');
 
                 return 1;
@@ -47,7 +47,7 @@ class TestAudibleLookup extends Command
 
             // Display authors
             $this->info("\nAuthors:");
-            if (! empty($book['authors'])) {
+            if (!empty($book['authors'])) {
                 foreach ($book['authors'] as $author) {
                     $this->info('- ' . ($author['author']['name'] ?? 'Unknown') .
                         (isset($author['author']['id']) ? " (ID: {$author['author']['id']})" : ''));
@@ -58,7 +58,7 @@ class TestAudibleLookup extends Command
 
             // Display narrators
             $this->info("\nNarrators:");
-            if (! empty($book['narrators'])) {
+            if (!empty($book['narrators'])) {
                 foreach ($book['narrators'] as $narrator) {
                     $this->info('- ' . ($narrator['author']['name'] ?? 'Unknown') .
                         (isset($narrator['author']['id']) ? " (ID: {$narrator['author']['id']})" : ''));

@@ -38,7 +38,7 @@ class MessagesController extends Controller
         $user = Auth::user();
         $firestore = new FirestoreService();
         $doc = $firestore->getClient()->collection('messages')->document($id)->snapshot();
-        if (! $doc->exists() || ($doc->data()['to_user_id'] ?? null) != $user->id) {
+        if (!$doc->exists() || ($doc->data()['to_user_id'] ?? null) != $user->id) {
             abort(404);
         }
         $message = $doc->data();
@@ -53,7 +53,7 @@ class MessagesController extends Controller
         $firestore = new FirestoreService();
         $docRef = $firestore->getClient()->collection('messages')->document($id);
         $doc = $docRef->snapshot();
-        if (! $doc->exists() || ($doc->data()['to_user_id'] ?? null) != $user->id) {
+        if (!$doc->exists() || ($doc->data()['to_user_id'] ?? null) != $user->id) {
             return response()->json(['success' => false, 'error' => 'Message not found'], 404);
         }
         $docRef->update([['path' => 'is_read', 'value' => true]]);

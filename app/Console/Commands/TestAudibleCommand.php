@@ -30,19 +30,19 @@ class TestAudibleCommand extends Command
         $author = $this->option('author');
         $limit = (int) $this->option('limit');
 
-        if (! in_array($action, ['search', 'details'])) {
+        if (!in_array($action, ['search', 'details'])) {
             $this->error('Action must be either "search" or "details"');
 
             return 1;
         }
 
         if ($action === 'search') {
-            if (! $query) {
+            if (!$query) {
                 $query = $this->ask('Enter search query:');
             }
             $this->handleSearch($query, $author, $limit);
         } else {
-            if (! $query) {
+            if (!$query) {
                 $query = $this->ask('Enter ASIN:');
             }
             $this->handleDetails($query);
@@ -82,7 +82,7 @@ class TestAudibleCommand extends Command
 
         $book = $this->audibleService->getBookDetails($asin);
 
-        if (! $book) {
+        if (!$book) {
             $this->error('Book not found or an error occurred.');
 
             return;
@@ -101,7 +101,7 @@ class TestAudibleCommand extends Command
             return $genre['genre']['name'] ?? null;
         }, $book['genres'] ?? []);
         $genres = array_filter($genres);
-        $this->line('Genres: ' . (! empty($genres) ? implode(', ', $genres) : 'N/A'));
+        $this->line('Genres: ' . (!empty($genres) ? implode(', ', $genres) : 'N/A'));
 
         // Handle rating safely
         $rating = null;
@@ -133,7 +133,7 @@ class TestAudibleCommand extends Command
             $this->line('Cover: N/A');
         }
 
-        if (! empty($book['description'])) {
+        if (!empty($book['description'])) {
             $this->line("\nDescription:");
             $this->line(wordwrap($book['description'], 80));
         }

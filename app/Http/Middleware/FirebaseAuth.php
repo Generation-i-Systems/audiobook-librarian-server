@@ -11,14 +11,14 @@ class FirebaseAuth
     public function handle(Request $request, Closure $next)
     {
         $authHeader = $request->header('Authorization');
-        if (! $authHeader || ! preg_match('/Bearer\s(.*)/', $authHeader, $matches)) {
+        if (!$authHeader || !preg_match('/Bearer\s(.*)/', $authHeader, $matches)) {
             return response()->json(['error' => 'Unauthorized'], 401);
         }
 
         $idToken = $matches[1];
         $firebaseAuth = new FirebaseAuthService();
         $uid = $firebaseAuth->verifyIdToken($idToken);
-        if (! $uid) {
+        if (!$uid) {
             return response()->json(['error' => 'Invalid or expired Firebase token'], 401);
         }
 

@@ -233,7 +233,7 @@ trait BookImportTrait
      *
      * @param  string  $directoryPath  The directory path to process
      * @return array{
-     *      genre: array, author: array, series?: array, title: string, directory_path: string, skipped?: bool,
+     *      genre: array, author: array, series?: array, title: string, directoryPath: string, skipped?: bool,
      *      error?: string
      * }
      *
@@ -243,7 +243,7 @@ trait BookImportTrait
     {
         // Initialize book array with default values
         $book = [
-            'directory_path' => $directoryPath,
+            'directoryPath' => $directoryPath,
             'genre' => [],
             'author' => [],
             'title' => '',
@@ -306,7 +306,7 @@ trait BookImportTrait
                 Log::warning("Skipping VA directory: {$directoryPath}");
 
                 return [
-                    'directory_path' => $directoryPath,
+                    'directoryPath' => $directoryPath,
                     'genre' => [],
                     'author' => [],
                     'title' => '',
@@ -337,7 +337,7 @@ trait BookImportTrait
             if (str_contains($author, ',') || stripos($author, ' and ') !== false || str_contains($author, '&')) {
                 $author = str_replace([' and ', ' & '], ',', $author);
                 $authors = array_map('trim', explode(',', $author));
-                $book['author'] = array_values(array_filter($authors, fn ($a) => strlen(trim($a)) > 4));
+                $book['author'] = array_values(array_filter($authors, fn($a) => strlen(trim($a)) > 4));
             } else {
                 $book['author'] = [trim($author)];
             }

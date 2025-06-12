@@ -447,7 +447,7 @@
                     const $modal = $form.closest('.modal');
                     const $submitBtn = $form.find('button[type="submit"]');
                     const originalBtnText = $submitBtn.html();
-                    const directoryPath = $form.find('input[name="directory_path"]').val() || '';
+                    const directoryPath = $form.find('input[name="directoryPath"]').val() || '';
 
                     // Show loading state
                     $submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Saving...');
@@ -467,7 +467,7 @@
                                 if (response.row_html) {
                                     // Find the row to replace (either by book ID or path)
                                     let $existingRow = $(`tr[data-book-id="${response.book_id}"]`);
-                                    const path = response.directory_path || directoryPath;
+                                    const path = response.directoryPath || directoryPath;
 
                                     if (!$existingRow.length && path) {
                                         // Try to find by path if not found by ID
@@ -488,7 +488,7 @@
                                     }
                                 } else if (typeof updateBookAction === 'function') {
                                     // Fallback to the old update method if no row HTML
-                                    updateBookAction(response.book_id, response.edit_url, response.directory_path || directoryPath);
+                                    updateBookAction(response.book_id, response.edit_url, response.directoryPath || directoryPath);
                                 }
                             } else {
                                 showAlert(response.message || 'An error occurred while saving the book.', 'danger');
@@ -578,10 +578,10 @@
                         // Update the action cell
                         const actionCell = row.find('td:last');
                         actionCell.html(`
-                                                                        <button class="btn btn-sm btn-primary me-1 open-edit-book-modal" data-url="${editUrl}">
-                                                                            <i class="fas fa-edit"></i> Edit
-                                                                        </button>
-                                                                    `);
+                                                                            <button class="btn btn-sm btn-primary me-1 open-edit-book-modal" data-url="${editUrl}">
+                                                                                <i class="fas fa-edit"></i> Edit
+                                                                            </button>
+                                                                        `);
 
 
                         // Show a success message

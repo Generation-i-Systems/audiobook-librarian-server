@@ -51,8 +51,8 @@ class ImportBookFromDirectoryJob implements ShouldQueue
                 'book_import',
                 'processing',
                 [
-                    'directory_path' => $this->directoryPath,
-                    'started_at' => now()->toDateTimeString(),
+                    'directoryPath' => $this->directoryPath,
+                    'startedAt' => now()->toDateTimeString(),
                     'message' => 'Starting book import from directory: ' . $this->directoryPath,
                 ]
             );
@@ -74,7 +74,7 @@ class ImportBookFromDirectoryJob implements ShouldQueue
             // Check for existing book in Firestore
             $existingBooks = $firestore->listBooks();
             foreach ($existingBooks as $b) {
-                if (($b['directory_path'] ?? null) === $dirPath) {
+                if (($b['directoryPath'] ?? null) === $dirPath) {
                     $error = '[BulkImport] Book already exists: ' . json_encode($b);
                     Log::error($error);
                     throw new \RuntimeException('Book already exists in the database');
@@ -144,9 +144,9 @@ class ImportBookFromDirectoryJob implements ShouldQueue
                 'authors' => $authors,
                 'genres' => $genres,
                 'series' => $series,
-                'directory_path' => $dirPath,
+                'directoryPath' => $dirPath,
                 'description' => $bookTmp['description'] ?? null,
-                'published_year' => $bookTmp['published_year'] ?? null,
+                'publishedYear' => $bookTmp['publishedYear'] ?? null,
                 'type' => $bookTmp['type'] ?? 'audiobook',
             ];
 
@@ -173,18 +173,18 @@ class ImportBookFromDirectoryJob implements ShouldQueue
                 $bookData['published_year'] = $meta['year'];
             }
             if ($coverAuto) {
-                $bookData['cover_image'] = ltrim($this->directoryPath, '/') . '/' . $coverAuto;
+                $bookData['coverImage'] = ltrim($this->directoryPath, '/') . '/' . $coverAuto;
             } elseif (!empty($coverCandidates)) {
-                $bookData['cover_image'] = ltrim($this->directoryPath, '/') . '/' . $coverCandidates[0];
+                $bookData['coverImage'] = ltrim($this->directoryPath, '/') . '/' . $coverCandidates[0];
             }
-            Log::info('[BulkImport] Cover image: ' . ($bookData['cover_image'] ?? ''));
+            Log::info('[BulkImport] Cover image: ' . ($bookData['coverImage'] ?? ''));
             Log::info('[BulkImport] Description: ' . ($bookData['description'] ?? ''));
-            Log::info('[BulkImport] Published year: ' . ($bookData['published_year'] ?? ''));
+            Log::info('[BulkImport] Published year: ' . ($bookData['publishedYear'] ?? ''));
 
             try {
-                $shouldSearchGoogle = empty($bookData['cover_image']) ||
+                $shouldSearchGoogle = empty($bookData['coverImage']) ||
                     empty($bookData['description']) ||
-                    empty($bookData['published_year']);
+                    empty($bookData['publishedYear']);
 
                 if ($shouldSearchGoogle) {
                     // Safely get author name
@@ -280,7 +280,7 @@ class ImportBookFromDirectoryJob implements ShouldQueue
                         Log::error(sprintf(
                             '[BulkImport] Google Books API quota exceeded after 10 retries for book: %s (%s)',
                             $bookData['title'] ?? 'Unknown',
-                            $bookData['directory_path'] ?? 'Unknown'
+                            $bookData['directoryPath'] ?? 'Unknown'
                         ));
 
                         return;
@@ -313,7 +313,7 @@ class ImportBookFromDirectoryJob implements ShouldQueue
             // Set dateAdded to the latest file modification date in the directory (fallback to authoritative
             // current time)
             try {
-                $dirPath = $bookData['directory_path'] ?? $bookData['directoryPath'] ?? null;
+                $dirPath = $bookData['directoryPath'] ?? null;
                 $storageRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
                 if ($dirPath && strpos($dirPath, '/') !== 0) {
                     $scanPath = $storageRoot . '/' . ltrim($dirPath, '/');
@@ -378,7 +378,7 @@ class ImportBookFromDirectoryJob implements ShouldQueue
                 usort($candidates, function ($a, $b) {
                     return $b['size'] <=> $a['size'];
                 });
-                // Update cover_image in Firestore
+                // Update coverImage in Firestore
                 $coverImagePath = $candidates[0]['path'];
                 $storageRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
                 if ($coverImagePath && strpos($coverImagePath, $storageRoot) === 0) {
@@ -412,7 +412,7 @@ class ImportBookFromDirectoryJob implements ShouldQueue
             );
         } catch (\Exception $e) {
             Log::error('[BulkImport] Error importing book: ' . $e->getMessage(), [
-                'directory_path' => $this->directoryPath,
+                'directoryPath' => $this->directoryPath,
                 'trace' => $e->getTraceAsString(),
             ]);
 

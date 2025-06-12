@@ -63,7 +63,7 @@ class RegisterController extends Controller
                         ->where('email', '=', $value)
                         ->documents();
 
-                    if (! $existingUser->isEmpty()) {
+                    if (!$existingUser->isEmpty()) {
                         $fail('The email has already been taken.');
                     }
                 },
@@ -79,7 +79,7 @@ class RegisterController extends Controller
                         ->where('username', '=', $value)
                         ->documents();
 
-                    if (! $existingUser->isEmpty()) {
+                    if (!$existingUser->isEmpty()) {
                         $fail('The username has already been taken.');
                     }
                 },
