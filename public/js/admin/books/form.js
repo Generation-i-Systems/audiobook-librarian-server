@@ -134,18 +134,6 @@ function initializeAutocomplete($container, selector, sourceUrl) {
     });
 }
 
-        if (!title) {
-            $container.find('#title').addClass('is-invalid').next('.invalid-feedback').remove();
-            $container.find('#title').after('<span class="invalid-feedback d-block">Title is required.</span>');
-            return;
-        }
-        if (authorInputs.length === 0) {
-            const firstAuthorInput = $container.find('input[name="author[]"]').first();
-            firstAuthorInput.addClass('is-invalid').parent().find('.invalid-feedback').remove();
-            firstAuthorInput.closest('.input-group').after('<span class="invalid-feedback d-block">At least one author is required.</span>');
-            return;
-        }
-
         const authorName = $(authorInputs[0]).val().trim();
         const series = $container.find('#series-select option:selected').text() || ''; // Assuming TomSelect for series, otherwise adjust
         const seriesNumber = $container.find('input[name="series_number[]"]').first().val() || ''; // Assuming first series number
@@ -197,14 +185,22 @@ function initializeAutocomplete($container, selector, sourceUrl) {
                         const match = data.matches[idx];
                         if (match.published_year) $container.find('#published_year').val(match.published_year);
                         if (match.description) $container.find('#description').val(match.description);
-                        if (match.authors) {
-                            $container.find('.author-row').remove(); // Clear all authors
-                            const authorDelimiters = /,|\s+and\s+|\s*&\s*/i;
-                            const authors = match.authors.split(authorDelimiters)
-                                .map(author => author.trim())
-                                .filter(author => author.length > 0);
-                            authors.forEach(author => addAuthorRow($container, author));
-                            if (authors.length === 0) addAuthorRow($container); // Ensure at least one empty row
+                        // Update authors
+                        $container.find('#authors-group').empty();
+                        (data.authors || ['']).forEach(function(author) {
+                            addAuthorRow($container, author);
+                        });
+                        updateAddRowButtons($container, '#authors-group', '.author-row', '.add-author-row');
+                        // Update series
+                        $container.find('#series-group').empty();
+                        (data.series || []).forEach(function(item) {
+                            addSeriesRow($container, item.name, item.number);
+                        });
+                        updateAddRowButtons($container, '#series-group', '.series-row', '.add-series-row');
+                        // Re-initialize autocomplete for new fields
+                        if (typeof initializeAutocomplete === 'function') {
+                            initializeAutocomplete($container, '.author-autocomplete', window.BOOK_FORM_ROUTES.authorsAutocomplete);
+                            initializeAutocomplete($container, '.series-autocomplete', window.BOOK_FORM_ROUTES.seriesAutocomplete);
                         }
                         if (match.cover_image_url) {
                             const proxiedUrl = googleBooksProxyUrl(match.cover_image_url);
@@ -249,9 +245,6 @@ function initializeAutocomplete($container, selector, sourceUrl) {
                 $container.find('#title').addClass('is-invalid').next('.invalid-feedback').remove();
                 $container.find('#title').after('<span class="invalid-feedback d-block">Failed to fetch book info.</span>');
             });
-    });
-
-}
 
 // Helper for proxying Google Books cover images
 function googleBooksProxyUrl(url) {
@@ -335,8 +328,7 @@ window.initBookForm = function(formContainerSelector) {
     updateAddRowButtons($container, '#series-group', '.series-row', '.add-series-row');
     updateAddRowButtons($container, '#genres-group', '.genre-row', '.add-genre-row');
 
-    // Autofill Modal Handler - API agnostic
-    bindAutofillModalBtn($container);
+
 
     // Any additional initialization (e.g., autocomplete)
     if (typeof initializeAutocomplete === 'function') {
@@ -374,6 +366,9 @@ window.initBookForm = function(formContainerSelector) {
 
 
 document.addEventListener('DOMContentLoaded', function () {
+    // Always bind autofill modal button globally after DOM is ready
+    bindAutofillModalBtn($('body'));
+
     const $bookForm = $('#book-form');
     if ($bookForm.length) {
         // Check if it's part of a modal
