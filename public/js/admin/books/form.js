@@ -26,6 +26,7 @@ function updateAddRowButtons($container, groupSelector, rowSelector, buttonClass
 
 // Function to add a new author row
 function addAuthorRow($container, authorName = '') {
+    console.log('addAuthorRow called. Container:', $container);
     const group = $container.find('#authors-group')[0];
     if (!group) return;
     const div = document.createElement('div');
@@ -39,7 +40,7 @@ function addAuthorRow($container, authorName = '') {
     group.appendChild(div);
         // Re-initialize autocomplete for the new element
     if (typeof initializeAutocomplete === 'function') {
-        initializeAutocomplete($container, '.author-autocomplete', window.BOOK_FORM_ROUTES.authorsAutocomplete);
+        initializeAutocomplete($(div), '.author-autocomplete', window.BOOK_FORM_ROUTES.authorsAutocomplete);
     }
     updateAddRowButtons($container, '#authors-group', '.author-row', '.add-author-row');
 }
@@ -48,6 +49,7 @@ window.addAuthorRow = addAuthorRow;
 
 // Function to add a new series row
 function addSeriesRow($container, seriesName = '', seriesNumber = '') {
+    console.log('addSeriesRow called. Container:', $container);
     const group = $container.find('#series-group')[0];
     if (!group) return;
     const div = document.createElement('div');
@@ -62,7 +64,7 @@ function addSeriesRow($container, seriesName = '', seriesNumber = '') {
     group.appendChild(div);
         // Re-initialize autocomplete for the new element
     if (typeof initializeAutocomplete === 'function') {
-        initializeAutocomplete($container, '.series-autocomplete', window.BOOK_FORM_ROUTES.seriesAutocomplete);
+        initializeAutocomplete($(div), '.series-autocomplete', window.BOOK_FORM_ROUTES.seriesAutocomplete);
     }
     updateAddRowButtons($container, '#series-group', '.series-row', '.add-series-row');
 }
@@ -71,6 +73,7 @@ window.addSeriesRow = addSeriesRow;
 
 // Function to add a new genre row
 function addGenreRow($container, selectedGenre = '') {
+    console.log('addGenreRow called. Container:', $container);
     const group = $container.find('#genres-group')[0];
     if (!group) return;
     const div = document.createElement('div');
@@ -94,14 +97,18 @@ window.addGenreRow = addGenreRow;
 
 // Helper function to initialize jQuery UI Autocomplete
 function initializeAutocomplete($container, selector, sourceUrl) {
+    console.log('initializeAutocomplete called. Container:', $container);
     $container.on('focus', selector, function() {
+        console.log('Input field focused. Selector:', selector);
         const $inputField = $(this); // Capture 'this' to use in callbacks
 
         // Check if autocomplete has already been initialized on this element
         if (!$inputField.data('autocomplete-initialized')) {
+            console.log('Initializing autocomplete for selector:', selector);
             $inputField.autocomplete({
                 minLength: 2,
                 source: function(request, responseCallback) {
+                    console.log('AJAX request for autocomplete. URL:', sourceUrl);
                     // request.term is the current value in the input field
                     $.ajax({
                         url: sourceUrl,
@@ -340,13 +347,6 @@ window.initBookForm = function(formContainerSelector) {
 
     // Initialize autocomplete for all author and series fields on page load
     if (typeof initializeAutocomplete === 'function') {
-        initializeAutocomplete($container, '.author-autocomplete', window.BOOK_FORM_ROUTES.authorsAutocomplete);
-        initializeAutocomplete($container, '.series-autocomplete', window.BOOK_FORM_ROUTES.seriesAutocomplete);
-    }
-
-    // Any additional initialization (e.g., autocomplete)
-    if (typeof initializeAutocomplete === 'function') {
-        // Setup delegated event handlers for autocomplete on the container
         initializeAutocomplete($container, '.author-autocomplete', window.BOOK_FORM_ROUTES.authorsAutocomplete);
         initializeAutocomplete($container, '.series-autocomplete', window.BOOK_FORM_ROUTES.seriesAutocomplete);
     }
