@@ -294,7 +294,7 @@ class BookController extends Controller
         }
 
         // Apply genre filter if provided
-        if ($request->has('genre_id') && ! empty($request->input('genre_id'))) {
+        if ($request->has('genre_id') && !empty($request->input('genre_id'))) {
             $genreId = $request->input('genre_id');
             $books = array_filter($books, function ($book) use ($genreId) {
                 if (!isset($book['genre']) || empty($book['genre'])) {
@@ -312,7 +312,7 @@ class BookController extends Controller
         }
 
         // Apply author filter if provided
-        if ($request->has('author_id') && ! empty($request->input('author_id'))) {
+        if ($request->has('author_id') && !empty($request->input('author_id'))) {
             $authorId = $request->input('author_id');
             $books = array_filter($books, function ($book) use ($authorId) {
                 if (!isset($book['author']) || empty($book['author'])) {
@@ -330,7 +330,7 @@ class BookController extends Controller
         }
 
         // Apply series filter if provided
-        if ($request->has('series_id') && ! empty($request->input('series_id'))) {
+        if ($request->has('series_id') && !empty($request->input('series_id'))) {
             $seriesId = $request->input('series_id');
             $books = array_filter($books, function ($book) use ($seriesId) {
                 if (!isset($book['series']) || empty($book['series'])) {
@@ -363,8 +363,12 @@ class BookController extends Controller
                     $result = strcasecmp($a['title'] ?? '', $b['title'] ?? '');
                     break;
                 case 'author':
-                    $authorA = isset($a['author']) && !empty($a['author']) ? (is_array($a['author']) ? $a['author'][0] : $a['author']) : '';
-                    $authorB = isset($b['author']) && !empty($b['author']) ? (is_array($b['author']) ? $b['author'][0] : $b['author']) : '';
+                    $authorA = isset($a['author']) && !empty($a['author']) ? (is_array($a['author'])
+                        ? $a['author'][0] : $a['author'])
+                        : '';
+                    $authorB = isset($b['author']) && !empty($b['author']) ? (is_array($b['author'])
+                        ? $b['author'][0] : $b['author'])
+                        : '';
                     $result = strcasecmp($authorA, $authorB);
                     break;
                 case 'date_added':

@@ -46,7 +46,10 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
                 $results = $this->apiService->searchAudiobooks($query, $searchOptions);
 
                 if (is_null($results)) {
-                    Log::warning('AudiobookBayService:performSearch - Null result from apiService->searchAudiobooks', ['query' => $query, 'options' => $searchOptions]);
+                    Log::warning('AudiobookBayService:performSearch - Null result from apiService->searchAudiobooks', [
+                        'query' => $query,
+                        'options' => $searchOptions,
+                    ]);
 
                     return [];
                 }
@@ -109,7 +112,12 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
             $details = $this->apiService->getAudiobookDetails($idOrSlug);
 
             if (is_null($details)) {
-                Log::warning('AudiobookBayService:performGetBookDetails - Null result from apiService->getAudiobookDetails', ['idOrSlug' => $idOrSlug]);
+                Log::warning(
+                    'AudiobookBayService:performGetBookDetails - Null result from apiService->getAudiobookDetails',
+                    [
+                        'idOrSlug' => $idOrSlug,
+                    ]
+                );
 
                 return null;
             }
@@ -261,12 +269,14 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
             'series_number' => $details['series']['number'] ?? null,
             'duration_seconds' => $this->parseDuration($details['metadata']['duration'] ??
                 $details['duration'] ?? null),
-            'metadata' => array_merge($details['metadata'] ??
-                [], [
-                'source' => 'AudiobookBay',
-                'url' => $details['url'] ??
-                    null
-            ]),
+            'metadata' => array_merge(
+                $details['metadata'] ?? [],
+                [
+                    'source' => 'AudiobookBay',
+                    'url' => $details['url'] ??
+                        null
+                ]
+            ),
         ];
     }
 

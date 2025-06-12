@@ -281,7 +281,10 @@ trait BookImportTrait
                             $genreIndex = array_search('NonFiction', $pathParts);
                         }
 
-                        if ($genreIndex !== false && isset($pathParts[$genreIndex + 1]) && isset($pathParts[$genreIndex + 2])) {
+                        if (
+                            $genreIndex !== false && isset($pathParts[$genreIndex + 1])
+                            && isset($pathParts[$genreIndex + 2])
+                        ) {
                             $book['genre'] = [$pathParts[$genreIndex]];
                             $book['author'] = [$pathParts[$genreIndex + 1]];
                             $book['title'] = $pathParts[$genreIndex + 2];
@@ -431,7 +434,8 @@ trait BookImportTrait
             curl_setopt(
                 $ch,
                 CURLOPT_USERAGENT,
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) ' . 'Chrome/58.0.3029.110 Safari/537.3'
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) ' .
+                'Chrome/58.0.3029.110 Safari/537.3'
             );
             $contents = curl_exec($ch);
             $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
@@ -656,8 +660,12 @@ trait BookImportTrait
      * @param  string  $path  The file path (optional)
      * @return array|null Array of reasons, or null if no review needed
      */
-    public function titleNeedsReview(string $title, ?string $series = null, ?string $author = null, ?string $path = null): ?array
-    {
+    public function titleNeedsReview(
+        string $title,
+        ?string $series = null,
+        ?string $author = null,
+        ?string $path = null
+    ): ?array {
         $title = trim($title);
         $series = $series ? trim($series) : null;
         $author = $author ? trim($author) : null;

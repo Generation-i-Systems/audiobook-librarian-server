@@ -46,12 +46,18 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
             $score = 0;
             if (!empty($result['title']) && stripos($result['title'], $inputTitle) !== false) {
                 $score += 3;
-            } elseif (!empty($result['title']) && similar_text(strtolower($result['title']), strtolower($inputTitle), $pct) && $pct > 80) {
+            } elseif (
+                !empty($result['title'])
+                && similar_text(strtolower($result['title']), strtolower($inputTitle), $pct)
+                && $pct > 80
+            ) {
                 $score += 2;
             }
             if (!empty($inputAuthor) && !empty($result['authors'])) {
                 foreach ($result['authors'] as $authorObj) {
-                    $authorName = is_array($authorObj['author'] ?? null) ? $authorObj['author']['name'] ?? '' : ($authorObj['author'] ?? '');
+                    $authorName = is_array($authorObj['author'] ?? null)
+                        ? $authorObj['author']['name'] ?? ''
+                        : ($authorObj['author'] ?? '');
                     if ($authorName && stripos($authorName, $inputAuthor) !== false) {
                         $score += 2;
                         break;
@@ -121,7 +127,12 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
         $apiFields = [];
         $needsReview = false;
         foreach ($merged as $field => $newValue) {
-            if (array_key_exists($field, $book) && $book[$field] !== null && $newValue !== null && $book[$field] != $newValue) {
+            if (
+                array_key_exists($field, $book)
+                && $book[$field] !== null
+                && $newValue !== null
+                && $book[$field] != $newValue
+            ) {
                 $apiFields[$field] = $newValue;
                 $needsReview = true;
                 $merged[$field] = $book[$field];

@@ -153,7 +153,7 @@ class BookDirectoryParser
         $normalizedPath = str_replace('\\', '/', $path);
         $parts = explode('/', $normalizedPath);
         $parts = array_values(array_filter($parts, function ($part) {
-            return ! empty($part);
+            return !empty($part);
         }));
 
         $i = 0;
@@ -321,11 +321,15 @@ class BookDirectoryParser
                     $metadata = [];
                     foreach ($lines as $line) {
                         $trimmedLine = trim($line);
-                        if ($trimmedLine === '' || str_starts_with($trimmedLine, ';') || str_starts_with($trimmedLine, '#')) {
+                        if (
+                            $trimmedLine === ''
+                            || str_starts_with($trimmedLine, ';')
+                            || str_starts_with($trimmedLine, '#')
+                        ) {
                             continue;
                         }
                         if (str_contains($trimmedLine, '=')) {
-                            if (! empty($descriptionLines)) {
+                            if (!empty($descriptionLines)) {
                                 $metadata['description'] = implode("\n", $descriptionLines);
                                 $descriptionLines = [];
                             }
@@ -366,7 +370,9 @@ class BookDirectoryParser
                                     break;
                                 case 'publishedyear':
                                     $publishedYearTrimmed = trim($value);
-                                    $metadata['publishedYear'] = is_numeric($publishedYearTrimmed) ? (int) $publishedYearTrimmed : null;
+                                    $metadata['publishedYear'] = is_numeric($publishedYearTrimmed)
+                                        ? (int) $publishedYearTrimmed
+                                        : null;
                                     break;
                                 default:
                                     $metadata[$key] = $value;
@@ -374,11 +380,11 @@ class BookDirectoryParser
 
                             continue;
                         }
-                        if (! empty($descriptionLines) || $trimmedLine !== '') {
+                        if (!empty($descriptionLines) || $trimmedLine !== '') {
                             $descriptionLines[] = $line;
                         }
                     }
-                    if (! empty($descriptionLines)) {
+                    if (!empty($descriptionLines)) {
                         $metadata['description'] = implode("\n", array_map('trim', $descriptionLines));
                     }
                     $fileMetadata = [
@@ -392,7 +398,9 @@ class BookDirectoryParser
                             ? (is_numeric($metadata['seriesNumber']) ? (int) $metadata['seriesNumber'] : null)
                             : (array_key_exists('series_number', $metadata)
                                 ? (is_numeric($metadata['series_number']) ? (int) $metadata['series_number'] : null)
-                                : (array_key_exists('seriesIndex', $metadata) && is_numeric($metadata['seriesIndex']) ? (int) $metadata['seriesIndex'] : null)),
+                                : (array_key_exists('seriesIndex', $metadata) && is_numeric($metadata['seriesIndex'])
+                                    ? (int) $metadata['seriesIndex']
+                                    : null)),
                         'year' => (
                             (array_key_exists('year', $metadata) && is_numeric($metadata['year']))
                             ? (int) $metadata['year']
@@ -433,7 +441,7 @@ class BookDirectoryParser
         $uniqueAuthors = [];
         foreach ($authors as $author) {
             $normalized = $this->normalizeAuthorName($author);
-            if (! empty($normalized) && ! isset($uniqueAuthors[$normalized])) {
+            if (!empty($normalized) && !isset($uniqueAuthors[$normalized])) {
                 $uniqueAuthors[$normalized] = $author;
             }
         }
@@ -607,13 +615,13 @@ class BookDirectoryParser
             $metadataPath = dirname($file->getPathname()) . '/metadata.abs';
             if (file_exists($metadataPath)) {
                 $metadata = $this->readMetadataFile($metadataPath);
-                if (! empty($metadata['title'])) {
+                if (!empty($metadata['title'])) {
                     $book['title'] = $metadata['title'];
                 }
-                if (! empty($metadata['author'])) {
+                if (!empty($metadata['author'])) {
                     $book['author'] = $metadata['author'];
                 }
-                if (! empty($metadata['series'])) {
+                if (!empty($metadata['series'])) {
                     $book['series'] = $metadata['series'];
                 }
                 if (isset($metadata['series_number'])) {
@@ -623,10 +631,12 @@ class BookDirectoryParser
                     $book['series_number'] = $metadata['seriesNumber']; // For backward compatibility
                     $book['seriesNumber'] = $metadata['seriesNumber'];
                 }
-                if (! empty($metadata['year'])) {
+                if (!empty($metadata['year'])) {
                     $book['year'] = $metadata['year'];
-                } elseif (! empty($metadata['publishedYear'])) {
-                    $book['year'] = is_numeric($metadata['publishedYear']) ? (int) $metadata['publishedYear'] : $metadata['publishedYear'];
+                } elseif (!empty($metadata['publishedYear'])) {
+                    $book['year'] = is_numeric($metadata['publishedYear'])
+                        ? (int) $metadata['publishedYear']
+                        : $metadata['publishedYear'];
                 }
                 if (isset($metadata['description'])) {
                     $book['description'] = $metadata['description'];
@@ -641,7 +651,8 @@ class BookDirectoryParser
 
     /**
      * Parse a directory for book files and extract metadata.
-     * Supports both scanning for book directories and treating the given directory as a book if it contains audio files.
+     * Supports both scanning for book directories and treating the given directory as a book if it contains
+     * audio files.
      *
      * @param  string  $directory  The directory path to parse
      * @param  array  $config  Configuration options
@@ -650,7 +661,7 @@ class BookDirectoryParser
     public function parseDirectory(string $directory, array $config = []): array
     {
         $directory = $this->resolveStoragePath($directory);
-        if (! is_dir($directory) || ! is_readable($directory)) {
+        if (!is_dir($directory) || !is_readable($directory)) {
             throw new \InvalidArgumentException("Directory does not exist or is not readable: $directory");
         }
         $books = [];
@@ -667,7 +678,7 @@ class BookDirectoryParser
                 if (empty($bookPathInfo['skipped']) && empty($bookPathInfo['error'])) {
                     $seriesName = '';
                     $seriesNumber = null;
-                    if (! empty($bookPathInfo['series']) && is_array($bookPathInfo['series'])) {
+                    if (!empty($bookPathInfo['series']) && is_array($bookPathInfo['series'])) {
                         $seriesName = array_key_first($bookPathInfo['series']);
                         $seriesNumber = $bookPathInfo['series'][$seriesName] ?? null;
                     }
@@ -703,15 +714,17 @@ class BookDirectoryParser
                 $path = trim(str_replace($this->storageRoot, '', $dir->getPathname()), '/');
                 $bookPathInfo = $this->processDirPath($path);
 
-                if (! empty($bookPathInfo['skipped'])) {
+                if (!empty($bookPathInfo['skipped'])) {
                     continue;
                 }
-                if (! empty($bookPathInfo['error'])) {
+                if (!empty($bookPathInfo['error'])) {
                     continue;
                 }
 
                 // Skip if any direct subdirectory contains audio files (treat only leaf-most dirs as books)
-                $subdirs = iterator_to_array((new Finder())->directories()->in($this->storageRoot . '/' . $path)->depth('== 0'));
+                $subdirs = iterator_to_array(
+                    (new Finder())->directories()->in($this->storageRoot . '/' . $path)->depth('== 0')
+                );
                 $hasAudioInSubdir = false;
                 foreach ($subdirs as $subdir) {
                     $audioFiles = (new Finder())->files()
@@ -737,7 +750,7 @@ class BookDirectoryParser
                     continue;
                 }
 
-                if (! empty($bookPathInfo['series']) && is_array($bookPathInfo['series'])) {
+                if (!empty($bookPathInfo['series']) && is_array($bookPathInfo['series'])) {
                     $seriesName = array_key_first($bookPathInfo['series']);
                     $seriesNumber = $bookPathInfo['series'][$seriesName] ?? null;
                 } else {
@@ -793,11 +806,14 @@ class BookDirectoryParser
 
         // Collect all seriesName => seriesNumber
         foreach ($books as $book) {
-            if (! empty($book['seriesName'])) {
+            if (!empty($book['seriesName'])) {
                 $series = $book['seriesName'];
                 $number = isset($book['seriesNumber']) ? $book['seriesNumber'] : null;
                 $normalized = $this->normalizeSeriesName($series);
-                if (! isset($seriesNumbers[$normalized]) || ($number !== null && $number > $seriesNumbers[$normalized])) {
+                if (
+                    !isset($seriesNumbers[$normalized]) ||
+                    ($number !== null && $number > $seriesNumbers[$normalized])
+                ) {
                     $seriesNumbers[$normalized] = $number;
                 }
             }
@@ -816,7 +832,7 @@ class BookDirectoryParser
                 'The ' . $canonical,
             ];
             foreach ($variations as $variation) {
-                if ($variation !== $canonical && ! isset($seriesMap[$variation])) {
+                if ($variation !== $canonical && !isset($seriesMap[$variation])) {
                     $seriesMap[$variation] = $seriesNumber;
                 }
             }
@@ -847,7 +863,7 @@ class BookDirectoryParser
         $this->debug("Finding leaf directories with audio files in: {$rootDir}");
 
         // Validate root directory
-        if (empty($rootDir) || ! is_string($rootDir) || ! is_dir($rootDir)) {
+        if (empty($rootDir) || !is_string($rootDir) || !is_dir($rootDir)) {
             $this->debug("Invalid root directory: {$rootDir}");
 
             return [];
@@ -870,7 +886,7 @@ class BookDirectoryParser
             // Sort directories by depth (deepest first)
             usort($directories, static function ($a, $b) {
                 // Ensure we're comparing strings
-                if (! is_string($a) || ! is_string($b)) {
+                if (!is_string($a) || !is_string($b)) {
                     return 0;
                 }
 
@@ -926,7 +942,7 @@ class BookDirectoryParser
             $seriesName = '';
             $seriesNumber = null;
 
-            if (! empty($pathInfo['series']) && is_array($pathInfo['series'])) {
+            if (!empty($pathInfo['series']) && is_array($pathInfo['series'])) {
                 $seriesName = array_key_first($pathInfo['series']);
                 $seriesNumber = $pathInfo['series'][$seriesName] ?? null;
             }
