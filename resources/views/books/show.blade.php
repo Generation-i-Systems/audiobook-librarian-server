@@ -3,6 +3,7 @@
 @section('content')
     <div class="container">
         <h1>{{ $book['title'] }}</h1>
+        <p><strong>Path:</strong> {{ isset($book['directoryPath']) ? $book['directoryPath'] : (isset($book['path']) ? $book['path'] : 'N/A') }}</p>
 
         <div class="row">
             <div class="col-md-4">
@@ -27,7 +28,19 @@
                 @endphp
                 @if($hasSeries)
                 <p><strong>Series:</strong>
-                    {{ $book['series'] }}@if(isset($book['series_number'])) (Book {{ $book['series_number'] }})@endif
+                    @php
+                        $seriesStr = '';
+                        if (is_array($book['series'])) {
+                            $parts = [];
+                            foreach ($book['series'] as $seriesName => $seriesNumber) {
+                                $parts[] = $seriesName . ' (Book ' . $seriesNumber . ')';
+                            }
+                            $seriesStr = implode(', ', $parts);
+                        } else {
+                            $seriesStr = (string) $book['series'];
+                        }
+                    @endphp
+                    {{ $seriesStr }}@if(isset($book['series_number'])) (Book {{ $book['series_number'] }})@endif
                 </p>
                 @endif
                 <p><strong>Genre:</strong>
