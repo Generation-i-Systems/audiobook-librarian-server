@@ -29,6 +29,7 @@
         "vite": "^6.3.2"
     },
     "dependencies": {
+        "@firebasegen/default-connector": "file:dataconnect-generated/js/default-connector",
         "jquery": "^3.7.1"
     }
 }

@@ -91,6 +91,8 @@ Audiobook Librarian is a Laravel-based web app for managing audiobooks, supporti
 
 ## 10. Contributors & Structure
 - **Controllers:** `app/Http/Controllers/Admin/BookController.php`
+- **Firebase Cloud Functions:** All Firebase backend automation, API endpoints, and event-driven logic are located in the `/functions` directory. Reference this for any Firebase-related backend code or extensions.
+
 - **Services:** `app/Services/FirestoreService.php`
 - **Views:** `resources/views/admin/books/form.blade.php`, `layouts/app.blade.php`
 - **JS:** `public/js/admin/books/form.js`
