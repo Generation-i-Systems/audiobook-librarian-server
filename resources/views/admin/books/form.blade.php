@@ -34,8 +34,20 @@
         @elseif(isset($initial['directoryPath']) && !empty($initial['directoryPath']))
             <input type="hidden" name="originalDirectoryPath" value="{{ $initial['directoryPath'] }}">
         @endif
+        <!-- Show actual directoryPath for sanity check -->
+        @php
+            $displayPath = old('directoryPath', request()->get('import_path', isset($book) && !empty($book['directoryPath']) ? $book['directoryPath'] : ($initial['directoryPath'] ?? '')));
+        @endphp
+        @if(!empty($displayPath))
+            <div class="mb-2">
+                <label class="form-label fw-bold">Library Path (actual):</label>
+                <div class="form-control-plaintext text-monospace text-muted" style="font-size: 0.95em; word-break: break-all;">
+                    {{ $displayPath }}
+                </div>
+            </div>
+        @endif
         <!-- DEBUG: This input is required for JS to load directory files -->
-        <input type="hidden" id="directoryPath" name="directoryPath" value="{{ old('directoryPath', isset($book) && !empty($book['directoryPath']) ? $book['directoryPath'] : ($initial['directoryPath'] ?? '') ) }}">
+        <input type="hidden" id="directoryPath" name="directoryPath" value="{{ $displayPath }}">
         <button type="button" class="btn btn-info mb-3" id="autofill-modal-btn"><i class="fas fa-magic"></i> Autofill Book Metadata</button>
 
 <!-- Autofill Modal -->
