@@ -127,6 +127,7 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         [Admin\AdminController::class, 'updateRole']
     )->name('users.updateRole');
     Route::get('/books/import', [Admin\BookController::class, 'import'])->name('books.import');
+    Route::get('/books/import-file', [Admin\BookController::class, 'importFile'])->name('books.importFile');
     Route::get('/books/googleBooks', action: [Admin\BookController::class, 'googleBooks'])->name('books.googleBooks');
 
     // AJAX endpoints for Tom Select
@@ -203,6 +204,13 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         Route::get('/queue/status', [Admin\QueueController::class, 'status']);
         Route::post('/queue/start', [Admin\QueueController::class, 'startWorker']);
         Route::post('/queue/clear', [Admin\QueueController::class, 'clear'])->name('queue.clear');
+    });
+
+    Route::middleware(['auth', 'admin'])->prefix('admin/import')->group(function () {
+        Route::get('/roots', [\App\Http\Controllers\Admin\ImportFileController::class, 'roots']);
+        Route::get('/list', [\App\Http\Controllers\Admin\ImportFileController::class, 'list']);
+        Route::post('/extract', [\App\Http\Controllers\Admin\ImportFileController::class, 'extract']);
+        Route::post('/move', [\App\Http\Controllers\Admin\ImportFileController::class, 'moveSelected']);
     });
 
     Route::resource('messages', Admin\MessageController::class);

@@ -89,7 +89,7 @@
         <div class="mb-3">
             <label for="title">Title:</label>
             <input type="text" class="form-control @error('title') is-invalid @enderror" id="title" name="title"
-                value="{{ old('title', isset($book) && !empty($book['title']) ? $book['title'] : ($initial['title'] ?? null)) }}" required>
+                value="{{ old('title', request()->get('title', isset($book) && !empty($book['title']) ? $book['title'] : ($initial['title'] ?? null))) }}" required>
             @error('title')
                 <span class="invalid-feedback d-block">{{ $message }}</span>
             @enderror
@@ -98,7 +98,7 @@
             <label class="form-label">Authors</label>
             <div id="authors-group">
                 @php
-                    $authors = old('author', isset($book) && !empty($book['author']) ? (is_array($book['author']) ? $book['author'] : [$book['author']]) : ($initial['author'] ?? []));
+                    $authors = old('author', request()->get('author') ? [request()->get('author')] : (isset($book) && !empty($book['author']) ? (is_array($book['author']) ? $book['author'] : [$book['author']]) : ($initial['author'] ?? [])));
                     if (!is_array($authors))
                         $authors = [$authors];
                 @endphp
@@ -125,7 +125,7 @@
             <div id="series-group">
                 @php
                     $seriesList = [];
-                    $oldSeries = old('series', []);
+                    $oldSeries = old('series', request()->get('series') ? [request()->get('series')] : []);
                     $oldSeriesNumbers = old('seriesNumber', old('seriesNumber', []));
 
                     // Log the raw series data for debugging

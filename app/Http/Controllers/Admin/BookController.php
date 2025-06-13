@@ -290,6 +290,16 @@ class BookController extends Controller
     }
 
     /**
+     * Show the file/audio import workflow for books.
+     *
+     * @return \Illuminate\Contracts\View\View
+     */
+    public function importFile()
+    {
+        return view('admin.books.import_file');
+    }
+
+    /**
      * Show the form for editing the specified book.
      *
      * @param  string  $id
@@ -315,6 +325,12 @@ class BookController extends Controller
                     $coverCandidates[] = $candidate;
                 }
             }
+        }
+        // Set coverAuto to the filename of the book's coverImage if present
+
+        // Set coverAuto to the filename of the book's coverImage if present
+        if (!empty($book['coverImage'])) {
+            $coverAuto = basename($book['coverImage']);
         }
 
         return view('admin.books.edit', [
