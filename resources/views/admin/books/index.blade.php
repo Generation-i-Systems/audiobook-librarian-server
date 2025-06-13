@@ -30,6 +30,37 @@
             <a href="{{ route('admin.authors.index') }}" class="btn btn-outline-secondary ms-2">Manage Authors</a>
             <a href="{{ route('admin.genres.index') }}" class="btn btn-outline-secondary ms-2">Manage Genres</a>
         </div>
+        @php
+            $genreCounts = [];
+            $totalBooks = count($books);
+            foreach ($books as $book) {
+                $genres = [];
+                if (!empty($book['genre'])) {
+                    if (is_array($book['genre'])) {
+                        foreach ($book['genre'] as $g) {
+                            $genres[] = is_array($g) ? ($g['name'] ?? $g[0] ?? $g) : $g;
+                        }
+                    } else {
+                        $genres[] = $book['genre'];
+                    }
+                }
+                foreach ($genres as $g) {
+                    $g = trim($g);
+                    if ($g === '') continue;
+                    $genreCounts[$g] = ($genreCounts[$g] ?? 0) + 1;
+                }
+            }
+        @endphp
+        <div class="mb-2 text-muted small">
+            <span>Total books: <strong>{{ $totalBooks }}</strong></span>
+            @if(count($genreCounts))
+                <span class="ms-3">Genres:
+                    {!! collect($genreCounts)->map(function($count, $genre) {
+                        return e($genre) . ' (' . $count . ')';
+                    })->implode(', ') !!}
+                </span>
+            @endif
+        </div>
 
         <table class="table">
             <thead>
