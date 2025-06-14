@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -20,8 +20,7 @@ class BookRequestApiController extends Controller
         ]);
 
         $userId = Auth::id();
-        $firestore = new FirestoreService();
-        $docRef = $firestore->getClient()->collection('book_requests')->add([
+        $bookRequest = $this->documentStoreService->createBookRequest([
             'user_id' => $userId,
             'book_id' => $request->input('book_id'),
             'title' => $request->title,
@@ -30,8 +29,6 @@ class BookRequestApiController extends Controller
             'description' => $request->description,
             'status' => 'pending',
         ]);
-        $bookRequest = $docRef->snapshot()->data();
-        $bookRequest['id'] = $docRef->id();
 
         return response()->json($bookRequest, 201); // 201 Created
     }

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -12,19 +12,20 @@ use Illuminate\Support\Facades\Session;
 
 class DebugController extends Controller
 {
-    protected $firestore;
+    protected DocumentStoreServiceInterface $documentStoreService;
 
-    public function __construct(FirestoreService $firestore)
+    public function __construct(DocumentStoreServiceInterface $documentStoreService)
     {
-        $this->firestore = $firestore;
+        $this->documentStoreService = $documentStoreService;
     }
+
 
     /**
      * Dump a Firestore document as JSON for debugging.
      */
     public function showDocument($collection, $docId): JsonResponse
     {
-        $doc = $this->firestore->getDocument($collection, $docId);
+        $doc = $this->documentStoreService->getDocument($collection, $docId);
         if ($doc) {
             return response()->json($doc);
         } else {
@@ -121,9 +122,9 @@ class DebugController extends Controller
     /**
      * Dump all Firestore users (debug)
      */
-    public function firestoreUsersDump(): JsonResponse
+    public function usersDump(): JsonResponse
     {
-        $result = FirestoreService::dumpAllUsers();
+        $result = $this->documentStoreService->dumpAllUsers();
 
         return response()->json($result);
     }
@@ -131,9 +132,9 @@ class DebugController extends Controller
     /**
      * Dump all Firestore books (debug)
      */
-    public function firestoreBooksDump(): JsonResponse
+    public function booksDump(): JsonResponse
     {
-        $result = FirestoreService::dumpAllBooks();
+        $result = $this->documentStoreService->dumpAllBooks();
 
         return response()->json($result);
     }

@@ -2,16 +2,22 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class BookQueueController extends Controller
 {
+    protected DocumentStoreServiceInterface $documentStoreService;
+
+    public function __construct(DocumentStoreServiceInterface $documentStoreService)
+    {
+        $this->documentStoreService = $documentStoreService;
+    }
     public function index()
     {
         $user = Auth::user();
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
         $queue = $firestore->getBookQueue($user->id);
 
         return view('queue.index', compact('queue'));
@@ -20,7 +26,7 @@ class BookQueueController extends Controller
     public function add($bookId)
     {
         $user = Auth::user();
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
         $queue = $firestore->getBookQueue($user->id);
         foreach ($queue as $item) {
             if ($item['book_id'] == $bookId) {
@@ -35,7 +41,7 @@ class BookQueueController extends Controller
     public function remove($bookId)
     {
         $user = Auth::user();
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
         $firestore->removeBookFromQueue($user->id, $bookId);
         $this->reorderQueue($user->id);
 
@@ -50,7 +56,7 @@ class BookQueueController extends Controller
             'queue.*.order' => 'required|integer',
         ]);
         $user = Auth::user();
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
 
         // Implement: update the order of books in queue in Firestore
         // (You may want to add a method in FirestoreService for this)

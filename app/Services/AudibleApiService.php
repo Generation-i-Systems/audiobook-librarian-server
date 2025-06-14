@@ -477,13 +477,13 @@ class AudibleApiService
             'authors' => $this->extractContributors($itemAttributes['Author'] ?? []),
             'narrators' => $this->extractContributors($itemAttributes['Narrator'] ?? []),
             'publisher' => $itemAttributes['Publisher'] ?? null,
-            'published_date' => $itemAttributes['PublicationDate'] ?? null,
+            'publishedDate' => $itemAttributes['PublicationDate'] ?? null,
             'description' => $description,
             'duration' => $runningTime, // Or $itemAttributes['RunningTime'] directly
             'coverImageUrl' => $coverImageUrl,
             'genres' => $this->extractGenres($item['BrowseNodes'] ?? []),
             'rating' => $item['CustomerReviews']['AverageRating'] ?? ($itemAttributes['AverageRating'] ?? null),
-            'rating_count' => $item['CustomerReviews']['TotalReviews'] ?? ($itemAttributes['TotalReviews'] ?? 0),
+            'ratingCount' => $item['CustomerReviews']['TotalReviews'] ?? ($itemAttributes['TotalReviews'] ?? 0),
             'url' => $item['DetailPageURL'] ?? null,
             'language' => $itemAttributes['Languages']['Language'][0]['Name'] ?? ($itemAttributes['Language'] ?? null),
             'format' => 'Audible Audiobook',
@@ -492,7 +492,7 @@ class AudibleApiService
                 : [],
             'tags' => [], // Audible API doesn't directly provide tags like user tags
             'sourceApi' => 'Audible',
-            'rawAudibleResponse' => $item, // Optionally include for debugging or further processing
+            'rawResponse' => $item, // Optionally include for debugging or further processing
         ];
     }
 

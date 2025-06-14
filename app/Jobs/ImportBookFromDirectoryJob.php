@@ -2,7 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use App\Traits\BookImportTrait;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -34,14 +34,28 @@ class ImportBookFromDirectoryJob implements ShouldQueue
      */
     protected $directoryPath;
 
-    public function __construct($directoryPath)
+    /**
+     * @var DocumentStoreServiceInterface
+     */
+    protected DocumentStoreServiceInterface $documentStoreService;
+
+    /**
+     * Create a new job instance.
+     *
+     * @param string $directoryPath
+     * @param DocumentStoreServiceInterface $documentStoreService
+     */
+    public function __construct($directoryPath, DocumentStoreServiceInterface $documentStoreService)
     {
         $this->directoryPath = $directoryPath;
+        $this->documentStoreService = $documentStoreService;
     }
 
+    /**
+     * Execute the job.
+     */
     public function handle()
     {
-        $firestore = new FirestoreService();
         $jobId = 'import_book_' . md5($this->directoryPath . '_' . now()->timestamp);
 
         try {
@@ -438,7 +452,7 @@ class ImportBookFromDirectoryJob implements ShouldQueue
      */
     protected function notifyAdminQuotaFailure($book, $msg, $attempts)
     {
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
         $jobId = 'quota_failure_' . md5(($book['title'] ?? '') . '_' . now()->timestamp);
 
         // Log the quota failure as a special job type

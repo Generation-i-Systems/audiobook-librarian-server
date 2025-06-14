@@ -2,12 +2,25 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Controller for sending admin notifications to users (push/broadcast).
+ *
+ * Uses DocumentStoreServiceInterface for user lookup.
+ *
+ * @package App\Http\Controllers
+ */
 class AdminNotificationController extends Controller
 {
+    /**
+     * Send a notification to all users or a specific user by Firestore ID.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\RedirectResponse
+     */
     public function sendNotification(Request $request)
     {
         $request->validate([
@@ -18,7 +31,7 @@ class AdminNotificationController extends Controller
         $message = $request->input('message');
         $userId = $request->input('user_id');
 
-        $firestore = new FirestoreService();
+        $firestore = app(\App\Contracts\DocumentStoreServiceInterface::class);
         if ($userId) {
             // Send to a specific user
             $userDoc = $firestore->getClient()->collection('users')->document($userId)->snapshot();
@@ -46,6 +59,13 @@ class AdminNotificationController extends Controller
         }
     }
 
+    /**
+     * Send a push notification to a user (stub, replace with FCM logic).
+     *
+     * @param array $user
+     * @param string $message
+     * @return void
+     */
     private function sendPushNotification($user, string $message)
     {
         // Implement your push notification logic here (Firebase Cloud Messaging)

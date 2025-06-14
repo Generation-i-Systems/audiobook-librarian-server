@@ -2,7 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -17,6 +17,16 @@ class CreateImportJobsForDirectory implements ShouldQueue
     use InteractsWithQueue;
     use Queueable;
     use SerializesModels;
+    /**
+     * @var DocumentStoreServiceInterface
+     */
+    protected DocumentStoreServiceInterface $documentStoreService;
+
+    public function __construct($dir, DocumentStoreServiceInterface $documentStoreService)
+    {
+        $this->dir = $dir;
+        $this->documentStoreService = $documentStoreService;
+    }
 
     /**
      * The number of times the job may be attempted.
@@ -32,15 +42,7 @@ class CreateImportJobsForDirectory implements ShouldQueue
      */
     protected $dir;
 
-    /**
-     * Create a new job instance.
-     *
-     * @param  string  $dir  The relative directory to scan for book directories
-     */
-    public function __construct($dir)
-    {
-        $this->dir = $dir;
-    }
+
 
     /**
      * Execute the job.
@@ -75,7 +77,7 @@ class CreateImportJobsForDirectory implements ShouldQueue
             'absolute_path' => $absDir,
         ]);
 
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
         $jobId = 'import_dir_' . md5($this->dir . '_' . now()->timestamp);
 
         try {

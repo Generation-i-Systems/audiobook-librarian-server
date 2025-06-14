@@ -14,6 +14,14 @@ use Laravel\Socialite\Facades\Socialite;
 
 class LoginController extends Controller
 {
+    protected DocumentStoreServiceInterface $documentStoreService;
+
+    public function __construct(DocumentStoreServiceInterface $documentStoreService)
+    {
+        $this->documentStoreService = $documentStoreService;
+        $this->middleware('guest')->except('logout');
+        $this->middleware('auth')->only('logout');
+    }
     /*
     |--------------------------------------------------------------------------
     | Login Controller
@@ -62,11 +70,7 @@ class LoginController extends Controller
      *
      * @return void
      */
-    public function __construct()
-    {
-        $this->middleware('guest')->except('logout');
-        $this->middleware('auth')->only('logout');
-    }
+
 
     /**
      * Called after user is authenticated.
@@ -78,7 +82,7 @@ class LoginController extends Controller
     {
         // Update last login timestamp
         try {
-            $firestore = new FirestoreService();
+            $firestore = $this->documentStoreService;
             $firestore->getClient()->collection('users')
                 ->document($user->getAuthIdentifier())
                 ->update([
@@ -119,7 +123,7 @@ class LoginController extends Controller
             return redirect('/login')->withErrors(['google' => 'No email provided by Google.']);
         }
 
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
 
         try {
             // Check if user exists

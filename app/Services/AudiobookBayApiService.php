@@ -186,21 +186,21 @@ class AudiobookBayApiService
             'page_count' => $data['page_count'] ?? $data['pages'] ?? null,
             'format' => $data['format'] ?? null,
             'edition' => $data['edition'] ?? null,
-            'cover_image_url' => $data['cover_image_url'] ?? $data['cover_url'] ?? $data['image_url'] ?? null,
-            'cover_image_thumbnail' => $data['cover_image_thumbnail'] ?? $data['thumbnail_url'] ?? null,
+            'coverImageUrl' => $data['coverImageUrl'] ?? $data['cover_url'] ?? $data['image_url'] ?? null,
+            'coverImageThumbnail' => $data['coverImageThumbnail'] ?? $data['thumbnail_url'] ?? null,
             'authors' => self::formatAuthors($data['authors'] ?? []),
             'narrators' => self::formatNarrators($data['narrators'] ?? []),
             'series' => self::formatSeries($data['series'] ?? null, $data['series_number'] ?? null),
             'genres' => self::formatGenres($data['genres'] ?? $data['categories'] ?? []),
             'rating' => $data['rating'] ?? $data['average_rating'] ?? null,
-            'ratings_count' => $data['ratings_count'] ?? $data['ratingsCount'] ?? 0,
+            'ratingsCount' => $data['ratingsCount'] ?? $data['ratings_count'] ?? 0,
             'metadata' => array_merge(
                 $data['metadata'] ?? [],
                 [
                     'source' => $data['metadata']['source'] ?? 'unknown',
                     'url' => $data['url'] ?? $data['metadata']['url'] ?? null,
-                    'created_at' => $data['created_at'] ?? now()->toDateTimeString(),
-                    'updated_at' => $data['updated_at'] ?? now()->toDateTimeString(),
+                    'dateAdded' => $data['dateAdded'] ?? now()->toDateTimeString(),
+                    'dateUpdated' => $data['dateUpdated'] ?? now()->toDateTimeString(),
                 ]
             ),
         ];
@@ -272,7 +272,7 @@ class AudiobookBayApiService
                 'authors' => [],
                 'narrators' => [],
                 'description' => '',
-                'cover_image_url' => '',
+                'coverImageUrl' => '',
                 'url' => '',
                 'metadata' => [
                     'source' => 'audiobookbay',
@@ -287,7 +287,7 @@ class AudiobookBayApiService
             // Extract cover image
             $imgNode = $xpath->query('.//div[contains(@class, "postImg")]//img', $item)->item(0);
             if ($imgNode instanceof \DOMElement && $imgNode->hasAttribute('src')) {
-                $result['cover_image_url'] = $imgNode->getAttribute('src');
+                $result['coverImageUrl'] = $imgNode->getAttribute('src');
             }
             // Extract author
             $authorNode = $xpath->query('.//div[contains(@class, "postAuthor")]//a', $item)->item(0);
@@ -356,10 +356,10 @@ class AudiobookBayApiService
             'authors' => [],
             'narrators' => [],
             'description' => '',
-            'cover_image_url' => '',
+            'coverImageUrl' => '',
             'series' => null,
             'publisher' => null,
-            'published_date' => null,
+            'publishedDate' => null,
             'categories' => [],
             'metadata' => [],
             'language' => null,
@@ -441,7 +441,7 @@ class AudiobookBayApiService
         // Extract cover image (if present in any img tag)
         $imgNode = $xpath->query('//img[contains(@src,"we-hunt-monsters")]')->item(0);
         if ($imgNode instanceof \DOMElement && $imgNode->hasAttribute('src')) {
-            $book['cover_image_url'] = $imgNode->getAttribute('src');
+            $book['coverImageUrl'] = $imgNode->getAttribute('src');
         }
 
         return $book;
@@ -658,7 +658,7 @@ class AudiobookBayApiService
                 }
 
                 return collect($cookies)
-                    ->map(fn ($cookie) => $cookie->getName() . '=' . $cookie->getValue())
+                    ->map(fn($cookie) => $cookie->getName() . '=' . $cookie->getValue())
                     ->implode('; ');
             } catch (\Exception $e) {
                 Log::error('AudiobookBayApiService: Exception during authentication.', [

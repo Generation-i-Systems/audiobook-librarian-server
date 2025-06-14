@@ -2,18 +2,20 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
 class MessageController extends Controller
 {
+    protected DocumentStoreServiceInterface $documentStoreService;
+
     private $firestoreService;
 
-    public function __construct(FirestoreService $firestoreService)
+    public function __construct(DocumentStoreServiceInterface $documentStoreService)
     {
-        $this->firestoreService = $firestoreService;
+        $this->documentStoreService = $documentStoreService;
     }
 
     /**
@@ -36,7 +38,7 @@ class MessageController extends Controller
                 'is_read' => false,
             ];
 
-            $messageId = $this->firestoreService->createMessage($messageData);
+            $messageId = $this->documentStoreService->createMessage($messageData);
 
             if ($messageId) {
                 return back()->with('success', 'Message sent to admin!');
@@ -71,7 +73,7 @@ class MessageController extends Controller
                 'is_read' => false,
             ];
 
-            $messageId = $this->firestoreService->createMessage($messageData);
+            $messageId = $this->documentStoreService->createMessage($messageData);
 
             if ($messageId) {
                 return back()->with('success', 'Message sent to user!');

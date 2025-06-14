@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\CreateImportJobsForDirectory;
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use App\Traits\BookImportTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -13,6 +13,12 @@ use Illuminate\Support\Facades\Process;
 
 class QueueController extends Controller
 {
+    protected DocumentStoreServiceInterface $documentStoreService;
+
+    public function __construct(DocumentStoreServiceInterface $documentStoreService)
+    {
+        $this->documentStoreService = $documentStoreService;
+    }
     use BookImportTrait;
 
     public function index()
@@ -23,8 +29,7 @@ class QueueController extends Controller
     public function list(Request $request)
     {
         $typeFilter = $request->query('type');
-        $firestore = new FirestoreService();
-        $jobsDocs = $firestore->getClient()->collection('jobs')->documents();
+        $jobsDocs = $this->documentStoreService->getClient()->collection('jobs')->documents();
 
         $jobTypeCounts = [];
         $jobTypes = [];
@@ -71,14 +76,14 @@ class QueueController extends Controller
 
     public function remove($id)
     {
-        (new FirestoreService())->getClient()->collection('jobs')->document($id)->delete();
+        $this->documentStoreService->getClient()->collection('jobs')->document($id)->delete();
 
         return response()->json(['success' => true]);
     }
 
     public function retry($id)
     {
-        (new FirestoreService())->getClient()->collection('jobs')->document($id)->delete();
+        $this->documentStoreService->getClient()->collection('jobs')->document($id)->delete();
 
         return response()->json(['success' => true]);
     }
@@ -87,7 +92,7 @@ class QueueController extends Controller
     {
         // Check for running worker (simple: look for process, or use a cache heartbeat)
         $running = Cache::get('queueWorkerHeartbeat') ? true : false;
-        $pending = (new FirestoreService())->getClient()->collection('jobs')->count();
+        $pending = $this->documentStoreService->getClient()->collection('jobs')->count();
 
         return response()->json(['workerRunning' => $running, 'pendingJobs' => $pending]);
     }
@@ -106,7 +111,7 @@ class QueueController extends Controller
 
     public function clear()
     {
-        $docs = (new FirestoreService())->getClient()->collection('jobs')->documents();
+        $docs = $this->documentStoreService->getClient()->collection('jobs')->documents();
         foreach ($docs as $doc) {
             if ($doc->exists()) {
                 $doc->reference()->delete();
@@ -132,8 +137,7 @@ class QueueController extends Controller
         // Use BookImportTrait's findBookDirectories
         $bookDirs = $this->findBookDirectories($absRoot);
         $queued = [];
-        $firestore = new FirestoreService();
-        $jobsCollection = $firestore->getClient()->collection('jobs');
+        $jobsCollection = $this->documentStoreService->getClient()->collection('jobs');
         $jobsDocs = $jobsCollection->documents();
         $pendingJobs = collect($jobsDocs)->map(function ($doc) {
             return $doc->exists() ? $doc->data() : null;
@@ -155,7 +159,7 @@ class QueueController extends Controller
             }
             // Check for existing book record in Firestore
             $bookExists = false;
-            $booksCollection = $firestore->getClient()->collection('books');
+            $booksCollection = $this->documentStoreService->getClient()->collection('books');
             $bookDocs = $booksCollection->where('directoryPath', '=', $relDir)->documents();
             foreach ($bookDocs as $doc) {
                 if ($doc->exists()) {

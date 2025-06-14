@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -16,7 +16,7 @@ class ReviewController extends Controller
             'content_rating' => 'required|string',
         ]);
 
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
         $firestore->createReview([
             'book_id' => $bookId,
             'user_id' => Auth::id(),

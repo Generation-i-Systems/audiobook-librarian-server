@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -28,20 +28,38 @@ class CreateAdminUser extends Command
      *
      * @return int
      */
+    /**
+     * @var DocumentStoreServiceInterface
+     */
+    protected DocumentStoreServiceInterface $documentStoreService;
+
+    /**
+     * CreateAdminUser constructor.
+     *
+     * @param DocumentStoreServiceInterface $documentStoreService
+     */
+    public function __construct(DocumentStoreServiceInterface $documentStoreService)
+    {
+        parent::__construct();
+        $this->documentStoreService = $documentStoreService;
+    }
+
+    /**
+     * Execute the console command.
+     *
+     * @return int
+     */
     public function handle()
     {
-        $firestore = new FirestoreService();
-        // Check if admin user exists in Firestore
-        $adminUsers = $firestore->getClient()->collection('users')->where('role', '=', 'admin')->documents();
-        foreach ($adminUsers as $doc) {
-            if ($doc->exists()) {
-                $this->info('An admin user already exists.');
-
-                return 0;
-            }
+        $admin = $this->documentStoreService->getUserByCredentials([
+            'role' => 'admin',
+        ]);
+        if ($admin) {
+            $this->info('An admin user already exists.');
+            return 0;
         }
         $password = Str::random(12);
-        $firestore->getClient()->collection('users')->add([
+        $this->documentStoreService->createUser([
             'name' => 'Admin',
             'email' => 'admin@example.com',
             'password' => Hash::make($password),
@@ -49,8 +67,7 @@ class CreateAdminUser extends Command
         ]);
         $this->info('Admin user created!');
         $this->info('Email: admin@example.com');
-        $this->info("Password: $password");
-
+        $this->info('Password: ' . $password);
         return 0;
     }
 }

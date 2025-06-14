@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Http\Request;
 
 class MessageApiController extends Controller
@@ -15,23 +15,11 @@ class MessageApiController extends Controller
         // Messages from mobile apps will not have an authenticated user
         $userId = auth()->check() ? auth()->id() : null;
 
-        $firestore = new FirestoreService();
-        $firestore->getClient()->collection('messages')->add([
+        $messages = $this->documentStoreService->createUserMessage([
             'user_id' => $userId,
             'content' => $request->input('content'),
-            'is_from_admin' => false, // All messages via API are from users
+            'is_from_admin' => false,
         ]);
-
-        $messagesDocs = $firestore->getClient()->collection('messages')->where('user_id', '=', $userId)->documents();
-        $messages = [];
-        foreach ($messagesDocs as $doc) {
-            if ($doc->exists()) {
-                $data = $doc->data();
-                $data['id'] = $doc->id();
-                $messages[] = $data;
-            }
-        }
-
         return response()->json($messages, 201); // Created
     }
 }

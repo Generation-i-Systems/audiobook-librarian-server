@@ -3,16 +3,16 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Support\Facades\Log;
 
 class MessageController extends Controller
 {
-    private $firestoreService;
+    protected DocumentStoreServiceInterface $documentStoreService;
 
-    public function __construct(FirestoreService $firestoreService)
+    public function __construct(DocumentStoreServiceInterface $documentStoreService)
     {
-        $this->firestoreService = $firestoreService;
+        $this->documentStoreService = $documentStoreService;
     }
 
     /**
@@ -24,8 +24,8 @@ class MessageController extends Controller
     {
         try {
             // Get all messages, including acknowledged ones
-            $messages = $this->firestoreService->getMessages(null, true, 100);
-            $users = $this->firestoreService->getUsersForMessaging();
+            $messages = $this->documentStoreService->getMessages(null, true, 100);
+            $users = $this->documentStoreService->getUsersForMessaging();
 
             return view('admin.messages.index', [
                 'messages' => $messages,
@@ -47,7 +47,7 @@ class MessageController extends Controller
     public function acknowledge($messageId)
     {
         try {
-            $success = $this->firestoreService->acknowledgeMessage($messageId);
+            $success = $this->documentStoreService->acknowledgeMessage($messageId);
 
             if ($success) {
                 return back()->with('success', 'Message acknowledged.');

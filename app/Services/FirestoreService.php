@@ -5,9 +5,122 @@ namespace App\Services;
 use Google\Cloud\Firestore\FirestoreClient;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use App\Contracts\DocumentStoreServiceInterface;
 
-class FirestoreService
+class FirestoreService implements DocumentStoreServiceInterface
 {
+    /**
+     * {@inheritdoc}
+     */
+    public function updateUser(string $id, array $data)
+    {
+        // TODO: Implement updateUser() method.
+        return null;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function deleteUser(string $id)
+    {
+        // TODO: Implement deleteUser() method.
+        return null;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function deleteGenre(string $id)
+    {
+        // TODO: Implement deleteGenre() method.
+        return null;
+    }
+
+
+
+
+
+
+
+
+
+    /**
+     * {@inheritdoc}
+     */
+    public function deleteSeries(string $id)
+    {
+        // TODO: Implement deleteSeries() method.
+        return null;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function createAuthor(array $data)
+    {
+        // TODO: Implement createAuthor() method.
+        return null;
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getBookQueue(string $userId): array
+    {
+        // TODO: Implement getBookQueue() method.
+        return [];
+    }
+
+    /**
+     * Reset reading progress for a user and book.
+     *
+     * @param string $userId
+     * @param string $bookId
+     * @return bool
+     */
+    public function resetReadingProgress(string $userId, string $bookId): bool
+    {
+        try {
+            if (!$this->db) {
+                return false;
+            }
+            $progressDocs = $this->db->collection('reading_progress')
+                ->where('user_id', '=', $userId)
+                ->where('book_id', '=', $bookId)
+                ->documents();
+            foreach ($progressDocs as $doc) {
+                if ($doc->exists()) {
+                    $doc->reference()->delete();
+                }
+            }
+            return true;
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to reset reading progress', [
+                'userId' => $userId,
+                'bookId' => $bookId,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+
+
     /** @var FirestoreClient|null */
     protected $db;
 
@@ -239,7 +352,18 @@ class FirestoreService
         }
     }
 
-    public static function dumpAllBooks()
+    public function dumpAllBooks()
+    {
+        return $this->dumpAllBooksFromCollection('books');
+    }
+
+    /**
+     * Dump all documents from the specified Firestore collection.
+     *
+     * @param string $collectionName
+     * @return array
+     */
+    public function dumpAllBooksFromCollection(string $collectionName)
     {
         try {
             $projectId = env('FIREBASE_PROJECT_ID');
@@ -248,20 +372,18 @@ class FirestoreService
                 'projectId' => $projectId,
                 'keyFilePath' => $credentials,
             ]);
-            $books = [];
-            $documents = $db->collection('books')->documents();
+            $docs = [];
+            $documents = $db->collection($collectionName)->documents();
             foreach ($documents as $doc) {
                 if ($doc->exists()) {
                     $data = $doc->data();
                     $data['id'] = $doc->id();
-                    $books[] = $data;
+                    $docs[] = $data;
                 }
             }
-
-            return $books;
+            return $docs;
         } catch (\Throwable $e) {
-            error_log('Firestore dumpAllBooks error: ' . $e->getMessage());
-
+            error_log('Firestore dumpAllBooksFromCollection error: ' . $e->getMessage());
             return ['error' => $e->getMessage()];
         }
     }
@@ -320,7 +442,7 @@ class FirestoreService
      *
      * @return array
      */
-    public static function listGenres()
+    public function listGenres()
     {
         return config('genres.list');
     }
@@ -883,15 +1005,7 @@ class FirestoreService
     }
 
     // BOOK QUEUE (STUBS)
-    /**
-     * Get a user's book queue (stub: implement as needed)
-     */
-    public function getBookQueue(string $userId): array
-    {
-        // Example: return [];
-        // Implement actual logic if you want to store queues in Firestore
-        return [];
-    }
+
 
     /**
      * Add a book to a user's queue (stub: implement as needed)

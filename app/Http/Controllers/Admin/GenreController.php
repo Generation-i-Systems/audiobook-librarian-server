@@ -3,14 +3,14 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Http\Request;
 
 class GenreController extends Controller
 {
     // public function index()
     // {
-    //     $firestore = new FirestoreService();
+
     //     $genres = $firestore->listGenres();
     //     return view('admin.genres.index', compact('genres'));
     // }
@@ -23,7 +23,7 @@ class GenreController extends Controller
     // public function store(Request $request)
     // {
     //     $request->validate(['name' => 'required|string|max:255']);
-    //     $firestore = new FirestoreService();
+
     //     // Check for duplicate
     //     foreach ($firestore->listGenres() as $genre) {
     //         if (strcasecmp($genre['name'], $request->name) === 0) {
@@ -36,7 +36,7 @@ class GenreController extends Controller
 
     // public function edit($id)
     // {
-    //     $firestore = new FirestoreService();
+
     //     $genre = $firestore->getGenre($id);
     //     if (!$genre) {
     //         abort(404);
@@ -47,7 +47,7 @@ class GenreController extends Controller
     // public function update(Request $request, $id)
     // {
     //     $request->validate(['name' => 'required|string|max:255']);
-    //     $firestore = new FirestoreService();
+
     //     $genre = $firestore->getGenre($id);
     //     if (!$genre) {
     //         abort(404);
@@ -64,7 +64,7 @@ class GenreController extends Controller
 
     // public function destroy($id)
     // {
-    //     $firestore = new FirestoreService();
+
     //     $firestore->deleteGenre($id);
     //     return redirect()->route('admin.genres.index')->with('success', 'Genre deleted!');
     // }

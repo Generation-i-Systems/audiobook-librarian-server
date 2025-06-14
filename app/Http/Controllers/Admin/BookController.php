@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Events\NewBookAdded;
 use App\Http\Controllers\Controller;
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use App\Services\GoogleBooksApiService;
 use App\Traits\BookImportTrait;
 use Illuminate\Http\Request;
@@ -68,23 +68,31 @@ class BookController extends Controller
         }
     }
 
-    protected $googleBooksApiService;
 
-    protected $firestoreService;
+
 
     private $storagePath;
 
-    public function __construct(GoogleBooksApiService $googleBooksApiService, FirestoreService $firestoreService)
+    /**
+     * @var DocumentStoreServiceInterface
+     */
+    protected DocumentStoreServiceInterface $documentStoreService;
+
+    /**
+     * @var GoogleBooksApiService
+     */
+    protected GoogleBooksApiService $googleBooksApiService;
+
+    public function __construct(DocumentStoreServiceInterface $documentStoreService, GoogleBooksApiService $googleBooksApiService)
     {
-        $this->setGoogleBooksApiService($googleBooksApiService);
-        $this->firestoreService = $firestoreService;
+        $this->documentStoreService = $documentStoreService;
+        $this->googleBooksApiService = $googleBooksApiService;
         $this->storagePath = env('BOOK_STORAGE_PATH');
     }
 
     public function index(Request $request)
     {
-        $firestore = new FirestoreService();
-        $books = $firestore->listBooks();
+        $books = $this->documentStoreService->listBooks();
 
         // Filtering
         if ($request->filled('search')) {
@@ -168,7 +176,7 @@ class BookController extends Controller
 
     public function create(Request $request)
     {
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
         // Always initialize author and genre as arrays for the form
         $initial = [
             'directoryPath' => $request->path,
@@ -307,7 +315,7 @@ class BookController extends Controller
      */
     public function edit($id)
     {
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
         $book = $firestore->getBook($id);
         if (!$book) {
             abort(404, 'Book not found');
@@ -349,7 +357,7 @@ class BookController extends Controller
      */
     public function destroy($id)
     {
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
         $firestore->deleteBook($id);
 
         return redirect()->route('admin.books.index')->with('success', 'Book deleted successfully.');
@@ -357,7 +365,7 @@ class BookController extends Controller
 
     public function download($id)
     {
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
         $book = $firestore->getBook($id);
         $directoryPath = $book['directoryPath'];
 
@@ -486,7 +494,7 @@ class BookController extends Controller
     public function seriesAjax(Request $request)
     {
         $q = $request->input('q', '');
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
         $series = $firestore->listSeries();
         if ($q) {
             $series = array_filter($series, function ($item) use ($q) {
@@ -540,12 +548,12 @@ class BookController extends Controller
                 $newRel = str_replace($this->storagePath, '', $newPath);
                 Log::info("({$this->storagePath}) {$oldRel} -> {$newRel}");
                 // Update Firestore books whose directoryPath matches $oldRel
-                $firestore = new FirestoreService();
-                $booksToUpdate = array_filter($firestore->listBooks(), function ($book) use ($oldRel) {
+                $firestore = $this->documentStoreService;
+                $booksToUpdate = array_filter($this->documentStoreService->listBooks(), function ($book) use ($oldRel) {
                     return isset($book['directoryPath']) && $book['directoryPath'] === $oldRel;
                 });
                 foreach ($booksToUpdate as $book) {
-                    $firestore->updateBook($book['id'], ['directoryPath' => $newRel]);
+                    $this->documentStoreService->updateBook($book['id'], ['directoryPath' => $newRel]);
                 }
             }
 
@@ -602,7 +610,7 @@ class BookController extends Controller
         if (empty($term)) {
             return response()->json([]);
         }
-        $authors = $this->firestoreService->searchAuthorsByName($term);
+        $authors = $this->documentStoreService->searchAuthorsByName($term);
 
         return response()->json($authors);
     }
@@ -616,7 +624,7 @@ class BookController extends Controller
         if (empty($term)) {
             return response()->json([]);
         }
-        $series = $this->firestoreService->searchSeriesByName($term);
+        $series = $this->documentStoreService->searchSeriesByName($term);
 
         return response()->json($series);
     }
@@ -629,7 +637,7 @@ class BookController extends Controller
      */
     public function getRawJson($id)
     {
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
         $book = $firestore->getBook($id);
         if (!$book) {
             abort(404);

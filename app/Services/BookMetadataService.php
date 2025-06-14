@@ -9,15 +9,15 @@ use Illuminate\Support\Facades\Storage;
 
 class BookMetadataService
 {
-    protected FirestoreService $firestoreService;
+    protected DocumentStoreServiceInterface $documentStoreService;
 
     protected string $storageMethod;
 
     protected string $localFilename;
 
-    public function __construct(FirestoreService $firestoreService)
+    public function __construct(DocumentStoreServiceInterface $documentStoreService)
     {
-        $this->firestoreService = $firestoreService;
+        $this->documentStoreService = $documentStoreService;
         $this->storageMethod = Config::get('bookparser.metadata_storage', 'local');
         $this->localFilename = Config::get('bookparser.local_metadata_filename', 'librarian.json');
     }
@@ -131,15 +131,15 @@ class BookMetadataService
             $metadata['updated_at'] = now()->toIso8601String();
 
             // Check if document exists
-            $existing = $this->firestoreService->getBook($bookId);
+            $existing = $this->documentStoreService->getBook($bookId);
 
             if ($existing) {
                 // Update existing document
-                $this->firestoreService->updateBook($bookId, $metadata);
+                $this->documentStoreService->updateBook($bookId, $metadata);
             } else {
                 // Create new document
                 $metadata['created_at'] = $metadata['updated_at'];
-                $this->firestoreService->createBook($metadata);
+                $this->documentStoreService->createBook($metadata);
             }
 
             return true;
@@ -162,7 +162,7 @@ class BookMetadataService
     protected function loadFromFirestore(string $bookId): array
     {
         try {
-            $book = $this->firestoreService->getBook($bookId);
+            $book = $this->documentStoreService->getBook($bookId);
 
             return is_array($book) ? $book : [];
         } catch (\Throwable $e) {

@@ -3,12 +3,18 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class ReadingProgressApiController extends Controller
 {
+    protected DocumentStoreServiceInterface $documentStoreService;
+
+    public function __construct(DocumentStoreServiceInterface $documentStoreService)
+    {
+        $this->documentStoreService = $documentStoreService;
+    }
     public function update(Request $request)
     {
         $request->validate([
@@ -17,73 +23,30 @@ class ReadingProgressApiController extends Controller
 
         $user = Auth::user();
 
-        $firestore = new FirestoreService();
         $userId = Auth::id();
         $bookId = $request->input('book_id');
-        $progressDocs = $firestore->getClient()->collection('reading_progress')
-            ->where('user_id', '=', $userId)
-            ->where('book_id', '=', $bookId)
-            ->documents();
-        $found = false;
-        foreach ($progressDocs as $doc) {
-            if ($doc->exists()) {
-                $doc->reference()->set([
-                    'current_position' => $request->current_position,
-                ], ['merge' => true]);
-                $found = true;
-            }
-        }
-        if (!$found) {
-            $firestore->getClient()->collection('reading_progress')->add([
-                'user_id' => $userId,
-                'book_id' => $bookId,
-                'current_position' => $request->current_position,
-            ]);
-        }
-
-        return response()->json(['success' => true], 200);
+        $result = $this->documentStoreService->updateReadingProgress($userId, $bookId, $request->current_position);
+        return response()->json(['success' => $result], $result ? 200 : 500);
     }
 
     public function reset(Request $request)
     {
-        $user = Auth::user();
-
-        $firestore = new FirestoreService();
         $userId = Auth::id();
         $bookId = $request->input('book_id');
-        $progressDocs = $firestore->getClient()->collection('reading_progress')
-            ->where('user_id', '=', $userId)
-            ->where('book_id', '=', $bookId)
-            ->documents();
-        foreach ($progressDocs as $doc) {
-            if ($doc->exists()) {
-                $doc->reference()->delete();
-            }
-        }
-
-        return response()->json(['message' => 'Progress reset.']);
+        $result = $this->documentStoreService->resetReadingProgress($userId, $bookId);
+        return response()->json([
+            'message' => $result ? 'Progress reset.' : 'Failed to reset progress.',
+            'success' => $result
+        ], $result ? 200 : 500);
     }
 
     public function get(Request $request)
     {
         $user = Auth::user();
 
-        $firestore = new FirestoreService();
         $userId = Auth::id();
         $bookId = $request->input('book_id');
-        $progressDocs = $firestore->getClient()->collection('reading_progress')
-            ->where('user_id', '=', $userId)
-            ->where('book_id', '=', $bookId)
-            ->documents();
-        $progress = 0;
-        foreach ($progressDocs as $doc) {
-            if ($doc->exists()) {
-                $data = $doc->data();
-                $progress = isset($data['current_position']) ? $data['current_position'] : 0;
-                break;
-            }
-        }
-
+        $progress = $this->documentStoreService->getReadingProgress($userId, $bookId);
         return response()->json(['progress' => $progress]);
     }
 }

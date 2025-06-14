@@ -2,12 +2,21 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class FollowController extends Controller
 {
+    /**
+     * @var DocumentStoreServiceInterface
+     */
+    protected DocumentStoreServiceInterface $documentStoreService;
+
+    public function __construct(DocumentStoreServiceInterface $documentStoreService)
+    {
+        $this->documentStoreService = $documentStoreService;
+    }
     public function follow(Request $request, $followableType, $followableId)
     {
         // Validate input
@@ -17,8 +26,7 @@ class FollowController extends Controller
         ]);
 
         // No need to fetch author/series from Eloquent, just trust input (validated above)
-        $firestore = new FirestoreService();
-        $firestore->getClient()->collection('follows')->add([
+        $this->documentStoreService->createFollow([
             'user_id' => Auth::id(),
             'followable_type' => $followableType,
             'followable_id' => $followableId,
@@ -35,15 +43,11 @@ class FollowController extends Controller
             'followable_id' => 'required|integer',
         ]);
         // No need to fetch author/series from Eloquent, just trust input (validated above)
-        $firestore = new FirestoreService();
-        $follows = $firestore->getClient()->collection('follows')
-            ->where('user_id', '=', Auth::id())
-            ->where('followable_type', '=', $followableType)
-            ->where('followable_id', '=', $followableId)
-            ->documents();
-        foreach ($follows as $follow) {
-            $follow->reference()->delete();
-        }
+        $this->documentStoreService->deleteFollow([
+            'user_id' => Auth::id(),
+            'followable_type' => $followableType,
+            'followable_id' => $followableId,
+        ]);
 
         return back()->with('success', 'Successfully unfollowed!');
     }

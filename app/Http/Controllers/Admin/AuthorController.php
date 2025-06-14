@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Http\Request;
 
 class AuthorController extends Controller
@@ -11,7 +11,7 @@ class AuthorController extends Controller
     public function index(Request $request)
     {
         $search = $request->input('search');
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
         $authors = $firestore->listAuthors();
         if ($search) {
             $authors = array_filter($authors, function ($author) use ($search) {
@@ -34,7 +34,7 @@ class AuthorController extends Controller
     public function store(Request $request)
     {
         $request->validate(['name' => 'required|string|max:255']);
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
         // Check for duplicate
         foreach ($firestore->listAuthors() as $author) {
             if (strcasecmp($author['name'], $request->name) === 0) {
@@ -48,7 +48,7 @@ class AuthorController extends Controller
 
     public function edit($id)
     {
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
         $author = $firestore->getAuthor($id);
         if (!$author) {
             abort(404);
@@ -60,7 +60,7 @@ class AuthorController extends Controller
     public function update(Request $request, $id)
     {
         $request->validate(['name' => 'required|string|max:255']);
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
         $author = $firestore->getAuthor($id);
         if (!$author) {
             abort(404);
@@ -78,7 +78,7 @@ class AuthorController extends Controller
 
     public function destroy($id)
     {
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
         $firestore->deleteAuthor($id);
 
         return redirect()->route('admin.authors.index')->with('success', 'Author deleted!');
@@ -90,7 +90,7 @@ class AuthorController extends Controller
     public function ajax(Request $request)
     {
         $q = $request->input('q', '');
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
         $authors = $firestore->listAuthors();
         if ($q) {
             $authors = array_filter($authors, function ($author) use ($q) {

@@ -2,7 +2,7 @@
 
 namespace App\Auth;
 
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\UserProvider;
 use Illuminate\Support\Facades\Log;
@@ -51,23 +51,23 @@ class FirestoreUserProvider implements UserProvider
         return $currentHash;
     }
 
-    protected $firestore;
+    protected DocumentStoreServiceInterface $documentStoreService;
 
-    public function __construct()
+    public function __construct(DocumentStoreServiceInterface $documentStoreService)
     {
-        $this->firestore = new FirestoreService();
+        $this->documentStoreService = $documentStoreService;
     }
 
     public function retrieveById($identifier)
     {
-        $user = $this->firestore->getUserById($identifier);
+        $user = $this->documentStoreService->getUserById($identifier);
 
         return $user ? new FirestoreUser($user) : null;
     }
 
     public function retrieveByToken($identifier, $token)
     {
-        $user = $this->firestore->getUserByRememberToken($identifier, $token);
+        $user = $this->documentStoreService->getUserByRememberToken($identifier, $token);
 
         return $user ? new FirestoreUser($user) : null;
     }
@@ -75,7 +75,7 @@ class FirestoreUserProvider implements UserProvider
     public function updateRememberToken(Authenticatable $user, $token)
     {
         // Update the "remember me" token in Firestore
-        $this->firestore->updateRememberToken($user->getAuthIdentifier(), $token);
+        $this->documentStoreService->updateRememberToken($user->getAuthIdentifier(), $token);
     }
 
     public function retrieveByCredentials(array $credentials)
@@ -83,7 +83,7 @@ class FirestoreUserProvider implements UserProvider
         if (empty($credentials)) {
             return null;
         }
-        $user = $this->firestore->getUserByCredentials($credentials);
+        $user = $this->documentStoreService->getUserByCredentials($credentials);
 
         return $user ? new FirestoreUser($user) : null;
     }
@@ -91,7 +91,7 @@ class FirestoreUserProvider implements UserProvider
     public function validateCredentials(Authenticatable $user, array $credentials)
     {
         // Validate user credentials (e.g., password)
-        return $this->firestore->validateUserCredentials(
+        return $this->documentStoreService->validateUserCredentials(
             $user,
             $credentials
         );

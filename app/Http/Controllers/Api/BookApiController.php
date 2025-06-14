@@ -3,20 +3,27 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\FirestoreService;
 use Illuminate\Http\Request;
+use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use App\Models\BookQueue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use ZipArchive;
 
 class BookApiController extends Controller
 {
+    protected DocumentStoreServiceInterface $documentStoreService;
+
+    public function __construct(DocumentStoreServiceInterface $documentStoreService)
+    {
+        $this->documentStoreService = $documentStoreService;
+    }
+
     public function index(Request $request)
     {
-        $firestore = new FirestoreService();
-        $books = $firestore->listBooks();
+        $books = $this->documentStoreService->listBooks();
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
         $perPage = $request->input('per_page', 100);
@@ -81,8 +88,7 @@ class BookApiController extends Controller
 
     public function show($id, Request $request)
     {
-        $firestore = new FirestoreService();
-        $book = $firestore->getBook($id);
+        $book = $this->documentStoreService->getBook($id);
         if (!$book) {
             return response()->json([
                 'error' => 'Book not found or not authorized.',
@@ -101,11 +107,10 @@ class BookApiController extends Controller
         $type = $request->input('type'); // 'genre', 'author', 'series'
         $perPage = $request->input('per_page', 100);
         $search = $request->input('search');
-        $firestore = new FirestoreService();
         $dataMap = [
-            'genre' => $firestore->listGenres(),
-            'author' => $firestore->listAuthors(),
-            'series' => $firestore->listSeries(),
+            'genre' => $this->documentStoreService->listGenres(),
+            'author' => $this->documentStoreService->listAuthors(),
+            'series' => $this->documentStoreService->listSeries(),
         ];
         if (!isset($dataMap[$type])) {
             return response()->json(['error' => 'Invalid browse type'], 400);
@@ -131,8 +136,7 @@ class BookApiController extends Controller
 
     public function cover($id)
     {
-        $firestore = new FirestoreService();
-        $book = $firestore->getBook($id);
+        $book = $this->documentStoreService->getBook($id);
         if (!$book) {
             return response()->json([
                 'error' => 'Book not found or not authorized.',
@@ -140,16 +144,16 @@ class BookApiController extends Controller
         }
         Log::info(
             'Cover image requested for book: ' . ($book['title'] ?? '[unknown]') . ' (' .
-            ($book['cover_image'] ?? '[none]') . ')'
+            ($book['coverImage'] ?? '[none]') . ')'
         );
         if (
-            !empty($book['cover_image']) &&
-            Storage::disk('books')->exists($book['cover_image'])
+            !empty($book['coverImage']) &&
+            Storage::disk('books')->exists($book['coverImage'])
         ) {
-            $mime = Storage::disk('books')->mimeType($book['cover_image']);
+            $mime = Storage::disk('books')->mimeType($book['coverImage']);
 
             return response(
-                Storage::disk('books')->get($book['cover_image']),
+                Storage::disk('books')->get($book['coverImage']),
                 200
             )->header('Content-Type', $mime);
         }
@@ -159,7 +163,7 @@ class BookApiController extends Controller
 
     public function search(Request $request)
     {
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
         $books = $firestore->listBooks();
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
@@ -213,12 +217,12 @@ class BookApiController extends Controller
 
     public function download($id)
     {
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
         $book = $firestore->getBook($id);
         if (!$book) {
             abort(404);
         }
-        $directoryPath = $book['directory_path'] ?? null;
+        $directoryPath = $book['directoryPath'] ?? null;
         if (!$directoryPath || !Storage::disk('books')->exists($directoryPath)) {
             abort(404, 'Book directory not found.');
         }
@@ -243,7 +247,7 @@ class BookApiController extends Controller
     public function queueDownload(Request $request)
     {
         $user = Auth::user();
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
         $queue = $firestore->getBookQueue($user->id);
         if (empty($queue)) {
             $queue = BookQueue::where('user_id', $user->id)->with('book')->get();
@@ -257,8 +261,8 @@ class BookApiController extends Controller
             if ($zip->open($zipPath, ZipArchive::CREATE) === true) {
                 foreach ($queue as $item) {
                     $book = $item->book;
-                    if ($book && $book->directory_path && Storage::exists($book->directory_path)) {
-                        $files = Storage::files($book->directory_path);
+                    if ($book && $book->directoryPath && Storage::exists($book->directoryPath)) {
+                        $files = Storage::files($book->directoryPath);
                         foreach ($files as $file) {
                             $localPath = storage_path('app/' . $file);
                             if (file_exists($localPath)) {
@@ -305,8 +309,7 @@ class BookApiController extends Controller
      */
     public function listGenres(Request $request)
     {
-        $firestore = new FirestoreService();
-        $genres = $firestore->listGenres();
+        $genres = $this->documentStoreService->listGenres();
         usort($genres, function ($a, $b) {
             return strcmp($a['name'], $b['name']);
         });
@@ -322,18 +325,17 @@ class BookApiController extends Controller
      */
     public function authorsByGenre(Request $request, $genreId)
     {
-        $firestore = new FirestoreService();
         $perPage = $request->input('per_page', 20);
         $search = $request->input('search');
-        $genre = $firestore->getGenre($genreId);
+        $genre = $this->documentStoreService->getGenre($genreId);
         if (!$genre) {
             return response()->json(['error' => 'Genre not found'], 404);
         }
-        $books = array_filter($firestore->listBooks(), function ($book) use ($genreId) {
+        $books = array_filter($this->documentStoreService->listBooks(), function ($book) use ($genreId) {
             return ($book['genre_id'] ?? null) == $genreId;
         });
         $authorIds = array_unique(array_column($books, 'author_id'));
-        $authors = array_filter($firestore->listAuthors(), function ($author) use ($authorIds, $search) {
+        $authors = array_filter($this->documentStoreService->listAuthors(), function ($author) use ($authorIds, $search) {
             $match = in_array($author['id'], $authorIds);
             if ($search) {
                 $match = $match && (stripos($author['name'], $search) !== false);
@@ -345,6 +347,7 @@ class BookApiController extends Controller
         usort($authors, function ($a, $b) {
             return strcmp($a['name'], $b['name']);
         });
+
         $total = count($authors);
         $page = (int) $request->input('page', 1);
         $authors = array_slice($authors, ($page - 1) * $perPage, $perPage);
@@ -362,7 +365,7 @@ class BookApiController extends Controller
      */
     public function authorsByGenreSimple($genreId, Request $request)
     {
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
         $genre = $firestore->getGenre($genreId);
         if (!$genre) {
             return response()->json(['error' => 'Genre not found'], 404);
@@ -393,7 +396,7 @@ class BookApiController extends Controller
      */
     public function booksBySeries($seriesId, Request $request)
     {
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
         $perPage = $request->input('per_page', 100);
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
@@ -428,7 +431,7 @@ class BookApiController extends Controller
      */
     public function booksByAuthor($authorId, Request $request)
     {
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
         $perPage = $request->input('per_page', 100);
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
@@ -463,7 +466,7 @@ class BookApiController extends Controller
      */
     public function seriesByAuthor($authorId, Request $request)
     {
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
         $author = $firestore->getAuthor($authorId);
         if (!$author) {
             return response()->json(['error' => 'Author not found'], 404);
@@ -501,7 +504,7 @@ class BookApiController extends Controller
         Log::info('booksByAuthorAndGenre ' . json_encode($_POST));
         Log::info('booksByAuthorAndGenre ' . json_encode($_GET));
 
-        $firestore = app(FirestoreService::class);
+        $firestore = $this->documentStoreService;
         $author = $firestore->getAuthor($authorId);
         $genre = $firestore->getGenre($genreId);
         $books = $firestore->getBooksByAuthorAndGenre($authorId, $genreId);
@@ -545,13 +548,13 @@ class BookApiController extends Controller
     private function getBookWithCover($book, $withCover = false, $inlineCovers = false)
     {
         $arr = $book;
-        if ($withCover && !empty($book['cover_image']) && Storage::disk('books')->exists($book['cover_image'])) {
+        if ($withCover && !empty($book['coverImage']) && Storage::disk('books')->exists($book['coverImage'])) {
             if ($inlineCovers) {
-                $coverPath = Storage::disk('books')->path($book['cover_image']);
+                $coverPath = Storage::disk('books')->path($book['coverImage']);
                 $arr['cover'] = [
                     'type' => 'base64',
                     'path' => $coverPath,
-                    'data' => base64_encode(Storage::disk('books')->get($book['cover_image'])),
+                    'data' => base64_encode(Storage::disk('books')->get($book['coverImage'])),
                 ];
             } else {
                 $arr['cover_url'] = url('/api/v1/books/' . ($book['id'] ?? '') . '/cover');
@@ -559,7 +562,7 @@ class BookApiController extends Controller
         } else {
             $arr['cover_url'] = null;
         }
-        unset($arr['cover_image_content']);
+        unset($arr['coverImageContent']);
 
         return $arr;
     }

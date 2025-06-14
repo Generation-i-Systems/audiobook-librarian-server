@@ -7,13 +7,19 @@ use Illuminate\Http\Request;
 
 class AdminController extends Controller
 {
+    protected DocumentStoreServiceInterface $documentStoreService;
+
+    public function __construct(DocumentStoreServiceInterface $documentStoreService)
+    {
+        $this->documentStoreService = $documentStoreService;
+    }
     public function updateRole(Request $request)
     {
         $request->validate([
             'user_id' => 'required|string',
             'role' => 'required|in:regular,admin',
         ]);
-        $firestore = new \App\Services\FirestoreService();
+        $firestore = $this->documentStoreService;
         $userId = $request->input('user_id');
         $role = $request->input('role');
         // Assuming users are stored in a 'users' collection

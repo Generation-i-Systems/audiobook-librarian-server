@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -12,11 +12,11 @@ use Illuminate\View\View;
 
 class JobController extends Controller
 {
-    protected FirestoreService $firestore;
+    protected DocumentStoreServiceInterface $documentStoreService;
 
-    public function __construct(FirestoreService $firestore)
+    public function __construct(DocumentStoreServiceInterface $documentStoreService)
     {
-        $this->firestore = $firestore;
+        $this->documentStoreService = $documentStoreService;
     }
 
     /**

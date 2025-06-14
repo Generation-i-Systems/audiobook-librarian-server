@@ -2,8 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\FirestoreService;
-use App\Services\GoogleBooksApiService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Response;
@@ -12,12 +11,29 @@ use Illuminate\Support\Facades\Storage;
 
 class BookController extends Controller
 {
-    protected $googleBooksApiService;
+    /**
+     * @var DocumentStoreServiceInterface
+     */
+    protected DocumentStoreServiceInterface $documentStoreService;
 
-    public function __construct(GoogleBooksApiService $googleBooksApiService)
+    /**
+     * @var GoogleBooksApiService
+     */
+    protected GoogleBooksApiService $googleBooksApiService;
+
+    /**
+     * BookController constructor.
+     *
+     * @param  DocumentStoreServiceInterface  $documentStoreService
+     * @param  GoogleBooksApiService  $googleBooksApiService
+     */
+    public function __construct(DocumentStoreServiceInterface $documentStoreService, GoogleBooksApiService $googleBooksApiService)
     {
+        $this->documentStoreService = $documentStoreService;
         $this->googleBooksApiService = $googleBooksApiService;
     }
+
+
 
     /**
      * Display the main books index page
@@ -26,9 +42,8 @@ class BookController extends Controller
      */
     public function index(Request $request)
     {
-        $firestore = new FirestoreService();
-        $books = $firestore->listBooks();
-        Log::debug('Books fetched from Firestore: ' . count($books));
+        $books = $this->documentStoreService->listBooks();
+        Log::debug('Books fetched from DocumentStoreService: ' . count($books));
 
         // Extract unique genres from books
         $genres = [];
@@ -102,9 +117,8 @@ class BookController extends Controller
      */
     public function jsonIndex(Request $request)
     {
-        $firestore = new FirestoreService();
-        $books = $firestore->listBooks();
-        Log::debug('JSON API: Books fetched from Firestore: ' . count($books));
+        $books = $this->documentStoreService->listBooks();
+        Log::debug('JSON API: Books fetched from DocumentStoreService: ' . count($books));
 
         return $this->handleMainBooksAjaxRequest($request, $books);
     }
@@ -116,9 +130,8 @@ class BookController extends Controller
      */
     public function jsonRecent(Request $request)
     {
-        $firestore = new FirestoreService();
-        $books = $firestore->listBooks();
-        Log::debug('JSON API: Recent books fetched from Firestore: ' . count($books));
+        $books = $this->documentStoreService->listBooks();
+        Log::debug('JSON API: Recent books fetched from DocumentStoreService: ' . count($books));
 
         // Force sorting by date_added for recent books
         $request->merge([
@@ -141,8 +154,7 @@ class BookController extends Controller
             return redirect()->route('books.index');
         }
 
-        $firestore = new FirestoreService();
-        $book = $firestore->getBook($id);
+        $book = $this->documentStoreService->getBook($id);
 
         if (!$book) {
             return redirect()->route('books.index')->with('error', 'Book not found');
@@ -152,7 +164,7 @@ class BookController extends Controller
         $book = $this->ensureBookFields($book);
 
         // Get related books (same author or series)
-        $relatedBooks = $firestore->listBooks();
+        $relatedBooks = $this->documentStoreService->listBooks();
         $relatedBooks = array_filter($relatedBooks, function ($relatedBook) use ($book, $id) {
             // Skip the current book
             if ($relatedBook['id'] === $id) {

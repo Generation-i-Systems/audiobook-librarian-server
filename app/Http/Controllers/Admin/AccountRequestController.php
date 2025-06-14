@@ -3,14 +3,20 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Http\Request;
 
 class AccountRequestController extends Controller
 {
+    protected DocumentStoreServiceInterface $documentStoreService;
+
+    public function __construct(DocumentStoreServiceInterface $documentStoreService)
+    {
+        $this->documentStoreService = $documentStoreService;
+    }
     public function index()
     {
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
         $accountRequests = $firestore->getClient()->collection('account_requests')
             ->where('status', '=', 'pending')->documents();
         $requests = [];
@@ -27,7 +33,7 @@ class AccountRequestController extends Controller
 
     public function approve($id)
     {
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
         $accountRequestDoc = $firestore->getClient()->collection('account_requests')->document($id)->snapshot();
         if (!$accountRequestDoc->exists()) {
             return back()->withErrors(['error' => 'Account request not found.']);
@@ -50,7 +56,7 @@ class AccountRequestController extends Controller
 
     public function reject($id)
     {
-        $firestore = new FirestoreService();
+        $firestore = $this->documentStoreService;
         $firestore->getClient()->collection('account_requests')->document($id)->set([
             'status' => 'rejected',
         ], ['merge' => true]);
