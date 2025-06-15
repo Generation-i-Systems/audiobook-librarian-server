@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Google\Cloud\Firestore\CollectionReference;
 use Google\Cloud\Firestore\DocumentReference;
 use Google\Cloud\Firestore\DocumentSnapshot;
@@ -24,13 +24,13 @@ class QueueControllerTest extends TestCase
     public function testStatusReturnsWorkerAndPendingJobs()
     {
         Cache::shouldReceive('get')->with('queue_worker_heartbeat')->andReturn(true);
-        $mockFirestore = Mockery::mock(FirestoreService::class);
+        $mockFirestore = Mockery::mock(DocumentStoreServiceInterface::class);
         $mockCollection = Mockery::mock(CollectionReference::class);
         $mockCollection->shouldReceive('count')->andReturn(3);
         $mockFirestore->shouldReceive('getClient')->andReturn((object) [
-            'collection' => fn($name) => $mockCollection,
+            'collection' => fn ($name) => $mockCollection,
         ]);
-        $this->app->instance(FirestoreService::class, $mockFirestore);
+        $this->app->instance(DocumentStoreServiceInterface::class, $mockFirestore);
 
         $response = $this->get('/admin/queue/status');
         $response->assertStatus(200)
@@ -50,7 +50,7 @@ class QueueControllerTest extends TestCase
 
     public function testClearDeletesAllJobs()
     {
-        $mockFirestore = Mockery::mock(FirestoreService::class);
+        $mockFirestore = Mockery::mock(DocumentStoreServiceInterface::class);
         $mockCollection = Mockery::mock(CollectionReference::class);
         $mockDoc = Mockery::mock(DocumentSnapshot::class);
         $mockDoc->shouldReceive('exists')->andReturn(true);
@@ -59,9 +59,9 @@ class QueueControllerTest extends TestCase
         $mockRef->shouldReceive('delete')->once();
         $mockCollection->shouldReceive('documents')->andReturn([$mockDoc]);
         $mockFirestore->shouldReceive('getClient')->andReturn((object) [
-            'collection' => fn($name) => $mockCollection,
+            'collection' => fn ($name) => $mockCollection,
         ]);
-        $this->app->instance(FirestoreService::class, $mockFirestore);
+        $this->app->instance(DocumentStoreServiceInterface::class, $mockFirestore);
 
         $response = $this->post('/admin/queue/clear');
         $response->assertStatus(200)
@@ -71,7 +71,7 @@ class QueueControllerTest extends TestCase
     public function testBulkImportBooksQueuesJobsAndSkipsExisting()
     {
         // This test focuses on logic, not actual Firestore or job dispatching
-        $mockFirestore = Mockery::mock(FirestoreService::class);
+        $mockFirestore = Mockery::mock(DocumentStoreServiceInterface::class);
         $mockJobsCollection = Mockery::mock(CollectionReference::class);
         $mockBooksCollection = Mockery::mock(CollectionReference::class);
         $mockJobsCollection->shouldReceive('documents')->andReturn([]);
@@ -87,7 +87,7 @@ class QueueControllerTest extends TestCase
         ]);
         $mockBooksCollection->shouldReceive('where')->with('directoryPath', '=', 'test/dir1')->andReturnSelf();
         $mockBooksCollection->shouldReceive('documents')->andReturn([]);
-        $this->app->instance(FirestoreService::class, $mockFirestore);
+        $this->app->instance(DocumentStoreServiceInterface::class, $mockFirestore);
 
         // Mock the trait method findBookDirectories
         $this->partialMock('App\\Http\\Controllers\\Admin\\QueueController', function ($mock) {

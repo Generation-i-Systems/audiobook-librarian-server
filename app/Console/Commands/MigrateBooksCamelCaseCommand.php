@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
@@ -26,9 +26,9 @@ class MigrateBooksCamelCaseCommand extends Command
     /**
      * The Firestore service instance.
      *
-     * @var FirestoreService
+     * @var DocumentStoreServiceInterface
      */
-    protected $firestoreService;
+    protected DocumentStoreServiceInterface $documentStoreService;
 
     /**
      * Field mapping from snake_case to camelCase.
@@ -58,10 +58,10 @@ class MigrateBooksCamelCaseCommand extends Command
      *
      * @return void
      */
-    public function __construct(FirestoreService $firestoreService)
+    public function __construct(DocumentStoreServiceInterface $documentStoreService)
     {
         parent::__construct();
-        $this->firestoreService = $firestoreService;
+        $this->documentStoreService = $documentStoreService;
     }
 
     /**
@@ -77,7 +77,7 @@ class MigrateBooksCamelCaseCommand extends Command
 
         try {
             // Get all books from Firestore
-            $books = $this->firestoreService->listBooks();
+            $books = $this->documentStoreService->listBooks();
             $this->info('Found ' . count($books) . ' books to process');
 
             $bar = $this->output->createProgressBar(count($books));
@@ -95,7 +95,7 @@ class MigrateBooksCamelCaseCommand extends Command
                 if ($updatedBook !== $book) {
                     try {
                         // Update the book in Firestore
-                        $this->firestoreService->updateBook($bookId, $updatedBook);
+                        $this->documentStoreService->updateBook($bookId, $updatedBook);
                         $updated++;
                     } catch (\Exception $e) {
                         $this->error("Error updating book {$bookId}: " . $e->getMessage());

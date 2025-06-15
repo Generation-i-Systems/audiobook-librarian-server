@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Auth\FirestoreUser;
 use App\Http\Controllers\Controller;
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Google\Cloud\Core\Timestamp as GoogleTimestamp;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Support\Facades\Auth;
@@ -14,14 +14,6 @@ use Laravel\Socialite\Facades\Socialite;
 
 class LoginController extends Controller
 {
-    protected DocumentStoreServiceInterface $documentStoreService;
-
-    public function __construct(DocumentStoreServiceInterface $documentStoreService)
-    {
-        $this->documentStoreService = $documentStoreService;
-        $this->middleware('guest')->except('logout');
-        $this->middleware('auth')->only('logout');
-    }
     /*
     |--------------------------------------------------------------------------
     | Login Controller
@@ -33,6 +25,14 @@ class LoginController extends Controller
     |
     */
     use AuthenticatesUsers;
+    protected DocumentStoreServiceInterface $documentStoreService;
+
+    public function __construct(DocumentStoreServiceInterface $documentStoreService)
+    {
+        $this->documentStoreService = $documentStoreService;
+        $this->middleware('guest')->except('logout');
+        $this->middleware('auth')->only('logout');
+    }
 
     /**
      * Allow login with either email or username.

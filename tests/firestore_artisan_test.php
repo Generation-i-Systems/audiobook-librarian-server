@@ -2,7 +2,7 @@
 
 namespace Tests;
 
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Testing\TestCase;
 
@@ -39,7 +39,7 @@ class FirestoreTest extends TestCase
         ];
 
         // Initialize FirestoreService
-        $firestoreService = app(FirestoreService::class);
+        $firestoreService = app(\App\Contracts\DocumentStoreServiceInterface::class);
 
         // Test creating a book
         echo "Creating test book...\n";

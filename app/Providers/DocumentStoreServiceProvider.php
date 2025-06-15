@@ -4,7 +4,6 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use App\Contracts\DocumentStoreServiceInterface;
-use App\Services\FirestoreService;
 use App\Services\MongoService;
 
 class DocumentStoreServiceProvider extends ServiceProvider
@@ -19,7 +18,7 @@ class DocumentStoreServiceProvider extends ServiceProvider
             if ($driver === 'mongodb') {
                 return new MongoService();
             }
-            return new FirestoreService();
+            return new \App\Services\FirestoreService();
         });
     }
 

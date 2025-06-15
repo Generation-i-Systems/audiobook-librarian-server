@@ -213,7 +213,7 @@ class BookController extends Controller
      */
     public function download(Request $request, $id)
     {
-        $firestore = new FirestoreService();
+        $firestore = app(\App\Contracts\DocumentStoreServiceInterface::class);
         $book = $firestore->getBook($id);
 
         if (!$book || !isset($book['file_path'])) {

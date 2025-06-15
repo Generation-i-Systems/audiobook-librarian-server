@@ -3,7 +3,7 @@
 namespace App\Listeners;
 
 use App\Events\NewBookAdded;
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Log;
@@ -16,7 +16,7 @@ class SendNewBookNotification implements ShouldQueue
 
     protected $firestore;
 
-    public function __construct(FirestoreService $firestore)
+    public function __construct(DocumentStoreServiceInterface $firestore)
     {
         $this->firestore = $firestore;
     }

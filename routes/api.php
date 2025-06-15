@@ -55,6 +55,7 @@ Route::prefix('v1')->group(function () {
         Route::delete('/unfollow/{followableType}/{followableId}', [FollowApiController::class, 'unfollow']);
 
         // Reading Progress Routes
+        Route::post('/reading-progress/reset', [ReadingProgressApiController::class, 'reset']);
         Route::post('/reading-progress/{book}', [ReadingProgressApiController::class, 'update']);
         Route::get('/reading-progress/{book}', [ReadingProgressApiController::class, 'get']);
 

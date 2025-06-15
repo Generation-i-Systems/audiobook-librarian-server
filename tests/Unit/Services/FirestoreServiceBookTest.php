@@ -4,22 +4,21 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Support\Facades\Log;
 use PHPUnit\Framework\TestCase;
 use Google\Cloud\Firestore\FirestoreClient;
 
-#[\PHPUnit\Framework\Attributes\CoversClass(FirestoreService::class)]
 class FirestoreServiceBookTest extends TestCase
 {
-    protected FirestoreService $service;
+    protected DocumentStoreServiceInterface $service;
     protected $mockDb;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->mockDb = $this->createMock(FirestoreClient::class);
-        $this->service = $this->getMockBuilder(FirestoreService::class)
+        $this->service = $this->getMockBuilder(DocumentStoreServiceInterface::class)
             ->disableOriginalConstructor()
             ->onlyMethods(['getServerTimestamp'])
             ->getMock();
@@ -127,10 +126,16 @@ class FirestoreServiceBookTest extends TestCase
         $mockDoc2->method('data')->willReturn(['title' => 'Book2']);
         $mockDoc2->method('id')->willReturn('id2');
         $mockDocuments = [$mockDoc1, $mockDoc2];
-        $mockDocIter = new class($mockDocuments) implements \IteratorAggregate {
+        $mockDocIter = new class ($mockDocuments) implements \IteratorAggregate {
             private $docs;
-            public function __construct($docs) { $this->docs = $docs; }
-            public function getIterator() { return new \ArrayIterator($this->docs); }
+            public function __construct($docs)
+            {
+                $this->docs = $docs;
+            }
+            public function getIterator()
+            {
+                return new \ArrayIterator($this->docs);
+            }
         };
         $this->mockDb->expects($this->once())
             ->method('collection')->with('books')->willReturnSelf();

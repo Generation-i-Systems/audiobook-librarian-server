@@ -11,7 +11,7 @@ class MessageController extends Controller
 {
     protected DocumentStoreServiceInterface $documentStoreService;
 
-    private $firestoreService;
+
 
     public function __construct(DocumentStoreServiceInterface $documentStoreService)
     {

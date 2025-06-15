@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -17,7 +17,7 @@ class FollowApiController extends Controller
             'followable_id' => 'required|integer',
         ]);
 
-        $firestore = new FirestoreService();
+        $firestore = app(\App\Contracts\DocumentStoreServiceInterface::class);
         $userId = Auth::id();
         $followableId = $followableId;
         if ($userId === $followableId) {
@@ -50,7 +50,7 @@ class FollowApiController extends Controller
             'followable_id' => 'required|integer',
         ]);
 
-        $firestore = new FirestoreService();
+        $firestore = app(\App\Contracts\DocumentStoreServiceInterface::class);
         $follows = $firestore->getClient()->collection('follows')
             ->where('user_id', '=', Auth::id())
             ->where('followable_type', '=', $followableType)

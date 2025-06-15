@@ -3,7 +3,7 @@
 namespace Tests\Unit\Services;
 
 use App\Services\BookMetadataService;
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 use org\bovigo\vfs\vfsStream;
@@ -38,8 +38,8 @@ class BookMetadataServiceTest extends TestCase
         Config::set('bookparser.metadata_storage', 'local');
         Config::set('bookparser.local_metadata_filename', 'librarian.json');
 
-        $mockFirestoreService = $this->createMock(FirestoreService::class);
-        $this->service = new BookMetadataService($mockFirestoreService);
+        $mockDocumentStoreService = $this->createMock(\App\Contracts\DocumentStoreServiceInterface::class);
+        $this->service = new BookMetadataService($mockDocumentStoreService);
     }
 
     #[Test]

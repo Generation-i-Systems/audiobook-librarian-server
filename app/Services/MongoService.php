@@ -282,6 +282,32 @@ class MongoService implements DocumentStoreServiceInterface
         return $result->getDeletedCount() > 0;
     }
 
+    // READING PROGRESS
+    /**
+     * Reset reading progress for a user and book.
+     *
+     * @param string $userId
+     * @param string $bookId
+     * @return bool Success status
+     */
+    public function resetReadingProgress(string $userId, string $bookId): bool
+    {
+        try {
+            $result = $this->getCollection('reading_progress')->deleteMany([
+                'user_id' => $userId,
+                'book_id' => $bookId
+            ]);
+            return $result->getDeletedCount() > 0;
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to reset reading progress (MongoDB)', [
+                'userId' => $userId,
+                'bookId' => $bookId,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
     // QUEUES
     /** @inheritDoc */
     public function getBookQueue(string $userId): array

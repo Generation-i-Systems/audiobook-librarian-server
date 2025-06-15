@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Google\Cloud\Core\Timestamp as GoogleTimestamp;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -13,7 +13,7 @@ class AuthController extends Controller
 {
     protected $firestore;
 
-    public function __construct(FirestoreService $firestore)
+    public function __construct(DocumentStoreServiceInterface $firestore)
     {
         $this->firestore = $firestore;
     }

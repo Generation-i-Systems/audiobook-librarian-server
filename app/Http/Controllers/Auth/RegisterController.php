@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Auth\FirestoreUser;
 use App\Http\Controllers\Controller;
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Google\Cloud\Core\Timestamp;
 use Illuminate\Foundation\Auth\RegistersUsers;
 use Illuminate\Support\Facades\Hash;
@@ -58,7 +58,7 @@ class RegisterController extends Controller
                 'email',
                 'max:255',
                 function ($attribute, $value, $fail) {
-                    $firestore = new FirestoreService();
+                    $firestore = app(\App\Contracts\DocumentStoreServiceInterface::class);
                     $existingUser = $firestore->getClient()->collection('users')
                         ->where('email', '=', $value)
                         ->documents();
@@ -74,7 +74,7 @@ class RegisterController extends Controller
                 'max:255',
                 'unique:users,username',
                 function ($attribute, $value, $fail) {
-                    $firestore = new FirestoreService();
+                    $firestore = app(\App\Contracts\DocumentStoreServiceInterface::class);
                     $existingUser = $firestore->getClient()->collection('users')
                         ->where('username', '=', $value)
                         ->documents();
@@ -96,7 +96,7 @@ class RegisterController extends Controller
     protected function create(array $data)
     {
         try {
-            $firestore = new FirestoreService();
+            $firestore = app(\App\Contracts\DocumentStoreServiceInterface::class);
 
             // Generate a unique ID for the user
             $userId = (string) Str::uuid();
@@ -132,7 +132,7 @@ class RegisterController extends Controller
      *
      * @return void
      */
-    protected function notifyAdminsAboutNewUser(FirestoreService $firestore, array $userData)
+    protected function notifyAdminsAboutNewUser(DocumentStoreServiceInterface $firestore, array $userData)
     {
         try {
             // Get all admin users

@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Services\BookDirectoryParser;
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 
@@ -42,7 +42,7 @@ class ParseBooksCommand extends Command
      *
      * @return int
      */
-    public function handle(BookDirectoryParser $parser, FirestoreService $firestoreService)
+    public function handle(BookDirectoryParser $parser, DocumentStoreServiceInterface $documentStoreService)
     {
         $paths = $this->argument('paths');
         $bookStoragePath = rtrim(env('BOOK_STORAGE_PATH'), '/');
@@ -478,7 +478,7 @@ class ParseBooksCommand extends Command
 
             // Store to Firestore if requested
             if ($this->option('store-firestore') && !$dryRun) {
-                $this->storeToFirestore($allBooks, $firestoreService);
+                $this->storeToFirestore($allBooks, $documentStoreService);
             }
 
             if (empty($allBooks)) {
@@ -719,7 +719,7 @@ class ParseBooksCommand extends Command
      * @param  array  $books  The books to store
      * @param  \App\Services\FirestoreService  $firestoreService  The Firestore service
      */
-    protected function storeToFirestore(array $books, \App\Services\FirestoreService $firestoreService): void
+    protected function storeToFirestore(array $books, DocumentStoreServiceInterface $documentStoreService): void
     {
         $this->info('\nStoring books to Firestore...');
         $updateExisting = $this->option('update-existing');
@@ -747,18 +747,18 @@ class ParseBooksCommand extends Command
                     continue;
                 }
 
-                $existingBook = $firestoreService->findBookByDirectoryPath($directoryPath);
+                $existingBook = $documentStoreService->findBookByDirectoryPath($directoryPath);
 
                 if ($existingBook && !$updateExisting) {
                     // Skip existing books if not updating
                     $skipped++;
                 } elseif ($existingBook) {
                     // Update existing book
-                    $firestoreService->updateBook($existingBook['id'], $book);
+                    $documentStoreService->updateBook($existingBook['id'], $book);
                     $updated++;
                 } else {
                     // Create new book
-                    $firestoreService->createBook($book);
+                    $documentStoreService->createBook($book);
                     $created++;
                 }
             } catch (\Exception $e) {

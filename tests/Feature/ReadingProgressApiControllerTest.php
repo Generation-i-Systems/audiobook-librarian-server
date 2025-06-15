@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Tests\TestCase;
-use App\Models\User;
 
 class ReadingProgressApiControllerTest extends TestCase
 {
@@ -15,6 +14,9 @@ class ReadingProgressApiControllerTest extends TestCase
         $mock = \Mockery::mock(\App\Contracts\DocumentStoreServiceInterface::class);
         $mock->shouldReceive('updateReadingProgress')->andReturn(true);
         $mock->shouldReceive('resetReadingProgress')->andReturn(true);
+        $mock->shouldReceive('getUserById')->andReturnUsing(function ($id) {
+            return ['id' => $id, 'name' => 'Test User', 'email' => 'test'.$id.'@example.com'];
+        });
         $this->app->instance(\App\Contracts\DocumentStoreServiceInterface::class, $mock);
         $this->withoutMiddleware();
     }
@@ -30,7 +32,7 @@ class ReadingProgressApiControllerTest extends TestCase
         $this->app->make(\App\Contracts\DocumentStoreServiceInterface::class)
             ->updateReadingProgress($userId, $bookId, 42);
 
-        $response = $this->postJson('/api/reading-progress/reset', [
+        $response = $this->postJson('/api/v1/reading-progress/reset', [
             'book_id' => $bookId,
         ]);
 
@@ -49,7 +51,7 @@ class ReadingProgressApiControllerTest extends TestCase
         $bookId = 'nonexistent-book';
 
         // Simulate failure by using a mock or invalid store (implementation may vary)
-        $response = $this->postJson('/api/reading-progress/reset', [
+        $response = $this->postJson('/api/v1/reading-progress/reset', [
             'book_id' => $bookId,
         ]);
 

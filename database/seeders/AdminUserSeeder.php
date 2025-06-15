@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Google\Cloud\Firestore\Timestamp as FirestoreTimestamp;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -40,7 +40,7 @@ class AdminUserSeeder extends Seeder
             return;
         }
 
-        $firestore = new FirestoreService();
+        $firestore = app(\App\Contracts\DocumentStoreServiceInterface::class);
 
         // Generate a unique ID for the user
         $userId = (string) Str::uuid();

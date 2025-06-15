@@ -3,7 +3,7 @@
 namespace App\Queue;
 
 use App\Queue\Jobs\FirestoreJob;
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 use Carbon\Carbon;
 use Illuminate\Contracts\Queue\Queue as QueueContract;
 use Illuminate\Queue\Queue;
@@ -18,7 +18,7 @@ class FirestoreQueue extends Queue implements QueueContract
 
     protected $collection;
 
-    public function __construct(FirestoreService $firestore, $collection)
+    public function __construct(DocumentStoreServiceInterface $firestore, $collection)
     {
         $this->firestore = $firestore;
         $this->collection = $collection;

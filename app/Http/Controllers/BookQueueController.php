@@ -59,7 +59,7 @@ class BookQueueController extends Controller
         $firestore = $this->documentStoreService;
 
         // Implement: update the order of books in queue in Firestore
-        // (You may want to add a method in FirestoreService for this)
+
         // For now, just return success
         return response()->json(['success' => true]);
     }

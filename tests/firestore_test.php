@@ -2,7 +2,7 @@
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
-use App\Services\FirestoreService;
+use App\Contracts\DocumentStoreServiceInterface;
 
 // Create a test book record
 $book = [
@@ -17,7 +17,7 @@ $book = [
 ];
 
 // Initialize FirestoreService
-$firestoreService = new FirestoreService();
+$firestoreService = app(\App\Contracts\DocumentStoreServiceInterface::class);
 
 // Test creating a book
 echo "Creating test book...\n";
