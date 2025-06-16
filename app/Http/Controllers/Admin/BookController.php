@@ -269,11 +269,7 @@ class BookController extends Controller
         $genres = [];
         if (!empty($initial['genre'])) {
             foreach ($initial['genre'] as $g) {
-                if (is_array($g) && isset($g['name'])) {
-                    $genres[] = (string) $g['name'];
-                } else {
-                    $genres[] = (string) $g;
-                }
+                $genres[] = trim((string)$g);
             }
         }
         // Also allow old input to override
@@ -380,14 +376,10 @@ class BookController extends Controller
         if (!empty($book['genre'])) {
             if (is_array($book['genre'])) {
                 foreach ($book['genre'] as $g) {
-                    if (is_array($g) && isset($g['name'])) {
-                        $genres[] = (string) $g['name'];
-                    } else {
-                        $genres[] = (string) $g;
-                    }
+                    $genres[] = trim((string)$g);
                 }
             } else {
-                $genres[] = (string) $book['genre'];
+                $genres[] = trim((string)$book['genre']);
             }
         }
         // Also allow old input to override
