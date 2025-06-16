@@ -192,11 +192,6 @@
         <div class="form-group">
             <label>Genres</label>
             <div id="genres-group">
-                @php
-                    $genres = old('genre', old('genre', isset($book) && !empty($book['genre']) ? (is_array($book['genre']) ? $book['genre'] : [$book['genre']]) : ($initial['genre'] ?? [])));
-                    if (!is_array($genres))
-                        $genres = [$genres];
-                @endphp
                 @php $genresCount = count($genres); @endphp
                 @foreach($genres as $idx => $genre)
                     <div class="input-group genre-row align-items-start mb-3">
