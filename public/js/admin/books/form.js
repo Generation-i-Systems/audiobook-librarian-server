@@ -707,6 +707,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 hasError = true;
             }
 
+            console.log('[DEBUG] book-form submit event fired');
             if (hasError) {
                 console.log('[DEBUG] Validation failed, preventing submit');
                 e.preventDefault();
