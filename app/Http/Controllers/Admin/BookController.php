@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use Illuminate\Support\Facades\Log;
 use App\Events\NewBookAdded;
 use App\Http\Controllers\Controller;
 use App\Contracts\DocumentStoreServiceInterface;
@@ -371,6 +372,15 @@ class BookController extends Controller
             $coverAuto = basename($book['coverImage']);
         }
 
+        // DEBUG: Log type and value of book['genre']
+        Log::debug('BookController@edit: genre raw', [
+            'type' => is_object($book['genre']) ? get_class($book['genre']) : gettype($book['genre']),
+            'value' => $book['genre']
+        ]);
+        // Hotfix: forcibly cast BSONArray to array if still present
+        if ($book['genre'] instanceof \MongoDB\Model\BSONArray) {
+            $book['genre'] = (array) $book['genre'];
+        }
         // Normalize selected genres for the form
         $genres = [];
         if (!empty($book['genre'])) {
