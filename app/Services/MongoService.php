@@ -231,17 +231,7 @@ class MongoService implements DocumentStoreServiceInterface
     /** @inheritDoc */
     public function listGenres()
     {
-        $cursor = $this->getCollection('genres')->find();
-        $names = [];
-        foreach ($cursor as $doc) {
-            if ($doc instanceof \MongoDB\Model\BSONDocument) {
-                $doc = (array) $doc;
-            }
-            if (isset($doc['name']) && is_string($doc['name'])) {
-                $names[] = trim($doc['name']);
-            }
-        }
-        return array_unique($names);
+        return config('genres.list', []);
     }
     /** @inheritDoc */
     public function deleteGenre(string $id)
