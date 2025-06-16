@@ -357,7 +357,6 @@
                 }
             }
         @endphp
-        </form>
         @if (!empty($coverOptions))
         <div class="mb-3" id="cover-candidates-group">
             <label class="form-label">Select Cover Image:</label>
