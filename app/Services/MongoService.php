@@ -41,6 +41,10 @@ class MongoService implements DocumentStoreServiceInterface
         }
         // Recursively normalize all BSONArray/BSONDocument to PHP arrays
         $doc = $this->normalizeMongoValue($doc);
+        // Hotfix: forcibly cast genre to array if still BSONArray
+        if (isset($doc['genre']) && $doc['genre'] instanceof \MongoDB\Model\BSONArray) {
+            $doc['genre'] = (array) $doc['genre'];
+        }
         $doc['id'] = (string) $doc['_id'];
         return $doc;
     }
@@ -228,12 +232,16 @@ class MongoService implements DocumentStoreServiceInterface
     public function listGenres()
     {
         $cursor = $this->getCollection('genres')->find();
-        $genres = [];
+        $names = [];
         foreach ($cursor as $doc) {
-            $doc['id'] = (string) $doc['_id'];
-            $genres[] = $doc;
+            if ($doc instanceof \MongoDB\Model\BSONDocument) {
+                $doc = (array) $doc;
+            }
+            if (isset($doc['name']) && is_string($doc['name'])) {
+                $names[] = trim($doc['name']);
+            }
         }
-        return $genres;
+        return array_unique($names);
     }
     /** @inheritDoc */
     public function deleteGenre(string $id)
