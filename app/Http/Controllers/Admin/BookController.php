@@ -242,9 +242,15 @@ class BookController extends Controller
             }
         }
         // Always fetch genreList as array for the form
-        $genreList = $firestore->listGenres();
-        if (!is_array($genreList)) {
-            $genreList = [];
+        // Normalize genreList to flat array of strings
+        $genreListRaw = $firestore->listGenres();
+        $genreList = [];
+        foreach ($genreListRaw as $g) {
+            if (is_array($g) && isset($g['name'])) {
+                $genreList[] = (string) $g['name'];
+            } elseif (is_string($g)) {
+                $genreList[] = $g;
+            }
         }
         // Guarantee initial['author'] and initial['genre'] are arrays for JS and Blade
         if (empty($initial['author']) || !is_array($initial['author'])) {
@@ -259,11 +265,29 @@ class BookController extends Controller
             $initial['directoryPath'] = '';
         }
 
+        // Normalize selected genres for the form
+        $genres = [];
+        if (!empty($initial['genre'])) {
+            foreach ($initial['genre'] as $g) {
+                if (is_array($g) && isset($g['name'])) {
+                    $genres[] = (string) $g['name'];
+                } else {
+                    $genres[] = (string) $g;
+                }
+            }
+        }
+        // Also allow old input to override
+        $genres = old('genre', $genres);
+        if (!is_array($genres)) {
+            $genres = [$genres];
+        }
+
         if ($request->ajax()) {
             return view(
                 'admin.books.create_form',
                 compact(
                     'genreList',
+                    'genres',
                     'initial',
                     'coverCandidates',
                     'coverAuto',
@@ -285,6 +309,7 @@ class BookController extends Controller
             'admin.books.create_form',
             compact(
                 'genreList',
+                'genres',
                 'initial',
                 'coverCandidates',
                 'coverAuto',
@@ -322,7 +347,16 @@ class BookController extends Controller
         if (!$book) {
             abort(404, 'Book not found');
         }
-        $genreList = $firestore->listGenres();
+        // Normalize genreList to flat array of strings
+        $genreListRaw = $firestore->listGenres();
+        $genreList = [];
+        foreach ($genreListRaw as $g) {
+            if (is_array($g) && isset($g['name'])) {
+                $genreList[] = (string) $g['name'];
+            } elseif (is_string($g)) {
+                $genreList[] = $g;
+            }
+        }
         $coverCandidates = [];
         $coverAuto = null;
         $directoryPath = $book['directoryPath'] ?? null;
@@ -337,15 +371,34 @@ class BookController extends Controller
             }
         }
         // Set coverAuto to the filename of the book's coverImage if present
-
-        // Set coverAuto to the filename of the book's coverImage if present
         if (!empty($book['coverImage'])) {
             $coverAuto = basename($book['coverImage']);
         }
 
+        // Normalize selected genres for the form
+        $genres = [];
+        if (!empty($book['genre'])) {
+            if (is_array($book['genre'])) {
+                foreach ($book['genre'] as $g) {
+                    if (is_array($g) && isset($g['name'])) {
+                        $genres[] = (string) $g['name'];
+                    } else {
+                        $genres[] = (string) $g;
+                    }
+                }
+            } else {
+                $genres[] = (string) $book['genre'];
+            }
+        }
+        // Also allow old input to override
+        $genres = old('genre', $genres);
+        if (!is_array($genres)) {
+            $genres = [$genres];
+        }
         return view('admin.books.edit', [
             'book' => $book,
             'genreList' => $genreList,
+            'genres' => $genres,
             'coverCandidates' => $coverCandidates,
             'coverAuto' => $coverAuto,
             'directoryPath' => $directoryPath,

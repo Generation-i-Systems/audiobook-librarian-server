@@ -196,18 +196,13 @@
                     $genres = old('genre', old('genre', isset($book) && !empty($book['genre']) ? (is_array($book['genre']) ? $book['genre'] : [$book['genre']]) : ($initial['genre'] ?? [])));
                     if (!is_array($genres))
                         $genres = [$genres];
-                    // Normalize genres to array of trimmed strings
-                    $genres = array_map(function($g) { return is_string($g) ? trim($g) : (is_array($g) && isset($g['name']) ? trim($g['name']) : ''); }, $genres);
-                    // Remove empty
-                    $genres = array_filter($genres, function($g) { return $g !== ''; });
-                    /* DEBUG: genres selected: @json($genres), genre options: @json(config('genres.list', [])) */
                 @endphp
                 @php $genresCount = count($genres); @endphp
                 @foreach($genres as $idx => $genre)
                     <div class="input-group genre-row align-items-start mb-3">
                         <select name="genre[]" class="form-select w-auto" style="max-width:200px; height:32px;" required>
                             <option value="">Select a genre</option>
-                            @foreach(config('genres.list', []) as $g)
+                            @foreach($genreList as $g)
                                 <option value="{{ $g }}" {{ $genre === $g ? 'selected' : '' }}>{{ $g }}</option>
                             @endforeach
                         </select>
