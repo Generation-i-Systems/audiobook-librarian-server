@@ -708,6 +708,7 @@ document.addEventListener("DOMContentLoaded", function () {
             }
 
             if (hasError) {
+                console.log('[DEBUG] Validation failed, preventing submit');
                 e.preventDefault();
                 const firstError = form.querySelector(".is-invalid");
                 if (firstError)
@@ -715,12 +716,14 @@ document.addEventListener("DOMContentLoaded", function () {
                         behavior: "smooth",
                         block: "center",
                     });
+                console.log('[DEBUG] Form will not submit due to validation errors');
                 return false;
             }
 
             // Handle AJAX form submission if in modal
             var $form = $(this);
             var $modal = $form.closest(".modal");
+
             if ($modal.length) {
                 e.preventDefault();
                 var url = $form.attr("action");
@@ -821,8 +824,11 @@ document.addEventListener("DOMContentLoaded", function () {
                             });
                     },
                 });
+                console.log('[DEBUG] Modal AJAX submit, returning false');
                 return false;
             }
+            // Non-modal: allow default submit
+            console.log('[DEBUG] No errors, not in modal, allowing normal form submit');
         });
     }
 
