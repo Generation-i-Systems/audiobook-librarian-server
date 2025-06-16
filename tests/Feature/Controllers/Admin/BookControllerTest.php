@@ -201,4 +201,92 @@ class BookControllerTest extends TestCase
         $book = $this->booksCollection->document($bookId)->snapshot();
         $this->assertFalse($book->exists());
     }
+
+    #[Test]
+    public function testGetRawJsonReturnsBookData()
+    {
+        $bookRef = $this->booksCollection->add([
+            'title' => 'Raw Test Book',
+            'authors' => ['Raw Author'],
+            'genre' => 'Raw Genre',
+        ]);
+        $bookId = $bookRef->id();
+
+        $response = $this->actingAs($this->admin->data())
+            ->get(route('admin.books.rawJson', $bookId));
+
+        $response->assertStatus(200)
+            ->assertJsonFragment(['title' => 'Raw Test Book']);
+    }
+
+    #[Test]
+    public function testGetRawJsonReturns404ForMissingBook()
+    {
+        $response = $this->actingAs($this->admin->data())
+            ->get(route('admin.books.rawJson', 'nonexistent-id'));
+
+        $response->assertStatus(404);
+    }
+
+    #[Test]
+    public function testSaveRawJsonUpdatesBook()
+    {
+        $bookRef = $this->booksCollection->add([
+            'title' => 'Old Raw Title',
+            'authors' => ['Raw Author'],
+            'genre' => 'Raw Genre',
+        ]);
+        $bookId = $bookRef->id();
+
+        $newJson = json_encode([
+            'title' => 'New Raw Title',
+            'authors' => ['Raw Author'],
+            'genre' => 'Raw Genre',
+        ]);
+
+        $response = $this->actingAs($this->admin->data())
+            ->post(route('admin.books.saveRawJson', $bookId), [
+                'json' => $newJson,
+            ]);
+
+        $response->assertStatus(200)->assertJson(['success' => true]);
+        $book = $this->booksCollection->document($bookId)->snapshot();
+        $this->assertEquals('New Raw Title', $book['title']);
+    }
+
+    #[Test]
+    public function testSaveRawJsonReturnsErrorForInvalidJson()
+    {
+        $bookRef = $this->booksCollection->add([
+            'title' => 'Invalid Raw Book',
+            'authors' => ['Raw Author'],
+            'genre' => 'Raw Genre',
+        ]);
+        $bookId = $bookRef->id();
+
+        $invalidJson = '{invalid: true';
+
+        $response = $this->actingAs($this->admin->data())
+            ->post(route('admin.books.saveRawJson', $bookId), [
+                'json' => $invalidJson,
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonStructure(['message']);
+    }
+
+    #[Test]
+    public function testSaveRawJsonReturns404ForMissingBook()
+    {
+        $validJson = json_encode([
+            'title' => 'Should Not Exist',
+            'authors' => ['Nobody'],
+            'genre' => 'None',
+        ]);
+        $response = $this->actingAs($this->admin->data())
+            ->post(route('admin.books.saveRawJson', 'nonexistent-id'), [
+                'json' => $validJson,
+            ]);
+        $response->assertStatus(404);
+    }
 }

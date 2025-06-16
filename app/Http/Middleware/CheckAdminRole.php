@@ -16,8 +16,11 @@ class CheckAdminRole
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (Auth::check() && Auth::user()->role === 'admin') {
-            return $next($request);
+        if (Auth::check()) {
+            $firestore = app(\App\Services\FirestoreService::class);
+            if ($firestore->isAdmin(Auth::id())) {
+                return $next($request);
+            }
         }
 
         abort(403, 'Unauthorized. Admin access required.');

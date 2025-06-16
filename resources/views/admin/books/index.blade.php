@@ -45,7 +45,7 @@
                     }
                 }
                 foreach ($genres as $g) {
-                    $g = trim($g);
+                    $g = is_string($g) ? trim($g) : $g;
                     if ($g === '') continue;
                     $genreCounts[$g] = ($genreCounts[$g] ?? 0) + 1;
                 }

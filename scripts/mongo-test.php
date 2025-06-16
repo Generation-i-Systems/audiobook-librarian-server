@@ -11,9 +11,9 @@ $apiVersion = new ServerApi(ServerApi::V1);
 $client = new MongoDB\Client($uri, [], ['serverApi' => $apiVersion]);
 
 try {
-	// Send a ping to confirm a successful connection
-	$client->selectDatabase('admin')->command(['ping' => 1]);
-	echo "Pinged your deployment. You successfully connected to MongoDB!\n";
+    // Send a ping to confirm a successful connection
+    $client->selectDatabase('admin')->command(['ping' => 1]);
+    echo "Pinged your deployment. You successfully connected to MongoDB!\n";
 } catch (Exception $e) {
-	printf($e->getMessage());
+    printf($e->getMessage());
 }

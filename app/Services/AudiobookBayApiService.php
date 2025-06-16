@@ -658,7 +658,7 @@ class AudiobookBayApiService
                 }
 
                 return collect($cookies)
-                    ->map(fn($cookie) => $cookie->getName() . '=' . $cookie->getValue())
+                    ->map(fn ($cookie) => $cookie->getName() . '=' . $cookie->getValue())
                     ->implode('; ');
             } catch (\Exception $e) {
                 Log::error('AudiobookBayApiService: Exception during authentication.', [

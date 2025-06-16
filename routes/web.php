@@ -145,6 +145,7 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::resource('authors', Admin\AuthorController::class);
     Route::resource('books', Admin\BookController::class);
     Route::get('books/{id}/raw-json', [Admin\BookController::class, 'getRawJson'])->name('books.rawJson');
+    Route::post('books/{id}/raw-json', [Admin\BookController::class, 'saveRawJson'])->name('books.saveRawJson');
 
     // Autocomplete routes for Book form
     Route::get('/books/autocomplete/authors', [

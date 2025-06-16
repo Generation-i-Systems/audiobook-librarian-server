@@ -13,13 +13,13 @@ use Illuminate\Support\Facades\Process;
 
 class QueueController extends Controller
 {
+    use BookImportTrait;
     protected DocumentStoreServiceInterface $documentStoreService;
 
     public function __construct(DocumentStoreServiceInterface $documentStoreService)
     {
         $this->documentStoreService = $documentStoreService;
     }
-    use BookImportTrait;
 
     public function index()
     {

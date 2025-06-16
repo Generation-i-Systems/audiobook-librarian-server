@@ -156,6 +156,12 @@ class FirestoreService implements DocumentStoreServiceInterface
         }
     }
 
+    /**
+     * Get a user document by ID.
+     *
+     * @param string $identifier
+     * @return array|null
+     */
     public function getUserById($identifier)
     {
         try {
@@ -178,6 +184,33 @@ class FirestoreService implements DocumentStoreServiceInterface
             self::$inProviderCall = false;
         }
     }
+
+    /**
+     * Get the user's role from Firestore.
+     *
+     * @param string $userId
+     * @return string|null  The user's role (e.g., 'admin'), or null if not set
+     */
+    public function getUserRole(string $userId): ?string
+    {
+        $user = $this->getUserById($userId);
+        if ($user && isset($user['role'])) {
+            return $user['role'];
+        }
+        return null;
+    }
+
+    /**
+     * Check if the user is an admin.
+     *
+     * @param string $userId
+     * @return bool  True if user is admin, false otherwise
+     */
+    public function isAdmin(string $userId): bool
+    {
+        return $this->getUserRole($userId) === 'admin';
+    }
+
 
     /**
      * Retrieve user by remember token.

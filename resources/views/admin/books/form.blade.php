@@ -49,7 +49,31 @@
         <!-- DEBUG: This input is required for JS to load directory files -->
         <input type="hidden" id="directoryPath" name="directoryPath" value="{{ $displayPath }}">
         <button type="button" class="btn btn-info mb-3" id="autofill-modal-btn"><i class="fas fa-magic"></i> Autofill Book Metadata</button>
+        @if(isset($book))
+        <button type="button" class="btn btn-secondary mb-3 ms-2" id="raw-json-edit-btn"><i class="fas fa-code"></i> Raw JSON Edit</button>
+        @endif
 
+<!-- Autofill Modal -->
+@if(isset($book))
+<div class="modal fade" id="rawJsonModal" tabindex="-1" aria-labelledby="rawJsonModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="rawJsonModalLabel">Edit Book JSON</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <textarea id="raw-json-textarea" class="form-control" rows="18" style="font-family:monospace;"></textarea>
+        <div id="raw-json-error" class="text-danger mt-2" style="display:none;"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="save-raw-json-btn">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+@endif
 <!-- Autofill Modal -->
 <div class="modal fade" id="autofillModal" tabindex="-1" aria-labelledby="autofillModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">
@@ -117,8 +141,16 @@
                 @php $authorsCount = count($authors); @endphp
                 @foreach($authors as $idx => $author)
                     <div class="input-group author-row align-items-start mb-3">
-                        <input type="text" name="author[]" class="form-control w-auto author-autocomplete" style="max-width:300px; height:32px;"
-                            value="{{ $author }}" required>
+                        @php
+    if ($author instanceof \MongoDB\Model\BSONArray) {
+        $author = (array) $author;
+    }
+    if (is_array($author)) {
+        $author = implode(', ', $author);
+    }
+@endphp
+<input type="text" name="author[]" class="form-control w-auto author-autocomplete" style="max-width:300px; height:32px;"
+    value="{{ $author }}" required>
                         <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
                             <button type="button" class="btn btn-outline-danger btn-sm remove-author p-0 mb-0"
                                 style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
@@ -140,12 +172,6 @@
                     $oldSeries = old('series', request()->get('series') ? [request()->get('series')] : []);
                     $oldSeriesNumbers = old('seriesNumber', old('seriesNumber', []));
 
-                    // Log the raw series data for debugging
-                    Log::debug('Series Data:', [
-                        'book_series' => isset($book) && !empty($book['series']) ? $book['series'] : null,
-                        'old_series' => $oldSeries,
-                        'old_series_numbers' => $oldSeriesNumbers,
-                    ]);
 
                     // Handle existing book data
                     if (isset($book) && !empty($book['series'])) {
@@ -213,14 +239,6 @@
                     @php
                         $name = isset($series['name']) ? $series['name'] : '';
                         $number = isset($series['number']) ? $series['number'] : '';
-                        \Log::debug('Rendering series input', [
-                            'series' => $series,
-                            'name' => $name,
-                            'number' => $number,
-                            'debug_backtrace' => array_map(function($t) {
-                                return ($t['file'] ?? 'unknown') . ':' . ($t['line'] ?? '?') . ' ' . ($t['function'] ?? '?');
-                            }, array_slice(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 5), 0, 3))
-                        ]);
                     @endphp
                     <div class="input-group series-row align-items-start mb-3">
                         <input type="text" name="series[]" class="form-control w-auto series-autocomplete" style="max-width:200px; height:32px;"

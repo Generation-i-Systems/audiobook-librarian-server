@@ -78,15 +78,11 @@ class BookController extends Controller
      */
     protected DocumentStoreServiceInterface $documentStoreService;
 
-    /**
-     * @var GoogleBooksApiService
-     */
-    protected GoogleBooksApiService $googleBooksApiService;
 
     public function __construct(DocumentStoreServiceInterface $documentStoreService, GoogleBooksApiService $googleBooksApiService)
     {
         $this->documentStoreService = $documentStoreService;
-        $this->googleBooksApiService = $googleBooksApiService;
+        $this->setGoogleBooksApiService($googleBooksApiService);
         $this->storagePath = env('BOOK_STORAGE_PATH');
     }
 
@@ -279,6 +275,12 @@ class BookController extends Controller
                 ->with('layout', 'layouts.modal');
         }
 
+        // Ensure initial['author'] is a string for the form field if it's an array
+        if (isset($initial['author']) && is_array($initial['author'])) {
+            $initial['author'] = array_map(function ($a) {
+                return is_array($a) ? implode(', ', $a) : (string) $a;
+            }, $initial['author']);
+        }
         return view(
             'admin.books.create_form',
             compact(
@@ -644,5 +646,34 @@ class BookController extends Controller
         }
 
         return response()->json($book, 200, ['Content-Type' => 'application/json'], JSON_PRETTY_PRINT);
+    }
+
+    /**
+     * Save raw JSON for a book (admin only).
+     * @param string $id
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function saveRawJson($id, Request $request)
+    {
+        $json = $request->input('json');
+        if (empty($json)) {
+            return response()->json(['message' => 'No JSON provided.'], 400);
+        }
+        try {
+            $data = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            return response()->json(['message' => 'Invalid JSON: ' . $e->getMessage()], 422);
+        }
+        // Remove _id if present, always use string id
+        unset($data['_id']);
+        $data['id'] = $id;
+        $firestore = $this->documentStoreService;
+        $book = $firestore->getBook($id);
+        if (!$book) {
+            return response()->json(['message' => 'Book not found.'], 404);
+        }
+        $firestore->updateBook($id, $data);
+        return response()->json(['success' => true]);
     }
 }

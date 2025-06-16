@@ -49,14 +49,14 @@ class ImportFileController extends Controller
             return response()->json(['error' => 'Not a directory'], 400);
         }
         $items = collect(File::directories($absPath))
-            ->map(fn($d) => [
+            ->map(fn ($d) => [
                 'type' => 'dir',
                 'name' => basename($d),
             ])
             ->merge(
                 collect(File::files($absPath))
-                    ->filter(fn($f) => in_array(strtolower($f->getExtension()), Config::get('import.allowed_extensions', [])))
-                    ->map(fn($f) => [
+                    ->filter(fn ($f) => in_array(strtolower($f->getExtension()), Config::get('import.allowed_extensions', [])))
+                    ->map(fn ($f) => [
                         'type' => 'file',
                         'name' => $f->getFilename(),
                     ])

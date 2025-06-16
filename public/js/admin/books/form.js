@@ -122,6 +122,49 @@ function addGenreRow($container, selectedGenre = "") {
 }
 window.addGenreRow = addGenreRow;
 
+// Raw JSON Edit Modal logic
+$(function() {
+    var $rawJsonBtn = $('#raw-json-edit-btn');
+    if ($rawJsonBtn.length) {
+        var bookId = $rawJsonBtn.closest('form').attr('action').match(/books\/(\w+)/);
+        bookId = bookId ? bookId[1] : null;
+        $rawJsonBtn.on('click', function() {
+            if (!bookId) return;
+            $('#raw-json-error').hide();
+            $.get('/admin/books/' + bookId + '/raw-json', function(data) {
+                $('#raw-json-textarea').val(JSON.stringify(data, null, 2));
+                $('#rawJsonModal').modal('show');
+            }).fail(function(xhr) {
+                $('#raw-json-textarea').val('');
+                $('#raw-json-error').text('Failed to load JSON: ' + xhr.status).show();
+                $('#rawJsonModal').modal('show');
+            });
+        });
+        $('#save-raw-json-btn').on('click', function() {
+            var json;
+            try {
+                json = JSON.parse($('#raw-json-textarea').val());
+            } catch (e) {
+                $('#raw-json-error').text('Invalid JSON: ' + e.message).show();
+                return;
+            }
+            $.ajax({
+                url: '/admin/books/' + bookId + '/raw-json',
+                type: 'POST',
+                data: { json: JSON.stringify(json) },
+                headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
+                success: function() {
+                    window.location.reload();
+                },
+                error: function(xhr) {
+                    var msg = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'Failed to save JSON.';
+                    $('#raw-json-error').text(msg).show();
+                }
+            });
+        });
+    }
+});
+
 // Helper function to initialize jQuery UI Autocomplete
 function initializeAutocomplete($container, selector, sourceUrl) {
     console.log("initializeAutocomplete called. Container:", $container);

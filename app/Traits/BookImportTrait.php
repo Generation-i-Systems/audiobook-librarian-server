@@ -477,9 +477,9 @@ trait BookImportTrait
     /**
      * Google Books API service instance.
      *
-     * @var mixed|null
+     * @var \App\Services\GoogleBooksApiService|null
      */
-    protected $googleBooksApiService = null;
+    protected ?\App\Services\GoogleBooksApiService $googleBooksApiService = null;
 
     public function setGoogleBooksApiService($service)
     {
@@ -488,7 +488,7 @@ trait BookImportTrait
 
     public function searchGoogleBooks($query)
     {
-        return $this->googleBooksApiService->searchBooks($query, 30);
+        return $this->googleBooksApiService->searchBooks($query, ['limit' => 30]);
     }
 
     public function getBookDetails($volumeId)

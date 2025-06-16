@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use MongoDB\Client;
-
 use App\Contracts\DocumentStoreServiceInterface;
 use MongoDB\BSON\ObjectId;
 use MongoDB\BSON\Regex;
@@ -34,17 +33,56 @@ class MongoService implements DocumentStoreServiceInterface
     public function getBook(string $id)
     {
         $doc = $this->getCollection('books')->findOne(['_id' => $id]);
-        if (!$doc) { return null; }
+        if (!$doc) {
+            return null;
+        }
+        if ($doc instanceof \MongoDB\Model\BSONDocument) {
+            $doc = (array) $doc;
+        }
+        // Ensure author is always an array, but do not flatten or convert to string
+        if (isset($doc['author']) && $doc['author'] instanceof \MongoDB\Model\BSONArray) {
+            $doc['author'] = (array) $doc['author'];
+        }
+        // Ensure series is always array or string, never BSONDocument
+        if (isset($doc['series']) && $doc['series'] instanceof \MongoDB\Model\BSONDocument) {
+            $doc['series'] = (array) $doc['series'];
+        }
         $doc['id'] = (string) $doc['_id'];
         return $doc;
     }
+    /**
+     * Recursively normalize MongoDB BSONArray/BSONDocument to PHP arrays.
+     *
+     * @param mixed $value
+     * @return mixed
+     */
+    private function normalizeMongoValue($value)
+    {
+        if ($value instanceof \MongoDB\Model\BSONArray || $value instanceof \MongoDB\Model\BSONDocument) {
+            $value = (array) $value;
+            foreach ($value as $k => $v) {
+                $value[$k] = $this->normalizeMongoValue($v);
+            }
+        }
+        return $value;
+    }
+
     /** @inheritDoc */
     public function listBooks()
     {
         $cursor = $this->getCollection('books')->find();
         $books = [];
         foreach ($cursor as $doc) {
+            if ($doc instanceof \MongoDB\Model\BSONDocument) {
+                $doc = (array) $doc;
+            }
             $doc['id'] = (string) $doc['_id'];
+            // Recursively normalize author, series, and genre fields to never return BSONArray/BSONDocument
+            foreach (['author', 'series', 'genre'] as $field) {
+                if (isset($doc[$field])) {
+                    $doc[$field] = $this->normalizeMongoValue($doc[$field]);
+                }
+            }
             $books[] = $doc;
         }
         return $books;
@@ -92,7 +130,20 @@ class MongoService implements DocumentStoreServiceInterface
     public function getUserById($identifier)
     {
         $doc = $this->getCollection('users')->findOne(['_id' => $identifier]);
-        if (!$doc) { return null; }
+        if (!$doc) {
+            return null;
+        }
+        if ($doc instanceof \MongoDB\Model\BSONDocument) {
+            $doc = (array) $doc;
+        }
+        // Normalize author if present
+        if (isset($doc['author']) && $doc['author'] instanceof \MongoDB\Model\BSONArray) {
+            $doc['author'] = (array) $doc['author'];
+        }
+        // Normalize series if present
+        if (isset($doc['series']) && $doc['series'] instanceof \MongoDB\Model\BSONDocument) {
+            $doc['series'] = (array) $doc['series'];
+        }
         $doc['id'] = (string) $doc['_id'];
         return $doc;
     }
@@ -101,10 +152,25 @@ class MongoService implements DocumentStoreServiceInterface
     {
         $query = [];
         foreach ($credentials as $k => $v) {
-            if ($k !== 'password') { $query[$k] = $v; }
+            if ($k !== 'password') {
+                $query[$k] = $v;
+            }
         }
         $doc = $this->getCollection('users')->findOne($query);
-        if (!$doc) { return null; }
+        if (!$doc) {
+            return null;
+        }
+        if ($doc instanceof \MongoDB\Model\BSONDocument) {
+            $doc = (array) $doc;
+        }
+        // Normalize author if present
+        if (isset($doc['author']) && $doc['author'] instanceof \MongoDB\Model\BSONArray) {
+            $doc['author'] = (array) $doc['author'];
+        }
+        // Normalize series if present
+        if (isset($doc['series']) && $doc['series'] instanceof \MongoDB\Model\BSONDocument) {
+            $doc['series'] = (array) $doc['series'];
+        }
         $doc['id'] = (string) $doc['_id'];
         return $doc;
     }
@@ -112,7 +178,20 @@ class MongoService implements DocumentStoreServiceInterface
     public function getUserByRememberToken($identifier, $token)
     {
         $doc = $this->getCollection('users')->findOne(['_id' => $identifier, 'remember_token' => $token]);
-        if (!$doc) { return null; }
+        if (!$doc) {
+            return null;
+        }
+        if ($doc instanceof \MongoDB\Model\BSONDocument) {
+            $doc = (array) $doc;
+        }
+        // Normalize author if present
+        if (isset($doc['author']) && $doc['author'] instanceof \MongoDB\Model\BSONArray) {
+            $doc['author'] = (array) $doc['author'];
+        }
+        // Normalize series if present
+        if (isset($doc['series']) && $doc['series'] instanceof \MongoDB\Model\BSONDocument) {
+            $doc['series'] = (array) $doc['series'];
+        }
         $doc['id'] = (string) $doc['_id'];
         return $doc;
     }
@@ -179,7 +258,21 @@ class MongoService implements DocumentStoreServiceInterface
     public function findOrCreateSeriesByName(string $name)
     {
         $doc = $this->getCollection('series')->findOne(['name' => $name]);
-        if ($doc) { $doc['id'] = (string) $doc['_id']; return $doc; }
+        if ($doc) {
+            if ($doc instanceof \MongoDB\Model\BSONDocument) {
+                $doc = (array) $doc;
+            }
+            // Normalize author if present
+            if (isset($doc['author']) && $doc['author'] instanceof \MongoDB\Model\BSONArray) {
+                $doc['author'] = (array) $doc['author'];
+            }
+            // Normalize series if present
+            if (isset($doc['series']) && $doc['series'] instanceof \MongoDB\Model\BSONDocument) {
+                $doc['series'] = (array) $doc['series'];
+            }
+            $doc['id'] = (string) $doc['_id'];
+            return $doc;
+        }
         $id = $this->createSeries(['name' => $name]);
         return ['id' => $id, 'name' => $name];
     }
@@ -187,7 +280,9 @@ class MongoService implements DocumentStoreServiceInterface
     public function getSeries(string $id)
     {
         $doc = $this->getCollection('series')->findOne(['_id' => $id]);
-        if (!$doc) { return null; }
+        if (!$doc) {
+            return null;
+        }
         $doc['id'] = (string) $doc['_id'];
         return $doc;
     }
@@ -210,7 +305,9 @@ class MongoService implements DocumentStoreServiceInterface
         $cursor = $this->getCollection('authors')->find();
         $names = [];
         foreach ($cursor as $doc) {
-            if (isset($doc['name'])) { $names[] = $doc['name']; }
+            if (isset($doc['name'])) {
+                $names[] = $doc['name'];
+            }
         }
         return array_unique($names);
     }
@@ -226,7 +323,9 @@ class MongoService implements DocumentStoreServiceInterface
         $cursor = $this->getCollection('authors')->find(['name' => $regex]);
         $names = [];
         foreach ($cursor as $doc) {
-            if (isset($doc['name'])) { $names[] = $doc['name']; }
+            if (isset($doc['name'])) {
+                $names[] = $doc['name'];
+            }
         }
         return array_unique($names);
     }
@@ -242,8 +341,12 @@ class MongoService implements DocumentStoreServiceInterface
     public function getMessages(?string $userId = null, bool $includeAcknowledged = false, int $limit = 100): array
     {
         $filter = [];
-        if ($userId) { $filter['user_id'] = $userId; }
-        if (!$includeAcknowledged) { $filter['acknowledged_at'] = null; }
+        if ($userId) {
+            $filter['user_id'] = $userId;
+        }
+        if (!$includeAcknowledged) {
+            $filter['acknowledged_at'] = null;
+        }
         $cursor = $this->getCollection('messages')->find($filter, ['limit' => $limit, 'sort' => ['created_at' => -1]]);
         $messages = [];
         foreach ($cursor as $doc) {
@@ -258,11 +361,15 @@ class MongoService implements DocumentStoreServiceInterface
     public function listJobs(?string $type = null, ?string $status = null, int $limit = 50, string $orderBy = 'updated_at', string $direction = 'DESC', ?string $startAfterId = null): array
     {
         $filter = [];
-        if ($type) { $filter['type'] = $type; }
-        if ($status) { $filter['status'] = $status; }
+        if ($type) {
+            $filter['type'] = $type;
+        }
+        if ($status) {
+            $filter['status'] = $status;
+        }
         $options = [
             'sort' => [$orderBy => ($direction === 'DESC' ? -1 : 1)],
-            'limit' => $limit
+            'limit' => $limit,
         ];
         if ($startAfterId) {
             $filter['_id'] = ['$gt' => $startAfterId];
@@ -295,7 +402,7 @@ class MongoService implements DocumentStoreServiceInterface
         try {
             $result = $this->getCollection('reading_progress')->deleteMany([
                 'user_id' => $userId,
-                'book_id' => $bookId
+                'book_id' => $bookId,
             ]);
             return $result->getDeletedCount() > 0;
         } catch (\Throwable $e) {
@@ -326,7 +433,20 @@ class MongoService implements DocumentStoreServiceInterface
     public function getDocument(string $collection, string $docId): ?array
     {
         $doc = $this->getCollection($collection)->findOne(['_id' => $docId]);
-        if (!$doc) { return null; }
+        if (!$doc) {
+            return null;
+        }
+        if ($doc instanceof \MongoDB\Model\BSONDocument) {
+            $doc = (array) $doc;
+        }
+        // Normalize author if present
+        if (isset($doc['author']) && $doc['author'] instanceof \MongoDB\Model\BSONArray) {
+            $doc['author'] = (array) $doc['author'];
+        }
+        // Normalize series if present
+        if (isset($doc['series']) && $doc['series'] instanceof \MongoDB\Model\BSONDocument) {
+            $doc['series'] = (array) $doc['series'];
+        }
         $doc['id'] = (string) $doc['_id'];
         return $doc;
     }
@@ -336,4 +456,3 @@ class MongoService implements DocumentStoreServiceInterface
         return $this->client;
     }
 }
-
