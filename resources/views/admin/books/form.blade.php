@@ -196,6 +196,11 @@
                     $genres = old('genre', old('genre', isset($book) && !empty($book['genre']) ? (is_array($book['genre']) ? $book['genre'] : [$book['genre']]) : ($initial['genre'] ?? [])));
                     if (!is_array($genres))
                         $genres = [$genres];
+                    // Normalize genres to array of trimmed strings
+                    $genres = array_map(function($g) { return is_string($g) ? trim($g) : (is_array($g) && isset($g['name']) ? trim($g['name']) : ''); }, $genres);
+                    // Remove empty
+                    $genres = array_filter($genres, function($g) { return $g !== ''; });
+                    /* DEBUG: genres selected: @json($genres), genre options: @json(config('genres.list', [])) */
                 @endphp
                 @php $genresCount = count($genres); @endphp
                 @foreach($genres as $idx => $genre)
