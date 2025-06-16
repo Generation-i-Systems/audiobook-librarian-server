@@ -84,7 +84,7 @@
       </div>
       <div class="modal-body">
         <div id="autofill-flash-message" class="alert alert-danger d-none" role="alert"></div>
-        <form id="autofill-search-form" class="mb-3">
+        <div id="autofill-search-form" class="mb-3">
           <div class="row g-2">
             <div class="col-md-5">
               <input type="text" class="form-control" name="title" placeholder="Title" required>
