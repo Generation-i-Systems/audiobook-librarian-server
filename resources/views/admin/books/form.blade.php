@@ -489,8 +489,7 @@
         <div id="directory-files-list" class="mt-2 mb-3" style="display:none; border: 1px solid #ddd; padding: 10px; border-radius: 4px;">
             {{-- Files will be listed here by JavaScript --}}
         </div>
-        <button type="submit" class="btn btn-primary"
-            id="modal-{{ isset($book) ? 'update' : 'create' }}-btn">{{ isset($book) ? 'Update' : 'Create' }}</button>
+        <button type="submit" class="btn btn-primary" id="modal-{{ isset($book) ? 'update' : 'create' }}-btn">{{ isset($book) ? 'Update' : 'Create' }}</button>
         @if(!empty($isModal))
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="modal-cancel-btn">Cancel</button>
         @else
@@ -527,4 +526,5 @@ $(function() {
 });
 </script>
 <script src="{{ asset('js/admin/books/form.js') }}"></script>
+<script>document.addEventListener('DOMContentLoaded', function() { console.log('[DEBUG] Blade inline script ran'); });</script>
 @endsection
