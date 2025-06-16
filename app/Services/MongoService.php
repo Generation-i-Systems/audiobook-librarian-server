@@ -39,14 +39,8 @@ class MongoService implements DocumentStoreServiceInterface
         if ($doc instanceof \MongoDB\Model\BSONDocument) {
             $doc = (array) $doc;
         }
-        // Ensure author is always an array, but do not flatten or convert to string
-        if (isset($doc['author']) && $doc['author'] instanceof \MongoDB\Model\BSONArray) {
-            $doc['author'] = (array) $doc['author'];
-        }
-        // Ensure series is always array or string, never BSONDocument
-        if (isset($doc['series']) && $doc['series'] instanceof \MongoDB\Model\BSONDocument) {
-            $doc['series'] = (array) $doc['series'];
-        }
+        // Recursively normalize all BSONArray/BSONDocument to PHP arrays
+        $doc = $this->normalizeMongoValue($doc);
         $doc['id'] = (string) $doc['_id'];
         return $doc;
     }
