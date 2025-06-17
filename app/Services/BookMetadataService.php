@@ -6,6 +6,7 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Storage;
+use App\Contracts\DocumentStoreServiceInterface;
 
 class BookMetadataService
 {
