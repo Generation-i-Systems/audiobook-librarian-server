@@ -337,7 +337,7 @@ trait BookImportTrait
             if (str_contains($author, ',') || stripos($author, ' and ') !== false || str_contains($author, '&')) {
                 $author = str_replace([' and ', ' & '], ',', $author);
                 $authors = array_map('trim', explode(',', $author));
-                $book['author'] = array_values(array_filter($authors, fn ($a) => strlen(trim($a)) > 4));
+                $book['author'] = array_values(array_filter($authors, fn($a) => strlen(trim($a)) > 4));
             } else {
                 $book['author'] = [trim($author)];
             }
@@ -497,20 +497,34 @@ trait BookImportTrait
     }
 
     /**
-     * Search Google Books and return matches sorted by similarity to title, author, series, and number.
-     * Returns [matches (sorted), close_match (or null)]
+     * Search Google Books API with similarity scoring and format results for frontend.
+     *
+     * @param string $title Book title to search for
+     * @param string $author Optional author name to improve matching
+     * @param string $series Optional series name to improve matching
+     * @param string $seriesNumber Optional series number to improve matching
+     * @param bool $more Whether to include more results
+     * @param int $limit Maximum number of results to return
+     * @return array Array of formatted book results ready for frontend consumption
      */
-    public function searchGoogleBooksWithSimilarity($title, $author, $series = '', $seriesNumber = '')
-    {
+    public function searchGoogleBooksWithSimilarity(
+        string $title,
+        string $author = '',
+        string $series = '',
+        string $seriesNumber = '',
+        bool $more = false,
+        int $limit = 10,
+    ): array { // phpcs:ignore Squiz.Functions.MultiLineFunctionDeclaration.NewlineBeforeOpenBrace
         $query = trim("intitle:{$title} inauthor:{$author}");
         $results = $this->googleBooksApiService->searchBooks($query, ['limit' => 30]);
-        if (empty($results['items'])) {
-            return [[], null];
+
+        if (empty($results)) {
+            Log::info('BookImportTrait: Received items from Google Books', ['count' => 0]);
+            return [];
         }
-        // Compute similarity for each item
+
+        Log::info('BookImportTrait: Received items from Google Books', ['count' => count($results)]);
         $matches = [];
-        $bestScore = 0;
-        $bestMatch = null;
         $maxScore = 120;
         if ($series) {
             $maxScore += 10;
@@ -518,26 +532,77 @@ trait BookImportTrait
         if ($seriesNumber) {
             $maxScore += 5;
         }
-        foreach ($results['items'] as $item) {
-            $info = $item['volumeInfo'];
+        foreach ($results as $item) {
+            $info = isset($item['volumeInfo']) && is_array($item['volumeInfo']) ? $item['volumeInfo'] : $item;
             $itemTitle = $info['title'] ?? '';
-            $itemAuthors = isset($info['authors']) ? implode(' ', $info['authors']) : '';
+            $itemAuthors = '';
+
+            if (isset($info['authors'])) {
+                if (is_array($info['authors'])) {
+                    Log::info('BookImportTrait: Item authors is an array', [
+                        'authors' => $info['authors'],
+                    ]);
+                    // Flatten nested author arrays (e.g., [ [ 'author' => [ 'name' => ... ] ] ])
+                    $authorNames = array();
+                    foreach ($info['authors'] as $authorEntry) {
+                        if (is_array($authorEntry)) {
+                            if (isset($authorEntry['name'])) {
+                                $authorNames[] = $authorEntry['name'];
+                            } elseif (
+                                isset($authorEntry['author'])
+                                && is_array($authorEntry['author'])
+                                && isset($authorEntry['author']['name'])
+                            ) {
+                                $authorNames[] = $authorEntry['author']['name'];
+                            } else {
+                                // Fallback: flatten any stringable values
+                                foreach ($authorEntry as $v) {
+                                    if (is_string($v)) {
+                                        $authorNames[] = $v;
+                                    }
+                                }
+                            }
+                        } elseif (is_string($authorEntry)) {
+                            $authorNames[] = $authorEntry;
+                        }
+                    }
+                    $itemAuthors = implode(' ', $authorNames);
+                } elseif (is_string($info['authors'])) {
+                    Log::info('BookImportTrait: Item authors is a string', [
+                        'authors' => $info['authors'],
+                    ]);
+                    $itemAuthors = $info['authors'];
+                }
+            }
             $itemSeries = $info['series'] ?? ($info['subtitle'] ?? '');
             $itemSeriesNumber = $info['seriesNumber'] ?? '';
             $score = 0;
             // Title similarity (Levenshtein, case-insensitive)
             $titleLev = 100 -
-                min(
-                    levenshtein(mb_strtolower($title), mb_strtolower($itemTitle)),
-                    100
-                );
+            min(
+                levenshtein(mb_strtolower($title), mb_strtolower($itemTitle)),
+                100
+            );
             $score += $titleLev;
             // Author similarity (Levenshtein, case-insensitive)
+            $authorString = '';
+            if (is_array($author) && count($author) > 0) {
+                $authorString = implode(' ', $author);
+            } elseif (is_string($author)) {
+                $authorString = $author;
+            }
+            // Ensure $itemAuthors is a string for levenshtein
+            $itemAuthorsString = '';
+            if (is_array($itemAuthors)) {
+                $itemAuthorsString = implode(' ', $itemAuthors);
+            } elseif (is_string($itemAuthors)) {
+                $itemAuthorsString = $itemAuthors;
+            }
             $authorLev = 100 -
-                min(
-                    levenshtein(mb_strtolower($author), mb_strtolower($itemAuthors)),
-                    100
-                );
+            min(
+                levenshtein(mb_strtolower($authorString), mb_strtolower($itemAuthorsString)),
+                100
+            );
             $score += $authorLev;
             // Series similarity
             if ($series && stripos($itemSeries, $series) !== false) {
@@ -550,23 +615,84 @@ trait BookImportTrait
             if (empty($info['description'])) {
                 $score -= 40;
             }
+            Log::info('BookImportTrait: Item similarity score', [
+                'title' => $itemTitle,
+                'authors' => $itemAuthors,
+                'score' => $score,
+            ]);
             $matches[] = [
                 'score' => $score,
                 'item' => $item,
             ];
-            if ($score > $bestScore) {
-                $bestScore = $score;
-                $item['score'] = $score;
-                $bestMatch = $item;
-            }
         }
         usort($matches, function ($a, $b) {
             return $b['score'] <=> $a['score'];
         });
-        // Only consider a close match if score is very high (stricter)
-        $closeMatch = ($bestScore > 160) ? $bestMatch : null;
 
-        return [$matches, $closeMatch];
+        // Format results for frontend consumption
+        $response = array_map(function ($m) {
+            $item = $m['item'] ?? $m;
+            $score = $m['score'] ?? null;
+            $info = isset($item['volumeInfo']) && is_array($item['volumeInfo']) ? $item['volumeInfo'] : $item;
+
+            // Extract only author.name fields into a flat author array
+            $authorArray = array();
+            if (isset($info['authors']) && is_array($info['authors'])) {
+                foreach ($info['authors'] as $authorEntry) {
+                    if (is_array($authorEntry) && isset($authorEntry['name'])) {
+                        $authorArray[] = $authorEntry['name'];
+                    } elseif (is_array($authorEntry) && isset($authorEntry['author']['name'])) {
+                        $authorArray[] = $authorEntry['author']['name'];
+                    } elseif (is_string($authorEntry)) {
+                        $authorArray[] = $authorEntry;
+                    }
+                }
+            } elseif (isset($info['authors']) && is_string($info['authors'])) {
+                $authorArray[] = $info['authors'];
+            }
+
+            // Merge all original fields from $item and $info, with $info taking precedence, and remove 'authors'
+            $result = array_merge($item, $info);
+            unset($result['authors']);
+
+            // Convert all keys to camelCase
+            $camelCaseResult = [];
+            foreach ($result as $key => $value) {
+                // Skip volumeInfo as it's a nested structure we don't need
+                if ($key === 'volumeInfo') {
+                    continue;
+                }
+
+                // Convert snake_case to camelCase
+                $camelKey = preg_replace_callback('/_([a-z])/', function ($matches) {
+                    return strtoupper($matches[1]);
+                }, $key);
+
+                $camelCaseResult[$camelKey] = $value;
+            }
+
+            // Add specific fields with proper camelCase naming
+            $camelCaseResult['author'] = $authorArray;
+            $camelCaseResult['publishedYear'] = isset($info['publishedDate']) ?
+                substr($info['publishedDate'], 0, 4) : '';
+            $camelCaseResult['coverImageUrl'] = $info['imageLinks']['thumbnail'] ?? '';
+            $camelCaseResult['matchScore'] = $score;
+            $camelCaseResult['series'] = $info['series'] ?? '';
+            $camelCaseResult['seriesName'] = $info['seriesName'] ?? $info['series'] ?? '';
+            $camelCaseResult['seriesNumber'] = $info['seriesNumber'] ?? '';
+
+            // Handle ID field specifically
+            if (isset($result['id'])) {
+                $camelCaseResult['googleBooksId'] = $result['id'];
+                unset($camelCaseResult['id']);
+            }
+
+            $result = $camelCaseResult;
+
+            return $result;
+        }, array_slice($matches, 0, $limit));
+
+        return array_values($response);
     }
 
     /**
@@ -610,9 +736,9 @@ trait BookImportTrait
             return [
                 'title' => $title,
                 'metadata' => [
-                    'needs_review' => false,
-                    'applied_corrections' => [],
-                ],
+                        'needs_review' => false,
+                        'applied_corrections' => [],
+                    ],
             ];
         }
 
@@ -635,22 +761,13 @@ trait BookImportTrait
         return [
             'title' => $title,
             'metadata' => [
-                // 'needs_review' => $needsReview,
-                'original_title' => $originalTitle,
-                'applied_corrections' => $appliedCorrections,
-            ],
+                    // 'needs_review' => $needsReview,
+                    'original_title' => $originalTitle,
+                    'applied_corrections' => $appliedCorrections,
+                ],
         ];
     }
 
-    /**
-     * Check if a title needs manual review
-     *
-     * @param  string  $title  The title to check
-     * @param  string  $series  The series name (if any)
-     * @param  string  $author  The author name(s)
-     * @param  string  $path  The file path (optional)
-     * @return bool True if the title needs review
-     */
     /**
      * Check if a title needs manual review. Returns an array of reasons if review is needed, or null if not.
      *

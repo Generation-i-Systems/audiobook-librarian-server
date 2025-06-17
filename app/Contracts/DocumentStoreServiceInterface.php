@@ -32,6 +32,8 @@ interface DocumentStoreServiceInterface
     public function findOrCreateSeriesByName(string $name);
     public function getSeries(string $id);
     public function deleteSeries(string $id);
+    public function listSeries(): array;
+    public function searchSeriesByName(string $term): array;
 
     // AUTHORS
     public function createAuthor(array $data);

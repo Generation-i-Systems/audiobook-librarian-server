@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Traits\BookImportTrait;
-use Google\Cloud\Firestore\FirestoreClient;
+use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -28,10 +28,8 @@ class BookImportTest extends TestCase
             $this->markTestSkipped('Firestore config missing: skipping Firestore-dependent tests.');
         }
 
-        $this->documentStore = new FirestoreClient([
-            'projectId' => config('firebase.project_id'),
-            'keyFilePath' => config('firebase.credentials.file'),
-        ]);
+        // TODO: Replace with a proper mock or test double for DocumentStoreServiceInterface
+        $this->documentStore = $this->createMock(DocumentStoreServiceInterface::class);
 
         $this->booksCollection = $this->documentStore->collection('books');
         $this->genresCollection = $this->documentStore->collection('genres');

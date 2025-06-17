@@ -933,7 +933,7 @@ class FirestoreService implements DocumentStoreServiceInterface
         return $series;
     }
 
-    public function listSeries()
+    public function listSeries(): array
     {
         try {
             if (!$this->db) {
@@ -968,8 +968,6 @@ class FirestoreService implements DocumentStoreServiceInterface
     /**
      * Search for series titles starting with a given term.
      *
-     * @param  string  $term  The search term.
-     *                        Search for series titles starting with a given term.
      * @param  string  $term  The search term.
      * @return array A list of unique series titles.
      */

@@ -186,21 +186,21 @@ class AudiobookBayApiService
             'page_count' => $data['page_count'] ?? $data['pages'] ?? null,
             'format' => $data['format'] ?? null,
             'edition' => $data['edition'] ?? null,
-            'coverImageUrl' => $data['coverImageUrl'] ?? $data['cover_url'] ?? $data['image_url'] ?? null,
-            'coverImageThumbnail' => $data['coverImageThumbnail'] ?? $data['thumbnail_url'] ?? null,
+            'coverImageUrl' => $data['coverImageUrl'] ?? $data['coverUrl'] ?? $data['cover_image_url'] ?? $data['cover_url'] ?? $data['image_url'] ?? null,
+            'coverImageThumbnail' => $data['coverImageThumbnail'] ?? $data['cover_image_thumbnail'] ?? $data['thumbnail_url'] ?? null,
             'authors' => self::formatAuthors($data['authors'] ?? []),
             'narrators' => self::formatNarrators($data['narrators'] ?? []),
             'series' => self::formatSeries($data['series'] ?? null, $data['series_number'] ?? null),
             'genres' => self::formatGenres($data['genres'] ?? $data['categories'] ?? []),
             'rating' => $data['rating'] ?? $data['average_rating'] ?? null,
-            'ratingsCount' => $data['ratingsCount'] ?? $data['ratings_count'] ?? 0,
-            'metadata' => array_merge(
+            'ratings_count' => $data['ratings_count'] ?? $data['ratingsCount'] ?? 0,
+            'metadata' => array_merge(self::formatAuthors($data[''] ?? []), $data[
                 $data['metadata'] ?? [],
                 [
                     'source' => $data['metadata']['source'] ?? 'unknown',
                     'url' => $data['url'] ?? $data['metadata']['url'] ?? null,
-                    'dateAdded' => $data['dateAdded'] ?? now()->toDateTimeString(),
-                    'dateUpdated' => $data['dateUpdated'] ?? now()->toDateTimeString(),
+                    'dateAdded' => $data['dateAdded'] ?? $data['created_at'] ?? now()->toDateTimeString(),
+                    'dateUpdated' => $data['dateUpdated'] ?? $data['updated_at'] ?? now()->toDateTimeString(),
                 ]
             ),
         ];

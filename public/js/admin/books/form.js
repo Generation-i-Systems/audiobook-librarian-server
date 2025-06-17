@@ -850,18 +850,22 @@ $(function() {
 
             $.get(endpoint, params)
                 .done(function(response) {
-                    var results = Array.isArray(response) ? response : (response.matches || []);
+                    var results = Array.isArray(response) ? response : [];
                     if (results.length > 0) {
                         var rows = '';
                         results.forEach(function(item, idx) {
                             var authors = Array.isArray(item.author) ? item.author.join(', ') : (item.author || '');
+                            // Handle both camelCase and snake_case properties
+                            var coverUrl = item.coverImageUrl || item.cover_image_url || '';
+                            var publishedYear = item.publishedYear || (item.published_date ? item.published_date.substring(0, 4) : '');
+
                             rows += '<tr>' +
                                 '<td><input type="radio" name="autofill_result_select" value="' + idx + '"></td>' +
-                                '<td>' + (item.coverImageUrl ? '<img src="' + item.coverImageUrl + '" alt="Cover" style="height:48px;max-width:40px;">' : '') + '</td>' +
+                                '<td>' + (coverUrl ? '<img src="' + coverUrl + '" alt="Cover" style="height:48px;max-width:40px;">' : '') + '</td>' +
                                 '<td>' + (item.title || '') + '</td>' +
                                 '<td>' + authors + '</td>' +
                                 '<td>' + (item.series || '') + '</td>' +
-                                '<td>' + (item.publishedYear || '') + '</td>' +
+                                '<td>' + (publishedYear || '') + '</td>' +
                                 '<td>' + (item.source || 'Google Books') + '</td>' +
                                 '</tr>';
                         });
@@ -882,7 +886,8 @@ $(function() {
                             if (!item) return;
                             // Autofill form fields
                             $('#title').val(item.title || '');
-                            // Authors
+
+                            // Authors - handle both formats
                             var authorsGroup = $('#authors-group');
                             authorsGroup.html('');
                             if (Array.isArray(item.author) && item.author.length) {
@@ -892,25 +897,60 @@ $(function() {
                             } else if (item.author) {
                                 addAuthorRow($('#book-form'), item.author);
                             }
-                            // Series
-                            if (item.series) {
+
+                            // Series - handle both formats
+                            var series = item.series || '';
+                            var seriesNumber = item.seriesNumber || item.series_number || '';
+                            if (series) {
                                 var seriesGroup = $('#series-group');
                                 seriesGroup.html('');
-                                addSeriesRow($('#book-form'), item.series, item.seriesNumber || '');
+                                addSeriesRow($('#book-form'), series, seriesNumber);
                             }
-                            // Published Year
+
+                            // Published Year - handle both formats
                             var pubYearInput = $('#publishedYear');
-                            if (pubYearInput.length && item.publishedYear) pubYearInput.val(item.publishedYear);
-                            // Cover
-                            var coverInput = $('#coverImage');
-                            if (coverInput.length && item.coverImageUrl) coverInput.val(item.coverImageUrl);
+                            var publishedYear = item.publishedYear || (item.published_date ? item.published_date.substring(0, 4) : '');
+                            if (pubYearInput.length && publishedYear) pubYearInput.val(publishedYear);
+
+                            // Cover - handle both formats
+                            var coverUrl = item.coverImageUrl || item.cover_image_url || '';
+                            if (coverUrl) {
+                                // Instead of setting file input value, create/update a hidden input for the cover URL
+                                var coverUrlInput = $('#coverImageUrl');
+                                if (!coverUrlInput.length) {
+                                    // Create hidden input if not present
+                                    $('<input>').attr({
+                                        type: 'hidden',
+                                        id: 'coverImageUrl',
+                                        name: 'coverImageUrl',
+                                        value: coverUrl
+                                    }).appendTo('#book-form');
+
+                                    // Add a preview of the cover image
+                                    var coverPreviewContainer = $('#cover-preview-container');
+                                    if (!coverPreviewContainer.length) {
+                                        coverPreviewContainer = $('<div id="cover-preview-container" class="mt-2"></div>');
+                                        $('#coverImage').after(coverPreviewContainer);
+                                    }
+                                    coverPreviewContainer.html(
+                                        '<p>Cover image from Google Books:</p>' +
+                                        '<img src="' + coverUrl + '" style="max-height: 200px; border: 1px solid #ccc;" class="mb-2">' +
+                                        '<p class="text-muted small">This URL will be used instead of a file upload.</p>'
+                                    );
+                                } else {
+                                    coverUrlInput.val(coverUrl);
+                                    $('#cover-preview-container img').attr('src', coverUrl);
+                                }
+                            }
+
                             // Set hidden googleBooksId
                             var gbIdInput = $('#googleBooksId');
+                            var googleBooksId = item.googleBooksId || '';
                             if (!gbIdInput.length) {
                                 // Create hidden input if not present
-                                $('<input>').attr({type:'hidden',id:'googleBooksId',name:'googleBooksId',value:item.googleBooksId||''}).appendTo('#book-form');
+                                $('<input>').attr({type:'hidden',id:'googleBooksId',name:'googleBooksId',value:googleBooksId}).appendTo('#book-form');
                             } else {
-                                gbIdInput.val(item.googleBooksId || '');
+                                gbIdInput.val(googleBooksId);
                             }
                             $('#autofillModal').modal('hide');
                         });

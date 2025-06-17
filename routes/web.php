@@ -165,10 +165,7 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         'importFromTitle',
     ])->name('books.importFromTitle');
 
-    Route::post('/books/search-google-books', [
-        Admin\BookController::class,
-        'searchGoogleBooks',
-    ])->name('books.searchGoogleBooks');
+
 
     Route::post('/books/import-from-google-books', [
         Admin\BookController::class,

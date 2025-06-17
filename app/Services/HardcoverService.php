@@ -8,6 +8,8 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use App\Contracts\DocumentStoreServiceInterface;
+
 
 class HardcoverService extends BaseBookService implements BookServiceInterface
 {

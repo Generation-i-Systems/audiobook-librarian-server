@@ -35,7 +35,7 @@
             <input type="hidden" name="originalDirectoryPath" value="{{ $initial['directoryPath'] }}">
         @endif
         @php
-            $displayPath = old('directoryPath', request()->get('import_path', isset($book) && !empty($book['directoryPath']) ? $book['directoryPath'] : ($initial['directoryPath'] ?? '')));
+            $displayPath = old('directoryPath') ?? request()->get('import_path') ?? ($book['directoryPath'] ?? null) ?? ($initial['directoryPath'] ?? '');
         @endphp
         <input type="hidden" id="directoryPath" name="directoryPath" value="{{ $displayPath }}">
         <button type="button" class="btn btn-info mb-3" id="autofill-modal-btn"><i class="fas fa-magic"></i> Autofill Book Metadata</button>
@@ -46,7 +46,7 @@
         <div class="mb-3">
             <label for="title">Title:</label>
             <input type="text" class="form-control @error('title') is-invalid @enderror" id="title" name="title"
-                value="{{ old('title', request()->get('title', isset($book) && !empty($book['title']) ? $book['title'] : ($initial['title'] ?? null))) }}" required>
+                value="{{ old('title') ?? request()->get('title') ?? ($book['title'] ?? null) ?? ($initial['title'] ?? '') }}" required>
             @error('title')
                 <span class="invalid-feedback d-block">{{ $message }}</span>
             @enderror
@@ -55,7 +55,7 @@
             <label class="form-label">Authors</label>
             <div id="authors-group">
                 @php
-                    $authors = old('author', request()->get('author') ? [request()->get('author')] : (isset($book) && !empty($book['author']) ? (is_array($book['author']) ? $book['author'] : [$book['author']]) : ($initial['author'] ?? [])));
+                    $authors = old('author') ?? (request()->get('author') ? [request()->get('author')] : null) ?? ($book['author'] ?? null) ?? ($initial['author'] ?? []);
                     if (!is_array($authors))
                         $authors = [$authors];
                 @endphp
@@ -63,15 +63,15 @@
                 @foreach($authors as $idx => $author)
                     <div class="input-group author-row align-items-start mb-3">
                         @php
-    if ($author instanceof \MongoDB\Model\BSONArray) {
-        $author = (array) $author;
-    }
-    if (is_array($author)) {
-        $author = implode(', ', $author);
-    }
-@endphp
-<input type="text" name="author[]" class="form-control w-auto author-autocomplete" style="max-width:300px; height:32px;"
-    value="{{ $author }}" required>
+                            if ($author instanceof \MongoDB\Model\BSONArray) {
+                                $author = (array) $author;
+                            }
+                            if (is_array($author)) {
+                                $author = implode(', ', $author);
+                            }
+                        @endphp
+                        <input type="text" name="author[]" class="form-control w-auto author-autocomplete" style="max-width:300px; height:32px;"
+                            value="{{ $author }}" required>
                         <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
                             <button type="button" class="btn btn-outline-danger btn-sm remove-author p-0 mb-0"
                                 style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
@@ -90,9 +90,8 @@
             <div id="series-group">
                 @php
                     $seriesList = [];
-                    $oldSeries = old('series', request()->get('series') ? [request()->get('series')] : []);
-                    $oldSeriesNumbers = old('seriesNumber', old('seriesNumber', []));
-
+                    $oldSeries = old('series') ?? (request()->get('series') ? [request()->get('series')] : null);
+                    $oldSeriesNumbers = old('seriesNumber') ?? old('seriesNumber', []);
 
                     // Handle existing book data
                     if (isset($book) && !empty($book['series'])) {
@@ -101,7 +100,7 @@
                             foreach ($book['series'] as $name => $number) {
                                 if (!empty($name)) {
                                     $seriesList[] = [
-                                        'name' => $name,
+                                        'seriesName' => $name,
                                         'number' => $number,
                                     ];
                                 }
@@ -110,12 +109,11 @@
                         // Handle single series as string (legacy format)
                         else if (is_string($book['series'])) {
                             $seriesList[] = [
-                                'name' => $book['series'],
+                                'seriesName' => $book['series'],
                                 'number' => $book['seriesNumber'] ?? $book['seriesNumber'] ?? ''
                             ];
                         }
                     }
-
 
                     // Handle old input (validation errors)
                     if (!empty($oldSeries)) {
@@ -123,7 +121,7 @@
                         foreach ($oldSeries as $i => $seriesName) {
                             if (!empty($seriesName)) {
                                 $seriesList[] = [
-                                    'name' => $seriesName,
+                                    'seriesName' => $seriesName,
                                     'number' => $oldSeriesNumbers[$i] ?? ''
                                 ];
                             }
@@ -136,29 +134,28 @@
                             foreach ($initial['series'] as $name => $number) {
                                 if (!empty($name)) {
                                     $seriesList[] = [
-                                        'name' => $name,
+                                        'seriesName' => $name,
                                         'number' => $number
                                     ];
                                 }
                             }
                         } else if (is_string($initial['series'])) {
                             $seriesList[] = [
-                                'name' => $initial['series'],
+                                'seriesName' => $initial['series'],
                                 'number' => $initial['seriesNumber'] ?? $initial['seriesNumber'] ?? ''
                             ];
                         }
                     }
 
-
                     // Ensure we have at least one empty series row
                     if (empty($seriesList)) {
-                        $seriesList[] = ['name' => '', 'number' => ''];
+                        $seriesList[] = ['seriesName' => '', 'number' => ''];
                     }
                     $seriesCount = count($seriesList);
                 @endphp
                 @foreach($seriesList as $idx => $series)
                     @php
-                        $name = isset($series['name']) ? $series['name'] : '';
+                        $name = isset($series['seriesName']) ? $series['seriesName'] : (isset($series['name']) ? $series['name'] : '');
                         $number = isset($series['number']) ? $series['number'] : '';
                     @endphp
                     <div class="input-group series-row align-items-start mb-3">
@@ -182,8 +179,14 @@
         <div class="form-group">
             <label>Genres</label>
             <div id="genres-group">
-                @php $genresCount = count($genres); @endphp
-@foreach($genres as $idx => $genre)
+                @php
+                    $genres = old('genre') ?? request()->get('genre') ?? ($book['genre'] ?? null) ?? ($initial['genre'] ?? []);
+                    if (!is_array($genres)) {
+                        $genres = [$genres];
+                    }
+                    $genresCount = count($genres);
+                @endphp
+                @foreach($genres as $idx => $genre)
                     <div class="input-group genre-row align-items-start mb-3">
                         <select name="genre[]" class="form-select w-auto" style="max-width:200px; height:32px;" required>
                             <option value="">Select a genre</option>
@@ -522,7 +525,31 @@ $(function() {
 });
 </script>
 <script src="{{ asset('js/admin/books/form.js') }}"></script>
-<script>document.addEventListener('DOMContentLoaded', function() { console.log('[DEBUG] Blade inline script ran'); });</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var autofillModal = document.getElementById('autofillModal');
+    if (autofillModal) {
+        autofillModal.addEventListener('show.bs.modal', function () {
+            // Get current form values
+            var title = document.querySelector('input[name="title"]')?.value || '';
+            var author = '';
+            var authorField = document.querySelector('input[name="author[]"]');
+            if (authorField) {
+                author = authorField.value;
+            }
+            var series = '';
+            var seriesField = document.querySelector('input[name="series[]"]');
+            if (seriesField) {
+                series = seriesField.value;
+            }
+            // Set modal fields
+            document.getElementById('autofill-title').value = title;
+            document.getElementById('autofill-author').value = author;
+            document.getElementById('autofill-series').value = series;
+        });
+    }
+});
+</script>
 <!-- Raw JSON Edit Modal -->
 <div class="modal fade" id="rawJsonModal" tabindex="-1" aria-labelledby="rawJsonModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">
@@ -544,19 +571,72 @@ $(function() {
 </div>
 
 <div class="modal fade" id="autofillModal" tabindex="-1" aria-labelledby="autofillModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="autofillModalLabel">Autofill Book Metadata</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <p>This feature will attempt to autofill book metadata (title, author, series, etc) using information from Google Books or the directory path. Proceed?</p>
-        <div id="autofill-modal-feedback" class="alert alert-danger d-none" style="display:none;"></div>
+        <form id="autofill-search-form" class="mb-3">
+          <div class="row g-2 mb-2 align-items-end">
+            <div class="col-md-3">
+              <label for="autofill-source" class="form-label">Source</label>
+              <select class="form-select" id="autofill-source" name="source" required>
+                <option value="google">Google Books</option>
+                <option value="audible">Audible</option>
+                <option value="audiobookbay">AudiobookBay</option>
+                <option value="hardcover">Hardcover</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label for="autofill-title" class="form-label">Title</label>
+              <input type="text" class="form-control" id="autofill-title" name="title" maxlength="120" autocomplete="off">
+            </div>
+            <div class="col-md-3">
+              <label for="autofill-author" class="form-label">Author</label>
+              <input type="text" class="form-control" id="autofill-author" name="author" maxlength="120" autocomplete="off">
+            </div>
+            <div class="col-md-3">
+              <label for="autofill-series" class="form-label">Series</label>
+              <input type="text" class="form-control" id="autofill-series" name="series" maxlength="120" autocomplete="off">
+            </div>
+          </div>
+          <div class="row g-2 mb-2 align-items-end">
+            <div class="col-md-6">
+              <label for="autofill-api-id" class="form-label">API ID (ASIN, Google ID, etc)</label>
+              <input type="text" class="form-control" id="autofill-api-id" name="api_id" placeholder="e.g. B00XXXXXXX, google:zyTCAlFPjgYC, ..." autocomplete="off">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+              <button type="submit" class="btn btn-primary w-100" id="autofill-search-btn">Search</button>
+            </div>
+            <div class="col-md-4">
+              <div id="autofill-modal-feedback" class="alert alert-danger d-none" style="display:none;"></div>
+            </div>
+          </div>
+        </form>
+        <div class="table-responsive" id="autofill-results-wrapper" style="display:none;">
+          <table class="table table-bordered table-hover align-middle mb-0" id="autofill-results-table">
+            <thead class="table-light">
+              <tr>
+                <th scope="col">Select</th>
+                <th scope="col">Cover</th>
+                <th scope="col">Title</th>
+                <th scope="col">Author</th>
+                <th scope="col">Series</th>
+                <th scope="col">Year</th>
+                <th scope="col">Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Results will be injected here by JS -->
+            </tbody>
+          </table>
+        </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary" id="autofill-modal-confirm-btn">Autofill</button>
+        <button type="button" class="btn btn-success" id="autofill-apply-btn" disabled>Apply</button>
       </div>
     </div>
   </div>

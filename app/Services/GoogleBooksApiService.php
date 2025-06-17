@@ -10,6 +10,12 @@ use Illuminate\Support\Facades\Log;
 class GoogleBooksApiService extends BaseBookService implements BookServiceInterface
 {
     /**
+     * The base URL for Google Books API requests.
+     * @var string
+     */
+    protected string $baseUrl = 'https://www.googleapis.com/books/v1/';
+
+    /**
      * Attempt to look up the book in Google Books and return additional metadata.
      */
     public function searchAndMerge(array $book): ?array
@@ -88,15 +94,17 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
             'releaseDate' => $source['published_date'] ?? $source['release_date'] ?? null,
             'categories' => $source['categories'] ?? null,
             'pageCount' => $source['page_count'] ?? null,
-            'isbn_10' => $source['isbn_10'] ?? null,
-            'isbn_13' => $source['isbn_13'] ?? null,
+            'averageRating' => $source['average_rating'],
+            'ratingsCount' => $source['ratings_count'],
+            'isbn10' => $source['isbn_10'] ?? null,
+            'isbn13' => $source['isbn_13'] ?? null,
             'language' => $source['language'] ?? null,
-            'preview_link' => $source['preview_link'] ?? null,
-            'info_link' => $source['info_link'] ?? null,
+            'previewLink' => $source['preview_link'] ?? null,
+            'infoLink' => $source['info_link'] ?? null,
         ];
         // Download cover image if present and directoryPath is available
-        if (!empty($merged['coverImage']) && !empty($book['directoryPath'])) {
-            $coverUrl = $merged['coverImage'];
+        if (!empty($merged['coverImageUrl']) && !empty($book['directoryPath'])) {
+            $coverUrl = $merged['coverImageUrl'];
             $directory = rtrim($book['directoryPath'], '/');
             $ext = pathinfo(parse_url($coverUrl, PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'jpg';
             $localFilename = $directory . '/cover.' . $ext;
@@ -106,12 +114,14 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
                     $response = \Illuminate\Support\Facades\Http::withOptions(['verify' => false])->get($coverUrl);
                     if ($response->successful()) {
                         file_put_contents($localFilename, $response->body());
+                        // Set both camelCase and snake_case versions for compatibility
                         $merged['coverImage'] = $localFilename;
                     }
                 } else {
                     $imageData = @file_get_contents($coverUrl);
                     if ($imageData !== false) {
                         file_put_contents($localFilename, $imageData);
+                        // Set both camelCase and snake_case versions for compatibility
                         $merged['coverImage'] = $localFilename;
                     }
                 }
@@ -157,7 +167,6 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
 
     protected $apiKey;
 
-    protected string $baseUrl = 'https://www.googleapis.com/books/v1';
 
     protected int $defaultLimit = 5;
 
@@ -166,12 +175,10 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
     public function __construct()
     {
         parent::__construct();
-
         $this->client = new Client([
-            'base_uri' => $this->baseUrl . '/',
+            'base_uri' => rtrim($this->baseUrl, '/') . '/',
             'timeout' => 10.0,
         ]);
-
         $this->apiKey = config('services.googlebooks.key');
     }
 
@@ -198,7 +205,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
         ];
 
         try {
-            $response = $this->httpGet('volumes', $queryParams);
+            $response = $this->httpGet($this->baseUrl . 'volumes', $queryParams); // Use full URL
 
             if (empty($response['items'])) {
                 Log::warning('No results found in Google Books API response', [
@@ -227,8 +234,11 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
     protected function performGetBookDetails(string $id): ?array
     {
         try {
-            $response = $this->httpGet("volumes/{$id}", ['key' => $this->apiKey]);
+            $response = $this->httpGet($this->baseUrl . "volumes/{$id}", ['key' => $this->apiKey]);
 
+            if ($response === null) {
+                return null;
+            }
             return $this->formatBookDetails($response);
         } catch (\Exception $e) {
             Log::error('Failed to get book details from Google Books API', [
@@ -281,7 +291,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
                 'subtitle' => $volumeInfo['subtitle'] ?? null,
                 'authors' => $this->formatAuthors($volumeInfo['authors'] ?? []),
                 'publisher' => ['name' => $volumeInfo['publisher'] ?? null],
-                'published_date' => $volumeInfo['publishedDate'] ?? null,
+                'publishedDate' => $volumeInfo['publishedDate'] ?? null,
                 'description' => $volumeInfo['description'] ?? null,
                 'page_count' => $volumeInfo['pageCount'] ?? null,
                 'categories' => $volumeInfo['categories'] ?? [],
@@ -300,10 +310,13 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
 
     /**
      * Format book details from Google Books API
+     *
+     * @param array|null $item The book details from Google Books API
+     * @return array The formatted book details
      */
-    protected function formatBookDetails(array $item): array
+    protected function formatBookDetails(?array $item): array
     {
-        if (!isset($item['volumeInfo'])) {
+        if ($item === null || !isset($item['volumeInfo'])) {
             return [];
         }
 

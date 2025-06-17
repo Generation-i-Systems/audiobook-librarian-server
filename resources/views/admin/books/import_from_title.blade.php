@@ -4,7 +4,7 @@
     <div class="container">
         <h1>Import Book from Title</h1>
 
-        <form action="{{ route('books.searchGoogleBooks') }}" method="POST">
+        <form action="{{ route('books.googleBooks') }}" method="POST">
             @csrf
 
             <div class="form-group">

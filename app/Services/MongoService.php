@@ -284,6 +284,21 @@ class MongoService implements DocumentStoreServiceInterface
         return $this->getCollection('series')->deleteOne(['_id' => $id]);
     }
 
+    /** @inheritDoc */
+    public function listSeries(): array
+    {
+        $cursor = $this->getCollection('series')->find();
+        $series = [];
+        foreach ($cursor as $doc) {
+            if ($doc instanceof \MongoDB\Model\BSONDocument) {
+                $doc = (array) $doc;
+            }
+            $doc['id'] = (string) $doc['_id'];
+            $series[] = $doc;
+        }
+        return $series;
+    }
+
     // AUTHORS
     /** @inheritDoc */
     public function createAuthor(array $data)
@@ -311,7 +326,7 @@ class MongoService implements DocumentStoreServiceInterface
     /** @inheritDoc */
     public function searchAuthorsByName(string $term): array
     {
-        $regex = new \MongoDB\BSON\Regex('^' . preg_quote($term), 'i');
+        $regex = new Regex('^' . preg_quote($term), 'i');
         $cursor = $this->getCollection('authors')->find(['name' => $regex]);
         $names = [];
         foreach ($cursor as $doc) {

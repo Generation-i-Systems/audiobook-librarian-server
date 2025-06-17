@@ -75,8 +75,10 @@ class BookController extends Controller
     protected DocumentStoreServiceInterface $documentStoreService;
 
 
-    public function __construct(DocumentStoreServiceInterface $documentStoreService, GoogleBooksApiService $googleBooksApiService)
-    {
+    public function __construct(
+        DocumentStoreServiceInterface $documentStoreService,
+        GoogleBooksApiService $googleBooksApiService
+    ) {
         $this->documentStoreService = $documentStoreService;
         $this->setGoogleBooksApiService($googleBooksApiService);
         $this->storagePath = env('BOOK_STORAGE_PATH');
@@ -91,26 +93,20 @@ class BookController extends Controller
             $search = strtolower($request->input('search'));
             $books = array_filter(
                 $books,
-                function ($book) use ($search) {
-                    return (isset($book['title']) && stripos($book['title'], $search) !== false)
-                        || (isset($book['author_name']) && stripos($book['author_name'], $search) !== false);
-                }
+                fn($book) => (isset($book['title']) && stripos($book['title'], $search) !== false)
+                || (isset($book['author']) && stripos($book['author'], $search) !== false)
             );
         }
         if ($request->filled('author')) {
             $books = array_filter(
                 $books,
-                function ($book) use ($request) {
-                    return isset($book['author']) && $book['author'] == $request->input('author');
-                }
+                fn($book) => isset($book['author']) && $book['author'] == $request->input('author')
             );
         }
         if ($request->filled('genre_id')) {
             $books = array_filter(
                 $books,
-                function ($book) use ($request) {
-                    return isset($book['genre_id']) && $book['genre_id'] == $request->input('genre_id');
-                }
+                fn($book) => isset($book['genre_id']) && $book['genre_id'] == $request->input('genre_id')
             );
         }
         // Sorting
@@ -118,27 +114,16 @@ class BookController extends Controller
         $books = array_values($books);
         usort(
             $books,
-            function ($a, $b) use ($sort) {
-                switch ($sort) {
-                    case 'recent_desc':
-                        return strtotime($b['created_at'] ?? 0) <=> strtotime($a['created_at'] ?? 0);
-                    case 'recent_asc':
-                        return strtotime($a['created_at'] ?? 0) <=> strtotime($b['created_at'] ?? 0);
-                    case 'author_asc':
-                        return strcmp($a['author_name'] ?? '', $b['author_name'] ?? '');
-                    case 'author_desc':
-                        return strcmp($b['author_name'] ?? '', $a['author_name'] ?? '');
-                    case 'title_asc':
-                        return strcmp($a['title'] ?? '', $b['title'] ?? '');
-                    case 'title_desc':
-                        return strcmp($b['title'] ?? '', $a['title'] ?? '');
-                    case 'year_asc':
-                        return ($a['published_year'] ?? 0) <=> ($b['published_year'] ?? 0);
-                    case 'year_desc':
-                        return ($b['published_year'] ?? 0) <=> ($a['published_year'] ?? 0);
-                    default:
-                        return strtotime($b['created_at'] ?? 0) <=> strtotime($a['created_at'] ?? 0);
-                }
+            fn($a, $b) => match ($sort) {
+                'recent_desc' => strtotime($b['created_at'] ?? 0) <=> strtotime($a['created_at'] ?? 0),
+                'recent_asc' => strtotime($a['created_at'] ?? 0) <=> strtotime($b['created_at'] ?? 0),
+                'author_asc' => strcmp($a['author_name'] ?? '', $b['author_name'] ?? ''),
+                'author_desc' => strcmp($b['author_name'] ?? '', $a['author_name'] ?? ''),
+                'title_asc' => strcmp($a['title'] ?? '', $b['title'] ?? ''),
+                'title_desc' => strcmp($b['title'] ?? '', $a['title'] ?? ''),
+                'year_asc' => ($a['published_year'] ?? 0) <=> ($b['published_year'] ?? 0),
+                'year_desc' => ($b['published_year'] ?? 0) <=> ($a['published_year'] ?? 0),
+                default => strtotime($b['created_at'] ?? 0) <=> strtotime($a['created_at'] ?? 0)
             }
         );
         // Pagination
@@ -417,7 +402,6 @@ class BookController extends Controller
             'directoryPath' => $directoryPath,
             'isModal' => request()->ajax() || request('isModal', false),
         ]);
-
     }
 
     /**
@@ -471,7 +455,7 @@ class BookController extends Controller
         $oldDirectoryPath = $book['directoryPath'] ?? null;
         $newDirectoryPath = $validated['directoryPath'] ?? null;
         if ($oldDirectoryPath && $newDirectoryPath && $oldDirectoryPath !== $newDirectoryPath) {
-            $disk = \Storage::disk('books');
+            $disk = \Illuminate\Support\Facades\Storage::disk('books');
             if ($disk->exists($oldDirectoryPath)) {
                 $files = $disk->allFiles($oldDirectoryPath);
                 foreach ($files as $file) {
@@ -522,6 +506,14 @@ class BookController extends Controller
             $candidate = $request->input('coverImageCandidate');
             if ($directoryPath && $candidate) {
                 $validated['coverImage'] = $directoryPath . '/' . $candidate;
+            }
+        } elseif ($request->filled('coverImageUrl')) {
+            // Handle external cover image URL from Google Books
+            $coverUrl = $request->input('coverImageUrl');
+            if ($coverUrl) {
+                // Store the URL directly in the coverImage field
+                $validated['coverImage'] = $coverUrl;
+                Log::info('Using external cover image URL', ['url' => $coverUrl]);
             }
         }
 
@@ -582,68 +574,31 @@ class BookController extends Controller
     public function googleBooks(Request $request)
     {
         $title = $request->query('title');
-        $author = $request->query('author');
+        $author = $request->query('author', '');
         $series = $request->query('series', '');
-        $seriesNumber = $request->query('series_number', '');
-
-        if (!$title || !$author) {
+        $seriesNumber = $request->query('seriesNumber', '');
+        if (!$title) {
             return response()->json([
-                'error' => 'Title and author are required.',
+                'error' => 'Title is required.',
             ], 400);
         }
 
-        // Use trait method for similarity
-        [$matches, $closeMatch] = $this->searchGoogleBooksWithSimilarity(
+        $more = $request->query('more');
+        $limit = min((int) $request->query('limit', 10), 40); // Default 10, max 40
+
+        Log::info('googleBooks called ' . $title . ' ' . $author . ' ' . $series . ' ' . $seriesNumber);
+        // Use trait method for similarity and formatting
+        $results = $this->searchGoogleBooksWithSimilarity(
             $title,
             $author,
             $series,
-            $seriesNumber
+            $seriesNumber,
+            (bool) $more,
+            $limit
         );
+        Log::info('googleBooks results: ' . count($results) . ' items');
 
-        $more = $request->query('more');
-        $limit = min((int) $request->query('limit', 10), 40); // Default 10, max 40
-        if ($closeMatch && !$more) {
-            $info = $closeMatch['volumeInfo'];
-            $autofill = [
-                'title' => $info['title'] ?? '',
-                'author' => isset($info['authors']) ? implode(', ', $info['authors']) : '',
-                'publishedYear' => isset($info['publishedDate']) ? substr($info['publishedDate'], 0, 4) : '',
-                'description' => $info['description'] ?? '',
-                'coverImageUrl' => $info['imageLinks']['thumbnail'] ?? '',
-                'id' => $closeMatch['item']['id'] ?? '',
-                'series' => $info['series'] ?? '',
-                'seriesNumber' => $info['seriesNumber'] ?? '',
-                'score' => $closeMatch['score'],
-                'matchType' => 'close',
-                'matches' => [],
-            ];
-
-            return response()->json($autofill);
-        } else {
-            // Prepare a list of up to $limit possible matches for user selection
-            $tableMatches = [];
-            foreach (array_slice($matches, 0, $limit) as $m) {
-                $info = $m['item']['volumeInfo'];
-                $tableMatches[] = [
-                    'title' => $info['title'] ?? '',
-                    'author' => isset($info['authors']) ? implode(', ', $info['authors']) : '',
-                    'publishedYear' => isset($info['publishedDate']) ? substr($info['publishedDate'], 0, 4) : '',
-                    'description' => $info['description'] ?? '',
-                    'coverImageUrl' => $info['imageLinks']['thumbnail'] ?? '',
-                    'id' => $m['item']['id'] ?? '',
-                    'series' => $info['series'] ?? '',
-                    'seriesNumber' => $info['seriesNumber'] ?? '',
-                    'score' => $m['score'],
-                ];
-            }
-
-            return response()->json([
-                'error' => 'No close match found.',
-                'matchType' => 'list',
-                'matches' => $tableMatches,
-                'maxed' => count($matches) <= $limit, // true if all results are shown
-            ], 200);
-        }
+        return response()->json(array_values($results));
     }
 
     /**

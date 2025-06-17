@@ -85,7 +85,7 @@ class ImportBookFromDirectoryJob implements ShouldQueue
                 throw new \RuntimeException($error);
             }
 
-            // Check for existing book in Firestore
+            // Check for existing book in Document
             $existingBooks = $documentStore->listBooks();
             foreach ($existingBooks as $b) {
                 if (($b['directoryPath'] ?? null) === $dirPath) {

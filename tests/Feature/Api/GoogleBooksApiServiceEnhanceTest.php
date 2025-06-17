@@ -32,33 +32,43 @@ class GoogleBooksApiServiceEnhanceTest extends TestCase
     #[Test]
     public function coverImageIsDownloadedAndPathIsSet()
     {
-        $service = new GoogleBooksApiService();
+        // Create a partial mock of GoogleBooksApiService to control the performSearch method
+        $service = $this->getMockBuilder(GoogleBooksApiService::class)
+            ->onlyMethods(['performSearch'])
+            ->getMock();
+
         $coverUrl = 'https://via.placeholder.com/150';
         $book = [
             'title' => 'Test Book',
             'authors' => [['author' => ['name' => 'Test Author']]],
             'directoryPath' => $this->testDir,
         ];
-        $enriched = [
-            'id' => 'test_id',
-            'title' => 'Test Book',
-            'authors' => [['author' => ['name' => 'Test Author']]],
-            'cover_image_url' => $coverUrl,
+
+        // Mock the API response - using flattened format expected by searchAndMerge
+        $mockResults = [
+            [
+                'id' => 'test_id',
+                'title' => 'Test Book',
+                'authors' => [
+                    ['author' => ['name' => 'Test Author']]
+                ],
+                'cover_image_url' => $coverUrl
+            ]
         ];
-        // Simulate the merge logic
-        $merged = [
-            'googlebooks_id' => $enriched['id'],
-            'title' => $enriched['title'],
-            'cover_image' => $enriched['cover_image_url'],
-            'authors' => $enriched['authors'],
-        ];
-        // Actually call the searchAndMerge logic
+
+        // Configure the mock to return our test data
+        $service->expects($this->once())
+            ->method('performSearch')
+            ->willReturn($mockResults);
+
         // Pre-create a dummy cover image to ensure the assertion passes if HTTP download is skipped or fails
         file_put_contents($this->testDir . '/cover.jpg', 'dummy image data');
-        $result = $service->searchAndMerge([
-            ...$book,
-            // force cover_image_url through the mock
-        ]);
+
+        // Call the method we're testing
+        $result = $service->searchAndMerge($book);
+
+        // Assertions
+        $this->assertNotNull($result, 'searchAndMerge should not return null');
         $coverPath = $this->testDir . '/cover.jpg';
         $this->assertTrue(file_exists($coverPath) || file_exists($this->testDir . '/cover.png'));
         $this->assertArrayHasKey('cover_image', $result);

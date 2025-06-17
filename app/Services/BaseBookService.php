@@ -162,9 +162,17 @@ abstract class BaseBookService implements BookServiceInterface
      */
     protected function httpGet(string $url, array $params = []): ?array
     {
+        $queryString = http_build_query(array_merge($this->defaultParams, $params));
+        $fullUrl = $url . (strpos($url, '?') === false ? '?' : '&') . $queryString;
+        Log::info('BaseBookService.httpGet: ' . $fullUrl);
         $response = Http::withHeaders($this->defaultHeaders)
             ->timeout(15)
             ->get($url, array_merge($this->defaultParams, $params));
+
+        Log::info('BaseBookService.httpGet: Response body', [
+            'url' => $fullUrl,
+            'body' => $response->body(),
+        ]);
 
         if (!$response->successful()) {
             Log::error('HTTP request failed', [
