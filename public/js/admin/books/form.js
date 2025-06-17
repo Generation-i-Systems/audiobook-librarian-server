@@ -10,7 +10,6 @@ function updateAddRowButtons(
     rowSelector,
     buttonClass,
 ) {
-    console.log("updateAddRowButtons called. Container:", $container);
     const group = $container.find(groupSelector)[0];
     if (!group) return;
     const rows = group.querySelectorAll(rowSelector);
@@ -32,7 +31,6 @@ function updateAddRowButtons(
 
 // Function to add a new author row
 function addAuthorRow($container, authorName = "") {
-    console.log("addAuthorRow called. Container:", $container);
     const group = $container.find("#authors-group")[0];
     if (!group) return;
     const div = document.createElement("div");
@@ -63,7 +61,6 @@ window.addAuthorRow = addAuthorRow;
 
 // Function to add a new series row
 function addSeriesRow($container, seriesName = "", seriesNumber = "") {
-    console.log("addSeriesRow called. Container:", $container);
     const group = $container.find("#series-group")[0];
     if (!group) return;
     const div = document.createElement("div");
@@ -95,7 +92,6 @@ window.addSeriesRow = addSeriesRow;
 
 // Function to add a new genre row
 function addGenreRow($container, selectedGenre = "") {
-    console.log("addGenreRow called. Container:", $container);
     const group = $container.find("#genres-group")[0];
     if (!group) return;
     const div = document.createElement("div");
@@ -167,27 +163,19 @@ $(function() {
 
 // Helper function to initialize jQuery UI Autocomplete
 function initializeAutocomplete($container, selector, sourceUrl) {
-    console.log("initializeAutocomplete called. Container:", $container);
     $container.on("focus", selector, function () {
-        console.log("Input field focused. Selector:", selector);
         const $inputField = $(this); // Capture 'this' to use in callbacks
 
         // Check if autocomplete has already been initialized on this element
         if (!$inputField.data("autocomplete-initialized")) {
-            console.log("Initializing autocomplete for selector:", selector);
             $inputField.autocomplete({
                 minLength: 2,
                 source: function (request, responseCallback) {
-                    console.log(
-                        "AJAX request for autocomplete. URL:",
-                        sourceUrl,
-                    );
-                    // request.term is the current value in the input field
                     $.ajax({
                         url: sourceUrl,
                         dataType: "json",
                         data: {
-                            term: request.term, // Pass the search term to the server
+                            term: request.term,
                         },
                         async: true, // Explicitly ensure the request is asynchronous
                         success: function (data) {
@@ -473,22 +461,7 @@ window.loadDirectoryFiles = loadDirectoryFiles; // Expose if called by onclick
 
 
 window.initBookForm = function (formContainerSelector) {
-    console.log("initBookForm - BOOK_FORM_ROUTES:", window.BOOK_FORM_ROUTES);
     const $container = $(formContainerSelector); // Scope all operations to this container
-
-    // Log DOM structure for debug
-    console.log(
-        "initBookForm: #authors-group children:",
-        $container.find("#authors-group").html(),
-    );
-    console.log(
-        "initBookForm: #series-group children:",
-        $container.find("#series-group").html(),
-    );
-    console.log(
-        "initBookForm: #genres-group children:",
-        $container.find("#genres-group").html(),
-    );
 
     // Initialize dynamic row buttons
     updateAddRowButtons(
@@ -528,19 +501,16 @@ window.initBookForm = function (formContainerSelector) {
     $container
         .off("click", ".add-author-row")
         .on("click", ".add-author-row", function () {
-            console.log("add-author-row clicked");
             addAuthorRow($container);
         });
     $container
         .off("click", ".add-series-row")
         .on("click", ".add-series-row", function () {
-            console.log("add-series-row clicked");
             addSeriesRow($container);
         });
     $container
         .off("click", ".add-genre-row")
         .on("click", ".add-genre-row", function () {
-            console.log("add-genre-row clicked");
             addGenreRow($container);
         });
 
@@ -548,7 +518,6 @@ window.initBookForm = function (formContainerSelector) {
     $container
         .off("click", ".remove-author")
         .on("click", ".remove-author", function () {
-            console.log("remove-author clicked");
             $(this).closest(".author-row").remove();
             updateAddRowButtons(
                 $container,
@@ -560,7 +529,6 @@ window.initBookForm = function (formContainerSelector) {
     $container
         .off("click", ".remove-series")
         .on("click", ".remove-series", function () {
-            console.log("remove-series clicked");
             $(this).closest(".series-row").remove();
             updateAddRowButtons(
                 $container,
@@ -572,7 +540,6 @@ window.initBookForm = function (formContainerSelector) {
     $container
         .off("click", ".remove-genre")
         .on("click", ".remove-genre", function () {
-            console.log("remove-genre clicked");
             $(this).closest(".genre-row").remove();
             updateAddRowButtons(
                 $container,
@@ -587,7 +554,6 @@ window.initBookForm = function (formContainerSelector) {
         .off("click", "#show-files-link")
         .on("click", "#show-files-link", function (e) {
             e.preventDefault(); // Prevent the default anchor behavior
-            console.log('[DEBUG] #show-files-link clicked');
             loadDirectoryFiles($container);
         }); // Confirm handler attached
 
@@ -596,13 +562,11 @@ window.initBookForm = function (formContainerSelector) {
         .off('click', '#autofill-modal-btn')
         .on('click', '#autofill-modal-btn', function (e) {
             e.preventDefault();
-            console.log('[DEBUG] #autofill-modal-btn clicked');
             if (typeof bootstrap !== 'undefined') {
                 var modalEl = document.getElementById('autofillModal');
                 if (modalEl) {
                     var bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
                     bsModal.show();
-                    console.log('[DEBUG] Autofill modal shown');
                 } else {
                     console.error('[DEBUG] #autofillModal element not found');
                 }
@@ -619,19 +583,11 @@ document.addEventListener("DOMContentLoaded", function () {
     if ($bookForm.length) {
         // Check if it's part of a modal
         if (!$bookForm.closest(".modal").length) {
-            console.log(
-                "DOMContentLoaded: Initializing #book-form (not in a modal).",
-            );
             initBookForm($bookForm); // Pass the jQuery object for #book-form
         } else {
-            console.log(
-                "DOMContentLoaded: #book-form found, but it is inside a modal. Initialization will be handled by modal events.",
-            );
             // For modals, initBookForm is typically called when the modal is shown.
             // Ensure that logic exists elsewhere if this form can also be in a modal.
         }
-    } else {
-        console.log("DOMContentLoaded: #book-form not found.");
     }
 
     // Form validation
@@ -707,9 +663,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 hasError = true;
             }
 
-            console.log('[DEBUG] book-form submit event fired');
             if (hasError) {
-                console.log('[DEBUG] Validation failed, preventing submit');
                 e.preventDefault();
                 const firstError = form.querySelector(".is-invalid");
                 if (firstError)
@@ -850,6 +804,127 @@ document.addEventListener("DOMContentLoaded", function () {
                     }
                 });
             });
+    }
+});
+// Autofill Modal Search Intercept
+$(function() {
+    var $autofillForm = $('#autofill-search-form');
+    if ($autofillForm.length) {
+        $autofillForm.on('submit', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var $modal = $('#autofillModal');
+            var $resultsTable = $modal.find('#autofill-results-table tbody');
+            var $applyBtn = $modal.find('#autofill-apply-btn');
+            $applyBtn.prop('disabled', true);
+
+            // Show loading state
+            $resultsTable.html('<tr><td colspan="7" class="text-center text-muted">Searching...</td></tr>');
+
+            // Gather search fields
+            var source = $autofillForm.find('[name="source"]').val();
+            var title = $autofillForm.find('[name="title"]').val();
+            var author = $autofillForm.find('[name="author"]').val();
+            var series = $autofillForm.find('[name="series"]').val();
+            var apiId = $autofillForm.find('[name="api_id"]').val();
+
+            // Show results wrapper
+            $('#autofill-results-wrapper').show();
+
+            // Determine endpoint (for now, only Google Books)
+            var endpoint = '';
+            if (source === 'google') {
+                endpoint = window.BOOK_FORM_ROUTES.googleBooks || '/admin/books/googleBooks';
+            } else {
+                $resultsTable.html('<tr><td colspan="7" class="text-center text-danger">Only Google Books is implemented.</td></tr>');
+                return false;
+            }
+
+            // Build query params
+            var params = {
+                title: title,
+                author: author,
+                series: series,
+                api_id: apiId
+            };
+
+            $.get(endpoint, params)
+                .done(function(response) {
+                    var results = Array.isArray(response) ? response : (response.matches || []);
+                    if (results.length > 0) {
+                        var rows = '';
+                        results.forEach(function(item, idx) {
+                            var authors = Array.isArray(item.author) ? item.author.join(', ') : (item.author || '');
+                            rows += '<tr>' +
+                                '<td><input type="radio" name="autofill_result_select" value="' + idx + '"></td>' +
+                                '<td>' + (item.coverImageUrl ? '<img src="' + item.coverImageUrl + '" alt="Cover" style="height:48px;max-width:40px;">' : '') + '</td>' +
+                                '<td>' + (item.title || '') + '</td>' +
+                                '<td>' + authors + '</td>' +
+                                '<td>' + (item.series || '') + '</td>' +
+                                '<td>' + (item.publishedYear || '') + '</td>' +
+                                '<td>' + (item.source || 'Google Books') + '</td>' +
+                                '</tr>';
+                        });
+                        $resultsTable.html(rows);
+                        // Store results for later use
+                        window.googleBooksMatches = results;
+                        // Enable selection and apply autofill logic
+                        $(document).off('change.autofillResult').on('change.autofillResult', 'input[name="autofill_result_select"]', function() {
+                            var idx = $(this).val();
+                            var item = window.googleBooksMatches[idx];
+                            if (!item) return;
+                            $('#autofill-apply-btn').prop('disabled', false);
+                            $('#autofill-apply-btn').data('selectedIdx', idx);
+                        });
+                        $('#autofill-apply-btn').off('click.autofillApply').on('click.autofillApply', function() {
+                            var idx = $(this).data('selectedIdx');
+                            var item = window.googleBooksMatches[idx];
+                            if (!item) return;
+                            // Autofill form fields
+                            $('#title').val(item.title || '');
+                            // Authors
+                            var authorsGroup = $('#authors-group');
+                            authorsGroup.html('');
+                            if (Array.isArray(item.author) && item.author.length) {
+                                item.author.forEach(function(author) {
+                                    addAuthorRow($('#book-form'), author);
+                                });
+                            } else if (item.author) {
+                                addAuthorRow($('#book-form'), item.author);
+                            }
+                            // Series
+                            if (item.series) {
+                                var seriesGroup = $('#series-group');
+                                seriesGroup.html('');
+                                addSeriesRow($('#book-form'), item.series, item.seriesNumber || '');
+                            }
+                            // Published Year
+                            var pubYearInput = $('#publishedYear');
+                            if (pubYearInput.length && item.publishedYear) pubYearInput.val(item.publishedYear);
+                            // Cover
+                            var coverInput = $('#coverImage');
+                            if (coverInput.length && item.coverImageUrl) coverInput.val(item.coverImageUrl);
+                            // Set hidden googleBooksId
+                            var gbIdInput = $('#googleBooksId');
+                            if (!gbIdInput.length) {
+                                // Create hidden input if not present
+                                $('<input>').attr({type:'hidden',id:'googleBooksId',name:'googleBooksId',value:item.googleBooksId||''}).appendTo('#book-form');
+                            } else {
+                                gbIdInput.val(item.googleBooksId || '');
+                            }
+                            $('#autofillModal').modal('hide');
+                        });
+                    } else {
+                        $resultsTable.html('<tr><td colspan="7" class="text-center text-warning">No results found.</td></tr>');
+                        window.googleBooksMatches = [];
+                    }
+                })
+                .fail(function(xhr) {
+                    $resultsTable.html('<tr><td colspan="7" class="text-center text-danger">Search failed: ' + (xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : 'Unknown error') + '</td></tr>');
+                });
+
+            return false;
+        });
     }
 });
 console.log("Form JS loaded 5");
