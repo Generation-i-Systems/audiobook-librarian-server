@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use Illuminate\Support\Facades\Storage;
 use App\Events\NewBookAdded;
 use App\Http\Controllers\Controller;
 use App\Contracts\DocumentStoreServiceInterface;
@@ -9,7 +10,6 @@ use App\Services\GoogleBooksApiService;
 use App\Traits\BookImportTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use ZipArchive;
 
 class BookController extends Controller
@@ -467,8 +467,66 @@ class BookController extends Controller
             $validated['publishedYear'] = $request->input('publishedYear');
         }
 
+        // Move files if directoryPath changed
+        $oldDirectoryPath = $book['directoryPath'] ?? null;
+        $newDirectoryPath = $validated['directoryPath'] ?? null;
+        if ($oldDirectoryPath && $newDirectoryPath && $oldDirectoryPath !== $newDirectoryPath) {
+            $disk = \Storage::disk('books');
+            if ($disk->exists($oldDirectoryPath)) {
+                $files = $disk->allFiles($oldDirectoryPath);
+                foreach ($files as $file) {
+                    $filename = basename($file);
+                    $disk->makeDirectory($newDirectoryPath);
+                    try {
+                        $disk->move($file, $newDirectoryPath . '/' . $filename);
+                    } catch (\Exception $e) {
+                        Log::error('Failed to move file during directory update', [
+                            'oldPath' => $oldDirectoryPath,
+                            'newPath' => $newDirectoryPath,
+                            'file' => $file,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+                // Remove old (now empty) directory
+                try {
+                    $disk->deleteDirectory($oldDirectoryPath);
+                } catch (\Exception $e) {
+                    Log::error('Failed to delete old directory during directory update', [
+                        'oldPath' => $oldDirectoryPath,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+            // Update file references (coverImage, etc)
+            if (!empty($book['coverImage'])) {
+                $oldCover = $book['coverImage'];
+                $coverName = basename($oldCover);
+                $validated['coverImage'] = $newDirectoryPath . '/' . $coverName;
+            }
+        }
+
+        // Handle cover image upload or candidate selection
+        if ($request->hasFile('coverImage') && $request->file('coverImage')->isValid()) {
+            $file = $request->file('coverImage');
+            $directoryPath = $book['directoryPath'] ?? null;
+            if ($directoryPath) {
+                $coverName = 'cover_' . uniqid() . '.' . $file->getClientOriginalExtension();
+                $storagePath = $directoryPath . '/' . $coverName;
+                // Store file in books disk
+                $file->storeAs($directoryPath, $coverName, 'books');
+                $validated['coverImage'] = $storagePath;
+            }
+        } elseif ($request->filled('coverImageCandidate')) {
+            $directoryPath = $book['directoryPath'] ?? null;
+            $candidate = $request->input('coverImageCandidate');
+            if ($directoryPath && $candidate) {
+                $validated['coverImage'] = $directoryPath . '/' . $candidate;
+            }
+        }
+
         $documentStore->updateBook($id, $validated);
-        return redirect()->route('admin.books.edit', $id)->with('success', 'Book updated successfully.');
+        return redirect()->route('admin.books.index')->with('success', 'Book updated successfully.');
     }
 
     /**

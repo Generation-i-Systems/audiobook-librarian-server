@@ -34,19 +34,9 @@
         @elseif(isset($initial['directoryPath']) && !empty($initial['directoryPath']))
             <input type="hidden" name="originalDirectoryPath" value="{{ $initial['directoryPath'] }}">
         @endif
-        <!-- Show actual directoryPath for sanity check -->
         @php
             $displayPath = old('directoryPath', request()->get('import_path', isset($book) && !empty($book['directoryPath']) ? $book['directoryPath'] : ($initial['directoryPath'] ?? '')));
         @endphp
-        @if(!empty($displayPath))
-            <div class="mb-2">
-                <label class="form-label fw-bold">Library Path (actual):</label>
-                <div class="form-control-plaintext text-monospace text-muted" style="font-size: 0.95em; word-break: break-all;">
-                    {{ $displayPath }}
-                </div>
-            </div>
-        @endif
-        <!-- DEBUG: This input is required for JS to load directory files -->
         <input type="hidden" id="directoryPath" name="directoryPath" value="{{ $displayPath }}">
         <button type="button" class="btn btn-info mb-3" id="autofill-modal-btn"><i class="fas fa-magic"></i> Autofill Book Metadata</button>
         @if(isset($book))
@@ -350,67 +340,148 @@
             @enderror
         </div>
         <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const resyncBtn = document.getElementById('resync-path-btn');
-            if (resyncBtn) {
-                resyncBtn.addEventListener('click', function() {
-                    const path = document.getElementById('directoryPath').value;
-                    if (!path) {
-                        alert('Please enter a directory path first.');
-                        return;
-                    }
-                    resyncBtn.disabled = true;
-                    resyncBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Resyncing...';
-                    fetch('/admin/books/resync-from-path', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': document.querySelector('input[name=_token]').value
-                        },
-                        body: JSON.stringify({ directoryPath: path })
-                    })
-                    .then(resp => resp.json())
-                    .then(data => {
-                        if (data.success) {
-                            if (data.title) document.getElementById('title').value = data.title;
-                            if (data.authors && Array.isArray(data.authors)) {
-                                const authorsGroup = document.getElementById('authors-group');
-                                if (authorsGroup) {
-                                    authorsGroup.innerHTML = '';
-                                    data.authors.forEach((author, idx) => {
-                                        const div = document.createElement('div');
-                                        div.className = 'input-group author-row align-items-start mb-3';
-                                        div.innerHTML = `<input type="text" name="author[]" class="form-control w-auto author-autocomplete" style="max-width:300px; height:32px;" value="${author}" required>`;
-                                        authorsGroup.appendChild(div);
-                                    });
-                                }
-                            }
-                            if (data.series && Array.isArray(data.series)) {
-                                const seriesGroup = document.getElementById('series-group');
-                                if (seriesGroup) {
-                                    seriesGroup.innerHTML = '';
-                                    data.series.forEach((item, idx) => {
-                                        const div = document.createElement('div');
-                                        div.className = 'input-group series-row align-items-start mb-3';
-                                        div.innerHTML = `<input type="text" name="series[]" class="form-control w-auto series-autocomplete" style="max-width:200px; height:32px;" placeholder="Series Name" value="${item.name}">
-                                            <input type="number" name="seriesNumber[]" class="form-control w-auto" style="max-width:100px; height:32px;" placeholder="Number" value="${item.number}" min="1" step="any">`;
-                                        seriesGroup.appendChild(div);
-                                    });
-                                }
-                            }
-                        } else {
-                            alert(data.message || 'Failed to reparse directory.');
-                        }
-                    })
-                    .catch(() => alert('Error contacting server.'))
-                    .finally(() => {
-                        resyncBtn.disabled = false;
-                        resyncBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Resync Title/Author/Series';
-                    });
-                });
+// [REMOVED] function initBookFormUI() - All dynamic row JS is now handled by window.initBookForm in form.js
+    // Restore add/remove buttons for authors
+    // [REMOVED] Inline add-author-row handler
+        btn.onclick = function() {
+            const group = document.getElementById('authors-group');
+            const idx = group.children.length;
+            const row = document.createElement('div');
+            row.className = 'input-group author-row align-items-start mb-3';
+            row.innerHTML = `<input type="text" name="author[]" class="form-control w-auto author-autocomplete" style="max-width:300px; height:32px;" required>
+                <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
+                    <button type="button" class="btn btn-outline-danger btn-sm remove-author p-0 mb-0" style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
+                    <button type="button" class="btn btn-primary btn-sm add-author-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
+                </div>`;
+            group.appendChild(row);
+            initBookFormUI();
+        };
+    });
+    // [REMOVED] Inline remove-author handler
+        btn.onclick = function() {
+            const row = btn.closest('.author-row');
+            if (row) row.remove();
+        };
+    });
+    // Series
+    // [REMOVED] Inline add-series-row handler
+        btn.onclick = function() {
+            const group = document.getElementById('series-group');
+            const idx = group.children.length;
+            const row = document.createElement('div');
+            row.className = 'input-group series-row align-items-start mb-3';
+            row.innerHTML = `<input type="text" name="series[${idx}][name]" class="form-control w-auto series-autocomplete" style="max-width:200px; height:32px;" placeholder="Series Name">
+                <input type="text" name="series[${idx}][number]" class="form-control w-auto ms-2" style="max-width:100px; height:32px;" placeholder="Number">
+                <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
+                    <button type="button" class="btn btn-outline-danger btn-sm remove-series p-0 mb-0" style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
+                    <button type="button" class="btn btn-primary btn-sm add-series-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
+                </div>`;
+            group.appendChild(row);
+            initBookFormUI();
+        };
+    });
+    // [REMOVED] Inline remove-series handler
+        btn.onclick = function() {
+            const row = btn.closest('.series-row');
+            if (row) row.remove();
+        };
+    });
+    // Genres
+    // [REMOVED] Inline add-genre-row handler
+        btn.onclick = function() {
+            const group = document.getElementById('genres-group');
+            const row = document.createElement('div');
+            row.className = 'input-group genre-row align-items-start mb-3';
+            row.innerHTML = `<input type="text" name="genre[]" class="form-control w-auto genre-autocomplete" style="max-width:200px; height:32px;" required>
+                <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
+                    <button type="button" class="btn btn-outline-danger btn-sm remove-genre p-0 mb-0" style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
+                    <button type="button" class="btn btn-primary btn-sm add-genre-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
+                </div>`;
+            group.appendChild(row);
+            initBookFormUI();
+        };
+    });
+    // [REMOVED] Inline remove-genre handler
+        btn.onclick = function() {
+            const row = btn.closest('.genre-row');
+            if (row) row.remove();
+        };
+    });
+    // Autocomplete (if using a plugin, re-initialize here)
+    // Example: $('.author-autocomplete').autocomplete(...)
+    // You may need to re-attach your autocomplete plugin here if used
+}
+
+// [REMOVED] Inline DOMContentLoaded/initBookFormUI block. Use window.initBookForm from form.js only.
+    if (resyncBtn) {
+        resyncBtn.addEventListener('click', function() {
+            const path = document.getElementById('directoryPath').value;
+            if (!path) {
+                alert('Please enter a directory path first.');
+                return;
             }
+            resyncBtn.disabled = true;
+            resyncBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Resyncing...';
+            fetch('/admin/books/resync-from-path', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('input[name=_token]').value
+                },
+                body: JSON.stringify({ directoryPath: path })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    resyncBtn.disabled = false;
+                    resyncBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Resync Title/Author/Series';
+                    if (data.success) {
+                        if (data.title) {
+                            document.getElementById('title').value = data.title;
+                        }
+                        if (data.authors) {
+                            const authorsGroup = document.getElementById('authors-group');
+                            authorsGroup.innerHTML = '';
+                            data.authors.forEach(function(author, idx) {
+                                const row = document.createElement('div');
+                                row.className = 'input-group author-row align-items-start mb-3';
+                                row.innerHTML = `<input type="text" name="author[]" class="form-control w-auto author-autocomplete" style="max-width:300px; height:32px;" value="${author}" required>
+                                    <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
+                                        <button type="button" class="btn btn-outline-danger btn-sm remove-author p-0 mb-0" style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
+                                        <button type="button" class="btn btn-primary btn-sm add-author-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
+                                    </div>`;
+                                authorsGroup.appendChild(row);
+                            });
+                        }
+                        if (data.series) {
+                            const seriesGroup = document.getElementById('series-group');
+                            seriesGroup.innerHTML = '';
+                            data.series.forEach(function(series, idx) {
+                                const row = document.createElement('div');
+                                row.className = 'input-group series-row align-items-start mb-3';
+                                row.innerHTML = `<input type="text" name="series[${idx}][name]" class="form-control w-auto series-autocomplete" style="max-width:200px; height:32px;" value="${series.name}" placeholder="Series Name">
+                                    <input type="text" name="series[${idx}][number]" class="form-control w-auto ms-2" style="max-width:100px; height:32px;" value="${series.number}" placeholder="Number">
+                                    <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
+                                        <button type="button" class="btn btn-outline-danger btn-sm remove-series p-0 mb-0" style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
+                                        <button type="button" class="btn btn-primary btn-sm add-series-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
+                                    </div>`;
+                                seriesGroup.appendChild(row);
+                            });
+                        }
+                        // TODO: Handle genres if needed
+                        if (typeof window.initBookForm === 'function') {
+                            window.initBookForm('#book-form');
+                        }
+                    }
+                })
+                .catch(err => {
+                    resyncBtn.disabled = false;
+                    resyncBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Resync Title/Author/Series';
+                    alert('Resync failed.');
+                });
         });
-        </script>
+    }
+});
+</script>
         <div id="directory-files-list" class="mt-2 mb-3" style="display:none; border: 1px solid #ddd; padding: 10px; border-radius: 4px;">
             {{-- Files will be listed here by JavaScript --}}
         </div>
@@ -467,6 +538,25 @@ $(function() {
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn btn-primary" id="save-raw-json-btn">Save JSON</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="autofillModal" tabindex="-1" aria-labelledby="autofillModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="autofillModalLabel">Autofill Book Metadata</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>This feature will attempt to autofill book metadata (title, author, series, etc) using information from Google Books or the directory path. Proceed?</p>
+        <div id="autofill-modal-feedback" class="alert alert-danger d-none" style="display:none;"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="autofill-modal-confirm-btn">Autofill</button>
       </div>
     </div>
   </div>
