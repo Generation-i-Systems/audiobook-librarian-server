@@ -193,7 +193,7 @@
             <label>Genres</label>
             <div id="genres-group">
                 @php $genresCount = count($genres); @endphp
-                @foreach($genres as $idx => $genre)
+@foreach($genres as $idx => $genre)
                     <div class="input-group genre-row align-items-start mb-3">
                         <select name="genre[]" class="form-select w-auto" style="max-width:200px; height:32px;" required>
                             <option value="">Select a genre</option>
@@ -452,4 +452,24 @@ $(function() {
 </script>
 <script src="{{ asset('js/admin/books/form.js') }}"></script>
 <script>document.addEventListener('DOMContentLoaded', function() { console.log('[DEBUG] Blade inline script ran'); });</script>
+<!-- Raw JSON Edit Modal -->
+<div class="modal fade" id="rawJsonModal" tabindex="-1" aria-labelledby="rawJsonModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="rawJsonModalLabel">Edit Book Raw JSON</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="raw-json-error" class="alert alert-danger d-none" role="alert" style="display:none;"></div>
+        <textarea id="raw-json-textarea" class="form-control font-monospace" rows="18" style="font-size:0.98em;"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="save-raw-json-btn">Save JSON</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 @endsection

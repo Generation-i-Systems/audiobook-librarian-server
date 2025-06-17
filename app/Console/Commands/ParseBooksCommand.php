@@ -27,8 +27,8 @@ class ParseBooksCommand extends Command
                             {--json-filename= : Filename for saved JSON (default: librarian.json)}
                             {--enrich : Lookup and enrich metadata from selected APIs}
                             {--apis= : Comma-separated list of APIs for --enrich (google,audible,abbay,hardcover)}
-                            {--store-firestore : Store parsed book data to Firestore}
-                            {--update-existing : Update existing books in Firestore instead of skipping them}';
+                            {--store : Store parsed book data to Documentstore}
+                            {--update-existing : Update existing books in Documentstore instead of skipping them}';
 
     /**
      * The console command description.
@@ -476,9 +476,9 @@ class ParseBooksCommand extends Command
                 $duration
             ));
 
-            // Store to Firestore if requested
-            if ($this->option('store-firestore') && !$dryRun) {
-                $this->storeToFirestore($allBooks, $documentStoreService);
+            // Store to Documentstore if requested
+            if ($this->option('store') && !$dryRun) {
+                $this->storeToDocumentstore($allBooks, $documentStoreService);
             }
 
             if (empty($allBooks)) {
@@ -584,7 +584,7 @@ class ParseBooksCommand extends Command
             // Handle author as array or string
             $author = $book['author'] ?? '';
             if (is_array($author)) {
-                $author = implode(', ', array_filter($author, fn ($a) => !empty(trim($a))));
+                $author = implode(', ', array_filter($author, fn($a) => !empty(trim($a))));
             }
 
             // Ensure all values are scalars or strings (no arrays)
@@ -714,14 +714,14 @@ class ParseBooksCommand extends Command
     }
 
     /**
-     * Store books to Firestore.
+     * Store books to Documentstore.
      *
      * @param  array  $books  The books to store
-     * @param  \App\Services\FirestoreService  $firestoreService  The Firestore service
+     * @param  \App\Contracts\DocumentStoreServiceInterface  $documentStoreService  The Documentstore service
      */
-    protected function storeToFirestore(array $books, DocumentStoreServiceInterface $documentStoreService): void
+    protected function storeToDocumentstore(array $books, DocumentStoreServiceInterface $documentStoreService): void
     {
-        $this->info('\nStoring books to Firestore...');
+        $this->info('\nStoring books to Documentstore...');
         $updateExisting = $this->option('update-existing');
 
         $bar = $this->output->createProgressBar(count($books));
@@ -734,7 +734,7 @@ class ParseBooksCommand extends Command
 
         foreach ($books as $book) {
             try {
-                // Check if book already exists in Firestore by directory path
+                // Check if book already exists in Documentstore by directory path
                 $directoryPath = $book['directoryPath'] ?? null;
 
                 if (!$directoryPath) {
@@ -772,7 +772,7 @@ class ParseBooksCommand extends Command
         $bar->finish();
         $this->newLine(2);
 
-        $this->info('Firestore storage completed:');
+        $this->info('Documentstore storage completed:');
         $this->info("- Created: {$created} books");
         $this->info("- Updated: {$updated} books");
         $this->info("- Skipped: {$skipped} books");

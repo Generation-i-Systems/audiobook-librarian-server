@@ -4,7 +4,7 @@ namespace App\Auth;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 
-class FirestoreUser implements Authenticatable
+class DocumentstoreUser implements Authenticatable
 {
     protected $user;
 
@@ -15,7 +15,7 @@ class FirestoreUser implements Authenticatable
 
     public function getAuthIdentifierName()
     {
-        return 'id'; // or whatever your Firestore user ID field is
+        return 'id'; // or whatever your Documentstore user ID field is
     }
 
     public function getAuthIdentifier()

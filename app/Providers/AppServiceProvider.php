@@ -17,7 +17,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(AudibleApiService::class, function ($app) {
             return new AudibleApiService(config('services.audible', []));
         });
-        //
+        // Bind DocumentStoreServiceInterface to MongoService
+        $this->app->bind(\App\Contracts\DocumentStoreServiceInterface::class, \App\Services\MongoService::class);
     }
 
     /**
@@ -25,16 +26,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Register custom Firestore user provider
-        Auth::provider('firestore', function ($app, array $config) {
-            return new \App\Auth\FirestoreUserProvider(
+        // Register custom Documentstore user provider
+        Auth::provider('documentstore', function ($app, array $config) {
+            return new \App\Auth\DocumentUserProvider(
                 $app->make(\App\Contracts\DocumentStoreServiceInterface::class)
             );
         });
 
-        // Register Firestore queue driver
-        Queue::extend('firestore', function ($app) {
-            return new \App\Queue\FirestoreQueueConnector();
+        // Register Documentstore queue driver
+        Queue::extend('documentstore', function ($app) {
+            return new \App\Queue\DocumentstoreQueueConnector();
         });
     }
 }

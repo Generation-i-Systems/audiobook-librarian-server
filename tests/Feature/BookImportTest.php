@@ -12,7 +12,7 @@ class BookImportTest extends TestCase
 {
     use BookImportTrait;
 
-    protected $firestore;
+    protected $documentStore;
 
     protected $booksCollection;
 
@@ -28,14 +28,14 @@ class BookImportTest extends TestCase
             $this->markTestSkipped('Firestore config missing: skipping Firestore-dependent tests.');
         }
 
-        $this->firestore = new FirestoreClient([
+        $this->documentStore = new FirestoreClient([
             'projectId' => config('firebase.project_id'),
             'keyFilePath' => config('firebase.credentials.file'),
         ]);
 
-        $this->booksCollection = $this->firestore->collection('books');
-        $this->genresCollection = $this->firestore->collection('genres');
-        $this->seriesCollection = $this->firestore->collection('series');
+        $this->booksCollection = $this->documentStore->collection('books');
+        $this->genresCollection = $this->documentStore->collection('genres');
+        $this->seriesCollection = $this->documentStore->collection('series');
 
         $this->clearTestData();
     }

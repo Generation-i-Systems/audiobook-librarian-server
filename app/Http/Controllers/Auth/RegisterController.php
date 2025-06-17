@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Auth;
 
-use App\Auth\FirestoreUser;
+use App\Auth\DocumentstoreUser;
 use App\Http\Controllers\Controller;
 use App\Contracts\DocumentStoreServiceInterface;
 use Google\Cloud\Core\Timestamp;
@@ -91,7 +91,7 @@ class RegisterController extends Controller
     /**
      * Create a new user instance after a valid registration.
      *
-     * @return \App\Auth\FirestoreUser
+     * @return \App\Auth\DocumentstoreUser
      */
     protected function create(array $data)
     {
@@ -120,7 +120,7 @@ class RegisterController extends Controller
             $this->notifyAdminsAboutNewUser($firestore, $userData);
 
             // Return a FirestoreUser instance for authentication
-            return new FirestoreUser($userData);
+            return new DocumentstoreUser($userData);
         } catch (\Exception $e) {
             Log::error('Error creating user: ' . $e->getMessage());
             throw $e; // Let the exception bubble up to be handled by Laravel

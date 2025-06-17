@@ -9,13 +9,11 @@ use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
 {
-    protected $firestore;
-
-    protected $firestoreUserProvider;
+    protected $documentStore;
 
     public function __construct()
     {
-        $this->firestore = app(\App\Contracts\DocumentStoreServiceInterface::class);
+        $this->documentStore = app(\App\Contracts\DocumentStoreServiceInterface::class);
     }
 
     public function register(Request $request)
@@ -34,16 +32,16 @@ class AuthController extends Controller
         $password = Hash::make($request->password);
 
         // Check if email already exists in users or account_requests
-        $existingUser = $this->firestore->getUserByCredentials(['email' => $request->email]);
+        $existingUser = $this->documentStore->getUserByCredentials(['email' => $request->email]);
         if ($existingUser) {
             return response()->json(['email' => ['Email already exists.']], 400);
         }
-        $existingRequest = $this->firestore->getUserByCredentials(['email' => $request->email]);
+        $existingRequest = $this->documentStore->getUserByCredentials(['email' => $request->email]);
         if ($existingRequest) {
             return response()->json(['email' => ['Account request already submitted with this email.']], 400);
         }
 
-        $this->firestore->getClient()->collection('account_requests')->add([
+        $this->documentStore->getClient()->collection('account_requests')->add([
             'name' => $request->name,
             'email' => $request->email,
             'password' => $password,

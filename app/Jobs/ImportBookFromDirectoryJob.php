@@ -60,7 +60,7 @@ class ImportBookFromDirectoryJob implements ShouldQueue
 
         try {
             // Update job status to processing
-            $firestore->updateJobStatus(
+            $documentStore->updateJobStatus(
                 $jobId,
                 'book_import',
                 'processing',
@@ -86,7 +86,7 @@ class ImportBookFromDirectoryJob implements ShouldQueue
             }
 
             // Check for existing book in Firestore
-            $existingBooks = $firestore->listBooks();
+            $existingBooks = $documentStore->listBooks();
             foreach ($existingBooks as $b) {
                 if (($b['directoryPath'] ?? null) === $dirPath) {
                     $error = '[BulkImport] Book already exists: ' . json_encode($b);
@@ -370,7 +370,7 @@ class ImportBookFromDirectoryJob implements ShouldQueue
                 $bookData['publishedYear'] ?? 'None',
                 $seriesNumber ?? 'None'
             ));
-            $bookId = $firestore->createBook($bookData);
+            $bookId = $documentStore->createBook($bookData);
             Log::info("[BulkImport] Created new book: {$bookData['title']} (ID: {$bookId})");
 
             $dirPath = $bookData['directoryPath'];
@@ -403,7 +403,7 @@ class ImportBookFromDirectoryJob implements ShouldQueue
                     $coverImagePath = rtrim($bookData['directoryPath'], '/') . '/' .
                         ltrim(basename($coverImagePath), '/');
                 }
-                $firestore->updateBook($bookId, ['coverImage' => $coverImagePath]);
+                $documentStore->updateBook($bookId, ['coverImage' => $coverImagePath]);
             }
 
             Log::info(
@@ -413,7 +413,7 @@ class ImportBookFromDirectoryJob implements ShouldQueue
             );
 
             // Update job status to completed
-            $firestore->updateJobStatus(
+            $documentStore->updateJobStatus(
                 $jobId,
                 'book_import',
                 'completed',
@@ -431,7 +431,7 @@ class ImportBookFromDirectoryJob implements ShouldQueue
             ]);
 
             // Update job status to failed
-            $firestore->updateJobStatus(
+            $documentStore->updateJobStatus(
                 $jobId,
                 'book_import',
                 'failed',
@@ -452,11 +452,11 @@ class ImportBookFromDirectoryJob implements ShouldQueue
      */
     protected function notifyAdminQuotaFailure($book, $msg, $attempts)
     {
-        $firestore = $this->documentStoreService;
+        $documentStore = $this->documentStoreService;
         $jobId = 'quota_failure_' . md5(($book['title'] ?? '') . '_' . now()->timestamp);
 
         // Log the quota failure as a special job type
-        $firestore->updateJobStatus(
+        $documentStore->updateJobStatus(
             $jobId,
             'quota_failure',
             'failed',

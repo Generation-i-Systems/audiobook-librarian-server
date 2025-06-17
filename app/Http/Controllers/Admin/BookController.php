@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Admin;
 
-use Illuminate\Support\Facades\Log;
 use App\Events\NewBookAdded;
 use App\Http\Controllers\Controller;
 use App\Contracts\DocumentStoreServiceInterface;
@@ -15,9 +14,6 @@ use ZipArchive;
 
 class BookController extends Controller
 {
-    // Register in routes/web.php:
-    // Route::post('/admin/books/resync-from-path', [BookController::class, 'resyncFromPath'])
-    // ->name('admin.books.resyncFromPath');
     use BookImportTrait;
 
     /**
@@ -34,7 +30,6 @@ class BookController extends Controller
         $directoryPath = $request->input('directoryPath');
         try {
             $parser = new \App\Services\BookDirectoryParser();
-            $storagePath = env('BOOK_STORAGE_PATH');
             $absPath = $parser->resolveStoragePath($directoryPath);
             if (!is_dir($absPath)) {
                 return response()->json(['success' => false, 'message' => 'Directory does not exist . '], 404);
@@ -173,7 +168,7 @@ class BookController extends Controller
 
     public function create(Request $request)
     {
-        $firestore = $this->documentStoreService;
+        $documentStore = $this->documentStoreService;
         // Always initialize author and genre as arrays for the form
         $initial = [
             'directoryPath' => $request->path,
@@ -244,7 +239,7 @@ class BookController extends Controller
         }
         // Always fetch genreList as array for the form
         // Normalize genreList to flat array of strings
-        $genreListRaw = $firestore->listGenres();
+        $genreListRaw = $documentStore->listGenres();
         $genreList = [];
         foreach ($genreListRaw as $g) {
             if (is_array($g) && isset($g['name'])) {
@@ -270,7 +265,7 @@ class BookController extends Controller
         $genres = [];
         if (!empty($initial['genre'])) {
             foreach ($initial['genre'] as $g) {
-                $genres[] = trim((string)$g);
+                $genres[] = trim((string) $g);
             }
         }
         // Also allow old input to override
@@ -332,6 +327,22 @@ class BookController extends Controller
     }
 
     /**
+     * Display the specified book.
+     *
+     * @param  string  $id
+     * @return \Illuminate\Contracts\View\View
+     */
+    public function show($id)
+    {
+        $documentStore = $this->documentStoreService;
+        $book = $documentStore->getBook($id);
+        if (!$book) {
+            abort(404, 'Book not found');
+        }
+        return view('admin.books.show', ['book' => $book]);
+    }
+
+    /**
      * Show the form for editing the specified book.
      *
      * @param  string  $id
@@ -339,13 +350,13 @@ class BookController extends Controller
      */
     public function edit($id)
     {
-        $firestore = $this->documentStoreService;
-        $book = $firestore->getBook($id);
+        $documentStore = $this->documentStoreService;
+        $book = $documentStore->getBook($id);
         if (!$book) {
             abort(404, 'Book not found');
         }
         // Normalize genreList to flat array of strings
-        $genreListRaw = $firestore->listGenres();
+        $genreListRaw = $documentStore->listGenres();
         $genreList = [];
         foreach ($genreListRaw as $g) {
             if (is_array($g) && isset($g['name'])) {
@@ -375,7 +386,7 @@ class BookController extends Controller
         // DEBUG: Log type and value of book['genre']
         Log::debug('BookController@edit: genre raw', [
             'type' => is_object($book['genre']) ? get_class($book['genre']) : gettype($book['genre']),
-            'value' => $book['genre']
+            'value' => $book['genre'],
         ]);
         // Hotfix: forcibly cast BSONArray to array if still present
         if ($book['genre'] instanceof \MongoDB\Model\BSONArray) {
@@ -386,10 +397,10 @@ class BookController extends Controller
         if (!empty($book['genre'])) {
             if (is_array($book['genre'])) {
                 foreach ($book['genre'] as $g) {
-                    $genres[] = trim((string)$g);
+                    $genres[] = trim((string) $g);
                 }
             } else {
-                $genres[] = trim((string)$book['genre']);
+                $genres[] = trim((string) $book['genre']);
             }
         }
         // Also allow old input to override
@@ -410,20 +421,71 @@ class BookController extends Controller
     }
 
     /**
+     * Update the specified book in storage.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  string  $id
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function update(Request $request, $id)
+    {
+        $documentStore = $this->documentStoreService;
+        $book = $documentStore->getBook($id);
+        if (!$book) {
+            return redirect()->route('admin.books.index')->withErrors(['Book not found.']);
+        }
+
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'author' => 'required|array|min:1',
+            'author.*' => 'required|string|max:255',
+            'genre' => 'required|array|min:1',
+            'genre.*' => 'required|string|max:255',
+            'publishedYear' => 'nullable|integer',
+            'description' => 'nullable|string',
+            'series' => 'nullable|array',
+            'series.*.name' => 'nullable|string',
+            'series.*.number' => 'nullable|string',
+            'directoryPath' => 'nullable|string',
+        ]);
+
+        // Flatten and clean genres/authors
+        $validated['genre'] = array_map('trim', $validated['genre']);
+        $validated['author'] = array_map('trim', $validated['author']);
+
+        // Optional fields
+        if ($request->has('series')) {
+            $validated['series'] = $request->input('series');
+        }
+        if ($request->has('directoryPath')) {
+            $validated['directoryPath'] = trim($request->input('directoryPath'));
+        }
+        if ($request->has('description')) {
+            $validated['description'] = trim($request->input('description'));
+        }
+        if ($request->has('publishedYear')) {
+            $validated['publishedYear'] = $request->input('publishedYear');
+        }
+
+        $documentStore->updateBook($id, $validated);
+        return redirect()->route('admin.books.edit', $id)->with('success', 'Book updated successfully.');
+    }
+
+    /**
      * Remove the specified book from storage.
      */
     public function destroy($id)
     {
-        $firestore = $this->documentStoreService;
-        $firestore->deleteBook($id);
+        $documentStore = $this->documentStoreService;
+        $documentStore->deleteBook($id);
 
         return redirect()->route('admin.books.index')->with('success', 'Book deleted successfully.');
     }
 
     public function download($id)
     {
-        $firestore = $this->documentStoreService;
-        $book = $firestore->getBook($id);
+        $documentStore = $this->documentStoreService;
+        $book = $documentStore->getBook($id);
         $directoryPath = $book['directoryPath'];
 
         if (!$directoryPath || !Storage::disk('books')->exists($directoryPath)) {
@@ -551,8 +613,8 @@ class BookController extends Controller
     public function seriesAjax(Request $request)
     {
         $q = $request->input('q', '');
-        $firestore = $this->documentStoreService;
-        $series = $firestore->listSeries();
+        $documentStore = $this->documentStoreService;
+        $series = $documentStore->listSeries();
         if ($q) {
             $series = array_filter($series, function ($item) use ($q) {
                 return stripos($item['name'], $q) !== false;
@@ -604,8 +666,8 @@ class BookController extends Controller
                 $oldRel = str_replace($this->storagePath, '', $path);
                 $newRel = str_replace($this->storagePath, '', $newPath);
                 Log::info("({$this->storagePath}) {$oldRel} -> {$newRel}");
-                // Update Firestore books whose directoryPath matches $oldRel
-                $firestore = $this->documentStoreService;
+                // Update Documentstore books whose directoryPath matches $oldRel
+                $documentStore = $this->documentStoreService;
                 $booksToUpdate = array_filter($this->documentStoreService->listBooks(), function ($book) use ($oldRel) {
                     return isset($book['directoryPath']) && $book['directoryPath'] === $oldRel;
                 });
@@ -687,15 +749,15 @@ class BookController extends Controller
     }
 
     /**
-     * Get the raw JSON data for a book from Firestore
+     * Get the raw JSON data for a book from $documentStore
      *
      * @param  string  $id  The book ID
      * @return \Illuminate\Http\JsonResponse
      */
     public function getRawJson($id)
     {
-        $firestore = $this->documentStoreService;
-        $book = $firestore->getBook($id);
+        $documentStore = $this->documentStoreService;
+        $book = $documentStore->getBook($id);
         if (!$book) {
             abort(404);
         }
@@ -723,12 +785,12 @@ class BookController extends Controller
         // Remove _id if present, always use string id
         unset($data['_id']);
         $data['id'] = $id;
-        $firestore = $this->documentStoreService;
-        $book = $firestore->getBook($id);
+        $documentStore = $this->documentStoreService;
+        $book = $documentStore->getBook($id);
         if (!$book) {
             return response()->json(['message' => 'Book not found.'], 404);
         }
-        $firestore->updateBook($id, $data);
+        $documentStore->updateBook($id, $data);
         return response()->json(['success' => true]);
     }
 }

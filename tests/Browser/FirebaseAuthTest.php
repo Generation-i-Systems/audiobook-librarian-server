@@ -9,7 +9,7 @@ use Tests\DuskTestCase;
 
 class FirebaseAuthTest extends DuskTestCase
 {
-    protected $firestore;
+    protected $documentStore;
 
     protected $usersCollection;
 

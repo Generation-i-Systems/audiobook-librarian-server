@@ -49,7 +49,7 @@ class DebugController extends Controller
      */
     public function auth(): JsonResponse
     {
-        \App\Auth\FirestoreUserProvider::logAuthState();
+        \App\Auth\DocumentUserProvider::logAuthState();
 
         return response()->json([
             'auth_user' => Auth::user(),

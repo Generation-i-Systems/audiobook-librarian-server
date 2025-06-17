@@ -6,55 +6,55 @@ use Illuminate\Container\Container;
 use Illuminate\Contracts\Queue\Job as JobContract;
 use Illuminate\Queue\Jobs\Job;
 
-class FirestoreJob extends Job implements JobContract
+class DocumentstoreJob extends Job implements JobContract
 {
-    protected $firestoreQueue;
+    protected $documentStoreQueue;
 
-    protected $firestoreDoc;
+    protected $documentStoreDoc;
 
     protected $queue;
 
     protected $rawBody;
 
-    public function __construct(Container $container, $firestoreQueue, $firestoreDoc, $connectionName, $queue)
+    public function __construct(Container $container, $documentStoreQueue, $documentStoreDoc, $connectionName, $queue)
     {
         $this->container = $container;
-        $this->firestoreQueue = $firestoreQueue;
-        $this->firestoreDoc = $firestoreDoc;
+        $this->documentStoreQueue = $documentStoreQueue;
+        $this->documentStoreDoc = $documentStoreDoc;
         $this->connectionName = $connectionName;
         $this->queue = $queue;
-        $this->rawBody = $firestoreDoc['payload'];
+        $this->rawBody = $documentStoreDoc['payload'];
     }
 
     public function getJobId()
     {
-        return $this->firestoreDoc['id'] ?? $this->firestoreDoc->id();
+        return $this->documentStoreDoc['id'] ?? $this->documentStoreDoc->id();
     }
 
     public function attempts()
     {
-        return $this->firestoreDoc['attempts'] ?? 0;
+        return $this->documentStoreDoc['attempts'] ?? 0;
     }
 
     public function delete()
     {
         parent::delete();
-        $this->firestoreDoc->reference()->delete();
+        $this->documentStoreDoc->reference()->delete();
     }
 
     public function release($delay = 0)
     {
         parent::release($delay);
         $availableAt = now()->addSeconds($delay)->timestamp;
-        $this->firestoreDoc->reference()->update([
+        $this->documentStoreDoc->reference()->update([
             ['path' => 'reserved_at', 'value' => null],
             ['path' => 'available_at', 'value' => $availableAt],
         ]);
     }
 
-    public function firestoreDoc()
+    public function documentStoreDoc()
     {
-        return $this->firestoreDoc;
+        return $this->documentStoreDoc;
     }
 
     /**

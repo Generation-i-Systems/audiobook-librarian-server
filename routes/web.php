@@ -84,8 +84,6 @@ Route::middleware(['auth'])->group(function () {
 Route::post('/messages', [MessageController::class, 'store'])->name('messages.store');
 
 // Regular book routes
-Route::post('/admin/books/resync-from-path', [BookController::class, 'resyncFromPath'])
-    ->name('admin.books.resyncFromPath');
 Route::get('/books', [BookController::class, 'index'])->name('books.index');
 Route::get('/books/{id?}', [BookController::class, 'show'])->name('books.show');
 
@@ -122,6 +120,9 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::get('/', function () {
         return redirect()->route('admin.books.index');
     });
+    Route::post('/books/resync-from-path', [Admin\BookController::class, 'resyncFromPath'])
+        ->name('books.resyncFromPath');
+
     Route::post(
         '/users/{user}/update-role',
         [Admin\AdminController::class, 'updateRole']

@@ -14,11 +14,11 @@ class SendNewBookNotification implements ShouldQueue
 {
     use InteractsWithQueue;
 
-    protected $firestore;
+    protected $documentStore;
 
-    public function __construct(DocumentStoreServiceInterface $firestore)
+    public function __construct(DocumentStoreServiceInterface $documentStore)
     {
-        $this->firestore = $firestore;
+        $this->firestore = $documentStore;
     }
 
     /**

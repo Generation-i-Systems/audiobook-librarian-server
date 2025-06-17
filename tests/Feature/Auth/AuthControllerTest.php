@@ -10,7 +10,7 @@ use Tests\TestCase;
 
 class AuthControllerTest extends TestCase
 {
-    protected $firestore;
+    protected $documentStore;
 
     protected $usersCollection;
 
@@ -25,13 +25,13 @@ class AuthControllerTest extends TestCase
         }
 
         // Initialize Firestore client
-        $this->firestore = new FirestoreClient([
+        $this->documentStore = new FirestoreClient([
             'projectId' => config('firebase.project_id'),
             'keyFilePath' => config('firebase.credentials.file'),
         ]);
 
-        $this->usersCollection = $this->firestore->collection('users');
-        $this->tokensCollection = $this->firestore->collection('api_tokens');
+        $this->usersCollection = $this->documentStore->collection('users');
+        $this->tokensCollection = $this->documentStore->collection('api_tokens');
 
         // Clear test data
         $this->clearTestData();

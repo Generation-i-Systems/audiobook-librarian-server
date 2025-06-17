@@ -7,7 +7,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\UserProvider;
 use Illuminate\Support\Facades\Log;
 
-class FirestoreUserProvider implements UserProvider
+class DocumentUserProvider implements UserProvider
 {
     /**
      * Log detailed authentication state for debugging
@@ -39,7 +39,7 @@ class FirestoreUserProvider implements UserProvider
      */
     public function rehashPasswordIfRequired(Authenticatable $user, array $credentials, bool $force = false): string
     {
-        Log::debug('FirestoreUserProvider::rehashPasswordIfRequired called with user=' .
+        Log::debug('DocumentUserProvider::rehashPasswordIfRequired called with user=' .
             print_r($user, true) . ', credentials=' . print_r($credentials, true) . ', force=' . $force);
         // Get the plain password from credentials
         $plain = $credentials['password'] ?? null;
@@ -62,14 +62,14 @@ class FirestoreUserProvider implements UserProvider
     {
         $user = $this->documentStoreService->getUserById($identifier);
 
-        return $user ? new FirestoreUser($user) : null;
+        return $user ? new DocumentstoreUser($user) : null;
     }
 
     public function retrieveByToken($identifier, $token)
     {
         $user = $this->documentStoreService->getUserByRememberToken($identifier, $token);
 
-        return $user ? new FirestoreUser($user) : null;
+        return $user ? new DocumentstoreUser($user) : null;
     }
 
     public function updateRememberToken(Authenticatable $user, $token)
@@ -85,7 +85,7 @@ class FirestoreUserProvider implements UserProvider
         }
         $user = $this->documentStoreService->getUserByCredentials($credentials);
 
-        return $user ? new FirestoreUser($user) : null;
+        return $user ? new DocumentstoreUser($user) : null;
     }
 
     public function validateCredentials(Authenticatable $user, array $credentials)

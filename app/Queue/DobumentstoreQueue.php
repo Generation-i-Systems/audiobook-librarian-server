@@ -2,7 +2,7 @@
 
 namespace App\Queue;
 
-use App\Queue\Jobs\FirestoreJob;
+use App\Queue\Jobs\DocumentstoreJob;
 use App\Contracts\DocumentStoreServiceInterface;
 use Carbon\Carbon;
 use Illuminate\Contracts\Queue\Queue as QueueContract;
@@ -12,15 +12,15 @@ use Illuminate\Support\Str;
 /**
  * @method int getSeconds(mixed $delay) Inherited from Illuminate\Queue\Queue
  */
-class FirestoreQueue extends Queue implements QueueContract
+class DobumentstoreQueue extends Queue implements QueueContract
 {
-    protected $firestore;
+    protected $documentStore;
 
     protected $collection;
 
-    public function __construct(DocumentStoreServiceInterface $firestore, $collection)
+    public function __construct(DocumentStoreServiceInterface $documentStore, $collection)
     {
-        $this->firestore = $firestore;
+        $this->firestore = $documentStore;
         $this->collection = $collection;
     }
 
@@ -85,7 +85,7 @@ class FirestoreQueue extends Queue implements QueueContract
                 ['path' => 'attempts', 'value' => ($document['attempts'] ?? 0) + 1],
             ]);
 
-            return new FirestoreJob(
+            return new DocumentstoreJob(
                 $this->container,
                 $this,
                 $document,

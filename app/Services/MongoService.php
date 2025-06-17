@@ -322,6 +322,53 @@ class MongoService implements DocumentStoreServiceInterface
         return array_unique($names);
     }
 
+    /**
+     * Search for series titles starting with a given term (matches keys in the 'series' map field).
+     *
+     * @param  string  $term  The search term.
+     * @return array A list of unique series titles.
+     */
+    public function searchSeriesByName(string $term): array
+    {
+        if (empty($term)) {
+            return [];
+        }
+        // Use aggregation to filter by series key prefix on the server side
+        $pipeline = [
+            [
+                '$project' => [
+                    'seriesKeys' => [
+                        '$objectToArray' => '$series'
+                    ]
+                ]
+            ],
+            [
+                '$unwind' => '$seriesKeys'
+            ],
+            [
+                '$match' => [
+                    'seriesKeys.k' => [
+                        '$regex' => '^' . preg_quote($term),
+                        '$options' => 'i'
+                    ]
+                ]
+            ],
+            [
+                '$group' => [
+                    '_id' => null,
+                    'uniqueKeys' => [
+                        '$addToSet' => '$seriesKeys.k'
+                    ]
+                ]
+            ]
+        ];
+        $result = $this->getCollection('series')->aggregate($pipeline)->toArray();
+        if (isset($result[0]['uniqueKeys'])) {
+            return array_values($result[0]['uniqueKeys']);
+        }
+        return [];
+    }
+
     // MESSAGES
     /** @inheritDoc */
     public function createMessage(array $messageData): ?string

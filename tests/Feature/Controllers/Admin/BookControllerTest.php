@@ -10,7 +10,7 @@ use PHPUnit\Framework\Attributes\Test;
 
 class BookControllerTest extends TestCase
 {
-    protected $firestore;
+    protected $documentStore;
 
     protected $booksCollection;
 
@@ -20,18 +20,23 @@ class BookControllerTest extends TestCase
 
     protected $admin;
 
+    /**
+     * Setup the test environment.
+     *
+     * @return void
+     */
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->firestore = new FirestoreClient([
+        $this->documentStore = new FirestoreClient([
             'projectId' => config('firebase.project_id'),
             'keyFilePath' => config('firebase.credentials.file'),
         ]);
 
-        $this->booksCollection = $this->firestore->collection('books');
-        $this->genresCollection = $this->firestore->collection('genres');
-        $this->seriesCollection = $this->firestore->collection('series');
+        $this->booksCollection = $this->documentStore->collection('books');
+        $this->genresCollection = $this->documentStore->collection('genres');
+        $this->seriesCollection = $this->documentStore->collection('series');
 
         $this->clearTestData();
 
@@ -39,12 +44,22 @@ class BookControllerTest extends TestCase
         $this->admin = $this->createAdminUser();
     }
 
+    /**
+     * Tear down the test environment.
+     *
+     * @return void
+     */
     protected function tearDown(): void
     {
         $this->clearTestData();
         parent::tearDown();
     }
 
+    /**
+     * Clear test data from Firestore.
+     *
+     * @return void
+     */
     protected function clearTestData()
     {
         // Clear test books
@@ -69,9 +84,14 @@ class BookControllerTest extends TestCase
         }
     }
 
+    /**
+     * Create an admin user for testing.
+     *
+     * @return \Google\Cloud\Firestore\DocumentSnapshot
+     */
     protected function createAdminUser()
     {
-        $userRef = $this->firestore->collection('users')->add([
+        $userRef = $this->documentStore->collection('users')->add([
             'name' => 'Admin User',
             'email' => 'admin@example.com',
             'password' => bcrypt('password'),

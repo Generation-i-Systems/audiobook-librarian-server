@@ -77,12 +77,12 @@ class CreateImportJobsForDirectory implements ShouldQueue
             'absolute_path' => $absDir,
         ]);
 
-        $firestore = $this->documentStoreService;
+        $documentStore = $this->documentStoreService;
         $jobId = 'import_dir_' . md5($this->dir . '_' . now()->timestamp);
 
         try {
             // Update job status to processing
-            $firestore->updateJobStatus(
+            $documentStore->updateJobStatus(
                 $jobId,
                 'directory_import',
                 'processing',
@@ -102,7 +102,7 @@ class CreateImportJobsForDirectory implements ShouldQueue
             $total = count($bookDirs);
 
             // Update total items count
-            $firestore->updateJobStatus(
+            $documentStore->updateJobStatus(
                 $jobId,
                 'directory_import',
                 'processing',
@@ -113,7 +113,7 @@ class CreateImportJobsForDirectory implements ShouldQueue
             foreach ($bookDirs as $dirPath) {
                 $relDir = ltrim(str_replace($storagePath, '', $dirPath), '/');
                 $exists = false;
-                $books = $firestore->listBooks();
+                $books = $documentStore->listBooks();
 
                 foreach ($books as $book) {
                     if (($book['directoryPath'] ?? null) === $relDir) {
@@ -124,7 +124,7 @@ class CreateImportJobsForDirectory implements ShouldQueue
 
                 if ($exists) {
                     $skipped[] = $relDir;
-                    $firestore->updateJobStatus(
+                    $documentStore->updateJobStatus(
                         $jobId,
                         'directory_import',
                         'processing',
@@ -185,7 +185,7 @@ class CreateImportJobsForDirectory implements ShouldQueue
                 }
 
                 // Update progress
-                $firestore->updateJobStatus(
+                $documentStore->updateJobStatus(
                     $jobId,
                     'directory_import',
                     'processing',
@@ -197,7 +197,7 @@ class CreateImportJobsForDirectory implements ShouldQueue
             }
 
             // Mark job as completed
-            $firestore->updateJobStatus(
+            $documentStore->updateJobStatus(
                 $jobId,
                 'directory_import',
                 'completed',
@@ -220,8 +220,8 @@ class CreateImportJobsForDirectory implements ShouldQueue
             ]);
 
             // Update job status to failed
-            if (isset($firestore)) {
-                $firestore->updateJobStatus(
+            if (isset($documentStore)) {
+                $documentStore->updateJobStatus(
                     $jobId,
                     'directory_import',
                     'failed',

@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Auth;
 
-use App\Auth\FirestoreUser;
+use App\Auth\DocumentstoreUser;
 use App\Http\Controllers\Controller;
 use App\Contracts\DocumentStoreServiceInterface;
 use Google\Cloud\Core\Timestamp as GoogleTimestamp;
@@ -180,7 +180,7 @@ class LoginController extends Controller
             }
 
             // Create user object and log in
-            $user = new FirestoreUser($userArr);
+            $user = new DocumentstoreUser($userArr);
             Auth::login($user, true);
 
             Log::info('User logged in via Google', [
