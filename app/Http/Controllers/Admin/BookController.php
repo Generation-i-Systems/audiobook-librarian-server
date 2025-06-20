@@ -716,19 +716,27 @@ class BookController extends Controller
             return redirect()->route('admin.books.index')->withErrors(['Book not found.']);
         }
 
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'author' => 'required|array|min:1',
-            'author.*' => 'required|string|max:255',
-            'genre' => 'required|array|min:1',
-            'genre.*' => 'required|string|max:255',
-            'publishedYear' => 'nullable|integer',
-            'description' => 'nullable|string',
-            'series' => 'nullable|array',
-            'series.*.name' => 'nullable|string',
-            'series.*.number' => 'nullable|string',
-            'directoryPath' => 'nullable|string',
-        ]);
+        try {
+            $validated = $request->validate([
+                'title' => 'required|string|max:255',
+                'author' => 'required|array|min:1',
+                'author.*' => 'required|string|max:255',
+                'genre' => 'required|array|min:1',
+                'genre.*' => 'required|string|max:255',
+                'publishedYear' => 'nullable|integer',
+                'description' => 'nullable|string',
+                'series' => 'nullable|array',
+                'series.*.name' => 'nullable|string',
+                'series.*.number' => 'nullable|string',
+                'directoryPath' => 'nullable|string',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $data = $request->except(['_token', '_method']);
+            if ($request->has('returnUrl')) {
+                $data['returnUrl'] = $request->input('returnUrl');
+            }
+            return redirect()->back()->withInput($data)->withErrors($e->validator);
+        }
 
         // Flatten and clean genres/authors
         $validated['genre'] = array_map('trim', $validated['genre']);
@@ -767,6 +775,20 @@ class BookController extends Controller
                             'file' => $file,
                             'error' => $e->getMessage(),
                         ]);
+                    }
+                }
+                // Set permissions/ownership on new directory to match old
+                $storageRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
+                $oldAbs = $storageRoot . '/' . ltrim($oldDirectoryPath, '/');
+                $newAbs = $storageRoot . '/' . ltrim($newDirectoryPath, '/');
+                if (is_dir($oldAbs) && is_dir($newAbs)) {
+                    $perms = @fileperms($oldAbs) & 0777;
+                    @chmod($newAbs, $perms);
+                    if (function_exists('fileowner') && function_exists('filegroup') && function_exists('chown') && function_exists('chgrp')) {
+                        $owner = @fileowner($oldAbs);
+                        $group = @filegroup($oldAbs);
+                        if ($owner !== false) @chown($newAbs, $owner);
+                        if ($group !== false) @chgrp($newAbs, $group);
                     }
                 }
                 // Remove old (now empty) directory
@@ -816,7 +838,14 @@ class BookController extends Controller
 
         $documentStore->updateBook($id, $validated);
 
-        return redirect()->route('admin.books.index')->with('success', 'Book updated successfully.');
+        // Redirect to returnUrl if present, else fallback
+        $returnUrl = $request->input('returnUrl');
+        if ($returnUrl) {
+            return redirect($returnUrl)->with('success', 'Book updated successfully.');
+        }
+        // Preserve original query params (search, filters, page, etc) on redirect
+        $query = $request->query();
+        return redirect()->route('admin.books.index', $query)->with('success', 'Book updated successfully.');
     }
 
     /**

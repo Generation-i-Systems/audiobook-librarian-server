@@ -151,7 +151,7 @@
                             @php
                                 $bookId = $book['id'] ?? ($book['documentId'] ?? 0);
                             @endphp
-                            <a href="{{ route('admin.books.edit', $bookId) }}" class="btn btn-sm btn-outline-primary"
+                            <a href="{{ route('admin.books.edit', array_merge([$bookId], request()->query())) }}" class="btn btn-sm btn-outline-primary"
                                 title="Edit"><i class="fas fa-pencil-alt"></i></a>
                             <form action="{{ route('admin.books.destroy', $bookId) }}" method="POST" style="display: inline;">
                                 @csrf
