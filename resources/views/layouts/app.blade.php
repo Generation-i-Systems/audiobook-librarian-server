@@ -34,7 +34,7 @@
     <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
     <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
 
     @stack('styles')
 </head>
@@ -112,7 +112,7 @@
                                         {{ __('Profile') }}
                                     </a>
 
-                                    @if (Auth::user()->role === 'admin')
+                                    @if (Auth::user()->is_admin)
                                         @if(request()->is('admin/*'))
                                             <form id="user-mode-form" action="{{ route('books.index') }}" method="GET"
                                                 class="d-none"></form>

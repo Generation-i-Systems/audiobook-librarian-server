@@ -60,11 +60,13 @@
 
                 <a href="{{ route('books.download', $book['id']) }}" class="btn btn-primary">Download</a>
 
-                @if(auth()->check() && (auth()->user()->is_admin ?? false))
-                    <a href="{{ route('admin.books.edit', $book['id']) }}" class="btn btn-sm btn-primary float-end ms-2">
-                        <i class="bi bi-pencil"></i> Edit
-                    </a>
-                @endif
+                @auth
+    @if(Auth::user()->is_admin)
+        <a href="{{ route('admin.books.edit', $book['id']) }}" class="btn btn-sm btn-primary float-end ms-2">
+            <i class="bi bi-pencil"></i> Edit
+        </a>
+    @endif
+@endauth
                 <hr>
 
                 @if(!empty($relatedBooks))

@@ -46,7 +46,19 @@ class DocumentstoreUser implements Authenticatable
     // Allow property-style access (e.g., Auth::user()->name)
     public function __get($key)
     {
+        if ($key === 'is_admin') {
+            return $this->isAdmin();
+        }
         return $this->user[$key] ?? null;
+    }
+
+    /**
+     * Returns true if the user has the admin role.
+     * @return bool
+     */
+    public function isAdmin(): bool
+    {
+        return ($this->user['role'] ?? null) === 'admin';
     }
 
     public function getRememberTokenName()
