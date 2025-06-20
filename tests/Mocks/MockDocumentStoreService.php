@@ -26,14 +26,14 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     {
         // Debug logging
         echo "\nMockDocumentStoreService::createBook called with data: " . json_encode($data) . "\n";
-        
+
         $id = $data['id'] ?? uniqid('book_');
         $data['id'] = $id;
         $this->books[$id] = $data;
-        
+
         // Verify book was added
         echo "Books after adding: " . json_encode($this->books) . "\n";
-        
+
         return $id;
     }
 
@@ -42,7 +42,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         if (!isset($this->books[$id])) {
             return false;
         }
-        
+
         $this->books[$id] = array_merge($this->books[$id], $data);
         return true;
     }
@@ -52,7 +52,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         if (!isset($this->books[$id])) {
             return false;
         }
-        
+
         unset($this->books[$id]);
         return true;
     }
@@ -65,12 +65,12 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
                 stripos($book['author'] ?? '', $query) !== false) {
                 $results[] = $book;
             }
-            
+
             if (count($results) >= $limit) {
                 break;
             }
         }
-        
+
         return array_slice($results, $offset, $limit);
     }
 
@@ -81,7 +81,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
                 return $book;
             }
         }
-        
+
         return null;
     }
 
@@ -93,7 +93,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
                 $results[] = $this->books[$id];
             }
         }
-        
+
         return $results;
     }
 
@@ -110,7 +110,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
                 }
             }
         }
-        
+
         return $results;
     }
 
@@ -122,7 +122,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
                 $results[] = $book;
             }
         }
-        
+
         return $results;
     }
 
@@ -134,45 +134,45 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
                 $results[] = $book;
             }
         }
-        
+
         return $results;
     }
-    
+
     public function listBooks()
     {
         return array_values($this->books);
     }
-    
+
     public function getBooksByAuthorAndGenre($author, $genre)
     {
         $results = [];
         foreach ($this->books as $book) {
-            if ((isset($book['author']) && $book['author'] === $author) && 
+            if ((isset($book['author']) && $book['author'] === $author) &&
                 (isset($book['genres']) && in_array($genre, $book['genres']))) {
                 $results[] = $book;
             }
         }
-        
+
         return $results;
     }
-    
+
     public function dumpAllBooks()
     {
         return $this->books;
     }
-    
+
     public function getAllBooks(): array
     {
         return array_values($this->books);
     }
-    
+
     // dumpAllBooks method already exists above
-    
+
     public function getUserById($identifier)
     {
         return $this->users[$identifier] ?? null;
     }
-    
+
     public function getUserByCredentials($credentials)
     {
         foreach ($this->users as $user) {
@@ -180,20 +180,20 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
                 return $user;
             }
         }
-        
+
         return null;
     }
-    
+
     public function getUserByRememberToken($identifier, $token)
     {
         $user = $this->getUserById($identifier);
         if ($user && isset($user['remember_token']) && $user['remember_token'] === $token) {
             return $user;
         }
-        
+
         return null;
     }
-    
+
     public function createUser(array $data)
     {
         $id = $data['id'] ?? uniqid('user_');
@@ -201,32 +201,32 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         $this->users[$id] = $data;
         return $id;
     }
-    
+
     public function updateUser(string $id, array $data)
     {
         if (!isset($this->users[$id])) {
             return false;
         }
-        
+
         $this->users[$id] = array_merge($this->users[$id], $data);
         return true;
     }
-    
+
     public function deleteUser(string $id)
     {
         if (!isset($this->users[$id])) {
             return false;
         }
-        
+
         unset($this->users[$id]);
         return true;
     }
-    
+
     public function getUsersForMessaging(): array
     {
         return array_values($this->users);
     }
-    
+
     public function createGenre(array $data)
     {
         $id = $data['id'] ?? uniqid('genre_');
@@ -234,22 +234,22 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         $this->genres[$id] = $data;
         return $id;
     }
-    
+
     public function listGenres()
     {
         return array_values($this->genres);
     }
-    
+
     public function deleteGenre(string $id)
     {
         if (!isset($this->genres[$id])) {
             return false;
         }
-        
+
         unset($this->genres[$id]);
         return true;
     }
-    
+
     public function createSeries(array $data)
     {
         $id = $data['id'] ?? uniqid('series_');
@@ -257,7 +257,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         $this->series[$id] = $data;
         return $id;
     }
-    
+
     public function findOrCreateSeriesByName(string $name)
     {
         foreach ($this->series as $series) {
@@ -265,37 +265,37 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
                 return $series;
             }
         }
-        
+
         // Create new series
         $id = uniqid('series_');
         $this->series[$id] = [
             'id' => $id,
             'seriesName' => $name
         ];
-        
+
         return $this->series[$id];
     }
-    
+
     public function getSeries(string $id)
     {
         return $this->series[$id] ?? null;
     }
-    
+
     public function deleteSeries(string $id)
     {
         if (!isset($this->series[$id])) {
             return false;
         }
-        
+
         unset($this->series[$id]);
         return true;
     }
-    
+
     public function listSeries(): array
     {
         return array_values($this->series);
     }
-    
+
     public function searchSeriesByName(string $term): array
     {
         $results = [];
@@ -304,10 +304,10 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
                 $results[] = $series;
             }
         }
-        
+
         return $results;
     }
-    
+
     public function createAuthor(array $data)
     {
         $id = $data['id'] ?? uniqid('author_');
@@ -315,12 +315,12 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         $this->authors[$id] = $data;
         return $id;
     }
-    
+
     public function listAuthors()
     {
         return array_values($this->authors);
     }
-    
+
     public function deleteAuthor(string $id): void
     {
         if (isset($this->authors[$id])) {
@@ -336,10 +336,10 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
                 $results[] = $author;
             }
         }
-        
+
         return $results;
     }
-    
+
     public function searchNarratorsByName(string $term): array
     {
         $results = [];
@@ -348,10 +348,10 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
                 $results[] = $narrator;
             }
         }
-        
+
         return $results;
     }
-    
+
     public function createMessage(array $messageData): ?string
     {
         $id = $messageData['id'] ?? uniqid('message_');
@@ -359,13 +359,13 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         $this->messages[$id] = $messageData;
         return $id;
     }
-    
+
     public function getMessages(?string $userId = null, bool $includeAcknowledged = false, int $limit = 100): array
     {
         if ($userId === null) {
             return array_slice(array_values($this->messages), 0, $limit);
         }
-        
+
         $results = [];
         foreach ($this->messages as $message) {
             if (isset($message['userId']) && $message['userId'] === $userId) {
@@ -373,52 +373,52 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
                     $results[] = $message;
                 }
             }
-            
+
             if (count($results) >= $limit) {
                 break;
             }
         }
-        
+
         return $results;
     }
-    
+
     public function listJobs(?string $type = null, ?string $status = null, int $limit = 50, string $orderBy = 'updated_at', string $direction = 'DESC', ?string $startAfterId = null): array
     {
         $results = [];
         foreach ($this->jobs as $job) {
-            if (($type === null || ($job['type'] ?? '') === $type) && 
+            if (($type === null || ($job['type'] ?? '') === $type) &&
                 ($status === null || ($job['status'] ?? '') === $status)) {
                 $results[] = $job;
             }
-            
+
             if (count($results) >= $limit) {
                 break;
             }
         }
-        
+
         return $results;
     }
-    
+
     public function deleteJob(string $jobId): bool
     {
         if (!isset($this->jobs[$jobId])) {
             return false;
         }
-        
+
         unset($this->jobs[$jobId]);
         return true;
     }
-    
+
     public function getBookQueue(string $userId): array
     {
         return $this->queues[$userId] ?? [];
     }
-    
+
     public function getQueueCollection($name)
     {
         return $this->queues[$name] ?? [];
     }
-    
+
     public function resetReadingProgress(string $userId, string $bookId): bool
     {
         $key = $userId . '_' . $bookId;
@@ -426,10 +426,10 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
             unset($this->readingProgress[$key]);
             return true;
         }
-        
+
         return false;
     }
-    
+
     public function getDocument(string $collection, string $docId): ?array
     {
         $collections = [
@@ -441,27 +441,31 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
             'messages' => $this->messages,
             'jobs' => $this->jobs,
         ];
-        
+
         return $collections[$collection][$docId] ?? null;
     }
-    
+
     public function getClient()
     {
         // Return a mock client object
-        return new class {
-            public function collection($name) {
+        return new class () {
+            public function collection($name)
+            {
                 return $this;
             }
-            
-            public function document($id) {
+
+            public function document($id)
+            {
                 return $this;
             }
-            
-            public function set($data) {
+
+            public function set($data)
+            {
                 return true;
             }
-            
-            public function get() {
+
+            public function get()
+            {
                 return null;
             }
         };

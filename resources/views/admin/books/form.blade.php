@@ -124,40 +124,16 @@
             <div id="series-group">
                 @php
                     $seriesList = [];
-                    $oldSeries = old('series') ?? (request()->get('series') ? [request()->get('series')] : null);
-                    $oldSeriesNumbers = old('seriesNumber') ?? old('seriesNumber', []);
-
-                    // Handle existing book data
-                    if (isset($book) && !empty($book['series'])) {
-                        if (is_array($book['series'])) {
-                            // Handle new format: ["Series Name" => number, ...]
-                            foreach ($book['series'] as $name => $number) {
-                                if (!empty($name)) {
-                                    $seriesList[] = [
-                                        'seriesName' => $name,
-                                        'number' => $number,
-                                    ];
-                                }
-                            }
-                        }
-                        // Handle single series as string (legacy format)
-                        else if (is_string($book['series'])) {
-                            $seriesList[] = [
-                                'seriesName' => $book['series'],
-                                'number' => $book['seriesNumber'] ?? $book['seriesNumber'] ?? ''
-                            ];
-                        }
-                    }
-
-                    // Handle old input (validation errors)
+                    $oldSeries = old('series');
+                    $bookSeries = $book['series'] ?? ($initial['series'] ?? []);
+                    if (!is_array($bookSeries)) $bookSeries = [];
+                    // Canonical: only accept array of objects with seriesName and number
                     if (!empty($oldSeries)) {
-                        $seriesList = []; // Reset to use old input
-                        foreach ($oldSeries as $i => $seriesName) {
-                            if (!empty($seriesName)) {
-                                $seriesList[] = [
-                                    'seriesName' => $seriesName,
-                                    'number' => $oldSeriesNumbers[$i] ?? ''
-                                ];
+                        foreach ($oldSeries as $item) {
+                            $name = is_array($item) ? ($item['seriesName'] ?? '') : '';
+                            $number = is_array($item) ? ($item['number'] ?? '') : '';
+                            if ($name !== '' || $number !== '') {
+                                $seriesList[] = ['seriesName' => $name, 'number' => $number];
                             }
                         }
                     }
@@ -193,10 +169,19 @@
                         $number = isset($series['number']) ? $series['number'] : '';
                     @endphp
                     <div class="input-group series-row align-items-start mb-3">
-                        <input type="text" name="series[]" class="form-control w-auto series-autocomplete" style="max-width:200px; height:32px;"
-                            placeholder="Series Name" value="{{ $name }}">
-                        <input type="number" name="seriesNumber[]" class="form-control w-auto"
-                            style="max-width:100px; height:32px;" placeholder="Number" value="{{ $number }}" min="1" step="any">
+                        @php
+    // Ensure $name and $number are always strings for safe HTML output
+    if (is_array($name) || is_object($name)) {
+        $name = '';
+    }
+    if (is_array($number) || is_object($number)) {
+        $number = '';
+    }
+@endphp
+<input type="text" name="series[]" class="form-control w-auto series-autocomplete" style="max-width:200px; height:32px;"
+    placeholder="Series Name" value="{{ $name }}">
+<input type="number" name="seriesNumber[]" class="form-control w-auto"
+    style="max-width:100px; height:32px;" placeholder="Number" value="{{ $number }}" min="1" step="any">
                         <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
                             <button type="button" class="btn btn-outline-danger btn-sm remove-series p-0 mb-0"
                                 style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>

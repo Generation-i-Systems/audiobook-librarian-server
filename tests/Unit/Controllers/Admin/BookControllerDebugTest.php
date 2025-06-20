@@ -3,7 +3,6 @@
 namespace Tests\Unit\Controllers\Admin;
 
 use App\Http\Controllers\Admin\BookController;
-use App\Events\NewBookAdded;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Event;
@@ -20,21 +19,21 @@ class BookControllerDebugTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Create a mock document store service
         $this->documentStore = new MockDocumentStoreService();
-        
+
         // Mock the required services
         $mockGoogleBooksService = $this->createMock(\App\Services\GoogleBooksApiService::class);
         $mockAudibleService = $this->createMock(\App\Services\AudibleService::class);
-        
+
         // Create the controller with the mock services
         $this->controller = new BookController(
             $this->documentStore,
             $mockGoogleBooksService,
             $mockAudibleService
         );
-        
+
         // Set up storage
         Storage::fake('books');
     }
@@ -48,17 +47,17 @@ class BookControllerDebugTest extends TestCase
             'author' => ['Direct Test Author'],
             'genre' => ['Direct Test Genre'],
         ]);
-        
+
         // Verify the direct addition worked
         $directBooks = $this->documentStore->getAllBooks();
         $this->assertNotEmpty($directBooks, 'Direct book addition failed');
-        
+
         // Now test the controller's store method
         Event::fake();
-        
+
         // Create a fake cover image
         $file = UploadedFile::fake()->image('cover.jpg');
-        
+
         // Create a request with valid book data and cover image
         $request = new Request([
             'title' => 'Test Book with Cover',
@@ -67,64 +66,67 @@ class BookControllerDebugTest extends TestCase
             'directoryPath' => 'test/path'
         ]);
         $request->files->set('cover', $file);
-        
+
         // Set environment variable for book storage path
         $this->app['config']->set('filesystems.disks.books', [
             'driver' => 'local',
             'root' => storage_path('app/books'),
         ]);
         putenv('BOOK_STORAGE_PATH=' . storage_path('app/books'));
-        
+
         // Add logging to trace execution
         Log::spy();
-        
+
         // Add a book directly to the mock store to verify it works
         $testBookId = $this->documentStore->createBook([
             'title' => 'Direct Test Book',
             'author' => ['Direct Test Author'],
             'genre' => ['Direct Test Genre'],
         ]);
-        
+
         // Verify the direct addition worked
         $directBooks = $this->documentStore->getAllBooks();
         $this->assertNotEmpty($directBooks, 'Direct book addition failed');
-        
+
         // Add a debug wrapper to the controller's documentStoreService
         $originalDocumentStore = $this->controller->documentStoreService;
-        $this->controller->documentStoreService = new class($originalDocumentStore) {
+        $this->controller->documentStoreService = new class ($originalDocumentStore) {
             private $originalService;
-            
-            public function __construct($originalService) {
+
+            public function __construct($originalService)
+            {
                 $this->originalService = $originalService;
             }
-            
-            public function createBook(array $data) {
+
+            public function createBook(array $data)
+            {
                 echo "\nController's createBook called with: " . json_encode($data) . "\n";
                 $result = $this->originalService->createBook($data);
                 echo "Result of createBook: " . $result . "\n";
                 return $result;
             }
-            
-            public function __call($method, $args) {
+
+            public function __call($method, $args)
+            {
                 return call_user_func_array([$this->originalService, $method], $args);
             }
         };
-        
+
         // Call the store method
         $response = $this->controller->store($request);
-        
+
         // Output debug info
         echo "Response: " . json_encode($response) . "\n";
-        
+
         // Output logs
         $logs = Log::logged();
         echo "Logs: " . json_encode($logs) . "\n";
         echo "Books after controller store: " . json_encode($this->documentStore->getAllBooks()) . "\n";
         echo "Raw books array: " . json_encode($this->documentStore->dumpAllBooks()) . "\n";
-        
+
         // Get all books from the mock store
         $books = $this->documentStore->getAllBooks();
-        
+
         // Assert that at least one book was added
         $this->assertNotEmpty($books, 'No books were added to the mock store');
     }

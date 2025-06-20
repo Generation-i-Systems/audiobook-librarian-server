@@ -2,7 +2,6 @@
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
-use App\Contracts\DocumentStoreServiceInterface;
 
 // Create a test book record
 $book = [

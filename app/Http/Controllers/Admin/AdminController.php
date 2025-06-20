@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Contracts\DocumentStoreServiceInterface;
 
-
 class AdminController extends Controller
 {
     protected DocumentStoreServiceInterface $documentStoreService;

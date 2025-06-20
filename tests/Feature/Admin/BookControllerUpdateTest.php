@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Admin;
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 use App\Models\User;
 use App\Services\MongoService;
@@ -30,7 +29,7 @@ class BookControllerUpdateTest extends TestCase
 
         $mock = \Mockery::mock(\App\Services\MongoService::class);
         $mock->shouldReceive('getBook')->with($bookId)->andReturn($bookData);
-        $mock->shouldReceive('updateBook')->with($bookId, \Mockery::on(function($data) {
+        $mock->shouldReceive('updateBook')->with($bookId, \Mockery::on(function ($data) {
             return $data['coverImage'] === 'old/path/coverfile.jpg';
         }))->once();
         $this->app->instance(\App\Services\MongoService::class, $mock);
@@ -65,7 +64,7 @@ class BookControllerUpdateTest extends TestCase
         ];
         $mock = \Mockery::mock(\App\Services\MongoService::class);
         $mock->shouldReceive('getBook')->with($bookId)->andReturn($bookData);
-        $mock->shouldReceive('updateBook')->with($bookId, \Mockery::on(function($data) {
+        $mock->shouldReceive('updateBook')->with($bookId, \Mockery::on(function ($data) {
             return isset($data['coverImage']) && str_starts_with($data['coverImage'], 'old/path/cover_');
         }))->once();
         $this->app->instance(\App\Services\MongoService::class, $mock);

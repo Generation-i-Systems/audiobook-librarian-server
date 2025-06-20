@@ -19,13 +19,28 @@ Audiobook Librarian is a Laravel-based web app for managing audiobooks, supporti
 
 ## 3. Data Structures
 
+### Book Data Model
+
+### Series Field (Canonical Format)
+- The `series` field is always an array of objects, each with `seriesName` (string) and `number` (string or int):
+  ```json
+  "series": [
+    { "seriesName": "Buryoku", "number": "9" }
+  ]
+  ```
+- All code (backend, frontend, API) expects and produces this format only.
+- Legacy formats (string, key-value, separate objects) are not supported.
+- Migration: update any old data to this format.
+
 ### Book Document (Firestore)
 ```json
 {
   "title": "The Way of Kings",
   "authors": ["Brandon Sanderson", "Co-Author Name"],
-  "series": {
-    "Stormlight Archive": 1,
+  "series": [
+    { "seriesName": "Stormlight Archive", "number": 1 },
+    { "seriesName": "Cosmere", "number": 15 }
+  ],
     "Cosmere": 15
   },
   "description": "Epic fantasy novel...",

@@ -7,7 +7,6 @@ namespace Tests\Feature;
 use App\Console\Commands\CreateAdminUser;
 use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use Tests\TestCase;

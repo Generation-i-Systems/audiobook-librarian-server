@@ -3,7 +3,9 @@
 @section('content')
     <div class="container">
         <h1>{{ $book['title'] }}</h1>
-        <p><strong>Path:</strong> {{ isset($book['directoryPath']) ? $book['directoryPath'] : (isset($book['path']) ? $book['path'] : 'N/A') }}</p>
+        <p><strong>Path:</strong>
+            {{ isset($book['directoryPath']) ? $book['directoryPath'] : (isset($book['path']) ? $book['path'] : 'N/A') }}
+        </p>
 
         <div class="row">
             <div class="col-md-4">
@@ -27,21 +29,25 @@
                     }
                 @endphp
                 @if($hasSeries)
-                <p><strong>Series:</strong>
-                    @php
-                        $seriesStr = '';
-                        if (is_array($book['series'])) {
-                            $parts = [];
-                            foreach ($book['series'] as $seriesName => $seriesNumber) {
-                                $parts[] = $seriesName . ' (Book ' . $seriesNumber . ')';
+                    <p><strong>Series:</strong>
+                        @php
+                            $seriesStr = '';
+                            if (is_array($book['series']) && isset($book['series'][0]['seriesName'])) {
+                                $parts = [];
+                                foreach ($book['series'] as $seriesEntry) {
+                                    $name = $seriesEntry['seriesName'] ?? '';
+                                    $number = $seriesEntry['number'] ?? '';
+                                    if ($name !== '') {
+                                        $parts[] = $name . ($number !== '' ? ' (Book ' . $number . ')' : '');
+                                    }
+                                }
+                                $seriesStr = implode(', ', $parts);
+                            } else {
+                                $seriesStr = (string) $book['series'];
                             }
-                            $seriesStr = implode(', ', $parts);
-                        } else {
-                            $seriesStr = (string) $book['series'];
-                        }
-                    @endphp
-                    {{ $seriesStr }}@if(isset($book['series_number'])) (Book {{ $book['series_number'] }})@endif
-                </p>
+                        @endphp
+                        {{ $seriesStr }}@if(isset($book['series_number'])) (Book {{ $book['series_number'] }})@endif
+                    </p>
                 @endif
                 <p><strong>Genre:</strong>
                     @if(isset($book['genre']) && is_array($book['genre']) && !empty($book['genre']))
@@ -54,30 +60,42 @@
 
                 <a href="{{ route('books.download', $book['id']) }}" class="btn btn-primary">Download</a>
 
+                @if(auth()->check() && (auth()->user()->is_admin ?? false))
+                    <a href="{{ route('admin.books.edit', $book['id']) }}" class="btn btn-sm btn-primary float-end ms-2">
+                        <i class="bi bi-pencil"></i> Edit
+                    </a>
+                @endif
                 <hr>
 
                 @if(!empty($relatedBooks))
-                <h2>Related Books</h2>
-                <div class="row">
-                    @foreach($relatedBooks as $relatedBook)
-                        <div class="col-md-4 mb-3">
-                            <div class="card h-100">
-                                @php
-                                    $relatedCover = isset($relatedBook['coverImage']) && $relatedBook['coverImage'] ?
-                                        route('cover.proxy', ['path' => $relatedBook['coverImage']]) :
-                                        url('images/placeholder.png');
-                                @endphp
-                                <img src="{{ $relatedCover }}" class="card-img-top" alt="{{ $relatedBook['title'] }}"
-                                     style="height: 150px; object-fit: contain;">
-                                <div class="card-body">
-                                    <h5 class="card-title">{{ $relatedBook['title'] }}</h5>
-                                    <a href="{{ route('books.show', $relatedBook['id']) }}" class="btn btn-sm btn-primary">View</a>
+                    <h2>Related Books</h2>
+                    <div class="row">
+                        @foreach($relatedBooks as $relatedBook)
+                            <div class="col-md-4 mb-3">
+                                <div class="card h-100">
+                                    @php
+                                        $relatedCover = isset($relatedBook['coverImage']) && $relatedBook['coverImage'] ?
+                                            route('cover.proxy', ['path' => $relatedBook['coverImage']]) :
+                                            url('images/placeholder.png');
+                                    @endphp
+                                    <img src="{{ $relatedCover }}" class="card-img-top" alt="{{ $relatedBook['title'] }}"
+                                        style="height: 150px; object-fit: contain;">
+                                    <div class="card-body">
+                                        @if(auth()->check() && (auth()->user()->is_admin ?? false))
+                                            <a href="{{ route('admin.books.edit', $book['id']) }}"
+                                                class="btn btn-sm btn-primary float-end ms-2">
+                                                <i class="bi bi-pencil"></i> Edit
+                                            </a>
+                                        @endif
+                                        <h5 class="card-title">{{ $relatedBook['title'] }}</h5>
+                                        <a href="{{ route('books.show', $relatedBook['id']) }}"
+                                            class="btn btn-sm btn-primary">View</a>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    @endforeach
-                </div>
-                <hr>
+                        @endforeach
+                    </div>
+                    <hr>
                 @endif
 
                 <h2>Reviews</h2>
@@ -86,8 +104,10 @@
                         <div class="card mb-3">
                             <div class="card-body">
                                 <p>{{ isset($review['comment']) ? $review['comment'] : '' }}</p>
-                                <p><strong>Age Rating:</strong> {{ isset($review['age_rating']) ? $review['age_rating'] : 'N/A' }}</p>
-                                <p><strong>Content Rating:</strong> {{ isset($review['content_rating']) ? $review['content_rating'] : 'N/A' }}</p>
+                                <p><strong>Age Rating:</strong> {{ isset($review['age_rating']) ? $review['age_rating'] : 'N/A' }}
+                                </p>
+                                <p><strong>Content Rating:</strong>
+                                    {{ isset($review['content_rating']) ? $review['content_rating'] : 'N/A' }}</p>
                             </div>
                         </div>
                     @endforeach

@@ -106,20 +106,20 @@ class BookController extends Controller
             $search = strtolower($request->input('search'));
             $books = array_filter(
                 $books,
-                fn($book) => (isset($book['title']) && stripos($book['title'], $search) !== false)
+                fn ($book) => (isset($book['title']) && stripos($book['title'], $search) !== false)
                 || (isset($book['author']) && stripos($book['author'], $search) !== false)
             );
         }
         if ($request->filled('author')) {
             $books = array_filter(
                 $books,
-                fn($book) => isset($book['author']) && $book['author'] == $request->input('author')
+                fn ($book) => isset($book['author']) && $book['author'] == $request->input('author')
             );
         }
         if ($request->filled('genre_id')) {
             $books = array_filter(
                 $books,
-                fn($book) => isset($book['genre_id']) && $book['genre_id'] == $request->input('genre_id')
+                fn ($book) => isset($book['genre_id']) && $book['genre_id'] == $request->input('genre_id')
             );
         }
         // Sorting
@@ -127,7 +127,7 @@ class BookController extends Controller
         $books = array_values($books);
         usort(
             $books,
-            fn($a, $b) => match ($sort) {
+            fn ($a, $b) => match ($sort) {
                 'recent_desc' => strtotime($b['created_at'] ?? 0) <=> strtotime($a['created_at'] ?? 0),
                 'recent_asc' => strtotime($a['created_at'] ?? 0) <=> strtotime($b['created_at'] ?? 0),
                 'author_asc' => strcmp($a['author_name'] ?? '', $b['author_name'] ?? ''),

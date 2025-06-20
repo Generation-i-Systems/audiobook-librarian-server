@@ -3,7 +3,6 @@
 namespace Tests\Feature\Admin;
 
 use App\Contracts\DocumentStoreServiceInterface;
-use App\Http\Controllers\Admin\BookController;
 use App\Http\Middleware\CheckAdminRole;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Mockery;

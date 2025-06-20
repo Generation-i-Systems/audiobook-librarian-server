@@ -13,7 +13,8 @@ if (file_exists(__DIR__ . '/../.env')) {
 }
 
 if (!function_exists('custom_base_path')) {
-    function custom_base_path($path = '') {
+    function custom_base_path($path = '')
+    {
         return rtrim(dirname(__DIR__), '/') . ($path ? DIRECTORY_SEPARATOR . ltrim($path, DIRECTORY_SEPARATOR) : '');
     }
 }

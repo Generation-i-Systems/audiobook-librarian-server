@@ -4,11 +4,9 @@ namespace Tests\Feature\Admin;
 
 use App\Auth\DocumentstoreUser;
 use App\Services\AudibleService;
-use App\Services\GoogleBooksApiService;
 use App\Services\MongoService;
 use Illuminate\Foundation\Testing\WithFaker;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 use Mockery;
 use Tests\TestCase;
 
@@ -60,7 +58,7 @@ class BookControllerAudibleTest extends TestCase
     {
         // Mock the AudibleService
         $mockAudibleService = Mockery::mock(AudibleService::class);
-        
+
         // Mock the searchBooksWithFiltering method
         $mockAudibleService->shouldReceive('searchBooksWithFiltering')
             ->once()

@@ -2,7 +2,6 @@
 
 namespace Tests;
 
-use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Testing\TestCase;
 

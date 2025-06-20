@@ -7,8 +7,6 @@ namespace Tests\Feature;
 use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Session;
-use Illuminate\Testing\TestResponse;
 use Mockery;
 use Tests\TestCase;
 use PHPUnit\Framework\Attributes\Test;

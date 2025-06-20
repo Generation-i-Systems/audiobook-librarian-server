@@ -3,7 +3,6 @@
 namespace Tests\Unit\Services;
 
 use App\Services\BookMetadataService;
-use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 use org\bovigo\vfs\vfsStream;

@@ -1,4 +1,18 @@
 ## [Unreleased]
+
+### Changed
+- The `series` field for books is now always stored and processed as an array of objects with `seriesName` and `number` keys.
+- All backend, frontend, API, and tests updated to use the canonical format.
+- Legacy formats (string, key-value, separate objects) are no longer accepted or produced.
+- Documentation and tests updated to reflect this normalization.
+
+### Migration
+- If you have existing data in legacy formats, you must migrate it to the new format:
+  ```json
+  "series": [
+    { "seriesName": "Buryoku", "number": "9" }
+  ]
+  ```
 ### Added
 - Implemented complete import-from-file/audio feature for book management
   - Added backend processing in BookController with new processImport method

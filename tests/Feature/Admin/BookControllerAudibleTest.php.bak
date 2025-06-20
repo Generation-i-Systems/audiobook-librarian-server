@@ -1,0 +1,201 @@
+<?php
+
+namespace Tests\Feature\Admin;
+
+use App\Auth\DocumentstoreUser;
+use App\Services\AudibleService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\WithFaker;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Mockery;
+use Tests\TestCase;
+
+/**
+ * @covers \App\Http\Controllers\Admin\BookController
+ */
+class BookControllerAudibleTest extends TestCase
+{
+    use RefreshDatabase;
+    use WithFaker;
+    
+    protected $user;
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Create a mock admin user
+        $userData = [
+            'id' => 'test-admin-user',
+            'name' => 'Test Admin',
+            'email' => 'admin@test.com',
+            'is_admin' => true
+        ];
+        $this->user = new DocumentstoreUser($userData);
+        Auth::login($this->user);
+        $this->actingAs($this->user);
+    }
+
+    /**
+     * Test the audible endpoint with a title search
+     *
+     * @return void
+     */
+    public function testAudibleSearchByTitle(): void
+    {
+        // Mock the AudibleService
+        $mockAudibleService = Mockery::mock([AudibleService::class], []);
+        $mockAudibleService->shouldReceive('searchBooks')
+            ->once()
+            ->with('Test Book', ['author' => 'Test Author', 'limit' => 10])
+            ->andReturn([
+                [
+                    'title' => 'Test Book',
+                    'author' => ['Test Author'],
+                    'asin' => 'B123456789',
+                    'image_url' => 'https://example.com/cover.jpg',
+                    'release_date' => '2023-01-01',
+                    'narrator' => ['Test Narrator'],
+                    'series' => ['Test Series' => '1'],
+                    'publisher' => 'Test Publisher',
+                    'description' => 'Test description',
+                ],
+            ]);
+
+        $this->app->instance(AudibleService::class, $mockAudibleService);
+
+        // Make the request
+        $response = $this->getJson('/admin/books/audible?title=Test+Book&author=Test+Author');
+
+        // Assert response
+        $response->assertStatus(200)
+            ->assertJsonCount(1)
+            ->assertJsonStructure([
+                [
+                    'title',
+                    'author',
+                    'audibleId',
+                    'coverImageUrl',
+                    'publishedYear',
+                    'narratorList',
+                    'seriesName',
+                    'seriesNumber',
+                    'source',
+                ],
+            ])
+            ->assertJson([
+                [
+                    'title' => 'Test Book',
+                    'author' => ['Test Author'],
+                    'audibleId' => 'B123456789',
+                    'coverImageUrl' => 'https://example.com/cover.jpg',
+                    'publishedYear' => '2023',
+                    'narratorList' => ['Test Narrator'],
+                    'seriesName' => 'Test Series',
+                    'seriesNumber' => '1',
+                    'source' => 'Audible',
+                ],
+            ]);
+    }
+
+    /**
+     * Test the audible endpoint with an ASIN search
+     *
+     * @return void
+     */
+    public function testAudibleSearchByAsin(): void
+    {
+        // Mock the AudibleService
+        $mockAudibleService = Mockery::mock([AudibleService::class], []);
+        $mockAudibleService->shouldReceive('getBookDetails')
+            ->once()
+            ->with('B123456789')
+            ->andReturn([
+                'title' => 'Test Book',
+                'author' => ['Test Author'],
+                'asin' => 'B123456789',
+                'image_url' => 'https://example.com/cover.jpg',
+                'release_date' => '2023-01-01',
+                'narrator' => ['Test Narrator'],
+                'series' => ['Test Series' => '1'],
+                'publisher' => 'Test Publisher',
+                'description' => 'Test description',
+            ]);
+
+        $this->app->instance(AudibleService::class, $mockAudibleService);
+
+        // Make the request
+        $response = $this->getJson('/admin/books/audible?api_id=B123456789');
+
+        // Assert response
+        $response->assertStatus(200)
+            ->assertJsonCount(1)
+            ->assertJsonStructure([
+                [
+                    'title',
+                    'author',
+                    'audibleId',
+                    'coverImageUrl',
+                    'publishedYear',
+                    'narratorList',
+                    'seriesName',
+                    'seriesNumber',
+                    'source',
+                ],
+            ])
+            ->assertJson([
+                [
+                    'title' => 'Test Book',
+                    'author' => ['Test Author'],
+                    'audibleId' => 'B123456789',
+                    'coverImageUrl' => 'https://example.com/cover.jpg',
+                    'publishedYear' => '2023',
+                    'narratorList' => ['Test Narrator'],
+                    'seriesName' => 'Test Series',
+                    'seriesNumber' => '1',
+                    'source' => 'Audible',
+                ],
+            ]);
+    }
+
+    /**
+     * Test the audible endpoint with a missing title and ASIN
+     *
+     * @return void
+     */
+    public function testAudibleSearchWithMissingTitleAndAsin(): void
+    {
+        // Make the request with no title or ASIN
+        $response = $this->getJson('/admin/books/audible');
+
+        // Assert response
+        $response->assertStatus(400)
+            ->assertJson([
+                'error' => 'Title or ASIN is required.',
+            ]);
+    }
+
+    /**
+     * Test the audible endpoint with an error from the service
+     *
+     * @return void
+     */
+    public function testAudibleSearchWithServiceError(): void
+    {
+        // Mock the AudibleService to throw an exception
+        $mockAudibleService = Mockery::mock([AudibleService::class], []);
+        $mockAudibleService->shouldReceive('searchBooks')
+            ->once()
+            ->andThrow(new \Exception('API Error'));
+
+        $this->app->instance(AudibleService::class, $mockAudibleService);
+
+        // Make the request
+        $response = $this->getJson('/admin/books/audible?title=Test+Book');
+
+        // Assert response
+        $response->assertStatus(500)
+            ->assertJson([
+                'error' => 'Audible search failed: API Error',
+            ]);
+    }
+}

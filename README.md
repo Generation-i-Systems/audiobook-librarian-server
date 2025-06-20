@@ -95,7 +95,12 @@ A Laravel-based audiobook library and management system for personal and family 
       "id": 1,
       "title": "...",
       "author": { ... },
-      "series": { ... },
+      "series": [
+        {
+          "seriesName": "Buryoku",
+          "number": "9"
+        }
+      ],
       "cover_url": "/api/v1/books/1/cover",
       "download_url": "/api/v1/books/1/download",
       ...
@@ -258,9 +263,9 @@ Repairs book covers and series numbers in the database.
   - `id`: Only repair the book with this ID.
   - `directoryPath`: Only repair books in this directory path.
 - **Behavior:**
-  - Scans for books with missing/placeholder covers or series numbers.
+  - Scans for books with missing/placeholder covers or series numbers (canonical format: array of {seriesName, number}).
   - Attempts to extract covers from storage or embedded in `.m4b` files.
-  - Parses series numbers from directory names using flexible patterns.
+  - Parses series numbers from directory names using flexible patterns and stores as array of {seriesName, number}.
   - Logs progress and results.
 - **Sample Output:**
   ```

@@ -2,8 +2,6 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Auth;
 use Tests\TestCase;
 
 class ReadingProgressApiControllerTest extends TestCase
@@ -15,7 +13,7 @@ class ReadingProgressApiControllerTest extends TestCase
         $mock->shouldReceive('updateReadingProgress')->andReturn(true);
         $mock->shouldReceive('resetReadingProgress')->andReturn(true);
         $mock->shouldReceive('getUserById')->andReturnUsing(function ($id) {
-            return ['id' => $id, 'name' => 'Test User', 'email' => 'test'.$id.'@example.com'];
+            return ['id' => $id, 'name' => 'Test User', 'email' => 'test' . $id . '@example.com'];
         });
         $this->app->instance(\App\Contracts\DocumentStoreServiceInterface::class, $mock);
         $this->withoutMiddleware();

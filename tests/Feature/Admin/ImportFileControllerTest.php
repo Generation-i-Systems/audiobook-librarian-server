@@ -35,10 +35,10 @@ class ImportFileControllerTest extends TestCase
         $response->assertStatus(200);
         $json = $response->json();
         $this->assertTrue(
-            collect($json['items'])->contains(fn($item) => $item['type'] === 'file' && $item['name'] === 'test.mp3')
+            collect($json['items'])->contains(fn ($item) => $item['type'] === 'file' && $item['name'] === 'test.mp3')
         );
         $this->assertTrue(
-            collect($json['items'])->contains(fn($item) => $item['type'] === 'dir' && $item['name'] === 'subdir')
+            collect($json['items'])->contains(fn ($item) => $item['type'] === 'dir' && $item['name'] === 'subdir')
         );
     }
 }

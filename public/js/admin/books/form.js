@@ -98,7 +98,7 @@ function addSeriesRow($container, seriesName = "", seriesNumber = "") {
     div.className = "input-group series-row align-items-start mb-3";
     div.innerHTML = `
         <input type="text" name="series[][seriesName]" class="form-control w-auto series-autocomplete" style="max-width:200px; height:32px;" placeholder="Series Name" value="${seriesName}">
-        <input type="number" name="series[][number]" class="form-control w-auto" style="max-width:100px; height:32px;" placeholder="Number" value="${seriesNumber}" min="1" step="any">
+        <input type="text" name="series[][number]" class="form-control w-auto ms-2" style="max-width:90px; height:32px;" placeholder="# in Series" value="${seriesNumber}">
         <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
             <button type="button" class="btn btn-outline-danger btn-sm remove-series p-0 mb-0" style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
             <button type="button" class="btn btn-primary btn-sm add-series-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>

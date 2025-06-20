@@ -4,8 +4,6 @@ namespace App\Services;
 
 use MongoDB\Client;
 use App\Contracts\DocumentStoreServiceInterface;
-use MongoDB\BSON\ObjectId;
-use MongoDB\BSON\Regex;
 use RuntimeException;
 
 class MongoService implements DocumentStoreServiceInterface

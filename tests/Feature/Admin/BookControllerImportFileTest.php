@@ -11,7 +11,8 @@ use Tests\TestCase;
 
 class BookControllerImportFileTest extends TestCase
 {
-    use RefreshDatabase, WithFaker;
+    use RefreshDatabase;
+    use WithFaker;
 
     /** @test */
     public function importFile_route_renders_view_for_admin()

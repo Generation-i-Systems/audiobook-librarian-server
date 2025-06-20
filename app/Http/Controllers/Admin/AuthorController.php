@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Http\Request;
 
 class AuthorController extends Controller
