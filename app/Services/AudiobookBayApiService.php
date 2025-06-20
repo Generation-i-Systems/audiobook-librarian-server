@@ -194,7 +194,7 @@ class AudiobookBayApiService
             'genres' => self::formatGenres($data['genres'] ?? $data['categories'] ?? []),
             'rating' => $data['rating'] ?? $data['average_rating'] ?? null,
             'ratings_count' => $data['ratings_count'] ?? $data['ratingsCount'] ?? 0,
-            'metadata' => array_merge(self::formatAuthors($data[''] ?? []), $data[
+            'metadata' => array_merge(
                 $data['metadata'] ?? [],
                 [
                     'source' => $data['metadata']['source'] ?? 'unknown',

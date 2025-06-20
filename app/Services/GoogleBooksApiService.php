@@ -216,7 +216,33 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
                 return [];
             }
 
-            return $this->formatSearchResults($response['items']);
+            $results = [];
+            foreach ($response['items'] as $item) {
+                $results[] = $this->transform($item);
+            }
+            // Post-filter by author if specified
+            if (!empty($author)) {
+                $originalCount = count($results);
+                $authorLower = mb_strtolower($author);
+                $results = array_filter($results, function ($book) use ($authorLower) {
+                    if (empty($book['authors'])) {
+                        return false;
+                    }
+                    foreach ((array)$book['authors'] as $bookAuthor) {
+                        if (mb_stripos($bookAuthor['author']['name'] ?? $bookAuthor, $authorLower) !== false) {
+                            return true;
+                        }
+                    }
+                    return false;
+                });
+                $results = array_values($results); // reindex
+                Log::debug('GoogleBooksApiService: Filtered results by author', [
+                    'input_author' => $author,
+                    'before_count' => $originalCount,
+                    'after_count' => count($results),
+                ]);
+            }
+            return $results;
         } catch (\Exception $e) {
             Log::error('Google Books API search failed', [
                 'query' => $query,
@@ -239,7 +265,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
             if ($response === null) {
                 return null;
             }
-            return $this->formatBookDetails($response);
+            return $this->transform($response);
         } catch (\Exception $e) {
             Log::error('Failed to get book details from Google Books API', [
                 'id' => $id,
@@ -412,5 +438,114 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
         Log::info('downloadCoverImage not implemented for GoogleBooksApiService');
 
         return null;
+    }
+
+    /**
+     * Transform a Google Books API result into a consistent format for frontend consumption.
+     *
+     * @param array $item The Google Books API result to transform
+     * @return array The transformed result
+     */
+    public function transform(array $item): array
+    {
+        // Extract volumeInfo if present
+        $info = isset($item['volumeInfo']) && is_array($item['volumeInfo']) ? $item['volumeInfo'] : $item;
+
+        // Extract author information
+        $authorArray = [];
+        if (isset($info['authors']) && is_array($info['authors'])) {
+            foreach ($info['authors'] as $authorEntry) {
+                if (is_array($authorEntry) && isset($authorEntry['name'])) {
+                    $authorArray[] = $authorEntry['name'];
+                } elseif (is_array($authorEntry) && isset($authorEntry['author']['name'])) {
+                    $authorArray[] = $authorEntry['author']['name'];
+                } elseif (is_string($authorEntry)) {
+                    $authorArray[] = $authorEntry;
+                }
+            }
+        } elseif (isset($info['authors']) && is_string($info['authors'])) {
+            $authorArray[] = $info['authors'];
+        }
+
+        // Extract image URL
+        $imageLinks = $info['imageLinks'] ?? [];
+        $coverImageUrl = $this->getBestImageUrl($imageLinks);
+
+        // Extract series information
+        $seriesName = $info['seriesName'] ?? $info['series'] ?? '';
+        $seriesNumber = $info['seriesNumber'] ?? '';
+
+        // Extract categories/genres
+        $categories = [];
+        if (isset($info['categories']) && is_array($info['categories'])) {
+            $categories = $info['categories'];
+        } elseif (isset($info['categories']) && is_string($info['categories'])) {
+            $categories = [$info['categories']];
+        }
+
+        // Extract industry identifiers (ISBN, etc.)
+        $isbn10 = null;
+        $isbn13 = null;
+        if (isset($info['industryIdentifiers']) && is_array($info['industryIdentifiers'])) {
+            foreach ($info['industryIdentifiers'] as $identifier) {
+                if (isset($identifier['type']) && isset($identifier['identifier'])) {
+                    if ($identifier['type'] === 'ISBN_10') {
+                        $isbn10 = $identifier['identifier'];
+                    } elseif ($identifier['type'] === 'ISBN_13') {
+                        $isbn13 = $identifier['identifier'];
+                    }
+                }
+            }
+        }
+
+        // Build the result array
+        $result = [
+            'source' => $this->getServiceName(),
+            'googleBooksId' => $item['id'] ?? null,
+            'title' => $info['title'] ?? 'Unknown Title',
+            'subtitle' => $info['subtitle'] ?? null,
+            'author' => $authorArray,
+            'publisher' => $info['publisher'] ?? null,
+            'publishedYear' => isset($info['publishedDate']) ? substr($info['publishedDate'], 0, 4) : null,
+            'description' => $info['description'] ?? null,
+            'pageCount' => $info['pageCount'] ?? null,
+            'category' => $categories,
+            'averageRating' => $info['averageRating'] ?? null,
+            'ratingsCount' => $info['ratingsCount'] ?? null,
+            'language' => $info['language'] ?? 'en',
+            'coverImageUrl' => $coverImageUrl,
+            'previewLink' => $info['previewLink'] ?? null,
+            'infoLink' => $info['infoLink'] ?? null,
+            'canonicalVolumeLink' => $info['canonicalVolumeLink'] ?? null,
+            'series' => $seriesName,
+            'seriesName' => $seriesName,
+            'seriesNumber' => $seriesNumber,
+            'isbn10' => $isbn10,
+            'isbn13' => $isbn13,
+        ];
+
+        // Convert all keys to camelCase
+        return $this->convertKeysToCamelCase($result);
+    }
+
+    /**
+     * Convert all keys in an array to camelCase.
+     *
+     * @param array $array The array with keys to convert
+     * @return array Array with camelCase keys
+     */
+    private function convertKeysToCamelCase(array $array): array
+    {
+        $camelCaseResult = [];
+        foreach ($array as $key => $value) {
+            // Convert snake_case to camelCase
+            $camelKey = preg_replace_callback('/_([a-z])/', function ($matches) {
+                return strtoupper($matches[1]);
+            }, $key);
+
+            $camelCaseResult[$camelKey] = $value;
+        }
+
+        return $camelCaseResult;
     }
 }

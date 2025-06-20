@@ -39,7 +39,20 @@ interface DocumentStoreServiceInterface
     public function createAuthor(array $data);
     public function listAuthors();
     public function deleteAuthor(string $id): void;
+    /**
+     * Search for authors by name
+     *
+     * @param string $term
+     * @return array
+     */
     public function searchAuthorsByName(string $term): array;
+    /**
+     * Search for narrators by name
+     *
+     * @param string $term
+     * @return array
+     */
+    public function searchNarratorsByName(string $term): array;
 
     // MESSAGES
     public function createMessage(array $messageData): ?string;

@@ -82,6 +82,99 @@ class AudibleService extends BaseBookService
         return 'Audible';
     }
 
+    /**
+     * Search for books with filtering and fallback logic
+     *
+     * @param string|null $title The title to search for
+     * @param string|null $author The author to filter by
+     * @param array $options Additional options for the search
+     * @return array The search results after filtering
+     */
+    public function searchBooksWithFiltering(?string $title, ?string $author = null, array $options = []): array
+    {
+        $this->log('AudibleService: searchBooksWithFiltering called', [
+            'title' => $title,
+            'author' => $author,
+            'options' => $options,
+        ]);
+
+        $limit = $options['limit'] ?? 10;
+        $results = [];
+
+        // Build the initial search query
+        if ($title) {
+            $query = $title;
+            $searchOptions = ['limit' => $limit];
+
+            // If we have an author, include it in the options
+            if ($author) {
+                $searchOptions['author'] = $author;
+                $this->log('AudibleService: Including author in search options', [
+                    'query' => $query,
+                    'author' => $author,
+                    'options' => $searchOptions,
+                ]);
+            }
+
+            $searchResults = $this->searchBooks($query, $searchOptions);
+
+            // If we have an author, filter the results to match the author more precisely
+            if ($author && $searchResults && is_array($searchResults)) {
+                $filteredResults = [];
+                foreach ($searchResults as $book) {
+                    // Check if the book's author contains our search author (case-insensitive)
+                    if (
+                        isset($book['author']) &&
+                        ((is_string($book['author']) && stripos($book['author'], $author) !== false) ||
+                            (is_array($book['author']) && $this->authorArrayContains($book['author'], $author)))
+                    ) {
+                        $filteredResults[] = $book;
+                    }
+                }
+
+                // If we found matches with the author filter, use those
+                if (!empty($filteredResults)) {
+                    $searchResults = $filteredResults;
+                }
+                // Otherwise, fall back to the original results (better than no results)
+            }
+
+            // If we still don't have results, try a different approach as a fallback
+            if (empty($searchResults) && $author) {
+                $this->log('AudibleService: First search returned no results, trying fallback search');
+                // Try a more general search with just the title but still pass author in options
+                $searchResults = $this->searchBooks($title, [
+                    'limit' => $limit,
+                    'author' => $author,
+                ]);
+            }
+
+            if ($searchResults && is_array($searchResults)) {
+                $results = $searchResults;
+            }
+        }
+
+        $this->log('AudibleService: searchBooksWithFiltering results: ' . count($results) . ' items');
+        return $results;
+    }
+
+    /**
+     * Helper method to check if an author name exists in an array of authors
+     *
+     * @param array $authorArray The array of authors to search in
+     * @param string $authorName The author name to search for
+     * @return bool Whether the author name exists in the array
+     */
+    protected function authorArrayContains(array $authorArray, string $authorName): bool
+    {
+        foreach ($authorArray as $author) {
+            if (stripos($author, $authorName) !== false) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     protected function performSearch(string $query, array $options = []): ?array
     {
         $this->log('AudibleService: performSearch called.', ['query' => $query, 'options' => $options]);
@@ -110,6 +203,10 @@ class AudibleService extends BaseBookService
         }
 
         $response = Http::timeout(15)->get($requestUrl, $params);
+        Log::debug(
+            'AudibleService: performSearch RAW REQUEST',
+            ['fullUrl' => $requestUrl . '?' . http_build_query($params)]
+        );
 
         $this->logDebug('AudibleService: performSearch RAW RESPONSE', [
             'body' => $response->body(),
@@ -220,7 +317,7 @@ class AudibleService extends BaseBookService
         }
     }
 
-    private function transform(array $book): array
+    public function transform(array $book): array
     {
         $authorsData = [];
         $narratorsData = [];
@@ -289,6 +386,8 @@ class AudibleService extends BaseBookService
 
         // Format series data as {seriesName: seriesNumber}
         $series = null;
+        $seriesName = '';
+        $seriesNumber = '';
         if (!empty($book['series']) && is_array($book['series']) && isset($book['series'][0])) {
             $firstSeries = $book['series'][0]; // Assuming the first series is the primary one
             $seriesName = $firstSeries['title'] ?? null;
@@ -310,21 +409,81 @@ class AudibleService extends BaseBookService
             $description = trim($description);
         }
 
-        return [
-            'source' => $this->getServiceName(),
-            'id' => $book['asin'] ?? null,
-            'title' => $book['title'] ?? null,
-            'audibleAuthors' => $audibleAuthors,
-            'audibleNarrators' => $audibleNarrators,
-            'narrator' => array_values($audibleNarrators),
-            'audibleCoverImageUrl' => $coverUrl,
-            'description' => $description,
-            'series' => $series,
-            'releaseDate' => $book['release_date'] ?? null,
-            'runtime' => isset($book['runtime_length_min']) ? round($book['runtime_length_min']) : null,
-            'publisher' => $book['publisher_name'] ?? null,
-            'language' => $book['language'] ?? null,
-        ];
+        // Ensure we have the source field
+        $result['source'] = $this->getServiceName();
+
+        // Set the title field
+        if (isset($book['title'])) {
+            $result['title'] = $book['title'];
+        }
+
+        // Keep the ID as 'id' instead of renaming to 'audibleId'
+        if (isset($book['asin'])) {
+            $result['id'] = $book['asin'];
+            // Remove the original asin field to avoid duplication
+            unset($result['asin']);
+        }
+
+        // Ensure we have a properly named cover image URL
+        $result['coverImageUrl'] = $coverUrl;
+        unset($result['image_url'], $result['audibleCoverImageUrl']);
+
+        // Ensure we have a properly formatted published year
+        if (isset($book['release_date'])) {
+            $result['publishedYear'] = substr($book['release_date'], 0, 4);
+            unset($result['release_date']);
+        }
+
+        // Format author array
+        if (!empty($audibleAuthors)) {
+            $result['author'] = array_values($audibleAuthors);
+        } else {
+            $result['author'] = [];
+        }
+
+        // Ensure narrators is properly formatted
+        $result['narrators'] = $narratorsList;
+
+        // Ensure series is properly formatted
+        $result['seriesName'] = $seriesName;
+        $result['seriesNumber'] = $seriesNumber;
+        $result['series'] = $seriesName; // For compatibility with Google Books format
+
+        // Use genre for category field if available
+        if (isset($book['genre'])) {
+            if (is_string($book['genre'])) {
+                $result['category'] = [$book['genre']];
+            } elseif (is_array($book['genre'])) {
+                $result['category'] = $book['genre'];
+            } else {
+                $result['category'] = [];
+            }
+        } elseif (isset($book['categories'])) {
+            $result['category'] = $book['categories'];
+        } else {
+            $result['category'] = [];
+        }
+
+        // Format publisher as an array
+        if (isset($book['publisher_name'])) {
+            if (is_string($book['publisher_name'])) {
+                $result['publisher'] = [$book['publisher_name']];
+            } elseif (is_array($book['publisher_name'])) {
+                $result['publisher'] = $book['publisher_name'];
+            } else {
+                $result['publisher'] = [];
+            }
+        } else {
+            $result['publisher'] = [];
+        }
+
+        // Add description if not already set
+        if (!isset($result['description'])) {
+            $result['description'] = $description;
+        }
+
+        // Convert all keys to camelCase for consistency
+        return $this->convertKeysToCamelCase($result);
     }
 
     /**
@@ -462,5 +621,26 @@ class AudibleService extends BaseBookService
         );
 
         return 'jpg';
+    }
+
+    /**
+     * Convert all keys in an array to camelCase.
+     *
+     * @param array $array The array with keys to convert
+     * @return array Array with camelCase keys
+     */
+    private function convertKeysToCamelCase(array $array): array
+    {
+        $camelCaseResult = [];
+        foreach ($array as $key => $value) {
+            // Convert snake_case to camelCase
+            $camelKey = preg_replace_callback('/_([a-z])/', function ($matches) {
+                return strtoupper($matches[1]);
+            }, $key);
+
+            $camelCaseResult[$camelKey] = $value;
+        }
+
+        return $camelCaseResult;
     }
 }

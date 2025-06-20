@@ -86,6 +86,40 @@
 
         </div>
         <div class="mb-3">
+            <label class="form-label">Narrators</label>
+            <div id="narrators-group">
+                @php
+                    $narrators = old('narrator') ?? ($book['narrator'] ?? null) ?? ($initial['narrator'] ?? []);
+                    if (!is_array($narrators))
+                        $narrators = [$narrators];
+                @endphp
+                @php $narratorsCount = count($narrators); @endphp
+                @foreach($narrators as $idx => $narrator)
+                    <div class="input-group narrator-row align-items-start mb-3">
+                        @php
+                            if ($narrator instanceof \MongoDB\Model\BSONArray) {
+                                $narrator = (array) $narrator;
+                            }
+                            if (is_array($narrator)) {
+                                $narrator = implode(', ', $narrator);
+                            }
+                        @endphp
+                        <input type="text" name="narrator[]" class="form-control w-auto narrator-autocomplete" style="max-width:300px; height:32px;"
+                            value="{{ $narrator }}">
+                        <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
+                            <button type="button" class="btn btn-outline-danger btn-sm remove-row p-0 mb-0"
+                                style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
+                            @if($idx === $narratorsCount - 1)
+                                <button type="button" class="btn btn-primary btn-sm add-narrator-row p-0 mt-1"
+                                    style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
+                            @endif
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+
+        </div>
+        <div class="mb-3">
             <label class="form-label">Series</label>
             <div id="series-group">
                 @php
@@ -343,9 +377,11 @@
             @enderror
         </div>
         <script>
-// [REMOVED] function initBookFormUI() - All dynamic row JS is now handled by window.initBookForm in form.js
+// Function to initialize book form UI elements
+function initBookFormUI() {
     // Restore add/remove buttons for authors
-    // [REMOVED] Inline add-author-row handler
+    // Handle add-author-row buttons
+    document.querySelectorAll('.add-author-row').forEach(btn => {
         btn.onclick = function() {
             const group = document.getElementById('authors-group');
             const idx = group.children.length;
@@ -360,14 +396,16 @@
             initBookFormUI();
         };
     });
-    // [REMOVED] Inline remove-author handler
+    // Handle remove-author buttons
+    document.querySelectorAll('.remove-author').forEach(btn => {
         btn.onclick = function() {
             const row = btn.closest('.author-row');
             if (row) row.remove();
         };
     });
     // Series
-    // [REMOVED] Inline add-series-row handler
+    // Handle add-series-row buttons
+    document.querySelectorAll('.add-series-row').forEach(btn => {
         btn.onclick = function() {
             const group = document.getElementById('series-group');
             const idx = group.children.length;
@@ -383,14 +421,16 @@
             initBookFormUI();
         };
     });
-    // [REMOVED] Inline remove-series handler
+    // Handle remove-series buttons
+    document.querySelectorAll('.remove-series').forEach(btn => {
         btn.onclick = function() {
             const row = btn.closest('.series-row');
             if (row) row.remove();
         };
     });
     // Genres
-    // [REMOVED] Inline add-genre-row handler
+    // Handle add-genre-row buttons
+    document.querySelectorAll('.add-genre-row').forEach(btn => {
         btn.onclick = function() {
             const group = document.getElementById('genres-group');
             const row = document.createElement('div');
@@ -404,7 +444,8 @@
             initBookFormUI();
         };
     });
-    // [REMOVED] Inline remove-genre handler
+    // Handle remove-genre buttons
+    document.querySelectorAll('.remove-genre').forEach(btn => {
         btn.onclick = function() {
             const row = btn.closest('.genre-row');
             if (row) row.remove();
@@ -415,7 +456,9 @@
     // You may need to re-attach your autocomplete plugin here if used
 }
 
-// [REMOVED] Inline DOMContentLoaded/initBookFormUI block. Use window.initBookForm from form.js only.
+// Initialize directory resync functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const resyncBtn = document.getElementById('resync-directory-btn');
     if (resyncBtn) {
         resyncBtn.addEventListener('click', function() {
             const path = document.getElementById('directoryPath').value;
@@ -497,23 +540,33 @@
     </form>
 </div>
 
-<script>
+@push('scripts')
+<script type="text/javascript">
+    // Define global route objects for book form
     window.BOOK_FORM_ROUTES = {
         index: "{{ route('admin.books.index') }}",
+        search: "{{ route('admin.books.search') }}",
         googleBooks: "{{ route('admin.books.googleBooks') }}",
+        audible: "{{ route('admin.books.audible') }}",
         filesAjax: "{{ route('admin.books.filesAjax') }}",
         authorsAutocomplete: "{{ route('admin.books.autocomplete.authors') }}",
         seriesAutocomplete: "{{ route('admin.books.autocomplete.series') }}",
+        narratorsAutocomplete: "{{ route('admin.books.autocomplete.narrators') }}"
     };
+
+    // Set other global variables
     window.APP_URL = "{{ config('app.url') }}";
     window.GENRE_OPTIONS = @json(config('genres.list', []));
-</script>
-<script>
-// Debug: Confirm jQuery and jQuery UI are loaded before form.js
-console.log('window.jQuery:', typeof window.jQuery, window.jQuery ? 'OK' : 'MISSING');
-console.log('$.fn.autocomplete:', typeof $.fn.autocomplete, $.fn.autocomplete ? 'OK' : 'MISSING');
+    window.AUDIBLE_SEARCH_URL = "{{ route('admin.books.audible') }}";
 
-// Always call initBookForm on DOM ready for this form
+    // Debug: Confirm jQuery and jQuery UI are loaded
+    console.log('window.jQuery:', typeof window.jQuery, window.jQuery ? 'OK' : 'MISSING');
+    console.log('$.fn.autocomplete:', typeof $.fn.autocomplete, $.fn.autocomplete ? 'OK' : 'MISSING');
+</script>
+
+{{-- Include form.js script --}}
+<script src="{{ asset('js/admin/books/form.js') }}"></script>
+<script type="text/javascript">
 $(function() {
     var formSelector = '#book-form';
     if (typeof window.initBookForm === 'function') {
@@ -524,8 +577,7 @@ $(function() {
     }
 });
 </script>
-<script src="{{ asset('js/admin/books/form.js') }}"></script>
-<script>
+<script type="text/javascript">
 document.addEventListener('DOMContentLoaded', function() {
     var autofillModal = document.getElementById('autofillModal');
     if (autofillModal) {
@@ -550,6 +602,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
+@endpush
 <!-- Raw JSON Edit Modal -->
 <div class="modal fade" id="rawJsonModal" tabindex="-1" aria-labelledby="rawJsonModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">

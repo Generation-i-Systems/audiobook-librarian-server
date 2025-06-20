@@ -175,6 +175,10 @@
         });
         $root.on('click', '#import-prefill-btn', function () {
             const $summary = $root.find('#import-metadata-summary');
+            const $btn = $(this);
+            const originalBtnText = $btn.html();
+
+            // Extract metadata from the summary
             let meta = {};
             $summary.find('li').each(function () {
                 let label = $(this).find('strong').text().replace(':', '').toLowerCase();
@@ -183,18 +187,102 @@
                     meta[label] = value;
                 }
             });
-            meta['import_path'] = $root.find('.list-group-item.active').data('name');
+
+            // Add import metadata
+            meta['import_path'] = currentPath ? currentPath + '/' + $root.find('.list-group-item.active').data('name') : $root.find('.list-group-item.active').data('name');
             meta['import_root'] = currentRoot;
             meta['import_type'] = $root.find('.list-group-item.active').data('type');
-            let params = Object.keys(meta)
-                .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(meta[k]))
-                .join('&');
-            let url = window.BOOK_FORM_ROUTES && window.BOOK_FORM_ROUTES.create ? window.BOOK_FORM_ROUTES.create : '/admin/books/create';
-            url += (url.indexOf('?') === -1 ? '?' : '&') + params;
-            console.debug('[ImportFile] Redirecting to:', url);
-            window.location.href = url;
+
+            // Process metadata for book creation
+            const bookData = {
+                title: meta.title || '',
+                description: meta.description || '',
+                import_path: meta.import_path,
+                import_root: meta.import_root,
+                import_type: meta.import_type
+            };
+
+            // Process author
+            if (meta.author) {
+                bookData.author = meta.author.split(/,\s*/);
+            } else {
+                bookData.author = ['Unknown'];
+            }
+
+            // Process genre
+            if (meta.genre) {
+                bookData.genre = meta.genre.split(/,\s*/);
+            } else {
+                bookData.genre = ['Uncategorized'];
+            }
+
+            // Process narrator
+            if (meta.narrator) {
+                bookData.narrator = meta.narrator.split(/,\s*/);
+            }
+
+            // Process series
+            if (meta.series) {
+                bookData.series = [{
+                    seriesName: meta.series,
+                    number: meta.seriesNumber || ''
+                }];
+            }
+
+            // Add additional metadata if available
+            if (meta.year) bookData.year = meta.year;
+            if (meta.publisher) bookData.publisher = meta.publisher;
+            if (meta.isbn) bookData.isbn = meta.isbn;
+            if (meta.language) bookData.language = meta.language;
+            if (meta.pages) bookData.pages = meta.pages;
+            if (meta.rating) bookData.rating = meta.rating;
+
+            // Check if we have a Google Books cover URL
+            const $gbCover = $summary.find('img[src*="books.google"]');
+            if ($gbCover.length) {
+                bookData.cover_url = $gbCover.attr('src');
+            }
+
+            console.debug('[ImportFile] Processing import with data:', bookData);
+
+            // Show loading state
+            $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...');
+
+            // Submit the import data
+            $.ajax({
+                url: '/admin/books/processImport',
+                type: 'POST',
+                data: bookData,
+                headers: {'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')},
+                success: function (response) {
+                    console.debug('[ImportFile] Import successful:', response);
+                    if (response.redirect) {
+                        // Show success message before redirecting
+                        $summary.html('<div class="alert alert-success">Book imported successfully! Redirecting to edit page...</div>');
+                        setTimeout(function() {
+                            window.location.href = response.redirect;
+                        }, 1000);
+                    } else {
+                        $summary.html('<div class="alert alert-success">Book imported successfully!</div>');
+                        $btn.prop('disabled', false).html(originalBtnText);
+                    }
+                },
+                error: function (xhr) {
+                    console.error('[ImportFile] Import failed:', xhr.responseText);
+                    let errorMsg = 'Import failed';
+                    try {
+                        const response = JSON.parse(xhr.responseText);
+                        errorMsg = response.message || errorMsg;
+                    } catch (e) {
+                        errorMsg += ': ' + xhr.statusText;
+                    }
+                    $summary.append('<div class="alert alert-danger mt-3">' + errorMsg + '</div>');
+                    $btn.prop('disabled', false).html(originalBtnText);
+                }
+            });
+        }
         });
         // Init
         loadRoots();
-    };
+    }
 })(jQuery);

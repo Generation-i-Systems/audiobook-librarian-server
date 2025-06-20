@@ -26,9 +26,15 @@ A Laravel-based audiobook library and management system for personal and family 
 - User authentication (API & web)
 - Dynamic add/remove for authors, series, genres
 - Directory resync for metadata
-- Modal-based Google Books autofill with AJAX search, selection, and UI update
+- Import-from-file feature for adding books directly from audio files
+  - Browser interface for selecting files/directories
+  - Automatic metadata extraction from audio files
+  - Cover image extraction and import
+  - One-click import with form pre-filling
+- Modal-based metadata autofill with AJAX search, selection, and UI update
+  - Google Books integration for book metadata
+  - Audible integration for audiobook-specific metadata including narrators
 - All JS logic is linted, syntax checked, and tested with Jest
-- Autofill modal logic is fully tested (see `tests/js/autofillModal.test.js`)
 - Autofill modal logic is fully tested (see `tests/js/autofillModal.test.js`)
 - Autofill modal JS changes include improved error handling and input validation
 - New Jest test added for autofill modal logic to ensure correct functionality
@@ -317,6 +323,10 @@ Creates a new admin user.
 - Dashboard for managing books, users, series, and genres
 - Run repair jobs from the web
 - View logs and system status
+- Import books directly from audio files
+  - Browse file system and select audio files/directories
+  - Extract metadata and cover images
+  - One-click import with form pre-filling
 
 ### User
 - Browse/search audiobooks

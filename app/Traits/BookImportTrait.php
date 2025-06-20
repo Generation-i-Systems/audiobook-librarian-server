@@ -579,10 +579,10 @@ trait BookImportTrait
             $score = 0;
             // Title similarity (Levenshtein, case-insensitive)
             $titleLev = 100 -
-            min(
-                levenshtein(mb_strtolower($title), mb_strtolower($itemTitle)),
-                100
-            );
+                min(
+                    levenshtein(mb_strtolower($title), mb_strtolower($itemTitle)),
+                    100
+                );
             $score += $titleLev;
             // Author similarity (Levenshtein, case-insensitive)
             $authorString = '';
@@ -599,10 +599,10 @@ trait BookImportTrait
                 $itemAuthorsString = $itemAuthors;
             }
             $authorLev = 100 -
-            min(
-                levenshtein(mb_strtolower($authorString), mb_strtolower($itemAuthorsString)),
-                100
-            );
+                min(
+                    levenshtein(mb_strtolower($authorString), mb_strtolower($itemAuthorsString)),
+                    100
+                );
             $score += $authorLev;
             // Series similarity
             if ($series && stripos($itemSeries, $series) !== false) {
@@ -736,9 +736,9 @@ trait BookImportTrait
             return [
                 'title' => $title,
                 'metadata' => [
-                        'needs_review' => false,
-                        'applied_corrections' => [],
-                    ],
+                    'needs_review' => false,
+                    'applied_corrections' => [],
+                ],
             ];
         }
 
@@ -761,10 +761,10 @@ trait BookImportTrait
         return [
             'title' => $title,
             'metadata' => [
-                    // 'needs_review' => $needsReview,
-                    'original_title' => $originalTitle,
-                    'applied_corrections' => $appliedCorrections,
-                ],
+                // 'needs_review' => $needsReview,
+                'original_title' => $originalTitle,
+                'applied_corrections' => $appliedCorrections,
+            ],
         ];
     }
 

@@ -61,6 +61,11 @@ class MongoService implements DocumentStoreServiceInterface
             foreach ($value as $k => $v) {
                 $value[$k] = $this->normalizeMongoValue($v);
             }
+        } elseif (is_array($value)) {
+            // Also normalize arrays that might contain BSONArray/BSONDocument objects
+            foreach ($value as $k => $v) {
+                $value[$k] = $this->normalizeMongoValue($v);
+            }
         }
         return $value;
     }
@@ -107,6 +112,10 @@ class MongoService implements DocumentStoreServiceInterface
         $cursor = $this->getCollection('books')->find(['author' => $author, 'genre' => $genre]);
         $books = [];
         foreach ($cursor as $doc) {
+            if ($doc instanceof \MongoDB\Model\BSONDocument) {
+                $doc = (array) $doc;
+            }
+            $doc = $this->normalizeMongoValue($doc);
             $doc['id'] = (string) $doc['_id'];
             $books[] = $doc;
         }
@@ -275,6 +284,10 @@ class MongoService implements DocumentStoreServiceInterface
         if (!$doc) {
             return null;
         }
+        if ($doc instanceof \MongoDB\Model\BSONDocument) {
+            $doc = (array) $doc;
+        }
+        $doc = $this->normalizeMongoValue($doc);
         $doc['id'] = (string) $doc['_id'];
         return $doc;
     }
@@ -293,6 +306,7 @@ class MongoService implements DocumentStoreServiceInterface
             if ($doc instanceof \MongoDB\Model\BSONDocument) {
                 $doc = (array) $doc;
             }
+            $doc = $this->normalizeMongoValue($doc);
             $doc['id'] = (string) $doc['_id'];
             $series[] = $doc;
         }
@@ -323,15 +337,59 @@ class MongoService implements DocumentStoreServiceInterface
     {
         $this->getCollection('authors')->deleteOne(['_id' => $id]);
     }
-    /** @inheritDoc */
+    /**
+     * @inheritDoc
+     * @uses \MongoDB\BSON\Regex
+     */
     public function searchAuthorsByName(string $term): array
     {
-        $regex = new Regex('^' . preg_quote($term), 'i');
+        /** @var \MongoDB\BSON\Regex $regex */
+        $regex = new \MongoDB\BSON\Regex('^' . preg_quote($term), 'i');
         $cursor = $this->getCollection('authors')->find(['name' => $regex]);
         $names = [];
         foreach ($cursor as $doc) {
+            if ($doc instanceof \MongoDB\Model\BSONDocument) {
+                $doc = (array) $doc;
+            }
             if (isset($doc['name'])) {
-                $names[] = $doc['name'];
+                $name = $doc['name'];
+                if ($name instanceof \MongoDB\Model\BSONArray) {
+                    $name = $this->normalizeMongoValue($name);
+                }
+                $names[] = $name;
+            }
+        }
+        return array_unique($names);
+    }
+
+    /**
+     * @inheritDoc
+     * @uses \MongoDB\BSON\Regex
+     */
+    public function searchNarratorsByName(string $term): array
+    {
+        /** @var \MongoDB\BSON\Regex $regex */
+        $regex = new \MongoDB\BSON\Regex('^' . preg_quote($term), 'i');
+        $cursor = $this->getCollection('books')->find(['narrator' => $regex]);
+        $names = [];
+        foreach ($cursor as $doc) {
+            if ($doc instanceof \MongoDB\Model\BSONDocument) {
+                $doc = (array) $doc;
+            }
+            $doc = $this->normalizeMongoValue($doc);
+
+            if (isset($doc['narrator'])) {
+                if (is_array($doc['narrator'])) {
+                    foreach ($doc['narrator'] as $narrator) {
+                        if (stripos($narrator, $term) === 0) {
+                            $names[] = $narrator;
+                        }
+                    }
+                } else {
+                    if (stripos($doc['narrator'], $term) === 0) {
+                        $names[] = $doc['narrator'];
+                    }
+                }
             }
         }
         return array_unique($names);
@@ -379,7 +437,11 @@ class MongoService implements DocumentStoreServiceInterface
         ];
         $result = $this->getCollection('series')->aggregate($pipeline)->toArray();
         if (isset($result[0]['uniqueKeys'])) {
-            return array_values($result[0]['uniqueKeys']);
+            $uniqueKeys = $result[0]['uniqueKeys'];
+            if ($uniqueKeys instanceof \MongoDB\Model\BSONArray) {
+                $uniqueKeys = $this->normalizeMongoValue($uniqueKeys);
+            }
+            return array_values($uniqueKeys);
         }
         return [];
     }

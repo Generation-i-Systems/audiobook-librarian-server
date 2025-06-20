@@ -32,7 +32,7 @@ if (app()->environment('local')) {
 
 Route::get('/', function () {
     if (Auth::check()) {
-        return redirect()->route('books.index')->with('status', 'Welcome to your audiobook library!');
+        return redirect()->route('books.index')->with('status', 'Welcome to Audiobook Librarian!');
     }
 
     return view('welcome');
@@ -51,7 +51,7 @@ Route::get(
 );
 
 Route::get('/home', function () {
-    return redirect()->route('books.index')->with('status', 'Welcome to your audiobook library!');
+    return redirect()->route('books.index')->with('status', 'Welcome to Audiobook Librarian!');
 })->name('home');
 
 Route::middleware(['auth'])->group(function () {
@@ -129,7 +129,12 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     )->name('users.updateRole');
     Route::get('/books/import', [Admin\BookController::class, 'import'])->name('books.import');
     Route::get('/books/import-file', [Admin\BookController::class, 'importFile'])->name('books.importFile');
+    // Unified search endpoint for all book APIs
+    Route::get('/books/search', action: [Admin\BookController::class, 'searchBooks'])->name('books.search');
+
+    // Legacy endpoints (deprecated)
     Route::get('/books/googleBooks', action: [Admin\BookController::class, 'googleBooks'])->name('books.googleBooks');
+    Route::get('/books/audible', action: [Admin\BookController::class, 'audible'])->name('books.audible');
 
     // AJAX endpoints for Tom Select
     Route::get('/authors/ajax', [Admin\AuthorController::class, 'ajax'])->name('authors.ajax');
@@ -158,6 +163,11 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         Admin\BookController::class,
         'autocompleteSeries',
     ])->name('books.autocomplete.series');
+
+    Route::get('/books/autocomplete/narrators', [
+        Admin\BookController::class,
+        'autocompleteNarrators',
+    ])->name('books.autocomplete.narrators');
 
     Route::resource('account_requests', Admin\AccountRequestController::class);
     Route::get('/books/import-from-title', [

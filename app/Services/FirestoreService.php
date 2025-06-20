@@ -871,6 +871,47 @@ class FirestoreService implements DocumentStoreServiceInterface
         return $matches;
     }
 
+    /**
+     * Search for narrator names starting with a given term.
+     *
+     * @param  string  $term  The search term.
+     * @return array A list of unique narrator names.
+     */
+    public function searchNarratorsByName(string $term): array
+    {
+        if (empty($term)) {
+            return [];
+        }
+        $termLower = strtolower($term);
+        $matches = [];
+
+        // Get all books and extract unique narrators
+        if ($this->db) {
+            $booksRef = $this->db->collection('books');
+            $query = $booksRef->limit(100); // Limit to prevent excessive reads
+            $snapshot = $query->documents();
+
+            foreach ($snapshot as $document) {
+                $book = $document->data();
+                if (isset($book['narrator'])) {
+                    if (is_array($book['narrator'])) {
+                        foreach ($book['narrator'] as $narrator) {
+                            if (stripos($narrator, $termLower) === 0) {
+                                $matches[] = $narrator;
+                            }
+                        }
+                    } else {
+                        if (stripos($book['narrator'], $termLower) === 0) {
+                            $matches[] = $book['narrator'];
+                        }
+                    }
+                }
+            }
+        }
+
+        return array_unique($matches);
+    }
+
     public function updateAuthor(string $id, array $data): void
     {
         $this->db->collection('authors')->document($id)->set($data, ['merge' => true]);

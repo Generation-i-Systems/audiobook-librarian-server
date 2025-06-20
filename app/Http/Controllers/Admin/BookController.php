@@ -2,19 +2,32 @@
 
 namespace App\Http\Controllers\Admin;
 
-use Illuminate\Support\Facades\Storage;
+use App\Contracts\DocumentStoreServiceInterface;
 use App\Events\NewBookAdded;
 use App\Http\Controllers\Controller;
-use App\Contracts\DocumentStoreServiceInterface;
+use App\Services\AudibleService;
 use App\Services\GoogleBooksApiService;
 use App\Traits\BookImportTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use ZipArchive;
 
 class BookController extends Controller
 {
     use BookImportTrait;
+
+    /**
+     * Set the document store service (for testing)
+     *
+     * @param  \App\Contracts\DocumentStoreServiceInterface  $service
+     * @return void
+     */
+    public function setDocumentStoreService($service)
+    {
+        $this->documentStoreService = $service;
+    }
 
     /**
      * AJAX: Resync title, author, and series from a directory path.
@@ -64,9 +77,6 @@ class BookController extends Controller
         }
     }
 
-
-
-
     private $storagePath;
 
     /**
@@ -74,13 +84,16 @@ class BookController extends Controller
      */
     protected DocumentStoreServiceInterface $documentStoreService;
 
+    protected AudibleService $audibleService;
 
     public function __construct(
         DocumentStoreServiceInterface $documentStoreService,
-        GoogleBooksApiService $googleBooksApiService
+        GoogleBooksApiService $googleBooksApiService,
+        AudibleService $audibleService
     ) {
         $this->documentStoreService = $documentStoreService;
         $this->setGoogleBooksApiService($googleBooksApiService);
+        $this->audibleService = $audibleService;
         $this->storagePath = env('BOOK_STORAGE_PATH');
     }
 
@@ -282,6 +295,7 @@ class BookController extends Controller
                 return is_array($a) ? implode(', ', $a) : (string) $a;
             }, $initial['author']);
         }
+
         return view(
             'admin.books.create_form',
             compact(
@@ -312,6 +326,137 @@ class BookController extends Controller
     }
 
     /**
+     * Process the import of a book from file/audio.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse|\
+     */
+    public function processImport(Request $request)
+    {
+        Log::info('Book import processing started', ['request_data' => $request->except(['cover', 'coverImage'])]);
+
+        try {
+            // Validate the request data
+            $validated = $request->validate([
+                'title' => 'required|string|max:255',
+                'author' => 'required|array',
+                'author.*' => 'required|string|max:255',
+                'genre' => 'required|array',
+                'genre.*' => 'required|string|max:255',
+                'narrator' => 'nullable|array',
+                'narrator.*' => 'nullable|string|max:255',
+                'series' => 'nullable|array',
+                'series.*.seriesName' => 'nullable|string|max:255',
+                'series.*.name' => 'nullable|string|max:255', // For backward compatibility
+                'series.*.number' => 'nullable|string|max:50',
+                'import_path' => 'nullable|string',
+                'import_root' => 'nullable|string',
+                'import_type' => 'nullable|string',
+                'cover_url' => 'nullable|url',
+                'description' => 'nullable|string',
+                'year' => 'nullable|string|max:4',
+                'publisher' => 'nullable|string|max:255',
+                'isbn' => 'nullable|string|max:20',
+                'language' => 'nullable|string|max:50',
+                'pages' => 'nullable|integer',
+                'rating' => 'nullable|numeric|min:0|max:5',
+            ]);
+
+            $id = (string) Str::uuid();
+            $validated['id'] = $id;
+
+            // Handle empty arrays
+            if (empty($validated['author'])) {
+                $validated['author'] = ['Unknown'];
+            }
+            if (empty($validated['genre'])) {
+                $validated['genre'] = ['Uncategorized'];
+            }
+
+            // Handle cover image from URL if provided
+            if (!empty($validated['cover_url'])) {
+                Log::debug('Processing cover image from URL', ['url' => $validated['cover_url']]);
+                try {
+                    $coverPath = $this->importCoverImageFromUrl($validated['cover_url']);
+                    if ($coverPath) {
+                        $validated['cover'] = $coverPath;
+                        Log::debug('Cover image imported successfully', ['path' => $coverPath]);
+                    }
+                } catch (\Exception $e) {
+                    Log::warning('Failed to import cover image from URL', [
+                        'url' => $validated['cover_url'],
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+                // Remove the cover_url from validated data as it's not stored in the document
+                unset($validated['cover_url']);
+            }
+
+            // Process series data - ensure we use seriesName instead of name
+            if (!empty($validated['series'])) {
+                Log::debug('Processing series data', ['series' => $validated['series']]);
+                $seriesData = [];
+                foreach ($validated['series'] as $series) {
+                    $seriesName = $series['seriesName'] ?? $series['name'] ?? null;
+                    $seriesNumber = $series['number'] ?? '';
+                    if (!empty($seriesName)) {
+                        // Normalize the series name
+                        $seriesName = $this->normalizeSeriesName($seriesName);
+                        $seriesData[] = [
+                            'seriesName' => $seriesName,
+                            'number' => $seriesNumber,
+                        ];
+                    }
+                }
+                $validated['series'] = $seriesData;
+                Log::debug('Processed series data', ['processed_series' => $validated['series']]);
+            }
+
+            // Add import metadata if available
+            if (!empty($validated['import_path']) && !empty($validated['import_root'])) {
+                $validated['import_metadata'] = [
+                    'path' => $validated['import_path'],
+                    'root' => $validated['import_root'],
+                    'type' => $validated['import_type'] ?? 'file',
+                    'imported_at' => now()->toISOString(),
+                ];
+                // Remove these fields as they're not stored directly in the document
+                unset($validated['import_path'], $validated['import_root'], $validated['import_type']);
+            }
+
+            // Create the book in the document store
+            $this->documentStoreService->createBook($validated);
+            Log::info('Book imported successfully', ['id' => $id]);
+
+            // Fire the NewBookAdded event
+            event(new NewBookAdded(['id' => $id, 'title' => $validated['title']]));
+
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Book imported successfully',
+                    'id' => $id,
+                    'redirect' => route('admin.books.edit', $id),
+                ]);
+            }
+
+            return redirect()->route('admin.books.edit', $id)
+                ->with('success', 'Book imported successfully.');
+        } catch (\Exception $e) {
+            Log::error('Book import failed', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Import failed: ' . $e->getMessage(),
+                ], 422);
+            }
+
+            return back()->withErrors(['error' => 'Import failed: ' . $e->getMessage()])->withInput();
+        }
+    }
+
+    /**
      * Display the specified book.
      *
      * @param  string  $id
@@ -324,6 +469,7 @@ class BookController extends Controller
         if (!$book) {
             abort(404, 'Book not found');
         }
+
         return view('admin.books.show', ['book' => $book]);
     }
 
@@ -393,6 +539,7 @@ class BookController extends Controller
         if (!is_array($genres)) {
             $genres = [$genres];
         }
+
         return view('admin.books.edit', [
             'book' => $book,
             'genreList' => $genreList,
@@ -405,9 +552,154 @@ class BookController extends Controller
     }
 
     /**
+     * Store a newly created book in storage.
+     *
+     * @return \Illuminate\Http\Response|\Illuminate\Http\RedirectResponse
+     */
+    public function store(Request $request)
+    {
+        Log::info('Book creation started', ['request_data' => $request->except(['cover', 'coverImage'])]);
+
+        try {
+            Log::debug('Validating book creation request', ['request_data' => $request->all()]);
+
+            $validated = $request->validate([
+                'title' => 'required|string|max:255',
+                'author' => 'required|array',
+                'author.*' => 'required|string|max:255',
+                'genre' => 'required|array',
+                'genre.*' => 'required|string|max:255',
+                'narrator' => 'nullable|array',
+                'narrator.*' => 'nullable|string|max:255',
+                'series' => 'nullable|array',
+                'series.*.seriesName' => 'nullable|string|max:255',
+                'series.*.name' => 'nullable|string|max:255', // For backward compatibility
+                'series.*.number' => 'nullable|string|max:50',
+                'description' => 'nullable|string',
+                'publishedYear' => 'nullable|integer|min:1000|max:' . (date('Y') + 10),
+                'directoryPath' => 'nullable|string',
+                'duration' => 'nullable|string|max:50',
+                'coverImage' => 'nullable|string',
+                'cover' => 'nullable|image|max:5120',
+                'language' => 'nullable|string|max:50',
+                'publisher' => 'nullable|string|max:255',
+                'isbn' => 'nullable|string|max:50',
+                'asin' => 'nullable|string|max:50',
+                'googleBooksId' => 'nullable|string|max:50',
+                'goodreadsId' => 'nullable|string|max:50',
+            ]);
+
+            // Generate a unique ID for the new book
+            $id = (string) Str::uuid();
+            $validated['id'] = $id;
+
+            // Handle empty arrays
+            if (empty($validated['author'])) {
+                $validated['author'] = ['Unknown'];
+            }
+
+            if (empty($validated['genre'])) {
+                $validated['genre'] = ['Uncategorized'];
+            }
+
+            // Handle cover image upload
+            if ($request->hasFile('cover')) {
+                Log::info('Processing cover image upload');
+                $file = $request->file('cover');
+                $directoryPath = $validated['directoryPath'] ?? 'uploads/' . date('Y-m-d');
+
+                // Get storage path from environment or use default
+                $storageBasePath = env('BOOK_STORAGE_PATH');
+
+                if (!empty($storageBasePath)) {
+                    // Ensure directory exists if we have a storage path
+                    $fullDirectoryPath = rtrim($storageBasePath, '/') . '/' . ltrim($directoryPath, '/');
+                    if (!is_dir($fullDirectoryPath)) {
+                        mkdir($fullDirectoryPath, 0755, true);
+                    }
+                } else {
+                    Log::warning('BOOK_STORAGE_PATH environment variable not set, using default storage');
+                }
+
+                $coverName = 'cover.' . $file->getClientOriginalExtension();
+                $file->storeAs($directoryPath, $coverName, 'books');
+                $validated['coverImage'] = $coverName;
+                Log::info('Cover image saved', ['path' => $directoryPath . '/' . $coverName]);
+            } elseif ($request->input('coverImageUrl')) {
+                // Handle external cover image URL
+                $coverUrl = $request->input('coverImageUrl');
+                $validated['coverImage'] = $coverUrl;
+                Log::info('Using external cover image URL', ['url' => $coverUrl]);
+            }
+
+            // Process series data - ensure we use seriesName instead of name
+            if (!empty($validated['series'])) {
+                Log::debug('Processing series data', ['series' => $validated['series']]);
+                $seriesData = [];
+                foreach ($validated['series'] as $series) {
+                    // Check if we have seriesName (new format) or name (old format)
+                    $seriesName = $series['seriesName'] ?? $series['name'] ?? null;
+                    $seriesNumber = $series['number'] ?? '';
+
+                    if (!empty($seriesName)) {
+                        // Create properly structured series entry with seriesName field
+                        $seriesData[] = [
+                            'seriesName' => $seriesName,
+                            'number' => $seriesNumber,
+                        ];
+                    }
+                }
+                $validated['series'] = $seriesData;
+                Log::debug('Processed series data', ['processed_series' => $validated['series']]);
+            }
+
+            // Create the book
+            $documentStore = $this->documentStoreService;
+            $documentStore->createBook($validated);
+            Log::info('Book created successfully', ['id' => $id]);
+
+            // Fire event for any listeners
+            event(new NewBookAdded(['id' => $id, 'title' => $validated['title']]));
+
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Book created successfully',
+                    'id' => $id,
+                    'redirect_url' => route('admin.books.edit', ['book' => $id]),
+                ]);
+            }
+
+            return redirect()->route('admin.books.edit', ['book' => $id])
+                ->with('success', 'Book created successfully.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::warning('Book creation validation failed', [
+                'errors' => $e->errors(),
+            ]);
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('Book creation failed', [
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            if ($request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to create book: ' . $e->getMessage(),
+                ], 500);
+            }
+
+            return redirect()->back()
+                ->withInput()
+                ->withErrors(['error' => 'Failed to create book: ' . $e->getMessage()]);
+        }
+    }
+
+    /**
      * Update the specified book in storage.
      *
-     * @param  \Illuminate\Http\Request  $request
      * @param  string  $id
      * @return \Illuminate\Http\RedirectResponse
      */
@@ -518,6 +810,7 @@ class BookController extends Controller
         }
 
         $documentStore->updateBook($id, $validated);
+
         return redirect()->route('admin.books.index')->with('success', 'Book updated successfully.');
     }
 
@@ -571,6 +864,13 @@ class BookController extends Controller
             ->deleteFileAfterSend(true); // Delete the temp zip file after sending.
     }
 
+    /**
+     * Search Google Books for books matching the given criteria.
+     *
+     * @deprecated Use searchBooks with source=googlebooks instead
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function googleBooks(Request $request)
     {
         $title = $request->query('title');
@@ -583,22 +883,342 @@ class BookController extends Controller
             ], 400);
         }
 
-        $more = $request->query('more');
         $limit = min((int) $request->query('limit', 10), 40); // Default 10, max 40
 
-        Log::info('googleBooks called ' . $title . ' ' . $author . ' ' . $series . ' ' . $seriesNumber);
-        // Use trait method for similarity and formatting
-        $results = $this->searchGoogleBooksWithSimilarity(
-            $title,
-            $author,
-            $series,
-            $seriesNumber,
-            (bool) $more,
-            $limit
-        );
-        Log::info('googleBooks results: ' . count($results) . ' items');
+        Log::info('googleBooks search called', [
+            'title' => $title,
+            'author' => $author,
+            'series' => $series,
+            'seriesNumber' => $seriesNumber,
+        ]);
 
-        return response()->json(array_values($results));
+        try {
+            // Build the search query
+            // Ensure we're properly formatting the author query parameter
+            $authorQuery = '';
+            if (!empty($author)) {
+                // Properly format author name for the API query
+                $authorQuery = " inauthor:\"{$author}\"";
+                Log::debug('Adding author to Google Books query', ['author' => $author, 'authorQuery' => $authorQuery]);
+            }
+            $query = trim("intitle:\"{$title}\"" . $authorQuery);
+            Log::debug('Google Books search query', ['query' => $query]);
+
+            // Search Google Books API
+            $results = $this->googleBooksApiService->searchBooks($query, ['limit' => $limit]);
+
+            Log::info('googleBooks search results', ['count' => count($results)]);
+
+            return response()->json($results);
+        } catch (\Exception $e) {
+            Log::error('googleBooks search failed', [
+                'error' => $e->getMessage(),
+                'title' => $title,
+                'author' => $author,
+            ]);
+
+            return response()->json([
+                'error' => 'Google Books search failed: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    // authorArrayContains method moved to AudibleService
+
+    /**
+     * Unified search endpoint for all book APIs (Audible, Google Books, etc.)
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function searchBooks(Request $request)
+    {
+        $title = $request->query('title');
+        $author = $request->query('author', '');
+        $apiId = $request->query('api_id', '');
+        $source = $request->query('source', 'audible'); // Default to audible if not specified
+        $series = $request->query('series', '');
+        $seriesNumber = $request->query('seriesNumber', '');
+        $limit = min((int) $request->query('limit', 10), 40); // Default 10, max 40
+
+        // Debug all request parameters
+        Log::debug('Book search request parameters', [
+            'all_params' => $request->all(),
+            'query_params' => $request->query(),
+            'title' => $title,
+            'author' => $author,
+            'author_type' => gettype($author),
+            'author_empty' => empty($author),
+            'api_id' => $apiId,
+            'source' => $source,
+        ]);
+
+        // Validate required parameters
+        if (!$title && !$apiId) {
+            return response()->json([
+                'error' => 'Title or API ID is required.',
+            ], 400);
+        }
+
+        Log::info('book search called', [
+            'source' => $source,
+            'title' => $title,
+            'author' => $author,
+            'api_id' => $apiId,
+            'series' => $series,
+            'seriesNumber' => $seriesNumber,
+        ]);
+
+        try {
+            $results = [];
+
+            switch (strtolower($source)) {
+                case 'audible':
+                    if ($apiId) {
+                        $bookDetails = $this->audibleService->getBookDetails($apiId);
+                        if ($bookDetails) {
+                            $results[] = $bookDetails; // Already transformed by the service
+                        }
+                    } else {
+                        // Debug Audible search parameters
+                        Log::debug('Audible search parameters', [
+                            'title' => $title,
+                            'author' => $author,
+                            'author_empty' => empty($author),
+                            'limit' => $limit,
+                        ]);
+
+                        // Make sure author is properly handled
+                        $authorParam = !empty($author) ? $author : null;
+
+                        $results = $this->audibleService->searchBooksWithFiltering($title, $authorParam, [
+                            'limit' => $limit,
+                        ]);
+                    }
+                    break;
+
+                case 'googlebooks':
+                    // Build the search query for Google Books
+                    // Ensure we're properly formatting the author query parameter
+                    $authorQuery = '';
+                    if (!empty($author)) {
+                        // Properly format author name for the API query with quotes
+                        $authorQuery = " inauthor:\"{$author}\"";
+                        Log::debug('Adding author to Google Books query', [
+                            'author' => $author,
+                            'authorQuery' => $authorQuery,
+                            'author_empty' => empty($author)
+                        ]);
+                    }
+
+                    // Ensure title is properly quoted
+                    $titleQuery = !empty($title) ? "intitle:\"{$title}\"" : '';
+                    $query = trim($titleQuery . $authorQuery);
+
+                    Log::debug('Google Books search query', ['query' => $query]);
+                    $results = $this->googleBooksApiService->searchBooks($query, ['limit' => $limit]);
+                    break;
+
+                default:
+                    return response()->json([
+                        'error' => 'Invalid source specified. Supported sources: audible, googlebooks',
+                    ], 400);
+            }
+
+            Log::info($source . ' search results: ' . count($results) . ' items');
+
+            return response()->json($results);
+        } catch (\Exception $e) {
+            Log::error($source . ' search failed: ' . $e->getMessage(), [
+                'exception' => $e,
+                'source' => $source,
+                'title' => $title,
+                'author' => $author,
+                'api_id' => $apiId,
+            ]);
+
+            return response()->json([
+                'error' => ucfirst($source) . ' search failed: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Search Audible for books matching the given criteria.
+     *
+     * @deprecated Use searchBooks with source=audible instead
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function audible(Request $request)
+    {
+        $title = $request->query('title');
+        $author = $request->query('author', '');
+        $apiId = $request->query('api_id', '');
+
+        if (!$title && !$apiId) {
+            return response()->json([
+                'error' => 'Title or ASIN is required.',
+            ], 400);
+        }
+
+        $limit = min((int) $request->query('limit', 10), 40); // Default 10, max 40
+
+        Log::info('audible search called', [
+            'title' => $title,
+            'author' => $author,
+            'api_id' => $apiId,
+        ]);
+
+        try {
+            $results = [];
+
+            // If ASIN is provided, get specific book details
+            if ($apiId) {
+                $bookDetails = $this->audibleService->getBookDetails($apiId);
+                if ($bookDetails) {
+                    $results[] = $bookDetails; // Already transformed by the service
+                }
+            } else {
+                // Otherwise search by title/author using the service method that handles filtering and fallback
+                $results = $this->audibleService->searchBooksWithFiltering($title, $author, [
+                    'limit' => $limit,
+                ]);
+            }
+
+            Log::info('audible search results: ' . count($results) . ' items');
+
+            return response()->json($results);
+        } catch (\Exception $e) {
+            Log::error('audible search failed: ' . $e->getMessage(), [
+                'exception' => $e,
+                'title' => $title,
+                'author' => $author,
+                'api_id' => $apiId,
+            ]);
+
+            return response()->json([
+                'error' => 'Audible search failed: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Format Audible API result for the frontend.
+     *
+     * @param  array  $book  The book data from Audible API
+     * @return array Formatted book data
+     */
+    protected function formatAudibleResult(array $book): array
+    {
+        // Start with the original data
+        $result = $book;
+
+        // Ensure we have the source field
+        $result['source'] = 'Audible';
+
+        // Keep the ID as 'id' instead of renaming to 'audibleId'
+        if (isset($book['asin'])) {
+            $result['id'] = $book['asin'];
+            // Remove the original asin field to avoid duplication
+            unset($result['asin']);
+        }
+
+        // Ensure we have a properly named cover image URL
+        if (isset($book['image_url'])) {
+            $result['audibleCoverImageUrl'] = $book['image_url'];
+            unset($result['image_url']);
+        }
+
+        // Ensure we have a properly formatted published year
+
+        // Use audibleAuthors field for author if available
+        if (isset($book['audibleAuthors'])) {
+            if (is_string($book['audibleAuthors'])) {
+                $result['author'] = [$book['audibleAuthors']];
+            } elseif (is_array($book['audibleAuthors'])) {
+                $result['author'] = $book['audibleAuthors'];
+            } else {
+                $result['author'] = [];
+            }
+        } elseif (isset($book['author'])) {
+            // Fall back to author field if audibleAuthors is not available
+            if (is_string($book['author'])) {
+                $result['author'] = [$book['author']];
+            } elseif (is_array($book['author'])) {
+                $result['author'] = $book['author'];
+            } else {
+                $result['author'] = [];
+            }
+        } else {
+            $result['author'] = [];
+        }
+
+        // Ensure narrator is properly formatted
+        if (isset($book['narrator'])) {
+            if (is_array($book['narrator'])) {
+                $result['narratorList'] = $book['narrator'];
+            } elseif (is_string($book['narrator'])) {
+                $result['narratorList'] = [$book['narrator']];
+            } elseif (is_string($book['narrator'])) {
+                $result['narratorList'] = [$book['narrator']];
+            } else {
+                $result['narratorList'] = [];
+            }
+        } else {
+            $result['narratorList'] = [];
+        }
+
+        // Ensure series is properly formatted
+        if (isset($book['series']) && is_array($book['series'])) {
+            $seriesNames = array_keys($book['series']);
+            if (!empty($seriesNames)) {
+                $seriesName = $seriesNames[0];
+                $seriesNumber = $book['series'][$seriesName] ?? '';
+                $result['seriesName'] = $seriesName;
+                $result['seriesNumber'] = $seriesNumber;
+                $result['series'] = $seriesName; // For compatibility with Google Books format
+            }
+        } else {
+            $result['seriesName'] = '';
+            $result['seriesNumber'] = '';
+            $result['series'] = '';
+        }
+
+        // Add category field if missing
+        if (!isset($result['category'])) {
+            $result['category'] = isset($book['categories']) ? $book['categories'] : [];
+        }
+
+        // Format publisher as an array
+        if (isset($book['publisher'])) {
+            if (is_string($book['publisher'])) {
+                $result['publisher'] = [$book['publisher']];
+            } elseif (is_array($book['publisher'])) {
+                $result['publisher'] = $book['publisher'];
+            } else {
+                $result['publisher'] = [];
+            }
+        } else {
+            $result['publisher'] = [];
+        }
+
+        // Add any other missing fields that Google Books has
+        if (!isset($result['description'])) {
+            $result['description'] = $book['summary'] ?? '';
+        }
+
+        // Convert all keys to camelCase for consistency with Google Books
+        $camelCaseResult = [];
+        foreach ($result as $key => $value) {
+            // Convert snake_case to camelCase
+            $camelKey = preg_replace_callback('/_([a-z])/', function ($matches) {
+                return strtoupper($matches[1]);
+            }, $key);
+
+            $camelCaseResult[$camelKey] = $value;
+        }
+
+        return $camelCaseResult;
     }
 
     /**
@@ -762,6 +1382,20 @@ class BookController extends Controller
     }
 
     /**
+     * Provides autocomplete suggestions for narrator names.
+     */
+    public function autocompleteNarrators(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $term = $request->input('term', '');
+        if (empty($term)) {
+            return response()->json([]);
+        }
+        $narrators = $this->documentStoreService->searchNarratorsByName($term);
+
+        return response()->json($narrators);
+    }
+
+    /**
      * Get the raw JSON data for a book from $documentStore
      *
      * @param  string  $id  The book ID
@@ -780,8 +1414,8 @@ class BookController extends Controller
 
     /**
      * Save raw JSON for a book (admin only).
-     * @param string $id
-     * @param Request $request
+     *
+     * @param  string  $id
      * @return \Illuminate\Http\JsonResponse
      */
     public function saveRawJson($id, Request $request)
