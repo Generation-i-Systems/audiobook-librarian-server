@@ -614,17 +614,26 @@ window.initBookForm = function (formContainerSelector) {
         .on('click', '#autofill-modal-btn', function (e) {
             e.preventDefault();
             console.log('[DEBUG] Autofill modal button clicked');
+            let bootstrapRef = null;
             if (typeof bootstrap !== 'undefined') {
+                bootstrapRef = bootstrap;
+            } else if (typeof window !== 'undefined' && typeof window.bootstrap !== 'undefined') {
+                bootstrapRef = window.bootstrap;
+            } else {
+                try {
+                    bootstrapRef = require('bootstrap');
+                } catch (e) {
+                    bootstrapRef = null;
+                }
+            }
+            if (bootstrapRef && typeof bootstrapRef.Modal !== 'undefined') {
                 var modalEl = document.getElementById('autofillModal');
                 if (modalEl) {
-                    var bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                    var bsModal = bootstrapRef.Modal.getOrCreateInstance(modalEl);
                     bsModal.show();
-                    console.log('[DEBUG] Showing autofill modal');
                 } else {
                     console.error('[DEBUG] #autofillModal element not found');
                 }
-            } else {
-                console.error('[DEBUG] Bootstrap JS not loaded');
             }
         });
 };

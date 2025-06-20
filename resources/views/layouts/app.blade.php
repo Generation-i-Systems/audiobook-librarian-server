@@ -25,6 +25,16 @@
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="{{ asset('images/favicon.png') }}" />
 
+    <!-- Bootstrap 5 CSS/JS restored for dropdowns, modals, and all Bootstrap-dependent features -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        crossorigin="anonymous">
+
+    <!-- jQuery UI override: ensure autocomplete dropdown is above Bootstrap elements -->
+    <link rel="stylesheet" href="/css/jquery-ui-overrides.css">
+
+    <!-- Bootstrap dropdown fix: ensure dropdown-menu is above navbar and other elements -->
+    <link rel="stylesheet" href="/css/bootstrap-dropdown-zfix.css">
+
     <!-- Scripts -->
     @vite(['resources/sass/app.scss', 'resources/js/app.js'])
 
@@ -34,7 +44,12 @@
     <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
     <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
 
-
+    <!-- Popper.js must be loaded globally before Bootstrap 5 JS for dropdowns to work -->
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"
+        crossorigin="anonymous"></script>
+    <!-- Bootstrap 5 JS (must be after jQuery if both are used, but before custom scripts) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+        crossorigin="anonymous"></script>
 
     @stack('styles')
 </head>
@@ -128,8 +143,9 @@
                                         @endif
                                     @endif
 
-                                    <a class="dropdown-item" href="{{ route('logout') }}" onclick="event.preventDefault();
-                                                                         document.getElementById('logout-form').submit();">
+                                    <a class="dropdown-item" href="{{ route('logout') }}"
+                                        onclick="event.preventDefault();
+                                                                                         document.getElementById('logout-form').submit();">
                                         {{ __('Logout') }}
                                     </a>
 
@@ -158,6 +174,33 @@
     </div>
     <script src="{{ asset('js/global-ajax-auth.js') }}"></script>
     @stack('scripts')
+
+    <!-- Force re-initialize Bootstrap dropdowns after DOM ready to fix event delegation conflicts -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            document.querySelectorAll('[data-bs-toggle="dropdown"]').forEach(function (el) {
+                bootstrap.Dropdown.getOrCreateInstance(el);
+            });
+        });
+    </script>
+    <!-- Diagnostic test button to force open dropdown -->
+
+    <!-- Patch for Bootstrap 5 dropdown vs. jQuery UI autocomplete conflicts -->
+    <script>
+        // Ensure autocomplete popup is always above dropdowns
+        $(document).on('autocompleteopen', function () {
+            setTimeout(function () {
+                $('.ui-autocomplete').css('z-index', 2000);
+            }, 10);
+        });
+        // Prevent clicking inside autocomplete from closing dropdown
+        $(document).on('mousedown', '.ui-autocomplete', function (e) {
+            e.stopPropagation();
+        });
+    </script>
+
+
+
 </body>
 
 </html>
