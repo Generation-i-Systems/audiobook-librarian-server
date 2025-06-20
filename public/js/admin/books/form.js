@@ -67,14 +67,15 @@ function addNarratorRow($container, narratorName = "") {
     div.className = "input-group narrator-row align-items-start mb-3";
     div.innerHTML = `
         <input type="text" name="narrator[]" class="form-control w-auto narrator-autocomplete" value="${narratorName}" style="max-width:300px; height:32px;">
-        <div class="input-group-append">
-            <button type="button" class="btn btn-sm btn-outline-danger remove-row" title="Remove Narrator">
-                <i class="fas fa-times"></i>
-            </button>
+        <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
+            <button type="button" class="btn btn-outline-danger btn-sm remove-row p-0 mb-0" style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
+            <button type="button" class="btn btn-primary btn-sm add-narrator-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
         </div>`;
     group.appendChild(div);
-    // Re-initialize autocomplete for the new element if available
-    if (typeof initializeAutocomplete === "function" && window.BOOK_FORM_ROUTES.narratorsAutocomplete) {
+    if (
+        typeof initializeAutocomplete === "function" &&
+        window.BOOK_FORM_ROUTES.narratorsAutocomplete
+    ) {
         initializeAutocomplete(
             $(div),
             ".narrator-autocomplete",
@@ -150,43 +151,57 @@ function addGenreRow($container, selectedGenre = "") {
 window.addGenreRow = addGenreRow;
 
 // Raw JSON Edit Modal logic
-$(function() {
-    var $rawJsonBtn = $('#raw-json-edit-btn');
+$(function () {
+    var $rawJsonBtn = $("#raw-json-edit-btn");
     if ($rawJsonBtn.length) {
-        var bookId = $rawJsonBtn.closest('form').attr('action').match(/books\/(\w+)/);
+        var bookId = $rawJsonBtn
+            .closest("form")
+            .attr("action")
+            .match(/books\/(\w+)/);
         bookId = bookId ? bookId[1] : null;
-        $rawJsonBtn.on('click', function() {
+        $rawJsonBtn.on("click", function () {
             if (!bookId) return;
-            $('#raw-json-error').hide();
-            $.get('/admin/books/' + bookId + '/raw-json', function(data) {
-                $('#raw-json-textarea').val(JSON.stringify(data, null, 2));
-                $('#rawJsonModal').modal('show');
-            }).fail(function(xhr) {
-                $('#raw-json-textarea').val('');
-                $('#raw-json-error').text('Failed to load JSON: ' + xhr.status).show();
-                $('#rawJsonModal').modal('show');
+            $("#raw-json-error").hide();
+            $.get("/admin/books/" + bookId + "/raw-json", function (data) {
+                $("#raw-json-textarea").val(JSON.stringify(data, null, 2));
+                $("#rawJsonModal").modal("show");
+            }).fail(function (xhr) {
+                $("#raw-json-textarea").val("");
+                $("#raw-json-error")
+                    .text("Failed to load JSON: " + xhr.status)
+                    .show();
+                $("#rawJsonModal").modal("show");
             });
         });
-        $('#save-raw-json-btn').on('click', function() {
+        $("#save-raw-json-btn").on("click", function () {
             var json;
             try {
-                json = JSON.parse($('#raw-json-textarea').val());
+                json = JSON.parse($("#raw-json-textarea").val());
             } catch (e) {
-                $('#raw-json-error').text('Invalid JSON: ' + e.message).show();
+                $("#raw-json-error")
+                    .text("Invalid JSON: " + e.message)
+                    .show();
                 return;
             }
             $.ajax({
-                url: '/admin/books/' + bookId + '/raw-json',
-                type: 'POST',
+                url: "/admin/books/" + bookId + "/raw-json",
+                type: "POST",
                 data: { json: JSON.stringify(json) },
-                headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
-                success: function() {
+                headers: {
+                    "X-CSRF-TOKEN": $('meta[name="csrf-token"]').attr(
+                        "content",
+                    ),
+                },
+                success: function () {
                     window.location.reload();
                 },
-                error: function(xhr) {
-                    var msg = xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'Failed to save JSON.';
-                    $('#raw-json-error').text(msg).show();
-                }
+                error: function (xhr) {
+                    var msg =
+                        xhr.responseJSON && xhr.responseJSON.message
+                            ? xhr.responseJSON.message
+                            : "Failed to save JSON.";
+                    $("#raw-json-error").text(msg).show();
+                },
             });
         });
     }
@@ -376,36 +391,49 @@ function loadDirectoryFiles($container) {
     console.log("loadDirectoryFiles called. Container:", $container);
     const filesList = $container.find("#directory-files-list");
     if (!filesList.length) {
-        console.error('[DEBUG] #directory-files-list not found in container');
+        console.error("[DEBUG] #directory-files-list not found in container");
         return;
     }
     let $viewFilesBtn = $container.find("#show-files-link");
     if (!$viewFilesBtn.length) {
-        console.error('[DEBUG] #show-files-link not found in container');
+        console.error("[DEBUG] #show-files-link not found in container");
         return;
     }
     // Store original button HTML if not already stored
-    if (!$viewFilesBtn.data('originalHtml')) {
-        $viewFilesBtn.data('originalHtml', $viewFilesBtn.html());
+    if (!$viewFilesBtn.data("originalHtml")) {
+        $viewFilesBtn.data("originalHtml", $viewFilesBtn.html());
     }
     // Toggle: If visible, hide and return
     if (filesList.is(":visible")) {
         filesList.slideUp();
-        let origHtml = $viewFilesBtn.data('originalHtml');
-        if (!origHtml) origHtml = '<i class="fas fa-folder"></i> View Directory Files';
+        let origHtml = $viewFilesBtn.data("originalHtml");
+        if (!origHtml)
+            origHtml = '<i class="fas fa-folder"></i> View Directory Files';
         $viewFilesBtn.html(origHtml);
-        console.log('[DEBUG] Directory files box hidden (toggle off), button text reset');
+        console.log(
+            "[DEBUG] Directory files box hidden (toggle off), button text reset",
+        );
         return;
     }
     // Show: set button text to Hide Directory Files
-    $viewFilesBtn.html('<i class="fas fa-folder-open"></i> Hide Directory Files');
+    $viewFilesBtn.html(
+        '<i class="fas fa-folder-open"></i> Hide Directory Files',
+    );
     // Debug: Print all inputs with id directoryPath in container
     const $dirInput = $container.find("#directoryPath");
-    console.log('[DEBUG] loadDirectoryFiles: #directoryPath inputs found:', $dirInput.length);
+    console.log(
+        "[DEBUG] loadDirectoryFiles: #directoryPath inputs found:",
+        $dirInput.length,
+    );
     if ($dirInput.length > 0) {
-        console.log('[DEBUG] loadDirectoryFiles: #directoryPath value:', $dirInput.val());
+        console.log(
+            "[DEBUG] loadDirectoryFiles: #directoryPath value:",
+            $dirInput.val(),
+        );
     } else {
-        console.warn('[DEBUG] loadDirectoryFiles: #directoryPath not found in container');
+        console.warn(
+            "[DEBUG] loadDirectoryFiles: #directoryPath not found in container",
+        );
     }
     const dirPath = $dirInput.val();
 
@@ -490,7 +518,6 @@ function loadDirectoryFiles($container) {
 }
 window.loadDirectoryFiles = loadDirectoryFiles; // Expose if called by onclick
 
-
 window.initBookForm = function (formContainerSelector) {
     console.log("[DEBUG] initBookForm called with", formContainerSelector);
     const $container = $(formContainerSelector); // Scope all operations to this container
@@ -539,6 +566,25 @@ window.initBookForm = function (formContainerSelector) {
         .off("click", ".add-narrator-row")
         .on("click", ".add-narrator-row", function () {
             addNarratorRow($container);
+        })
+        .off("click", ".remove-row")
+        .on("click", ".remove-row", function () {
+            const group = $container.find("#narrators-group")[0];
+            const rows = group.querySelectorAll(".narrator-row");
+            const row = $(this).closest(".narrator-row")[0];
+            if (rows.length > 1) {
+                if (row) row.remove();
+            } else if (row) {
+                // Only one row: clear the input
+                const input = row.querySelector('input[name="narrator[]"]');
+                if (input) input.value = "";
+            }
+            updateAddRowButtons(
+                $container,
+                "#narrators-group",
+                ".narrator-row",
+                ".add-narrator-row",
+            );
         });
     $container
         .off("click", ".add-series-row")
@@ -555,14 +601,49 @@ window.initBookForm = function (formContainerSelector) {
     $container
         .off("click", ".remove-author")
         .on("click", ".remove-author", function () {
-            $(this).closest(".author-row").remove();
+            const group = $container.find("#authors-group")[0];
+            const rows = group.querySelectorAll(".author-row");
+            const row = $(this).closest(".author-row")[0];
+            if (rows.length > 1) {
+                if (row) row.remove();
+            } else if (row) {
+                // Only one row: clear the input
+                const input = row.querySelector('input[name="author[]"]');
+                if (input) input.value = "";
+            }
             updateAddRowButtons(
                 $container,
                 "#authors-group",
                 ".author-row",
                 ".add-author-row",
             );
+        })
+        .off("click", ".remove-series")
+        .on("click", ".remove-series", function () {
+            const group = $container.find("#series-group")[0];
+            const rows = group.querySelectorAll(".series-row");
+            const row = $(this).closest(".series-row")[0];
+            if (rows.length > 1) {
+                if (row) row.remove();
+            } else if (row) {
+                // Only one row: clear the inputs
+                const nameInput = row.querySelector(
+                    'input[name^="series"][name$="[seriesName]"]',
+                );
+                const numberInput = row.querySelector(
+                    'input[name^="series"][name$="[number]"]',
+                );
+                if (nameInput) nameInput.value = "";
+                if (numberInput) numberInput.value = "";
+            }
+            updateAddRowButtons(
+                $container,
+                "#series-group",
+                ".series-row",
+                ".add-series-row",
+            );
         });
+    // Legacy: .remove-row handler for rows created before migration to .remove-narrator-row
     $container
         .off("click", ".remove-row")
         .on("click", ".remove-row", function () {
@@ -576,17 +657,6 @@ window.initBookForm = function (formContainerSelector) {
                     ".add-narrator-row",
                 );
             }
-        });
-    $container
-        .off("click", ".remove-series")
-        .on("click", ".remove-series", function () {
-            $(this).closest(".series-row").remove();
-            updateAddRowButtons(
-                $container,
-                "#series-group",
-                ".series-row",
-                ".add-series-row",
-            );
         });
     $container
         .off("click", ".remove-genre")
@@ -610,29 +680,33 @@ window.initBookForm = function (formContainerSelector) {
 
     // Attach event handler for Autofill Modal button
     $container
-        .off('click', '#autofill-modal-btn')
-        .on('click', '#autofill-modal-btn', function (e) {
+        .off("click", "#autofill-modal-btn")
+        .on("click", "#autofill-modal-btn", function (e) {
             e.preventDefault();
-            console.log('[DEBUG] Autofill modal button clicked');
+            console.log("[DEBUG] Autofill modal button clicked");
             let bootstrapRef = null;
-            if (typeof bootstrap !== 'undefined') {
+            if (typeof bootstrap !== "undefined") {
                 bootstrapRef = bootstrap;
-            } else if (typeof window !== 'undefined' && typeof window.bootstrap !== 'undefined') {
+            } else if (
+                typeof window !== "undefined" &&
+                typeof window.bootstrap !== "undefined"
+            ) {
                 bootstrapRef = window.bootstrap;
             } else {
                 try {
-                    bootstrapRef = require('bootstrap');
+                    bootstrapRef = require("bootstrap");
                 } catch (e) {
                     bootstrapRef = null;
                 }
             }
-            if (bootstrapRef && typeof bootstrapRef.Modal !== 'undefined') {
-                var modalEl = document.getElementById('autofillModal');
+            if (bootstrapRef && typeof bootstrapRef.Modal !== "undefined") {
+                var modalEl = document.getElementById("autofillModal");
                 if (modalEl) {
-                    var bsModal = bootstrapRef.Modal.getOrCreateInstance(modalEl);
+                    var bsModal =
+                        bootstrapRef.Modal.getOrCreateInstance(modalEl);
                     bsModal.show();
                 } else {
-                    console.error('[DEBUG] #autofillModal element not found');
+                    console.error("[DEBUG] #autofillModal element not found");
                 }
             }
         });
@@ -655,8 +729,10 @@ document.addEventListener("DOMContentLoaded", function () {
             // Also ensure modal forms are initialized when shown
             const modalEl = $bookForm.closest(".modal")[0];
             if (modalEl) {
-                modalEl.addEventListener('shown.bs.modal', function () {
-                    console.log("[DEBUG] Modal shown event, reinitializing form");
+                modalEl.addEventListener("shown.bs.modal", function () {
+                    console.log(
+                        "[DEBUG] Modal shown event, reinitializing form",
+                    );
                     initBookForm($bookForm);
                 });
             }
@@ -746,7 +822,9 @@ document.addEventListener("DOMContentLoaded", function () {
                         behavior: "smooth",
                         block: "center",
                     });
-                console.log('[DEBUG] Form will not submit due to validation errors');
+                console.log(
+                    "[DEBUG] Form will not submit due to validation errors",
+                );
                 return false;
             }
 
@@ -854,11 +932,13 @@ document.addEventListener("DOMContentLoaded", function () {
                             });
                     },
                 });
-                console.log('[DEBUG] Modal AJAX submit, returning false');
+                console.log("[DEBUG] Modal AJAX submit, returning false");
                 return false;
             }
             // Non-modal: allow default submit
-            console.log('[DEBUG] No errors, not in modal, allowing normal form submit');
+            console.log(
+                "[DEBUG] No errors, not in modal, allowing normal form submit",
+            );
         });
     }
 
@@ -881,20 +961,23 @@ document.addEventListener("DOMContentLoaded", function () {
             });
     }
 });
+
 // Autofill Modal Search Intercept
-$(function() {
-    var $autofillForm = $('#autofill-search-form');
+$(function () {
+    var $autofillForm = $("#autofill-search-form");
     if ($autofillForm.length) {
-        $autofillForm.on('submit', function(e) {
+        $autofillForm.on("submit", function (e) {
             e.preventDefault();
             e.stopPropagation();
-            var $modal = $('#autofillModal');
-            var $resultsTable = $modal.find('#autofill-results-table tbody');
-            var $applyBtn = $modal.find('#autofill-apply-btn');
-            $applyBtn.prop('disabled', true);
+            var $modal = $("#autofillModal");
+            var $resultsTable = $modal.find("#autofill-results-table tbody");
+            var $applyBtn = $modal.find("#autofill-apply-btn");
+            $applyBtn.prop("disabled", true);
 
             // Show loading state
-            $resultsTable.html('<tr><td colspan="7" class="text-center text-muted">Searching...</td></tr>');
+            $resultsTable.html(
+                '<tr><td colspan="7" class="text-center text-muted">Searching...</td></tr>',
+            );
 
             // Gather search fields
             var source = $autofillForm.find('[name="source"]').val();
@@ -904,19 +987,24 @@ $(function() {
             var apiId = $autofillForm.find('[name="api_id"]').val();
 
             // Show results wrapper
-            $('#autofill-results-wrapper').show();
+            $("#autofill-results-wrapper").show();
 
             // Use the unified search endpoint
-            var endpoint = window.BOOK_FORM_ROUTES.search || '/admin/books/search';
+            var endpoint =
+                window.BOOK_FORM_ROUTES.search || "/admin/books/search";
 
             // Map the source value to the API source parameter
-            var apiSource = '';
-            if (source === 'google') {
-                apiSource = 'googlebooks';
-            } else if (source === 'audible') {
-                apiSource = 'audible';
+            var apiSource = "";
+            if (source === "google") {
+                apiSource = "googlebooks";
+            } else if (source === "audible") {
+                apiSource = "audible";
             } else {
-                $resultsTable.html('<tr><td colspan="7" class="text-center text-danger">Source not implemented: ' + source + '</td></tr>');
+                $resultsTable.html(
+                    '<tr><td colspan="7" class="text-center text-danger">Source not implemented: ' +
+                        source +
+                        "</td></tr>",
+                );
                 return false;
             }
 
@@ -926,186 +1014,321 @@ $(function() {
                 title: title,
                 author: author,
                 series: series,
-                api_id: apiId
+                api_id: apiId,
             };
 
             // Debug log the search parameters
-            console.log('[DEBUG] Autofill search parameters:', params);
+            console.log("[DEBUG] Autofill search parameters:", params);
 
             $.get(endpoint, params)
-                .done(function(response) {
+                .done(function (response) {
                     var results = Array.isArray(response) ? response : [];
                     if (results.length > 0) {
-                        var rows = '';
-                        results.forEach(function(item, idx) {
-                            var authors = Array.isArray(item.author) ? item.author.join(', ') : (item.author || '');
+                        var rows = "";
+                        results.forEach(function (item, idx) {
+                            var authors = Array.isArray(item.author)
+                                ? item.author.join(", ")
+                                : item.author || "";
                             // Handle both camelCase and snake_case properties
-                            var coverUrl = item.coverImageUrl || item.cover_image_url || '';
-                            var publishedYear = item.publishedYear || (item.published_date ? item.published_date.substring(0, 4) : '');
+                            var coverUrl =
+                                item.coverImageUrl ||
+                                item.cover_image_url ||
+                                "";
+                            var publishedYear =
+                                item.publishedYear ||
+                                (item.published_date
+                                    ? item.published_date.substring(0, 4)
+                                    : "");
 
-                            rows += '<tr>' +
-                                '<td><input type="radio" name="autofill_result_select" value="' + idx + '"></td>' +
-                                '<td>' + (coverUrl ? '<img src="' + coverUrl + '" alt="Cover" style="height:48px;max-width:40px;">' : '') + '</td>' +
-                                '<td>' + (item.title || '') + '</td>' +
-                                '<td>' + authors + '</td>' +
-                                '<td>' + (item.series || '') + '</td>' +
-                                '<td>' + (publishedYear || '') + '</td>' +
-                                '<td>' + (item.source || 'Google Books') + '</td>' +
-                                '</tr>';
+                            rows +=
+                                "<tr>" +
+                                '<td><input type="radio" name="autofill_result_select" value="' +
+                                idx +
+                                '"></td>' +
+                                "<td>" +
+                                (coverUrl
+                                    ? '<img src="' +
+                                      coverUrl +
+                                      '" alt="Cover" style="height:48px;max-width:40px;">'
+                                    : "") +
+                                "</td>" +
+                                "<td>" +
+                                (item.title || "") +
+                                "</td>" +
+                                "<td>" +
+                                authors +
+                                "</td>" +
+                                "<td>" +
+                                (item.series || "") +
+                                "</td>" +
+                                "<td>" +
+                                (publishedYear || "") +
+                                "</td>" +
+                                "<td>" +
+                                (item.source || "Google Books") +
+                                "</td>" +
+                                "</tr>";
                         });
                         $resultsTable.html(rows);
                         // Store results for later use based on source
                         window.autofillMatches = results;
                         // Enable selection and apply autofill logic
-                        $(document).off('change.autofillResult').on('change.autofillResult', 'input[name="autofill_result_select"]', function() {
-                            var idx = $(this).val();
-                            var item = window.autofillMatches[idx];
-                            if (!item) return;
-                            $('#autofill-apply-btn').prop('disabled', false);
-                            $('#autofill-apply-btn').data('selectedIdx', idx);
-                        });
+                        $(document)
+                            .off("change.autofillResult")
+                            .on(
+                                "change.autofillResult",
+                                'input[name="autofill_result_select"]',
+                                function () {
+                                    var idx = $(this).val();
+                                    var item = window.autofillMatches[idx];
+                                    if (!item) return;
+                                    $("#autofill-apply-btn").prop(
+                                        "disabled",
+                                        false,
+                                    );
+                                    $("#autofill-apply-btn").data(
+                                        "selectedIdx",
+                                        idx,
+                                    );
+                                },
+                            );
 
                         // Handle the apply button click
-                        $('#autofill-apply-btn').off('click.autofillApply').on('click.autofillApply', function() {
-                            var idx = $(this).data('selectedIdx');
-                            var item = window.autofillMatches[idx];
-                            if (!item) return;
+                        $("#autofill-apply-btn")
+                            .off("click.autofillApply")
+                            .on("click.autofillApply", function () {
+                                var idx = $(this).data("selectedIdx");
+                                var item = window.autofillMatches[idx];
+                                if (!item) return;
 
-                            // Set title
-                            $('#title').val(item.title || '');
+                                // Set title
+                                $("#title").val(item.title || "");
 
-                            // Authors - handle both single string and array formats
-                            if (item.author) {
-                                $('#authors-group').html('');
-                                if (typeof item.author === 'string') {
-                                    addAuthorRow($('#book-form'), item.author);
-                                } else if (Array.isArray(item.author)) {
-                                    item.author.forEach(function(author) {
-                                        addAuthorRow($('#book-form'), author);
-                                    });
-                                } else {
-                                    addAuthorRow($('#book-form'), item.author);
-                                }
-                            }
-
-                            // Narrators are handled in the source-specific sections below
-
-                            // Series - handle both formats
-                            var series = item.series || '';
-                            var seriesNumber = item.seriesNumber || item.series_number || '';
-                            if (series) {
-                                var seriesGroup = $('#series-group');
-                                seriesGroup.html('');
-                                addSeriesRow($('#book-form'), series, seriesNumber);
-                            }
-
-                            // Published Year - handle both formats
-                            var pubYearInput = $('#publishedYear');
-                            var publishedYear = item.publishedYear || (item.published_date ? item.published_date.substring(0, 4) : '');
-                            if (pubYearInput.length && publishedYear) pubYearInput.val(publishedYear);
-
-                            // Cover - handle both formats
-                            var coverUrl = item.coverImageUrl || item.cover_image_url || '';
-                            if (coverUrl) {
-                                // Instead of setting file input value, create/update a hidden input for the cover URL
-                                var coverUrlInput = $('#coverImageUrl');
-                                if (!coverUrlInput.length) {
-                                    // Create hidden input if not present
-                                    $('<input>').attr({
-                                        type: 'hidden',
-                                        id: 'coverImageUrl',
-                                        name: 'coverImageUrl',
-                                        value: coverUrl
-                                    }).appendTo('#book-form');
-
-                                    // Add a preview of the cover image
-                                    var coverPreviewContainer = $('#cover-preview-container');
-                                    if (!coverPreviewContainer.length) {
-                                        coverPreviewContainer = $('<div id="cover-preview-container" class="mt-2"></div>');
-                                        $('#coverImage').after(coverPreviewContainer);
+                                // Authors - handle both single string and array formats
+                                if (item.author) {
+                                    $("#authors-group").html("");
+                                    if (typeof item.author === "string") {
+                                        addAuthorRow(
+                                            $("#book-form"),
+                                            item.author,
+                                        );
+                                    } else if (Array.isArray(item.author)) {
+                                        item.author.forEach(function (author) {
+                                            addAuthorRow(
+                                                $("#book-form"),
+                                                author,
+                                            );
+                                        });
+                                    } else {
+                                        addAuthorRow(
+                                            $("#book-form"),
+                                            item.author,
+                                        );
                                     }
-                                    coverPreviewContainer.html(
-                                        '<p>Cover image from ' + (item.source || 'Google Books') + ':</p>' +
-                                        '<img src="' + coverUrl + '" style="max-height: 200px; border: 1px solid #ccc;" class="mb-2">' +
-                                        '<p class="text-muted small">This URL will be used instead of a file upload.</p>'
+                                }
+
+                                // Narrators are handled in the source-specific sections below
+
+                                // Series - handle both formats
+                                var series = item.series || "";
+                                var seriesNumber =
+                                    item.seriesNumber ||
+                                    item.series_number ||
+                                    "";
+                                if (series) {
+                                    var seriesGroup = $("#series-group");
+                                    seriesGroup.html("");
+                                    addSeriesRow(
+                                        $("#book-form"),
+                                        series,
+                                        seriesNumber,
                                     );
-                                } else {
-                                    coverUrlInput.val(coverUrl);
-                                    $('#cover-preview-container img').attr('src', coverUrl);
-                                }
-                            }
-
-                            // Handle source-specific IDs and fields
-                            if (item.source === 'Audible') {
-                                // Set Audible ID
-                                var audibleIdInput = $('#audibleId');
-                                var audibleId = item.audibleId || item.asin || '';
-                                if (!audibleIdInput.length) {
-                                    // Create hidden input if not present
-                                    $('<input>').attr({type:'hidden',id:'audibleId',name:'audibleId',value:audibleId}).appendTo('#book-form');
-                                } else {
-                                    audibleIdInput.val(audibleId);
                                 }
 
-                                // Handle narrators if available
-                                // Clear any existing narrators first
-                                $('#narrators-group').html('');
+                                // Published Year - handle both formats
+                                var pubYearInput = $("#publishedYear");
+                                var publishedYear =
+                                    item.publishedYear ||
+                                    (item.published_date
+                                        ? item.published_date.substring(0, 4)
+                                        : "");
+                                if (pubYearInput.length && publishedYear)
+                                    pubYearInput.val(publishedYear);
 
-                                // Try narratorList first (from Audible API)
-                                if (item.narratorList && Array.isArray(item.narratorList) && item.narratorList.length > 0) {
-                                    item.narratorList.forEach(function(narrator) {
-                                        addNarratorRow($('#book-form'), narrator);
-                                    });
-                                }
-                                // Fall back to narrator field if available
-                                else if (item.narrator) {
-                                    if (typeof item.narrator === 'string') {
-                                        addNarratorRow($('#book-form'), item.narrator);
-                                    } else if (Array.isArray(item.narrator)) {
-                                        item.narrator.forEach(function(narrator) {
-                                            addNarratorRow($('#book-form'), narrator);
-                                        });
+                                // Cover - handle both formats
+                                var coverUrl =
+                                    item.coverImageUrl ||
+                                    item.cover_image_url ||
+                                    "";
+                                if (coverUrl) {
+                                    // Instead of setting file input value, create/update a hidden input for the cover URL
+                                    var coverUrlInput = $("#coverImageUrl");
+                                    if (!coverUrlInput.length) {
+                                        // Create hidden input if not present
+                                        $("<input>")
+                                            .attr({
+                                                type: "hidden",
+                                                id: "coverImageUrl",
+                                                name: "coverImageUrl",
+                                                value: coverUrl,
+                                            })
+                                            .appendTo("#book-form");
+
+                                        // Add a preview of the cover image
+                                        var coverPreviewContainer = $(
+                                            "#cover-preview-container",
+                                        );
+                                        if (!coverPreviewContainer.length) {
+                                            coverPreviewContainer = $(
+                                                '<div id="cover-preview-container" class="mt-2"></div>',
+                                            );
+                                            $("#coverImage").after(
+                                                coverPreviewContainer,
+                                            );
+                                        }
+                                        coverPreviewContainer.html(
+                                            "<p>Cover image from " +
+                                                (item.source ||
+                                                    "Google Books") +
+                                                ":</p>" +
+                                                '<img src="' +
+                                                coverUrl +
+                                                '" style="max-height: 200px; border: 1px solid #ccc;" class="mb-2">' +
+                                                '<p class="text-muted small">This URL will be used instead of a file upload.</p>',
+                                        );
+                                    } else {
+                                        coverUrlInput.val(coverUrl);
+                                        $("#cover-preview-container img").attr(
+                                            "src",
+                                            coverUrl,
+                                        );
                                     }
                                 }
-                                // If no narrators, add an empty row
-                                else {
-                                    addNarratorRow($('#book-form'), '');
-                                }
-                            } else {
-                                // Set Google Books ID
-                                var gbIdInput = $('#googleBooksId');
-                                var googleBooksId = item.googleBooksId || '';
-                                if (!gbIdInput.length) {
-                                    // Create hidden input if not present
-                                    $('<input>').attr({type:'hidden',id:'googleBooksId',name:'googleBooksId',value:googleBooksId}).appendTo('#book-form');
-                                } else {
-                                    gbIdInput.val(googleBooksId);
-                                }
 
-                                // For Google Books, we may not have narrators, so add an empty row if needed
-                                $('#narrators-group').html('');
-                                if (item.narrator) {
-                                    if (typeof item.narrator === 'string') {
-                                        addNarratorRow($('#book-form'), item.narrator);
-                                    } else if (Array.isArray(item.narrator)) {
-                                        item.narrator.forEach(function(narrator) {
-                                            addNarratorRow($('#book-form'), narrator);
-                                        });
+                                // Handle source-specific IDs and fields
+                                if (item.source === "Audible") {
+                                    // Set Audible ID
+                                    var audibleIdInput = $("#audibleId");
+                                    var audibleId =
+                                        item.audibleId || item.asin || "";
+                                    if (!audibleIdInput.length) {
+                                        // Create hidden input if not present
+                                        $("<input>")
+                                            .attr({
+                                                type: "hidden",
+                                                id: "audibleId",
+                                                name: "audibleId",
+                                                value: audibleId,
+                                            })
+                                            .appendTo("#book-form");
+                                    } else {
+                                        audibleIdInput.val(audibleId);
+                                    }
+
+                                    // Handle narrators if available
+                                    // Clear any existing narrators first
+                                    $("#narrators-group").html("");
+
+                                    // Try narratorList first (from Audible API)
+                                    if (
+                                        item.narratorList &&
+                                        Array.isArray(item.narratorList) &&
+                                        item.narratorList.length > 0
+                                    ) {
+                                        item.narratorList.forEach(
+                                            function (narrator) {
+                                                addNarratorRow(
+                                                    $("#book-form"),
+                                                    narrator,
+                                                );
+                                            },
+                                        );
+                                    }
+                                    // Fall back to narrator field if available
+                                    else if (item.narrator) {
+                                        if (typeof item.narrator === "string") {
+                                            addNarratorRow(
+                                                $("#book-form"),
+                                                item.narrator,
+                                            );
+                                        } else if (
+                                            Array.isArray(item.narrator)
+                                        ) {
+                                            item.narrator.forEach(
+                                                function (narrator) {
+                                                    addNarratorRow(
+                                                        $("#book-form"),
+                                                        narrator,
+                                                    );
+                                                },
+                                            );
+                                        }
+                                    }
+                                    // If no narrators, add an empty row
+                                    else {
+                                        addNarratorRow($("#book-form"), "");
                                     }
                                 } else {
-                                    // Add an empty narrator row
-                                    addNarratorRow($('#book-form'), '');
+                                    // Set Google Books ID
+                                    var gbIdInput = $("#googleBooksId");
+                                    var googleBooksId =
+                                        item.googleBooksId || "";
+                                    if (!gbIdInput.length) {
+                                        // Create hidden input if not present
+                                        $("<input>")
+                                            .attr({
+                                                type: "hidden",
+                                                id: "googleBooksId",
+                                                name: "googleBooksId",
+                                                value: googleBooksId,
+                                            })
+                                            .appendTo("#book-form");
+                                    } else {
+                                        gbIdInput.val(googleBooksId);
+                                    }
+
+                                    // For Google Books, we may not have narrators, so add an empty row if needed
+                                    $("#narrators-group").html("");
+                                    if (item.narrator) {
+                                        if (typeof item.narrator === "string") {
+                                            addNarratorRow(
+                                                $("#book-form"),
+                                                item.narrator,
+                                            );
+                                        } else if (
+                                            Array.isArray(item.narrator)
+                                        ) {
+                                            item.narrator.forEach(
+                                                function (narrator) {
+                                                    addNarratorRow(
+                                                        $("#book-form"),
+                                                        narrator,
+                                                    );
+                                                },
+                                            );
+                                        }
+                                    } else {
+                                        // Add an empty narrator row
+                                        addNarratorRow($("#book-form"), "");
+                                    }
                                 }
-                            }
-                            $('#autofillModal').modal('hide');
-                        });
+                                $("#autofillModal").modal("hide");
+                            });
                     } else {
-                        $resultsTable.html('<tr><td colspan="7" class="text-center text-warning">No results found.</td></tr>');
+                        $resultsTable.html(
+                            '<tr><td colspan="7" class="text-center text-warning">No results found.</td></tr>',
+                        );
                         window.autofillMatches = [];
                     }
                 })
-                .fail(function(xhr) {
-                    $resultsTable.html('<tr><td colspan="7" class="text-center text-danger">Search failed: ' + (xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : 'Unknown error') + '</td></tr>');
+                .fail(function (xhr) {
+                    $resultsTable.html(
+                        '<tr><td colspan="7" class="text-center text-danger">Search failed: ' +
+                            (xhr.responseJSON && xhr.responseJSON.error
+                                ? xhr.responseJSON.error
+                                : "Unknown error") +
+                            "</td></tr>",
+                    );
                 });
 
             return false;

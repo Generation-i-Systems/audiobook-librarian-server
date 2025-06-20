@@ -46,7 +46,8 @@
                 }
                 foreach ($genres as $g) {
                     $g = is_string($g) ? trim($g) : $g;
-                    if ($g === '') continue;
+                    if ($g === '')
+                        continue;
                     $genreCounts[$g] = ($genreCounts[$g] ?? 0) + 1;
                 }
             }
@@ -54,11 +55,11 @@
         <div class="mb-2 text-muted small">
             <span>Total books: <strong>{{ $totalBooks }}</strong></span>
             @if(count($genreCounts))
-                <span class="ms-3">Genres:
-                    {!! collect($genreCounts)->map(function($count, $genre) {
-                        return e($genre) . ' (' . $count . ')';
-                    })->implode(', ') !!}
-                </span>
+                    <span class="ms-3">Genres:
+                        {!! collect($genreCounts)->map(function ($count, $genre) {
+                    return e($genre) . ' (' . $count . ')';
+                })->implode(', ') !!}
+                    </span>
             @endif
         </div>
 
@@ -107,32 +108,25 @@
                         </td>
                         <td>
                             @if(!empty($book['series']))
-                                @if(is_array($book['series']))
-                                    @php
-                                        // Handle both new format (name => number) and old format (array of arrays)
-                                        $isNewFormat = array_keys($book['series']) !== range(0, count($book['series']) - 1);
-                                    @endphp
-                                    @if($isNewFormat)
-                                        @foreach($book['series'] as $seriesName => $seriesNumber)
-                                            {{ $seriesName }}{{ $seriesNumber ? ' (#' . $seriesNumber . ')' : '' }}
-                                            @if(!$loop->last)<br>@endif
-                                        @endforeach
-                                    @else
-                                        @foreach($book['series'] as $seriesItem)
-                                            @if(is_array($seriesItem) && isset($seriesItem['name']))
-                                                {{ $seriesItem['name'] }}{{ !empty($seriesItem['number']) ? ' (#' . $seriesItem['number'] . ')' : '' }}
-                                            @elseif(is_array($seriesItem))
-                                                @foreach($seriesItem as $name => $number)
-                                                    {{ $name }}{{ $number ? ' (#' . $number . ')' : '' }}
-                                                @endforeach
-                                            @else
-                                                {{ $seriesItem }}
-                                            @endif
-                                            @if(!$loop->last)<br>@endif
-                                        @endforeach
-                                    @endif
-                                @else
-                                    {{ $book['series'] }}
+                                @php
+                                    $series = $book['series'] ?? [];
+                                @endphp
+                                @if(is_array($series))
+                                    @foreach($series as $key => $item)
+                                        @if(is_array($item) && (isset($item['seriesName']) || isset($item['name'])))
+                                            {{-- Canonical: [{seriesName, number}] or [{name, number}] --}}
+                                            {{ $item['seriesName'] ?? $item['name'] }}{{ !empty($item['number']) ? ' (#' . $item['number'] . ')' : '' }}
+                                        @elseif(is_string($key) && (is_scalar($item) || is_null($item)))
+                                            {{-- Assoc: ['Name' => number] --}}
+                                            {{ $key }}{{ $item ? ' (#' . $item . ')' : '' }}
+                                        @elseif(is_string($item))
+                                            {{-- Legacy: ['Name', ...] --}}
+                                            {{ $item }}
+                                        @endif
+                                        @if(!$loop->last)<br>@endif
+                                    @endforeach
+                                @elseif(is_string($series))
+                                    {{ $series }}
                                 @endif
                             @endif
                         </td>

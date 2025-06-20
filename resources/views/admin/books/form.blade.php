@@ -92,6 +92,8 @@
                     $narrators = old('narrator') ?? ($book['narrator'] ?? null) ?? ($initial['narrator'] ?? []);
                     if (!is_array($narrators))
                         $narrators = [$narrators];
+                    if (empty($narrators) || (count($narrators) === 1 && ($narrators[0] === null || $narrators[0] === '')))
+                        $narrators = [''];
                 @endphp
                 @php $narratorsCount = count($narrators); @endphp
                 @foreach($narrators as $idx => $narrator)
@@ -484,6 +486,43 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 @push('scripts')
+<script>
+// Accessibility fix for autofillModal: Remove aria-hidden if set while modal is open and focused
+(function() {
+    var autofillModal = document.getElementById('autofillModal');
+    var observer = null;
+    function removeAriaHiddenIfFocused() {
+        if (!autofillModal) return;
+        // Remove aria-hidden if modal or any descendant has focus
+        var focused = autofillModal.contains(document.activeElement) || autofillModal === document.activeElement;
+        if (focused && autofillModal.hasAttribute('aria-hidden')) {
+            autofillModal.removeAttribute('aria-hidden');
+        }
+    }
+    if (autofillModal) {
+        autofillModal.addEventListener('show.bs.modal', function () {
+            removeAriaHiddenIfFocused();
+            // Observe attribute changes to remove aria-hidden if it's set while open
+            if (observer) observer.disconnect();
+            observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    if (mutation.attributeName === 'aria-hidden') {
+                        removeAriaHiddenIfFocused();
+                    }
+                });
+            });
+            observer.observe(autofillModal, { attributes: true });
+        });
+        autofillModal.addEventListener('hidden.bs.modal', function () {
+            if (observer) observer.disconnect();
+            observer = null;
+        });
+        // Also patch on focusin (e.g. if focus moves to modal)
+        autofillModal.addEventListener('focusin', removeAriaHiddenIfFocused);
+    }
+})();
+</script>
+
 <script type="text/javascript">
     // Define global route objects for book form
     window.BOOK_FORM_ROUTES = {
@@ -566,7 +605,7 @@ document.addEventListener('DOMContentLoaded', function() {
   </div>
 </div>
 
-<div class="modal fade" id="autofillModal" tabindex="-1" aria-labelledby="autofillModalLabel" aria-hidden="true">
+<div class="modal fade" id="autofillModal" tabindex="-1" aria-labelledby="autofillModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">

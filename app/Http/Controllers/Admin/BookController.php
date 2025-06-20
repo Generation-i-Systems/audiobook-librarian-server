@@ -106,8 +106,13 @@ class BookController extends Controller
             $search = strtolower($request->input('search'));
             $books = array_filter(
                 $books,
-                fn ($book) => (isset($book['title']) && stripos($book['title'], $search) !== false)
-                || (isset($book['author']) && stripos($book['author'], $search) !== false)
+                fn ($book) => (
+    isset($book['title']) && stripos($book['title'], $search) !== false
+) || (
+    isset($book['author']) && (
+        (is_array($book['author']) ? stripos(implode(', ', $book['author']), $search) !== false : stripos($book['author'], $search) !== false)
+    )
+)
             );
         }
         if ($request->filled('author')) {
