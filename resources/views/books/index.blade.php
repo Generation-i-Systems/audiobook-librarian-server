@@ -126,15 +126,13 @@
                                             <p class="card-text small mb-0">{{ isset($book['author']) && is_array($book['author']) && !empty($book['author']) ? $book['author'][0] : 'Unknown' }}</p>
                                             @if(isset($book['series']) && !empty($book['series']))
                                                 <p class="card-text small text-muted mb-0" style="font-size: 0.75rem;">
-                                                    @if(is_array($book['series']))
+                                                    @if(is_array($book['series']) && isset($book['series'][0]['seriesName']))
                                                         @php
-                                                            $firstSeries = array_key_first($book['series']);
-                                                            $seriesNumber = $book['series'][$firstSeries];
+                                                            $seriesEntry = $book['series'][0];
+                                                            $seriesName = $seriesEntry['seriesName'] ?? '';
+                                                            $seriesNumber = $seriesEntry['number'] ?? '';
                                                         @endphp
-                                                        {{ $firstSeries }}
-                                                        @if(!empty($seriesNumber))
-                                                            #{{ $seriesNumber }}
-                                                        @endif
+                                                        {{ $seriesName }}@if($seriesNumber !== '') (Book {{ $seriesNumber }})@endif
                                                     @else
                                                         {{ $book['series'] }}
                                                         @if(isset($book['series_number']) && !empty($book['series_number']))
@@ -172,15 +170,13 @@
                                                     <p class="card-text small mb-0">{{ isset($book['author']) && is_array($book['author']) && !empty($book['author']) ? $book['author'][0] : 'Unknown' }}</p>
                                                     @if(isset($book['series']) && !empty($book['series']))
                                                         <p class="card-text small text-muted mb-0" style="font-size: 0.75rem;">
-                                                            @if(is_array($book['series']))
+                                                            @if(is_array($book['series']) && count($book['series']) > 0)
                                                                 @php
-                                                                    $firstSeries = array_key_first($book['series']);
-                                                                    $seriesNumber = $book['series'][$firstSeries];
+                                                                    $firstSeries = $book['series'][0];
+                                                                    $seriesName = $firstSeries['seriesName'] ?? $firstSeries['name'] ?? '';
+                                                                    $seriesNumber = $firstSeries['number'] ?? '';
                                                                 @endphp
-                                                                {{ $firstSeries }}
-                                                                @if(!empty($seriesNumber))
-                                                                    #{{ $seriesNumber }}
-                                                                @endif
+                                                                {{ $seriesName }}@if($seriesNumber !== '') (Book {{ $seriesNumber }})@endif
                                                             @else
                                                                 {{ $book['series'] }}
                                                                 @if(isset($book['series_number']) && !empty($book['series_number']))
@@ -222,15 +218,13 @@
                                             <a href="{{ route('books.show', $book['id']) }}" class="text-decoration-none">{{ $book['title'] }}</a>
                                             @if(isset($book['series']) && !empty($book['series']))
                                                 <div class="small text-muted">
-                                                    @if(is_array($book['series']))
+                                                    @if(is_array($book['series']) && isset($book['series'][0]['seriesName']))
                                                         @php
-                                                            $firstSeries = array_key_first($book['series']);
-                                                            $seriesNumber = $book['series'][$firstSeries];
+                                                            $seriesEntry = $book['series'][0];
+                                                            $seriesName = $seriesEntry['seriesName'] ?? '';
+                                                            $seriesNumber = $seriesEntry['number'] ?? '';
                                                         @endphp
-                                                        {{ $firstSeries }}
-                                                        @if(!empty($seriesNumber))
-                                                            #{{ $seriesNumber }}
-                                                        @endif
+                                                        {{ $seriesName }}@if($seriesNumber !== '') (Book {{ $seriesNumber }})@endif
                                                     @else
                                                         {{ $book['series'] }}
                                                         @if(isset($book['series_number']) && !empty($book['series_number']))

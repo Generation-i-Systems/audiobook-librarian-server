@@ -122,70 +122,28 @@
         <div class="mb-3">
             <label class="form-label">Series</label>
             <div id="series-group">
+                {{-- Only use canonical format: array of objects with seriesName and number --}}
                 @php
-                    $seriesList = [];
-                    $oldSeries = old('series');
-                    $bookSeries = $book['series'] ?? ($initial['series'] ?? []);
-                    if (!is_array($bookSeries)) $bookSeries = [];
-                    // Canonical: only accept array of objects with seriesName and number
-                    if (!empty($oldSeries)) {
-                        foreach ($oldSeries as $item) {
-                            $name = is_array($item) ? ($item['seriesName'] ?? '') : '';
-                            $number = is_array($item) ? ($item['number'] ?? '') : '';
-                            if ($name !== '' || $number !== '') {
-                                $seriesList[] = ['seriesName' => $name, 'number' => $number];
-                            }
-                        }
+                    $seriesList = old('series') ?? ($book['series'] ?? ($initial['series'] ?? []));
+                    // Ensure $seriesList is an array of objects with seriesName/number
+                    if (!is_array($seriesList) || (isset($seriesList[0]) && !is_array($seriesList[0]))) {
+                        $seriesList = [];
                     }
-
-                    // Handle initial data if no series found yet
-                    if (empty($seriesList) && !empty($initial['series'])) {
-                        if (is_array($initial['series'])) {
-                            foreach ($initial['series'] as $name => $number) {
-                                if (!empty($name)) {
-                                    $seriesList[] = [
-                                        'seriesName' => $name,
-                                        'number' => $number
-                                    ];
-                                }
-                            }
-                        } else if (is_string($initial['series'])) {
-                            $seriesList[] = [
-                                'seriesName' => $initial['series'],
-                                'number' => $initial['seriesNumber'] ?? $initial['seriesNumber'] ?? ''
-                            ];
-                        }
-                    }
-
-                    // Ensure we have at least one empty series row
+                    // If empty, provide one empty row
                     if (empty($seriesList)) {
                         $seriesList[] = ['seriesName' => '', 'number' => ''];
                     }
-                    $seriesCount = count($seriesList);
                 @endphp
                 @foreach($seriesList as $idx => $series)
-                    @php
-                        $name = isset($series['seriesName']) ? $series['seriesName'] : (isset($series['name']) ? $series['name'] : '');
-                        $number = isset($series['number']) ? $series['number'] : '';
-                    @endphp
                     <div class="input-group series-row align-items-start mb-3">
-                        @php
-    // Ensure $name and $number are always strings for safe HTML output
-    if (is_array($name) || is_object($name)) {
-        $name = '';
-    }
-    if (is_array($number) || is_object($number)) {
-        $number = '';
-    }
-@endphp
-<input type="text" name="series[]" class="form-control w-auto series-autocomplete" style="max-width:200px; height:32px;"
-    placeholder="Series Name" value="{{ $name }}">
-<input type="number" name="seriesNumber[]" class="form-control w-auto"
-    style="max-width:100px; height:32px;" placeholder="Number" value="{{ $number }}" min="1" step="any">
+                        <input type="text" name="series[{{ $idx }}][seriesName]" class="form-control w-auto series-autocomplete" style="max-width:200px; height:32px;"
+                            placeholder="Series Name" value="{{ $series['seriesName'] ?? '' }}">
+                        <input type="number" name="series[{{ $idx }}][number]" class="form-control w-auto"
+                            style="max-width:100px; height:32px;" placeholder="Number" value="{{ $series['number'] ?? '' }}" min="1" step="any">
                         <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
                             <button type="button" class="btn btn-outline-danger btn-sm remove-series p-0 mb-0"
                                 style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
-                            @if($idx === $seriesCount - 1)
+                            @if($idx === count($seriesList) - 1)
                                 <button type="button" class="btn btn-primary btn-sm add-series-row p-0 mt-1"
                                     style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
                             @endif

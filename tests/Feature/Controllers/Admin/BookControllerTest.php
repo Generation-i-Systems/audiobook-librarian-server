@@ -134,13 +134,16 @@ class BookControllerTest extends TestCase
         Storage::fake('public');
         $file = UploadedFile::fake()->create('cover.jpg', 1024);
 
+        $seriesCanonical = [
+            ['seriesName' => 'Test Series', 'number' => 1],
+        ];
+
         $response = $this->actingAs($this->admin->data())
             ->post(route('admin.books.store'), [
                 'title' => 'New Test Book',
                 'author' => ['Test Author'],
                 'genre' => ['Fiction'],
-                'series' => ['Test Series'],
-                'seriesNumber' => [1],
+                'series' => $seriesCanonical,
                 'coverImage' => $file,
                 'description' => 'Test description',
             ]);
@@ -154,8 +157,10 @@ class BookControllerTest extends TestCase
         $book = $books->rows()[0]->data();
         $this->assertEquals('Test Author', $book['authors'][0] ?? $book['author'][0] ?? null);
         $this->assertEquals('Fiction', $book['genre'][0] ?? $book['genre'] ?? null);
-        $this->assertEquals('Test Series', $book['series'][0] ?? $book['series'] ?? null);
-        $this->assertEquals(1, $book['series_number'][0] ?? $book['series_number'] ?? null);
+        // Canonical series format assertion
+        $this->assertIsArray($book['series']);
+        $this->assertEquals('Test Series', $book['series'][0]['seriesName']);
+        $this->assertEquals(1, $book['series'][0]['number']);
     }
 
     #[Test]
@@ -178,17 +183,23 @@ class BookControllerTest extends TestCase
             'title' => 'Old Title',
             'authors' => ['Old Author'],
             'genre' => 'Old Genre',
-            'series' => [],
+            'series' => [
+                ['seriesName' => 'Old Series', 'number' => 2],
+            ],
         ]);
 
         $bookId = $bookRef->id();
+
+        $seriesCanonical = [
+            ['seriesName' => 'Updated Series', 'number' => 3],
+        ];
 
         $response = $this->actingAs($this->admin->data())
             ->put(route('admin.books.update', $bookId), [
                 'title' => 'Updated Title',
                 'authors' => ['New Author'],
                 'genre' => 'New Genre',
-                'series' => [],
+                'series' => $seriesCanonical,
                 'description' => 'Updated description',
             ]);
 
@@ -199,6 +210,9 @@ class BookControllerTest extends TestCase
         $this->assertEquals('Updated Title', $book['title']);
         $this->assertEquals(['New Author'], $book['authors']);
         $this->assertEquals('New Genre', $book['genre']);
+        $this->assertIsArray($book['series']);
+        $this->assertEquals('Updated Series', $book['series'][0]['seriesName']);
+        $this->assertEquals(3, $book['series'][0]['number']);
     }
 
     public function testDestroyDeletesBook(): void
