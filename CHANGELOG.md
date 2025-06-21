@@ -1,4 +1,11 @@
 ## [Unreleased]
+### Added
+- MongoDB Atlas Search autocomplete integration for series (fuzzy, prefix, $search aggregation)
+- New API endpoint: `/api/v1/series/autocomplete` via `BookApiController@autocompleteSeries`
+- Service method: `MongoService::autocompleteSeries`
+- Interface update: `DocumentStoreServiceInterface::autocompleteSeries`
+- Tests: `BookApiAutocompleteSeriesTest` (feature), interface mocks updated
+
 
 ### Changed
 - The `series` field for books is now always stored and processed as an array of objects with `seriesName` and `number` keys.

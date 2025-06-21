@@ -8,7 +8,6 @@ use App\Traits\BookImportTrait;
 use Illuminate\Support\Facades\File;
 use SplFileInfo;
 use Symfony\Component\Finder\Finder;
-use Illuminate\Support\Facades\Log;
 
 class BookDirectoryParser
 {

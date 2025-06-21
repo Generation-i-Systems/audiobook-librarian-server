@@ -50,7 +50,8 @@ class RenameToRomanScriptTest extends TestCase
         touch($src);
         $output = shell_exec(sprintf(
             'php %s/scripts/rename_to_roman.php %s --verbose',
-            escapeshellarg(dirname(__DIR__, 3)), escapeshellarg($src)
+            escapeshellarg(dirname(__DIR__, 3)),
+            escapeshellarg($src)
         ));
         $this->assertFileDoesNotExist($src);
         $this->assertFileExists($expected);
@@ -63,7 +64,8 @@ class RenameToRomanScriptTest extends TestCase
         touch($src);
         $output = shell_exec(sprintf(
             'php %s/scripts/rename_to_roman.php %s --verbose',
-            escapeshellarg(dirname(__DIR__, 3)), escapeshellarg($src)
+            escapeshellarg(dirname(__DIR__, 3)),
+            escapeshellarg($src)
         ));
         $this->assertFileExists($src);
         $this->assertStringContainsString('No change', $output);
@@ -76,7 +78,8 @@ class RenameToRomanScriptTest extends TestCase
         touch($src);
         $output = shell_exec(sprintf(
             'php %s/scripts/rename_to_roman.php %s --digits=3 --verbose',
-            escapeshellarg(dirname(__DIR__, 3)), escapeshellarg($src)
+            escapeshellarg(dirname(__DIR__, 3)),
+            escapeshellarg($src)
         ));
         $this->assertFileDoesNotExist($src);
         $this->assertFileExists($expected);

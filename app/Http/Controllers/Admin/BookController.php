@@ -107,12 +107,12 @@ class BookController extends Controller
             $books = array_filter(
                 $books,
                 fn ($book) => (
-    isset($book['title']) && stripos($book['title'], $search) !== false
-) || (
-    isset($book['author']) && (
-        (is_array($book['author']) ? stripos(implode(', ', $book['author']), $search) !== false : stripos($book['author'], $search) !== false)
-    )
-)
+                    isset($book['title']) && stripos($book['title'], $search) !== false
+                ) || (
+                    isset($book['author']) && (
+                        (is_array($book['author']) ? stripos(implode(', ', $book['author']), $search) !== false : stripos($book['author'], $search) !== false)
+                    )
+                )
             );
         }
         if ($request->filled('author')) {
@@ -787,8 +787,12 @@ class BookController extends Controller
                     if (function_exists('fileowner') && function_exists('filegroup') && function_exists('chown') && function_exists('chgrp')) {
                         $owner = @fileowner($oldAbs);
                         $group = @filegroup($oldAbs);
-                        if ($owner !== false) @chown($newAbs, $owner);
-                        if ($group !== false) @chgrp($newAbs, $group);
+                        if ($owner !== false) {
+                            @chown($newAbs, $owner);
+                        }
+                        if ($group !== false) {
+                            @chgrp($newAbs, $group);
+                        }
                     }
                 }
                 // Remove old (now empty) directory

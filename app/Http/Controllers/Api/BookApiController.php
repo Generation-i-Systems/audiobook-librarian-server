@@ -14,6 +14,57 @@ use ZipArchive;
 
 class BookApiController extends Controller
 {
+    /**
+     * Autocomplete book series names using fuzzy search (MongoDB Atlas Search).
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function autocompleteSeries(Request $request)
+    {
+        $query = $request->input('query', '');
+        $limit = (int) $request->input('limit', 10);
+        if (!$query) {
+            return response()->json(['data' => []]);
+        }
+        $series = $this->documentStoreService->autocompleteSeries($query, $limit);
+        return response()->json(['data' => $series]);
+    }
+
+    /**
+     * Autocomplete author names using fuzzy search (MongoDB Atlas Search).
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function autocompleteAuthors(Request $request)
+    {
+        $query = $request->input('query', '');
+        $limit = (int) $request->input('limit', 10);
+        if (!$query) {
+            return response()->json(['data' => []]);
+        }
+        $authors = $this->documentStoreService->autocompleteAuthors($query, $limit);
+        return response()->json(['data' => $authors]);
+    }
+
+    /**
+     * Autocomplete narrator names using fuzzy search (MongoDB Atlas Search).
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function autocompleteNarrators(Request $request)
+    {
+        $query = $request->input('query', '');
+        $limit = (int) $request->input('limit', 10);
+        if (!$query) {
+            return response()->json(['data' => []]);
+        }
+        $narrators = $this->documentStoreService->autocompleteNarrators($query, $limit);
+        return response()->json(['data' => $narrators]);
+    }
+
     protected DocumentStoreServiceInterface $documentStoreService;
 
     public function __construct(DocumentStoreServiceInterface $documentStoreService)

@@ -4,6 +4,33 @@ namespace App\Contracts;
 
 interface DocumentStoreServiceInterface
 {
+    /**
+     * Autocomplete series names using fuzzy search.
+     *
+     * @param string $query
+     * @param int $limit
+     * @return array
+     */
+    public function autocompleteSeries(string $query, int $limit = 10): array;
+
+    /**
+     * Autocomplete author names using fuzzy search.
+     *
+     * @param string $query
+     * @param int $limit
+     * @return array
+     */
+    public function autocompleteAuthors(string $query, int $limit = 10): array;
+
+    /**
+     * Autocomplete narrator names using fuzzy search.
+     *
+     * @param string $query
+     * @param int $limit
+     * @return array
+     */
+    public function autocompleteNarrators(string $query, int $limit = 10): array;
+
     // BOOKS
     public function getBook(string $id);
     public function listBooks();

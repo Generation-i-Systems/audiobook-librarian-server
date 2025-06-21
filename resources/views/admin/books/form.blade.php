@@ -78,6 +78,7 @@
                         @endphp
                         <input type="text" name="author[]" class="form-control w-auto author-autocomplete" style="max-width:300px; height:32px;"
                             value="{{ $author }}" required>
+                        <datalist id="author-list"></datalist>
                         <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
                             <button type="button" class="btn btn-outline-danger btn-sm remove-author p-0 mb-0"
                                 style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
@@ -114,6 +115,7 @@
                         @endphp
                         <input type="text" name="narrator[]" class="form-control w-auto narrator-autocomplete" style="max-width:300px; height:32px;"
                             value="{{ $narrator }}">
+                        <datalist id="narrator-list"></datalist>
                         <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
                             <button type="button" class="btn btn-outline-danger btn-sm remove-row p-0 mb-0"
                                 style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
@@ -145,7 +147,8 @@
                 @foreach($seriesList as $idx => $series)
                     <div class="input-group series-row align-items-start mb-3">
                         <input type="text" name="series[{{ $idx }}][seriesName]" class="form-control w-auto series-autocomplete" style="max-width:200px; height:32px;"
-                            placeholder="Series Name" value="{{ $series['seriesName'] ?? '' }}">
+                             placeholder="Series Name" value="{{ $series['seriesName'] ?? '' }}">
+                        <datalist id="series-list"></datalist>
                         <input type="number" name="series[{{ $idx }}][number]" class="form-control w-auto"
                             style="max-width:100px; height:32px;" placeholder="Number" value="{{ $series['number'] ?? '' }}" min="1" step="any">
                         <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
@@ -683,4 +686,7 @@ document.addEventListener('DOMContentLoaded', function() {
   </div>
 </div>
 
+@push('scripts')
+    <script src="/js/admin/book-autocomplete.js"></script>
+@endpush
 @endsection

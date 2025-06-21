@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Script to normalize the `series` field for all books in both MongoDB and Firestore.
  * - Converts legacy formats to canonical: array of objects [{seriesName, number}]
@@ -12,7 +13,8 @@ use Google\Cloud\Firestore\FirestoreClient;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
-function canonicalizeSeries($series, $seriesName = null, $seriesNumber = null) {
+function canonicalizeSeries($series, $seriesName = null, $seriesNumber = null)
+{
     // Already canonical
     if (is_array($series) && isset($series[0]['seriesName'])) {
         return $series;
@@ -49,7 +51,8 @@ function canonicalizeSeries($series, $seriesName = null, $seriesNumber = null) {
     return [];
 }
 
-function updateMongoDB() {
+function updateMongoDB()
+{
     $uri = getenv('MONGODB_URI') ?: 'mongodb://localhost:27017';
     $dbName = getenv('MONGODB_DB') ?: 'ab_librarian';
     $client = new MongoClient($uri);
@@ -66,8 +69,12 @@ function updateMongoDB() {
         if ($series !== $canonical || (empty($series) && ($seriesName || $seriesNumber))) {
             $update = ['series' => $canonical];
             // Optionally remove legacy fields
-            if (isset($doc['seriesName'])) $update['seriesName'] = null;
-            if (isset($doc['seriesNumber'])) $update['seriesNumber'] = null;
+            if (isset($doc['seriesName'])) {
+                $update['seriesName'] = null;
+            }
+            if (isset($doc['seriesNumber'])) {
+                $update['seriesNumber'] = null;
+            }
             $books->updateOne(['_id' => $id], ['$set' => $update, '$unset' => ['seriesName' => '', 'seriesNumber' => '']]);
             $count++;
             echo "[MongoDB] Updated book {$id}\n";
@@ -76,14 +83,17 @@ function updateMongoDB() {
     echo "[MongoDB] Migration complete. Updated {$count} records.\n";
 }
 
-function updateFirestore() {
+function updateFirestore()
+{
     $projectId = getenv('FIREBASE_PROJECT_ID') ?: 'your-project-id';
     $firestore = new FirestoreClient(['projectId' => $projectId]);
     $books = $firestore->collection('books');
     $documents = $books->documents();
     $count = 0;
     foreach ($documents as $doc) {
-        if (!$doc->exists()) continue;
+        if (!$doc->exists()) {
+            continue;
+        }
         $data = $doc->data();
         $series = $data['series'] ?? null;
         $seriesName = $data['seriesName'] ?? null;
@@ -92,8 +102,12 @@ function updateFirestore() {
         if ($series !== $canonical || (empty($series) && ($seriesName || $seriesNumber))) {
             $update = ['series' => $canonical];
             // Optionally remove legacy fields
-            if (isset($data['seriesName'])) $update['seriesName'] = firestoreDeleteField();
-            if (isset($data['seriesNumber'])) $update['seriesNumber'] = firestoreDeleteField();
+            if (isset($data['seriesName'])) {
+                $update['seriesName'] = firestoreDeleteField();
+            }
+            if (isset($data['seriesNumber'])) {
+                $update['seriesNumber'] = firestoreDeleteField();
+            }
             $doc->reference()->update($update);
             $count++;
             echo "[Firestore] Updated book {$doc->id()}\n";
@@ -102,7 +116,8 @@ function updateFirestore() {
     echo "[Firestore] Migration complete. Updated {$count} records.\n";
 }
 
-function firestoreDeleteField() {
+function firestoreDeleteField()
+{
     // Helper for Firestore field deletion
     return new Google\Cloud\Firestore\FieldValue(['deleteField' => true]);
 }

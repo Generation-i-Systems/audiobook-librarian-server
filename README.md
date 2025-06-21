@@ -1,5 +1,29 @@
 # Audiobook Librarian
 
+## MongoDB Atlas Search Series Autocomplete
+
+### API Endpoint
+
+- `GET /api/v1/series/autocomplete?query=Super&limit=5`
+    - Returns fuzzy, prefix-matched series names using Atlas Search autocomplete aggregation on the `seriesName` field.
+    - Example response:
+      ```json
+      { "data": ["Super Powereds", "Super Heroes"] }
+      ```
+    - Parameters:
+        - `query` (required): The search string for the series name.
+        - `limit` (optional, default 10): Maximum results.
+
+### Implementation
+- Uses MongoDB `$search` aggregation with `autocomplete` and `fuzzy` options.
+- Service: `MongoService::autocompleteSeries`
+- Controller: `BookApiController@autocompleteSeries`
+- Interface: `DocumentStoreServiceInterface::autocompleteSeries`
+- Tests: `BookApiAutocompleteSeriesTest`
+
+See [CHANGELOG.md](CHANGELOG.md) for details.
+
+
 A Laravel-based audiobook library and management system for personal and family use. Features a RESTful API, web interface (admin & user), and powerful console utilities for maintaining and repairing your audiobook collection.
 
 ---

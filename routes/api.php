@@ -34,6 +34,13 @@ Route::prefix('v1')->group(function () {
         // Series Books Route
         Route::get('/series/{seriesId}/books', [BookApiController::class, 'booksBySeries']);
 
+        // Series Autocomplete
+        Route::get('/series/autocomplete', [BookApiController::class, 'autocompleteSeries']);
+        // Author Autocomplete
+        Route::get('/authors/autocomplete', [BookApiController::class, 'autocompleteAuthors']);
+        // Narrator Autocomplete
+        Route::get('/narrators/autocomplete', [BookApiController::class, 'autocompleteNarrators']);
+
         // Author Books Route
         Route::get('/authors/{authorId}/books', [BookApiController::class, 'booksByAuthor']);
         // Author Books by Genre Route

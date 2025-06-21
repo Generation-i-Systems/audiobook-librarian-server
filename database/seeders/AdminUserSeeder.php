@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Contracts\DocumentStoreServiceInterface;
 use Google\Cloud\Firestore\Timestamp as FirestoreTimestamp;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;

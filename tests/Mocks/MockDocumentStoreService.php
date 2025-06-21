@@ -6,6 +6,18 @@ use App\Contracts\DocumentStoreServiceInterface;
 
 class MockDocumentStoreService implements DocumentStoreServiceInterface
 {
+    public function autocompleteSeries(string $query, int $limit = 10): array
+    {
+        return [];
+    }
+    public function autocompleteAuthors(string $query, int $limit = 10): array
+    {
+        return [];
+    }
+    public function autocompleteNarrators(string $query, int $limit = 10): array
+    {
+        return [];
+    }
     protected $books = [];
     protected $series = [];
     protected $genres = [];

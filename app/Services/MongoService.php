@@ -27,6 +27,125 @@ class MongoService implements DocumentStoreServiceInterface
     }
 
     // BOOKS
+    /**
+     * Autocomplete author names using MongoDB Atlas Search with fuzzy matching.
+     *
+     * @param string $query
+     * @param int $limit
+     * @return array
+     */
+    public function autocompleteAuthors(string $query, int $limit = 10): array
+    {
+        $pipeline = [
+            ['$search' => [
+                'index' => 'default',
+                'autocomplete' => [
+                    'query' => $query,
+                    'path' => 'name',
+                    'fuzzy' => [
+                        'maxEdits' => 2,
+                        'prefixLength' => 1,
+                        'maxExpansions' => 50,
+                    ],
+                ],
+            ]],
+            ['$limit' => $limit],
+            ['$project' => [
+                'name' => 1,
+                '_id' => 0
+            ]],
+        ];
+        $results = $this->getCollection('authors')->aggregate($pipeline);
+        $authors = [];
+        foreach ($results as $doc) {
+            if (isset($doc['name'])) {
+                $authors[] = $doc['name'];
+            }
+        }
+        return $authors;
+    }
+
+    /**
+     * Autocomplete narrator names using MongoDB Atlas Search with fuzzy matching.
+     *
+     * @param string $query
+     * @param int $limit
+     * @return array
+     */
+    public function autocompleteNarrators(string $query, int $limit = 10): array
+    {
+        $pipeline = [
+            ['$search' => [
+                'index' => 'default',
+                'autocomplete' => [
+                    'query' => $query,
+                    'path' => 'narrator',
+                    'fuzzy' => [
+                        'maxEdits' => 2,
+                        'prefixLength' => 1,
+                        'maxExpansions' => 50,
+                    ],
+                ],
+            ]],
+            ['$limit' => $limit],
+            ['$project' => [
+                'narrator' => 1,
+                '_id' => 0
+            ]],
+        ];
+        $results = $this->getCollection('books')->aggregate($pipeline);
+        $narrators = [];
+        foreach ($results as $doc) {
+            if (isset($doc['narrator'])) {
+                if (is_array($doc['narrator'])) {
+                    foreach ($doc['narrator'] as $n) {
+                        $narrators[] = $n;
+                    }
+                } else {
+                    $narrators[] = $doc['narrator'];
+                }
+            }
+        }
+        return array_values(array_unique($narrators));
+    }
+
+    /**
+     * Autocomplete series names using MongoDB Atlas Search with fuzzy matching.
+     *
+     * @param string $query
+     * @param int $limit
+     * @return array
+     */
+    public function autocompleteSeries(string $query, int $limit = 10): array
+    {
+        $pipeline = [
+            ['$search' => [
+                'index' => 'default',
+                'autocomplete' => [
+                    'query' => $query,
+                    'path' => 'seriesName',
+                    'fuzzy' => [
+                        'maxEdits' => 2,
+                        'prefixLength' => 1,
+                        'maxExpansions' => 50,
+                    ],
+                ],
+            ]],
+            ['$limit' => $limit],
+            ['$project' => [
+                'seriesName' => 1,
+                '_id' => 0
+            ]],
+        ];
+        $results = $this->getCollection('series')->aggregate($pipeline);
+        $series = [];
+        foreach ($results as $doc) {
+            if (isset($doc['seriesName'])) {
+                $series[] = $doc['seriesName'];
+            }
+        }
+        return $series;
+    }
     /** @inheritDoc */
     public function getBook(string $id)
     {
