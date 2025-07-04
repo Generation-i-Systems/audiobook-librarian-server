@@ -19,8 +19,12 @@ class ProfileController extends Controller
     {
         $firestore = $this->documentStoreService;
         $userId = Auth::id();
-        $userDoc = $firestore->getClient()->collection('users')->document($userId)->snapshot();
-        $user = $userDoc->exists() ? $userDoc->data() : null;
+
+        // Fix: Use getCollection method instead of calling collection() directly on the client
+        $usersCollection = $firestore->getCollection('users');
+        $userDoc = $usersCollection->findOne(['_id' => $userId]);
+
+        $user = $userDoc ? $this->normalizeMongoDocument($userDoc) : null;
         if ($user) {
             $user['id'] = $userId;
         }
@@ -37,10 +41,16 @@ class ProfileController extends Controller
 
         $firestore = $this->documentStoreService;
         $userId = Auth::id();
-        $firestore->getClient()->collection('users')->document($userId)->set([
-            'name' => $request->name,
-            'email' => $request->email,
-        ], ['merge' => true]);
+
+        // Fix: Use getCollection method instead of calling collection() directly on the client
+        $usersCollection = $firestore->getCollection('users');
+        $usersCollection->updateOne(
+            ['_id' => $userId],
+            ['$set' => [
+                'name' => $request->name,
+                'email' => $request->email,
+            ]]
+        );
 
         return back()->with('success', 'Profile updated successfully!');
     }
@@ -54,14 +64,20 @@ class ProfileController extends Controller
 
         $firestore = $this->documentStoreService;
         $userId = Auth::id();
-        $userDoc = $firestore->getClient()->collection('users')->document($userId)->snapshot();
-        $user = $userDoc->exists() ? $userDoc->data() : null;
+
+        // Fix: Use getCollection method instead of calling collection() directly on the client
+        $usersCollection = $firestore->getCollection('users');
+        $userDoc = $usersCollection->findOne(['_id' => $userId]);
+
+        $user = $userDoc ? $this->normalizeMongoDocument($userDoc) : null;
         if (!$user || !Hash::check($request->current_password, $user['password'])) {
             return back()->withErrors(['current_password' => 'Incorrect current password.']);
         }
-        $firestore->getClient()->collection('users')->document($userId)->set([
-            'password' => Hash::make($request->password),
-        ], ['merge' => true]);
+
+        $usersCollection->updateOne(
+            ['_id' => $userId],
+            ['$set' => ['password' => Hash::make($request->password)]]
+        );
 
         return back()->with('success', 'Password changed successfully!');
     }
@@ -74,12 +90,43 @@ class ProfileController extends Controller
 
         $firestore = $this->documentStoreService;
         $userId = Auth::id();
-        $firestore->getClient()->collection('messages')->add([
+
+        // Fix: Use getCollection method instead of calling collection() directly on the client
+        $messagesCollection = $firestore->getCollection('messages');
+        $messagesCollection->insertOne([
             'user_id' => $userId,
             'content' => $request->input('content'),
             'is_from_admin' => false,
         ]);
 
         return back()->with('success', 'Admin permission request sent!');
+    }
+
+    /**
+     * Normalize MongoDB document to PHP array
+     *
+     * @param mixed $document
+     * @return array
+     */
+    protected function normalizeMongoDocument($document): array
+    {
+        if ($document instanceof \MongoDB\Model\BSONDocument) {
+            $document = (array) $document;
+        }
+
+        // Convert any nested BSONDocument or BSONArray objects to PHP arrays
+        foreach ($document as $key => $value) {
+            if ($value instanceof \MongoDB\Model\BSONDocument || $value instanceof \MongoDB\Model\BSONArray) {
+                $document[$key] = $this->normalizeMongoDocument($value);
+            } elseif (is_array($value)) {
+                $document[$key] = array_map(function ($item) {
+                    return ($item instanceof \MongoDB\Model\BSONDocument || $item instanceof \MongoDB\Model\BSONArray)
+                        ? $this->normalizeMongoDocument($item)
+                        : $item;
+                }, $value);
+            }
+        }
+
+        return $document;
     }
 }

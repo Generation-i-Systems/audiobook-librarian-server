@@ -129,6 +129,29 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     )->name('users.updateRole');
     Route::get('/books/import', [Admin\BookController::class, 'import'])->name('books.import');
     Route::get('/books/import-file', [Admin\BookController::class, 'importFile'])->name('books.importFile');
+
+    // Import file browser routes
+    Route::prefix('import')->group(function () {
+        Route::get('roots', [
+            \App\Http\Controllers\Admin\ImportFileController::class,
+            'roots'
+        ])->name('import.roots');
+
+        Route::get('list', [
+            \App\Http\Controllers\Admin\ImportFileController::class,
+            'list'
+        ])->name('import.list');
+
+        Route::post('extract', [
+            \App\Http\Controllers\Admin\ImportFileController::class,
+            'extract'
+        ])->name('import.extract');
+
+        Route::post('move', [
+            \App\Http\Controllers\Admin\ImportFileController::class,
+            'moveSelected'
+        ])->name('import.move');
+    });
     // Unified search endpoint for all book APIs
     Route::get('/books/search', action: [Admin\BookController::class, 'searchBooks'])->name('books.search');
 
@@ -215,12 +238,7 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         Route::post('/queue/clear', [Admin\QueueController::class, 'clear'])->name('queue.clear');
     });
 
-    Route::middleware(['auth', 'admin'])->prefix('admin/import')->group(function () {
-        Route::get('/roots', [\App\Http\Controllers\Admin\ImportFileController::class, 'roots']);
-        Route::get('/list', [\App\Http\Controllers\Admin\ImportFileController::class, 'list']);
-        Route::post('/extract', [\App\Http\Controllers\Admin\ImportFileController::class, 'extract']);
-        Route::post('/move', [\App\Http\Controllers\Admin\ImportFileController::class, 'moveSelected']);
-    });
+
 
     Route::resource('messages', Admin\MessageController::class);
     // Admin messaging system

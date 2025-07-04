@@ -6,6 +6,37 @@
 - Interface update: `DocumentStoreServiceInterface::autocompleteSeries`
 - Tests: `BookApiAutocompleteSeriesTest` (feature), interface mocks updated
 
+### Fixed
+- Fixed import file browser JavaScript initialization issues
+- Added proper error handling for AJAX requests in import file browser
+- Improved DOM element selection for import file browser containers
+- Enhanced logging for import file browser initialization and AJAX calls
+- Fixed missing routes for import file browser API endpoints
+- Improved route definitions for import file browser to ensure proper access
+- Added consistent URL variable usage in JavaScript for better maintainability
+- Fixed issue with select button remaining disabled when selecting directories with audio files
+- Improved directory listing with direct event attachment to list items
+- Enhanced ImportFileController with better logging and error handling
+- Improved user-facing error messages for permission issues in ImportFileController
+- Added detailed error reporting with specific HTTP status codes for different error types
+- Implemented comprehensive permission checking for file and directory operations
+- Added informative error details for common file system issues (not found, permission denied, etc.)
+- Added robust error handling for getID3 library availability and failures
+- Improved parameter validation in ImportFileController extract endpoint
+- Enhanced exception handling with detailed stack trace logging
+- Added graceful fallback for audio metadata extraction when getID3 fails
+- Implemented better error categorization (permission, disk space, library issues)
+- Added URL-based navigation to preserve browse location between page loads
+- Added support for query string parameters to select initial root and path
+- Implemented directory metadata extraction for improved import experience
+- Added support for selecting directories containing audio files
+- Enhanced metadata extraction from audio files with support for multiple tag formats (ID3v1, ID3v2, QuickTime)
+- Improved parsing of title, author, series, narrator, and other metadata from audio files
+- Added cover image extraction from audio file picture/APIC tags
+- Enhanced series detection from artist parentheses (e.g., "Author Name (Series Name)")
+- Improved series number extraction from album prefixes (e.g., "00.1 The Mad Lancers")
+- Added robust tag normalization for consistent metadata extraction across different file formats
+
 
 ### Changed
 - The `series` field for books is now always stored and processed as an array of objects with `seriesName` and `number` keys.
@@ -77,3 +108,7 @@
 - Renamed 'coverImageUrl' to 'audibleCoverImageUrl' for Audible responses
 - Converted Audible publisher field to array format to match Google Books response structure
 - Ensured all Audible response keys are in camelCase for consistent frontend integration
+- Fixed audio metadata extraction tests by properly overriding extractFileMetadata method in anonymous subclasses
+- Improved test reliability by avoiding real getID3 analysis calls in unit tests
+- Enhanced test coverage for series extraction from artist parentheses and album prefixes
+- Added robust tests for cover image extraction from audio file picture tags

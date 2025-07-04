@@ -418,20 +418,79 @@ class BookController extends Controller
             }
 
             // Add import metadata if available
+            $importPath = null;
+            $importRoot = null;
+            $importType = null;
+            $genrePath = null;
+            $directoryPath = null;
+
             if (!empty($validated['import_path']) && !empty($validated['import_root'])) {
+                $importPath = $validated['import_path'];
+                $importRoot = $validated['import_root'];
+                $importType = $validated['import_type'] ?? 'dir';
+                $genrePath = $validated['genre_path'] ?? $validated['genre'][0] ?? 'Other';
+                $directoryPath = $this->buildDirectoryPath($validated);
+
                 $validated['import_metadata'] = [
-                    'path' => $validated['import_path'],
-                    'root' => $validated['import_root'],
-                    'type' => $validated['import_type'] ?? 'file',
+                    'path' => $importPath,
+                    'root' => $importRoot,
+                    'type' => $importType,
                     'imported_at' => now()->toISOString(),
+                    'genre_path' => $genrePath,
+                    'directory_path' => $directoryPath
                 ];
+
                 // Remove these fields as they're not stored directly in the document
-                unset($validated['import_path'], $validated['import_root'], $validated['import_type']);
+                unset($validated['import_path'], $validated['import_root'], $validated['import_type'], $validated['genre_path']);
             }
 
             // Create the book in the document store
             $this->documentStoreService->createBook($validated);
             Log::info('Book imported successfully', ['id' => $id]);
+
+            // If we have import path information, attempt to move the files to the library
+            if ($importPath && $importRoot && $directoryPath) {
+                try {
+                    // Use the ImportFileController to move the files
+                    $importFileController = app()->make('App\Http\Controllers\Admin\ImportFileController');
+
+                    $moveRequest = new Request([
+                        'path' => $importPath,
+                        'root' => $importRoot,
+                        'genrePath' => $genrePath,
+                        'directoryPath' => $directoryPath,
+                        'type' => $importType
+                    ]);
+
+                    Log::info('Attempting to move imported files to library', [
+                        'path' => $importPath,
+                        'root' => $importRoot,
+                        'genrePath' => $genrePath,
+                        'directoryPath' => $directoryPath,
+                        'type' => $importType
+                    ]);
+
+                    $moveResult = $importFileController->moveSelected($moveRequest);
+                    $moveData = json_decode($moveResult->getContent(), true);
+
+                    if (isset($moveData['success']) && $moveData['success']) {
+                        Log::info('Successfully moved imported files to library', [
+                            'newPath' => $moveData['newPath'] ?? 'Unknown'
+                        ]);
+                    } else {
+                        Log::warning('Failed to move imported files to library', [
+                            'message' => $moveData['message'] ?? 'Unknown error',
+                            'details' => $moveData['details'] ?? ''
+                        ]);
+                    }
+                } catch (\Exception $moveException) {
+                    Log::error('Exception while moving imported files to library', [
+                        'error' => $moveException->getMessage(),
+                        'trace' => $moveException->getTraceAsString()
+                    ]);
+                    // Don't throw the exception - we still want to return the book import success
+                }
+            }
 
             // Fire the NewBookAdded event
             event(new NewBookAdded(['id' => $id, 'title' => $validated['title']]));
@@ -459,6 +518,46 @@ class BookController extends Controller
 
             return back()->withErrors(['error' => 'Import failed: ' . $e->getMessage()])->withInput();
         }
+    }
+
+    /**
+     * Build a directory path from book metadata
+     *
+     * @param array $bookData Book metadata
+     * @return string Formatted directory path
+     */
+    private function buildDirectoryPath(array $bookData): string
+    {
+        $parts = [];
+
+        // Use the first genre as the genre path if not explicitly provided
+        $genrePath = $bookData['genre_path'] ?? ($bookData['genre'][0] ?? 'Other');
+        $parts[] = $genrePath;
+
+        // Add author (use first author if multiple)
+        if (!empty($bookData['author'])) {
+            $parts[] = is_array($bookData['author']) ? $bookData['author'][0] : $bookData['author'];
+        }
+
+        // Add series if available
+        if (!empty($bookData['series'])) {
+            $series = $bookData['series'][0] ?? null;
+            if (is_array($series) && !empty($series['seriesName'])) {
+                $parts[] = $series['seriesName'];
+            } elseif (is_string($series)) {
+                $parts[] = $series;
+            }
+        }
+
+        // Add title
+        if (!empty($bookData['title'])) {
+            $parts[] = $bookData['title'];
+        }
+
+        // Join parts with directory separator
+        $path = implode('/', array_filter($parts));
+
+        return $path ?: 'Unknown';
     }
 
     /**
