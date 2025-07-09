@@ -753,6 +753,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 msg.remove(),
             );
 
+            // Disable submit button and show spinner
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalBtnText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
+
             let hasError = false;
 
             const dirPathInput = form.querySelector(
@@ -816,9 +822,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
             if (hasError) {
                 e.preventDefault();
-                const firstError = form.querySelector(".is-invalid");
-                if (firstError)
-                    firstError.scrollIntoView({
+                // Re-enable the submit button if there are validation errors
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
+
+                const firstErrorField = form.querySelector(".is-invalid");
+                if (firstErrorField)
+                    firstErrorField.scrollIntoView({
                         behavior: "smooth",
                         block: "center",
                     });

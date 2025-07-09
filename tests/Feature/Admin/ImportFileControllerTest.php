@@ -74,6 +74,9 @@ class ImportFileControllerTest extends TestCase
         $this->testFile = $this->testRoot . '/test.mp3';
         file_put_contents($this->testFile, 'test data');
 
+        // Create a test MP3 file in the subdirectory so it will be included in directory listing
+        file_put_contents($this->testSubdir . '/subdir_test.mp3', 'test data in subdir');
+
         // Set up book storage path for file moving tests
         $this->bookStoragePath = sys_get_temp_dir() . '/book_storage_' . uniqid();
         mkdir($this->bookStoragePath);
@@ -149,6 +152,56 @@ class ImportFileControllerTest extends TestCase
         // Verify test subdirectory is listed
         $this->assertTrue(
             collect($json['items'])->contains(fn ($item) => $item['type'] === 'dir' && $item['name'] === 'subdir')
+        );
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function list_endpoint_skips_directories_without_matching_files(): void
+    {
+        // Arrange: Configure allowed extensions
+        Config::set('import.allowed_extensions', ['mp3', 'pdf']);
+
+        // Create directory with matching files
+        $dirWithMatching = $this->testRoot . '/dir_with_matching';
+        mkdir($dirWithMatching);
+        file_put_contents($dirWithMatching . '/file.mp3', 'mp3 data');
+
+        // Create directory without matching files
+        $dirWithoutMatching = $this->testRoot . '/dir_without_matching';
+        mkdir($dirWithoutMatching);
+        file_put_contents($dirWithoutMatching . '/file.txt', 'text data');
+
+        // Create empty directory
+        $emptyDir = $this->testRoot . '/empty_dir';
+        mkdir($emptyDir);
+
+        // Act: Call the list endpoint
+        $response = $this->withoutMiddleware()
+            ->get('/admin/import/list?root=' . urlencode($this->testRoot));
+
+        // Assert: Verify response contains only directories with matching files
+        $response->assertStatus(200);
+        $json = $response->json();
+
+        // Directory with matching files should be included
+        $this->assertTrue(
+            collect($json['items'])->contains(
+                fn ($item) => $item['type'] === 'dir' && $item['name'] === 'dir_with_matching'
+            )
+        );
+
+        // Directory without matching files should be excluded
+        $this->assertFalse(
+            collect($json['items'])->contains(
+                fn ($item) => $item['type'] === 'dir' && $item['name'] === 'dir_without_matching'
+            )
+        );
+
+        // Empty directory should be excluded
+        $this->assertFalse(
+            collect($json['items'])->contains(
+                fn ($item) => $item['type'] === 'dir' && $item['name'] === 'empty_dir'
+            )
         );
     }
 

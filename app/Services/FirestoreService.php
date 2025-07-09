@@ -680,9 +680,20 @@ class FirestoreService implements DocumentStoreServiceInterface
             if (!isset($data['dateAdded'])) {
                 $data['dateAdded'] = $this->getServerTimestamp();
             }
-            $docRef = $this->db->collection('books')->add($data);
 
-            return $docRef->id();
+            // Use the provided ID if available, otherwise generate one
+            $docId = $data['id'] ?? null;
+
+            if ($docId) {
+                // Use set() to create document with specific ID
+                $docRef = $this->db->collection('books')->document($docId);
+                $docRef->set($data);
+                return $docId;
+            } else {
+                // Use add() to auto-generate ID
+                $docRef = $this->db->collection('books')->add($data);
+                return $docRef->id();
+            }
         } catch (\Throwable $e) {
             Log::error('Failed to create book: ' . $e->getMessage());
 

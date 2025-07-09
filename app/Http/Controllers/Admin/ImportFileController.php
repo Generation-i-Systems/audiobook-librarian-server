@@ -208,7 +208,18 @@ class ImportFileController extends Controller
             }
 
             // Get directories
+            $allowedExtensions = Config::get('import.allowed_extensions', []);
             $directories = collect(File::directories($absPath))
+                ->filter(function ($d) use ($allowedExtensions) {
+                    // Check if the directory contains any files with allowed extensions
+                    $hasMatchingFiles = collect(File::files($d))
+                        ->filter(function ($f) use ($allowedExtensions) {
+                            return in_array(strtolower($f->getExtension()), $allowedExtensions);
+                        })
+                        ->isNotEmpty();
+
+                    return $hasMatchingFiles;
+                })
                 ->map(function ($d) {
                     return [
                         'type' => 'dir',
@@ -216,10 +227,9 @@ class ImportFileController extends Controller
                     ];
                 });
 
-            Log::debug('[ImportFile] Found ' . count($directories) . " directories in {$absPath}");
+            Log::debug('[ImportFile] Found ' . count($directories) . " directories with matching files in {$absPath}");
 
             // Get files with allowed extensions
-            $allowedExtensions = Config::get('import.allowed_extensions', []);
             $files = collect(File::files($absPath))
                 ->filter(function ($f) use ($allowedExtensions) {
                     return in_array(strtolower($f->getExtension()), $allowedExtensions);
@@ -1537,6 +1547,12 @@ class ImportFileController extends Controller
             'sourceType' => $meta['sourceType'] ?? '',
             'importMode' => true, // Flag to indicate this is from import
         ];
+
+        // Store cover image data in session to avoid URL parameter size limits
+        if (!empty($meta['coverImage'])) {
+            session(['import_cover_image' => $meta['coverImage']]);
+            $formData['hasCoverImage'] = true;
+        }
 
         // Handle authors as array
         if (!empty($meta['author'])) {

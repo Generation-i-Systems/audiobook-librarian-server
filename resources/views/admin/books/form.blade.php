@@ -44,6 +44,23 @@
             $displayPath = old('directoryPath') ?? request()->get('import_path') ?? ($book['directoryPath'] ?? null) ?? ($initial['directoryPath'] ?? '');
         @endphp
         <input type="hidden" id="directoryPath" name="directoryPath" value="{{ $displayPath }}">
+
+        <!-- Import-related hidden fields -->
+        @if(!empty($initial['sourcePath']))
+            <input type="hidden" name="sourcePath" value="{{ $initial['sourcePath'] }}">
+        @endif
+        @if(!empty($initial['sourceRoot']))
+            <input type="hidden" name="sourceRoot" value="{{ $initial['sourceRoot'] }}">
+        @endif
+        @if(!empty($initial['sourceRelPath']))
+            <input type="hidden" name="sourceRelPath" value="{{ $initial['sourceRelPath'] }}">
+        @endif
+        @if(!empty($initial['sourceType']))
+            <input type="hidden" name="sourceType" value="{{ $initial['sourceType'] }}">
+        @endif
+        @if(!empty($initial['importMode']))
+            <input type="hidden" name="importMode" value="{{ $initial['importMode'] ? '1' : '0' }}">
+        @endif
         <button type="button" class="btn btn-info mb-3" id="autofill-modal-btn"><i class="fas fa-magic"></i> Autofill Book Metadata</button>
         @if(isset($book))
         <button type="button" class="btn btn-secondary mb-3 ms-2" id="raw-json-edit-btn"><i class="fas fa-code"></i> Raw JSON Edit</button>
@@ -222,7 +239,15 @@
             $addedCovers = [];
 
             // Get just the filename for the current cover
-            $currentCoverFilename = !empty($coverImg) ? basename($coverImg) : null;
+            $currentCoverFilename = null;
+            if (!empty($coverImg)) {
+                if (is_string($coverImg)) {
+                    $currentCoverFilename = basename($coverImg);
+                } elseif (is_array($coverImg) && isset($coverImg['data'])) {
+                    // This is embedded image data from import, we'll handle it later
+                    $currentCoverFilename = null;
+                }
+            }
 
             // Always show current cover if it exists
             if (isset($book) && !empty($currentCoverFilename)) {
@@ -234,6 +259,21 @@
                     'display_name' => $currentCoverFilename,
                 ];
                 $addedCovers[] = $currentCoverFilename;
+            }
+
+            // Handle embedded cover image from import
+            if (!empty($coverImg) && is_array($coverImg) && isset($coverImg['data'])) {
+                $mimeType = $coverImg['mime'] ?? 'image/jpeg';
+                $imageData = base64_encode($coverImg['data']);
+                $dataUri = 'data:' . $mimeType . ';base64,' . $imageData;
+
+                $coverOptions[] = [
+                    'type' => 'embedded',
+                    'value' => 'embedded_from_import',
+                    'src' => $dataUri,
+                    'label' => 'Embedded Cover (from audio file)',
+                    'display_name' => 'Embedded Cover',
+                ];
             }
 
             // Add Google Books cover if available and not the same as current cover

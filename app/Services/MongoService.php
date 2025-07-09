@@ -210,6 +210,12 @@ class MongoService implements DocumentStoreServiceInterface
     /** @inheritDoc */
     public function createBook(array $data)
     {
+        // If an ID is provided, use it as the _id field
+        if (isset($data['id'])) {
+            $data['_id'] = $data['id'];
+            unset($data['id']); // Remove the id field since MongoDB uses _id
+        }
+
         $result = $this->getCollection('books')->insertOne($data);
         return (string) $result->getInsertedId();
     }
