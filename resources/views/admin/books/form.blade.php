@@ -167,7 +167,7 @@
                              placeholder="Series Name" value="{{ $series['seriesName'] ?? '' }}">
                         <datalist id="series-list"></datalist>
                         <input type="number" name="series[{{ $idx }}][number]" class="form-control w-auto"
-                            style="max-width:100px; height:32px;" placeholder="Number" value="{{ $series['number'] ?? '' }}" min="1" step="any">
+                            style="max-width:100px; height:32px;" placeholder="Number" value="{{ $series['number'] ?? '' }}" step="any">
                         <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
                             <button type="button" class="btn btn-outline-danger btn-sm remove-series p-0 mb-0"
                                 style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
@@ -251,11 +251,23 @@
 
             // Always show current cover if it exists
             if (isset($book) && !empty($currentCoverFilename)) {
+                // Detect if current cover is from Audible or Google Books by filename pattern
+                $coverType = 'current-NOT';
+                $coverLabel = 'Current Cover';
+
+                if (strpos($currentCoverFilename, 'audible_') === 0 || strpos($currentCoverFilename, 'cover_audible_') === 0) {
+                    $coverType = 'audible';
+                    $coverLabel = 'Current Cover (Audible)';
+                } elseif (strpos($currentCoverFilename, 'googlebooks_') === 0 || strpos($currentCoverFilename, 'cover_googlebooks_') === 0) {
+                    $coverType = 'google';
+                    $coverLabel = 'Current Cover (Google Books)';
+                }
+
                 $coverOptions[] = [
-                    'type' => 'current',
+                    'type' => $coverType,
                     'value' => $currentCoverFilename,
                     'src' => route('cover.proxy', ['path' => $directoryPath . '/' . $currentCoverFilename]),
-                    'label' => 'Current Cover',
+                    'label' => $coverLabel,
                     'display_name' => $currentCoverFilename,
                 ];
                 $addedCovers[] = $currentCoverFilename;
@@ -288,15 +300,30 @@
                 $addedCovers[] = $coverAuto;
             }
 
+            // Add Audible cover if available
+            if (!empty($audibleCover) && !in_array($audibleCover, $addedCovers)) {
+                $coverOptions[] = [
+                    'type' => 'audible',
+                    'value' => $audibleCover,
+                    'src' => route('cover.proxy', ['path' => $directoryPath . '/' . $audibleCover]),
+                    'label' => 'Audible',
+                    'display_name' => $audibleCover,
+                ];
+                $addedCovers[] = $audibleCover;
+            }
+
             // Add other candidates (already filtered in controller)
             if (!empty($coverCandidates)) {
                 foreach ($coverCandidates as $candidate) {
                     if (!in_array($candidate, $addedCovers)) {
+                        // Check if this is an Audible cover by filename pattern
+                        $isAudible = (strpos($candidate, 'audible_') === 0 || strpos($candidate, 'cover_audible_') === 0);
+
                         $coverOptions[] = [
-                            'type' => 'candidate',
+                            'type' => $isAudible ? 'audible' : 'candidate',
                             'value' => $candidate,
                             'src' => route('cover.proxy', ['path' => $directoryPath . '/' . $candidate]),
-                            'label' => 'Candidate',
+                            'label' => $isAudible ? 'Audible' : 'Candidate',
                             'display_name' => $candidate,
                         ];
                         $addedCovers[] = $candidate;
@@ -307,11 +334,45 @@
         @if (!empty($coverOptions))
         <div class="mb-3" id="cover-candidates-group">
             <label class="form-label">Select Cover Image:</label>
+            @php
+                $initialCoverSource = '';
+                foreach($coverOptions as $option) {
+                    if((isset($biggestCover) && $biggestCover === $option['value']) ||
+                       (empty($biggestCover) && $option['type'] === 'current')) {
+                        $initialCoverSource = $option['type'];
+                        break;
+                    }
+                }
+            @endphp
+            <!-- Original coverImageSource field -->
+            <input type="hidden" name="coverImageSource" id="coverImageSource" value="{{ $initialCoverSource }}">
+
+            <!-- Add a script to ensure coverImageSource is set correctly on form submission -->
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    const bookForm = document.getElementById('book-form');
+                    if (bookForm) {
+                        bookForm.addEventListener('submit', function() {
+                            const selectedRadio = document.querySelector('input[name="coverImageCandidate"]:checked');
+                            if (selectedRadio) {
+                                const sourceField = document.getElementById('coverImageSource');
+                                if (sourceField) {
+                                    sourceField.value = selectedRadio.dataset.source || '';
+                                    console.log('Form submit: Setting coverImageSource to ' + sourceField.value);
+                                }
+                            }
+                        });
+                    }
+                });
+            </script>
+            <!-- Debug info -->
+            <div class="d-none">Initial cover source: {{ $initialCoverSource }}</div>
             <div class="d-flex flex-wrap gap-3" id="cover-candidates-list">
                 @foreach($coverOptions as $option)
                 <div class="text-center">
                     <label class="d-flex flex-column align-items-center">
                         <input type="radio" name="coverImageCandidate" value="{{ $option['value'] }}"
+                            data-source="{{ $option['type'] }}"
                             @if((isset($biggestCover) && $biggestCover === $option['value']) || (empty($biggestCover) && $option['type'] === 'current')) checked @endif class="mb-2">
                                                 <img src="{{ $option['src'] }}" alt="{{ $option['label'] }}"
                                                     style="max-width:100px;max-height:140px;border:1px solid #ccc;">
@@ -727,6 +788,6 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 @push('scripts')
-    <script src="/js/admin/book-autocomplete.js"></script>
+    @vite(['resources/js/admin/book-autocomplete.js'])
 @endpush
 @endsection

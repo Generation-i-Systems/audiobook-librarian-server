@@ -21,6 +21,21 @@
 - Interface: `DocumentStoreServiceInterface::autocompleteSeries`
 - Tests: `BookApiAutocompleteSeriesTest`
 
+## Unified External Cover Image Integration
+
+### Features
+- Seamless integration of external cover images (Audible, Google Books) into the book form UI
+- Automatic download and storage of external cover images when books are created or updated
+- Consistent UI for selecting between different cover image sources
+- Auto-selection of cover images after autofill operations
+- Error handling for failed cover image downloads
+
+### Implementation
+- Service: `ExternalCoverService` handles downloading and naming of external cover images
+- UI: External cover images are integrated into the "Select Cover Image" block
+- JavaScript: Enhanced form.js with auto-selection and error handling for cover images
+- Controller: BookController uses ExternalCoverService for cover image management
+
 See [CHANGELOG.md](CHANGELOG.md) for details.
 
 

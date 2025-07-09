@@ -6,6 +6,7 @@ use App\Contracts\DocumentStoreServiceInterface;
 use App\Events\NewBookAdded;
 use App\Http\Controllers\Controller;
 use App\Services\AudibleService;
+use App\Services\ExternalCoverService;
 use App\Services\GoogleBooksApiService;
 use App\Traits\BookImportTrait;
 use Illuminate\Http\Request;
@@ -87,14 +88,18 @@ class BookController extends Controller
 
     protected AudibleService $audibleService;
 
+    protected ExternalCoverService $externalCoverService;
+
     public function __construct(
         DocumentStoreServiceInterface $documentStoreService,
         GoogleBooksApiService $googleBooksApiService,
-        AudibleService $audibleService
+        AudibleService $audibleService,
+        ExternalCoverService $externalCoverService
     ) {
         $this->documentStoreService = $documentStoreService;
         $this->setGoogleBooksApiService($googleBooksApiService);
         $this->audibleService = $audibleService;
+        $this->externalCoverService = $externalCoverService;
         $this->storagePath = env('BOOK_STORAGE_PATH');
     }
 
@@ -107,7 +112,7 @@ class BookController extends Controller
             $search = strtolower($request->input('search'));
             $books = array_filter(
                 $books,
-                fn ($book) => (
+                fn($book) => (
                     isset($book['title']) && stripos($book['title'], $search) !== false
                 ) || (
                     isset($book['author']) && (
@@ -119,13 +124,13 @@ class BookController extends Controller
         if ($request->filled('author')) {
             $books = array_filter(
                 $books,
-                fn ($book) => isset($book['author']) && $book['author'] == $request->input('author')
+                fn($book) => isset($book['author']) && $book['author'] == $request->input('author')
             );
         }
         if ($request->filled('genre_id')) {
             $books = array_filter(
                 $books,
-                fn ($book) => isset($book['genre_id']) && $book['genre_id'] == $request->input('genre_id')
+                fn($book) => isset($book['genre_id']) && $book['genre_id'] == $request->input('genre_id')
             );
         }
         // Sorting
@@ -133,7 +138,7 @@ class BookController extends Controller
         $books = array_values($books);
         usort(
             $books,
-            fn ($a, $b) => match ($sort) {
+            fn($a, $b) => match ($sort) {
                 'recent_desc' => strtotime($b['created_at'] ?? 0) <=> strtotime($a['created_at'] ?? 0),
                 'recent_asc' => strtotime($a['created_at'] ?? 0) <=> strtotime($b['created_at'] ?? 0),
                 'author_asc' => strcmp($a['author_name'] ?? '', $b['author_name'] ?? ''),
@@ -184,10 +189,10 @@ class BookController extends Controller
         $biggestCover = null;
         $biggestSize = 0;
         $directoryPath = $request->old('directoryPath') ?? $initial['directoryPath'] ?? '';
-        
+
         // Check if this is an import request with pre-extracted metadata
         $isImportMode = $request->has('importMode') && $request->get('importMode');
-        
+
         if ($isImportMode) {
             // Use the pre-extracted metadata from import process instead of re-processing
             $initial = [
@@ -208,14 +213,14 @@ class BookController extends Controller
                 'sourceType' => $request->get('sourceType', ''),
                 'importMode' => $request->get('importMode', false),
             ];
-            
+
             // Get cover image from session if available
             if ($request->has('hasCoverImage') && session()->has('import_cover_image')) {
                 $initial['coverImage'] = session('import_cover_image');
                 session()->forget('import_cover_image'); // Clean up session
             }
 
-            
+
             // Ensure arrays are properly formatted
             if (!is_array($initial['author'])) {
                 $initial['author'] = empty($initial['author']) ? [''] : [$initial['author']];
@@ -229,7 +234,7 @@ class BookController extends Controller
             if (!is_array($initial['series'])) {
                 $initial['series'] = empty($initial['series']) ? [] : $initial['series'];
             }
-            
+
             $directoryPath = $initial['directoryPath'];
         } else {
             // Use processDirPath to extract initial values from the directory
@@ -247,7 +252,7 @@ class BookController extends Controller
                 }
             }
         }
-        
+
         [$coverAuto, $coverCandidates] = $this->findCoverImageCandidate($directoryPath);
         // If no cover and no images, try m4b extraction
         if (empty($coverAuto) && empty($coverCandidates)) {
@@ -302,19 +307,19 @@ class BookController extends Controller
                 $genreList[] = $g;
             }
         }
-        
+
         // If in import mode, ensure the requested genre exists in the genre list
         if ($isImportMode) {
             $requestedGenres = $request->get('genre', []);
             if (!is_array($requestedGenres)) {
                 $requestedGenres = [$requestedGenres];
             }
-            
+
             foreach ($requestedGenres as $requestedGenre) {
                 if (!empty($requestedGenre) && !in_array($requestedGenre, $genreList)) {
                     // Add the new genre to the list so it appears in the dropdown
                     $genreList[] = $requestedGenre;
-                    
+
                     // Also add it to the database for future use
                     try {
                         $documentStore->createGenre(['name' => $requestedGenre]);
@@ -322,13 +327,13 @@ class BookController extends Controller
                     } catch (\Exception $e) {
                         Log::warning('Failed to auto-create genre', [
                             'genre' => $requestedGenre,
-                            'error' => $e->getMessage()
+                            'error' => $e->getMessage(),
                         ]);
                     }
                 }
             }
         }
-        
+
         // Debug logging for genre list
         Log::debug('Genre list for form', [
             'genreList' => $genreList,
@@ -520,7 +525,7 @@ class BookController extends Controller
                     'type' => $importType,
                     'imported_at' => now()->toISOString(),
                     'genre_path' => $genrePath,
-                    'directory_path' => $directoryPath
+                    'directory_path' => $directoryPath,
                 ];
 
                 // Remove these fields as they're not stored directly in the document
@@ -542,7 +547,7 @@ class BookController extends Controller
                         'root' => $importRoot,
                         'genrePath' => $genrePath,
                         'directoryPath' => $directoryPath,
-                        'type' => $importType
+                        'type' => $importType,
                     ]);
 
                     Log::info('Attempting to move imported files to library', [
@@ -550,7 +555,7 @@ class BookController extends Controller
                         'root' => $importRoot,
                         'genrePath' => $genrePath,
                         'directoryPath' => $directoryPath,
-                        'type' => $importType
+                        'type' => $importType,
                     ]);
 
                     $moveResult = $importFileController->moveSelected($moveRequest);
@@ -569,7 +574,7 @@ class BookController extends Controller
                 } catch (\Exception $moveException) {
                     Log::error('Exception while moving imported files to library', [
                         'error' => $moveException->getMessage(),
-                        'trace' => $moveException->getTraceAsString()
+                        'trace' => $moveException->getTraceAsString(),
                     ]);
                     // Don't throw the exception - we still want to return the book import success
                 }
@@ -780,11 +785,6 @@ class BookController extends Controller
                 'googleBooksId' => 'nullable|string|max:50',
                 'goodreadsId' => 'nullable|string|max:50',
                 // Import-specific fields
-                'importMode' => 'nullable|boolean',
-                'sourcePath' => 'nullable|string',
-                'sourceRoot' => 'nullable|string',
-                'sourceRelPath' => 'nullable|string',
-                'sourceType' => 'nullable|string|in:file,dir',
                 'genrePath' => 'nullable|string',
             ]);
 
@@ -824,37 +824,119 @@ class BookController extends Controller
                 $file->storeAs($directoryPath, $coverName, 'books');
                 $validated['coverImage'] = $coverName;
                 Log::info('Cover image saved', ['path' => $directoryPath . '/' . $coverName]);
-            } elseif ($request->input('coverImageUrl')) {
-                // Handle external cover image URL - download it to local storage
+            } elseif ($request->filled('coverImageUrl')) {
+                // Handle external cover image URL from Google Books
                 $coverUrl = $request->input('coverImageUrl');
                 $directoryPath = $validated['directoryPath'] ?? '';
+                $googleBooksId = $request->input('googleBooksId') ?? $validated['googleBooksId'] ?? null;
 
                 if (!empty($directoryPath)) {
                     try {
-                        $localCoverPath = $this->importCoverImageFromUrl($coverUrl, $directoryPath);
-                        if ($localCoverPath) {
-                            $validated['coverImage'] = basename($localCoverPath);
-                            Log::info('Cover image downloaded from URL', [
-                                'url' => $coverUrl,
-                                'path' => $localCoverPath
+                        // Validate URL before attempting to download
+                        if (!filter_var($coverUrl, FILTER_VALIDATE_URL)) {
+                            Log::error('Invalid Google Books cover image URL format', ['url' => $coverUrl]);
+                            return back()
+                                ->withInput()
+                                ->withErrors(['coverImageUrl' => 'Invalid image URL format']);
+                        }
+
+                        $result = $this->externalCoverService->downloadCoverImage(
+                            $coverUrl,
+                            $directoryPath,
+                            'googlebooks',
+                            $googleBooksId
+                        );
+
+                        if ($result['success']) {
+                            $validated['coverImage'] = basename($result['path']);
+                            Log::info('Google Books cover image downloaded successfully', [
+                                'path' => $result['path'],
                             ]);
                         } else {
-                            // Fallback to storing URL if download fails
-                            $validated['coverImage'] = $coverUrl;
-                            Log::warning('Failed to download cover image, storing URL', ['url' => $coverUrl]);
+                            // Return with error if download fails
+                            Log::error('Failed to download Google Books cover image', [
+                                'url' => $coverUrl,
+                                'error' => $result['error'] ?? 'Unknown error'
+                            ]);
+
+                            return back()
+                                ->withInput()
+                                ->withErrors(['coverImageUrl' => 'Failed to download cover image: ' . ($result['error'] ?? 'Unknown error')]);
                         }
                     } catch (\Exception $e) {
-                        // Fallback to storing URL if download fails
-                        $validated['coverImage'] = $coverUrl;
-                        Log::warning('Exception downloading cover image, storing URL', [
+                        Log::error('Exception while downloading Google Books cover image', [
                             'url' => $coverUrl,
-                            'error' => $e->getMessage()
+                            'error' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString(),
                         ]);
+
+                        return back()
+                            ->withInput()
+                            ->withErrors(['coverImageUrl' => 'Error downloading cover image: ' . $e->getMessage()]);
                     }
                 } else {
-                    // No directory path, store URL directly
-                    $validated['coverImage'] = $coverUrl;
-                    Log::info('No directory path for cover download, storing URL', ['url' => $coverUrl]);
+                    // No directory path, can't download
+                    Log::error('No directory path for Google Books cover download', ['url' => $coverUrl]);
+                    return back()
+                        ->withInput()
+                        ->withErrors(['directoryPath' => 'Directory path is required to download cover image']);
+                }
+            } elseif ($request->filled('audibleCoverImageUrl')) {
+                // Handle Audible cover image URL
+                $coverUrl = $request->input('audibleCoverImageUrl');
+                $directoryPath = $validated['directoryPath'] ?? '';
+                $asin = $request->input('audibleId') ?? $validated['asin'] ?? null;
+
+                if (!empty($directoryPath)) {
+                    try {
+                        // Validate URL before attempting to download
+                        if (!filter_var($coverUrl, FILTER_VALIDATE_URL)) {
+                            Log::error('Invalid Audible cover image URL format', ['url' => $coverUrl]);
+                            return back()
+                                ->withInput()
+                                ->withErrors(['audibleCoverImageUrl' => 'Invalid image URL format']);
+                        }
+
+                        $result = $this->externalCoverService->downloadCoverImage(
+                            $coverUrl,
+                            $directoryPath,
+                            'audible',
+                            $asin
+                        );
+
+                        if ($result['success']) {
+                            $validated['coverImage'] = basename($result['path']);
+                            Log::info('Audible cover image downloaded successfully', [
+                                'path' => $result['path'],
+                            ]);
+                        } else {
+                            // Return with error if download fails
+                            Log::error('Failed to download Audible cover image', [
+                                'url' => $coverUrl,
+                                'error' => $result['error'] ?? 'Unknown error'
+                            ]);
+
+                            return back()
+                                ->withInput()
+                                ->withErrors(['audibleCoverImageUrl' => 'Failed to download cover image: ' . ($result['error'] ?? 'Unknown error')]);
+                        }
+                    } catch (\Exception $e) {
+                        Log::error('Exception while downloading Audible cover image', [
+                            'url' => $coverUrl,
+                            'error' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString(),
+                        ]);
+
+                        return back()
+                            ->withInput()
+                            ->withErrors(['audibleCoverImageUrl' => 'Error downloading cover image: ' . $e->getMessage()]);
+                    }
+                } else {
+                    // No directory path, can't download
+                    Log::error('No directory path for Audible cover download', ['url' => $coverUrl]);
+                    return back()
+                        ->withInput()
+                        ->withErrors(['directoryPath' => 'Directory path is required to download cover image']);
                 }
             } elseif (!empty($validated['coverImage'])) {
                 // Handle coverImage from import metadata (could be URL or embedded data)
@@ -876,13 +958,13 @@ class BookController extends Controller
                                 $validated['coverImage'] = basename($localCoverPath);
                                 Log::info('Cover image downloaded from import URL', [
                                     'url' => $coverImage,
-                                    'path' => $localCoverPath
+                                    'path' => $localCoverPath,
                                 ]);
                             }
                         } catch (\Exception $e) {
                             Log::warning('Failed to download cover from import URL', [
                                 'url' => $coverImage,
-                                'error' => $e->getMessage()
+                                'error' => $e->getMessage(),
                             ]);
                         }
                     } elseif (is_array($coverImage) && isset($coverImage['data'])) {
@@ -916,7 +998,7 @@ class BookController extends Controller
                             }
                         } catch (\Exception $e) {
                             Log::warning('Failed to save embedded cover image', [
-                                'error' => $e->getMessage()
+                                'error' => $e->getMessage(),
                             ]);
                         }
                     }
@@ -957,14 +1039,16 @@ class BookController extends Controller
             Log::info('Book created successfully', ['id' => $id]);
 
             // Handle import file moving if this is from import
-            if (!empty($validated['importMode']) && 
-                !empty($validated['sourcePath']) && 
-                !empty($validated['sourceRoot']) && 
-                !empty($validated['directoryPath'])) {
-                
+            if (
+                !empty($validated['importMode']) &&
+                !empty($validated['sourcePath']) &&
+                !empty($validated['sourceRoot']) &&
+                !empty($validated['directoryPath'])
+            ) {
+
                 try {
                     $importFileController = app()->make('App\Http\Controllers\Admin\ImportFileController');
-                    
+
                     $moveSuccess = $importFileController->moveImportedFiles(
                         $validated['sourcePath'],
                         $validated['sourceRoot'],
@@ -972,18 +1056,18 @@ class BookController extends Controller
                         $validated['sourceType'] ?? 'dir',
                         $validated['directoryPath']
                     );
-                    
+
                     if ($moveSuccess) {
                         Log::info('Import files moved successfully', [
                             'bookId' => $id,
                             'from' => $validated['sourcePath'],
-                            'to' => $validated['directoryPath']
+                            'to' => $validated['directoryPath'],
                         ]);
                     } else {
                         Log::warning('Failed to move import files', [
                             'bookId' => $id,
                             'from' => $validated['sourcePath'],
-                            'to' => $validated['directoryPath']
+                            'to' => $validated['directoryPath'],
                         ]);
                     }
                 } catch (\Exception $moveException) {
@@ -991,7 +1075,7 @@ class BookController extends Controller
                     Log::error('Exception during import file move', [
                         'bookId' => $id,
                         'error' => $moveException->getMessage(),
-                        'sourcePath' => $validated['sourcePath']
+                        'sourcePath' => $validated['sourcePath'],
                     ]);
                 }
             }
@@ -1043,6 +1127,7 @@ class BookController extends Controller
      */
     public function update(Request $request, $book)
     {
+        Log::info('Updating book: ' . $book . ' ' . print_r($request->all(), true));
         $documentStore = $this->documentStoreService;
         $id = $book; // Store the ID before overwriting $book variable
         $book = $documentStore->getBook($book);
@@ -1094,6 +1179,8 @@ class BookController extends Controller
         $oldDirectoryPath = $book['directoryPath'] ?? null;
         $newDirectoryPath = $validated['directoryPath'] ?? null;
         if ($oldDirectoryPath && $newDirectoryPath && $oldDirectoryPath !== $newDirectoryPath) {
+            Log::info('Moving files from old directory to new directory' . $oldDirectoryPath . '' . $newDirectoryPath . '' . $oldDirectoryPath . '');
+
             $disk = \Illuminate\Support\Facades\Storage::disk('books');
             if ($disk->exists($oldDirectoryPath)) {
                 $files = $disk->allFiles($oldDirectoryPath);
@@ -1141,6 +1228,10 @@ class BookController extends Controller
             }
             // Update file references (coverImage, etc)
             if (!empty($book['coverImage'])) {
+                Log::debug('Updating cover image reference', [
+                    'book' => $book,
+                    'newDirectoryPath' => $newDirectoryPath,
+                ]);
                 $oldCover = $book['coverImage'];
                 $coverName = basename($oldCover);
                 $validated['coverImage'] = $newDirectoryPath . '/' . $coverName;
@@ -1149,6 +1240,10 @@ class BookController extends Controller
 
         // Handle cover image upload or candidate selection
         if ($request->hasFile('coverImage') && $request->file('coverImage')->isValid()) {
+            Log::info('Updating cover image', [
+                'book' => $book,
+                'directoryPath' => $book['directoryPath'],
+            ]);
             $file = $request->file('coverImage');
             $directoryPath = $book['directoryPath'] ?? null;
             if ($directoryPath) {
@@ -1157,20 +1252,85 @@ class BookController extends Controller
                 // Store file in books disk
                 $file->storeAs($directoryPath, $coverName, 'books');
                 $validated['coverImage'] = $storagePath;
+            } else {
+                Log::error('Failed to update cover image', [
+                    'book' => $book,
+                    'directoryPath' => $directoryPath,
+                ]);
             }
-        } elseif ($request->filled('coverImageCandidate')) {
+        } elseif (
+            $request->filled('coverImageCandidate') &&
+            Storage::disk('books')->exists($book['directoryPath'] . '/' . $request->input('coverImageCandidate'))
+        ) {
+            Log::debug('Updating cover image candidate', [
+                'candidate' => $request->input('coverImageCandidate'),
+            ]);
             $directoryPath = $book['directoryPath'] ?? null;
             $candidate = $request->input('coverImageCandidate');
             if ($directoryPath && $candidate) {
                 $validated['coverImage'] = $directoryPath . '/' . $candidate;
             }
         } elseif ($request->filled('coverImageUrl')) {
-            // Handle external cover image URL from Google Books
+            Log::debug('Updating cover image URL', [
+                'coverImageUrl' => $request->input('coverImageUrl'),
+                'coverImageSource' => $request->input('coverImageSource'),
+                'coverImage' => $request->input('coverImage'),
+                'coverImageCandidate' => $request->input('coverImageCandidate'),
+                'audibleId' => $request->input('audibleId'),
+                'googleBooksId' => $request->input('googleBooksId'),
+            ]);
+            // Handle external cover image URL
             $coverUrl = $request->input('coverImageUrl');
-            if ($coverUrl) {
-                // Store the URL directly in the coverImage field
-                $validated['coverImage'] = $coverUrl;
-                Log::info('Using external cover image URL', ['url' => $coverUrl]);
+            $directoryPath = $book['directoryPath'] ?? null;
+            $googleBooksId = $request->input('googleBooksId') ?? $book['googleBooksId'] ?? null;
+
+            // Get the cover image source from the form
+            $coverImageSource = $request->input('coverImageSource') ?? 'googlebooks';
+            Log::info('Cover image source from form', ['source' => $coverImageSource]);
+
+            if ($coverUrl && $directoryPath) {
+                try {
+                    // Validate URL before attempting to download
+                    if (!filter_var($coverUrl, FILTER_VALIDATE_URL)) {
+                        Log::error('Invalid Google Books cover image URL format', ['url' => $coverUrl]);
+                        return back()
+                            ->withInput()
+                            ->withErrors(['coverImageUrl' => 'Invalid image URL format']);
+                    }
+
+                    $result = $this->externalCoverService->downloadCoverImage(
+                        $coverUrl,
+                        $directoryPath,
+                        $coverImageSource,
+                        $googleBooksId
+                    );
+
+                    if ($result['success']) {
+                        $validated['coverImage'] = $result['path'];
+                    } else {
+                        // Log the error but continue with the update
+                        Log::error('Failed to download Google Books cover image', [
+                            'url' => $coverUrl,
+                            'error' => $result['error'] ?? 'Unknown error'
+                        ]);
+
+                        // Return with error if download fails
+                        $errorMsg = 'Failed to download cover image: ' . ($result['error'] ?? 'Unknown error');
+                        return back()
+                            ->withInput()
+                            ->withErrors(['coverImageUrl' => $errorMsg]);
+                    }
+                } catch (\Exception $e) {
+                    Log::error('Exception while downloading Google Books cover image', [
+                        'url' => $coverUrl,
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                    ]);
+
+                    return back()
+                        ->withInput()
+                        ->withErrors(['coverImageUrl' => 'Error downloading cover image: ' . $e->getMessage()]);
+                }
             }
         } elseif ($request->filled('audibleCoverImageUrl')) {
             // Handle Audible cover image URL
@@ -1178,51 +1338,48 @@ class BookController extends Controller
             $directoryPath = $book['directoryPath'] ?? null;
             $asin = $request->input('audibleId') ?? $book['audibleId'] ?? null;
 
-            if ($coverUrl && $directoryPath && $asin) {
-                Log::info('Downloading Audible cover image', [
-                    'url' => $coverUrl,
-                    'directoryPath' => $directoryPath,
-                    'asin' => $asin
-                ]);
-
-                // Download the cover image to the book directory
+            if ($coverUrl && $directoryPath) {
                 try {
-                    $response = \Illuminate\Support\Facades\Http::timeout(15)->get($coverUrl);
+                    // Validate URL before attempting to download
+                    if (!filter_var($coverUrl, FILTER_VALIDATE_URL)) {
+                        Log::error('Invalid Audible cover image URL format', ['url' => $coverUrl]);
+                        return back()
+                            ->withInput()
+                            ->withErrors(['audibleCoverImageUrl' => 'Invalid image URL format']);
+                    }
 
-                    if ($response->successful()) {
-                        $imageContents = $response->body();
-                        $extension = 'jpg'; // Default to jpg for Audible covers
+                    $result = $this->externalCoverService->downloadCoverImage(
+                        $coverUrl,
+                        $directoryPath,
+                        'audible',
+                        $asin
+                    );
 
-                        // Detect extension from content type if available
-                        $contentType = $response->header('Content-Type');
-                        if (strpos($contentType, 'image/jpeg') !== false) {
-                            $extension = 'jpg';
-                        } elseif (strpos($contentType, 'image/png') !== false) {
-                            $extension = 'png';
-                        }
-
-                        $fileName = 'cover_audible_' . $asin . '.' . $extension;
-                        $storagePath = $directoryPath . '/' . $fileName;
-
-                        // Store file in books disk
-                        Storage::disk('books')->put($storagePath, $imageContents);
-                        $validated['coverImage'] = $storagePath;
-
-                        Log::info('Audible cover image downloaded successfully', [
-                            'path' => $storagePath
-                        ]);
+                    if ($result['success']) {
+                        $validated['coverImage'] = $result['path'];
                     } else {
+                        // Log the error but continue with the update
                         Log::error('Failed to download Audible cover image', [
                             'url' => $coverUrl,
-                            'status' => $response->status()
+                            'error' => $result['error'] ?? 'Unknown error'
                         ]);
+
+                        // Return with error if download fails
+                        $errorMsg = 'Failed to download cover image: ' . ($result['error'] ?? 'Unknown error');
+                        return back()
+                            ->withInput()
+                            ->withErrors(['audibleCoverImageUrl' => $errorMsg]);
                     }
                 } catch (\Exception $e) {
                     Log::error('Exception while downloading Audible cover image', [
                         'url' => $coverUrl,
-                        'message' => $e->getMessage(),
-                        'trace' => Str::limit($e->getTraceAsString(), 1000)
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
                     ]);
+
+                    return back()
+                        ->withInput()
+                        ->withErrors(['audibleCoverImageUrl' => 'Error downloading cover image: ' . $e->getMessage()]);
                 }
             }
         }
@@ -1431,7 +1588,7 @@ class BookController extends Controller
                         Log::debug('Adding author to Google Books query', [
                             'author' => $author,
                             'authorQuery' => $authorQuery,
-                            'author_empty' => empty($author)
+                            'author_empty' => empty($author),
                         ]);
                     }
 

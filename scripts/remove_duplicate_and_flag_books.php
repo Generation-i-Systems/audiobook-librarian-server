@@ -35,8 +35,8 @@ $toDelete = [];
 foreach ($byDir as $dir => $group) {
     if (count($group) > 1) {
         usort($group, function ($a, $b) {
-            $aFields = count(array_filter($a, fn ($v) => $v && $v !== '' && $v !== []));
-            $bFields = count(array_filter($b, fn ($v) => $v && $v !== '' && $v !== []));
+            $aFields = count(array_filter($a, fn($v) => $v && $v !== '' && $v !== []));
+            $bFields = count(array_filter($b, fn($v) => $v && $v !== '' && $v !== []));
             $aUpdated = isset($a['updatedAt']) ? (is_object($a['updatedAt']) ? $a['updatedAt']->toDateTime()->getTimestamp() : strtotime($a['updatedAt'])) : 0;
             $bUpdated = isset($b['updatedAt']) ? (is_object($b['updatedAt']) ? $b['updatedAt']->toDateTime()->getTimestamp() : strtotime($b['updatedAt'])) : 0;
             if ($aUpdated !== $bUpdated) {
@@ -92,7 +92,7 @@ foreach ($allBooks as $book) {
             $reasons[] = 'directoryPath author mismatch';
         }
         if (isset($parsed['series'], $book['series'])) {
-            $seriesNames = array_map(fn ($s) => is_array($s) ? ($s['seriesName'] ?? $s['name'] ?? null) : $s, (array) $book['series']);
+            $seriesNames = array_map(fn($s) => is_array($s) ? ($s['seriesName'] ?? $s['name'] ?? null) : $s, (array) $book['series']);
             if (!in_array($parsed['series'], $seriesNames)) {
                 $reasons[] = 'directoryPath series mismatch';
             }
@@ -120,7 +120,7 @@ foreach ($allBooks as $book) {
     }
     // Series name matches author name
     if (!empty($book['series']) && !empty($book['author'])) {
-        $seriesNames = array_map(fn ($s) => is_array($s) ? ($s['seriesName'] ?? $s['name'] ?? null) : $s, (array) $book['series']);
+        $seriesNames = array_map(fn($s) => is_array($s) ? ($s['seriesName'] ?? $s['name'] ?? null) : $s, (array) $book['series']);
         $authors = (array) $book['author'];
         foreach ($seriesNames as $sn) {
             if ($sn && in_array($sn, $authors)) {

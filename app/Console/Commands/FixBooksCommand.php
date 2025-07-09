@@ -87,8 +87,8 @@ class FixBooksCommand extends Command
                 usort($group, function ($a, $b) {
                     $aArr = (array) $a;
                     $bArr = (array) $b;
-                    $aFields = count(array_filter($aArr, fn ($v) => $v && $v !== '' && $v !== []));
-                    $bFields = count(array_filter($bArr, fn ($v) => $v && $v !== '' && $v !== []));
+                    $aFields = count(array_filter($aArr, fn($v) => $v && $v !== '' && $v !== []));
+                    $bFields = count(array_filter($bArr, fn($v) => $v && $v !== '' && $v !== []));
                     $aUpdated = isset($aArr['updatedAt']) ? (is_object($aArr['updatedAt']) ? $aArr['updatedAt']->toDateTime()->getTimestamp() : strtotime($aArr['updatedAt'])) : 0;
                     $bUpdated = isset($bArr['updatedAt']) ? (is_object($bArr['updatedAt']) ? $bArr['updatedAt']->toDateTime()->getTimestamp() : strtotime($bArr['updatedAt'])) : 0;
                     if ($aUpdated !== $bUpdated) {
@@ -224,7 +224,7 @@ class FixBooksCommand extends Command
                     }
                     return is_array($s) ? ($s['seriesName'] ?? null) : $s;
                 }, $seriesArr);
-                $seriesNamesStr = implode(', ', array_map(fn ($v) => is_scalar($v) ? $v : json_encode($v), $seriesNames));
+                $seriesNamesStr = implode(', ', array_map(fn($v) => is_scalar($v) ? $v : json_encode($v), $seriesNames));
                 // Only flag series mismatch if parsed series is not in any seriesName
                 if (!in_array($parsed['series'], $seriesNames)) {
                     $reasons[] = "directoryPath series mismatch\nParsed: {$parsed['series']}\nDocument: " . $seriesNamesStr;

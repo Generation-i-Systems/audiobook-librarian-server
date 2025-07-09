@@ -722,6 +722,9 @@ document.addEventListener("DOMContentLoaded", function () {
         // Initialize all book forms on page load, regardless of whether they're in a modal or not
         initBookForm($bookForm);
 
+        // Ensure a cover image radio button is selected if any are available
+        ensureCoverImageSelected();
+
         // Log whether this is a modal or non-modal form for debugging
         if ($bookForm.closest(".modal").length) {
             console.log("[DEBUG] Form is in a modal");
@@ -734,6 +737,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         "[DEBUG] Modal shown event, reinitializing form",
                     );
                     initBookForm($bookForm);
+                    ensureCoverImageSelected();
                 });
             }
         } else {
@@ -741,10 +745,67 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
+    // Handle cover image radio button selection
+    const coverRadios = document.querySelectorAll('input[name="coverImageCandidate"]');
+    coverRadios.forEach((radio) => {
+        radio.addEventListener("change", function () {
+            console.log("Cover image selected: " + this.value);
+            console.log("Cover source: " + this.dataset.source);
+
+            // Set the hidden coverImageSource field
+            const coverImageSourceField = document.getElementById('coverImageSource');
+            if (coverImageSourceField) {
+                coverImageSourceField.value = this.dataset.source || '';
+                console.log("Set coverImageSource to: " + coverImageSourceField.value);
+            }
+        });
+    });
+
+    // Set initial value for coverImageSource if a radio is already checked
+    const checkedCoverRadio = document.querySelector('input[name="coverImageCandidate"]:checked');
+    if (checkedCoverRadio) {
+        const coverImageSourceField = document.getElementById('coverImageSource');
+        if (coverImageSourceField) {
+            // Ensure we're getting the correct source value
+            const source = checkedCoverRadio.dataset.source || '';
+            console.log("[DEBUG] Initial checked radio data-source:", source);
+            console.log("[DEBUG] Initial checked radio value:", checkedCoverRadio.value);
+
+            coverImageSourceField.value = source;
+            console.log("Initial coverImageSource set to: " + coverImageSourceField.value);
+        }
+    }
+
+    // Force update the coverImageSource field now to ensure it's set correctly
+    setTimeout(() => {
+        const checkedRadio = document.querySelector('input[name="coverImageCandidate"]:checked');
+        if (checkedRadio) {
+            const sourceField = document.getElementById('coverImageSource');
+            if (sourceField) {
+                sourceField.value = checkedRadio.dataset.source || '';
+                console.log("[DEBUG] Forced coverImageSource update to:", sourceField.value);
+            }
+        }
+    }, 100);
+
     // Form validation
     const form = document.getElementById("book-form"); // Ensure your form has id="book-form"
     if (form) {
         form.addEventListener("submit", function (e) {
+            // CRITICAL: Update coverImageSource right before form submission
+            const checkedRadioButton = document.querySelector('input[name="coverImageCandidate"]:checked');
+            if (checkedRadioButton) {
+                const coverSourceField = document.getElementById('coverImageSource');
+                if (coverSourceField) {
+                    const sourceValue = checkedRadioButton.dataset.source || '';
+                    coverSourceField.value = sourceValue;
+                    console.log("[SUBMIT] Setting coverImageSource to:", sourceValue);
+
+                    // Force a data attribute to the form to ensure it's used
+                    form.dataset.coverSource = sourceValue;
+                }
+            }
+
             // Clear previous validation
             form.querySelectorAll(".is-invalid").forEach((field) =>
                 field.classList.remove("is-invalid"),
@@ -768,6 +829,48 @@ document.addEventListener("DOMContentLoaded", function () {
                 dirPathInput.value = dirPathInput.value.replace(/^\/+/, "");
             }
 
+            // Check if an external cover image is selected
+            const selectedCoverRadio = form.querySelector('input[name="coverImageCandidate"]:checked');
+            console.log("[DEBUG] Selected cover radio data-source:", selectedCoverRadio ? selectedCoverRadio.dataset.source : "none");
+
+            if (selectedCoverRadio && (selectedCoverRadio.dataset.source === "audible" || selectedCoverRadio.dataset.source === "google")) {
+                console.log("[DEBUG] External cover image selected: " + selectedCoverRadio.dataset.source);
+
+                // Verify we have the corresponding ID for the external source
+                if (selectedCoverRadio.dataset.source === "audible") {
+                    const audibleIdInput = form.querySelector('#audibleId');
+                    if (!audibleIdInput || !audibleIdInput.value.trim()) {
+                        $(audibleIdInput).closest('.form-group').addClass("is-invalid");
+                        $(audibleIdInput).closest('.form-group').after(
+                            '<span class="invalid-feedback d-block">Audible ID is missing. Cannot download Audible cover image.</span>'
+                        );
+                        hasError = true;
+                        console.log("[DEBUG] (error) Audible ID is missing");
+                    }
+                } else if (selectedCoverRadio.dataset.source === "google") {
+                    const googleBooksIdInput = form.querySelector('#googleBooksId');
+                    if (!googleBooksIdInput || !googleBooksIdInput.value.trim()) {
+                        $(selectedCoverRadio).closest('.form-group').addClass("is-invalid");
+                        $(selectedCoverRadio).closest('.form-group').after(
+                            '<span class="invalid-feedback d-block">Google Books ID is missing. Cannot download Google Books cover image.</span>'
+                        );
+                        hasError = true;
+                        console.log("[DEBUG] (error) Google Books ID is missing");
+                    }
+                }
+
+                // Verify we have a cover URL if using external cover
+                const coverUrlInput = form.querySelector('#coverImageUrl');
+                if (!coverUrlInput || !coverUrlInput.value.trim()) {
+                    $(selectedCoverRadio).closest('.form-group').addClass("is-invalid");
+                    $(selectedCoverRadio).closest('.form-group').after(
+                        '<span class="invalid-feedback d-block">External cover image URL is missing. Cannot download cover image.</span>'
+                    );
+                    hasError = true;
+                    console.log("[DEBUG] (error) External cover image URL is missing");
+                }
+            }
+
             const titleInput = form.querySelector('input[name="title"]');
             if (!titleInput || !titleInput.value.trim()) {
                 titleInput.classList.add("is-invalid");
@@ -775,6 +878,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     '<span class="invalid-feedback d-block">Title is required.</span>',
                 );
                 hasError = true;
+                console.log("[DEBUG] (error) Title is required");
             }
 
             const authorInputs = form.querySelectorAll(
@@ -790,6 +894,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     '<span class="invalid-feedback d-block">At least one author is required.</span>',
                 );
                 hasError = true;
+                console.log("[DEBUG] (error) No author selected");
             } else if (authorInputs.length === 0) {
                 // No author input fields at all
                 const authorsGroup = document.getElementById("authors-group");
@@ -797,6 +902,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     '<span class="invalid-feedback d-block">At least one author is required.</span>',
                 );
                 hasError = true;
+                console.log("[DEBUG] (error) No author input fields found");
             }
 
             const genreSelects = form.querySelectorAll(
@@ -811,13 +917,21 @@ document.addEventListener("DOMContentLoaded", function () {
                 $(genreSelects[0].closest(".input-group")).after(
                     '<span class="invalid-feedback d-block">At least one genre is required.</span>',
                 );
+                console.log("[DEBUG] (error) No genre selected");
                 hasError = true;
             } else if (genreSelects.length === 0) {
                 const genresGroup = document.getElementById("genres-group");
                 $(genresGroup).after(
                     '<span class="invalid-feedback d-block">At least one genre is required.</span>',
                 );
+                console.log("[DEBUG] (error) No genre select fields found");
                 hasError = true;
+            }
+
+            // Log the selected cover image value for debugging
+            if (selectedCoverRadio) {
+                console.log("[DEBUG] Selected cover image value before submission:", selectedCoverRadio.value);
+                console.log("[DEBUG] Selected cover image data-source:", selectedCoverRadio.dataset.source);
             }
 
             if (hasError) {
@@ -827,11 +941,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 submitBtn.innerHTML = originalBtnText;
 
                 const firstErrorField = form.querySelector(".is-invalid");
-                if (firstErrorField)
+                if (firstErrorField) {
                     firstErrorField.scrollIntoView({
                         behavior: "smooth",
                         block: "center",
                     });
+                }
                 console.log(
                     "[DEBUG] Form will not submit due to validation errors",
                 );
@@ -897,6 +1012,35 @@ document.addEventListener("DOMContentLoaded", function () {
                         let msg = "Failed to save book.";
                         if (xhr.responseJSON && xhr.responseJSON.message)
                             msg = xhr.responseJSON.message;
+
+                        // Check specifically for external cover image download errors
+                        if (xhr.responseJSON && xhr.responseJSON.error_type === "external_cover_download_failed") {
+                            console.log("[DEBUG] External cover download failed: " + msg);
+
+                            // Find the selected cover image radio button
+                            const selectedCoverRadio = form.querySelector('input[name="coverImageCandidate"]:checked');
+                            if (selectedCoverRadio) {
+                                const coverGroup = selectedCoverRadio.closest('.form-group') ||
+                                                  document.getElementById('cover-candidates-group');
+
+                                if (coverGroup) {
+                                    $(coverGroup).addClass("is-invalid");
+                                    $(coverGroup).after(
+                                        '<span class="invalid-feedback d-block alert alert-danger">' +
+                                        '<strong>Cover Image Error:</strong> ' + msg +
+                                        '</span>'
+                                    );
+
+                                    // Scroll to the error
+                                    coverGroup.scrollIntoView({
+                                        behavior: "smooth",
+                                        block: "center"
+                                    });
+                                    return;
+                                }
+                            }
+                        }
+
                         if (xhr.responseJSON && xhr.responseJSON.errors) {
                             // Display validation errors
                             $.each(
@@ -1183,44 +1327,63 @@ $(function () {
                                                 value: coverUrl,
                                             })
                                             .appendTo("#book-form");
-
-                                        // Add a preview of the cover image
-                                        var coverPreviewContainer = $(
-                                            "#cover-preview-container",
-                                        );
-                                        if (!coverPreviewContainer.length) {
-                                            coverPreviewContainer = $(
-                                                '<div id="cover-preview-container" class="mt-2"></div>',
-                                            );
-                                            $("#coverImage").after(
-                                                coverPreviewContainer,
-                                            );
-                                        }
-                                        coverPreviewContainer.html(
-                                            "<p>Cover image from " +
-                                                (item.source ||
-                                                    "Google Books") +
-                                                ":</p>" +
-                                                '<img src="' +
-                                                coverUrl +
-                                                '" style="max-height: 200px; border: 1px solid #ccc;" class="mb-2">' +
-                                                '<p class="text-muted small">This URL will be used instead of a file upload.</p>',
-                                        );
                                     } else {
                                         coverUrlInput.val(coverUrl);
-                                        $("#cover-preview-container img").attr(
-                                            "src",
-                                            coverUrl,
-                                        );
+                                    }
+
+                                    // If we're in the cover selection UI, add this cover to the options
+                                    var $coverCandidatesList = $("#cover-candidates-list");
+                                    if ($coverCandidatesList.length) {
+                                        // Check if we already have a radio button for this source
+                                        var sourceType = item.source === "Audible" ? "audible" : "googlebooks";
+                                        var existingRadio = $('input[name="coverImageCandidate"][data-source="' + sourceType + '"]');
+
+                                        if (existingRadio.length) {
+                                            // Update existing radio button's image
+                                            existingRadio.closest('label').find('img').attr('src', coverUrl);
+                                            // Select this radio button
+                                            existingRadio.prop('checked', true);
+                                            console.log("[DEBUG] Updated existing " + sourceType + " cover radio button and selected it");
+                                        } else {
+                                            // Create a new radio button option
+                                            var sourceLabel = item.source === "Audible" ? "Audible Cover" : "Google Books Cover";
+                                            var newOption = $('<div class="text-center">' +
+                                                '<label class="d-flex flex-column align-items-center">' +
+                                                '<input type="radio" name="coverImageCandidate" value="' + sourceType + '" ' +
+                                                'data-source="' + sourceType + '" checked class="mb-2">' +
+                                                '<img src="' + coverUrl + '" alt="' + sourceLabel + '" ' +
+                                                'style="max-width:100px;max-height:140px;border:1px solid #ccc;">' +
+                                                '</label>' +
+                                                '<div class="mt-1" style="font-size:12px;word-break:break-all;">' +
+                                                sourceLabel + '<br>' +
+                                                '<small class="text-muted">External Cover</small>' +
+                                                '</div>' +
+                                                '</div>');
+
+                                            $coverCandidatesList.append(newOption);
+                                            console.log("[DEBUG] Added new " + sourceType + " cover radio button and selected it");
+
+                                            // If this is the first cover option, make the container visible
+                                            if ($coverCandidatesList.children().length === 1) {
+                                                $("#cover-candidates-group").show();
+                                            }
+                                        }
+
+                                        // Ensure the cover candidates group is visible
+                                        $("#cover-candidates-group").show();
                                     }
                                 }
 
                                 // Handle source-specific IDs and fields
+                                console.log("[DEBUG] Processing source-specific IDs and fields for " + item.source);
                                 if (item.source === "Audible") {
+                                    console.log("[DEBUG] Processing Audible-specific IDs and fields");
+                                    console.log("[DEBUG] item: ", item);
                                     // Set Audible ID
                                     var audibleIdInput = $("#audibleId");
                                     var audibleId =
-                                        item.audibleId || item.asin || "";
+                                        item.audibleId || item.asin || item.id || "";
+                                    console.log("[DEBUG] Audible ID: " + audibleId);
                                     if (!audibleIdInput.length) {
                                         // Create hidden input if not present
                                         $("<input>")
@@ -1231,8 +1394,10 @@ $(function () {
                                                 value: audibleId,
                                             })
                                             .appendTo("#book-form");
+                                        console.log("[DEBUG] Created hidden input for Audible ID (value: " + audibleId + ")");
                                     } else {
                                         audibleIdInput.val(audibleId);
+                                        console.log("[DEBUG] Updated hidden input for Audible ID (value: " + audibleId + ")");
                                     }
 
                                     // Handle narrators if available
@@ -1249,9 +1414,9 @@ $(function () {
                                             function (narrator) {
                                                 addNarratorRow(
                                                     $("#book-form"),
-                                                    narrator,
+                                                    narrator
                                                 );
-                                            },
+                                            }
                                         );
                                     }
                                     // Fall back to narrator field if available
@@ -1259,7 +1424,7 @@ $(function () {
                                         if (typeof item.narrator === "string") {
                                             addNarratorRow(
                                                 $("#book-form"),
-                                                item.narrator,
+                                                item.narrator
                                             );
                                         } else if (
                                             Array.isArray(item.narrator)
@@ -1268,9 +1433,9 @@ $(function () {
                                                 function (narrator) {
                                                     addNarratorRow(
                                                         $("#book-form"),
-                                                        narrator,
+                                                        narrator
                                                     );
-                                                },
+                                                }
                                             );
                                         }
                                     }
@@ -1303,7 +1468,7 @@ $(function () {
                                         if (typeof item.narrator === "string") {
                                             addNarratorRow(
                                                 $("#book-form"),
-                                                item.narrator,
+                                                item.narrator
                                             );
                                         } else if (
                                             Array.isArray(item.narrator)
@@ -1312,9 +1477,9 @@ $(function () {
                                                 function (narrator) {
                                                     addNarratorRow(
                                                         $("#book-form"),
-                                                        narrator,
+                                                        narrator
                                                     );
-                                                },
+                                                }
                                             );
                                         }
                                     } else {
@@ -1326,7 +1491,7 @@ $(function () {
                             });
                     } else {
                         $resultsTable.html(
-                            '<tr><td colspan="7" class="text-center text-warning">No results found.</td></tr>',
+                            '<tr><td colspan="7" class="text-center text-warning">No results found.</td></tr>'
                         );
                         window.autofillMatches = [];
                     }
@@ -1337,12 +1502,39 @@ $(function () {
                             (xhr.responseJSON && xhr.responseJSON.error
                                 ? xhr.responseJSON.error
                                 : "Unknown error") +
-                            "</td></tr>",
-                    );
+                            "</td></tr>"
+                        );
                 });
 
             return false;
         });
     }
 });
+
+// Function to ensure a cover image radio button is always selected if any are available
+function ensureCoverImageSelected() {
+    console.log("[DEBUG] Ensuring a cover image radio button is selected");
+    const $coverRadios = $('input[name="coverImageCandidate"]');
+
+    // If we have cover image radio buttons but none are selected
+    if ($coverRadios.length > 0 && $coverRadios.filter(":checked").length === 0) {
+        console.log("[DEBUG] Found cover radio buttons but none selected, selecting first one");
+
+        // First try to select external covers (Audible or Google Books) if available
+        const $externalCoverRadios = $coverRadios.filter('[data-source="audible"], [data-source="googlebooks"]');
+        if ($externalCoverRadios.length > 0) {
+            $externalCoverRadios.first().prop("checked", true);
+            console.log("[DEBUG] Selected external cover radio button");
+        } else {
+            // Otherwise select the first available radio button
+            $coverRadios.first().prop("checked", true);
+            console.log("[DEBUG] Selected first available cover radio button");
+        }
+    } else if ($coverRadios.length > 0) {
+        console.log("[DEBUG] Cover radio button already selected:", $coverRadios.filter(":checked").val());
+    } else {
+        console.log("[DEBUG] No cover radio buttons found");
+    }
+}
+
 console.log("Form JS loaded 6");

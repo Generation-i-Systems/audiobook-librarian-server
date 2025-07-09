@@ -8,7 +8,9 @@ export default defineConfig({
             input: [
                 'resources/sass/app.scss',
                 'resources/js/app.js',
-                'resources/js/admin/book-create.js'],
+                'resources/js/admin/book-create.js',
+                'resources/js/admin/book-autocomplete.js'],
+            publicDirectory: 'public',
             refresh: true,
         }),
     ],

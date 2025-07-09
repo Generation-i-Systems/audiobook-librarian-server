@@ -9,6 +9,13 @@
   - Updated ImportFileController to filter directories during listing
   - Added comprehensive tests to verify directory filtering behavior
   - Improved import experience by showing only relevant directories
+- Unified external cover image integration
+  - Added `ExternalCoverService` for handling Audible and Google Books cover images
+  - Integrated external cover images into the "Select Cover Image" UI block
+  - Auto-select external cover image radio buttons after autofill
+  - Implemented error handling for external cover image downloads
+  - Added validation to prevent form submission with invalid external cover images
+  - Ensured a cover image radio button is always selected if any image is available
 
 ### Fixed
 - Fixed import file browser JavaScript initialization issues
