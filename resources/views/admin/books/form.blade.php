@@ -96,7 +96,7 @@
             <label class="form-label">Narrators</label>
             <div id="narrators-group">
                 @php
-                    $narrators = old('narrator') ?? ($book['narrator'] ?? null) ?? ($initial['narrator'] ?? []);
+                    $narrators = old('narrator') ?? request()->get('narrator') ?? ($book['narrator'] ?? null) ?? ($initial['narrator'] ?? []);
                     if (!is_array($narrators))
                         $narrators = [$narrators];
                     if (empty($narrators) || (count($narrators) === 1 && ($narrators[0] === null || $narrators[0] === '')))
@@ -134,7 +134,7 @@
             <div id="series-group">
                 {{-- Only use canonical format: array of objects with seriesName and number --}}
                 @php
-                    $seriesList = old('series') ?? ($book['series'] ?? ($initial['series'] ?? []));
+                    $seriesList = old('series') ?? request()->get('series') ?? ($book['series'] ?? ($initial['series'] ?? []));
                     // Ensure $seriesList is an array of objects with seriesName/number
                     if (!is_array($seriesList) || (isset($seriesList[0]) && !is_array($seriesList[0]))) {
                         $seriesList = [];

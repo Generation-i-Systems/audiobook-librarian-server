@@ -4,15 +4,12 @@ namespace App\Listeners;
 
 use App\Events\NewBookAdded;
 use App\Contracts\DocumentStoreServiceInterface;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Log;
 use Kreait\Firebase\Messaging\CloudMessage;
 use Kreait\Firebase\Messaging\Notification;
 
-class SendNewBookNotification implements ShouldQueue
+class SendNewBookNotification
 {
-    use InteractsWithQueue;
 
     protected $documentStore;
 

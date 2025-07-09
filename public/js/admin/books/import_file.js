@@ -20,34 +20,14 @@
         const ajaxProcessImportUrl = options.ajaxProcessImportUrl || '/admin/books/processImport';
 
         // Initialize from URL parameters if present
-        const urlParams = new URLSearchParams(window.location.search);
-        const rootParam = urlParams.get('root');
-        const pathParam = urlParams.get('path');
-
-        // Try to get currentPath from multiple sources in order of preference
-        // 1. URL parameters
-        // 2. localStorage (if available)
-        // 3. Default to empty string
         let currentPath = '';
-        if (pathParam) {
-            currentPath = pathParam;
-        } else {
-            try {
-                const savedPath = localStorage.getItem('importFileBrowser_currentPath');
-                if (savedPath) {
-                    currentPath = savedPath;
-                }
-            } catch (e) {
-            }
-        }
-
-        // Always log the final initialized path
+        
+        // Check if we have URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlRoot = urlParams.get('root');
+        const urlPath = urlParams.get('path');
 
         let currentRoot = null;
-        if (rootParam) {
-            currentRoot = rootParam;
-            $root.find('#import-root-select').val(rootParam);
-        }
 
         // Store instance reference on DOM element
         $root.data('instance', self);
@@ -75,22 +55,26 @@
                 }
 
                 if (data.length > 0) {
-                    // Use URL parameters if available
-                    if (currentRoot) {
-                        // Select the matching option in the dropdown
-                        $select.val(currentRoot);
-                        if ($select.val() !== currentRoot) {
-                            // If the selected value doesn't match (not found in options), use the first one
+                    // Only use URL parameters if they exist
+                    if (urlRoot && urlPath) {
+                        // Check if the URL root exists in the available roots
+                        const rootExists = data.some(root => root.value === urlRoot);
+                        if (rootExists) {
+                            currentRoot = urlRoot;
+                            $select.val(currentRoot);
+                            loadDirectory(urlPath); // Load the directory from URL parameters
+                        } else {
+                            // Fallback to default if root doesn't exist
                             currentRoot = data[0].value;
                             $select.val(currentRoot);
+                            loadDirectory(''); // Load the root directory
                         }
                     } else {
-                        // No URL parameter, use the first root
+                        // No URL parameters, use defaults
                         currentRoot = data[0].value;
+                        $select.val(currentRoot);
+                        loadDirectory(''); // Load the root directory
                     }
-
-                    // Load the directory using the current path (from URL or empty)
-                    loadDirectory(currentPath);
                 }
             }).fail(function (xhr) {
                 $root.html('<div class="alert alert-danger">Failed to load import roots: ' + xhr.statusText + '</div>');
@@ -106,19 +90,7 @@
             // Update UI
             $root.find('#import-path-input').val(path);
 
-            // Store in localStorage for persistence
-            try {
-                localStorage.setItem('importFileBrowser_currentPath', currentPath);
-            } catch (e) {
-            }
             $root.find('#import-directory-list').html('<div class="text-muted">Loading...</div>');
-
-            // Update URL with current path and root for state preservation
-            const url = new URL(window.location.href);
-            url.searchParams.set('root', currentRoot);
-            url.searchParams.set('path', path);
-            window.history.replaceState({}, '', url);
-
 
             $.getJSON(ajaxListUrl, {root: currentRoot, path: path}, function (data) {
                 renderDirectoryList(data);
@@ -135,8 +107,9 @@
             // Check if directory contains audio files
             const hasAudioFiles = data.items && data.items.some(item => item.type === 'file');
 
-            // Enable select button if the current directory has audio files
-            if (hasAudioFiles) {
+            // Enable select button if we have items (files or directories)
+            // Allow selecting directories even without immediate audio files
+            if (data.items && data.items.length > 0) {
                 $root.find('#import-select-btn').prop('disabled', false);
             } else {
                 $root.find('#import-select-btn').prop('disabled', true);
@@ -175,90 +148,70 @@
             currentRoot = $(this).val();
             loadDirectory('');
         });
-        // Click handler moved to renderDirectoryList for direct attachment to list items
+        // Updated click handler for new simplified workflow
         $root.on('click', '#import-select-btn', function () {
-            // When selecting a directory with audio files, use the current directory path
-            const fullPath = currentRoot + '/' + (currentPath || '');
-            const dirName = currentPath.split('/').pop() || currentRoot.split('/').pop();
+            // Determine the selected item (file or directory)
+            const $selectedItem = $root.find('.list-group-item.active');
+            let selectedPath, selectedType;
 
+            if ($selectedItem.length) {
+                // User selected a specific file
+                selectedPath = currentPath ? currentPath + '/' + $selectedItem.data('name') : $selectedItem.data('name');
+                selectedType = $selectedItem.data('type');
+            } else {
+                // No specific selection, use current directory
+                selectedPath = currentPath;
+                selectedType = 'dir';
+            }
 
-            // Store the current location in localStorage for returning to this location later
-            localStorage.setItem('importFileBrowser_lastRoot', currentRoot);
-            localStorage.setItem('importFileBrowser_lastPath', currentPath);
+            // Show loading state
+            const $btn = $(this);
+            const originalText = $btn.text();
+            $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...');
 
-            // Prepare payload for metadata extraction
-            let payload = {root: currentRoot, path: currentPath, type: 'dir'};
+            // Prepare payload for metadata extraction and redirect
+            const payload = {
+                root: currentRoot,
+                path: selectedPath,
+                type: selectedType,
+                redirectToForm: true
+            };
 
-            $root.find('#import-metadata-summary').remove();
-            $root.append('<div id="import-metadata-summary" class="my-3"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div> <span class="ms-2">Extracting metadata...</span></div>');
-
-            $.ajax({
-                url: ajaxExtractUrl,
-                type: 'POST',
-                data: payload,
-                headers: {'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')},
-                success: function (data) {
-
-                    const summaryHtml = renderMetadataSummary(data);
-
-                    // Store all extracted metadata in the summary element's data attributes
-                    const $summary = $root.find('#import-metadata-summary');
-                    if (data.directoryPath) {
-                        $summary.data('extracted-directory-path', data.directoryPath);
-                    }
-
-                    // Store other metadata fields - handle series as string, array or object
-                    // Default to empty string if series is null or undefined
-                    let seriesValue = '';
-
-                    // Store genrePath and directoryPath in data attributes
-                    if (data.genrePath) {
-                        $summary.data('genrePath', data.genrePath);
-                    }
-
-                    if (data.directoryPath) {
-                        $summary.data('directoryPath', data.directoryPath);
-                    }
-
-                    // Check for both 'series' and 'seriesName' fields in the response
-                    // The backend uses 'seriesName' but our frontend might be looking for 'series'
-                    const seriesData = data.series || data.seriesName;
-
-                    if (seriesData) {
-                        // If series is an array or object (but not null), extract the name property or first item
-                        seriesValue = seriesData;
-                        if (Array.isArray(seriesData) && seriesData.length > 0) {
-                            // If it's an array, use the first item's name or the item itself
-                            seriesValue = seriesData[0].name || seriesData[0] || '';
-                        } else if (typeof seriesData === 'object' && seriesData !== null) {
-                            // If it's an object, use the name property
-                            seriesValue = seriesData.name || '';
-                        }
-                    }
-
-                    // Always store series value, even if it's empty
-                    $summary.data('extracted-series', seriesValue);
-
-                    if (data.genre) {
-                        $summary.data('extracted-genre', data.genre);
-                    }
-
-                    if (data.author) {
-                        $summary.data('extracted-author', data.author);
-                    }
-
-                    $summary.html(summaryHtml);
-
-                    // Call onSelect callback with the extracted data
-                    if (options.onSelect) {
-                        options.onSelect(fullPath, dirName, data);
-                    }
-                },
-                error: function (xhr) {
-                    $root.find('#import-metadata-summary').html('<div class="text-danger">Failed: ' + xhr.statusText + '</div>');
-                }
+            // Create a form to submit the data via POST
+            const $form = $('<form>', {
+                action: ajaxExtractUrl,
+                method: 'POST',
+                style: 'display: none;'
             });
+
+            // Add CSRF token
+            $form.append($('<input>', {
+                type: 'hidden',
+                name: '_token',
+                value: $('meta[name="csrf-token"]').attr('content')
+            }));
+
+            // Add form data
+            Object.keys(payload).forEach(function(key) {
+                $form.append($('<input>', {
+                    type: 'hidden',
+                    name: key,
+                    value: payload[key]
+                }));
+            });
+
+            // Submit form
+            $('body').append($form);
+            $form.submit();
+            $form.remove();
+
+            // Re-enable button after delay (form will redirect)
+            setTimeout(function() {
+                $btn.prop('disabled', false).text(originalText);
+            }, 2000);
         });
+        // This function is no longer needed in the new simplified workflow
+        // but keeping for backward compatibility if needed
         function renderMetadataSummary(data) {
             if (!data.success) {
                 return '<div class="text-danger">' + (data.message || 'Metadata extraction failed.') + '</div>';
@@ -275,8 +228,7 @@
             html += '<li><strong>Genre Path:</strong> ' + (data.genrePath || '-') + '</li>';
             html += '<li><strong>Directory Path:</strong> ' + (data.directoryPath || '-') + '</li>';
             html += '</ul>';
-            html += '<button id="import-prefill-btn" class="btn btn-primary me-2">Import and Prefill Book Form</button>';
-            html += '<button id="import-move-btn" class="btn btn-success">Move to Library</button>';
+            html += '<div class="alert alert-info">Files will be moved when you save the book form.</div>';
             html += '</div>';
             return html;
         }

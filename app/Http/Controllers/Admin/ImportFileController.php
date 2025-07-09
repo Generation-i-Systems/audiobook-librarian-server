@@ -92,7 +92,7 @@ class ImportFileController extends Controller
                             }
                         }
                     } catch (\Exception $e) {
-                        Log::error('[ImportFile] Error processing import root path: ' . $path . ' - ' .
+                        Log::error('[ImportFile] Error processing import root path: ' . $path . ' - ' . 
                         $e->getMessage());
 
                         return [];
@@ -255,9 +255,9 @@ class ImportFileController extends Controller
     }
 
     /**
-     * Extract metadata from a file or directory for import.
+     * Extract metadata from a file or directory and redirect to import form.
      *
-     * @return \Illuminate\Http\JsonResponse
+     * @return \Illuminate\Http\JsonResponse|\Illuminate\Http\RedirectResponse
      */
     public function extract(Request $request)
     {
@@ -265,10 +265,10 @@ class ImportFileController extends Controller
             $root = $request->input('root');
             $relPath = $request->input('path');
             $type = $request->input('type');
-            $prefillForm = $request->input('prefillForm', false);
+            $redirectToForm = $request->input('redirectToForm', false);
 
             $logMessage = "[ImportFile] Extracting metadata: root={$root}, path={$relPath}, ";
-            $logMessage .= "type={$type}, prefillForm={$prefillForm}";
+            $logMessage .= "type={$type}, redirectToForm={$redirectToForm}";
             Log::debug($logMessage);
 
             // Check for required parameters
@@ -349,11 +349,20 @@ class ImportFileController extends Controller
             $genrePath = $this->determineGenrePath($meta);
             Log::debug("[ImportFile] Determined genre path: {$genrePath}");
 
-            // Prepare form data if requested
-            $formData = null;
-            if ($prefillForm) {
-                $formData = $this->prepareFormData($meta);
+            // Store source info for later use
+            $meta['sourcePath'] = $absPath;
+            $meta['sourceRoot'] = $root;
+            $meta['sourceRelPath'] = $relPath;
+            $meta['sourceType'] = $type;
+
+            // If redirectToForm is true, redirect to the import form with prefilled data
+            if ($redirectToForm) {
+                $formData = $this->prepareFormDataForRedirect($meta, $directoryPath, $genrePath);
+                return redirect()->route('admin.books.create', $formData);
             }
+
+            // Prepare form data if requested for JSON response
+            $formData = $this->prepareFormData($meta);
 
             // Sanitize all string values in the response data to prevent UTF-8 encoding issues
             $responseData = array_merge([
@@ -364,11 +373,8 @@ class ImportFileController extends Controller
                 'relPath' => $relPath,
                 'root' => $root,
                 'editable' => true, // Allow editing of metadata before moving
+                'formData' => $formData,
             ], $meta);
-
-            if ($formData) {
-                $responseData['formData'] = $formData;
-            }
 
             $sanitizedData = $this->sanitizeArrayRecursive($responseData);
 
@@ -627,7 +633,7 @@ class ImportFileController extends Controller
                     $meta['title'] = $tags['title'] ?? null;
 
                     // If title contains book/series info in parentheses, extract it
-                    if (! empty($meta['title']) && preg_match('/^(.*?)(?:\s*[:\-]\s*(.*))?$/', $meta['title'], $matches)) {
+                    if (! empty($meta['title']) && preg_match('/^(.*?)(?:\s*[:\-]*\s*(.*))?$/', $meta['title'], $matches)) {
                         $meta['title'] = trim($matches[1]);
                         if (! empty($matches[2])) {
                             $meta['subtitle'] = trim($matches[2]);
@@ -683,7 +689,10 @@ class ImportFileController extends Controller
 
                 // Extract other metadata
                 $meta['genre'] = $tags['genre'] ?? null;
-                $meta['narrator'] = $tags['composer'] ?? null;
+                
+                // Extract narrator from multiple possible fields
+                $meta['narrator'] = $tags['composer'] ?? $tags['narrator'] ?? $tags['performer'] ?? null;
+                
                 $meta['year'] = $tags['year'] ?? null;
 
                 // Extract description if available
@@ -845,6 +854,16 @@ class ImportFileController extends Controller
                 $tags['composer'] = $this->sanitizeString(is_array($qt['composer']) ? $qt['composer'][0] : $qt['composer']);
             }
 
+            // Narrator field (explicit narrator tag)
+            if (! empty($qt['narrator'])) {
+                $tags['narrator'] = $this->sanitizeString(is_array($qt['narrator']) ? $qt['narrator'][0] : $qt['narrator']);
+            }
+
+            // Performer field (sometimes used for narrator)
+            if (! empty($qt['performer'])) {
+                $tags['performer'] = $this->sanitizeString(is_array($qt['performer']) ? $qt['performer'][0] : $qt['performer']);
+            }
+
             // Year/date
             if (! empty($qt['creation_date'])) {
                 $tags['year'] = $this->sanitizeString(is_array($qt['creation_date']) ? $qt['creation_date'][0] : $qt['creation_date']);
@@ -898,6 +917,14 @@ class ImportFileController extends Controller
 
             if (empty($tags['composer']) && ! empty($id3['composer'][0])) {
                 $tags['composer'] = $this->sanitizeString($id3['composer'][0]);
+            }
+
+            if (empty($tags['narrator']) && ! empty($id3['narrator'][0])) {
+                $tags['narrator'] = $this->sanitizeString($id3['narrator'][0]);
+            }
+
+            if (empty($tags['performer']) && ! empty($id3['performer'][0])) {
+                $tags['performer'] = $this->sanitizeString($id3['performer'][0]);
             }
 
             if (empty($tags['year']) && ! empty($id3['year'][0])) {
@@ -985,6 +1012,9 @@ class ImportFileController extends Controller
 
         Log::debug("[ImportFile] Analyzing directory: {$dirPath}");
 
+        // Try to extract metadata from directory name patterns
+        $this->extractMetadataFromDirectoryName($base, $meta);
+
         // Get all audio files in the directory
         $allowedExtensions = Config::get('import.allowed_extensions', []);
         $files = collect(File::files($dirPath))
@@ -997,10 +1027,32 @@ class ImportFileController extends Controller
         // If we have audio files, try to extract metadata from the first one
         if ($files->count() > 0) {
             $firstFile = $files->first()->getPathname();
+            
+            // Store directory-parsed metadata to preserve it
+            $directoryGenre = $meta['genre'] ?? null;
+            $directoryTitle = $meta['title'] ?? null;
+            $directoryAuthor = $meta['author'] ?? null;
+            $directorySeries = $meta['series'] ?? null;
+            $directorySeriesNumber = $meta['seriesNumber'] ?? null;
+            
             $this->extractFileMetadata($firstFile, $meta);
 
-            // Override title with directory name if it was extracted from file
-            $meta['title'] = $base;
+            // Preserve directory-parsed metadata if it was successfully extracted
+            if (!empty($directoryGenre)) {
+                $meta['genre'] = $directoryGenre;
+            }
+            if (!empty($directoryTitle) && $directoryTitle !== $base) {
+                $meta['title'] = $directoryTitle; // Use parsed title instead of full directory name
+            }
+            if (!empty($directoryAuthor)) {
+                $meta['author'] = $directoryAuthor; // Prefer directory-parsed author
+            }
+            if (!empty($directorySeries)) {
+                $meta['series'] = $directorySeries;
+            }
+            if (!empty($directorySeriesNumber)) {
+                $meta['seriesNumber'] = $directorySeriesNumber;
+            }
 
             // Add all files to the list
             $meta['files'] = [];
@@ -1017,6 +1069,258 @@ class ImportFileController extends Controller
     }
 
     /**
+     * Extract metadata from directory name patterns.
+     */
+    private function extractMetadataFromDirectoryName(string $dirName, array &$meta): void
+    {
+        // Common patterns for audiobook directory names:
+        // Genre_Author_Name_Series_Book_Number_Title (e.g., Fantasy_Brandon_Sanderson_Mistborn_01_The_Final_Empire)
+        // Author_Name_Series_Book_Number_Title
+        // Author_Name_Title
+        
+        // Split by underscores and analyze parts
+        $parts = explode('_', $dirName);
+        
+        if (count($parts) >= 3) {
+            // Check if first part looks like a genre
+            $commonGenres = ['Fantasy', 'Science', 'Fiction', 'Mystery', 'Romance', 'Thriller', 'Horror', 'Biography', 'History', 'Self', 'Business'];
+            $firstPartIsGenre = in_array($parts[0], $commonGenres) || in_array(ucfirst(strtolower($parts[0])), $commonGenres);
+            
+            if ($firstPartIsGenre && count($parts) >= 4) {
+                // Pattern: Genre_Author_Name_Series_Number_Title
+                $meta['genre'] = $parts[0];
+                
+                // Find where the author name ends by looking for series indicators
+                // For Fantasy_Brandon_Sanderson_Mistborn_01_The_Final_Empire:
+                // parts[0]=Fantasy, parts[1]=Brandon, parts[2]=Sanderson, parts[3]=Mistborn, parts[4]=01, parts[5]=The, etc.
+                $authorEndIndex = 1; // Default to just parts[1] (Brandon)
+                
+                for ($i = 2; $i < count($parts) - 1; $i++) {
+                    // Check if next part looks like a series number - this means current part is series name
+                    if ($i + 1 < count($parts) && (is_numeric($parts[$i + 1]) || preg_match('/^\d+/', $parts[$i + 1]))) {
+                        $authorEndIndex = $i - 1; // Author ends before this series name part
+                        break;
+                    }
+                    // Look for direct series indicators (numbers, common series words)
+                    if (is_numeric($parts[$i]) || preg_match('/^\d+/', $parts[$i]) || 
+                        in_array(ucfirst(strtolower($parts[$i])), ['Book', 'Vol', 'Volume', 'Part'])) {
+                        $authorEndIndex = $i - 1; // Author ends just before this part
+                        break;
+                    }
+                }
+                
+                // If we didn't find clear series indicators, assume 2 parts for author name (common pattern)
+                if ($authorEndIndex === 1 && count($parts) >= 6) {
+                    $authorEndIndex = 2; // Include parts[1] and parts[2] for author
+                }
+                
+                // Extract author (from parts[1] to parts[authorEndIndex] inclusive)
+                // array_slice($parts, 1, $length) where length = authorEndIndex - 1 + 1 = authorEndIndex
+                $authorLength = $authorEndIndex; // This is the number of parts to include starting from index 1
+                $authorParts = array_slice($parts, 1, $authorLength);
+                $meta['author'] = implode(' ', $authorParts);
+                
+                // Extract series and title from remaining parts
+                $remainingParts = array_slice($parts, $authorEndIndex + 1);
+                if (count($remainingParts) >= 3) {
+                    // Check if we have a clear series pattern (series + number + title)
+                    if (is_numeric($remainingParts[1]) || preg_match('/^\d+/', $remainingParts[1])) {
+                        // Pattern: Series_Number_Title
+                        $meta['series'] = $remainingParts[0];
+                        $meta['seriesNumber'] = $remainingParts[1];
+                        $meta['title'] = implode(' ', array_slice($remainingParts, 2));
+                    } else {
+                        // Check if first part looks like a series name (not an article)
+                        $firstPart = $remainingParts[0];
+                        $isArticle = in_array(strtolower($firstPart), ['the', 'a', 'an']);
+                        
+                        if (!$isArticle && strlen($firstPart) > 2) {
+                            // Likely series name
+                            $meta['series'] = $firstPart;
+                            $meta['title'] = implode(' ', array_slice($remainingParts, 1));
+                        } else {
+                            // Treat all as title (includes articles)
+                            $meta['title'] = implode(' ', $remainingParts);
+                        }
+                    }
+                } else if (count($remainingParts) >= 2) {
+                    // Check if first part looks like series vs title
+                    $firstPart = $remainingParts[0];
+                    $isArticle = in_array(strtolower($firstPart), ['the', 'a', 'an']);
+                    
+                    if (!$isArticle && strlen($firstPart) > 2) {
+                        // Likely series name
+                        $meta['series'] = $firstPart;
+                        $meta['title'] = implode(' ', array_slice($remainingParts, 1));
+                    } else {
+                        // Treat all as title
+                        $meta['title'] = implode(' ', $remainingParts);
+                    }
+                } else {
+                    // Just title
+                    $meta['title'] = implode(' ', $remainingParts);
+                }
+                
+            } else if (count($parts) >= 4) {
+                // Pattern: Author_Name_Series_Number_Title (no genre prefix)
+                // Find where the author name ends
+                $authorEndIndex = 1;
+                for ($i = 2; $i < count($parts) - 1; $i++) {
+                    if (is_numeric($parts[$i]) || preg_match('/^\d+/', $parts[$i])) {
+                        $authorEndIndex = $i - 1;
+                        break;
+                    }
+                }
+                
+                // If no clear series number found, assume 2 parts for author
+                if ($authorEndIndex === 1 && count($parts) >= 5) {
+                    $authorEndIndex = 2;
+                }
+                
+                // Extract author
+                $authorParts = array_slice($parts, 0, $authorEndIndex + 1);
+                $meta['author'] = implode(' ', $authorParts);
+                
+                // Extract remaining parts
+                $remainingParts = array_slice($parts, $authorEndIndex + 1);
+                if (count($remainingParts) >= 2) {
+                    if (is_numeric($remainingParts[0]) || preg_match('/^\d+/', $remainingParts[0])) {
+                        // Has series number
+                        $meta['seriesNumber'] = $remainingParts[0];
+                        $meta['title'] = implode(' ', array_slice($remainingParts, 1));
+                    } else {
+                        $meta['series'] = $remainingParts[0];
+                        if (count($remainingParts) >= 3 && (is_numeric($remainingParts[1]) || preg_match('/^\d+/', $remainingParts[1]))) {
+                            $meta['seriesNumber'] = $remainingParts[1];
+                            $meta['title'] = implode(' ', array_slice($remainingParts, 2));
+                        } else {
+                            $meta['title'] = implode(' ', array_slice($remainingParts, 1));
+                        }
+                    }
+                } else {
+                    $meta['title'] = implode(' ', $remainingParts);
+                }
+                
+            } else {
+                // Simple pattern: Author_Series_Title
+                $meta['author'] = $parts[0];
+                $meta['series'] = $parts[1];
+                $meta['title'] = implode(' ', array_slice($parts, 2));
+            }
+        }
+        
+        Log::debug('[ImportFile] Extracted from directory name', [
+            'dirName' => $dirName,
+            'parts' => $parts,
+            'firstPartIsGenre' => $firstPartIsGenre ?? false,
+            'authorEndIndex' => $authorEndIndex ?? null,
+            'author' => $meta['author'] ?? null,
+            'series' => $meta['series'] ?? null,
+            'genre' => $meta['genre'] ?? null,
+            'title' => $meta['title'] ?? null,
+            'seriesNumber' => $meta['seriesNumber'] ?? null
+        ]);
+    }
+
+    /**
+     * Move imported files from source to final destination during book creation.
+     *
+     * @param  string  $sourcePath  Source file/directory path
+     * @param  string  $sourceRoot  Source root directory
+     * @param  string  $sourceRelPath  Source relative path
+     * @param  string  $sourceType  Source type (file/dir)
+     * @param  string  $destinationPath  Final destination path
+     * @return bool Success status
+     */
+    public function moveImportedFiles(string $sourcePath, string $sourceRoot, string $sourceRelPath, string $sourceType, string $destinationPath): bool
+    {
+        try {
+            // Get the book storage root
+            $bookStorageRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
+            if (!$bookStorageRoot || !is_dir($bookStorageRoot)) {
+                Log::error('[ImportFile] Book storage path not found or invalid', [
+                    'path' => $bookStorageRoot
+                ]);
+                return false;
+            }
+
+            // Build full destination path
+            $fullDestinationPath = $bookStorageRoot . '/' . trim($destinationPath, '/');
+            
+            // Create destination directory if it doesn't exist
+            if (!is_dir($fullDestinationPath)) {
+                if (!File::makeDirectory($fullDestinationPath, 0775, true)) {
+                    Log::error('[ImportFile] Failed to create destination directory', [
+                        'path' => $fullDestinationPath
+                    ]);
+                    return false;
+                }
+            }
+
+            // Verify source exists and is within allowed root
+            if (!file_exists($sourcePath)) {
+                Log::error('[ImportFile] Source path does not exist', [
+                    'path' => $sourcePath
+                ]);
+                return false;
+            }
+
+            $absSourceRoot = realpath($sourceRoot);
+            $absSourcePath = realpath($sourcePath);
+            
+            if (!$absSourceRoot || !$absSourcePath || strpos($absSourcePath, $absSourceRoot) !== 0) {
+                Log::error('[ImportFile] Source path security violation', [
+                    'sourceRoot' => $absSourceRoot,
+                    'sourcePath' => $absSourcePath
+                ]);
+                return false;
+            }
+
+            // Determine target name
+            $sourceName = basename($sourcePath);
+            $targetPath = $fullDestinationPath . '/' . $sourceName;
+
+            // Check if target already exists
+            if (file_exists($targetPath)) {
+                Log::warning('[ImportFile] Target already exists, skipping move', [
+                    'target' => $targetPath
+                ]);
+                return true; // Consider this success since files are already in place
+            }
+
+            // Move the files
+            if ($sourceType === 'file') {
+                $success = File::move($sourcePath, $targetPath);
+            } else {
+                $success = File::moveDirectory($sourcePath, $targetPath);
+            }
+
+            if ($success) {
+                Log::info('[ImportFile] Successfully moved files', [
+                    'from' => $sourcePath,
+                    'to' => $targetPath,
+                    'type' => $sourceType
+                ]);
+                return true;
+            } else {
+                Log::error('[ImportFile] Failed to move files', [
+                    'from' => $sourcePath,
+                    'to' => $targetPath,
+                    'type' => $sourceType
+                ]);
+                return false;
+            }
+        } catch (\Exception $e) {
+            Log::error('[ImportFile] Exception during file move', [
+                'error' => $e->getMessage(),
+                'sourcePath' => $sourcePath,
+                'destinationPath' => $destinationPath
+            ]);
+            return false;
+        }
+    }
+
+    /**
      * Move the selected file or directory to the composed directoryPath under the import destination root.
      *
      * @return \Illuminate\Http\JsonResponse
@@ -1026,441 +1330,85 @@ class ImportFileController extends Controller
         $root = $request->input('root');
         $relPath = $request->input('path');
         $type = $request->input('type');
-        // Get directoryPath with fallback to empty string, then validate and sanitize
         $directoryPath = $request->input('directoryPath', '');
 
-        // Log the received directoryPath for debugging
-        Log::info('[ImportFile] Received directoryPath', [
-            'directoryPath' => $directoryPath,
-            'isEmpty' => empty($directoryPath)
-        ]);
-
-        // If directoryPath is empty, use a default structure
         if (empty($directoryPath)) {
             $directoryPath = 'imports/' . date('Y-m-d');
-            Log::info('[ImportFile] Using default directoryPath', ['directoryPath' => $directoryPath]);
         }
 
-        // Sanitize the directoryPath to prevent directory traversal
         $directoryPath = trim($directoryPath, '/');
         $directoryPath = str_replace('..', '', $directoryPath);
-        $metadata = $request->input('metadata', []);  // Allow custom metadata from the form
-        // Check if root directory exists and is accessible
-        if (! file_exists($root)) {
-            Log::warning("[ImportFile] Root directory does not exist: {$root}");
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Root directory does not exist',
-                'details' => "The directory '{$root}' could not be found on the server.",
-            ], 404);
-        }
-
-        if (! is_dir($root)) {
-            Log::warning("[ImportFile] Root path is not a directory: {$root}");
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid root path',
-                'details' => "The path '{$root}' exists but is not a directory.",
-            ], 400);
-        }
-
-        if (! is_readable($root)) {
-            Log::warning("[ImportFile] Root directory is not readable due to permissions: {$root}");
-            $perms = substr(sprintf('%o', fileperms($root)), -4);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Permission denied',
-                'details' => "The directory '{$root}' exists but cannot be read due to insufficient permissions.",
-                'permissions' => $perms,
-            ], 403);
-        }
 
         $absRoot = realpath($root);
-        if (! $absRoot) {
-            Log::warning("[ImportFile] Could not resolve real path for root: {$root}");
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Path resolution failed',
-                'details' => "Could not resolve the real path for '{$root}'. " .
-                    "This might be due to symlink issues or filesystem restrictions.",
-            ], 400);
+        if (! $absRoot || ! is_dir($absRoot)) {
+            return response()->json(['success' => false, 'message' => 'Invalid root'], 400);
         }
+
         $absPath = $absRoot . ($relPath ? DIRECTORY_SEPARATOR . $relPath : '');
         $absPath = realpath($absPath) ?: $absPath;
 
-        // Check for path traversal attempts (security check)
         if (strpos($absPath, $absRoot) !== 0) {
-            Log::warning('[ImportFile] Path traversal detected: ' . $absPath);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Security violation: Path traversal detected',
-                'details' => 'The requested path is outside the allowed root directory. This may be an attempt to access unauthorized files.',
-            ], 403);
+            return response()->json(['success' => false, 'message' => 'Path traversal detected'], 400);
         }
 
-        // Check if path exists
         if (! file_exists($absPath)) {
-            Log::warning('[ImportFile] File or directory does not exist: ' . $absPath);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'File or directory not found',
-                'details' => "The requested path '{$relPath}' does not exist in the selected root directory.",
-            ], 404);
+            return response()->json(['success' => false, 'message' => 'File or directory does not exist'], 404);
         }
 
-        // Check if path is readable
-        if (! is_readable($absPath)) {
-            Log::warning('[ImportFile] Path is not readable due to permissions: ' . $absPath);
-            $perms = substr(sprintf('%o', fileperms($absPath)), -4);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Permission denied',
-                'details' => "The path '{$relPath}' exists but cannot be read due to insufficient permissions.",
-                'permissions' => $perms,
-            ], 403);
-        }
-        // Determine import destination root from environment variable or fallback to config
         $destRoot = env('BOOK_STORAGE_PATH')
             ?? Config::get('audiobooks.root')
             ?? Config::get('import.dest_root')
             ?? storage_path('audiobooks');
 
-        // Get genre or genrePath from request if available
         $genrePath = $request->input('genrePath', $request->input('genre'));
 
-        // Log the received parameters for debugging
-        Log::info('[ImportFile] Constructing destination directory', [
-            'destRoot' => $destRoot,
-            'directoryPath' => $directoryPath,
-            'genrePath' => $genrePath,
-            'genre' => $request->input('genre')
-        ]);
-
-        // Check if directoryPath already contains the genre path
         $directoryPathParts = explode('/', $directoryPath);
         $firstPart = reset($directoryPathParts);
 
         if (!empty($genrePath) && $firstPart !== $genrePath) {
-            // If directoryPath doesn't start with genrePath, prepend it
             $destDir = $destRoot . DIRECTORY_SEPARATOR . $genrePath . DIRECTORY_SEPARATOR . $directoryPath;
-            Log::info('[ImportFile] Adding genrePath to directoryPath', [
-                'destRoot' => $destRoot,
-                'genrePath' => $genrePath,
-                'directoryPath' => $directoryPath,
-                'destDir' => $destDir
-            ]);
         } else {
-            // directoryPath already includes genrePath or no genrePath provided
             $destDir = $destRoot . DIRECTORY_SEPARATOR . $directoryPath;
-            Log::info('[ImportFile] Using directoryPath as is', [
-                'destRoot' => $destRoot,
-                'directoryPath' => $directoryPath,
-                'destDir' => $destDir
-            ]);
         }
+
         if (! file_exists($destDir)) {
-            try {
-                if (! File::makeDirectory($destDir, 0775, true)) {
-                    Log::error('[ImportFile] Failed to create directory: ' . $destDir);
-
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Failed to create destination directory',
-                        'details' => "Could not create the directory '{$directoryPath}' in the destination. "
-                            . "This may be due to permission issues.",
-                    ], 500);
-                }
-            } catch (\Exception $e) {
-                $errorMessage = $e->getMessage();
-                // Calculate what the target would be, even though we haven't created it yet
-                $potentialTarget = $destDir . DIRECTORY_SEPARATOR . basename($absPath);
-                Log::error('[ImportFile] Exception creating directory', [
-                    'from' => $absPath,
-                    'potentialTarget' => $potentialTarget,
-                    'type' => $type ?? 'unknown',
-                    'destDir' => $destDir,
-                    'error' => $errorMessage
-                ]);
-
-                // Determine if it's a permission issue
-                $permissionError = false;
-                if (
-                    strpos(strtolower($errorMessage), 'permission') !== false ||
-                    strpos(strtolower($errorMessage), 'denied') !== false
-                ) {
-                    $permissionError = true;
-                }
-
-                return response()->json([
-                    'success' => false,
-                    'message' => $permissionError ? 'Permission denied' : 'Failed to create destination directory',
-                    'details' => $permissionError
-                        ? "You don't have permission to create the directory '{$directoryPath}' in the destination."
-                        : "An error occurred while creating the directory: {$errorMessage}",
-                ], $permissionError ? 403 : 500);
+            if (! File::makeDirectory($destDir, 0775, true)) {
+                return response()->json(['success' => false, 'message' => 'Failed to create destination directory'], 500);
             }
-        } elseif (! is_writable($destDir)) {
-            // Directory exists but isn't writable
-            $perms = substr(sprintf('%o', fileperms($destDir)), -4);
-            // Calculate what the target would be, even though we haven't assigned it yet
-            $potentialTarget = $destDir . DIRECTORY_SEPARATOR . basename($absPath);
-            Log::error('[ImportFile] Destination directory exists but is not writable', [
-                'from' => $absPath,
-                'potentialTarget' => $potentialTarget,
-                'type' => $type ?? 'unknown',
-                'destDir' => $destDir,
-                'permissions' => $perms
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Destination directory not writable',
-                'details' => "The destination directory exists but you don't have permission to write to it.",
-                'permissions' => $perms,
-            ], 403);
         }
-        // Check if the destination path already ends with the basename of the source path
+
         $basename = basename($absPath);
         $destDirBasename = basename($destDir);
 
-        // Log the path components for debugging
-        Log::info('[ImportFile] Path components', [
-            'absPath' => $absPath,
-            'basename' => $basename,
-            'destDir' => $destDir,
-            'destDirBasename' => $destDirBasename
-        ]);
-
-        // If the destination directory already ends with the basename, don't append it again
         if ($destDirBasename === $basename) {
             $target = $destDir;
-            Log::info('[ImportFile] Using destination directory as target (avoiding duplication)');
         } else {
             $target = $destDir . DIRECTORY_SEPARATOR . $basename;
-            Log::info('[ImportFile] Appending basename to destination directory');
         }
 
-        // Log the paths for debugging
-        Log::info('[ImportFile] Move preparation', [
-            'absPath' => $absPath,
-            'basename' => $basename,
-            'destDir' => $destDir,
-            'target' => $target
-        ]);
-        if (realpath($absPath) === realpath($target)) {
-            Log::info('[ImportFile] Source and destination are the same, skipping move.');
-
-            return response()->json(
-                ['success' => true, 'newPath' => $target, 'message' => 'Already in target location.']
-            );
-        }
-        try {
-            // Validate the type parameter
-            if (empty($type)) {
-                // If type is not provided, determine it based on the path
-                $type = is_file($absPath) ? 'file' : (is_dir($absPath) ? 'dir' : null);
-                Log::info("[ImportFile] Type parameter not provided, automatically determined as: {$type}");
-            }
-
-            if ($type !== 'file' && $type !== 'dir') {
-                Log::warning("[ImportFile] Invalid type parameter: {$type}");
-
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid type parameter',
-                    'details' => "The type parameter must be either 'file' or 'dir'. Received: '{$type}'.",
-                ], 400);
-            }
-
-            // Check if target already exists (would be overwritten)
-            if (file_exists($target) && $target !== $destDir) {
-                // Only return an error if the target is not the same as destDir
-                // This allows us to use the same directory when we've determined it's already correct
-                Log::warning("[ImportFile] Target already exists: {$target}");
-
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Target already exists',
-                    'details' => 'The destination path already contains a file or directory with the same name. ' .
-                        'Cannot overwrite existing content.',
-                ], 409); // HTTP 409 Conflict
-            }
-
-            // Check if source is writable (needed for deletion after move)
-            if (! is_writable(dirname($absPath))) {
-                Log::warning('[ImportFile] Source directory is not writable', [
-                    'from' => $absPath,
-                    'to' => $target,
-                    'type' => $type,
-                    'sourceDir' => dirname($absPath),
-                    'permissions' => substr(sprintf('%o', fileperms(dirname($absPath))), -4)
-                ]);
-
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Source directory not writable',
-                    'details' => 'The source directory is not writable. ' .
-                        'Cannot remove the original file/directory after copying.',
-                    'permissions' => substr(sprintf('%o', fileperms(dirname($absPath))), -4),
-                ], 403);
-            }
-
-            // Perform the move operation
+        if (realpath($absPath) !== realpath($target)) {
             if ($type === 'file') {
-                Log::info('[ImportFile] Moving file', [
-                    'from' => $absPath,
-                    'to' => $target
-                ]);
                 File::move($absPath, $target);
             } else { // $type === 'dir'
-                Log::info('[ImportFile] Moving directory', [
-                    'from' => $absPath,
-                    'to' => $target,
-                    'source_exists' => file_exists($absPath) ? 'Yes' : 'No',
-                    'source_is_dir' => is_dir($absPath) ? 'Yes' : 'No',
-                    'source_readable' => is_readable($absPath) ? 'Yes' : 'No',
-                    'source_writable' => is_writable($absPath) ? 'Yes' : 'No',
-                    'target_exists' => file_exists($target) ? 'Yes' : 'No',
-                    'target_parent_exists' => file_exists(dirname($target)) ? 'Yes' : 'No',
-                    'target_parent_writable' => is_writable(dirname($target)) ? 'Yes' : 'No',
-                    'source_contents' => array_slice(scandir($absPath), 0, 10) // Show first 10 items
-                ]);
-
-                try {
-                    // First try the standard moveDirectory
-                    $moveResult = File::moveDirectory($absPath, $target);
-
-                    if (!$moveResult) {
-                        Log::warning('[ImportFile] Standard moveDirectory failed, trying manual copy+delete approach');
-
-                        // If standard move fails, try copy+delete approach
-                        // First make sure destination directory exists
-                        if (!file_exists($target)) {
-                            File::makeDirectory($target, 0775, true);
-                        }
-
-                        // Copy all files from source to destination
-                        $sourceFiles = File::allFiles($absPath);
-                        $copySuccess = true;
-
-                        foreach ($sourceFiles as $file) {
-                            $relativePath = str_replace($absPath, '', $file->getPathname());
-                            $destFile = $target . $relativePath;
-
-                            // Ensure destination directory exists
-                            $destDir = dirname($destFile);
-                            if (!file_exists($destDir)) {
-                                File::makeDirectory($destDir, 0775, true);
-                            }
-
-                            // Copy the file
-                            if (!File::copy($file->getPathname(), $destFile)) {
-                                Log::error('[ImportFile] Failed to copy file', [
-                                    'from' => $file->getPathname(),
-                                    'to' => $destFile
-                                ]);
-                                $copySuccess = false;
-                                break;
-                            }
-                        }
-
-                        // If all files were copied successfully, delete the source directory
-                        if ($copySuccess) {
-                            // Don't delete source yet for safety
-                            // File::deleteDirectory($absPath);
-                            Log::info('[ImportFile] Successfully copied all files from source to destination');
-                        } else {
-                            throw new \Exception('Failed to copy all files from source to destination');
-                        }
-                    }
-                } catch (\Exception $e) {
-                    Log::error('[ImportFile] Exception during moveDirectory', [
-                        'from' => $absPath,
-                        'to' => $target,
-                        'error' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString()
-                    ]);
-                    throw $e; // Re-throw to be caught by the outer try-catch
-                }
+                File::moveDirectory($absPath, $target);
             }
+        }
 
-            Log::info('[ImportFile] Successfully moved "' . $absPath . '" to "' . $target . '"');
+        $meta = $this->extract($request)->getData(true);
 
-            // If metadata was provided, store it with the book
-            if (! empty($metadata)) {
-                // Generate a unique book ID for the imported book
-                $bookId = hash('sha256', $target);
+        // Check if the request is coming from within the import page
+        $referer = $request->header('referer');
+        $isInternalNavigation = $referer && (
+            strpos($referer, '/admin/import/') !== false ||
+            strpos($referer, '/admin/books/import-file') !== false
+        );
 
-                // Store the metadata in the document store
-                try {
-                    $metadata['id'] = $bookId;
-                    $metadata['path'] = $target;
-                    $metadata['updated_at'] = now()->toIso8601String();
-                    $metadata['created_at'] = $metadata['updated_at'];
-
-                    $this->documentStoreService->createBook($metadata);
-                    Log::info('[ImportFile] Stored metadata for imported book', [
-                        'bookId' => $bookId,
-                    ]);
-                } catch (\Exception $e) {
-                    Log::error('[ImportFile] Failed to store metadata', [
-                        'bookId' => $bookId,
-                        'error' => $e->getMessage(),
-                    ]);
-                }
-            }
-
-            return response()->json([
-                'success' => true,
-                'newPath' => $target,
-                'message' => 'File successfully imported',
-                'details' => ($type === 'file' ? 'File' : 'Directory') .
-                    ' was successfully moved to the destination.',
-                'metadata' => $metadata,
-            ]);
-        } catch (\Exception $e) {
-            $errorMessage = $e->getMessage();
-            Log::error('[ImportFile] Move failed: ' . $errorMessage, [
-                'from' => $absPath,
-                'to' => $target,
-                'type' => $type
-            ]);
-
-            // Determine if it's a permission issue
-            $permissionError = false;
-            if (
-                strpos(strtolower($errorMessage), 'permission') !== false ||
-                strpos(strtolower($errorMessage), 'denied') !== false
-            ) {
-                $permissionError = true;
-            }
-
-            // Determine if it's a disk space issue
-            $diskSpaceError = false;
-            if (
-                strpos(strtolower($errorMessage), 'space') !== false ||
-                strpos(strtolower($errorMessage), 'quota') !== false ||
-                strpos(strtolower($errorMessage), 'full') !== false
-            ) {
-                $diskSpaceError = true;
-            }
-            return response()->json([
-                'success' => false,
-                'message' => $permissionError ? 'Permission denied' :
-                    ($diskSpaceError ? 'Insufficient disk space' : 'Move operation failed'),
-                'details' => $permissionError
-                    ? "You don't have permission to perform this operation."
-                    : ($diskSpaceError
-                        ? 'There is not enough disk space to complete this operation.'
-                        : "An error occurred during the move operation: {$errorMessage}"),
-            ], $permissionError ? 403 : ($diskSpaceError ? 507 : 500));
+        // Only include URL parameters if navigating within the import page
+        if ($isInternalNavigation) {
+            return redirect()->route('admin.books.create', $meta);
+        } else {
+            // When coming from main site, don't include URL parameters
+            return redirect()->route('admin.books.create');
         }
     }
 
@@ -1560,6 +1508,88 @@ class ImportFileController extends Controller
             Log::error('[ImportFile] Error fetching genres', ['error' => $e->getMessage()]);
             $formData['availableGenres'] = [];
         }
+
+        return $formData;
+    }
+
+    /**
+     * Prepare data for redirecting to the book form with prefilled data.
+     *
+     * @param  array  $meta  Extracted metadata
+     * @param  string  $directoryPath  Composed directory path
+     * @param  string  $genrePath  Determined genre path
+     * @return array Form data for URL parameters
+     */
+    protected function prepareFormDataForRedirect(array $meta, string $directoryPath, string $genrePath): array
+    {
+        $formData = [
+            'title' => $meta['title'] ?? '',
+            'description' => $meta['description'] ?? '',
+            'publishedYear' => $meta['year'] ?? '',
+            'language' => $meta['language'] ?? 'en',
+            'isbn' => $meta['isbn'] ?? '',
+            'asin' => $meta['asin'] ?? '',
+            'directoryPath' => $directoryPath,
+            'genrePath' => $genrePath,
+            'sourcePath' => $meta['sourcePath'] ?? '',
+            'sourceRoot' => $meta['sourceRoot'] ?? '',
+            'sourceRelPath' => $meta['sourceRelPath'] ?? '',
+            'sourceType' => $meta['sourceType'] ?? '',
+            'importMode' => true, // Flag to indicate this is from import
+        ];
+
+        // Handle authors as array
+        if (!empty($meta['author'])) {
+            $authors = is_array($meta['author']) ? $meta['author'] : [$meta['author']];
+            foreach ($authors as $index => $author) {
+                $formData["author[{$index}]"] = trim($author);
+            }
+        }
+
+        // Handle narrators as array - ensure we have narrator data
+        if (!empty($meta['narrator'])) {
+            $narrators = is_array($meta['narrator']) ? $meta['narrator'] : [$meta['narrator']];
+            foreach ($narrators as $index => $narrator) {
+                $formData["narrator[{$index}]"] = trim($narrator);
+            }
+        }
+
+        // Handle genres as array - prefer genrePath over generic audio metadata genres
+        $audioGenre = $meta['genre'] ?? '';
+        $intelligentGenre = $genrePath ?? 'Other';
+        
+        // Use genrePath if audio genre is generic/unhelpful, otherwise use audio metadata
+        $genericAudioGenres = ['Audiobook', 'Audio', 'Spoken Word', 'Book', 'Literature', 'Other'];
+        if (!empty($intelligentGenre) && $intelligentGenre !== 'Other' && 
+            (empty($audioGenre) || in_array($audioGenre, $genericAudioGenres))) {
+            $genre = $intelligentGenre;
+        } else {
+            $genre = $audioGenre ?: $intelligentGenre;
+        }
+        
+        if (!empty($genre)) {
+            $genres = is_array($genre) ? $genre : [$genre];
+            foreach ($genres as $index => $genreItem) {
+                $formData["genre[{$index}]"] = trim($genreItem);
+            }
+        }
+
+        // Handle series as array with objects - check both series and seriesName
+        $seriesName = $meta['seriesName'] ?? $meta['series'] ?? null;
+        if (!empty($seriesName)) {
+            $seriesNumber = $meta['seriesNumber'] ?? '';
+            $formData['series[0][name]'] = trim($seriesName);
+            $formData['series[0][number]'] = trim($seriesNumber);
+        }
+
+        Log::debug('[ImportFile] Prepared form data for redirect', [
+            'directoryPath' => $directoryPath,
+            'genrePath' => $genrePath,
+            'hasAuthor' => !empty($formData['author[0]']),
+            'hasNarrator' => !empty($formData['narrator[0]']),
+            'hasGenre' => !empty($formData['genre[0]']),
+            'hasSeries' => !empty($formData['series[0][name]']),
+        ]);
 
         return $formData;
     }

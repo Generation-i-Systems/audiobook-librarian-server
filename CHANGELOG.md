@@ -5,6 +5,10 @@
 - Service method: `MongoService::autocompleteSeries`
 - Interface update: `DocumentStoreServiceInterface::autocompleteSeries`
 - Tests: `BookApiAutocompleteSeriesTest` (feature), interface mocks updated
+- Import feature now skips directories without files matching allowed extensions
+  - Updated ImportFileController to filter directories during listing
+  - Added comprehensive tests to verify directory filtering behavior
+  - Improved import experience by showing only relevant directories
 
 ### Fixed
 - Fixed import file browser JavaScript initialization issues
@@ -14,6 +18,13 @@
 - Fixed missing routes for import file browser API endpoints
 - Improved route definitions for import file browser to ensure proper access
 - Added consistent URL variable usage in JavaScript for better maintainability
+- Fixed Audible cover download in book update functionality
+  - Fixed tests to properly verify cover image storage
+  - Added test fixture image for cover testing
+  - Ensured proper file extension handling for downloaded covers
+- Fixed Audible cover download in book edit form to properly save cover images to book directory
+- Added UI feedback during book form submission (spinner and disabled button)
+- Improved error handling for Audible cover image downloads with proper logging
 - Fixed issue with select button remaining disabled when selecting directories with audio files
 - Improved directory listing with direct event attachment to list items
 - Enhanced ImportFileController with better logging and error handling

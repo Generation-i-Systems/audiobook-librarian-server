@@ -183,46 +183,85 @@ class BookController extends Controller
         $biggestCover = null;
         $biggestSize = 0;
         $directoryPath = $request->old('directoryPath') ?? $initial['directoryPath'] ?? '';
-        // Use processDirPath to extract initial values from the directory
-        if ($directoryPath) {
-            $dirMeta = $this->processDirPath($directoryPath);
-            if (is_array($dirMeta)) {
-                $initial = array_merge($initial, $dirMeta);
-                // Ensure author and genre are arrays
-                if (empty($initial['author']) || !is_array($initial['author'])) {
-                    $initial['author'] = [''];
-                }
-                if (empty($initial['genre']) || !is_array($initial['genre'])) {
-                    $initial['genre'] = [''];
+        
+        // Check if this is an import request with pre-extracted metadata
+        $isImportMode = $request->has('importMode') && $request->get('importMode');
+        
+        if ($isImportMode) {
+            // Use the pre-extracted metadata from import process instead of re-processing
+            $initial = [
+                'directoryPath' => $request->get('directoryPath', ''),
+                'author' => $request->get('author', ['']),
+                'genre' => $request->get('genre', ['']),
+                'narrator' => $request->get('narrator', ['']),
+                'series' => $request->get('series', []),
+                'title' => $request->get('title', ''),
+                'description' => $request->get('description', ''),
+                'publishedYear' => $request->get('publishedYear', ''),
+                'language' => $request->get('language', 'en'),
+                'isbn' => $request->get('isbn', ''),
+                'asin' => $request->get('asin', ''),
+            ];
+            
+            
+            // Ensure arrays are properly formatted
+            if (!is_array($initial['author'])) {
+                $initial['author'] = empty($initial['author']) ? [''] : [$initial['author']];
+            }
+            if (!is_array($initial['genre'])) {
+                $initial['genre'] = empty($initial['genre']) ? [''] : [$initial['genre']];
+            }
+            if (!is_array($initial['narrator'])) {
+                $initial['narrator'] = empty($initial['narrator']) ? [''] : [$initial['narrator']];
+            }
+            if (!is_array($initial['series'])) {
+                $initial['series'] = empty($initial['series']) ? [] : $initial['series'];
+            }
+            
+            $directoryPath = $initial['directoryPath'];
+        } else {
+            // Use processDirPath to extract initial values from the directory
+            if ($directoryPath) {
+                $dirMeta = $this->processDirPath($directoryPath);
+                if (is_array($dirMeta)) {
+                    $initial = array_merge($initial, $dirMeta);
+                    // Ensure author and genre are arrays
+                    if (empty($initial['author']) || !is_array($initial['author'])) {
+                        $initial['author'] = [''];
+                    }
+                    if (empty($initial['genre']) || !is_array($initial['genre'])) {
+                        $initial['genre'] = [''];
+                    }
                 }
             }
-            [$coverAuto, $coverCandidates] = $this->findCoverImageCandidate($directoryPath);
-            // If no cover and no images, try m4b extraction
-            if (empty($coverAuto) && empty($coverCandidates)) {
-                $dir = rtrim($this->storagePath, '/') . '/' . ltrim($directoryPath, '/');
-                if (is_dir($dir)) {
-                    $m4bs = array_values(array_filter(scandir($dir), function ($f) use ($dir) {
-                        return is_file($dir . '/' . $f) && strtolower(pathinfo($f, PATHINFO_EXTENSION)) === 'm4b';
-                    }));
-                    if ($m4bs) {
-                        $firstM4b = $dir . '/' . $m4bs[0];
-                        $coverFile = $this->extractCoverFromM4B($firstM4b, $dir);
-                        if ($coverFile) {
-                            $coverAuto = $coverFile;
-                        }
-                        $tags = $this->extractTagData($firstM4b);
-                        if (!empty($tags['description'])) {
-                            $initial['description'] = $tags['description'];
-                        }
+        }
+        
+        [$coverAuto, $coverCandidates] = $this->findCoverImageCandidate($directoryPath);
+        // If no cover and no images, try m4b extraction
+        if (empty($coverAuto) && empty($coverCandidates)) {
+            $dir = rtrim($this->storagePath, '/') . '/' . ltrim($directoryPath, '/');
+            if (is_dir($dir)) {
+                $m4bs = array_values(array_filter(scandir($dir), function ($f) use ($dir) {
+                    return is_file($dir . '/' . $f) && strtolower(pathinfo($f, PATHINFO_EXTENSION)) === 'm4b';
+                }));
+                if ($m4bs) {
+                    $firstM4b = $dir . '/' . $m4bs[0];
+                    $coverFile = $this->extractCoverFromM4B($firstM4b, $dir);
+                    if ($coverFile) {
+                        $coverAuto = $coverFile;
                     }
-                    // Also check metadata.abs for description and year
-                    $meta = $this->extractMetadataAbs($dir);
-                    if (!empty($meta['description']) && empty($initial['description'])) {
-                        $initial['description'] = $meta['description'];
+                    $tags = $this->extractTagData($firstM4b);
+                    if (!empty($tags['description'])) {
+                        $initial['description'] = $tags['description'];
                     }
-                    if (!empty($meta['year']) && empty($initial['publishedYear'])) {
-                        $initial['publishedYear'] = $meta['year'];
-                    }
+                }
+                // Also check metadata.abs for description and year
+                $meta = $this->extractMetadataAbs($dir);
+                if (!empty($meta['description']) && empty($initial['description'])) {
+                    $initial['description'] = $meta['description'];
+                }
+                if (!empty($meta['year']) && empty($initial['publishedYear'])) {
+                    $initial['publishedYear'] = $meta['year'];
                 }
             }
         }
@@ -251,6 +290,38 @@ class BookController extends Controller
                 $genreList[] = $g;
             }
         }
+        
+        // If in import mode, ensure the requested genre exists in the genre list
+        if ($isImportMode) {
+            $requestedGenres = $request->get('genre', []);
+            if (!is_array($requestedGenres)) {
+                $requestedGenres = [$requestedGenres];
+            }
+            
+            foreach ($requestedGenres as $requestedGenre) {
+                if (!empty($requestedGenre) && !in_array($requestedGenre, $genreList)) {
+                    // Add the new genre to the list so it appears in the dropdown
+                    $genreList[] = $requestedGenre;
+                    
+                    // Also add it to the database for future use
+                    try {
+                        $documentStore->createGenre(['name' => $requestedGenre]);
+                        Log::info('Auto-created genre during import', ['genre' => $requestedGenre]);
+                    } catch (\Exception $e) {
+                        Log::warning('Failed to auto-create genre', [
+                            'genre' => $requestedGenre,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
+                }
+            }
+        }
+        
+        // Debug logging for genre list
+        Log::debug('Genre list for form', [
+            'genreList' => $genreList,
+            'requested_genre' => $isImportMode ? ($request->get('genre') ?? 'none') : 'not_import'
+        ]);
         // Guarantee initial['author'] and initial['genre'] are arrays for JS and Blade
         if (empty($initial['author']) || !is_array($initial['author'])) {
             $initial['author'] = [''];
@@ -500,11 +571,11 @@ class BookController extends Controller
                     'success' => true,
                     'message' => 'Book imported successfully',
                     'id' => $id,
-                    'redirect' => route('admin.books.edit', $id),
+                    'redirect' => route('admin.books.edit', ['book' => $id]),
                 ]);
             }
 
-            return redirect()->route('admin.books.edit', $id)
+            return redirect()->route('admin.books.edit', ['book' => $id])
                 ->with('success', 'Book imported successfully.');
         } catch (\Exception $e) {
             Log::error('Book import failed', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
@@ -563,13 +634,13 @@ class BookController extends Controller
     /**
      * Display the specified book.
      *
-     * @param  string  $id
+     * @param  string  $book
      * @return \Illuminate\Contracts\View\View
      */
-    public function show($id)
+    public function show($book)
     {
         $documentStore = $this->documentStoreService;
-        $book = $documentStore->getBook($id);
+        $book = $documentStore->getBook($book);
         if (!$book) {
             abort(404, 'Book not found');
         }
@@ -580,13 +651,13 @@ class BookController extends Controller
     /**
      * Show the form for editing the specified book.
      *
-     * @param  string  $id
+     * @param  string  $book
      * @return \Illuminate\Contracts\View\View
      */
-    public function edit($id)
+    public function edit($book)
     {
         $documentStore = $this->documentStoreService;
-        $book = $documentStore->getBook($id);
+        $book = $documentStore->getBook($book);
         if (!$book) {
             abort(404, 'Book not found');
         }
@@ -691,6 +762,13 @@ class BookController extends Controller
                 'asin' => 'nullable|string|max:50',
                 'googleBooksId' => 'nullable|string|max:50',
                 'goodreadsId' => 'nullable|string|max:50',
+                // Import-specific fields
+                'importMode' => 'nullable|boolean',
+                'sourcePath' => 'nullable|string',
+                'sourceRoot' => 'nullable|string',
+                'sourceRelPath' => 'nullable|string',
+                'sourceType' => 'nullable|string|in:file,dir',
+                'genrePath' => 'nullable|string',
             ]);
 
             // Generate a unique ID for the new book
@@ -762,6 +840,46 @@ class BookController extends Controller
             $documentStore->createBook($validated);
             Log::info('Book created successfully', ['id' => $id]);
 
+            // Handle import file moving if this is from import
+            if (!empty($validated['importMode']) && 
+                !empty($validated['sourcePath']) && 
+                !empty($validated['sourceRoot']) && 
+                !empty($validated['directoryPath'])) {
+                
+                try {
+                    $importFileController = app()->make('App\Http\Controllers\Admin\ImportFileController');
+                    
+                    $moveSuccess = $importFileController->moveImportedFiles(
+                        $validated['sourcePath'],
+                        $validated['sourceRoot'],
+                        $validated['sourceRelPath'] ?? '',
+                        $validated['sourceType'] ?? 'dir',
+                        $validated['directoryPath']
+                    );
+                    
+                    if ($moveSuccess) {
+                        Log::info('Import files moved successfully', [
+                            'bookId' => $id,
+                            'from' => $validated['sourcePath'],
+                            'to' => $validated['directoryPath']
+                        ]);
+                    } else {
+                        Log::warning('Failed to move import files', [
+                            'bookId' => $id,
+                            'from' => $validated['sourcePath'],
+                            'to' => $validated['directoryPath']
+                        ]);
+                    }
+                } catch (\Exception $moveException) {
+                    // Log but don't fail the book creation
+                    Log::error('Exception during import file move', [
+                        'bookId' => $id,
+                        'error' => $moveException->getMessage(),
+                        'sourcePath' => $validated['sourcePath']
+                    ]);
+                }
+            }
+
             // Fire event for any listeners
             event(new NewBookAdded(['id' => $id, 'title' => $validated['title']]));
 
@@ -804,13 +922,13 @@ class BookController extends Controller
     /**
      * Update the specified book in storage.
      *
-     * @param  string  $id
+     * @param  string  $book
      * @return \Illuminate\Http\RedirectResponse
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, $book)
     {
         $documentStore = $this->documentStoreService;
-        $book = $documentStore->getBook($id);
+        $book = $documentStore->getBook($book);
         if (!$book) {
             return redirect()->route('admin.books.index')->withErrors(['Book not found.']);
         }
@@ -1535,7 +1653,7 @@ class BookController extends Controller
     /**
      * Get the raw JSON data for a book from $documentStore
      *
-     * @param  string  $id  The book ID
+     * @param  string  $book  The book ID
      * @return \Illuminate\Http\JsonResponse
      */
     public function getRawJson($id)
@@ -1552,7 +1670,7 @@ class BookController extends Controller
     /**
      * Save raw JSON for a book (admin only).
      *
-     * @param  string  $id
+     * @param  string  $book
      * @return \Illuminate\Http\JsonResponse
      */
     public function saveRawJson($id, Request $request)
