@@ -18,6 +18,11 @@
   - Ensured a cover image radio button is always selected if any image is available
 
 ### Fixed
+- Fixed 401 Unauthorized error for series autocomplete in admin book form
+  - Added admin-accessible endpoint `/admin/series-autocomplete` in BookController
+  - Updated JS to use the correct endpoint for series autocomplete
+  - Ensured proper normalization of series data using 'seriesName' field
+  - Added comprehensive tests for the admin series autocomplete endpoint
 - Fixed import file browser JavaScript initialization issues
 - Added proper error handling for AJAX requests in import file browser
 - Improved DOM element selection for import file browser containers

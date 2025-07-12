@@ -2,7 +2,7 @@
 
 ## MongoDB Atlas Search Series Autocomplete
 
-### API Endpoint
+### API Endpoints
 
 - `GET /api/v1/series/autocomplete?query=Super&limit=5`
     - Returns fuzzy, prefix-matched series names using Atlas Search autocomplete aggregation on the `seriesName` field.
@@ -14,12 +14,26 @@
         - `query` (required): The search string for the series name.
         - `limit` (optional, default 10): Maximum results.
 
+- `GET /admin/series-autocomplete?query=Super` (Admin-only endpoint)
+    - Admin-accessible endpoint for series autocomplete in the book form.
+    - Used by jQuery UI autocomplete in the admin book form.
+    - Example response:
+      ```json
+      { "data": ["Super Powereds", "Super Heroes"] }
+      ```
+    - Parameters:
+        - `query` or `term` (required): The search string for the series name.
+
 ### Implementation
 - Uses MongoDB `$search` aggregation with `autocomplete` and `fuzzy` options.
 - Service: `MongoService::autocompleteSeries`
-- Controller: `BookApiController@autocompleteSeries`
+- Controllers: 
+  - `BookApiController@autocompleteSeries` (API endpoint)
+  - `BookController@autocompleteSeries` (Admin endpoint)
 - Interface: `DocumentStoreServiceInterface::autocompleteSeries`
-- Tests: `BookApiAutocompleteSeriesTest`
+- Tests: 
+  - `BookApiAutocompleteSeriesTest` (API endpoint)
+  - `BookControllerSeriesAutocompleteTest` (Admin endpoint)
 
 ## Unified External Cover Image Integration
 

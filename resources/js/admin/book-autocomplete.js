@@ -22,5 +22,5 @@ $(function () {
     }
     setupAutocomplete('.author-autocomplete', '/api/v1/authors/autocomplete');
     setupAutocomplete('.narrator-autocomplete', '/api/v1/narrators/autocomplete');
-    setupAutocomplete('.series-autocomplete', '/api/v1/series/autocomplete');
+    setupAutocomplete('.series-autocomplete', '/admin/series-autocomplete');
 });

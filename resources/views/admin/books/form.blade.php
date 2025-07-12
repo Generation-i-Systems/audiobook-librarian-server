@@ -346,7 +346,7 @@
             @endphp
             <!-- Original coverImageSource field -->
             <input type="hidden" name="coverImageSource" id="coverImageSource" value="{{ $initialCoverSource }}">
-
+            
             <!-- Add a script to ensure coverImageSource is set correctly on form submission -->
             <script>
                 document.addEventListener('DOMContentLoaded', function() {

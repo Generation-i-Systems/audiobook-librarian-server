@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep:*)",
+      "Bash(php artisan test:*)",
+      "Bash(find:*)",
+      "Bash(./vendor/bin/phpunit:*)",
+      "Bash(rg:*)",
+      "Bash(php:*)"
+    ],
+    "deny": []
+  }
+}

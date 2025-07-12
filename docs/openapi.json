@@ -1,0 +1,556 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Audiobook Librarian API",
+    "version": "1.0.0",
+    "description": "API documentation for the Audiobook Librarian application.\n\nThis specification covers all endpoints available in the Audiobook Librarian API."
+  },
+  "servers": [
+    {
+      "url": "/api/v1",
+      "description": "API v1"
+    },
+    {
+      "url": "/admin",
+      "description": "Admin API"
+    }
+  ],
+  "paths": {
+    "/register": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Register new user",
+        "description": "Registers a new user account",
+        "operationId": "register"
+      }
+    },
+    "/login": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Login",
+        "description": "Authenticates a user and returns a JWT token",
+        "operationId": "login"
+      }
+    },
+    "/logout": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Logout",
+        "description": "Logs out the current user by invalidating their token",
+        "operationId": "logout"
+      }
+    },
+    "/user": {
+      "get": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Get current user profile",
+        "description": "Returns the profile of the currently authenticated user",
+        "operationId": "getCurrentUser"
+      }
+    },
+    "/me": {
+      "get": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Get current user profile (alias)",
+        "description": "Alias for /user endpoint - returns the profile of the currently authenticated user",
+        "operationId": "getMe"
+      }
+    },
+    "/series/autocomplete": {
+      "get": {
+        "tags": [
+          "Series"
+        ],
+        "summary": "Series name autocomplete",
+        "description": "|",
+        "operationId": "seriesAutocomplete"
+      }
+    },
+    "/books": {
+      "get": {
+        "tags": [
+          "Books"
+        ],
+        "summary": "List books",
+        "description": "Returns a paginated list of books with optional filtering",
+        "operationId": "listBooks"
+      }
+    },
+    "/books/{book}": {
+      "get": {
+        "tags": [
+          "Books"
+        ],
+        "summary": "Get book details",
+        "description": "Returns detailed information about a specific book",
+        "operationId": "getBook"
+      }
+    },
+    "/books/{book}/cover": {
+      "get": {
+        "tags": [
+          "Books"
+        ],
+        "summary": "Get book cover image",
+        "description": "Returns the cover image for a specific book",
+        "operationId": "getBookCover"
+      }
+    },
+    "/books/{book}/download": {
+      "get": {
+        "tags": [
+          "Books"
+        ],
+        "summary": "Download book audio file",
+        "description": "Returns the audio file for a specific book (requires permission)",
+        "operationId": "downloadBook"
+      }
+    },
+    "/books/browse": {
+      "get": {
+        "tags": [
+          "Books"
+        ],
+        "summary": "Browse books by genre/author/series",
+        "description": "Returns a paginated list of genres, authors, or series for browsing",
+        "operationId": "browseBooks"
+      }
+    },
+    "/books/search": {
+      "get": {
+        "tags": [
+          "Books"
+        ],
+        "summary": "Advanced search for books",
+        "description": "Returns a paginated list of books matching the search criteria",
+        "operationId": "searchBooks"
+      }
+    },
+    "/authors": {
+      "get": {
+        "tags": [
+          "Authors"
+        ],
+        "summary": "List authors",
+        "description": "Returns a paginated list of authors",
+        "operationId": "listAuthors"
+      }
+    },
+    "/authors/{author}": {
+      "get": {
+        "tags": [
+          "Authors"
+        ],
+        "summary": "Get author details",
+        "description": "Returns detailed information about a specific author and their books",
+        "operationId": "getAuthor"
+      }
+    },
+    "/genres": {
+      "get": {
+        "tags": [
+          "Genres"
+        ],
+        "summary": "List genres",
+        "description": "Returns a paginated list of genres",
+        "operationId": "listGenres"
+      }
+    },
+    "/genres/{genre}": {
+      "get": {
+        "tags": [
+          "Genres"
+        ],
+        "summary": "Get genre details",
+        "description": "Returns detailed information about a specific genre and books in that genre",
+        "operationId": "getGenre"
+      }
+    },
+    "/series": {
+      "get": {
+        "tags": [
+          "Series"
+        ],
+        "summary": "List series",
+        "description": "Returns a paginated list of series",
+        "operationId": "listSeries"
+      }
+    },
+    "/series/{series}": {
+      "get": {
+        "tags": [
+          "Series"
+        ],
+        "summary": "Get series details",
+        "description": "Returns detailed information about a specific series and books in that series",
+        "operationId": "getSeries"
+      }
+    },
+    "/admin/books/autocomplete/series": {
+      "get": {
+        "tags": [
+          "Admin",
+          "Series"
+        ],
+        "summary": "Autocomplete series names (admin)",
+        "description": "Returns series names matching the search term for admin autocomplete",
+        "operationId": "adminAutocompleteSeriesNames"
+      }
+    },
+    "/user/profile": {
+      "get": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Get user profile",
+        "description": "Returns the current user's profile information",
+        "operationId": "getUserProfile"
+      },
+      "put": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Update user profile",
+        "description": "Updates the current user's profile information",
+        "operationId": "updateUserProfile"
+      }
+    },
+    "/user/library": {
+      "get": {
+        "tags": [
+          "User",
+          "Books"
+        ],
+        "summary": "Get user library",
+        "description": "Returns the current user's library of books",
+        "operationId": "getUserLibrary"
+      }
+    },
+    "/books/{book}/progress": {
+      "get": {
+        "tags": [
+          "Books",
+          "User"
+        ],
+        "summary": "Get reading progress",
+        "description": "Returns the user's reading progress for a specific book",
+        "operationId": "getBookProgress"
+      },
+      "put": {
+        "tags": [
+          "Books",
+          "User"
+        ],
+        "summary": "Update reading progress",
+        "description": "Updates the user's reading progress for a specific book",
+        "operationId": "updateBookProgress"
+      }
+    },
+    "/book-requests": {
+      "get": {
+        "tags": [
+          "Book Requests"
+        ],
+        "summary": "List book requests",
+        "description": "Returns a paginated list of book requests",
+        "operationId": "listBookRequests"
+      },
+      "post": {
+        "tags": [
+          "Book Requests"
+        ],
+        "summary": "Create book request",
+        "description": "Creates a new book request",
+        "operationId": "createBookRequest"
+      }
+    },
+    "/book-requests/{request}": {
+      "get": {
+        "tags": [
+          "Book Requests"
+        ],
+        "summary": "Get book request",
+        "description": "Returns details of a specific book request",
+        "operationId": "getBookRequest"
+      },
+      "put": {
+        "tags": [
+          "Book Requests",
+          "Admin"
+        ],
+        "summary": "Update book request status (admin)",
+        "description": "Updates the status of a book request (admin only)",
+        "operationId": "updateBookRequestStatus"
+      },
+      "delete": {
+        "tags": [
+          "Book Requests"
+        ],
+        "summary": "Delete book request",
+        "description": "Deletes a book request (only allowed for the user who created it or admins)",
+        "operationId": "deleteBookRequest"
+      }
+    },
+    "/authors/{author}/follow": {
+      "post": {
+        "tags": [
+          "Authors",
+          "User"
+        ],
+        "summary": "Follow author",
+        "description": "Follow an author to receive notifications about new books",
+        "operationId": "followAuthor"
+      },
+      "delete": {
+        "tags": [
+          "Authors",
+          "User"
+        ],
+        "summary": "Unfollow author",
+        "description": "Unfollow an author to stop receiving notifications about new books",
+        "operationId": "unfollowAuthor"
+      }
+    },
+    "/series/{series}/follow": {
+      "post": {
+        "tags": [
+          "Series",
+          "User"
+        ],
+        "summary": "Follow series",
+        "description": "Follow a series to receive notifications about new books",
+        "operationId": "followSeries"
+      },
+      "delete": {
+        "tags": [
+          "Series",
+          "User"
+        ],
+        "summary": "Unfollow series",
+        "description": "Unfollow a series to stop receiving notifications about new books",
+        "operationId": "unfollowSeries"
+      }
+    },
+    "/messages": {
+      "get": {
+        "tags": [
+          "Messages"
+        ],
+        "summary": "List messages",
+        "description": "Returns a paginated list of messages for the current user",
+        "operationId": "listMessages"
+      },
+      "post": {
+        "tags": [
+          "Messages",
+          "Admin"
+        ],
+        "summary": "Create message (admin)",
+        "description": "Creates a new message for a user or all users (admin only)",
+        "operationId": "createMessage"
+      }
+    },
+    "/messages/{message}": {
+      "get": {
+        "tags": [
+          "Messages"
+        ],
+        "summary": "Get message",
+        "description": "Returns details of a specific message and marks it as read",
+        "operationId": "getMessage"
+      },
+      "delete": {
+        "tags": [
+          "Messages"
+        ],
+        "summary": "Delete message",
+        "description": "Deletes a message",
+        "operationId": "deleteMessage"
+      }
+    },
+    "/admin/users": {
+      "get": {
+        "tags": [
+          "Admin",
+          "User"
+        ],
+        "summary": "List all users (admin)",
+        "description": "Returns a paginated list of all users (admin only)",
+        "operationId": "adminListUsers"
+      }
+    },
+    "/admin/users/{user}": {
+      "get": {
+        "tags": [
+          "Admin",
+          "User"
+        ],
+        "summary": "Get user details (admin)",
+        "description": "Returns detailed information about a specific user (admin only)",
+        "operationId": "adminGetUser"
+      },
+      "put": {
+        "tags": [
+          "Admin",
+          "User"
+        ],
+        "summary": "Update user (admin)",
+        "description": "Updates a user's information (admin only)",
+        "operationId": "adminUpdateUser"
+      },
+      "delete": {
+        "tags": [
+          "Admin",
+          "User"
+        ],
+        "summary": "Delete user (admin)",
+        "description": "Deletes a user (admin only)",
+        "operationId": "adminDeleteUser"
+      }
+    },
+    "/admin/stats": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Get system statistics (admin)",
+        "description": "Returns system statistics (admin only)",
+        "operationId": "adminGetStats"
+      }
+    },
+    "/admin/books/import": {
+      "post": {
+        "tags": [
+          "Admin",
+          "Books"
+        ],
+        "summary": "Import books (admin)",
+        "description": "Imports books from a file or external source (admin only)",
+        "operationId": "adminImportBooks"
+      }
+    },
+    "/admin/books/import/{import_id}": {
+      "get": {
+        "tags": [
+          "Admin",
+          "Books"
+        ],
+        "summary": "Get import status (admin)",
+        "description": "Returns the status of a book import job (admin only)",
+        "operationId": "adminGetImportStatus"
+      }
+    },
+    "/books/queue/download": {
+      "post": {
+        "tags": [
+          "Books"
+        ],
+        "summary": "Queue multiple books for download",
+        "description": "Creates a zip file containing multiple books for download",
+        "operationId": "queueDownload"
+      }
+    },
+    "/books/queue/download/{zipId}": {
+      "get": {
+        "tags": [
+          "Books"
+        ],
+        "summary": "Download queued zip file",
+        "description": "Downloads a previously queued zip file containing multiple books",
+        "operationId": "downloadQueuedZip"
+      }
+    },
+    "/books/queue/download/{zipId}/mark-downloaded": {
+      "post": {
+        "tags": [
+          "Books"
+        ],
+        "summary": "Mark zip as downloaded",
+        "description": "Marks a queued zip file as downloaded by the user",
+        "operationId": "markZipDownloaded"
+      }
+    },
+    "/narrators/autocomplete": {
+      "get": {
+        "tags": [
+          "Narrators"
+        ],
+        "summary": "Autocomplete narrators",
+        "description": "Returns a list of narrators matching the search term",
+        "operationId": "autocompleteNarrators"
+      }
+    },
+    "/reading-progress/reset": {
+      "post": {
+        "tags": [
+          "Reading Progress"
+        ],
+        "summary": "Reset reading progress",
+        "description": "Resets reading progress for all books or a specific book",
+        "operationId": "resetReadingProgress"
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Error message"
+          },
+          "errors": {
+            "type": "object",
+            "description": "Validation errors"
+          }
+        }
+      },
+      "PaginationMeta": {
+        "type": "object",
+        "properties": {
+          "current_page": {
+            "type": "integer",
+            "description": "Current page number"
+          },
+          "last_page": {
+            "type": "integer",
+            "description": "Last page number"
+          },
+          "per_page": {
+            "type": "integer",
+            "description": "Items per page"
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total number of items"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT token authentication."
+      },
+      "adminAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Admin authentication required."
+      }
+    }
+  }
+}

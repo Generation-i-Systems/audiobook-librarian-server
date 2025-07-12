@@ -116,6 +116,11 @@ Route::get('/google-books-cover/{encodedUrl}', [
     'googleBooksCover',
 ])->where('encodedUrl', '.+')->name('google.books.cover.proxy');
 
+// Admin series autocomplete endpoint for book form (accessible to admin users)
+Route::get('/admin/series-autocomplete', [Admin\BookController::class, 'autocompleteSeries'])
+    ->name('admin.series.autocomplete')
+    ->middleware(['auth', 'admin']);
+
 Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(function () {
     Route::get('/', function () {
         return redirect()->route('admin.books.index');

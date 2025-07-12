@@ -1,0 +1,4850 @@
+openapi: 3.0.3
+info:
+  title: Audiobook Librarian API
+  description: |
+    API documentation for the Audiobook Librarian application.
+    
+    This specification covers all endpoints available in the Audiobook Librarian API.
+  version: 1.0.0
+  contact:
+    name: Audiobook Librarian Support
+    email: support@audiobooklibrarian.example.com
+servers:
+  - url: /api/v1
+    description: API v1
+  - url: /admin
+    description: Admin API
+
+paths:
+  # Authentication Endpoints
+  /register:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new user
+      description: Creates a new user account and returns an authentication token
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "John Doe"
+                email:
+                  type: string
+                  format: email
+                  example: "john.doe@example.com"
+                password:
+                  type: string
+                  format: password
+                  example: "securePassword123"
+              required:
+                - name
+                - email
+                - password
+      responses:
+        '200':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: JWT authentication token
+                  user:
+                    $ref: '#/components/schemas/User'
+              example:
+                token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ"
+                user:
+                  id: 1
+                  name: "John Doe"
+                  email: "john.doe@example.com"
+                  created_at: "2025-07-10T10:30:00.000000Z"
+                  updated_at: "2025-07-10T10:30:00.000000Z"
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+              example:
+                message: "The given data was invalid."
+                errors:
+                  email: ["The email has already been taken."]
+                  password: ["The password must be at least 8 characters."]
+
+  /login:
+    post:
+      tags:
+        - Authentication
+      summary: Login user
+      description: Authenticates a user and returns a token
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "john.doe@example.com"
+                password:
+                  type: string
+                  format: password
+                  example: "securePassword123"
+              required:
+                - email
+                - password
+      responses:
+        '200':
+          description: User logged in successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    description: JWT authentication token
+                  user:
+                    $ref: '#/components/schemas/User'
+              example:
+                token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ"
+                user:
+                  id: 1
+                  name: "John Doe"
+                  email: "john.doe@example.com"
+                  created_at: "2025-07-10T10:30:00.000000Z"
+                  updated_at: "2025-07-10T10:30:00.000000Z"
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Unauthorized"
+                message: "Invalid credentials"
+                status_code: 401
+
+  /logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout user
+      description: Invalidates the user's authentication token
+      operationId: logoutUser
+      responses:
+        '200':
+          description: User logged out successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: "Successfully logged out"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Unauthorized"
+                message: "Unauthenticated"
+                status_code: 401
+      security:
+        - bearerAuth: []
+
+  # User Endpoints
+  /user:
+    get:
+      tags:
+        - User
+      summary: Get current user
+      description: Returns the currently authenticated user's details
+      operationId: getCurrentUser
+      responses:
+        '200':
+          description: User details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+              example:
+                id: 1
+                name: "John Doe"
+                email: "john.doe@example.com"
+                created_at: "2025-07-10T10:30:00.000000Z"
+                updated_at: "2025-07-10T10:30:00.000000Z"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Unauthorized"
+                message: "Unauthenticated"
+                status_code: 401
+      security:
+        - bearerAuth: []
+
+  /me:
+    get:
+      tags:
+        - User
+      summary: Get current user (alias)
+      description: Alias for /user endpoint
+      operationId: getCurrentUserAlias
+      responses:
+        '200':
+          description: User details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+              example:
+                id: 1
+                name: "John Doe"
+                email: "john.doe@example.com"
+                created_at: "2025-07-10T10:30:00.000000Z"
+                updated_at: "2025-07-10T10:30:00.000000Z"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Unauthorized"
+                message: "Unauthenticated"
+                status_code: 401
+      security:
+        - bearerAuth: []
+
+  # Series Autocomplete Endpoints
+  /series/autocomplete:
+    get:
+      tags:
+        - Series
+      summary: Series name autocomplete
+      description: |
+        Returns fuzzy, prefix-matched series names using Atlas Search autocomplete aggregation on the `seriesName` field.
+        This endpoint supports partial matching and handles typos gracefully.
+      operationId: seriesAutocomplete
+      parameters:
+        - name: query
+          in: query
+          description: The search string for the series name
+          required: true
+          schema:
+            type: string
+            example: "Super"
+        - name: limit
+          in: query
+          description: Maximum number of results to return
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 50
+            example: 5
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: string
+                example:
+                  data: ["Super Powereds", "Super Heroes", "Superman", "Supergirl", "Supernatural"]
+              examples:
+                fullMatch:
+                  summary: Full match results
+                  value:
+                    data: ["Super Powereds", "Super Heroes", "Superman", "Supergirl", "Supernatural"]
+                partialMatch:
+                  summary: Partial match results
+                  value:
+                    data: ["Mistborn", "Mist Born", "Mistwalker"]
+                emptyResults:
+                  summary: No matches found
+                  value:
+                    data: []
+        '400':
+          description: Bad request - missing required parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Bad Request"
+                message: "Missing required parameter: query"
+                status_code: 400
+        '401':
+          description: Unauthorized - authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Unauthorized"
+                message: "Authentication required"
+                status_code: 401
+      security:
+        - bearerAuth: []
+        
+  # Book Endpoints
+  /books:
+    get:
+      tags:
+        - Books
+      summary: List books
+      description: Returns a paginated list of books with optional filtering
+      operationId: listBooks
+      parameters:
+        - name: query
+          in: query
+          description: Search string (matches title, author, or series)
+          required: false
+          schema:
+            type: string
+            example: "dragon"
+        - name: author_id
+          in: query
+          description: Filter by author ID
+          required: false
+          schema:
+            type: string
+            example: "123"
+        - name: author
+          in: query
+          description: Filter by author name
+          required: false
+          schema:
+            type: string
+            example: "Brandon Sanderson"
+        - name: series_id
+          in: query
+          description: Filter by series ID
+          required: false
+          schema:
+            type: string
+            example: "456"
+        - name: series
+          in: query
+          description: Filter by series name
+          required: false
+          schema:
+            type: string
+            example: "Mistborn"
+        - name: genre_id
+          in: query
+          description: Filter by genre ID
+          required: false
+          schema:
+            type: string
+            example: "789"
+        - name: genre
+          in: query
+          description: Filter by genre name
+          required: false
+          schema:
+            type: string
+            example: "Fantasy"
+        - name: published_year
+          in: query
+          description: Filter by publication year
+          required: false
+          schema:
+            type: integer
+            example: 2020
+        - name: date_added
+          in: query
+          description: Filter by date the book was added
+          required: false
+          schema:
+            type: string
+            format: date
+            example: "2025-07-01"
+        - name: with_cover
+          in: query
+          description: Include cover info
+          required: false
+          schema:
+            type: boolean
+            default: true
+            example: true
+        - name: inlineCovers
+          in: query
+          description: Return base64-encoded cover images instead of URLs
+          required: false
+          schema:
+            type: boolean
+            default: false
+            example: false
+        - name: per_page
+          in: query
+          description: Results per page
+          required: false
+          schema:
+            type: integer
+            default: 100
+            example: 20
+        - name: page
+          in: query
+          description: Page number
+          required: false
+          schema:
+            type: integer
+            default: 1
+            example: 1
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Book'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+              example:
+                data: [
+                  {
+                    "id": 1,
+                    "title": "The Way of Kings",
+                    "author": {
+                      "id": 1,
+                      "name": "Brandon Sanderson"
+                    },
+                    "series": [
+                      {
+                        "seriesName": "The Stormlight Archive",
+                        "number": "1"
+                      }
+                    ],
+                    "cover_url": "/api/v1/books/1/cover",
+                    "download_url": "/api/v1/books/1/download",
+                    "genres": ["Fantasy", "Epic"],
+                    "description": "Roshar is a world of stone and storms...",
+                    "duration": 45720
+                  },
+                  {
+                    "id": 2,
+                    "title": "Words of Radiance",
+                    "author": {
+                      "id": 1,
+                      "name": "Brandon Sanderson"
+                    },
+                    "series": [
+                      {
+                        "seriesName": "The Stormlight Archive",
+                        "number": "2"
+                      }
+                    ],
+                    "cover_url": "/api/v1/books/2/cover",
+                    "download_url": "/api/v1/books/2/download",
+                    "genres": ["Fantasy", "Epic"],
+                    "description": "Expected by his enemies to die...",
+                    "duration": 48330
+                  }
+                ],
+                meta: {
+                  "current_page": 1,
+                  "last_page": 10,
+                  "per_page": 20,
+                  "total": 200,
+                  "from": 1,
+                  "to": 20,
+                  "path": "/api/v1/books",
+                  "links": {
+                    "first": "/api/v1/books?page=1",
+                    "last": "/api/v1/books?page=10",
+                    "prev": null,
+                    "next": "/api/v1/books?page=2"
+                  }
+                }
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Unauthorized"
+                message: "Unauthenticated"
+                status_code: 401
+      security:
+        - bearerAuth: []
+        
+  /books/{book}:
+    get:
+      tags:
+        - Books
+      summary: Get book details
+      description: Returns detailed information about a specific book
+      operationId: getBook
+      parameters:
+        - name: book
+          in: path
+          description: Book ID
+          required: true
+          schema:
+            type: string
+            example: "1"
+        - name: with_cover
+          in: query
+          description: Include cover info
+          required: false
+          schema:
+            type: boolean
+            default: true
+            example: true
+        - name: inlineCovers
+          in: query
+          description: Return base64-encoded cover image instead of URL
+          required: false
+          schema:
+            type: boolean
+            default: false
+            example: false
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Book'
+              example:
+                id: 1
+                title: "The Way of Kings"
+                author: {
+                  "id": 1,
+                  "name": "Brandon Sanderson"
+                }
+                series: [
+                  {
+                    "seriesName": "The Stormlight Archive",
+                    "number": "1"
+                  }
+                ]
+                cover_url: "/api/v1/books/1/cover"
+                download_url: "/api/v1/books/1/download"
+                genres: ["Fantasy", "Epic"]
+                description: "Roshar is a world of stone and storms..."
+                duration: 45720
+                published_year: 2010
+                narrator: "Michael Kramer and Kate Reading"
+                publisher: "Macmillan Audio"
+                language: "English"
+                format: "m4b"
+                file_size: 524288000
+                date_added: "2025-01-15T10:30:00.000000Z"
+        '404':
+          description: Book not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Not Found"
+                message: "Book not found"
+                status_code: 404
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Unauthorized"
+                message: "Unauthenticated"
+                status_code: 401
+      security:
+        - bearerAuth: []
+        
+  /books/{book}/cover:
+    get:
+      tags:
+        - Books
+      summary: Get book cover image
+      description: Returns the cover image for a specific book
+      operationId: getBookCover
+      parameters:
+        - name: book
+          in: path
+          description: Book ID
+          required: true
+          schema:
+            type: string
+            example: "1"
+      responses:
+        '200':
+          description: Cover image
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Cover image not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Not Found"
+                message: "Cover image not found"
+                status_code: 404
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+  /books/{book}/download:
+    get:
+      tags:
+        - Books
+      summary: Download book audio file
+      description: Returns the audio file for a specific book (requires permission)
+      operationId: downloadBook
+      parameters:
+        - name: book
+          in: path
+          description: Book ID
+          required: true
+          schema:
+            type: string
+            example: "1"
+      responses:
+        '200':
+          description: Audio file
+          content:
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+            audio/mp4:
+              schema:
+                type: string
+                format: binary
+        '403':
+          description: Forbidden - insufficient permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Forbidden"
+                message: "You do not have permission to download this book"
+                status_code: 403
+        '404':
+          description: Book audio file not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Not Found"
+                message: "Audio file not found"
+                status_code: 404
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+  /books/browse:
+    get:
+      tags:
+        - Books
+      summary: Browse books by genre/author/series
+      description: Returns a paginated list of genres, authors, or series for browsing
+      operationId: browseBooks
+      parameters:
+        - name: type
+          in: query
+          description: Type of items to browse
+          required: true
+          schema:
+            type: string
+            enum: ["genre", "author", "series"]
+            example: "genre"
+        - name: search
+          in: query
+          description: Filter items by name
+          required: false
+          schema:
+            type: string
+            example: "fantasy"
+        - name: per_page
+          in: query
+          description: Results per page
+          required: false
+          schema:
+            type: integer
+            default: 100
+            example: 20
+        - name: page
+          in: query
+          description: Page number
+          required: false
+          schema:
+            type: integer
+            default: 1
+            example: 1
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      oneOf:
+                        - $ref: '#/components/schemas/Genre'
+                        - $ref: '#/components/schemas/Author'
+                        - $ref: '#/components/schemas/Series'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+              examples:
+                genres:
+                  summary: Browse by genre
+                  value:
+                    data: [
+                      {
+                        "id": "1",
+                        "name": "Fantasy",
+                        "book_count": 120
+                      },
+                      {
+                        "id": "2",
+                        "name": "Science Fiction",
+                        "book_count": 85
+                      },
+                      {
+                        "id": "3",
+                        "name": "Mystery",
+                        "book_count": 64
+                      }
+                    ],
+                    meta: {
+                      "current_page": 1,
+                      "last_page": 2,
+                      "per_page": 20,
+                      "total": 25,
+                      "from": 1,
+                      "to": 20,
+                      "path": "/api/v1/books/browse",
+                      "links": {
+                        "first": "/api/v1/books/browse?page=1",
+                        "last": "/api/v1/books/browse?page=2",
+                        "prev": null,
+                        "next": "/api/v1/books/browse?page=2"
+                      }
+                    }
+                authors:
+                  summary: Browse by author
+                  value:
+                    data: [
+                      {
+                        "id": "1",
+                        "name": "Brandon Sanderson",
+                        "book_count": 15
+                      },
+                      {
+                        "id": "2",
+                        "name": "J.K. Rowling",
+                        "book_count": 10
+                      },
+                      {
+                        "id": "3",
+                        "name": "Stephen King",
+                        "book_count": 25
+                      }
+                    ],
+                    meta: {
+                      "current_page": 1,
+                      "last_page": 10,
+                      "per_page": 20,
+                      "total": 200,
+                      "from": 1,
+                      "to": 20,
+                      "path": "/api/v1/books/browse",
+                      "links": {
+                        "first": "/api/v1/books/browse?page=1",
+                        "last": "/api/v1/books/browse?page=10",
+                        "prev": null,
+                        "next": "/api/v1/books/browse?page=2"
+                      }
+                    }
+                series:
+                  summary: Browse by series
+                  value:
+                    data: [
+                      {
+                        "id": "1",
+                        "seriesName": "The Stormlight Archive",
+                        "book_count": 4
+                      },
+                      {
+                        "id": "2",
+                        "seriesName": "Harry Potter",
+                        "book_count": 7
+                      },
+                      {
+                        "id": "3",
+                        "seriesName": "The Dark Tower",
+                        "book_count": 8
+                      }
+                    ],
+                    meta: {
+                      "current_page": 1,
+                      "last_page": 5,
+                      "per_page": 20,
+                      "total": 100,
+                      "from": 1,
+                      "to": 20,
+                      "path": "/api/v1/books/browse",
+                      "links": {
+                        "first": "/api/v1/books/browse?page=1",
+                        "last": "/api/v1/books/browse?page=5",
+                        "prev": null,
+                        "next": "/api/v1/books/browse?page=2"
+                      }
+                    }
+        '400':
+          description: Bad request - invalid type parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Bad Request"
+                message: "Invalid type parameter. Must be one of: genre, author, series"
+                status_code: 400
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+  /books/search:
+    get:
+      tags:
+        - Books
+      summary: Advanced search for books
+      description: Returns a paginated list of books matching the search criteria
+      operationId: searchBooks
+      parameters:
+        - name: title
+          in: query
+          description: Filter by book title
+          required: false
+          schema:
+            type: string
+            example: "king"
+        - name: author
+          in: query
+          description: Filter by author name
+          required: false
+          schema:
+            type: string
+            example: "Sanderson"
+        - name: series
+          in: query
+          description: Filter by series name
+          required: false
+          schema:
+            type: string
+            example: "Stormlight"
+        - name: genre
+          in: query
+          description: Filter by genre name
+          required: false
+          schema:
+            type: string
+            example: "Fantasy"
+        - name: published_year
+          in: query
+          description: Filter by publication year
+          required: false
+          schema:
+            type: integer
+            example: 2020
+        - name: date_added
+          in: query
+          description: Filter by date added
+          required: false
+          schema:
+            type: string
+            format: date
+            example: "2025-01-01"
+        - name: with_cover
+          in: query
+          description: Include cover info
+          required: false
+          schema:
+            type: boolean
+            default: true
+            example: true
+        - name: inlineCovers
+          in: query
+          description: Return base64-encoded cover images instead of URLs
+          required: false
+          schema:
+            type: boolean
+            default: false
+            example: false
+        - name: per_page
+          in: query
+          description: Results per page
+          required: false
+          schema:
+            type: integer
+            default: 100
+            example: 20
+        - name: page
+          in: query
+          description: Page number
+          required: false
+          schema:
+            type: integer
+            default: 1
+            example: 1
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Book'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+              example:
+                data:
+                  - id: 1
+                    title: "The Way of Kings"
+                    author:
+                      id: 1
+                      name: "Brandon Sanderson"
+                    series:
+                      - seriesName: "The Stormlight Archive"
+                        number: "1"
+                    cover_url: "/api/v1/books/1/cover"
+                    download_url: "/api/v1/books/1/download"
+                    genres: ["Fantasy", "Epic"]
+                    description: "Roshar is a world of stone and storms..."
+                    duration: 45720
+                  - id: 2
+                    title: "The Name of the Wind"
+                    author:
+                      id: 2
+                      name: "Patrick Rothfuss"
+                    series:
+                      - seriesName: "The Kingkiller Chronicle"
+                        number: "1"
+                    cover_url: "/api/v1/books/2/cover"
+                    download_url: "/api/v1/books/2/download"
+                    genres: ["Fantasy", "Adventure"]
+                    description: "This is a story about a man named Kvothe..."
+                    duration: 34200
+                meta: {
+                  "current_page": 1,
+                  "last_page": 1,
+                  "per_page": 20,
+                  "total": 1,
+                  "from": 1,
+                  "to": 1,
+                  "path": "/api/v1/books/search",
+                  "links": {
+                    "first": "/api/v1/books/search?page=1",
+                    "last": "/api/v1/books/search?page=1",
+                    "prev": null,
+                    "next": null
+                  }
+                }
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+  # Author Endpoints
+  /authors:
+    get:
+      tags:
+        - Authors
+      summary: List authors
+      description: Returns a paginated list of authors
+      operationId: listAuthors
+      parameters:
+        - name: search
+          in: query
+          description: Search string for author name
+          required: false
+          schema:
+            type: string
+            example: "Sand"
+        - name: per_page
+          in: query
+          description: Results per page
+          required: false
+          schema:
+            type: integer
+            default: 100
+            example: 20
+        - name: page
+          in: query
+          description: Page number
+          required: false
+          schema:
+            type: integer
+            default: 1
+            example: 1
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Author'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+              example:
+                data: [
+                  {
+                    "id": "1",
+                    "name": "Brandon Sanderson",
+                    "book_count": 15
+                  },
+                  {
+                    "id": "2",
+                    "name": "George R.R. Martin",
+                    "book_count": 12
+                  },
+                  {
+                    "id": "3",
+                    "name": "J.K. Rowling",
+                    "book_count": 10
+                  }
+                ],
+                meta: {
+                  "current_page": 1,
+                  "last_page": 10,
+                  "per_page": 20,
+                  "total": 200,
+                  "from": 1,
+                  "to": 20,
+                  "path": "/api/v1/authors",
+                  "links": {
+                    "first": "/api/v1/authors?page=1",
+                    "last": "/api/v1/authors?page=10",
+                    "prev": null,
+                    "next": "/api/v1/authors?page=2"
+                  }
+                }
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+  /authors/{author}:
+    get:
+      tags:
+        - Authors
+      summary: Get author details
+      description: Returns detailed information about a specific author and their books
+      operationId: getAuthor
+      parameters:
+        - name: author
+          in: path
+          description: Author ID
+          required: true
+          schema:
+            type: string
+            example: "1"
+        - name: with_books
+          in: query
+          description: Include books by this author
+          required: false
+          schema:
+            type: boolean
+            default: true
+            example: true
+        - name: with_cover
+          in: query
+          description: Include cover info for books
+          required: false
+          schema:
+            type: boolean
+            default: true
+            example: true
+        - name: inlineCovers
+          in: query
+          description: Return base64-encoded cover images instead of URLs
+          required: false
+          schema:
+            type: boolean
+            default: false
+            example: false
+        - name: per_page
+          in: query
+          description: Results per page for books
+          required: false
+          schema:
+            type: integer
+            default: 100
+            example: 20
+        - name: page
+          in: query
+          description: Page number for books
+          required: false
+          schema:
+            type: integer
+            default: 1
+            example: 1
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Author'
+                  - type: object
+                    properties:
+                      books:
+                        type: object
+                        properties:
+                          data:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Book'
+                          meta:
+                            $ref: '#/components/schemas/PaginationMeta'
+              example:
+                id: "1"
+                name: "Brandon Sanderson"
+                book_count: 15
+                books:
+                  data: [
+                    {
+                      "id": 1,
+                      "title": "The Way of Kings",
+                      "series": [
+                        {
+                          "seriesName": "The Stormlight Archive",
+                          "number": "1"
+                        }
+                      ],
+                      "cover_url": "/api/v1/books/1/cover",
+                      "download_url": "/api/v1/books/1/download",
+                      "genres": ["Fantasy", "Epic"],
+                      "description": "Roshar is a world of stone and storms...",
+                      "duration": 45720
+                    },
+                    {
+                      "id": 2,
+                      "title": "Words of Radiance",
+                      "series": [
+                        {
+                          "seriesName": "The Stormlight Archive",
+                          "number": "2"
+                        }
+                      ],
+                      "cover_url": "/api/v1/books/2/cover",
+                      "download_url": "/api/v1/books/2/download",
+                      "genres": ["Fantasy", "Epic"],
+                      "description": "Expected by his enemies to die...",
+                      "duration": 48330
+                    }
+                  ],
+                  meta: {
+                    "current_page": 1,
+                    "last_page": 1,
+                    "per_page": 20,
+                    "total": 15,
+                    "from": 1,
+                    "to": 15,
+                    "path": "/api/v1/authors/1",
+                    "links": {
+                      "first": "/api/v1/authors/1?page=1",
+                      "last": "/api/v1/authors/1?page=1",
+                      "prev": null,
+                      "next": null
+                    }
+                  }
+        '404':
+          description: Author not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Not Found"
+                message: "Author not found"
+                status_code: 404
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+  # Genre Endpoints
+  /genres:
+    get:
+      tags:
+        - Genres
+      summary: List genres
+      description: Returns a paginated list of genres
+      operationId: listGenres
+      parameters:
+        - name: search
+          in: query
+          description: Search string for genre name
+          required: false
+          schema:
+            type: string
+            example: "Fant"
+        - name: per_page
+          in: query
+          description: Results per page
+          required: false
+          schema:
+            type: integer
+            default: 100
+            example: 20
+        - name: page
+          in: query
+          description: Page number
+          required: false
+          schema:
+            type: integer
+            default: 1
+            example: 1
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Genre'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+              example:
+                data: [
+                  {
+                    "id": "1",
+                    "name": "Fantasy",
+                    "book_count": 120
+                  },
+                  {
+                    "id": "2",
+                    "name": "Science Fiction",
+                    "book_count": 85
+                  },
+                  {
+                    "id": "3",
+                    "name": "Mystery",
+                    "book_count": 64
+                  }
+                ],
+                meta: {
+                  "current_page": 1,
+                  "last_page": 1,
+                  "per_page": 20,
+                  "total": 25,
+                  "from": 1,
+                  "to": 20,
+                  "path": "/api/v1/genres",
+                  "links": {
+                    "first": "/api/v1/genres?page=1",
+                    "last": "/api/v1/genres?page=1",
+                    "prev": null,
+                    "next": null
+                  }
+                }
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+  /genres/{genre}:
+    get:
+      tags:
+        - Genres
+      summary: Get genre details
+      description: Returns detailed information about a specific genre and books in that genre
+      operationId: getGenre
+      parameters:
+        - name: genre
+          in: path
+          description: Genre ID
+          required: true
+          schema:
+            type: string
+            example: "1"
+        - name: with_books
+          in: query
+          description: Include books in this genre
+          required: false
+          schema:
+            type: boolean
+            default: true
+            example: true
+        - name: with_cover
+          in: query
+          description: Include cover info for books
+          required: false
+          schema:
+            type: boolean
+            default: true
+            example: true
+        - name: inlineCovers
+          in: query
+          description: Return base64-encoded cover images instead of URLs
+          required: false
+          schema:
+            type: boolean
+            default: false
+            example: false
+        - name: per_page
+          in: query
+          description: Results per page for books
+          required: false
+          schema:
+            type: integer
+            default: 100
+            example: 20
+        - name: page
+          in: query
+          description: Page number for books
+          required: false
+          schema:
+            type: integer
+            default: 1
+            example: 1
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Genre'
+                  - type: object
+                    properties:
+                      books:
+                        type: object
+                        properties:
+                          data:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Book'
+                          meta:
+                            $ref: '#/components/schemas/PaginationMeta'
+              example:
+                id: "1"
+                name: "Fantasy"
+                book_count: 120
+                books:
+                  data: [
+                    {
+                      "id": 1,
+                      "title": "The Way of Kings",
+                      "author": {
+                        "id": 1,
+                        "name": "Brandon Sanderson"
+                      },
+                      "series": [
+                        {
+                          "seriesName": "The Stormlight Archive",
+                          "number": "1"
+                        }
+                      ],
+                      "cover_url": "/api/v1/books/1/cover",
+                      "download_url": "/api/v1/books/1/download",
+                      "description": "Roshar is a world of stone and storms...",
+                      "duration": 45720
+                    },
+                    {
+                      "id": 3,
+                      "title": "The Name of the Wind",
+                      "author": {
+                        "id": 4,
+                        "name": "Patrick Rothfuss"
+                      },
+                      "series": [
+                        {
+                          "seriesName": "The Kingkiller Chronicle",
+                          "number": "1"
+                        }
+                      ],
+                      "cover_url": "/api/v1/books/3/cover",
+                      "download_url": "/api/v1/books/3/download",
+                      "description": "My name is Kvothe...",
+                      "duration": 42300
+                    }
+                  ],
+                  meta: {
+                    "current_page": 1,
+                    "last_page": 6,
+                    "per_page": 20,
+                    "total": 120,
+                    "from": 1,
+                    "to": 20,
+                    "path": "/api/v1/genres/1",
+                    "links": {
+                      "first": "/api/v1/genres/1?page=1",
+                      "last": "/api/v1/genres/1?page=6",
+                      "prev": null,
+                      "next": "/api/v1/genres/1?page=2"
+                    }
+                  }
+        '404':
+          description: Genre not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Not Found"
+                message: "Genre not found"
+                status_code: 404
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+  # Series Endpoints
+  /series:
+    get:
+      tags:
+        - Series
+      summary: List series
+      description: Returns a paginated list of series
+      operationId: listSeries
+      parameters:
+        - name: search
+          in: query
+          description: Search string for series name
+          required: false
+          schema:
+            type: string
+            example: "Storm"
+        - name: per_page
+          in: query
+          description: Results per page
+          required: false
+          schema:
+            type: integer
+            default: 100
+            example: 20
+        - name: page
+          in: query
+          description: Page number
+          required: false
+          schema:
+            type: integer
+            default: 1
+            example: 1
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Series'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+              example:
+                data: [
+                  {
+                    "id": "1",
+                    "seriesName": "The Stormlight Archive",
+                    "book_count": 4
+                  },
+                  {
+                    "id": "2",
+                    "seriesName": "Mistborn",
+                    "book_count": 6
+                  },
+                  {
+                    "id": "3",
+                    "seriesName": "The Kingkiller Chronicle",
+                    "book_count": 2
+                  }
+                ],
+                meta: {
+                  "current_page": 1,
+                  "last_page": 1,
+                  "per_page": 20,
+                  "total": 25,
+                  "from": 1,
+                  "to": 20,
+                  "path": "/api/v1/series",
+                  "links": {
+                    "first": "/api/v1/series?page=1",
+                    "last": "/api/v1/series?page=1",
+                    "prev": null,
+                    "next": null
+                  }
+                }
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+  /series/{series}:
+    get:
+      tags:
+        - Series
+      summary: Get series details
+      description: Returns detailed information about a specific series and books in that series
+      operationId: getSeries
+      parameters:
+        - name: series
+          in: path
+          description: Series ID
+          required: true
+          schema:
+            type: string
+            example: "1"
+        - name: with_books
+          in: query
+          description: Include books in this series
+          required: false
+          schema:
+            type: boolean
+            default: true
+            example: true
+        - name: with_cover
+          in: query
+          description: Include cover info for books
+          required: false
+          schema:
+            type: boolean
+            default: true
+            example: true
+        - name: inlineCovers
+          in: query
+          description: Return base64-encoded cover images instead of URLs
+          required: false
+          schema:
+            type: boolean
+            default: false
+            example: false
+        - name: per_page
+          in: query
+          description: Results per page for books
+          required: false
+          schema:
+            type: integer
+            default: 100
+            example: 20
+        - name: page
+          in: query
+          description: Page number for books
+          required: false
+          schema:
+            type: integer
+            default: 1
+            example: 1
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Series'
+                  - type: object
+                    properties:
+                      books:
+                        type: object
+                        properties:
+                          data:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Book'
+                          meta:
+                            $ref: '#/components/schemas/PaginationMeta'
+              example:
+                id: "1"
+                seriesName: "The Stormlight Archive"
+                book_count: 4
+                books:
+                  data: [
+                    {
+                      "id": 1,
+                      "title": "The Way of Kings",
+                      "author": {
+                        "id": 1,
+                        "name": "Brandon Sanderson"
+                      },
+                      "series": [
+                        {
+                          "seriesName": "The Stormlight Archive",
+                          "number": "1"
+                        }
+                      ],
+                      "cover_url": "/api/v1/books/1/cover",
+                      "download_url": "/api/v1/books/1/download",
+                      "genres": ["Fantasy", "Epic"],
+                      "description": "Roshar is a world of stone and storms...",
+                      "duration": 45720
+                    },
+                    {
+                      "id": 2,
+                      "title": "Words of Radiance",
+                      "author": {
+                        "id": 1,
+                        "name": "Brandon Sanderson"
+                      },
+                      "series": [
+                        {
+                          "seriesName": "The Stormlight Archive",
+                          "number": "2"
+                        }
+                      ],
+                      "cover_url": "/api/v1/books/2/cover",
+                      "download_url": "/api/v1/books/2/download",
+                      "genres": ["Fantasy", "Epic"],
+                      "description": "Expected by his enemies to die...",
+                      "duration": 48330
+                    }
+                  ],
+                  meta: {
+                    "current_page": 1,
+                    "last_page": 1,
+                    "per_page": 20,
+                    "total": 4,
+                    "from": 1,
+                    "to": 4,
+                    "path": "/api/v1/series/1",
+                    "links": {
+                      "first": "/api/v1/series/1?page=1",
+                      "last": "/api/v1/series/1?page=1",
+                      "prev": null,
+                      "next": null
+                    }
+                  }
+        '404':
+          description: Series not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Not Found"
+                message: "Series not found"
+                status_code: 404
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+  # Series Autocomplete Endpoint (Admin)
+  /admin/books/autocomplete/series:
+    get:
+      tags:
+        - Admin
+        - Series
+      summary: Autocomplete series names (admin)
+      description: Returns series names matching the search term for admin autocomplete
+      operationId: adminAutocompleteSeriesNames
+      parameters:
+        - name: term
+          in: query
+          description: Search term for series name
+          required: true
+          schema:
+            type: string
+            example: "Storm"
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      description: Series ID
+                    seriesName:
+                      type: string
+                      description: Series name
+                    value:
+                      type: string
+                      description: Series name (for autocomplete compatibility)
+              example:
+                - id: "1"
+                  seriesName: "The Stormlight Archive"
+                  value: "The Stormlight Archive"
+                - id: "5"
+                  seriesName: "Storm Front"
+                  value: "Storm Front"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+  # User Profile Endpoints
+  /user/profile:
+    get:
+      tags:
+        - User
+      summary: Get user profile
+      description: Returns the current user's profile information
+      operationId: getUserProfile
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+              example:
+                id: "1"
+                name: "John Doe"
+                email: "john@example.com"
+                created_at: "2025-01-01T12:00:00Z"
+                updated_at: "2025-01-01T12:00:00Z"
+                preferences:
+                  theme: "dark"
+                  notifications_enabled: true
+                  auto_download: false
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+    put:
+      tags:
+        - User
+      summary: Update user profile
+      description: Updates the current user's profile information
+      operationId: updateUserProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: "John Smith"
+                email:
+                  type: string
+                  format: email
+                  example: "john.smith@example.com"
+                password:
+                  type: string
+                  format: password
+                  example: "newPassword123"
+                password_confirmation:
+                  type: string
+                  format: password
+                  example: "newPassword123"
+                preferences:
+                  type: object
+                  properties:
+                    theme:
+                      type: string
+                      enum: ["light", "dark", "system"]
+                      example: "dark"
+                    notifications_enabled:
+                      type: boolean
+                      example: true
+                    auto_download:
+                      type: boolean
+                      example: false
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+              example:
+                id: "1"
+                name: "John Smith"
+                email: "john.smith@example.com"
+                created_at: "2025-01-01T12:00:00Z"
+                updated_at: "2025-01-10T15:30:00Z"
+                preferences:
+                  theme: "dark"
+                  notifications_enabled: true
+                  auto_download: false
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+              example:
+                message: "The given data was invalid."
+                errors:
+                  email: ["The email has already been taken."]
+                  password: ["The password must be at least 8 characters."]
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+  # User Library Management
+  /user/library:
+    get:
+      tags:
+        - User
+        - Books
+      summary: Get user library
+      description: Returns the current user's library of books
+      operationId: getUserLibrary
+      parameters:
+        - name: with_cover
+          in: query
+          description: Include cover info
+          required: false
+          schema:
+            type: boolean
+            default: true
+            example: true
+        - name: inlineCovers
+          in: query
+          description: Return base64-encoded cover images instead of URLs
+          required: false
+          schema:
+            type: boolean
+            default: false
+            example: false
+        - name: per_page
+          in: query
+          description: Results per page
+          required: false
+          schema:
+            type: integer
+            default: 100
+            example: 20
+        - name: page
+          in: query
+          description: Page number
+          required: false
+          schema:
+            type: integer
+            default: 1
+            example: 1
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Book'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+              example:
+                data: [
+                  {
+                    "id": 1,
+                    "title": "The Way of Kings",
+                    "author": {
+                      "id": 1,
+                      "name": "Brandon Sanderson"
+                    },
+                    "series": [
+                      {
+                        "seriesName": "The Stormlight Archive",
+                        "number": "1"
+                      }
+                    ],
+                    "cover_url": "/api/v1/books/1/cover",
+                    "download_url": "/api/v1/books/1/download",
+                    "genres": ["Fantasy", "Epic"],
+                    "description": "Roshar is a world of stone and storms...",
+                    "duration": 45720,
+                    "progress": 0.75,
+                    "last_position": 34290,
+                    "added_to_library_at": "2025-01-01T12:00:00Z"
+                  }
+                ],
+                meta: {
+                  "current_page": 1,
+                  "last_page": 1,
+                  "per_page": 20,
+                  "total": 1,
+                  "from": 1,
+                  "to": 1,
+                  "path": "/api/v1/user/library",
+                  "links": {
+                    "first": "/api/v1/user/library?page=1",
+                    "last": "/api/v1/user/library?page=1",
+                    "prev": null,
+                    "next": null
+                  }
+                }
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+  # Reading Progress Tracking
+  /books/{book}/progress:
+    get:
+      tags:
+        - Books
+        - User
+      summary: Get reading progress
+      description: Returns the user's reading progress for a specific book
+      operationId: getBookProgress
+      parameters:
+        - name: book
+          in: path
+          description: Book ID
+          required: true
+          schema:
+            type: string
+            example: "1"
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  book_id:
+                    type: string
+                    description: Book ID
+                  progress:
+                    type: number
+                    format: float
+                    description: Reading progress as a decimal between 0 and 1
+                  last_position:
+                    type: integer
+                    description: Last position in seconds
+                  last_updated:
+                    type: string
+                    format: date-time
+                    description: When the progress was last updated
+              example:
+                book_id: "1"
+                progress: 0.75
+                last_position: 34290
+                last_updated: "2025-01-15T18:30:00Z"
+        '404':
+          description: Book not found or not in user's library
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Not Found"
+                message: "Book not found in your library"
+                status_code: 404
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+    put:
+      tags:
+        - Books
+        - User
+      summary: Update reading progress
+      description: Updates the user's reading progress for a specific book
+      operationId: updateBookProgress
+      parameters:
+        - name: book
+          in: path
+          description: Book ID
+          required: true
+          schema:
+            type: string
+            example: "1"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                progress:
+                  type: number
+                  format: float
+                  description: Reading progress as a decimal between 0 and 1
+                  example: 0.75
+                last_position:
+                  type: integer
+                  description: Last position in seconds
+                  example: 34290
+      responses:
+        '200':
+          description: Progress updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  book_id:
+                    type: string
+                    description: Book ID
+                  progress:
+                    type: number
+                    format: float
+                    description: Reading progress as a decimal between 0 and 1
+                  last_position:
+                    type: integer
+                    description: Last position in seconds
+                  last_updated:
+                    type: string
+                    format: date-time
+                    description: When the progress was last updated
+              example:
+                book_id: "1"
+                progress: 0.75
+                last_position: 34290
+                last_updated: "2025-01-15T18:30:00Z"
+        '404':
+          description: Book not found or not in user's library
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Not Found"
+                message: "Book not found in your library"
+                status_code: 404
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+              example:
+                message: "The given data was invalid."
+                errors:
+                  progress: ["The progress must be between 0 and 1."]
+                  last_position: ["The last position must not exceed the book duration."]
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+  # Book Requests
+  /book-requests:
+    get:
+      tags:
+        - Book Requests
+      summary: List book requests
+      description: Returns a paginated list of book requests
+      operationId: listBookRequests
+      parameters:
+        - name: status
+          in: query
+          description: Filter by request status
+          required: false
+          schema:
+            type: string
+            enum: [pending, approved, rejected, fulfilled]
+            example: "pending"
+        - name: per_page
+          in: query
+          description: Results per page
+          required: false
+          schema:
+            type: integer
+            default: 100
+            example: 20
+        - name: page
+          in: query
+          description: Page number
+          required: false
+          schema:
+            type: integer
+            default: 1
+            example: 1
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BookRequest'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+              example:
+                data: [
+                  {
+                    "id": "1",
+                    "title": "Project Hail Mary",
+                    "author": "Andy Weir",
+                    "isbn": "9780593135204",
+                    "status": "pending",
+                    "notes": "This is the latest sci-fi novel by Andy Weir",
+                    "requested_by": {
+                      "id": "1",
+                      "name": "John Doe"
+                    },
+                    "created_at": "2025-01-01T12:00:00Z",
+                    "updated_at": "2025-01-01T12:00:00Z"
+                  },
+                  {
+                    "id": "2",
+                    "title": "Leviathan Falls",
+                    "author": "James S.A. Corey",
+                    "isbn": "9780316332910",
+                    "status": "approved",
+                    "notes": "Final book in The Expanse series",
+                    "requested_by": {
+                      "id": "2",
+                      "name": "Jane Smith"
+                    },
+                    "created_at": "2025-01-02T14:30:00Z",
+                    "updated_at": "2025-01-03T09:15:00Z"
+                  }
+                ],
+                meta: {
+                  "current_page": 1,
+                  "last_page": 1,
+                  "per_page": 20,
+                  "total": 2,
+                  "from": 1,
+                  "to": 2,
+                  "path": "/api/v1/book-requests",
+                  "links": {
+                    "first": "/api/v1/book-requests?page=1",
+                    "last": "/api/v1/book-requests?page=1",
+                    "prev": null,
+                    "next": null
+                  }
+                }
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+    post:
+      tags:
+        - Book Requests
+      summary: Create book request
+      description: Creates a new book request
+      operationId: createBookRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - author
+              properties:
+                title:
+                  type: string
+                  description: Book title
+                  example: "Project Hail Mary"
+                author:
+                  type: string
+                  description: Author name
+                  example: "Andy Weir"
+                isbn:
+                  type: string
+                  description: ISBN (optional)
+                  example: "9780593135204"
+                notes:
+                  type: string
+                  description: Additional notes about the request
+                  example: "This is the latest sci-fi novel by Andy Weir"
+      responses:
+        '201':
+          description: Book request created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookRequest'
+              example:
+                id: "3"
+                title: "Project Hail Mary"
+                author: "Andy Weir"
+                isbn: "9780593135204"
+                status: "pending"
+                notes: "This is the latest sci-fi novel by Andy Weir"
+                requested_by: {
+                  "id": "1",
+                  "name": "John Doe"
+                }
+                created_at: "2025-01-15T12:00:00Z"
+                updated_at: "2025-01-15T12:00:00Z"
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+              example:
+                message: "The given data was invalid."
+                errors:
+                  title: ["The title field is required."]
+                  author: ["The author field is required."]
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+  /book-requests/{request}:
+    get:
+      tags:
+        - Book Requests
+      summary: Get book request
+      description: Returns details of a specific book request
+      operationId: getBookRequest
+      parameters:
+        - name: request
+          in: path
+          description: Book request ID
+          required: true
+          schema:
+            type: string
+            example: "1"
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookRequest'
+              example:
+                id: "1"
+                title: "Project Hail Mary"
+                author: "Andy Weir"
+                isbn: "9780593135204"
+                status: "pending"
+                notes: "This is the latest sci-fi novel by Andy Weir"
+                requested_by: {
+                  "id": "1",
+                  "name": "John Doe"
+                }
+                created_at: "2025-01-01T12:00:00Z"
+                updated_at: "2025-01-01T12:00:00Z"
+                admin_notes: null
+        '404':
+          description: Book request not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Not Found"
+                message: "Book request not found"
+                status_code: 404
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+    put:
+      tags:
+        - Book Requests
+        - Admin
+      summary: Update book request status (admin)
+      description: Updates the status of a book request (admin only)
+      operationId: updateBookRequestStatus
+      parameters:
+        - name: request
+          in: path
+          description: Book request ID
+          required: true
+          schema:
+            type: string
+            example: "1"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum: [pending, approved, rejected, fulfilled]
+                  description: New status for the request
+                  example: "approved"
+                admin_notes:
+                  type: string
+                  description: Admin notes about the decision
+                  example: "Will be added to the library next week"
+      responses:
+        '200':
+          description: Book request updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookRequest'
+              example:
+                id: "1"
+                title: "Project Hail Mary"
+                author: "Andy Weir"
+                isbn: "9780593135204"
+                status: "approved"
+                notes: "This is the latest sci-fi novel by Andy Weir"
+                requested_by: {
+                  "id": "1",
+                  "name": "John Doe"
+                }
+                created_at: "2025-01-01T12:00:00Z"
+                updated_at: "2025-01-15T14:30:00Z"
+                admin_notes: "Will be added to the library next week"
+        '404':
+          description: Book request not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Not Found"
+                message: "Book request not found"
+                status_code: 404
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+              example:
+                message: "The given data was invalid."
+                errors:
+                  status: ["The selected status is invalid."]
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - User is not an admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Forbidden"
+                message: "You do not have permission to update book request status"
+                status_code: 403
+      security:
+        - bearerAuth: []
+        
+    delete:
+      tags:
+        - Book Requests
+      summary: Delete book request
+      description: Deletes a book request (only allowed for the user who created it or admins)
+      operationId: deleteBookRequest
+      parameters:
+        - name: request
+          in: path
+          description: Book request ID
+          required: true
+          schema:
+            type: string
+            example: "1"
+      responses:
+        '204':
+          description: Book request deleted successfully
+        '404':
+          description: Book request not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Not Found"
+                message: "Book request not found"
+                status_code: 404
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - User is not the creator or an admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Forbidden"
+                message: "You do not have permission to delete this book request"
+                status_code: 403
+      security:
+        - bearerAuth: []
+        
+  # Follow/Unfollow Functionality
+  /authors/{author}/follow:
+    post:
+      tags:
+        - Authors
+        - User
+      summary: Follow author
+      description: Follow an author to receive notifications about new books
+      operationId: followAuthor
+      parameters:
+        - name: author
+          in: path
+          description: Author ID
+          required: true
+          schema:
+            type: string
+            example: "1"
+      responses:
+        '200':
+          description: Author followed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Success message
+                  author_id:
+                    type: string
+                    description: Author ID
+                  following:
+                    type: boolean
+                    description: Whether the user is following the author
+              example:
+                message: "You are now following Brandon Sanderson"
+                author_id: "1"
+                following: true
+        '404':
+          description: Author not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Not Found"
+                message: "Author not found"
+                status_code: 404
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+    delete:
+      tags:
+        - Authors
+        - User
+      summary: Unfollow author
+      description: Unfollow an author to stop receiving notifications about new books
+      operationId: unfollowAuthor
+      parameters:
+        - name: author
+          in: path
+          description: Author ID
+          required: true
+          schema:
+            type: string
+            example: "1"
+      responses:
+        '200':
+          description: Author unfollowed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Success message
+                  author_id:
+                    type: string
+                    description: Author ID
+                  following:
+                    type: boolean
+                    description: Whether the user is following the author
+              example:
+                message: "You have unfollowed Brandon Sanderson"
+                author_id: "1"
+                following: false
+        '404':
+          description: Author not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Not Found"
+                message: "Author not found"
+                status_code: 404
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+  /series/{series}/follow:
+    post:
+      tags:
+        - Series
+        - User
+      summary: Follow series
+      description: Follow a series to receive notifications about new books
+      operationId: followSeries
+      parameters:
+        - name: series
+          in: path
+          description: Series ID
+          required: true
+          schema:
+            type: string
+            example: "1"
+      responses:
+        '200':
+          description: Series followed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Success message
+                  series_id:
+                    type: string
+                    description: Series ID
+                  following:
+                    type: boolean
+                    description: Whether the user is following the series
+              example:
+                message: "You are now following The Stormlight Archive"
+                series_id: "1"
+                following: true
+        '404':
+          description: Series not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Not Found"
+                message: "Series not found"
+                status_code: 404
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+    delete:
+      tags:
+        - Series
+        - User
+      summary: Unfollow series
+      description: Unfollow a series to stop receiving notifications about new books
+      operationId: unfollowSeries
+      parameters:
+        - name: series
+          in: path
+          description: Series ID
+          required: true
+          schema:
+            type: string
+            example: "1"
+      responses:
+        '200':
+          description: Series unfollowed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Success message
+                  series_id:
+                    type: string
+                    description: Series ID
+                  following:
+                    type: boolean
+                    description: Whether the user is following the series
+              example:
+                message: "You have unfollowed The Stormlight Archive"
+                series_id: "1"
+                following: false
+        '404':
+          description: Series not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Not Found"
+                message: "Series not found"
+                status_code: 404
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+  # Messaging System
+  /messages:
+    get:
+      tags:
+        - Messages
+      summary: List messages
+      description: Returns a paginated list of messages for the current user
+      operationId: listMessages
+      parameters:
+        - name: unread_only
+          in: query
+          description: Only show unread messages
+          required: false
+          schema:
+            type: boolean
+            default: false
+            example: false
+        - name: per_page
+          in: query
+          description: Results per page
+          required: false
+          schema:
+            type: integer
+            default: 20
+            example: 20
+        - name: page
+          in: query
+          description: Page number
+          required: false
+          schema:
+            type: integer
+            default: 1
+            example: 1
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Message'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+              example:
+                data: [
+                  {
+                    "id": "1",
+                    "subject": "New book available",
+                    "content": "A new book by Brandon Sanderson is now available in the library.",
+                    "read": false,
+                    "created_at": "2025-01-15T12:00:00Z",
+                    "related_book": {
+                      "id": "5",
+                      "title": "Rhythm of War"
+                    }
+                  },
+                  {
+                    "id": "2",
+                    "subject": "Book request approved",
+                    "content": "Your request for 'Project Hail Mary' has been approved.",
+                    "read": true,
+                    "created_at": "2025-01-10T09:30:00Z",
+                    "related_request": {
+                      "id": "3",
+                      "title": "Project Hail Mary"
+                    }
+                  }
+                ],
+                meta: {
+                  "current_page": 1,
+                  "last_page": 1,
+                  "per_page": 20,
+                  "total": 2,
+                  "from": 1,
+                  "to": 2,
+                  "path": "/api/v1/messages",
+                  "links": {
+                    "first": "/api/v1/messages?page=1",
+                    "last": "/api/v1/messages?page=1",
+                    "prev": null,
+                    "next": null
+                  }
+                }
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+    post:
+      tags:
+        - Messages
+        - Admin
+      summary: Create message (admin)
+      description: Creates a new message for a user or all users (admin only)
+      operationId: createMessage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - subject
+                - content
+              properties:
+                subject:
+                  type: string
+                  description: Message subject
+                  example: "System maintenance"
+                content:
+                  type: string
+                  description: Message content
+                  example: "The system will be down for maintenance on Saturday from 2-4 AM."
+                user_id:
+                  type: string
+                  description: User ID to send the message to (null for all users)
+                  nullable: true
+                  example: null
+                related_book_id:
+                  type: string
+                  description: Related book ID (optional)
+                  nullable: true
+                  example: null
+                related_request_id:
+                  type: string
+                  description: Related book request ID (optional)
+                  nullable: true
+                  example: null
+      responses:
+        '201':
+          description: Message created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+              example:
+                id: "3"
+                subject: "System maintenance"
+                content: "The system will be down for maintenance on Saturday from 2-4 AM."
+                read: false
+                created_at: "2025-01-15T14:30:00Z"
+                related_book: null
+                related_request: null
+                recipients_count: 50
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+              example:
+                message: "The given data was invalid."
+                errors:
+                  subject: ["The subject field is required."]
+                  content: ["The content field is required."]
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - User is not an admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Forbidden"
+                message: "You do not have permission to create messages"
+                status_code: 403
+      security:
+        - bearerAuth: []
+        
+  /messages/{message}:
+    get:
+      tags:
+        - Messages
+      summary: Get message
+      description: Returns details of a specific message and marks it as read
+      operationId: getMessage
+      parameters:
+        - name: message
+          in: path
+          description: Message ID
+          required: true
+          schema:
+            type: string
+            example: "1"
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+              example:
+                id: "1"
+                subject: "New book available"
+                content: "A new book by Brandon Sanderson is now available in the library."
+                read: true
+                created_at: "2025-01-15T12:00:00Z"
+                related_book: {
+                  "id": "5",
+                  "title": "Rhythm of War"
+                }
+                related_request: null
+        '404':
+          description: Message not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Not Found"
+                message: "Message not found"
+                status_code: 404
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - Message belongs to another user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Forbidden"
+                message: "You do not have permission to view this message"
+                status_code: 403
+      security:
+        - bearerAuth: []
+        
+    delete:
+      tags:
+        - Messages
+      summary: Delete message
+      description: Deletes a message
+      operationId: deleteMessage
+      parameters:
+        - name: message
+          in: path
+          description: Message ID
+          required: true
+          schema:
+            type: string
+            example: "1"
+      responses:
+        '204':
+          description: Message deleted successfully
+        '404':
+          description: Message not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Not Found"
+                message: "Message not found"
+                status_code: 404
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - Message belongs to another user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Forbidden"
+                message: "You do not have permission to delete this message"
+                status_code: 403
+      security:
+        - bearerAuth: []
+        
+  # Admin Endpoints
+  /admin/users:
+    get:
+      tags:
+        - Admin
+        - User
+      summary: List all users (admin)
+      description: Returns a paginated list of all users (admin only)
+      operationId: adminListUsers
+      parameters:
+        - name: search
+          in: query
+          description: Search term for name or email
+          required: false
+          schema:
+            type: string
+            example: "john"
+        - name: per_page
+          in: query
+          description: Results per page
+          required: false
+          schema:
+            type: integer
+            default: 20
+            example: 20
+        - name: page
+          in: query
+          description: Page number
+          required: false
+          schema:
+            type: integer
+            default: 1
+            example: 1
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+              example:
+                data: [
+                  {
+                    "id": "1",
+                    "name": "John Doe",
+                    "email": "john@example.com",
+                    "created_at": "2025-01-01T12:00:00Z",
+                    "updated_at": "2025-01-01T12:00:00Z",
+                    "is_admin": false,
+                    "book_count": 15,
+                    "last_login": "2025-01-15T09:30:00Z"
+                  },
+                  {
+                    "id": "2",
+                    "name": "Jane Smith",
+                    "email": "jane@example.com",
+                    "created_at": "2025-01-02T14:30:00Z",
+                    "updated_at": "2025-01-02T14:30:00Z",
+                    "is_admin": true,
+                    "book_count": 8,
+                    "last_login": "2025-01-14T16:45:00Z"
+                  }
+                ],
+                meta: {
+                  "current_page": 1,
+                  "last_page": 1,
+                  "per_page": 20,
+                  "total": 2,
+                  "from": 1,
+                  "to": 2,
+                  "path": "/api/v1/admin/users",
+                  "links": {
+                    "first": "/api/v1/admin/users?page=1",
+                    "last": "/api/v1/admin/users?page=1",
+                    "prev": null,
+                    "next": null
+                  }
+                }
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - User is not an admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Forbidden"
+                message: "You do not have permission to access this resource"
+                status_code: 403
+      security:
+        - bearerAuth: []
+        
+  /admin/users/{user}:
+    get:
+      tags:
+        - Admin
+        - User
+      summary: Get user details (admin)
+      description: Returns detailed information about a specific user (admin only)
+      operationId: adminGetUser
+      parameters:
+        - name: user
+          in: path
+          description: User ID
+          required: true
+          schema:
+            type: string
+            example: "1"
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+              example:
+                id: "1"
+                name: "John Doe"
+                email: "john@example.com"
+                created_at: "2025-01-01T12:00:00Z"
+                updated_at: "2025-01-01T12:00:00Z"
+                is_admin: false
+                book_count: 15
+                last_login: "2025-01-15T09:30:00Z"
+                preferences:
+                  theme: "dark"
+                  notifications_enabled: true
+                  auto_download: false
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Not Found"
+                message: "User not found"
+                status_code: 404
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - User is not an admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Forbidden"
+                message: "You do not have permission to access this resource"
+                status_code: 403
+      security:
+        - bearerAuth: []
+        
+    put:
+      tags:
+        - Admin
+        - User
+      summary: Update user (admin)
+      description: Updates a user's information (admin only)
+      operationId: adminUpdateUser
+      parameters:
+        - name: user
+          in: path
+          description: User ID
+          required: true
+          schema:
+            type: string
+            example: "1"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: User name
+                  example: "John Doe Updated"
+                email:
+                  type: string
+                  format: email
+                  description: User email
+                  example: "john.updated@example.com"
+                is_admin:
+                  type: boolean
+                  description: Whether the user is an admin
+                  example: true
+                password:
+                  type: string
+                  description: New password (optional)
+                  example: "newSecurePassword123"
+      responses:
+        '200':
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+              example:
+                id: "1"
+                name: "John Doe Updated"
+                email: "john.updated@example.com"
+                created_at: "2025-01-01T12:00:00Z"
+                updated_at: "2025-01-15T14:30:00Z"
+                is_admin: true
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Not Found"
+                message: "User not found"
+                status_code: 404
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+              example:
+                message: "The given data was invalid."
+                errors:
+                  email: ["The email has already been taken."]
+                  password: ["The password must be at least 8 characters."]
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - User is not an admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Forbidden"
+                message: "You do not have permission to update users"
+                status_code: 403
+      security:
+        - bearerAuth: []
+        
+    delete:
+      tags:
+        - Admin
+        - User
+      summary: Delete user (admin)
+      description: Deletes a user (admin only)
+      operationId: adminDeleteUser
+      parameters:
+        - name: user
+          in: path
+          description: User ID
+          required: true
+          schema:
+            type: string
+            example: "1"
+      responses:
+        '204':
+          description: User deleted successfully
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Not Found"
+                message: "User not found"
+                status_code: 404
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - User is not an admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Forbidden"
+                message: "You do not have permission to delete users"
+                status_code: 403
+      security:
+        - bearerAuth: []
+        
+  /admin/stats:
+    get:
+      tags:
+        - Admin
+      summary: Get system statistics (admin)
+      description: Returns system statistics (admin only)
+      operationId: adminGetStats
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_users:
+                    type: integer
+                    description: Total number of users
+                  total_books:
+                    type: integer
+                    description: Total number of books
+                  total_authors:
+                    type: integer
+                    description: Total number of authors
+                  total_series:
+                    type: integer
+                    description: Total number of series
+                  total_genres:
+                    type: integer
+                    description: Total number of genres
+                  total_book_requests:
+                    type: integer
+                    description: Total number of book requests
+                  pending_book_requests:
+                    type: integer
+                    description: Number of pending book requests
+                  storage_usage:
+                    type: object
+                    properties:
+                      total_gb:
+                        type: number
+                        format: float
+                        description: Total storage usage in GB
+                      audio_gb:
+                        type: number
+                        format: float
+                        description: Audio storage usage in GB
+                      covers_gb:
+                        type: number
+                        format: float
+                        description: Cover image storage usage in GB
+                  recent_activity:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                          description: Activity type
+                        user_id:
+                          type: string
+                          description: User ID
+                        user_name:
+                          type: string
+                          description: User name
+                        timestamp:
+                          type: string
+                          format: date-time
+                          description: Activity timestamp
+                        details:
+                          type: object
+                          description: Activity details
+              example:
+                total_users: 150
+                total_books: 1250
+                total_authors: 320
+                total_series: 95
+                total_genres: 42
+                total_book_requests: 75
+                pending_book_requests: 12
+                storage_usage:
+                  total_gb: 125.6
+                  audio_gb: 120.3
+                  covers_gb: 5.3
+                recent_activity: [
+                  {
+                    "type": "book_added",
+                    "user_id": "2",
+                    "user_name": "Jane Smith",
+                    "timestamp": "2025-01-15T14:30:00Z",
+                    "details": {
+                      "book_id": "5",
+                      "book_title": "Rhythm of War"
+                    }
+                  },
+                  {
+                    "type": "user_registered",
+                    "user_id": "150",
+                    "user_name": "New User",
+                    "timestamp": "2025-01-15T12:15:00Z",
+                    "details": {}
+                  }
+                ]
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - User is not an admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Forbidden"
+                message: "You do not have permission to access system statistics"
+                status_code: 403
+      security:
+        - bearerAuth: []
+        
+  /admin/books/import:
+    post:
+      tags:
+        - Admin
+        - Books
+      summary: Import books (admin)
+      description: Imports books from a file or external source (admin only)
+      operationId: adminImportBooks
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                import_file:
+                  type: string
+                  format: binary
+                  description: CSV or JSON file with book data
+                import_type:
+                  type: string
+                  enum: [csv, json, audible, goodreads]
+                  description: Type of import
+                  example: "csv"
+                options:
+                  type: object
+                  properties:
+                    skip_existing:
+                      type: boolean
+                      description: Skip existing books
+                      example: true
+                    download_covers:
+                      type: boolean
+                      description: Download cover images
+                      example: true
+      responses:
+        '200':
+          description: Import started successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Success message
+                  import_id:
+                    type: string
+                    description: Import job ID for status checking
+                  estimated_completion:
+                    type: string
+                    format: date-time
+                    description: Estimated completion time
+              example:
+                message: "Import started successfully"
+                import_id: "imp_123456"
+                estimated_completion: "2025-01-15T15:30:00Z"
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+              example:
+                message: "The given data was invalid."
+                errors:
+                  import_file: ["The import file is required."]
+                  import_type: ["The selected import type is invalid."]
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - User is not an admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Forbidden"
+                message: "You do not have permission to import books"
+                status_code: 403
+      security:
+        - bearerAuth: []
+        
+  /admin/books/import/{import_id}:
+    get:
+      tags:
+        - Admin
+        - Books
+      summary: Get import status (admin)
+      description: Returns the status of a book import job (admin only)
+      operationId: adminGetImportStatus
+      parameters:
+        - name: import_id
+          in: path
+          description: Import job ID
+          required: true
+          schema:
+            type: string
+            example: "imp_123456"
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  import_id:
+                    type: string
+                    description: Import job ID
+                  status:
+                    type: string
+                    enum: [pending, processing, completed, failed]
+                    description: Import status
+                  progress:
+                    type: number
+                    format: float
+                    description: Import progress (0-1)
+                  total_items:
+                    type: integer
+                    description: Total number of items to import
+                  processed_items:
+                    type: integer
+                    description: Number of items processed
+                  successful_items:
+                    type: integer
+                    description: Number of items successfully imported
+                  failed_items:
+                    type: integer
+                    description: Number of items that failed to import
+                  errors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        item:
+                          type: string
+                          description: Item identifier
+                        error:
+                          type: string
+                          description: Error message
+                  started_at:
+                    type: string
+                    format: date-time
+                    description: When the import started
+                  completed_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                    description: When the import completed
+              example:
+                import_id: "imp_123456"
+                status: "processing"
+                progress: 0.65
+                total_items: 100
+                processed_items: 65
+                successful_items: 62
+                failed_items: 3
+                errors: [
+                  {
+                    "item": "row_45",
+                    "error": "Invalid author name format"
+                  },
+                  {
+                    "item": "row_52",
+                    "error": "Missing required title field"
+                  },
+                  {
+                    "item": "row_60",
+                    "error": "Duplicate ISBN"
+                  }
+                ]
+                started_at: "2025-01-15T14:30:00Z"
+                completed_at: null
+        '404':
+          description: Import job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Not Found"
+                message: "Import job not found"
+                status_code: 404
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden - User is not an admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Forbidden"
+                message: "You do not have permission to view import status"
+                status_code: 403
+      security:
+        - bearerAuth: []
+        
+  # Batch Download Endpoints
+  /books/queue/download:
+    post:
+      tags:
+        - Books
+      summary: Queue multiple books for download
+      description: Creates a zip file containing multiple books for download
+      operationId: queueDownload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                book_ids:
+                  type: array
+                  items:
+                    type: string
+                  description: Array of book IDs to include in the download
+                  example: ["1", "2", "3"]
+      responses:
+        '200':
+          description: Download queued successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Success message
+                  zip_id:
+                    type: string
+                    description: ID of the queued zip file
+                  status:
+                    type: string
+                    enum: [pending, processing, completed, failed]
+                    description: Current status of the zip creation
+              example:
+                message: "Download queued successfully"
+                zip_id: "zip_123456"
+                status: "processing"
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+              example:
+                message: "The given data was invalid."
+                errors:
+                  book_ids: ["The book_ids field is required."]
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+  /books/queue/download/{zipId}:
+    get:
+      tags:
+        - Books
+      summary: Download queued zip file
+      description: Downloads a previously queued zip file containing multiple books
+      operationId: downloadQueuedZip
+      parameters:
+        - name: zipId
+          in: path
+          description: ID of the queued zip file
+          required: true
+          schema:
+            type: string
+            example: "zip_123456"
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Zip file not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Not Found"
+                message: "Zip file not found"
+                status_code: 404
+        '202':
+          description: Zip file is still being generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Status message
+                  status:
+                    type: string
+                    enum: [pending, processing]
+                    description: Current status of the zip creation
+                  progress:
+                    type: number
+                    format: float
+                    description: Progress percentage (0-1)
+              example:
+                message: "Zip file is still being generated"
+                status: "processing"
+                progress: 0.75
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+  /books/queue/download/{zipId}/mark-downloaded:
+    post:
+      tags:
+        - Books
+      summary: Mark zip as downloaded
+      description: Marks a queued zip file as downloaded by the user
+      operationId: markZipDownloaded
+      parameters:
+        - name: zipId
+          in: path
+          description: ID of the queued zip file
+          required: true
+          schema:
+            type: string
+            example: "zip_123456"
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Success message
+              example:
+                message: "Zip file marked as downloaded"
+        '404':
+          description: Zip file not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Not Found"
+                message: "Zip file not found"
+                status_code: 404
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+  # Narrator Autocomplete Endpoint
+  /narrators/autocomplete:
+    get:
+      tags:
+        - Narrators
+      summary: Autocomplete narrators
+      description: Returns a list of narrators matching the search term
+      operationId: autocompleteNarrators
+      parameters:
+        - name: query
+          in: query
+          description: Search term
+          required: true
+          schema:
+            type: string
+            example: "jim"
+        - name: limit
+          in: query
+          description: Maximum number of results to return
+          required: false
+          schema:
+            type: integer
+            default: 10
+            example: 10
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: string
+                    description: List of narrator names matching the search term
+              example:
+                data: [
+                  "Jim Dale",
+                  "Jim Frangione",
+                  "Jimmy Smits"
+                ]
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+  # User Profile Endpoints
+  /user:
+    get:
+      tags:
+        - User
+      summary: Get current user profile
+      description: Returns the profile of the currently authenticated user
+      operationId: getCurrentUser
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+              example:
+                id: "1"
+                name: "John Doe"
+                email: "john@example.com"
+                created_at: "2025-01-01T12:00:00Z"
+                updated_at: "2025-01-01T12:00:00Z"
+                is_admin: false
+                preferences:
+                  theme: "dark"
+                  notifications_enabled: true
+                  auto_download: false
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+  /me:
+    get:
+      tags:
+        - User
+      summary: Get current user profile (alias)
+      description: Alias for /user endpoint - returns the profile of the currently authenticated user
+      operationId: getMe
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+              example:
+                id: "1"
+                name: "John Doe"
+                email: "john@example.com"
+                created_at: "2025-01-01T12:00:00Z"
+                updated_at: "2025-01-01T12:00:00Z"
+                is_admin: false
+                preferences:
+                  theme: "dark"
+                  notifications_enabled: true
+                  auto_download: false
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+  # Reading Progress Reset Endpoint
+  /reading-progress/reset:
+    post:
+      tags:
+        - Reading Progress
+      summary: Reset reading progress
+      description: Resets reading progress for all books or a specific book
+      operationId: resetReadingProgress
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                book_id:
+                  type: string
+                  description: Optional book ID to reset progress for. If not provided, resets progress for all books.
+                  example: "1"
+      responses:
+        '200':
+          description: Reading progress reset successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Success message
+                  reset_count:
+                    type: integer
+                    description: Number of books whose progress was reset
+              example:
+                message: "Reading progress reset successfully"
+                reset_count: 1
+        '404':
+          description: Book not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Not Found"
+                message: "Book not found"
+                status_code: 404
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+  # Authentication Endpoints
+  /logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout
+      description: Logs out the current user by invalidating their token
+      operationId: logout
+      responses:
+        '200':
+          description: Successfully logged out
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Success message
+              example:
+                message: "Successfully logged out"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - bearerAuth: []
+        
+  /register:
+    post:
+      tags:
+        - Authentication
+      summary: Register new user
+      description: Registers a new user account
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: User's full name
+                  example: "John Doe"
+                email:
+                  type: string
+                  format: email
+                  description: User's email address
+                  example: "john@example.com"
+                password:
+                  type: string
+                  format: password
+                  description: User's password
+                  example: "securePassword123"
+                password_confirmation:
+                  type: string
+                  format: password
+                  description: Password confirmation
+                  example: "securePassword123"
+              required:
+                - name
+                - email
+                - password
+                - password_confirmation
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+                  token:
+                    type: string
+                    description: JWT authentication token
+              example:
+                user:
+                  id: "1"
+                  name: "John Doe"
+                  email: "john@example.com"
+                  created_at: "2025-01-01T12:00:00Z"
+                  updated_at: "2025-01-01T12:00:00Z"
+                  is_admin: false
+                token: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+              example:
+                message: "The given data was invalid."
+                errors:
+                  email: ["The email has already been taken."]
+                  password: ["The password must be at least 8 characters."]
+                  
+  /login:
+    post:
+      tags:
+        - Authentication
+      summary: Login
+      description: Authenticates a user and returns a JWT token
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: User's email address
+                  example: "john@example.com"
+                password:
+                  type: string
+                  format: password
+                  description: User's password
+                  example: "securePassword123"
+              required:
+                - email
+                - password
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+                  token:
+                    type: string
+                    description: JWT authentication token
+              example:
+                user:
+                  id: "1"
+                  name: "John Doe"
+                  email: "john@example.com"
+                  created_at: "2025-01-01T12:00:00Z"
+                  updated_at: "2025-01-01T12:00:00Z"
+                  is_admin: false
+                token: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Unauthorized"
+                message: "Invalid credentials"
+                status_code: 401
+
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          description: User ID
+        name:
+          type: string
+          description: User's full name
+        email:
+          type: string
+          format: email
+          description: User's email address
+        created_at:
+          type: string
+          format: date-time
+          description: Account creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          description: Account last update timestamp
+      example:
+        id: "123"
+        name: "John Doe"
+        email: "john@example.com"
+        created_at: "2025-01-01T00:00:00.000000Z"
+        updated_at: "2025-01-01T00:00:00.000000Z"
+        
+    Book:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Book ID
+        title:
+          type: string
+          description: Book title
+        author:
+          type: string
+          description: Author name
+        series:
+          type: string
+          description: Series name
+          nullable: true
+        seriesIndex:
+          type: number
+          format: float
+          description: Position in series
+          nullable: true
+        narrator:
+          type: string
+          description: Narrator name
+          nullable: true
+        duration:
+          type: number
+          format: float
+          description: Duration in seconds
+          nullable: true
+        coverPath:
+          type: string
+          description: Path to cover image
+          nullable: true
+        genres:
+          type: array
+          items:
+            type: string
+          description: List of genres
+        description:
+          type: string
+          description: Book description
+          nullable: true
+        publishedYear:
+          type: integer
+          description: Year published
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+        file_size:
+          type: integer
+          description: File size in bytes
+          nullable: true
+        file_format:
+          type: string
+          description: Audio file format (e.g., mp3, m4b)
+          nullable: true
+        bitrate:
+          type: integer
+          description: Audio bitrate in kbps
+          nullable: true
+        sample_rate:
+          type: integer
+          description: Audio sample rate in Hz
+          nullable: true
+        channels:
+          type: integer
+          description: Number of audio channels
+          nullable: true
+        reading_progress:
+          type: object
+          description: Current user's reading progress for this book
+          nullable: true
+          properties:
+            progress:
+              type: number
+              format: float
+              description: Reading progress (0-1)
+            current_position:
+              type: number
+              format: float
+              description: Current position in seconds
+            updated_at:
+              type: string
+              format: date-time
+              description: Last update timestamp
+      example:
+        id: "1"
+        title: "Project Hail Mary"
+        author: "Andy Weir"
+        series: null
+        seriesIndex: null
+        narrator: "Ray Porter"
+        duration: 35820
+        coverPath: "/storage/covers/project-hail-mary.jpg"
+        genres: ["Science Fiction", "Adventure"]
+        description: "Ryland Grace is the sole survivor on a desperate, last-chance mission..."
+        publishedYear: 2021
+        created_at: "2025-01-01T12:00:00Z"
+        updated_at: "2025-01-01T12:00:00Z"
+        file_size: 524288000
+        file_format: "m4b"
+        bitrate: 64
+        sample_rate: 44100
+        channels: 2
+        reading_progress: {
+          "progress": 0.35,
+          "current_position": 12537,
+          "updated_at": "2025-01-15T09:30:00Z"
+        }
+        
+    Author:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Author ID
+        name:
+          type: string
+          description: Author name
+        book_count:
+          type: integer
+          description: Number of books by this author
+        genres:
+          type: array
+          items:
+            type: string
+          description: List of genres this author writes in
+        series_count:
+          type: integer
+          description: Number of series by this author
+        following:
+          type: boolean
+          description: Whether the current user is following this author
+          nullable: true
+        books:
+          type: array
+          items:
+            $ref: '#/components/schemas/Book'
+          description: Books by this author (only included in detailed responses)
+          nullable: true
+      example:
+        id: "1"
+        name: "Andy Weir"
+        book_count: 3
+        genres: ["Science Fiction", "Adventure"]
+        series_count: 0
+        following: true
+        
+    Series:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Series ID
+        seriesName:
+          type: string
+          description: Series name
+        book_count:
+          type: integer
+          description: Number of books in this series
+        authors:
+          type: array
+          items:
+            type: string
+          description: List of authors who have written books in this series
+        genres:
+          type: array
+          items:
+            type: string
+          description: List of genres this series belongs to
+        following:
+          type: boolean
+          description: Whether the current user is following this series
+          nullable: true
+        books:
+          type: array
+          items:
+            $ref: '#/components/schemas/Book'
+          description: Books in this series (only included in detailed responses)
+          nullable: true
+      example:
+        id: "1"
+        seriesName: "The Expanse"
+        book_count: 9
+        authors: ["James S.A. Corey"]
+        genres: ["Science Fiction", "Space Opera"]
+        following: false
+        
+    Genre:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Genre ID
+        name:
+          type: string
+          description: Genre name
+        book_count:
+          type: integer
+          description: Number of books in this genre
+        authors:
+          type: array
+          items:
+            $ref: '#/components/schemas/Author'
+          description: Authors who have books in this genre (only included in detailed responses)
+          nullable: true
+      example:
+        id: "1"
+        name: "Science Fiction"
+        book_count: 250
+        
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          description: User ID
+        name:
+          type: string
+          description: User name
+        email:
+          type: string
+          format: email
+          description: User email
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+        is_admin:
+          type: boolean
+          description: Whether the user is an admin
+        book_count:
+          type: integer
+          description: Number of books the user has access to
+          nullable: true
+        last_login:
+          type: string
+          format: date-time
+          description: Last login timestamp
+          nullable: true
+        preferences:
+          type: object
+          description: User preferences
+          properties:
+            theme:
+              type: string
+              description: UI theme preference
+            notifications_enabled:
+              type: boolean
+              description: Whether notifications are enabled
+            auto_download:
+              type: boolean
+              description: Whether auto-download is enabled
+      example:
+        id: "1"
+        name: "John Doe"
+        email: "john@example.com"
+        created_at: "2025-01-01T12:00:00Z"
+        updated_at: "2025-01-01T12:00:00Z"
+        is_admin: false
+        book_count: 150
+        last_login: "2025-01-15T09:30:00Z"
+        preferences:
+          theme: "dark"
+          notifications_enabled: true
+          auto_download: false
+          
+    BookRequest:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Request ID
+        title:
+          type: string
+          description: Requested book title
+        author:
+          type: string
+          description: Requested book author
+          nullable: true
+        isbn:
+          type: string
+          description: ISBN of the requested book
+          nullable: true
+        status:
+          type: string
+          enum: [pending, approved, rejected, fulfilled]
+          description: Current status of the request
+        notes:
+          type: string
+          description: Additional notes from the requester
+          nullable: true
+        admin_notes:
+          type: string
+          description: Notes from admin (only visible to admins)
+          nullable: true
+        requester:
+          type: object
+          properties:
+            id:
+              type: string
+              description: Requester user ID
+            name:
+              type: string
+              description: Requester name
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+        fulfilled_book_id:
+          type: string
+          description: ID of the book that fulfilled this request
+          nullable: true
+      example:
+        id: "1"
+        title: "Project Hail Mary"
+        author: "Andy Weir"
+        isbn: "9780593135204"
+        status: "pending"
+        notes: "I really enjoyed The Martian and would love to listen to this one too!"
+        admin_notes: null
+        requester:
+          id: "2"
+          name: "Jane Smith"
+        created_at: "2025-01-15T09:30:00Z"
+        updated_at: "2025-01-15T09:30:00Z"
+        fulfilled_book_id: null
+        
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Message ID
+        subject:
+          type: string
+          description: Message subject
+        content:
+          type: string
+          description: Message content
+        read:
+          type: boolean
+          description: Whether the message has been read
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        related_book:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              description: Related book ID
+            title:
+              type: string
+              description: Related book title
+        related_request:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              description: Related request ID
+            title:
+              type: string
+              description: Related request title
+        recipients_count:
+          type: integer
+          description: Number of recipients (only for admin-sent messages)
+          nullable: true
+        sender:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              description: Sender user ID
+            name:
+              type: string
+              description: Sender name
+            is_admin:
+              type: boolean
+              description: Whether the sender is an admin
+      example:
+        id: "1"
+        subject: "Your book request has been approved"
+        content: "Good news! Your request for 'Project Hail Mary' has been approved and will be added to the library soon."
+        read: false
+        created_at: "2025-01-15T14:30:00Z"
+        related_book: null
+        related_request:
+          id: "1"
+          title: "Project Hail Mary"
+        recipients_count: null
+        sender:
+          id: "3"
+          name: "Admin User"
+          is_admin: true
+        
+    ReadingProgress:
+      type: object
+      properties:
+        book_id:
+          type: string
+          description: Book ID
+        user_id:
+          type: string
+          description: User ID
+        progress:
+          type: number
+          format: float
+          description: Reading progress (0-1)
+        current_position:
+          type: number
+          format: float
+          description: Current position in seconds
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+        book_details:
+          type: object
+          nullable: true
+          properties:
+            title:
+              type: string
+              description: Book title
+            author:
+              type: string
+              description: Book author
+            coverPath:
+              type: string
+              description: Path to cover image
+      example:
+        book_id: "1"
+        user_id: "2"
+        progress: 0.75
+        current_position: 26865
+        updated_at: "2025-01-15T09:30:00Z"
+        book_details:
+          title: "Project Hail Mary"
+          author: "Andy Weir"
+          coverPath: "/storage/covers/project-hail-mary.jpg"
+        
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error type
+        message:
+          type: string
+          description: Error message
+        status_code:
+          type: integer
+          description: HTTP status code
+      example:
+        error: "Not Found"
+        message: "Resource not found"
+        status_code: 404
+        
+    ValidationError:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Error message
+        errors:
+          type: object
+          description: Validation errors by field
+          additionalProperties:
+            type: array
+            items:
+              type: string
+      example:
+        message: "The given data was invalid."
+        errors:
+          title: ["The title field is required."]
+          author: ["The author field is required."]
+          
+    PaginationMeta:
+      type: object
+      properties:
+        current_page:
+          type: integer
+          description: Current page number
+        last_page:
+          type: integer
+          description: Last page number
+        per_page:
+          type: integer
+          description: Items per page
+        total:
+          type: integer
+          description: Total number of items
+        from:
+          type: integer
+          description: First item index on current page
+        to:
+          type: integer
+          description: Last item index on current page
+        path:
+          type: string
+          description: Base path for pagination links
+        links:
+          type: object
+          properties:
+            first:
+              type: string
+              description: Link to first page
+            last:
+              type: string
+              description: Link to last page
+            prev:
+              type: string
+              nullable: true
+              description: Link to previous page
+            next:
+              type: string
+              nullable: true
+              description: Link to next page
+      example:
+        current_page: 2
+        last_page: 5
+        per_page: 20
+        total: 100
+        from: 21
+        to: 40
+        path: "/api/v1/books"
+        links:
+          first: "/api/v1/books?page=1"
+          last: "/api/v1/books?page=5"
+          prev: "/api/v1/books?page=1"
+          next: "/api/v1/books?page=3"
+          
+    ZipDownload:
+      type: object
+      properties:
+        zip_id:
+          type: string
+          description: Zip file ID
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+          description: Current status of the zip creation
+        progress:
+          type: number
+          format: float
+          description: Progress percentage (0-1)
+        book_count:
+          type: integer
+          description: Number of books in the zip file
+        total_size:
+          type: integer
+          description: Total size of the zip file in bytes
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        completed_at:
+          type: string
+          format: date-time
+          description: Completion timestamp
+          nullable: true
+        downloaded:
+          type: boolean
+          description: Whether the zip file has been downloaded
+        expires_at:
+          type: string
+          format: date-time
+          description: Expiration timestamp
+      example:
+        zip_id: "zip_123456"
+        status: "completed"
+        progress: 1.0
+        book_count: 3
+        total_size: 1572864000
+        created_at: "2025-01-15T14:30:00Z"
+        completed_at: "2025-01-15T14:35:00Z"
+        downloaded: false
+        expires_at: "2025-01-22T14:30:00Z"
+        
+    ValidationError:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Error message
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: Validation errors by field
+      example:
+        message: "The given data was invalid."
+        errors:
+          email: ["The email field is required."]
+          password: ["The password must be at least 8 characters."]
+      required:
+        - message
+        - errors
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT token authentication.
+        Example: `Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
+    adminAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Admin authentication required.
+        The JWT token must contain an admin role claim.
+        Example: `Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`

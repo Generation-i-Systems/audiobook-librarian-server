@@ -1088,8 +1088,14 @@ class BookController extends Controller
                     'success' => true,
                     'message' => 'Book created successfully',
                     'id' => $id,
-                    'redirect_url' => route('admin.books.edit', ['book' => $id]),
+                    'redirect_url' => $request->input('returnUrl') ?: route('admin.books.edit', ['book' => $id]),
                 ]);
+            }
+
+            // Redirect to returnUrl if present, else go to edit page
+            $returnUrl = $request->input('returnUrl');
+            if ($returnUrl) {
+                return redirect($returnUrl)->with('success', 'Book created successfully.');
             }
 
             return redirect()->route('admin.books.edit', ['book' => $id])
@@ -1951,16 +1957,39 @@ class BookController extends Controller
 
     /**
      * Provides autocomplete suggestions for series titles.
+     * Supports both 'term' (legacy) and 'query' (book-autocomplete.js) parameters.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Illuminate\Http\JsonResponse
      */
     public function autocompleteSeries(Request $request): \Illuminate\Http\JsonResponse
     {
-        $term = $request->input('term', '');
-        if (empty($term)) {
-            return response()->json([]);
+        // Support both 'term' (legacy) and 'query' (book-autocomplete.js) parameters
+        $term = $request->input('query', $request->input('term', ''));
+        $limit = $request->input('limit', 10);
+        
+        if (empty($term) || strlen($term) < 2) {
+            return response()->json(['data' => []]);
         }
+        
+        // Get series data from document store (only pass the search term)
         $series = $this->documentStoreService->searchSeriesByName($term);
-
-        return response()->json($series);
+        
+        // Apply limit after fetching results
+        if (count($series) > $limit) {
+            $series = array_slice($series, 0, $limit);
+        }
+        
+        // Format response based on whether we're using the legacy or new format
+        if ($request->has('query')) {
+            // New format for book-autocomplete.js
+            // Use 'seriesName' field instead of 'name' for series documents
+            $seriesNames = collect($series)->pluck('seriesName')->unique()->values()->all();
+            return response()->json(['data' => $seriesNames]);
+        } else {
+            // Legacy format
+            return response()->json($series);
+        }
     }
 
     /**

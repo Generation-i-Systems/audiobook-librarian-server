@@ -751,7 +751,7 @@ document.addEventListener("DOMContentLoaded", function () {
         radio.addEventListener("change", function () {
             console.log("Cover image selected: " + this.value);
             console.log("Cover source: " + this.dataset.source);
-
+            
             // Set the hidden coverImageSource field
             const coverImageSourceField = document.getElementById('coverImageSource');
             if (coverImageSourceField) {
@@ -760,7 +760,7 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         });
     });
-
+    
     // Set initial value for coverImageSource if a radio is already checked
     const checkedCoverRadio = document.querySelector('input[name="coverImageCandidate"]:checked');
     if (checkedCoverRadio) {
@@ -770,12 +770,12 @@ document.addEventListener("DOMContentLoaded", function () {
             const source = checkedCoverRadio.dataset.source || '';
             console.log("[DEBUG] Initial checked radio data-source:", source);
             console.log("[DEBUG] Initial checked radio value:", checkedCoverRadio.value);
-
+            
             coverImageSourceField.value = source;
             console.log("Initial coverImageSource set to: " + coverImageSourceField.value);
         }
     }
-
+    
     // Force update the coverImageSource field now to ensure it's set correctly
     setTimeout(() => {
         const checkedRadio = document.querySelector('input[name="coverImageCandidate"]:checked');
@@ -800,12 +800,12 @@ document.addEventListener("DOMContentLoaded", function () {
                     const sourceValue = checkedRadioButton.dataset.source || '';
                     coverSourceField.value = sourceValue;
                     console.log("[SUBMIT] Setting coverImageSource to:", sourceValue);
-
+                    
                     // Force a data attribute to the form to ensure it's used
                     form.dataset.coverSource = sourceValue;
                 }
             }
-
+            
             // Clear previous validation
             form.querySelectorAll(".is-invalid").forEach((field) =>
                 field.classList.remove("is-invalid"),
@@ -832,7 +832,7 @@ document.addEventListener("DOMContentLoaded", function () {
             // Check if an external cover image is selected
             const selectedCoverRadio = form.querySelector('input[name="coverImageCandidate"]:checked');
             console.log("[DEBUG] Selected cover radio data-source:", selectedCoverRadio ? selectedCoverRadio.dataset.source : "none");
-
+            
             if (selectedCoverRadio && (selectedCoverRadio.dataset.source === "audible" || selectedCoverRadio.dataset.source === "google")) {
                 console.log("[DEBUG] External cover image selected: " + selectedCoverRadio.dataset.source);
 
@@ -933,7 +933,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 console.log("[DEBUG] Selected cover image value before submission:", selectedCoverRadio.value);
                 console.log("[DEBUG] Selected cover image data-source:", selectedCoverRadio.dataset.source);
             }
-
+            
             if (hasError) {
                 e.preventDefault();
                 // Re-enable the submit button if there are validation errors
