@@ -617,4 +617,76 @@ class BookApiController extends Controller
 
         return $arr;
     }
+
+    /**
+     * Get the download manifest for a book
+     *
+     * Provides metadata about the contents of the book download zip without downloading the file
+     *
+     * @param string $id Book ID
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function downloadManifest($id)
+    {
+        // Get the book details
+        $book = $this->documentStoreService->getBook($id);
+
+        if (!$book) {
+            return response()->json(['error' => 'Book not found'], 404);
+        }
+
+        // Check if the book has audio files
+        $audioPath = 'books/' . $id . '/audio';
+        $hasAudio = Storage::disk('books')->exists($audioPath);
+
+        // Get audio file metadata
+        $chapters = [];
+        $totalDuration = 0;
+
+        if ($hasAudio) {
+            $files = Storage::disk('books')->files($audioPath);
+            sort($files); // Ensure files are in order
+
+            foreach ($files as $index => $file) {
+                // Only include audio files
+                $extension = pathinfo($file, PATHINFO_EXTENSION);
+                if (!in_array(strtolower($extension), ['mp3', 'm4a', 'wav', 'aac', 'ogg', 'flac'])) {
+                    continue;
+                }
+
+                $chapterNum = $index + 1;
+                $fileName = basename($file);
+
+                // Extract duration if available in metadata (this is a placeholder - implement actual duration extraction)
+                $duration = $book['chapters'][$index]['duration'] ?? 0;
+                $totalDuration += $duration;
+
+                $chapters[] = [
+                    'chapter_number' => $chapterNum,
+                    'file_name' => $fileName,
+                    'format' => $extension,
+                    'duration' => $duration,
+                    'size_bytes' => Storage::disk('books')->size($file),
+                ];
+            }
+        }
+
+        // Build the manifest
+        $manifest = [
+            'book_id' => $id,
+            'title' => $book['title'] ?? '',
+            'author' => $book['author_name'] ?? '',
+            'series' => $book['series_name'] ?? '',
+            'series_number' => $book['series_number'] ?? null,
+            'total_duration_seconds' => $totalDuration,
+            'cover_included' => !empty($book['coverImage']) && Storage::disk('books')->exists($book['coverImage']),
+            'format' => 'zip',
+            'chapters' => $chapters,
+            'has_audio' => $hasAudio,
+            'total_chapters' => count($chapters),
+            'total_files' => count($chapters) + ($book['coverImage'] ? 1 : 0),
+        ];
+
+        return response()->json($manifest);
+    }
 }

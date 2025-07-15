@@ -86,12 +86,40 @@ interface DocumentStoreServiceInterface
     public function getMessages(?string $userId = null, bool $includeAcknowledged = false, int $limit = 100): array;
 
     // JOBS
-    public function listJobs(?string $type = null, ?string $status = null, int $limit = 50, string $orderBy = 'updated_at', string $direction = 'DESC', ?string $startAfterId = null): array;
+    /**
+     * List jobs with optional filtering and pagination
+     *
+     * @param string|null $type Job type filter
+     * @param string|null $status Job status filter
+     * @param int $limit Maximum number of jobs to return
+     * @param string $orderBy Field to order by
+     * @param string $direction Sort direction (ASC or DESC)
+     * @param string|null $startAfterId ID to start after (for pagination)
+     * @return array
+     */
+    public function listJobs(
+        ?string $type = null,
+        ?string $status = null,
+        int $limit = 50,
+        string $orderBy = 'updated_at',
+        string $direction = 'DESC',
+        ?string $startAfterId = null
+    ): array;
     public function deleteJob(string $jobId): bool;
 
     // QUEUES
     public function getBookQueue(string $userId): array;
     public function getQueueCollection($name);
+
+    // SERIES BOOKS
+    public function getBooksInSeries(string $seriesId): array;
+    /**
+     * Get the manifest of contents for a book download
+     *
+     * @param string $bookId
+     * @return array
+     */
+    public function getManifestForBook(string $bookId): array;
 
     // READING PROGRESS
     /**
@@ -102,6 +130,53 @@ interface DocumentStoreServiceInterface
      * @return bool Success status
      */
     public function resetReadingProgress(string $userId, string $bookId): bool;
+
+    // BOOKMARKS
+    /**
+     * Get all bookmarks for a user and book
+     *
+     * @param string $userId
+     * @param string $bookId
+     * @return array
+     */
+    public function getBookmarks(string $userId, string $bookId): array;
+
+    /**
+     * Get a specific bookmark by ID, filtered by user and book
+     *
+     * @param string $bookmarkId
+     * @param string $userId
+     * @param string $bookId
+     * @return array|null
+     */
+    public function getBookmark(string $bookmarkId, string $userId, string $bookId): ?array;
+
+    /**
+     * Create a new bookmark
+     *
+     * @param array $data
+     * @return string Bookmark ID
+     */
+    public function createBookmark(array $data): string;
+
+    /**
+     * Update a bookmark
+     *
+     * @param string $bookmarkId
+     * @param array $data
+     * @return bool
+     */
+    public function updateBookmark(string $bookmarkId, array $data): bool;
+
+    /**
+     * Delete a bookmark
+     *
+     * @param string $bookmarkId
+     * @param string $userId
+     * @param string $bookId
+     * @return bool
+     */
+    public function deleteBookmark(string $bookmarkId, string $userId, string $bookId): bool;
 
     // GENERIC
     public function getDocument(string $collection, string $docId): ?array;

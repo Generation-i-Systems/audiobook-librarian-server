@@ -694,4 +694,72 @@ class MongoService implements DocumentStoreServiceInterface
     {
         return $this->client;
     }
+
+    // BOOKMARKS
+    /** @inheritDoc */
+    public function getBookmarks(string $userId, string $bookId): array
+    {
+        $cursor = $this->getCollection('bookmarks')->find([
+            'user_id' => $userId,
+            'book_id' => $bookId
+        ]);
+
+        $bookmarks = [];
+        foreach ($cursor as $doc) {
+            $doc = $this->normalizeMongoValue($doc);
+            $doc['id'] = (string) $doc['_id'];
+            $bookmarks[] = $doc;
+        }
+
+        return $bookmarks;
+    }
+
+    /** @inheritDoc */
+    public function getBookmark(string $bookmarkId, string $userId, string $bookId): ?array
+    {
+        $doc = $this->getCollection('bookmarks')->findOne([
+            '_id' => $bookmarkId,
+            'user_id' => $userId,
+            'book_id' => $bookId,
+        ]);
+
+        if (!$doc) {
+            return null;
+        }
+
+        $doc = $this->normalizeMongoValue($doc);
+        $doc['id'] = (string) $doc['_id'];
+
+        return $doc;
+    }
+
+    /** @inheritDoc */
+    public function createBookmark(array $data): string
+    {
+        $result = $this->getCollection('bookmarks')->insertOne($data);
+        return (string) $result->getInsertedId();
+    }
+
+    /** @inheritDoc */
+    public function updateBookmark(string $bookmarkId, array $data): bool
+    {
+        $result = $this->getCollection('bookmarks')->updateOne(
+            ['_id' => $bookmarkId],
+            ['$set' => $data]
+        );
+
+        return $result->getModifiedCount() > 0;
+    }
+
+    /** @inheritDoc */
+    public function deleteBookmark(string $bookmarkId, string $userId, string $bookId): bool
+    {
+        $result = $this->getCollection('bookmarks')->deleteOne([
+            '_id' => $bookmarkId,
+            'user_id' => $userId,
+            'book_id' => $bookId,
+        ]);
+
+        return $result->getDeletedCount() > 0;
+    }
 }

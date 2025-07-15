@@ -51,7 +51,11 @@ Example series document:
 
 ### Authentication
 
-Most API endpoints require authentication. The API supports the following authentication methods:
+Most API endpoints require authentication using a JWT token. You can obtain a token by registering or logging in using the authentication endpoints.
+
+#### OAuth Authentication
+
+Google OAuth authentication will soon be available through the `/api/v1/auth/google` endpoint. This will allow users to authenticate using their Google accounts.
 
 - API Key authentication
 - OAuth2 with JWT tokens
