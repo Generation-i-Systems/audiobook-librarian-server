@@ -6,10 +6,11 @@ namespace Tests\Feature;
 
 use App\Services\AudiobookBayApiService;
 use Illuminate\Support\Facades\Cache;
-use PHPUnit\Framework\TestCase;
-use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
 
-#[\CoversClass(AudiobookBayApiService::class)]
+/**
+ * @covers \App\Services\AudiobookBayApiService
+ */
 class AudiobookBayApiServiceCacheTest extends TestCase
 {
     protected function setUp(): void
@@ -18,11 +19,11 @@ class AudiobookBayApiServiceCacheTest extends TestCase
         Cache::flush();
     }
 
-    #[Test]
+    /** @test */
     public function searchAudiobooksHandlesInvalidCacheValueGracefully(): void
     {
         $service = app(AudiobookBayApiService::class);
-        $endpoint = '/test';
+        $endpoint = '/search';
         $params = ['q' => 'foo'];
         // Simulate cache pollution
         $cacheKey = (new \ReflectionClass($service))->getMethod('getCacheKey')->invoke($service, $endpoint, $params);

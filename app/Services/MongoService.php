@@ -762,4 +762,23 @@ class MongoService implements DocumentStoreServiceInterface
 
         return $result->getDeletedCount() > 0;
     }
+
+    // SERIES BOOKS
+    public function getBooksInSeries(string $seriesId): array
+    {
+        // TODO: Implement getBooksInSeries() method.
+        return [];
+    }
+
+    /**
+     * Get the manifest of contents for a book download
+     *
+     * @param string $bookId
+     * @return array
+     */
+    public function getManifestForBook(string $bookId): array
+    {
+        // TODO: Implement getManifestForBook() method.
+        return [];
+    }
 }

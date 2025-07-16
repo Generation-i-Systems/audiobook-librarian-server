@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\BookController;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Services\GoogleBooksApiService;
 use App\Services\AudibleService;
+use App\Services\ExternalCoverService;
 use Illuminate\Foundation\Testing\WithoutMiddleware;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -43,7 +44,8 @@ class BookControllerUpdateTest extends TestCase
         $this->controller = new BookController(
             $this->documentStoreService,
             $this->createMock(\App\Services\GoogleBooksApiService::class),
-            $this->createMock(\App\Services\AudibleService::class)
+            $this->createMock(\App\Services\AudibleService::class),
+            $this->createMock(\App\Services\ExternalCoverService::class)
         );
 
         // Create a test user with admin role
@@ -260,11 +262,11 @@ class BookControllerUpdateTest extends TestCase
         // Create request with data including Audible cover URL
         $request = new Request([
             'title' => 'Updated Audible Book',
-            'author' => ['Updated Author'], // Note: controller expects 'author', not 'authors'
+            'author' => 'Updated Author',
             'genre' => ['Updated Genre'],
             'description' => 'Updated desc',
             'directoryPath' => 'test/path',
-            'audibleCoverImageUrl' => 'https://images-na.ssl-images-amazon.com/images/I/B01234ABCD.jpg',
+            'audible_cover_image_url' => 'https://images-na.ssl-images-amazon.com/images/I/B01234ABCD.jpg',
             'audibleId' => $asin
         ]);
         $this->app->instance('request', $request);

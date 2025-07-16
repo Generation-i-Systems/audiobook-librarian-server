@@ -497,5 +497,56 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         return $id;
     }
 
-    // Add any other methods required by the interface
+    public function getManifestForBook(string $bookId): array
+    {
+        return $this->books[$bookId] ?? [];
+    }
+
+    public function getBookmarks(string $userId, string $bookId): array
+    {
+        return [];
+    }
+
+    public function getBookmark(string $bookmarkId, string $userId, string $bookId): ?array
+    {
+        return null;
+    }
+
+    public function createBookmark(array $data): string
+    {
+        $id = uniqid('bookmark_');
+        return $id;
+    }
+
+    public function updateBookmark(string $bookmarkId, array $data): bool
+    {
+        return true;
+    }
+
+    public function deleteBookmark(string $bookmarkId, string $userId, string $bookId): bool
+    {
+        return true;
+    }
+
+    public function updateBookQueue(string $userId, array $bookIds): void
+    {
+        $this->queues[$userId] = $bookIds;
+    }
+
+    public function getJob(string $jobId): ?array
+    {
+        return $this->jobs[$jobId] ?? null;
+    }
+
+    public function updateJob(string $jobId, array $data): void
+    {
+        if (isset($this->jobs[$jobId])) {
+            $this->jobs[$jobId] = array_merge($this->jobs[$jobId], $data);
+        }
+    }
+
+    public function getBooksInSeries(string $seriesId): array
+    {
+        return [];
+    }
 }

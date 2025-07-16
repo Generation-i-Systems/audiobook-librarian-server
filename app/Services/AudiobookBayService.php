@@ -64,7 +64,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
                         'size' => $resultItem['metadata']['size'] ?? '',
                         'format' => $resultItem['metadata']['format'] ?? '',
                         'link' => $resultItem['url'] ?? '',
-                        'cover' => $resultItem['coverImageUrl'] ?? '',
+                        'cover' => $resultItem['cover_image_url'] ?? '',
                         'description' => $resultItem['description'] ?? '',
                         'metadata' => $resultItem['metadata'] ?? [],
                     ];
@@ -172,10 +172,16 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
         }
         $query = $inputTitle;
         $options = ['limit' => 10];
-        $results = $this->apiService->searchAudiobooks($query, $options) ?? [];
-        if (empty($results)) {
-            return null;
+        $apiResults = $this->apiService->searchAudiobooks($query, $options);
+
+        if (empty($apiResults)) {
+            return [];
         }
+
+        $results = array_map(function ($result) {
+            return $result;
+        }, $apiResults);
+
         $bestMatch = null;
         $bestScore = 0;
         foreach ($results as $result) {

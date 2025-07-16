@@ -259,7 +259,7 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::post(
         '/send-notification',
         [AdminNotificationController::class, 'sendNotification']
-    )->name('sendNotification');
+    )->name('send.notification');
     Route::post('/messages', [MessageController::class, 'storeAdmin'])->name('messages.storeAdmin');
     // Message routes
     Route::post(

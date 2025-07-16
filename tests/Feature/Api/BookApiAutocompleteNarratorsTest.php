@@ -7,9 +7,17 @@ namespace Tests\Feature\Api;
 use Tests\TestCase;
 use App\Services\MongoService;
 use Mockery;
+use App\Auth\DocumentstoreUser;
 
 class BookApiAutocompleteNarratorsTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $user = new DocumentstoreUser(['id' => 'test-user', 'name' => 'Test User', 'email' => 'test@example.com']);
+        $this->actingAs($user, 'api');
+    }
+
     /** @test */
     public function it_returns_autocomplete_narrators_results()
     {

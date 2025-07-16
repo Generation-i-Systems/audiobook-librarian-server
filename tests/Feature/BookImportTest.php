@@ -72,7 +72,7 @@ class BookImportTest extends TestCase
         }
 
         // Clear test series
-        $series = $this->seriesCollection->where('name', '=', 'Test Series')
+        $series = $this->seriesCollection->where('seriesName', '=', 'Test Series')
             ->documents();
         foreach ($series as $item) {
             $item->reference()->delete();
@@ -84,7 +84,7 @@ class BookImportTest extends TestCase
     {
         // Create test genre and series
         $genreRef = $this->genresCollection->add(['name' => 'Test Genre']);
-        $seriesRef = $this->seriesCollection->add(['name' => 'Test Series']);
+        $seriesRef = $this->seriesCollection->add(['seriesName' => 'Test Series']);
 
         $dirPath = '/Test Genre/Test Author/Test Series/1 Test Book';
         $result = $this->processDirPath($dirPath);

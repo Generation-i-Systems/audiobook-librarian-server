@@ -127,6 +127,8 @@ class AudibleServiceTest extends TestCase
             'asin' => 'TEST123',
             'title' => 'Test Book',
             'subtitle' => 'A Test Subtitle',
+            'authors' => [['author' => ['name' => 'Test Author']]],
+            'narrators' => [['narrator' => ['name' => 'Test Narrator']]],
             'contributors' => [
                 ['role' => 'author', 'name' => 'Test Author', 'asin' => 'AUTH123'],
                 ['role' => 'author', 'name' => 'Co-Author', 'asin' => 'AUTH456'],

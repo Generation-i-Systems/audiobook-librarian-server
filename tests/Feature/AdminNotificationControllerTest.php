@@ -63,7 +63,7 @@ class AdminNotificationControllerTest extends TestCase
     #[Test]
     public function sendNotification_sends_to_specific_user(): void
     {
-        $response = $this->post(route('send.notification'), [
+        $response = $this->post(route('admin.send.notification'), [
             'message' => 'Test message',
             'user_id' => 'user123',
         ]);
@@ -76,7 +76,7 @@ class AdminNotificationControllerTest extends TestCase
     #[Test]
     public function sendNotification_sends_to_all_users(): void
     {
-        $response = $this->post(route('send.notification'), [
+        $response = $this->post(route('admin.send.notification'), [
             'message' => 'Broadcast message',
         ]);
         $response->assertSessionHas('success', 'Notification sent to all users!');
@@ -101,7 +101,7 @@ class AdminNotificationControllerTest extends TestCase
         });
         $this->app->instance(DocumentStoreServiceInterface::class, $mock);
 
-        $response = $this->post(route('send.notification'), [
+        $response = $this->post(route('admin.send.notification'), [
             'message' => 'Test message',
             'user_id' => 'notfound',
         ]);
@@ -111,7 +111,7 @@ class AdminNotificationControllerTest extends TestCase
     #[Test]
     public function sendNotification_requires_message(): void
     {
-        $response = $this->post(route('send.notification'), [
+        $response = $this->post(route('admin.send.notification'), [
             'user_id' => 'user123',
         ]);
         $response->assertSessionHasErrors(['message']);

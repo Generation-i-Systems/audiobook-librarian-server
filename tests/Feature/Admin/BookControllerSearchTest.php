@@ -104,7 +104,7 @@ class BookControllerSearchTest extends TestCase
         // Mock the searchBooks method
         $mockGoogleBooksService->shouldReceive('searchBooks')
             ->once()
-            ->with('intitle:Test Book inauthor:Test Author', ['limit' => 10])
+            ->with('intitle:"Test Book" inauthor:"Test Author"', ['limit' => 10])
             ->andReturn([
                 [
                     'title' => 'Test Book',

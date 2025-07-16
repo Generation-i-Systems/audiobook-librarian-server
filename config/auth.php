@@ -40,6 +40,17 @@ return [
             'driver' => 'session',
             'provider' => 'documentstore',
         ],
+
+        'api' => [
+            'driver' => 'token',
+            'provider' => 'documentstore',
+            'hash' => false,
+        ],
+
+        'api_test' => [
+            'driver' => 'session',
+            'provider' => 'documentstore',
+        ],
         // 'sanctum' => [
         //     'driver' => 'sanctum',
         //     'provider' => null,

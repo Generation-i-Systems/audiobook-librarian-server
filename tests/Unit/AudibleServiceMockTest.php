@@ -101,6 +101,8 @@ class AudibleServiceMockTest extends TestCase
             'asin' => 'TEST123',
             'title' => 'Test Book',
             'subtitle' => 'A Test Subtitle',
+            'authors' => [['author' => ['name' => 'Test Author']]],
+            'narrators' => [['narrator' => ['name' => 'Test Narrator']]],
             'contributors' => [
                 ['role' => 'author', 'name' => 'Test Author', 'asin' => 'AUTH123'],
                 ['role' => 'narrator', 'name' => 'Test Narrator', 'asin' => 'NARR123'],

@@ -17,8 +17,12 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(AudibleApiService::class, function ($app) {
             return new AudibleApiService(config('services.audible', []));
         });
-        // Bind DocumentStoreServiceInterface to MongoService
-        $this->app->bind(\App\Contracts\DocumentStoreServiceInterface::class, \App\Services\MongoService::class);
+                // Bind DocumentStoreServiceInterface based on the default database connection
+        if (config('database.default') === 'mysql') {
+            $this->app->bind(\App\Contracts\DocumentStoreServiceInterface::class, \App\Services\MySqlService::class);
+        } else {
+            $this->app->bind(\App\Contracts\DocumentStoreServiceInterface::class, \App\Services\MongoService::class);
+        }
     }
 
     /**

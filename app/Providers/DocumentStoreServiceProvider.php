@@ -2,30 +2,39 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\ServiceProvider;
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Services\FirestoreService;
 use App\Services\MongoService;
+use App\Services\MySqlService;
+use Tests\Mocks\MockDocumentStoreService;
+use Illuminate\Support\ServiceProvider;
 
 class DocumentStoreServiceProvider extends ServiceProvider
 {
     /**
      * Register services.
      */
-    public function register()
+    public function register(): void
     {
         $this->app->singleton(DocumentStoreServiceInterface::class, function ($app) {
-            $driver = config('documentstore.driver', 'firestore');
-            if ($driver === 'mongodb') {
-                return new MongoService();
+            if ($app->environment('testing')) {
+                return new MockDocumentStoreService();
             }
-            return new \App\Services\FirestoreService();
+
+            $driver = config('documentstore.driver', 'mysql');
+
+            return match ($driver) {
+                'mongodb' => new MongoService(),
+                'firestore' => new FirestoreService(),
+                default => new MySqlService(),
+            };
         });
     }
 
     /**
      * Bootstrap services.
      */
-    public function boot()
+    public function boot(): void
     {
         //
     }

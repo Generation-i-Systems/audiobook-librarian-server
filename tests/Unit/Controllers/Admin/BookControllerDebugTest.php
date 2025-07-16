@@ -26,12 +26,14 @@ class BookControllerDebugTest extends TestCase
         // Mock the required services
         $mockGoogleBooksService = $this->createMock(\App\Services\GoogleBooksApiService::class);
         $mockAudibleService = $this->createMock(\App\Services\AudibleService::class);
+        $mockExternalCoverService = $this->createMock(\App\Services\ExternalCoverService::class);
 
         // Create the controller with the mock services
         $this->controller = new BookController(
             $this->documentStore,
             $mockGoogleBooksService,
-            $mockAudibleService
+            $mockAudibleService,
+            $mockExternalCoverService
         );
 
         // Set up storage

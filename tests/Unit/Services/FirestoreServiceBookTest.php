@@ -19,8 +19,6 @@ class FirestoreServiceBookTest extends TestCase
         parent::setUp();
         $this->mockDb = $this->createMock(FirestoreClient::class);
         $this->service = $this->getMockBuilder(DocumentStoreServiceInterface::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['getServerTimestamp'])
             ->getMock();
         $this->service->db = $this->mockDb;
     }

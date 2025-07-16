@@ -1402,4 +1402,54 @@ class FirestoreService implements DocumentStoreServiceInterface
             return 0;
         }
     }
+
+    public function getManifestForBook(string $bookId): array
+    {
+        throw new \Exception('Not implemented');
+    }
+
+    public function getBookmarks(string $userId, string $bookId): array
+    {
+        throw new \Exception('Not implemented');
+    }
+
+    public function getBookmark(string $bookmarkId, string $userId, string $bookId): ?array
+    {
+        throw new \Exception('Not implemented');
+    }
+
+    public function createBookmark(array $data): string
+    {
+        throw new \Exception('Not implemented');
+    }
+
+    public function updateBookmark(string $bookmarkId, array $data): bool
+    {
+        throw new \Exception('Not implemented');
+    }
+
+    public function deleteBookmark(string $bookmarkId, string $userId, string $bookId): bool
+    {
+        throw new \Exception('Not implemented');
+    }
+
+    public function updateBookQueue(string $userId, array $bookIds): void
+    {
+        throw new \Exception('Not implemented');
+    }
+
+    public function getJob(string $jobId): ?array
+    {
+        throw new \Exception('Not implemented');
+    }
+
+    public function getBooksInSeries(string $seriesId): array
+    {
+        throw new \Exception('Not implemented');
+    }
+
+    public function updateJob(string $jobId, array $data): void
+    {
+        throw new \Exception('Not implemented');
+    }
 }

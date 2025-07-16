@@ -1664,7 +1664,8 @@ class BookController extends Controller
             if ($apiId) {
                 $bookDetails = $this->audibleService->getBookDetails($apiId);
                 if ($bookDetails) {
-                    $results[] = $bookDetails; // Already transformed by the service
+                    // If we found a book by ASIN, return it directly as a single object
+                    return response()->json($bookDetails);
                 }
             } else {
                 // Otherwise search by title/author using the service method that handles filtering and fallback

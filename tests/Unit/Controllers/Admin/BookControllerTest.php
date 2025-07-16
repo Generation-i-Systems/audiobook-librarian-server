@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\BookController;
 use App\Events\NewBookAdded;
 use App\Services\GoogleBooksApiService;
 use App\Services\AudibleService;
+use App\Services\ExternalCoverService;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Event;
@@ -21,6 +22,7 @@ class BookControllerTest extends TestCase
     protected MockDocumentStoreService $documentStore;
     protected GoogleBooksApiService $googleBooksApiService;
     protected AudibleService $audibleService;
+    protected ExternalCoverService $externalCoverService;
 
     protected function setUp(): void
     {
@@ -32,10 +34,14 @@ class BookControllerTest extends TestCase
         $this->audibleService = $this->getMockBuilder(AudibleService::class)
             ->disableOriginalConstructor()
             ->getMock();
+        $this->externalCoverService = $this->getMockBuilder(ExternalCoverService::class)
+            ->disableOriginalConstructor()
+            ->getMock();
         $this->controller = new BookController(
             $this->documentStore,
             $this->googleBooksApiService,
-            $this->audibleService
+            $this->audibleService,
+            $this->externalCoverService
         );
         // Set up storage
         Storage::fake('books');
@@ -284,21 +290,31 @@ class BookControllerTest extends TestCase
     {
         // Mock the event dispatcher
         Event::fake();
+
+        // Mock the ExternalCoverService to return a path
+        $this->mockExternalCoverService->expects($this->once())
+            ->method('processCoverUrl')
+            ->with('https://example.com/cover.jpg')
+            ->willReturn('path/to/cover.jpg');
+
         // Create a request with valid book data and external cover URL
         $request = new Request([
             'title' => 'Test Book with External Cover',
             'author' => ['Test Author'],
             'genre' => ['Test Genre'],
-            'coverImageUrl' => 'https://example.com/cover.jpg'
+            'cover_url' => 'https://example.com/cover.jpg'
         ]);
+
         // Call the store method
         $response = $this->controller->store($request);
+
         // Get all books from the mock store
         $books = $this->documentStore->getAllBooks();
         $book = $books[0];
+
         // Assert that external cover URL was used
         $this->assertArrayHasKey('coverImage', $book);
-        $this->assertEquals('https://example.com/cover.jpg', $book['coverImage']);
+        $this->assertEquals('path/to/cover.jpg', $book['coverImage']);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
