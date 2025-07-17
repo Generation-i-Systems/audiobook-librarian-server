@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Feature;
 
 use App\Services\BookDirectoryParser;
@@ -25,8 +27,7 @@ class BookDirectoryParserTest extends TestCase
             File::makeDirectory($this->testDataPath, 0755, true);
         }
 
-        // Create a mock BookDirectoryParser that doesn't rely on external dependencies
-        $this->parser = $this->createMockParser();
+        $this->parser = new BookDirectoryParser();
 
         // Create test directory structure
         $this->createTestDirectoryStructure();
@@ -46,7 +47,7 @@ class BookDirectoryParserTest extends TestCase
     }
 
     /**
-     * Clean up any error handlers that might be registered during tests
+     * Clean up any error handlers that might be registered during tests.
      */
     protected function cleanupErrorHandlers(): void
     {
@@ -62,113 +63,6 @@ class BookDirectoryParserTest extends TestCase
         if (function_exists('gc_collect_cycles')) {
             gc_collect_cycles();
         }
-    }
-
-    /**
-     * Create a mock BookDirectoryParser that doesn't rely on external dependencies
-     */
-    protected function createMockParser(): BookDirectoryParser
-    {
-        // Create a mock parser that will return our test data
-        $parser = $this->getMockBuilder(BookDirectoryParser::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['parseDirectory'])
-            ->getMock();
-
-        // Set up the mock to return our test data when parseDirectory is called
-        $parser->method('parseDirectory')
-            ->willReturn($this->getTestBooks());
-
-        return $parser;
-    }
-
-    /**
-     * Get test book data
-     */
-    protected function getTestBooks(): array
-    {
-        return [
-            [
-                'title' => 'The Way of Kings',
-                'author' => 'Brandon Sanderson',
-                'series' => 'The Stormlight Archive',
-                'seriesNumber' => null,
-                'fileExtension' => 'm4b',
-                'directoryPath' => 'Fantasy/Brandon Sanderson/The Stormlight Archive',
-            ],
-            [
-                'title' => 'Words of Radiance',
-                'author' => 'Brandon Sanderson',
-                'series' => 'The Stormlight Archive',
-                'seriesNumber' => null,
-                'fileExtension' => 'mp3',
-                'directoryPath' => 'Fantasy/Brandon Sanderson/The Stormlight Archive',
-            ],
-            [
-                'title' => 'Oathbringer',
-                'author' => 'Brandon Sanderson',
-                'series' => 'The Stormlight Archive',
-                'seriesNumber' => null,
-                'fileExtension' => 'm4b',
-                'narrator' => 'Michael Kramer',
-                'directoryPath' => 'Fantasy/Brandon Sanderson/The Stormlight Archive',
-            ],
-            [
-                'title' => 'Rhythm of War',
-                'author' => 'Brandon Sanderson',
-                'series' => 'The Stormlight Archive',
-                'seriesNumber' => null,
-                'fileExtension' => 'mp3',
-                'edition' => 'Graphic Audio',
-                'directoryPath' => 'Fantasy/Brandon Sanderson/The Stormlight Archive',
-            ],
-            [
-                'title' => 'Mistborn: The Final Empire',
-                'author' => 'Brandon Sanderson',
-                'series' => 'Mistborn',
-                'seriesNumber' => 1,
-                'fileExtension' => 'm4b',
-                'directoryPath' => 'Fantasy/Brandon Sanderson/Mistborn',
-            ],
-            [
-                'title' => 'The Martian',
-                'author' => 'Andy Weir',
-                'narrator' => 'R.C. Bray',
-                'fileExtension' => 'm4b',
-                'directoryPath' => 'Science Fiction/Andy Weir',
-            ],
-            [
-                'title' => 'Project Hail Mary',
-                'author' => 'Andy Weir',
-                'narrator' => 'Ray Porter',
-                'fileExtension' => 'm4b',
-                'directoryPath' => 'Science Fiction/Andy Weir',
-            ],
-            [
-                'title' => 'The Fellowship of the Ring',
-                'author' => 'J.R.R. Tolkien',
-                'series' => 'The Lord of the Rings',
-                'seriesNumber' => 1,
-                'fileExtension' => 'm4b',
-                'directoryPath' => 'Fantasy/J.R.R. Tolkien/The Lord of the Rings',
-            ],
-            [
-                'title' => 'The Two Towers',
-                'author' => 'J.R.R. Tolkien',
-                'series' => 'The Lord of the Rings',
-                'seriesNumber' => 2,
-                'fileExtension' => 'm4b',
-                'directoryPath' => 'Fantasy/J.R.R. Tolkien/The Lord of the Rings',
-            ],
-            [
-                'title' => 'The Return of the King',
-                'author' => 'J.R.R. Tolkien',
-                'series' => 'The Lord of the Rings',
-                'seriesNumber' => 3,
-                'fileExtension' => 'm4b',
-                'directoryPath' => 'Fantasy/J.R.R. Tolkien/The Lord of the Rings',
-            ],
-        ];
     }
 
     protected function createTestDirectoryStructure(): void
@@ -214,7 +108,7 @@ class BookDirectoryParserTest extends TestCase
             if (is_array($content)) {
                 // It's a directory
                 if (!File::exists($path)) {
-                    File::makeDirectory($path, 0755, true);
+                    File::makeDirectory($path, 0o755, true);
                 }
                 $this->createDirectories($path, $content);
             } else {
@@ -225,52 +119,53 @@ class BookDirectoryParserTest extends TestCase
     }
 
     #[Test]
-    public function testParseDirectoryWithDefaultOptions()
+    public function testParseDirectoryWithDefaultOptions(): void
     {
         $books = $this->parser->parseDirectory($this->testDataPath);
 
         $this->assertCount(10, $books);
 
         // Test a few specific books
-        $wayOfKings = collect($books)->first(fn ($book) => str_contains($book['title'], 'Way of Kings'));
+        $wayOfKings = collect($books)->first(fn($book) => str_contains($book['title'], 'Way of Kings'));
         $this->assertNotNull($wayOfKings, 'Should find The Way of Kings');
-        $this->assertEquals('Brandon Sanderson', $wayOfKings['author']);
-        $this->assertEquals('The Stormlight Archive', $wayOfKings['series']);
+        $this->assertEquals('Brandon Sanderson', $wayOfKings['author'][0]);
+        $this->assertEquals('The Stormlight Archive', $wayOfKings['seriesName']);
 
-        $mistborn1 = collect($books)->first(fn ($book) => str_contains($book['title'], 'Final Empire'));
-        $this->assertEquals(1, $mistborn1['series_number'], 'Should parse series number from filename');
+        $mistborn1 = collect($books)->first(fn($book) => str_contains($book['title'], 'Final Empire'));
+        $this->assertEquals(1, $mistborn1['seriesNumber'], 'Should parse series number from filename');
 
-        $martian = collect($books)->first(fn ($book) => str_contains($book['title'], 'Martian'));
-        $this->assertEquals('R.C. Bray', $martian['narrator'], 'Should parse narrator from brackets');
+        $martian = collect($books)->first(fn($book) => str_contains($book['title'], 'Martian'));
+        $this->assertEquals('R.C. Bray', $martian['narrators'][0], 'Should parse narrator from brackets');
 
-        $hailMary = collect($books)->first(fn ($book) => str_contains($book['title'], 'Project Hail Mary'));
-        $this->assertEquals('Ray Porter', $hailMary['narrator'], 'Should parse narrator from "narrated by" pattern');
+        $hailMary = collect($books)->first(fn($book) => str_contains($book['title'], 'Project Hail Mary'));
+        $this->assertEquals('Ray Porter', $hailMary['narrators'][0], 'Should parse narrator from "narrated by" pattern');
     }
 
     #[Test]
-    public function testParseWithSeriesExtraction()
+    public function testParseWithSeriesExtraction(): void
     {
         $books = $this->parser->parseDirectory($this->testDataPath);
 
         // Check that Lord of the Rings series is correctly parsed with series numbers
         $lotrBooks = collect($books)
-            ->filter(fn ($book) => str_contains($book['series'] ?? '', 'Lord of the Rings'))
-            ->sortBy('series_number')
+            ->filter(fn($book) => str_contains($book['seriesName'] ?? '', 'Lord of the Rings'))
+            ->sortBy('seriesNumber')
             ->values()
-            ->all();
+            ->all()
+        ;
 
         $this->assertCount(3, $lotrBooks);
-        $this->assertEquals(1, $lotrBooks[0]['series_number']);
-        $this->assertEquals(2, $lotrBooks[1]['series_number']);
-        $this->assertEquals(3, $lotrBooks[2]['series_number']);
+        $this->assertEquals(1, $lotrBooks[0]['seriesNumber']);
+        $this->assertEquals(2, $lotrBooks[1]['seriesNumber']);
+        $this->assertEquals(3, $lotrBooks[2]['seriesNumber']);
     }
 
     #[Test]
-    public function testParseWithEditionExtraction()
+    public function testParseWithEditionExtraction(): void
     {
         $books = $this->parser->parseDirectory($this->testDataPath);
 
-        $rhythmOfWar = collect($books)->first(fn ($book) => str_contains($book['title'] ?? '', 'Rhythm of War'));
+        $rhythmOfWar = collect($books)->first(fn($book) => str_contains($book['title'] ?? '', 'Rhythm of War'));
         $this->assertEquals('Graphic Audio', $rhythmOfWar['edition']);
     }
 }

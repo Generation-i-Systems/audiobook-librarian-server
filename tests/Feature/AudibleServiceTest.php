@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace Tests\Feature;
 
 use App\Services\AudibleService;
@@ -18,15 +20,14 @@ class AudibleServiceTest extends TestCase
 
         // Mock the cache to prevent database connections
         Cache::shouldReceive('remember')
-            ->andReturnUsing(function ($key, $seconds, $callback) {
-                return $callback();
-            });
+            ->andReturnUsing(fn ($key, $seconds, $callback) => $callback())
+        ;
 
         $this->service = new AudibleService();
     }
 
     #[Test]
-    public function testSearchBooksByTitle()
+    public function testSearchBooksByTitle(): void
     {
         // Mock the HTTP response
         Http::fake([
@@ -55,7 +56,7 @@ class AudibleServiceTest extends TestCase
     }
 
     #[Test]
-    public function testGetBookDetails()
+    public function testGetBookDetails(): void
     {
         $mockBook = $this->getMockBookData();
 
@@ -93,7 +94,7 @@ class AudibleServiceTest extends TestCase
     }
 
     #[Test]
-    public function testHandlesApiErrorsGracefully()
+    public function testHandlesApiErrorsGracefully(): void
     {
         // Test search error
         Http::fake([

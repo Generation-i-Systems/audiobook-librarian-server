@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Admin;
 
-use App\Auth\DocumentstoreUser;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Admin\BookController;
 use Illuminate\Http\Request;
@@ -11,10 +10,10 @@ use Tests\TestCase;
 
 class BookControllerSeriesAutocompleteTest extends TestCase
 {
+
+
     /**
      * Test the autocompleteSeries method directly.
-     *
-     * @return void
      */
     public function testAutocompleteSeries()
     {
@@ -27,7 +26,7 @@ class BookControllerSeriesAutocompleteTest extends TestCase
             ->andReturn([
                 ['seriesName' => 'Test Series 1'],
                 ['seriesName' => 'Test Series 2'],
-                ['seriesName' => 'Another Test Series']
+                ['seriesName' => 'Another Test Series'],
             ]);
 
         // Create services needed for controller
@@ -57,8 +56,10 @@ class BookControllerSeriesAutocompleteTest extends TestCase
             'data' => [
                 'Test Series 1',
                 'Test Series 2',
-                'Another Test Series'
-            ]
+                'Another Test Series',
+            ],
         ], $response->getData(true));
     }
+
+
 }

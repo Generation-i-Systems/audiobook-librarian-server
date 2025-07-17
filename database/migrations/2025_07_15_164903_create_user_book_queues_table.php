@@ -9,7 +9,7 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-        public function up(): void
+    public function up(): void
     {
         Schema::create('user_book_queues', function (Blueprint $table) {
             $table->foreignId('user_id')->constrained()->onDelete('cascade');

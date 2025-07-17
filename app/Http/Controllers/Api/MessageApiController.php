@@ -19,6 +19,7 @@ class MessageApiController extends Controller
             'content' => $request->input('content'),
             'is_from_admin' => false,
         ]);
+
         return response()->json($messages, 201); // Created
     }
 }

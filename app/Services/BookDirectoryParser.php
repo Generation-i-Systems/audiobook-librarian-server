@@ -591,7 +591,7 @@ class BookDirectoryParser
 
             $book = [
                 'title' => $title,
-                'author' => $author,
+                'author' => [$author], // Ensure author is always an array
                 'path' => $file->getPathname(),
                 'filename' => $filename,
                 'fileSize' => $file->getSize(),
@@ -606,6 +606,7 @@ class BookDirectoryParser
                 'durationFormatted' => '00:00:00',
                 'duration_formatted' => '00:00:00', // For backward compatibility
                 'description' => '',
+                'edition' => null, // Initialize edition
             ];
 
             // Try to extract additional metadata from filename
@@ -678,16 +679,30 @@ class BookDirectoryParser
                 if (empty($bookPathInfo['skipped']) && empty($bookPathInfo['error'])) {
                     $seriesName = '';
                     $seriesNumber = null;
-                    if (!empty($bookPathInfo['series']) && is_array($bookPathInfo['series'])) {
-                        $seriesName = array_key_first($bookPathInfo['series']);
-                        $seriesNumber = $bookPathInfo['series'][$seriesName] ?? null;
+                    $edition = null;
+
+                    if (!empty($bookPathInfo['series'])) {
+                        if (is_array($bookPathInfo['series'])) {
+                            $seriesName = array_key_first($bookPathInfo['series']);
+                            $seriesNumber = $bookPathInfo['series'][$seriesName] ?? null;
+                        } else {
+                            $seriesName = $bookPathInfo['series'];
+                            $seriesNumber = $bookPathInfo['seriesNumber'] ?? null;
+                        }
                     }
+
+                    if (!empty($bookPathInfo['edition'])) {
+                        $edition = $bookPathInfo['edition'];
+                    }
+
                     [$coverImage, $coverCandidates] = $this->findCoverImageCandidate($path);
                     $book = [
                         'directoryPath' => $path,
                         'genre' => $bookPathInfo['genre'] ?? [],
-                        'author' => $bookPathInfo['author'] ?? [],
-                        'series' => $bookPathInfo['series'] ?? null,
+                        'author' => is_array($bookPathInfo['author'])
+                            ? $bookPathInfo['author']
+                            : [$bookPathInfo['author'] ?? 'Unknown Author'],
+                        'series' => $seriesName,
                         'seriesName' => $seriesName,
                         'seriesNumber' => $seriesNumber,
                         'series_number' => $seriesNumber, // Adding series_number for backward compatibility
@@ -699,6 +714,7 @@ class BookDirectoryParser
                         'fileTags' => $audioFilesData['fileTags'],
                         'needsReview' => false,
                         'coverImage' => $coverImage ?? null,
+                        'edition' => $edition,
                     ];
                     $books[] = $book;
                 }
@@ -750,9 +766,14 @@ class BookDirectoryParser
                     continue;
                 }
 
-                if (!empty($bookPathInfo['series']) && is_array($bookPathInfo['series'])) {
-                    $seriesName = array_key_first($bookPathInfo['series']);
-                    $seriesNumber = $bookPathInfo['series'][$seriesName] ?? null;
+                if (!empty($bookPathInfo['series'])) {
+                    if (is_array($bookPathInfo['series'])) {
+                        $seriesName = array_key_first($bookPathInfo['series']);
+                        $seriesNumber = $bookPathInfo['series'][$seriesName] ?? null;
+                    } else {
+                        $seriesName = $bookPathInfo['series'];
+                        $seriesNumber = $bookPathInfo['seriesNumber'] ?? null;
+                    }
                 } else {
                     $seriesName = '';
                     $seriesNumber = null;
@@ -765,8 +786,10 @@ class BookDirectoryParser
                 $book = [
                     'directoryPath' => $path,
                     'genre' => $bookPathInfo['genre'] ?? [],
-                    'author' => $bookPathInfo['author'] ?? [],
-                    'series' => $bookPathInfo['series'] ?? null,
+                    'author' => is_array($bookPathInfo['author'])
+                        ? $bookPathInfo['author']
+                        : [$bookPathInfo['author'] ?? 'Unknown Author'],
+                    'series' => $seriesName,
                     'seriesName' => $seriesName,
                     'seriesNumber' => $seriesNumber,
                     'series_number' => $seriesNumber, // Adding series_number for backward compatibility
@@ -777,6 +800,7 @@ class BookDirectoryParser
                     'fileTags' => $fileTags,
                     'needsReview' => false,
                     'coverImage' => $coverImage ?? null,
+                    'edition' => $bookPathInfo['edition'] ?? null,
                 ];
 
                 $books[] = $book;

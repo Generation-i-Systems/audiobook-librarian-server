@@ -42,7 +42,7 @@ class BookMetadataServiceTest extends TestCase
     }
 
     #[Test]
-    public function testSavesAndLoadsMetadataLocally()
+    public function test_saves_and_loads_metadata_locally()
     {
         $bookId = 'test-book-123';
         $directoryPath = $this->testDir . '/test-book';
@@ -71,7 +71,7 @@ class BookMetadataServiceTest extends TestCase
     }
 
     #[Test]
-    public function testHandleMissingMetadataFile()
+    public function test_handle_missing_metadata_file()
     {
         $bookId = 'non-existent-book';
         $directoryPath = $this->testDir . '/non-existent-book';
@@ -82,7 +82,7 @@ class BookMetadataServiceTest extends TestCase
     }
 
     #[Test]
-    public function testGeneratesConsistentBookIds()
+    public function test_generates_consistent_book_ids()
     {
         $path1 = '/path/to/book';
         $path2 = '/path/to/book';
@@ -103,7 +103,7 @@ class BookMetadataServiceTest extends TestCase
     }
 
     #[Test]
-    public function testHandlesInvalidMetadata()
+    public function test_handles_invalid_metadata()
     {
         $bookId = 'invalid-metadata-test';
         $directoryPath = $this->testDir . '/invalid-metadata';

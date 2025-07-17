@@ -17,16 +17,16 @@ class AudibleServiceMockTest extends TestCase
 
         // Mock the cache facade
         $cache = new \Illuminate\Cache\Repository(
-            new \Illuminate\Cache\ArrayStore()
+            new \Illuminate\Cache\ArrayStore
         );
         $this->app->instance('cache', $cache);
 
         // Create the service instance
-        $this->service = new AudibleService();
+        $this->service = new AudibleService;
     }
 
     #[Test]
-    public function testItCanSearchBooksByTitle()
+    public function test_it_can_search_books_by_title()
     {
         // Mock the HTTP response
         Http::fake([
@@ -42,12 +42,12 @@ class AudibleServiceMockTest extends TestCase
         $this->assertIsArray($results);
         $this->assertCount(1, $results);
         $this->assertEquals('Test Book', $results[0]['title']);
-        $this->assertEquals('Test Author', $results[0]['authors'][0]['author']['name']);
-        $this->assertStringContainsString('500x500', $results[0]['cover_image_url']);
+        $this->assertEquals('Test Author', $results[0]['author'][0]);
+        $this->assertStringContainsString('500x500', $results[0]['coverImageUrl']);
     }
 
     #[Test]
-    public function testItGetsBookDetails()
+    public function test_it_gets_book_details()
     {
         $mockBook = $this->getMockBookData();
 
@@ -62,24 +62,24 @@ class AudibleServiceMockTest extends TestCase
 
         $this->assertIsArray($book);
         $this->assertEquals('Test Book', $book['title']);
-        $this->assertEquals('Test Author', $book['authors'][0]['author']['name']);
-        $this->assertEquals('Test Narrator', $book['narrators'][0]['narrator']['name']);
+        $this->assertEquals('Test Author', $book['author'][0]);
+        $this->assertEquals('Test Narrator', $book['narrators'][0]);
         // The runtime is in minutes, so 630 minutes = 10 hours and 30 minutes
-        $this->assertEquals(630, $book['runtime']);
+        $this->assertEquals(630, $book['runtimeLengthMin']);
 
         // Check that the book has the expected structure
         $this->assertArrayHasKey('id', $book);
         $this->assertArrayHasKey('title', $book);
-        $this->assertArrayHasKey('authors', $book);
+        $this->assertArrayHasKey('author', $book);
         $this->assertArrayHasKey('narrators', $book);
-        $this->assertArrayHasKey('cover_image_url', $book);
+        $this->assertArrayHasKey('coverImageUrl', $book);
         $this->assertArrayHasKey('publisher', $book);
         $this->assertArrayHasKey('description', $book);
         $this->assertArrayHasKey('language', $book);
     }
 
     #[Test]
-    public function testHandlesApiErrorsGracefully()
+    public function test_handles_api_errors_gracefully()
     {
         Http::fake([
             'api.audible.com/1.0/catalog/products*' => Http::response(
@@ -101,8 +101,8 @@ class AudibleServiceMockTest extends TestCase
             'asin' => 'TEST123',
             'title' => 'Test Book',
             'subtitle' => 'A Test Subtitle',
-            'authors' => [['author' => ['name' => 'Test Author']]],
-            'narrators' => [['narrator' => ['name' => 'Test Narrator']]],
+            'authors' => [['name' => 'Test Author']],
+            'narrators' => [['name' => 'Test Narrator']],
             'contributors' => [
                 ['role' => 'author', 'name' => 'Test Author', 'asin' => 'AUTH123'],
                 ['role' => 'narrator', 'name' => 'Test Narrator', 'asin' => 'NARR123'],
@@ -121,7 +121,14 @@ class AudibleServiceMockTest extends TestCase
                     ['name' => 'Adventure'],
                 ],
             ],
-            'runtime_length_min' => 630, // 10 hours and 30 minutes in minutes
+            'series' => [
+                [
+                    'asin' => 'SERIES123',
+                    'title' => 'Test Series',
+                    'sequence' => '1',
+                ],
+            ],
+            'runtimeLengthMin' => 630, // 10 hours and 30 minutes in minutes
             'language' => 'english',
             'is_adult_product' => false,
             'format_type' => 'unabridged',
@@ -132,8 +139,6 @@ class AudibleServiceMockTest extends TestCase
             'content_type' => 'audio',
             'content_delivery_type' => 'SinglePartBook',
             'publication_name' => 'Test Publication',
-            'publisher_summary' => 'This is a test book summary.',
-            'merchandising_summary' => 'This is a test book description.',
         ];
     }
 }

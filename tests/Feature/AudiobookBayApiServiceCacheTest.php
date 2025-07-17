@@ -20,15 +20,15 @@ class AudiobookBayApiServiceCacheTest extends TestCase
     }
 
     /** @test */
-    public function searchAudiobooksHandlesInvalidCacheValueGracefully(): void
+    public function search_audiobooks_handles_invalid_cache_value_gracefully(): void
     {
+        $cacheSpy = Cache::spy();
+        $cacheSpy->shouldReceive('get')->andReturn(12345); // Return invalid data
+
         $service = app(AudiobookBayApiService::class);
-        $endpoint = '/search';
-        $params = ['q' => 'foo'];
-        // Simulate cache pollution
-        $cacheKey = (new \ReflectionClass($service))->getMethod('getCacheKey')->invoke($service, $endpoint, $params);
-        Cache::put($cacheKey, 12345, 10); // Invalid value
         $result = $service->searchAudiobooks('foo');
+
         $this->assertNull($result, 'Should return null when cache contains invalid value');
+        $cacheSpy->shouldHaveReceived('get');
     }
 }

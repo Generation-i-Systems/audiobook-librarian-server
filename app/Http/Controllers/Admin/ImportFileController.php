@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers\Admin;
 
 use App\Contracts\DocumentStoreServiceInterface;
@@ -33,9 +32,9 @@ class ImportFileController extends Controller
                 Log::warning('[ImportFile] No import roots configured in config/import.php');
                 // Create default import directory if it doesn't exist
                 $defaultRoot = storage_path('import');
-                if (! is_dir($defaultRoot)) {
+                if (!is_dir($defaultRoot)) {
                     Log::info('[ImportFile] Creating default import directory: ' . $defaultRoot);
-                    if (! File::makeDirectory($defaultRoot, 0775, true)) {
+                    if (!File::makeDirectory($defaultRoot, 0775, true)) {
                         Log::error('[ImportFile] Failed to create default import directory: ' . $defaultRoot);
                     }
                 }
@@ -68,7 +67,7 @@ class ImportFileController extends Controller
                             ];
                         } else {
                             // Check if directory exists but isn't accessible due to permissions
-                            if (file_exists($path) && ! is_readable($path)) {
+                            if (file_exists($path) && !is_readable($path)) {
                                 Log::warning('[ImportFile] Directory exists but is not readable due to permissions: ' . $path);
 
                                 return [
@@ -92,8 +91,8 @@ class ImportFileController extends Controller
                             }
                         }
                     } catch (\Exception $e) {
-                        Log::error('[ImportFile] Error processing import root path: ' . $path . ' - ' . 
-                        $e->getMessage());
+                        Log::error('[ImportFile] Error processing import root path: ' . $path . ' - ' .
+                            $e->getMessage());
 
                         return [];
                     }
@@ -126,7 +125,7 @@ class ImportFileController extends Controller
             Log::debug("[ImportFile] Listing directory: root={$root}, path={$path}");
 
             // Check if root directory exists and is accessible
-            if (! file_exists($root)) {
+            if (!file_exists($root)) {
                 Log::warning("[ImportFile] Root directory does not exist: {$root}");
 
                 return response()->json([
@@ -135,7 +134,7 @@ class ImportFileController extends Controller
                 ], 404);
             }
 
-            if (! is_dir($root)) {
+            if (!is_dir($root)) {
                 Log::warning("[ImportFile] Root path is not a directory: {$root}");
 
                 return response()->json([
@@ -144,7 +143,7 @@ class ImportFileController extends Controller
                 ], 400);
             }
 
-            if (! is_readable($root)) {
+            if (!is_readable($root)) {
                 Log::warning("[ImportFile] Root directory is not readable due to permissions: {$root}");
                 $perms = substr(sprintf('%o', fileperms($root)), -4);
 
@@ -159,13 +158,13 @@ class ImportFileController extends Controller
             }
 
             $absRoot = realpath($root);
-            if (! $absRoot) {
+            if (!$absRoot) {
                 Log::warning("[ImportFile] Could not resolve real path for root: {$root}");
 
                 return response()->json([
                     'error' => 'Path resolution failed',
                     'details' => "Could not resolve the real path for '{$root}'. " .
-                    "This might be due to symlink issues or filesystem restrictions.",
+                        'This might be due to symlink issues or filesystem restrictions.',
                 ], 400);
             }
 
@@ -183,7 +182,7 @@ class ImportFileController extends Controller
             }
 
             // Check if path exists
-            if (! file_exists($absPath)) {
+            if (!file_exists($absPath)) {
                 Log::warning("[ImportFile] Path does not exist: {$absPath}");
 
                 return response()->json([
@@ -193,7 +192,7 @@ class ImportFileController extends Controller
             }
 
             // Check if path is readable
-            if (! is_readable($absPath)) {
+            if (!is_readable($absPath)) {
                 Log::warning("[ImportFile] Path is not readable due to permissions: {$absPath}");
                 $perms = substr(sprintf('%o', fileperms($absPath)), -4);
 
@@ -214,8 +213,8 @@ class ImportFileController extends Controller
                     // Check if the directory contains any files with allowed extensions
                     $hasMatchingFiles = collect(File::files($d))
                         ->filter(function ($f) use ($allowedExtensions) {
-                            return in_array(strtolower($f->getExtension()), $allowedExtensions);
-                        })
+                        return in_array(strtolower($f->getExtension()), $allowedExtensions);
+                    })
                         ->isNotEmpty();
 
                     return $hasMatchingFiles;
@@ -264,6 +263,7 @@ class ImportFileController extends Controller
         }
     }
 
+
     /**
      * Extract metadata from a file or directory and redirect to import form.
      *
@@ -295,7 +295,7 @@ class ImportFileController extends Controller
             }
 
             $absRoot = realpath($root);
-            if (! $absRoot || ! is_dir($absRoot)) {
+            if (!$absRoot || !is_dir($absRoot)) {
                 Log::warning('[ImportFile] Invalid root: ' . $root);
 
                 return response()->json(['success' => false, 'message' => 'Invalid root'], 400);
@@ -310,7 +310,7 @@ class ImportFileController extends Controller
                 return response()->json(['success' => false, 'message' => 'Path traversal detected'], 400);
             }
 
-            if (! file_exists($absPath)) {
+            if (!file_exists($absPath)) {
                 Log::warning('[ImportFile] File or directory does not exist: ' . $absPath);
 
                 return response()->json(['success' => false, 'message' => 'File or directory does not exist'], 404);
@@ -351,7 +351,7 @@ class ImportFileController extends Controller
             Log::debug("[ImportFile] Metadata extracted successfully: title={$meta['title']}");
 
             // Determine genre based on other books by the same author or series
-            if (! empty($meta['author']) || ! empty($meta['series'])) {
+            if (!empty($meta['author']) || !empty($meta['series'])) {
                 $this->suggestGenreFromExistingBooks($meta);
             }
 
@@ -368,6 +368,7 @@ class ImportFileController extends Controller
             // If redirectToForm is true, redirect to the import form with prefilled data
             if ($redirectToForm) {
                 $formData = $this->prepareFormDataForRedirect($meta, $directoryPath, $genrePath);
+
                 return redirect()->route('admin.books.create', $formData);
             }
 
@@ -415,6 +416,7 @@ class ImportFileController extends Controller
         }
     }
 
+
     /**
      * Compose a directory path from genre, author, series, seriesNumber, and title (skipping empty values).
      *
@@ -424,13 +426,14 @@ class ImportFileController extends Controller
     {
         $parts = [];
         foreach (['genre', 'author', 'series', 'seriesNumber', 'title'] as $key) {
-            if (! empty($meta[$key])) {
+            if (!empty($meta[$key])) {
                 $parts[] = preg_replace('/[\\\/]/', '-', trim($meta[$key]));
             }
         }
 
         return implode(DIRECTORY_SEPARATOR, $parts);
     }
+
 
     /**
      * Compose a directory path for the imported files based on metadata.
@@ -461,11 +464,12 @@ class ImportFileController extends Controller
             'genre' => $genrePath,
             'author' => $meta['author'] ?? null,
             'series' => $meta['seriesName'] ?? $meta['series'] ?? null,
-            'title' => $meta['title'] ?? null
+            'title' => $meta['title'] ?? null,
         ]);
 
         return $path;
     }
+
 
     /**
      * Determine the appropriate genre path based on existing genres and author/series data.
@@ -478,7 +482,7 @@ class ImportFileController extends Controller
      * 4. If no other rules match and the author is in a genre, use that genre
      * 5. Use the "Other" genre as fallback
      *
-     * @param array $meta Metadata containing author, series, and genre information
+     * @param  array  $meta  Metadata containing author, series, and genre information
      * @return string The appropriate genre path to use
      */
     private function determineGenrePath(array $meta): string
@@ -490,8 +494,9 @@ class ImportFileController extends Controller
         $libraryRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
         if (!is_dir($libraryRoot)) {
             Log::warning('[ImportFile] Library root directory not found', [
-                'path' => $libraryRoot
+                'path' => $libraryRoot,
             ]);
+
             return $defaultGenre;
         }
 
@@ -511,16 +516,18 @@ class ImportFileController extends Controller
         // Rule 1: If the genre matches an existing one, use that
         if ($genre && in_array($genre, $existingGenres)) {
             Log::info('[ImportFile] Using exact genre match', [
-                'genre' => $genre
+                'genre' => $genre,
             ]);
+
             return $genre;
         }
 
         // If no author, we can't apply the other rules
         if (!$author) {
             Log::info('[ImportFile] No author provided, using default genre', [
-                'defaultGenre' => $defaultGenre
+                'defaultGenre' => $defaultGenre,
             ]);
+
             return $defaultGenre;
         }
 
@@ -569,7 +576,7 @@ class ImportFileController extends Controller
             // Sort by match strength (series match > author match)
             arsort($genreMatches);
             $maxScore = max($genreMatches);
-            $topGenres = array_keys(array_filter($genreMatches, function($score) use ($maxScore) {
+            $topGenres = array_keys(array_filter($genreMatches, function ($score) use ($maxScore) {
                 return $score === $maxScore;
             }));
 
@@ -591,7 +598,7 @@ class ImportFileController extends Controller
                     'series' => $series,
                     'selectedGenre' => $bestGenre,
                     'bookCount' => $mostBooks,
-                    'matchingGenres' => $topGenres
+                    'matchingGenres' => $topGenres,
                 ]);
 
                 return $bestGenre;
@@ -603,7 +610,7 @@ class ImportFileController extends Controller
                     'author' => $author,
                     'series' => $series,
                     'selectedGenre' => $selectedGenre,
-                    'matchStrength' => $genreMatches[$selectedGenre]
+                    'matchStrength' => $genreMatches[$selectedGenre],
                 ]);
 
                 return $selectedGenre;
@@ -614,11 +621,12 @@ class ImportFileController extends Controller
         Log::info('[ImportFile] No matching genres found, using default', [
             'author' => $author,
             'series' => $series,
-            'defaultGenre' => $defaultGenre
+            'defaultGenre' => $defaultGenre,
         ]);
 
         return $defaultGenre;
     }
+
 
     /**
      * Extract metadata from a single audio file.
@@ -643,17 +651,17 @@ class ImportFileController extends Controller
                     $meta['title'] = $tags['title'] ?? null;
 
                     // If title contains book/series info in parentheses, extract it
-                    if (! empty($meta['title']) && preg_match('/^(.*?)(?:\s*[:\-]*\s*(.*))?$/', $meta['title'], $matches)) {
+                    if (!empty($meta['title']) && preg_match('/^(.*?)(?:\s*[:\-]*\s*(.*))?$/', $meta['title'], $matches)) {
                         $meta['title'] = trim($matches[1]);
-                        if (! empty($matches[2])) {
+                        if (!empty($matches[2])) {
                             $meta['subtitle'] = trim($matches[2]);
                         }
                     }
 
                     // Check for "Book X" pattern in title
-                    if (! empty($meta['title']) && preg_match('/^(.*?)(?:,\s*Book\s*(\d+))?$/', $meta['title'], $matches)) {
+                    if (!empty($meta['title']) && preg_match('/^(.*?)(?:,\s*Book\s*(\d+))?$/', $meta['title'], $matches)) {
                         $meta['title'] = trim($matches[1]);
-                        if (! empty($matches[2])) {
+                        if (!empty($matches[2])) {
                             $meta['seriesNumber'] = trim($matches[2]);
                         }
                     }
@@ -664,7 +672,7 @@ class ImportFileController extends Controller
                     $meta['author'] = $tags['artist'] ?? null;
 
                     // Handle author with series in parentheses: "Author Name (Series Name)"
-                    if (! empty($meta['author']) && preg_match('/^(.*?)\s*\(([^)]+)\)$/', $meta['author'], $matches)) {
+                    if (!empty($meta['author']) && preg_match('/^(.*?)\s*\(([^)]+)\)$/', $meta['author'], $matches)) {
                         $meta['author'] = trim($matches[1]);
 
                         // If we don't already have series info, use this
@@ -675,12 +683,12 @@ class ImportFileController extends Controller
                 }
 
                 // Extract series information
-                if (empty($meta['seriesName']) && ! empty($tags['grouping'])) {
+                if (empty($meta['seriesName']) && !empty($tags['grouping'])) {
                     $meta['seriesName'] = $tags['grouping'];
                 }
 
                 // Extract album/series info
-                if (! empty($tags['album'])) {
+                if (!empty($tags['album'])) {
                     // Check for series number in album: "00.1 The Mad Lancers" or "Book 01 - Series Name"
                     if (preg_match('/^(?:Book\s*)?(\d+(?:\.\d+)?)\s*(?:-\s*)?(.*)$/', $tags['album'], $matches)) {
                         // Only set series number if not already set
@@ -699,27 +707,27 @@ class ImportFileController extends Controller
 
                 // Extract other metadata
                 $meta['genre'] = $tags['genre'] ?? null;
-                
+
                 // Extract narrator from multiple possible fields
                 $meta['narrator'] = $tags['composer'] ?? $tags['narrator'] ?? $tags['performer'] ?? null;
-                
+
                 $meta['year'] = $tags['year'] ?? null;
 
                 // Extract description if available
-                if (! empty($tags['description'])) {
+                if (!empty($tags['description'])) {
                     $meta['description'] = $tags['description'];
-                } elseif (! empty($tags['comment']) && strlen($tags['comment']) > 20) {
+                } elseif (!empty($tags['comment']) && strlen($tags['comment']) > 20) {
                     $meta['description'] = $tags['comment'];
                 }
 
                 // Extract cover image if available
-                if (! empty($tags['picture'])) {
+                if (!empty($tags['picture'])) {
                     $meta['coverImage'] = $tags['picture'];
                     Log::debug('[ImportFile] Cover image extracted from audio file');
                 }
 
                 // Extract chapters if available
-                if (! empty($info['quicktime']['chapters'])) {
+                if (!empty($info['quicktime']['chapters'])) {
                     $meta['chapters'] = [];
                     foreach ($info['quicktime']['chapters'] as $chapter) {
                         $meta['chapters'][] = [
@@ -766,6 +774,7 @@ class ImportFileController extends Controller
         }
     }
 
+
     /**
      * Sanitize a string to ensure it's valid UTF-8.
      *
@@ -780,6 +789,7 @@ class ImportFileController extends Controller
         // Trim whitespace
         return trim($value);
     }
+
 
     /**
      * Recursively sanitize all string values in an array to ensure valid UTF-8 encoding.
@@ -808,6 +818,7 @@ class ImportFileController extends Controller
         }
     }
 
+
     /**
      * Normalize audio tags from different sources (ID3v1, ID3v2, QuickTime) into a unified format.
      * Handles encoding issues by sanitizing all string values.
@@ -820,15 +831,15 @@ class ImportFileController extends Controller
         $tags = [];
 
         // Process QuickTime tags (m4a/m4b files)
-        if (! empty($info['tags']['quicktime'])) {
+        if (!empty($info['tags']['quicktime'])) {
             $qt = $info['tags']['quicktime'];
 
             // Title - could be a string or array
-            if (! empty($qt['title'])) {
+            if (!empty($qt['title'])) {
                 if (is_array($qt['title'])) {
                     // If it's an array of chapter titles, use the first non-chapter title
                     foreach ($qt['title'] as $title) {
-                        if (! preg_match('/^(Chapter|Part|Section|\d+)\s*\d*$/i', $title)) {
+                        if (!preg_match('/^(Chapter|Part|Section|\d+)\s*\d*$/i', $title)) {
                             $tags['title'] = $title;
                             break;
                         }
@@ -843,59 +854,59 @@ class ImportFileController extends Controller
             }
 
             // Artist
-            if (! empty($qt['artist'])) {
+            if (!empty($qt['artist'])) {
                 $tags['artist'] = $this->sanitizeString(is_array($qt['artist']) ? $qt['artist'][0] : $qt['artist']);
-            } elseif (! empty($qt['album_artist'])) {
+            } elseif (!empty($qt['album_artist'])) {
                 $tags['artist'] = $this->sanitizeString(is_array($qt['album_artist']) ? $qt['album_artist'][0] : $qt['album_artist']);
             }
 
             // Album
-            if (! empty($qt['album'])) {
+            if (!empty($qt['album'])) {
                 $tags['album'] = $this->sanitizeString(is_array($qt['album']) ? $qt['album'][0] : $qt['album']);
             }
 
             // Genre
-            if (! empty($qt['genre'])) {
+            if (!empty($qt['genre'])) {
                 $tags['genre'] = $this->sanitizeString(is_array($qt['genre']) ? $qt['genre'][0] : $qt['genre']);
             }
 
             // Composer (often used for narrator in audiobooks)
-            if (! empty($qt['composer'])) {
+            if (!empty($qt['composer'])) {
                 $tags['composer'] = $this->sanitizeString(is_array($qt['composer']) ? $qt['composer'][0] : $qt['composer']);
             }
 
             // Narrator field (explicit narrator tag)
-            if (! empty($qt['narrator'])) {
+            if (!empty($qt['narrator'])) {
                 $tags['narrator'] = $this->sanitizeString(is_array($qt['narrator']) ? $qt['narrator'][0] : $qt['narrator']);
             }
 
             // Performer field (sometimes used for narrator)
-            if (! empty($qt['performer'])) {
+            if (!empty($qt['performer'])) {
                 $tags['performer'] = $this->sanitizeString(is_array($qt['performer']) ? $qt['performer'][0] : $qt['performer']);
             }
 
             // Year/date
-            if (! empty($qt['creation_date'])) {
+            if (!empty($qt['creation_date'])) {
                 $tags['year'] = $this->sanitizeString(is_array($qt['creation_date']) ? $qt['creation_date'][0] : $qt['creation_date']);
             }
 
             // Description
-            if (! empty($qt['description'])) {
+            if (!empty($qt['description'])) {
                 $tags['description'] = $this->sanitizeString(is_array($qt['description']) ? $qt['description'][0] : $qt['description']);
             }
 
             // Comment
-            if (! empty($qt['comment'])) {
+            if (!empty($qt['comment'])) {
                 $tags['comment'] = $this->sanitizeString(is_array($qt['comment']) ? $qt['comment'][0] : $qt['comment']);
             }
 
             // Grouping (often used for series name)
-            if (! empty($qt['grouping'])) {
+            if (!empty($qt['grouping'])) {
                 $tags['grouping'] = $this->sanitizeString(is_array($qt['grouping']) ? $qt['grouping'][0] : $qt['grouping']);
             }
 
             // Extract cover image from QuickTime tags if available
-            if (! empty($info['comments']['picture'][0])) {
+            if (!empty($info['comments']['picture'][0])) {
                 $tags['picture'] = [
                     'data' => $info['comments']['picture'][0]['data'],
                     'mime' => $info['comments']['picture'][0]['image_mime'],
@@ -905,48 +916,48 @@ class ImportFileController extends Controller
         }
 
         // Process ID3v2 tags (mp3 files)
-        if (! empty($info['tags']['id3v2'])) {
+        if (!empty($info['tags']['id3v2'])) {
             $id3 = $info['tags']['id3v2'];
 
             // Only set these if not already set from QuickTime tags
-            if (empty($tags['title']) && ! empty($id3['title'][0])) {
+            if (empty($tags['title']) && !empty($id3['title'][0])) {
                 $tags['title'] = $this->sanitizeString($id3['title'][0]);
             }
 
-            if (empty($tags['artist']) && ! empty($id3['artist'][0])) {
+            if (empty($tags['artist']) && !empty($id3['artist'][0])) {
                 $tags['artist'] = $this->sanitizeString($id3['artist'][0]);
             }
 
-            if (empty($tags['album']) && ! empty($id3['album'][0])) {
+            if (empty($tags['album']) && !empty($id3['album'][0])) {
                 $tags['album'] = $this->sanitizeString($id3['album'][0]);
             }
 
-            if (empty($tags['genre']) && ! empty($id3['genre'][0])) {
+            if (empty($tags['genre']) && !empty($id3['genre'][0])) {
                 $tags['genre'] = $this->sanitizeString($id3['genre'][0]);
             }
 
-            if (empty($tags['composer']) && ! empty($id3['composer'][0])) {
+            if (empty($tags['composer']) && !empty($id3['composer'][0])) {
                 $tags['composer'] = $this->sanitizeString($id3['composer'][0]);
             }
 
-            if (empty($tags['narrator']) && ! empty($id3['narrator'][0])) {
+            if (empty($tags['narrator']) && !empty($id3['narrator'][0])) {
                 $tags['narrator'] = $this->sanitizeString($id3['narrator'][0]);
             }
 
-            if (empty($tags['performer']) && ! empty($id3['performer'][0])) {
+            if (empty($tags['performer']) && !empty($id3['performer'][0])) {
                 $tags['performer'] = $this->sanitizeString($id3['performer'][0]);
             }
 
-            if (empty($tags['year']) && ! empty($id3['year'][0])) {
+            if (empty($tags['year']) && !empty($id3['year'][0])) {
                 $tags['year'] = $this->sanitizeString($id3['year'][0]);
             }
 
-            if (empty($tags['comment']) && ! empty($id3['comment'][0])) {
+            if (empty($tags['comment']) && !empty($id3['comment'][0])) {
                 $tags['comment'] = $this->sanitizeString($id3['comment'][0]);
             }
 
             // Extract picture/cover image from ID3v2 tags
-            if (! empty($info['id3v2']['APIC'])) {
+            if (!empty($info['id3v2']['APIC'])) {
                 // There might be multiple pictures, try to find the front cover
                 foreach ($info['id3v2']['APIC'] as $pic) {
                     if (isset($pic['picturetypeid']) && $pic['picturetypeid'] == 3) { // 3 = front cover
@@ -960,7 +971,7 @@ class ImportFileController extends Controller
                 }
 
                 // If no front cover was found, use the first picture
-                if (empty($tags['picture']) && ! empty($info['id3v2']['APIC'][0]['data'])) {
+                if (empty($tags['picture']) && !empty($info['id3v2']['APIC'][0]['data'])) {
                     $pic = $info['id3v2']['APIC'][0];
                     $tags['picture'] = [
                         'data' => $pic['data'],
@@ -972,37 +983,37 @@ class ImportFileController extends Controller
         }
 
         // Process ID3v1 tags as fallback
-        if (! empty($info['tags']['id3v1'])) {
+        if (!empty($info['tags']['id3v1'])) {
             $id3 = $info['tags']['id3v1'];
 
             // Only set these if not already set from other tag sources
-            if (empty($tags['title']) && ! empty($id3['title'][0])) {
+            if (empty($tags['title']) && !empty($id3['title'][0])) {
                 $tags['title'] = $this->sanitizeString($id3['title'][0]);
             }
 
-            if (empty($tags['artist']) && ! empty($id3['artist'][0])) {
+            if (empty($tags['artist']) && !empty($id3['artist'][0])) {
                 $tags['artist'] = $this->sanitizeString($id3['artist'][0]);
             }
 
-            if (empty($tags['album']) && ! empty($id3['album'][0])) {
+            if (empty($tags['album']) && !empty($id3['album'][0])) {
                 $tags['album'] = $this->sanitizeString($id3['album'][0]);
             }
 
-            if (empty($tags['genre']) && ! empty($id3['genre'][0])) {
+            if (empty($tags['genre']) && !empty($id3['genre'][0])) {
                 $tags['genre'] = $this->sanitizeString($id3['genre'][0]);
             }
 
-            if (empty($tags['year']) && ! empty($id3['year'][0])) {
+            if (empty($tags['year']) && !empty($id3['year'][0])) {
                 $tags['year'] = $this->sanitizeString($id3['year'][0]);
             }
 
-            if (empty($tags['comment']) && ! empty($id3['comment'][0])) {
+            if (empty($tags['comment']) && !empty($id3['comment'][0])) {
                 $tags['comment'] = $this->sanitizeString($id3['comment'][0]);
             }
         }
 
         // Use filename as fallback for title
-        if (empty($tags['title']) && ! empty($info['filename'])) {
+        if (empty($tags['title']) && !empty($info['filename'])) {
             $filename = pathinfo($info['filename'], PATHINFO_FILENAME);
             // Remove leading numbers and separators often found in filenames
             $tags['title'] = $this->sanitizeString(preg_replace('/^\d+[\s\._\-]+/', '', $filename));
@@ -1010,6 +1021,7 @@ class ImportFileController extends Controller
 
         return $tags;
     }
+
 
     /**
      * Extract metadata from a directory containing audio files.
@@ -1037,14 +1049,14 @@ class ImportFileController extends Controller
         // If we have audio files, try to extract metadata from the first one
         if ($files->count() > 0) {
             $firstFile = $files->first()->getPathname();
-            
+
             // Store directory-parsed metadata to preserve it
             $directoryGenre = $meta['genre'] ?? null;
             $directoryTitle = $meta['title'] ?? null;
             $directoryAuthor = $meta['author'] ?? null;
             $directorySeries = $meta['series'] ?? null;
             $directorySeriesNumber = $meta['seriesNumber'] ?? null;
-            
+
             $this->extractFileMetadata($firstFile, $meta);
 
             // Preserve directory-parsed metadata if it was successfully extracted
@@ -1078,6 +1090,7 @@ class ImportFileController extends Controller
         }
     }
 
+
     /**
      * Extract metadata from directory name patterns.
      */
@@ -1087,24 +1100,24 @@ class ImportFileController extends Controller
         // Genre_Author_Name_Series_Book_Number_Title (e.g., Fantasy_Brandon_Sanderson_Mistborn_01_The_Final_Empire)
         // Author_Name_Series_Book_Number_Title
         // Author_Name_Title
-        
+
         // Split by underscores and analyze parts
         $parts = explode('_', $dirName);
-        
+
         if (count($parts) >= 3) {
             // Check if first part looks like a genre
             $commonGenres = ['Fantasy', 'Science', 'Fiction', 'Mystery', 'Romance', 'Thriller', 'Horror', 'Biography', 'History', 'Self', 'Business'];
             $firstPartIsGenre = in_array($parts[0], $commonGenres) || in_array(ucfirst(strtolower($parts[0])), $commonGenres);
-            
+
             if ($firstPartIsGenre && count($parts) >= 4) {
                 // Pattern: Genre_Author_Name_Series_Number_Title
                 $meta['genre'] = $parts[0];
-                
+
                 // Find where the author name ends by looking for series indicators
                 // For Fantasy_Brandon_Sanderson_Mistborn_01_The_Final_Empire:
                 // parts[0]=Fantasy, parts[1]=Brandon, parts[2]=Sanderson, parts[3]=Mistborn, parts[4]=01, parts[5]=The, etc.
                 $authorEndIndex = 1; // Default to just parts[1] (Brandon)
-                
+
                 for ($i = 2; $i < count($parts) - 1; $i++) {
                     // Check if next part looks like a series number - this means current part is series name
                     if ($i + 1 < count($parts) && (is_numeric($parts[$i + 1]) || preg_match('/^\d+/', $parts[$i + 1]))) {
@@ -1112,24 +1125,26 @@ class ImportFileController extends Controller
                         break;
                     }
                     // Look for direct series indicators (numbers, common series words)
-                    if (is_numeric($parts[$i]) || preg_match('/^\d+/', $parts[$i]) || 
-                        in_array(ucfirst(strtolower($parts[$i])), ['Book', 'Vol', 'Volume', 'Part'])) {
+                    if (
+                        is_numeric($parts[$i]) || preg_match('/^\d+/', $parts[$i]) ||
+                        in_array(ucfirst(strtolower($parts[$i])), ['Book', 'Vol', 'Volume', 'Part'])
+                    ) {
                         $authorEndIndex = $i - 1; // Author ends just before this part
                         break;
                     }
                 }
-                
+
                 // If we didn't find clear series indicators, assume 2 parts for author name (common pattern)
                 if ($authorEndIndex === 1 && count($parts) >= 6) {
                     $authorEndIndex = 2; // Include parts[1] and parts[2] for author
                 }
-                
+
                 // Extract author (from parts[1] to parts[authorEndIndex] inclusive)
                 // array_slice($parts, 1, $length) where length = authorEndIndex - 1 + 1 = authorEndIndex
                 $authorLength = $authorEndIndex; // This is the number of parts to include starting from index 1
                 $authorParts = array_slice($parts, 1, $authorLength);
                 $meta['author'] = implode(' ', $authorParts);
-                
+
                 // Extract series and title from remaining parts
                 $remainingParts = array_slice($parts, $authorEndIndex + 1);
                 if (count($remainingParts) >= 3) {
@@ -1143,7 +1158,7 @@ class ImportFileController extends Controller
                         // Check if first part looks like a series name (not an article)
                         $firstPart = $remainingParts[0];
                         $isArticle = in_array(strtolower($firstPart), ['the', 'a', 'an']);
-                        
+
                         if (!$isArticle && strlen($firstPart) > 2) {
                             // Likely series name
                             $meta['series'] = $firstPart;
@@ -1153,11 +1168,11 @@ class ImportFileController extends Controller
                             $meta['title'] = implode(' ', $remainingParts);
                         }
                     }
-                } else if (count($remainingParts) >= 2) {
+                } elseif (count($remainingParts) >= 2) {
                     // Check if first part looks like series vs title
                     $firstPart = $remainingParts[0];
                     $isArticle = in_array(strtolower($firstPart), ['the', 'a', 'an']);
-                    
+
                     if (!$isArticle && strlen($firstPart) > 2) {
                         // Likely series name
                         $meta['series'] = $firstPart;
@@ -1170,8 +1185,7 @@ class ImportFileController extends Controller
                     // Just title
                     $meta['title'] = implode(' ', $remainingParts);
                 }
-                
-            } else if (count($parts) >= 4) {
+            } elseif (count($parts) >= 4) {
                 // Pattern: Author_Name_Series_Number_Title (no genre prefix)
                 // Find where the author name ends
                 $authorEndIndex = 1;
@@ -1181,16 +1195,16 @@ class ImportFileController extends Controller
                         break;
                     }
                 }
-                
+
                 // If no clear series number found, assume 2 parts for author
                 if ($authorEndIndex === 1 && count($parts) >= 5) {
                     $authorEndIndex = 2;
                 }
-                
+
                 // Extract author
                 $authorParts = array_slice($parts, 0, $authorEndIndex + 1);
                 $meta['author'] = implode(' ', $authorParts);
-                
+
                 // Extract remaining parts
                 $remainingParts = array_slice($parts, $authorEndIndex + 1);
                 if (count($remainingParts) >= 2) {
@@ -1210,7 +1224,6 @@ class ImportFileController extends Controller
                 } else {
                     $meta['title'] = implode(' ', $remainingParts);
                 }
-                
             } else {
                 // Simple pattern: Author_Series_Title
                 $meta['author'] = $parts[0];
@@ -1218,7 +1231,7 @@ class ImportFileController extends Controller
                 $meta['title'] = implode(' ', array_slice($parts, 2));
             }
         }
-        
+
         Log::debug('[ImportFile] Extracted from directory name', [
             'dirName' => $dirName,
             'parts' => $parts,
@@ -1228,9 +1241,10 @@ class ImportFileController extends Controller
             'series' => $meta['series'] ?? null,
             'genre' => $meta['genre'] ?? null,
             'title' => $meta['title'] ?? null,
-            'seriesNumber' => $meta['seriesNumber'] ?? null
+            'seriesNumber' => $meta['seriesNumber'] ?? null,
         ]);
     }
+
 
     /**
      * Move imported files from source to final destination during book creation.
@@ -1249,20 +1263,22 @@ class ImportFileController extends Controller
             $bookStorageRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
             if (!$bookStorageRoot || !is_dir($bookStorageRoot)) {
                 Log::error('[ImportFile] Book storage path not found or invalid', [
-                    'path' => $bookStorageRoot
+                    'path' => $bookStorageRoot,
                 ]);
+
                 return false;
             }
 
             // Build full destination path
             $fullDestinationPath = $bookStorageRoot . '/' . trim($destinationPath, '/');
-            
+
             // Create destination directory if it doesn't exist
             if (!is_dir($fullDestinationPath)) {
                 if (!File::makeDirectory($fullDestinationPath, 0775, true)) {
                     Log::error('[ImportFile] Failed to create destination directory', [
-                        'path' => $fullDestinationPath
+                        'path' => $fullDestinationPath,
                     ]);
+
                     return false;
                 }
             }
@@ -1270,19 +1286,21 @@ class ImportFileController extends Controller
             // Verify source exists and is within allowed root
             if (!file_exists($sourcePath)) {
                 Log::error('[ImportFile] Source path does not exist', [
-                    'path' => $sourcePath
+                    'path' => $sourcePath,
                 ]);
+
                 return false;
             }
 
             $absSourceRoot = realpath($sourceRoot);
             $absSourcePath = realpath($sourcePath);
-            
+
             if (!$absSourceRoot || !$absSourcePath || strpos($absSourcePath, $absSourceRoot) !== 0) {
                 Log::error('[ImportFile] Source path security violation', [
                     'sourceRoot' => $absSourceRoot,
-                    'sourcePath' => $absSourcePath
+                    'sourcePath' => $absSourcePath,
                 ]);
+
                 return false;
             }
 
@@ -1293,8 +1311,9 @@ class ImportFileController extends Controller
             // Check if target already exists
             if (file_exists($targetPath)) {
                 Log::warning('[ImportFile] Target already exists, skipping move', [
-                    'target' => $targetPath
+                    'target' => $targetPath,
                 ]);
+
                 return true; // Consider this success since files are already in place
             }
 
@@ -1309,26 +1328,30 @@ class ImportFileController extends Controller
                 Log::info('[ImportFile] Successfully moved files', [
                     'from' => $sourcePath,
                     'to' => $targetPath,
-                    'type' => $sourceType
+                    'type' => $sourceType,
                 ]);
+
                 return true;
             } else {
                 Log::error('[ImportFile] Failed to move files', [
                     'from' => $sourcePath,
                     'to' => $targetPath,
-                    'type' => $sourceType
+                    'type' => $sourceType,
                 ]);
+
                 return false;
             }
         } catch (\Exception $e) {
             Log::error('[ImportFile] Exception during file move', [
                 'error' => $e->getMessage(),
                 'sourcePath' => $sourcePath,
-                'destinationPath' => $destinationPath
+                'destinationPath' => $destinationPath,
             ]);
+
             return false;
         }
     }
+
 
     /**
      * Move the selected file or directory to the composed directoryPath under the import destination root.
@@ -1350,7 +1373,7 @@ class ImportFileController extends Controller
         $directoryPath = str_replace('..', '', $directoryPath);
 
         $absRoot = realpath($root);
-        if (! $absRoot || ! is_dir($absRoot)) {
+        if (!$absRoot || !is_dir($absRoot)) {
             return response()->json(['success' => false, 'message' => 'Invalid root'], 400);
         }
 
@@ -1361,14 +1384,11 @@ class ImportFileController extends Controller
             return response()->json(['success' => false, 'message' => 'Path traversal detected'], 400);
         }
 
-        if (! file_exists($absPath)) {
+        if (!file_exists($absPath)) {
             return response()->json(['success' => false, 'message' => 'File or directory does not exist'], 404);
         }
 
-        $destRoot = env('BOOK_STORAGE_PATH')
-            ?? Config::get('audiobooks.root')
-            ?? Config::get('import.dest_root')
-            ?? storage_path('audiobooks');
+        $destRoot = env('BOOK_STORAGE_PATH') ?? Config::get('audiobooks.root') ?? Config::get('import.dest_root') ?? storage_path('audiobooks');
 
         $genrePath = $request->input('genrePath', $request->input('genre'));
 
@@ -1381,8 +1401,8 @@ class ImportFileController extends Controller
             $destDir = $destRoot . DIRECTORY_SEPARATOR . $directoryPath;
         }
 
-        if (! file_exists($destDir)) {
-            if (! File::makeDirectory($destDir, 0775, true)) {
+        if (!file_exists($destDir)) {
+            if (!File::makeDirectory($destDir, 0775, true)) {
                 return response()->json(['success' => false, 'message' => 'Failed to create destination directory'], 500);
             }
         }
@@ -1422,6 +1442,7 @@ class ImportFileController extends Controller
         }
     }
 
+
     /**
      * Suggest genre based on other books by the same author or in the same series.
      *
@@ -1430,7 +1451,7 @@ class ImportFileController extends Controller
     protected function suggestGenreFromExistingBooks(array &$meta): void
     {
         // Skip if genre is already set
-        if (! empty($meta['genre'])) {
+        if (!empty($meta['genre'])) {
             return;
         }
 
@@ -1442,9 +1463,9 @@ class ImportFileController extends Controller
             // First try to find books in the same series if available
             if ($series) {
                 $seriesBooks = $this->documentStoreService->searchSeriesByName($series);
-                if (! empty($seriesBooks)) {
+                if (!empty($seriesBooks)) {
                     foreach ($seriesBooks as $book) {
-                        if (! empty($book['genre'])) {
+                        if (!empty($book['genre'])) {
                             // Give series matches higher weight
                             $genreCounts[$book['genre']] = ($genreCounts[$book['genre']] ?? 0) + 2;
                         }
@@ -1455,9 +1476,9 @@ class ImportFileController extends Controller
             // Then try to find books by the same author
             if ($author) {
                 $authorBooks = $this->documentStoreService->searchAuthorsByName($author);
-                if (! empty($authorBooks)) {
+                if (!empty($authorBooks)) {
                     foreach ($authorBooks as $book) {
-                        if (! empty($book['genre'])) {
+                        if (!empty($book['genre'])) {
                             $genreCounts[$book['genre']] = ($genreCounts[$book['genre']] ?? 0) + 1;
                         }
                     }
@@ -1465,7 +1486,7 @@ class ImportFileController extends Controller
             }
 
             // Determine the most common genre
-            if (! empty($genreCounts)) {
+            if (!empty($genreCounts)) {
                 arsort($genreCounts);
                 $meta['genre'] = key($genreCounts);
                 $meta['genreSuggested'] = true;
@@ -1483,6 +1504,7 @@ class ImportFileController extends Controller
             ]);
         }
     }
+
 
     /**
      * Prepare data for the book form.
@@ -1521,6 +1543,7 @@ class ImportFileController extends Controller
 
         return $formData;
     }
+
 
     /**
      * Prepare data for redirecting to the book form with prefilled data.
@@ -1573,16 +1596,18 @@ class ImportFileController extends Controller
         // Handle genres as array - prefer genrePath over generic audio metadata genres
         $audioGenre = $meta['genre'] ?? '';
         $intelligentGenre = $genrePath ?? 'Other';
-        
+
         // Use genrePath if audio genre is generic/unhelpful, otherwise use audio metadata
         $genericAudioGenres = ['Audiobook', 'Audio', 'Spoken Word', 'Book', 'Literature', 'Other'];
-        if (!empty($intelligentGenre) && $intelligentGenre !== 'Other' && 
-            (empty($audioGenre) || in_array($audioGenre, $genericAudioGenres))) {
+        if (
+            !empty($intelligentGenre) && $intelligentGenre !== 'Other' &&
+            (empty($audioGenre) || in_array($audioGenre, $genericAudioGenres))
+        ) {
             $genre = $intelligentGenre;
         } else {
             $genre = $audioGenre ?: $intelligentGenre;
         }
-        
+
         if (!empty($genre)) {
             $genres = is_array($genre) ? $genre : [$genre];
             foreach ($genres as $index => $genreItem) {
@@ -1609,4 +1634,6 @@ class ImportFileController extends Controller
 
         return $formData;
     }
+
+
 }

@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Http\Controllers\Controller;
+use App\Models\BookQueue;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
-use App\Models\BookQueue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use ZipArchive;
@@ -17,7 +17,6 @@ class BookApiController extends Controller
     /**
      * Autocomplete book series names using fuzzy search (MongoDB Atlas Search).
      *
-     * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function autocompleteSeries(Request $request)
@@ -28,13 +27,13 @@ class BookApiController extends Controller
             return response()->json(['data' => []]);
         }
         $series = $this->documentStoreService->autocompleteSeries($query, $limit);
+
         return response()->json(['data' => $series]);
     }
 
     /**
      * Autocomplete author names using fuzzy search (MongoDB Atlas Search).
      *
-     * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function autocompleteAuthors(Request $request)
@@ -45,13 +44,13 @@ class BookApiController extends Controller
             return response()->json(['data' => []]);
         }
         $authors = $this->documentStoreService->autocompleteAuthors($query, $limit);
+
         return response()->json(['data' => $authors]);
     }
 
     /**
      * Autocomplete narrator names using fuzzy search (MongoDB Atlas Search).
      *
-     * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function autocompleteNarrators(Request $request)
@@ -62,6 +61,7 @@ class BookApiController extends Controller
             return response()->json(['data' => []]);
         }
         $narrators = $this->documentStoreService->autocompleteNarrators($query, $limit);
+
         return response()->json(['data' => $narrators]);
     }
 
@@ -214,8 +214,7 @@ class BookApiController extends Controller
 
     public function search(Request $request)
     {
-        $firestore = $this->documentStoreService;
-        $books = $firestore->listBooks();
+        $books = $this->documentStoreService->listBooks();
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
         $perPage = $request->input('per_page', 100);
@@ -268,8 +267,7 @@ class BookApiController extends Controller
 
     public function download($id)
     {
-        $firestore = $this->documentStoreService;
-        $book = $firestore->getBook($id);
+        $book = $this->documentStoreService->getBook($id);
         if (!$book) {
             abort(404);
         }
@@ -298,10 +296,9 @@ class BookApiController extends Controller
     public function queueDownload(Request $request)
     {
         $user = Auth::user();
-        $firestore = $this->documentStoreService;
-        $queue = $firestore->getBookQueue($user->id);
+        $queue = $this->documentStoreService->getBookQueue($user->id);
         if (empty($queue)) {
-            $queue = BookQueue::where('user_id', $user->id)->with('book')->get();
+            $queue = $this->documentStoreService->getBookQueue($user->id);
             if ($queue->isEmpty()) {
                 return response()->json(['error' => 'No books queued for download.'], 404);
             }
@@ -311,9 +308,9 @@ class BookApiController extends Controller
             $zip = new ZipArchive();
             if ($zip->open($zipPath, ZipArchive::CREATE) === true) {
                 foreach ($queue as $item) {
-                    $book = $item->book;
-                    if ($book && $book->directoryPath && Storage::exists($book->directoryPath)) {
-                        $files = Storage::files($book->directoryPath);
+                    $book = $item['book'];
+                    if ($book && $book['directoryPath'] && Storage::exists($book['directoryPath'])) {
+                        $files = Storage::files($book['directoryPath']);
                         foreach ($files as $file) {
                             $localPath = storage_path('app/' . $file);
                             if (file_exists($localPath)) {
@@ -330,7 +327,7 @@ class BookApiController extends Controller
             // Optionally, store a record of the zip for later deletion/marking
             return response()->json(['zip_id' => $zipName, 'download_url' => url('storage/' . $zipName)]);
         }
-        // If Firestore queue is not empty, handle that logic here (implement if needed)
+        // If document store queue is not empty, handle that logic here (implement if needed)
     }
 
     public function downloadQueuedZip($zipId)
@@ -416,25 +413,19 @@ class BookApiController extends Controller
      */
     public function authorsByGenreSimple($genreId, Request $request)
     {
-        $firestore = $this->documentStoreService;
-        $genre = $firestore->getGenre($genreId);
+        $documentSt ore = $this->documentStoreService;
+        $genre = $documentStore->getGenre($genreId);
         if (!$genre) {
             return response()->json(['error' => 'Genre not found'], 404);
         }
-        $books = array_filter($firestore->listBooks(), function ($book) use ($genreId) {
+        $books = array_filter($documentStore->listBooks(), function ($book) use ($genreId) {
             return ($book['genre_id'] ?? null) == $genreId;
         });
         $authorIds = array_unique(array_column($books, 'author_id'));
-        $authors = array_filter($firestore->listAuthors(), function ($author) use ($authorIds) {
-            return in_array($author['id'], $authorIds);
-        });
+        $authors = array_filter($documentStore->listAuthors(), fn($author) => in_array($author['id'], $authorIds));
         $authors = array_values($authors);
-        usort($authors, function ($a, $b) {
-            return strcmp($a['name'], $b['name']);
-        });
-        $authors = array_map(function ($a) {
-            return ['id' => $a['id'], 'name' => $a['name']];
-        }, $authors);
+        usort($authors, fn($a, $b) => strcmp($a['name'], $b['name']));
+        $authors = array_map(fn($a) => ['id' => $a['id'], 'name' => $a['name']], $authors);
 
         return response()->json([
             'genre' => ['id' => $genre['id'], 'name' => $genre['name']],
@@ -447,24 +438,20 @@ class BookApiController extends Controller
      */
     public function booksBySeries($seriesId, Request $request)
     {
-        $firestore = $this->documentStoreService;
+        $documentStore = $this->documentStoreService;
         $perPage = $request->input('per_page', 100);
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
-        $series = $firestore->getSeries($seriesId);
+        $series = $documentStore->getSeries($seriesId);
         if (!$series) {
             return response()->json(['error' => 'Series not found'], 404);
         }
-        $books = array_filter($firestore->listBooks(), function ($book) use ($seriesId) {
-            return ($book['series_id'] ?? null) == $seriesId;
-        });
+        $books = array_filter($documentStore->listBooks(), fn($book) => ($book['series_id'] ?? null) == $seriesId);
         $books = array_values($books);
         $total = count($books);
         $page = (int) $request->input('page', 1);
         $books = array_slice($books, ($page - 1) * $perPage, $perPage);
-        $books = array_map(function ($book) use ($withCover, $inlineCovers) {
-            return $this->getBookWithCover($book, $withCover, $inlineCovers);
-        }, $books);
+        $books = array_map(fn($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $books);
 
         return response()->json([
             'series' => ['id' => $series['id'], 'name' => $series['name']],
@@ -482,24 +469,20 @@ class BookApiController extends Controller
      */
     public function booksByAuthor($authorId, Request $request)
     {
-        $firestore = $this->documentStoreService;
+        $documentStore = $this->documentStoreService;
         $perPage = $request->input('per_page', 100);
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
-        $author = $firestore->getAuthor($authorId);
+        $author = $documentStore->getAuthor($authorId);
         if (!$author) {
             return response()->json(['error' => 'Author not found'], 404);
         }
-        $books = array_filter($firestore->listBooks(), function ($book) use ($authorId) {
-            return ($book['author_id'] ?? null) == $authorId;
-        });
+        $books = array_filter($documentStore->listBooks(), fn($book) => ($book['author_id'] ?? null) == $authorId);
         $books = array_values($books);
         $total = count($books);
         $page = (int) $request->input('page', 1);
         $books = array_slice($books, ($page - 1) * $perPage, $perPage);
-        $books = array_map(function ($book) use ($withCover, $inlineCovers) {
-            return $this->getBookWithCover($book, $withCover, $inlineCovers);
-        }, $books);
+        $books = array_map(fn($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $books);
 
         return response()->json([
             'author' => ['id' => $author['id'], 'name' => $author['name']],
@@ -517,25 +500,17 @@ class BookApiController extends Controller
      */
     public function seriesByAuthor($authorId, Request $request)
     {
-        $firestore = $this->documentStoreService;
-        $author = $firestore->getAuthor($authorId);
+        $documentStore = $this->documentStoreService;
+        $author = $documentStore->getAuthor($authorId);
         if (!$author) {
             return response()->json(['error' => 'Author not found'], 404);
         }
-        $books = array_filter($firestore->listBooks(), function ($book) use ($authorId) {
-            return ($book['author_id'] ?? null) == $authorId;
-        });
+        $books = array_filter($documentStore->listBooks(), fn($book) => ($book['author_id'] ?? null) == $authorId);
         $seriesIds = array_unique(array_column($books, 'series_id'));
-        $series = array_filter($firestore->listSeries(), function ($ser) use ($seriesIds) {
-            return in_array($ser['id'], $seriesIds);
-        });
+        $series = array_filter($documentStore->listSeries(), fn($ser) => in_array($ser['id'], $seriesIds));
         $series = array_values($series);
-        usort($series, function ($a, $b) {
-            return strcmp($a['name'], $b['name']);
-        });
-        $series = array_map(function ($s) {
-            return ['id' => $s['id'], 'name' => $s['name']];
-        }, $series);
+        usort($series, fn($a, $b) => strcmp($a['name'], $b['name']));
+        $series = array_map(fn($s) => ['id' => $s['id'], 'name' => $s['name']], $series);
 
         return response()->json([
             'author' => ['id' => $author['id'], 'name' => $author['name']],
@@ -555,17 +530,17 @@ class BookApiController extends Controller
         Log::info('booksByAuthorAndGenre ' . json_encode($_POST));
         Log::info('booksByAuthorAndGenre ' . json_encode($_GET));
 
-        $firestore = $this->documentStoreService;
-        $author = $firestore->getAuthor($authorId);
-        $genre = $firestore->getGenre($genreId);
-        $books = $firestore->getBooksByAuthorAndGenre($authorId, $genreId);
+        $documentStore = $this->documentStoreService;
+        $author = $documentStore->getAuthor($authorId);
+        $genre = $documentStore->getGenre($genreId);
+        $books = $documentStore->getBooksByAuthorAndGenre($authorId, $genreId);
         if (!$author || !$genre) {
             return response()->json([
                 'error' => 'Author or Genre not found.',
             ], 404);
         }
         // Sort books by series name, series number, and title
-        usort($books, function ($a, $b) {
+        usort($books, fn($a, $b) => {
             $seriesA = $a['series']['name'] ?? '';
             $seriesB = $b['series']['name'] ?? '';
             if ($seriesA !== $seriesB) {
@@ -584,9 +559,7 @@ class BookApiController extends Controller
         $page = max(1, (int) $request->input('page', 1));
         $offset = ($page - 1) * $perPage;
         $paginatedBooks = array_slice($books, $offset, $perPage);
-        $paginatedBooks = array_map(function ($book) use ($withCover, $inlineCovers) {
-            return $this->getBookWithCover($book, $withCover, $inlineCovers);
-        }, $paginatedBooks);
+        $paginatedBooks = array_map(fn($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $paginatedBooks);
 
         return response()->json([
             'data' => $paginatedBooks,
@@ -623,7 +596,7 @@ class BookApiController extends Controller
      *
      * Provides metadata about the contents of the book download zip without downloading the file
      *
-     * @param string $id Book ID
+     * @param  string  $id  Book ID
      * @return \Illuminate\Http\JsonResponse
      */
     public function downloadManifest($id)

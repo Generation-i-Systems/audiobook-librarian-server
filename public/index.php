@@ -3,9 +3,8 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Http\Request;
 
-//set the maximum executrion time to 0 seconds
+// set the maximum executrion time to 0 seconds
 set_time_limit(0);
-
 
 define('LARAVEL_START', microtime(true));
 

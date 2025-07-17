@@ -4,6 +4,7 @@ namespace App\Support;
 
 /**
  * This file exists solely to provide IDE type hints for MongoDB classes
+ *
  * @noinspection PhpIllegalPsrClassPathInspection
  */
 
@@ -11,6 +12,7 @@ namespace App\Support;
 if (!class_exists('MongoDB\BSON\Regex')) {
     /**
      * @psalm-suppress MissingDependency
+     *
      * @phpstan-ignore-next-line
      */
     class_alias('MongoDB\BSON\Regex', 'MongoDB\BSON\Regex');
@@ -19,6 +21,7 @@ if (!class_exists('MongoDB\BSON\Regex')) {
 if (!class_exists('MongoDB\BSON\ObjectId')) {
     /**
      * @psalm-suppress MissingDependency
+     *
      * @phpstan-ignore-next-line
      */
     class_alias('MongoDB\BSON\ObjectId', 'MongoDB\BSON\ObjectId');

@@ -2,6 +2,7 @@
 
 /**
  * This file exists solely to provide IDE type hints for Mockery
+ *
  * @noinspection PhpIllegalPsrClassPathInspection
  */
 

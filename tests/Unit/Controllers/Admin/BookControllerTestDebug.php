@@ -13,6 +13,7 @@ use Tests\TestCase;
 class BookControllerTestDebug extends TestCase
 {
     protected $controller;
+
     protected $documentStore;
 
     protected function setUp(): void
@@ -20,7 +21,7 @@ class BookControllerTestDebug extends TestCase
         parent::setUp();
 
         // Create a mock document store service
-        $this->documentStore = new MockDocumentStoreService();
+        $this->documentStore = new MockDocumentStoreService;
 
         // Mock the required services
         $mockGoogleBooksService = $this->createMock(\App\Services\GoogleBooksApiService::class);
@@ -38,7 +39,7 @@ class BookControllerTestDebug extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
-    public function testDebugStoreMethod()
+    public function test_debug_store_method()
     {
         // Mock the event dispatcher
         Event::fake();
@@ -51,7 +52,7 @@ class BookControllerTestDebug extends TestCase
             'title' => 'Test Book with Cover',
             'author' => ['Test Author'],
             'genre' => ['Test Genre'],
-            'directoryPath' => 'test/path'
+            'directoryPath' => 'test/path',
         ]);
         $request->files->set('cover', $file);
 
@@ -74,8 +75,8 @@ class BookControllerTestDebug extends TestCase
         $booksArray = $this->documentStore->getAllBooks();
 
         // Output debug info
-        echo "Raw books array: " . json_encode($rawBooks) . "\n";
-        echo "Books array from getAllBooks: " . json_encode($booksArray) . "\n";
+        echo 'Raw books array: ' . json_encode($rawBooks) . "\n";
+        echo 'Books array from getAllBooks: ' . json_encode($booksArray) . "\n";
 
         // Assert that at least one book was added
         $this->assertNotEmpty($booksArray, 'No books were added to the mock store');

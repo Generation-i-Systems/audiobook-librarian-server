@@ -12,10 +12,10 @@ class ExternalCoverService
     /**
      * Download an external cover image and save it to the book's directory
      *
-     * @param string $url The URL of the external cover image
-     * @param string $directoryPath The book's directory path
-     * @param string $source The source of the cover image (audible, googlebooks, etc.)
-     * @param string|null $sourceId The ID of the book in the external source (ASIN, Google Books ID, etc.)
+     * @param  string  $url  The URL of the external cover image
+     * @param  string  $directoryPath  The book's directory path
+     * @param  string  $source  The source of the cover image (audible, googlebooks, etc.)
+     * @param  string|null  $sourceId  The ID of the book in the external source (ASIN, Google Books ID, etc.)
      * @return array Returns an array with the saved file path and error message if any
      */
     public function downloadCoverImage(
@@ -34,8 +34,9 @@ class ExternalCoverService
             $result['error'] = 'URL or directory path is empty';
             Log::error('ExternalCoverService: Cannot download image - URL or directory path is empty', [
                 'url' => $url,
-                'directoryPath' => $directoryPath
+                'directoryPath' => $directoryPath,
             ]);
+
             return $result;
         }
 
@@ -44,13 +45,14 @@ class ExternalCoverService
                 'url' => $url,
                 'directoryPath' => $directoryPath,
                 'source' => $source,
-                'sourceId' => $sourceId
+                'sourceId' => $sourceId,
             ]);
 
             // Validate URL format before attempting to download
             if (!filter_var($url, FILTER_VALIDATE_URL)) {
                 $result['error'] = 'Invalid URL format';
                 Log::error('ExternalCoverService: Invalid URL format', ['url' => $url]);
+
                 return $result;
             }
 
@@ -79,6 +81,7 @@ class ExternalCoverService
                 if (empty($imageContents)) {
                     $result['error'] = 'Downloaded image content is empty';
                     Log::error('ExternalCoverService: Downloaded image content is empty', ['url' => $url]);
+
                     return $result;
                 }
 
@@ -89,8 +92,9 @@ class ExternalCoverService
                     $result['error'] = 'Downloaded content is not an image: ' . $mimeType;
                     Log::error('ExternalCoverService: Downloaded content is not an image', [
                         'url' => $url,
-                        'mimeType' => $mimeType
+                        'mimeType' => $mimeType,
                     ]);
+
                     return $result;
                 }
 
@@ -103,8 +107,9 @@ class ExternalCoverService
                         $result['error'] = 'Failed to create directory: ' . $e->getMessage();
                         Log::error('ExternalCoverService: Failed to create directory', [
                             'directoryPath' => $directoryPath,
-                            'error' => $e->getMessage()
+                            'error' => $e->getMessage(),
                         ]);
+
                         return $result;
                     }
                 }
@@ -115,8 +120,9 @@ class ExternalCoverService
                     $result['error'] = 'Failed to save image: ' . $e->getMessage();
                     Log::error('ExternalCoverService: Failed to save image', [
                         'storagePath' => $storagePath,
-                        'error' => $e->getMessage()
+                        'error' => $e->getMessage(),
                     ]);
+
                     return $result;
                 }
 
@@ -125,14 +131,14 @@ class ExternalCoverService
 
                 Log::info('External cover image downloaded successfully', [
                     'source' => $source,
-                    'path' => $storagePath
+                    'path' => $storagePath,
                 ]);
             } else {
                 $result['error'] = 'Failed to download image: HTTP ' . $response->status();
                 Log::error('ExternalCoverService: Failed to download external cover image', [
                     'url' => $url,
                     'status' => $response->status(),
-                    'response' => $response->body() ? Str::limit($response->body(), 200) : 'empty'
+                    'response' => $response->body() ? Str::limit($response->body(), 200) : 'empty',
                 ]);
             }
         } catch (\Exception $e) {
@@ -143,7 +149,7 @@ class ExternalCoverService
                 'trace' => Str::limit($e->getTraceAsString(), 1000),
                 'directoryPath' => $directoryPath,
                 'source' => $source,
-                'sourceId' => $sourceId
+                'sourceId' => $sourceId,
             ]);
         }
 
@@ -153,9 +159,9 @@ class ExternalCoverService
     /**
      * Generate a filename for the external cover image
      *
-     * @param string $source The source of the cover image
-     * @param string|null $sourceId The ID of the book in the external source
-     * @param string $extension The file extension
+     * @param  string  $source  The source of the cover image
+     * @param  string|null  $sourceId  The ID of the book in the external source
+     * @param  string  $extension  The file extension
      * @return string The generated filename
      */
     private function generateFileName(string $source, ?string $sourceId, string $extension): string
@@ -170,13 +176,14 @@ class ExternalCoverService
 
         // Otherwise use a timestamp to ensure uniqueness
         $timestamp = time();
+
         return "cover_{$normalizedSource}_{$timestamp}.{$extension}";
     }
 
     /**
      * Get the appropriate source name for the given source identifier
      *
-     * @param string $source The source identifier (e.g., 'google', 'audible')
+     * @param  string  $source  The source identifier (e.g., 'google', 'audible')
      * @return string The normalized source name
      */
     public function normalizeSourceName(string $source): string

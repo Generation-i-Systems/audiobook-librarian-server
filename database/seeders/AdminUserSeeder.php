@@ -10,6 +10,8 @@ use Illuminate\Support\Str;
 
 class AdminUserSeeder extends Seeder
 {
+
+
     /**
      * Run the database seeds.
      */

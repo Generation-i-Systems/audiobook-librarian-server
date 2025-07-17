@@ -2,999 +2,592 @@
 
 namespace App\Services;
 
+use App\Contracts\DocumentStoreServiceInterface;
 use Google\Cloud\Firestore\FirestoreClient;
+use Google\Cloud\Firestore\Timestamp;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
-use App\Contracts\DocumentStoreServiceInterface;
+use Illuminate\Support\Facades\Collection;
 
 class FirestoreService implements DocumentStoreServiceInterface
 {
+    protected $db;
+
+
+    public function __construct()
+    {
+        $projectId = config('firebase.project_id');
+        $keyFilePath = config('firebase.credentials_path');
+
+        if (!file_exists($keyFilePath)) {
+            Log::error("Firebase credentials file not found at: {$keyFilePath}");
+            throw new \Exception("Firebase credentials file not found.");
+        }
+
+        $this->db = new FirestoreClient([
+            'projectId' => $projectId,
+            'keyFilePath' => $keyFilePath,
+        ]);
+    }
+
     public function autocompleteSeries(string $query, int $limit = 10): array
     {
         return [];
     }
+
     public function autocompleteAuthors(string $query, int $limit = 10): array
     {
         return [];
     }
+
     public function autocompleteNarrators(string $query, int $limit = 10): array
     {
-        return [];
-    }
-    /**
-     * {@inheritdoc}
-     */
-    public function updateUser(string $id, array $data)
-    {
-        // TODO: Implement updateUser() method.
-        return null;
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function deleteUser(string $id)
-    {
-        // TODO: Implement deleteUser() method.
-        return null;
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function deleteGenre(string $id)
-    {
-        // TODO: Implement deleteGenre() method.
-        return null;
-    }
-
-
-
-
-
-
-
-
-
-    /**
-     * {@inheritdoc}
-     */
-    public function deleteSeries(string $id)
-    {
-        // TODO: Implement deleteSeries() method.
-        return null;
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function createAuthor(array $data)
-    {
-        // TODO: Implement createAuthor() method.
-        return null;
-    }
-
-
-
-
-
-
-
-
-
-
-
-
-
-    /**
-     * {@inheritdoc}
-     */
-    public function getBookQueue(string $userId): array
-    {
-        // TODO: Implement getBookQueue() method.
+        // Implementation for autocompleteNarrators
         return [];
     }
 
-    /**
-     * Reset reading progress for a user and book.
-     *
-     * @param string $userId
-     * @param string $bookId
-     * @return bool
-     */
-    public function resetReadingProgress(string $userId, string $bookId): bool
+    public function getBook(string $id)
+    {
+        try {
+            if (!$this->db) {
+                return null;
+            }
+
+            $docRef = $this->db->collection('books')->document($id);
+            $snapshot = $docRef->snapshot();
+
+            if ($snapshot->exists()) {
+                return array_merge(['id' => $snapshot->id()], $snapshot->data());
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            Log::error('Error getting book: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    public function listBooks()
+    {
+        try {
+            if (!$this->db) {
+                return [];
+            }
+
+            $books = [];
+            $query = $this->db->collection('books');
+            $documents = $query->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $books[] = array_merge(['id' => $document->id()], $document->data());
+                }
+            }
+
+            return $books;
+        } catch (\Exception $e) {
+            Log::error('Error listing books: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function createBook(array $data)
+    {
+        try {
+            if (!$this->db) {
+                return null;
+            }
+
+            $docRef = $this->db->collection('books')->newDocument();
+            $docRef->set($data);
+
+            return $docRef->id();
+        } catch (\Exception $e) {
+            Log::error('Error creating book: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    public function updateBook(string $id, array $data)
     {
         try {
             if (!$this->db) {
                 return false;
             }
-            $progressDocs = $this->db->collection('reading_progress')
-                ->where('user_id', '=', $userId)
-                ->where('book_id', '=', $bookId)
-                ->documents();
-            foreach ($progressDocs as $doc) {
-                if ($doc->exists()) {
-                    $doc->reference()->delete();
-                }
-            }
+
+            $docRef = $this->db->collection('books')->document($id);
+            $docRef->set($data, ['merge' => true]);
+
             return true;
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('Failed to reset reading progress', [
-                'userId' => $userId,
-                'bookId' => $bookId,
-                'error' => $e->getMessage(),
-            ]);
+        } catch (\Exception $e) {
+            \Log::error('Error updating book: ' . $e->getMessage());
             return false;
         }
     }
 
-    /**
-     * {@inheritdoc}
-     */
-
-
-    /** @var FirestoreClient|null */
-    protected $db;
-
-    /** @var string */
-    protected $projectId;
-
-    /** @var bool */
-    protected static $inProviderCall = false;
-
-    // --- AUTHENTICATION METHODS ---
-
-    /**
-     * Get a document from any collection by ID (for debugging).
-     */
-    public function getDocument(string $collection, string $docId): ?array
+    public function deleteBook(string $id)
     {
         try {
             if (!$this->db) {
-                return null;
+                return false;
             }
-            $snap = $this->db->collection($collection)->document($docId)->snapshot();
-            if (!$snap->exists()) {
-                return null;
-            }
-            $data = $snap->data();
-            $data['id'] = $docId;
 
-            return $data;
-        } catch (\Throwable $e) {
-            Log::error('Firestore getDocument failed: ' . $e->getMessage());
+            $docRef = $this->db->collection('books')->document($id);
+            $docRef->delete();
 
-            return null;
+            return true;
+        } catch (\Exception $e) {
+            \Log::error('Error deleting book: ' . $e->getMessage());
+            return false;
         }
     }
 
-    /**
-     * Get a user document by ID.
-     *
-     * @param string $identifier
-     * @return array|null
-     */
+    public function getBooksByAuthorAndGenre($author, $genre)
+    {
+        try {
+            if (!$this->db) {
+                return [];
+            }
+
+            $books = [];
+            $query = $this->db->collection('books');
+
+            if ($author) {
+                $query = $query->where('authors', 'array-contains', $author);
+            }
+
+            if ($genre) {
+                $query = $query->where('genre', '=', $genre);
+            }
+
+            $documents = $query->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $books[] = array_merge(['id' => $document->id()], $document->data());
+                }
+            }
+
+            return $books;
+        } catch (\Exception $e) {
+            \Log::error('Error getting books by author and genre: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function dumpAllBooks()
+    {
+        try {
+            if (!$this->db) {
+                return [];
+            }
+
+            $books = [];
+            $documents = $this->db->collection('books')->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $books[] = array_merge(['id' => $document->id()], $document->data());
+                }
+            }
+
+            return $books;
+        } catch (\Exception $e) {
+            \Log::error('Error dumping all books: ' . $e->getMessage());
+            return [];
+        }
+    }
+
     public function getUserById($identifier)
     {
         try {
             if (!$this->db) {
                 return null;
             }
-            $snap = $this->db->collection('users')->document($identifier)->snapshot();
-            if (!$snap->exists()) {
-                return null;
-            }
-            $user = $snap->data();
-            $user['id'] = $identifier;
 
-            return $user;
-        } catch (\Throwable $e) {
-            Log::error('Firestore getUserById failed: ' . $e->getMessage());
+            $docRef = $this->db->collection('users')->document($identifier);
+            $snapshot = $docRef->snapshot();
+
+            if ($snapshot->exists()) {
+                return array_merge(['id' => $snapshot->id()], $snapshot->data());
+            }
 
             return null;
-        } finally {
-            self::$inProviderCall = false;
+        } catch (\Exception $e) {
+            \Log::error('Error getting user by ID: ' . $e->getMessage());
+            return null;
         }
     }
 
-    /**
-     * Get the user's role from Firestore.
-     *
-     * @param string $userId
-     * @return string|null  The user's role (e.g., 'admin'), or null if not set
-     */
-    public function getUserRole(string $userId): ?string
+    public function getUserByCredentials($credentials)
     {
-        $user = $this->getUserById($userId);
-        if ($user && isset($user['role'])) {
-            return $user['role'];
+        try {
+            if (!$this->db) {
+                return null;
+            }
+
+            $query = $this->db->collection('users')
+                ->where('email', '=', $credentials['email']);
+
+            $documents = $query->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $user = $document->data();
+                    if (password_verify($credentials['password'], $user['password'] ?? '')) {
+                        return array_merge(['id' => $document->id()], $user);
+                    }
+                }
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            \Log::error('Error getting user by credentials: ' . $e->getMessage());
+            return null;
         }
-        return null;
     }
 
-    /**
-     * Check if the user is an admin.
-     *
-     * @param string $userId
-     * @return bool  True if user is admin, false otherwise
-     */
-    public function isAdmin(string $userId): bool
-    {
-        return $this->getUserRole($userId) === 'admin';
-    }
-
-
-    /**
-     * Retrieve user by remember token.
-     *
-     * @param  string  $identifier
-     * @param  string  $token
-     * @return array|null
-     */
     public function getUserByRememberToken($identifier, $token)
     {
         try {
             if (!$this->db) {
                 return null;
             }
-            $snap = $this->db->collection('users')->document($identifier)->snapshot();
-            if (!$snap->exists()) {
-                return null;
-            }
-            $user = $snap->data();
-            $user['id'] = $identifier;
-            if (($user['remember_token'] ?? null) === $token) {
-                return $user;
+
+            $docRef = $this->db->collection('users')->document($identifier);
+            $snapshot = $docRef->snapshot();
+
+            if ($snapshot->exists()) {
+                $user = $snapshot->data();
+                if (isset($user['remember_token']) && hash_equals($user['remember_token'], $token)) {
+                    return array_merge(['id' => $snapshot->id()], $user);
+                }
             }
 
             return null;
-        } catch (\Throwable $e) {
-            Log::error('Firestore getUserByRememberToken failed: ' . $e->getMessage());
-
-            return null;
-        } finally {
-            self::$inProviderCall = false;
-        }
-    }
-
-    /**
-     * Update the remember token for the user.
-     *
-     * @param  string  $identifier
-     * @param  string  $token
-     * @return void
-     */
-    public function updateRememberToken($identifier, $token)
-    {
-        $this->db->collection('users')->document($identifier)->set([
-            'remember_token' => $token,
-        ], ['merge' => true]);
-    }
-
-    /**
-     * Retrieve user by credentials (e.g. email).
-     *
-     * @param  array  $credentials
-     * @return array|null
-     */
-    public function getUserByCredentials($credentials)
-    {
-        try {
-            // Only log which keys are being used, not values
-            Log::debug('getUserByCredentials', ['credential_keys' => array_keys($credentials)]);
-            if (!$this->db) {
-                Log::error('getUserByCredentials: db not initialized');
-
-                return null;
-            }
-            $query = $this->db->collection('users');
-            foreach ($credentials as $key => $value) {
-                if ($key === 'password') {
-                    continue; // Never filter by password
-                }
-                Log::debug('getUserByCredentials: adding filter: ' . $key);
-                // For username/email, fetch all users and filter in PHP for case-insensitive match
-                if (in_array($key, ['username', 'email'])) {
-                    $allDocs = $this->db->collection('users')->documents();
-                    foreach ($allDocs as $doc) {
-                        if (!$doc->exists()) {
-                            continue;
-                        }
-                        $data = $doc->data();
-                        if (isset($data[$key]) && mb_strtolower($data[$key]) === mb_strtolower($value)) {
-                            $data['id'] = $doc->id();
-
-                            return $data;
-                        }
-                    }
-
-                    return null;
-                } else {
-                    $query = $query->where($key, '=', $value);
-                }
-            }
-            $documents = $query->documents();
-            if ($documents->size() === 0) {
-                return null;
-            }
-            $user = $documents->rows()[0]->data();
-            $user['id'] = $documents->rows()[0]->id();
-
-            return $user;
-        } catch (\Throwable $e) {
-            Log::error('Firestore getUserByCredentials failed: ' . $e->getMessage());
-
+        } catch (\Exception $e) {
+            \Log::error('Error getting user by remember token: ' . $e->getMessage());
             return null;
         }
     }
 
-    /**
-     * Validate user credentials (e.g. password).
-     *
-     * @param  array|object  $user
-     * @return bool
-     */
-    public function validateUserCredentials($user, array $credentials)
-    {
-        Log::debug('validateUserCredentials', ['user' => $user, 'credentials' => $credentials]);
-        try {
-            // FirestoreUser may be an object, so handle both
-            $userArr = is_array($user) ? $user : (method_exists($user, 'getRawUser') ? $user->getRawUser() : []);
-            if (!isset($userArr['password']) || !isset($credentials['password'])) {
-                Log::debug('Missing password field', ['userArr' => $userArr, 'credentials' => $credentials]);
-
-                return false;
-            }
-            $plain = $credentials['password'];
-            $hash = $userArr['password'];
-            $result = Hash::check($plain, $hash);
-            Log::debug('validateUserCredentials: plain: ' . $plain);
-            Log::debug('validateUserCredentials: hash: ' . $hash);
-            Log::debug('Checking password', [
-                'plain' => $plain,
-                'hash' => $hash,
-                'result' => $result,
-            ]);
-            Log::debug('validateUserCredentials result: ' . ($result ? 'true' : 'false'));
-
-            return $result;
-        } catch (\Throwable $e) {
-            Log::error('Firestore validateUserCredentials failed: ' . $e->getMessage());
-
-            return false;
-        }
-    }
-
-    public function getClient()
-    {
-        return $this->db;
-    }
-
-    public static function dumpAllUsers()
-    {
-        try {
-            $projectId = env('FIREBASE_PROJECT_ID');
-            $credentials = base_path(env('FIREBASE_CREDENTIALS'));
-            $db = new FirestoreClient([
-                'projectId' => $projectId,
-                'keyFilePath' => $credentials,
-            ]);
-            $users = [];
-            $documents = $db->collection('users')->documents();
-            foreach ($documents as $doc) {
-                if ($doc->exists()) {
-                    $data = $doc->data();
-                    $data['id'] = $doc->id();
-                    $users[] = $data;
-                }
-            }
-
-            return $users;
-        } catch (\Throwable $e) {
-            error_log('Firestore dumpAllUsers error: ' . $e->getMessage());
-
-            return ['error' => $e->getMessage()];
-        }
-    }
-
-    public function dumpAllBooks()
-    {
-        return $this->dumpAllBooksFromCollection('books');
-    }
-
-    /**
-     * Dump all documents from the specified Firestore collection.
-     *
-     * @param string $collectionName
-     * @return array
-     */
-    public function dumpAllBooksFromCollection(string $collectionName)
-    {
-        try {
-            $projectId = env('FIREBASE_PROJECT_ID');
-            $credentials = base_path(env('FIREBASE_CREDENTIALS'));
-            $db = new FirestoreClient([
-                'projectId' => $projectId,
-                'keyFilePath' => $credentials,
-            ]);
-            $docs = [];
-            $documents = $db->collection($collectionName)->documents();
-            foreach ($documents as $doc) {
-                if ($doc->exists()) {
-                    $data = $doc->data();
-                    $data['id'] = $doc->id();
-                    $docs[] = $data;
-                }
-            }
-            return $docs;
-        } catch (\Throwable $e) {
-            error_log('Firestore dumpAllBooksFromCollection error: ' . $e->getMessage());
-            return ['error' => $e->getMessage()];
-        }
-    }
-
-    public function __construct()
-    {
-        try {
-            $this->projectId = env('FIREBASE_PROJECT_ID');
-            $credentials = base_path(env('FIREBASE_CREDENTIALS'));
-            $this->db = new FirestoreClient([
-                'projectId' => $this->projectId,
-                'keyFilePath' => $credentials,
-            ]);
-        } catch (\Throwable $e) {
-            // Log error but do NOT trigger auth/user lookup!
-            Log::error('Firestore client init failed: ' . $e->getMessage());
-            $this->db = null;
-        }
-    }
-
-    // QUEUE COLLECTION ACCESS
-    /**
-     * Get a Firestore collection reference for a queue.
-     *
-     * @param  string  $name
-     * @return \Google\Cloud\Firestore\CollectionReference
-     */
-    public function getQueueCollection($name)
-    {
-        return $this->db->collection($name);
-    }
-
-    // USER CRUD
     public function createUser(array $data)
     {
-        if (!$this->db) {
-            return null;
-        }
-        // Default role to 'preview' if not set
-        if (!isset($data['role'])) {
-            $data['role'] = 'preview';
-        }
         try {
-            $docRef = $this->db->collection('users')->add($data);
-
-            return $docRef->id();
-        } catch (\Throwable $e) {
-            Log::error('Firestore createUser failed: ' . $e->getMessage());
-
-            return null;
-        }
-    }
-
-    /**
-     * Get the global genre list from config/genres.php
-     *
-     * @return array
-     */
-    public function listGenres()
-    {
-        return config('genres.list');
-    }
-
-    // MESSAGES
-
-    /**
-     * Create a new message in Firestore
-     *
-     * @return string|null Returns the document ID or null on failure
-     */
-    public function createMessage(array $messageData): ?string
-    {
-        if (!$this->db) {
-            Log::error('Cannot create message: Firestore client not initialized');
-
-            return null;
-        }
-
-        try {
-            $messageData['created_at'] = $this->getServerTimestamp();
-            $messageData['updated_at'] = $this->getServerTimestamp();
-
-            $docRef = $this->db->collection('messages')->add($messageData);
-
-            return $docRef->id();
-        } catch (\Exception $e) {
-            Log::error('Failed to create message: ' . $e->getMessage());
-
-            return null;
-        }
-    }
-
-    /**
-     * Get all messages, optionally filtered by user ID
-     *
-     * @param  string|null  $userId  Optional user ID to filter by
-     * @param  bool  $includeAcknowledged  Whether to include acknowledged messages
-     * @param  int  $limit  Maximum number of messages to return
-     */
-    public function getMessages(?string $userId = null, bool $includeAcknowledged = false, int $limit = 100): array
-    {
-        if (!$this->db) {
-            Log::error('Cannot get messages: Firestore client not initialized');
-
-            return [];
-        }
-
-        try {
-            $query = $this->db->collection('messages');
-
-            if ($userId) {
-                $query = $query->where('to_user_id', '==', $userId);
-            }
-
-            if (!$includeAcknowledged) {
-                $query = $query->where('acknowledged_at', '==', null);
-            }
-
-            $query = $query->orderBy('created_at', 'DESC')
-                ->limit($limit);
-
-            $snapshots = $query->documents();
-
-            $messages = [];
-            foreach ($snapshots as $snapshot) {
-                $message = $snapshot->data();
-                $message['id'] = $snapshot->id();
-                $messages[] = $message;
-            }
-
-            return $messages;
-        } catch (\Exception $e) {
-            Log::error('Failed to get messages: ' . $e->getMessage());
-
-            return [];
-        }
-    }
-
-    /**
-     * Get a single message by ID
-     */
-    public function getMessage(string $messageId): ?array
-    {
-        if (!$this->db) {
-            Log::error('Cannot get message: Firestore client not initialized');
-
-            return null;
-        }
-
-        try {
-            $snapshot = $this->db->collection('messages')->document($messageId)->snapshot();
-
-            if (!$snapshot->exists()) {
+            if (!$this->db) {
+                \Log::error('Firestore DB connection not initialized');
                 return null;
             }
 
-            $message = $snapshot->data();
-            $message['id'] = $snapshot->id();
+            // Hash password if present
+            if (isset($data['password'])) {
+                $data['password'] = password_hash($data['password'], PASSWORD_DEFAULT);
+            }
 
-            return $message;
+            // Add timestamps
+            $now = new \DateTime();
+            $data['created_at'] = $now;
+            $data['updated_at'] = $now;
+
+            \Log::debug('Creating user in Firestore', $data);
+            
+            $docRef = $this->db->collection('users')->newDocument();
+            $docRef->set($data);
+            $userId = $docRef->id();
+            
+            \Log::debug('User created successfully', ['user_id' => $userId]);
+            
+            return $userId;
         } catch (\Exception $e) {
-            Log::error('Failed to get message: ' . $e->getMessage());
-
+            \Log::error('Error creating user: ' . $e->getMessage(), [
+                'exception' => get_class($e),
+                'trace' => $e->getTraceAsString()
+            ]);
             return null;
         }
     }
 
-    /**
-     * Acknowledge a message
-     */
-    public function acknowledgeMessage(string $messageId): bool
+    public function updateUser(string $id, array $data)
     {
-        if (!$this->db) {
-            Log::error('Cannot acknowledge message: Firestore client not initialized');
-
-            return false;
-        }
-
         try {
-            $this->db->collection('messages')->document($messageId)->update([
-                ['path' => 'acknowledged_at', 'value' => $this->getServerTimestamp()],
-                ['path' => 'updated_at', 'value' => $this->getServerTimestamp()],
-            ]);
+            if (!$this->db) {
+                return false;
+            }
+
+            // Don't update the password if it's empty
+            if (isset($data['password']) && empty($data['password'])) {
+                unset($data['password']);
+            } elseif (isset($data['password'])) {
+                // Hash the new password
+                $data['password'] = password_hash($data['password'], PASSWORD_DEFAULT);
+            }
+
+            $docRef = $this->db->collection('users')->document($id);
+            $docRef->set($data, ['merge' => true]);
 
             return true;
         } catch (\Exception $e) {
-            Log::error('Failed to acknowledge message: ' . $e->getMessage());
-
+            \Log::error('Error updating user: ' . $e->getMessage());
             return false;
         }
     }
 
-    /**
-     * Get all users for the admin message interface
-     */
-    public function getUsersForMessaging(): array
+    public function deleteUser(string $id)
     {
-        if (!$this->db) {
-            Log::error('Cannot get users: Firestore client not initialized');
-
-            return [];
-        }
-
         try {
-            $snapshots = $this->db->collection('users')
-                ->select(['id', 'name', 'email'])
-                ->documents();
-
-            $users = [];
-            foreach ($snapshots as $snapshot) {
-                $user = $snapshot->data();
-                $user['id'] = $snapshot->id();
-                $users[] = $user;
+            if (!$this->db) {
+                return false;
             }
 
-            return $users;
+            $docRef = $this->db->collection('users')->document($id);
+            $docRef->delete();
+
+            return true;
         } catch (\Exception $e) {
-            Log::error('Failed to get users: ' . $e->getMessage());
-
-            return [];
+            \Log::error('Error deleting user: ' . $e->getMessage());
+            return false;
         }
     }
 
-    /**
-     * Helper method to get server timestamp for Firestore
-     *
-     * @return \Google\Cloud\Firestore\FieldValue\ServerTimestampValue
-     */
-    private function getServerTimestamp()
+    public function isAdmin(string $userId): bool
     {
-        return new \Google\Cloud\Firestore\FieldValue\ServerTimestampValue();
-    }
-
-    // BOOKS CRUD
-    /**
-     * Create a new book in Firestore
-     *
-     * @return string|null Returns the document ID or null on failure
-     */
-    public function createBook(array $data): ?string
-    {
-        if (!$this->db) {
-            Log::error('Cannot create book: Firestore client not initialized');
-
-            return null;
-        }
         try {
-            // Ensure dateAdded is set (should be set by caller, fallback to server timestamp)
-            if (!isset($data['dateAdded'])) {
-                $data['dateAdded'] = $this->getServerTimestamp();
+            if (!$this->db) {
+                return false;
             }
 
-            // Use the provided ID if available, otherwise generate one
-            $docId = $data['id'] ?? null;
+            $docRef = $this->db->collection('users')->document($userId);
+            $snapshot = $docRef->snapshot();
 
-            if ($docId) {
-                // Use set() to create document with specific ID
-                $docRef = $this->db->collection('books')->document($docId);
-                $docRef->set($data);
-                return $docId;
-            } else {
-                // Use add() to auto-generate ID
-                $docRef = $this->db->collection('books')->add($data);
-                return $docRef->id();
+            if ($snapshot->exists()) {
+                $user = $snapshot->data();
+                return $user['is_admin'] ?? false;
             }
-        } catch (\Throwable $e) {
-            Log::error('Failed to create book: ' . $e->getMessage());
 
-            return null;
+            return false;
+        } catch (\Exception $e) {
+            \Log::error('Error checking admin status: ' . $e->getMessage());
+            return false;
         }
     }
 
-    // REVIEWS CRUD
-    /**
-     * Create a new review in Firestore
-     *
-     * @return string|null Returns the document ID or null on failure
-     */
-    public function createReview(array $data): ?string
-    {
-        if (!$this->db) {
-            Log::error('Cannot create review: Firestore client not initialized');
-
-            return null;
-        }
-        try {
-            $docRef = $this->db->collection('reviews')->add($data);
-
-            return $docRef->id();
-        } catch (\Throwable $e) {
-            Log::error('Failed to create review: ' . $e->getMessage());
-
-            return null;
-        }
-    }
-
-    /**
-     * Get all books by author and genre
-     *
-     * @param  string  $authorId
-     * @param  string  $genreId
-     * @return array
-     */
-    public function getBooksByAuthorAndGenre($author, $genre)
-    {
-        $books = $this->listBooks();
-
-        return array_values(array_filter($books, function ($book) use ($author, $genre) {
-            return (isset($book['author']) && $book['author'] === $author)
-                && (isset($book['genre']) && $book['genre'] === $genre);
-        }));
-    }
-
-    public function updateBook(string $id, array $data)
-    {
-        $this->db->collection('books')->document($id)->set($data);
-    }
-
-    public function getBook(string $id)
-    {
-        $snapshot = $this->db->collection('books')->document($id)->snapshot();
-        if (!$snapshot->exists()) {
-            return null;
-        }
-        $data = $snapshot->data();
-        $data['id'] = $id; // Ensure the ID is included in the returned data
-
-        return $data;
-    }
-
-    public function deleteBook(string $id)
-    {
-        $this->db->collection('books')->document($id)->delete();
-    }
-
-    public function listBooks()
-    {
-        $documents = $this->db->collection('books')->documents();
-        $books = [];
-        foreach ($documents as $doc) {
-            $book = $doc->data();
-            $book['id'] = $doc->id();
-            $books[] = $book;
-        }
-
-        return $books;
-    }
-
-    // // AUTHORS CRUD
-    // /**
-    //  * Finds an author by name, or creates one if not found.
-    //  * @param string $name
-    //  * @return array Author data including id
-    //  */
-    // public function findOrCreateAuthorByName(string $name)
-    // {
-    //     $authors = $this->db->collection('authors')->where('name', '=', $name)->documents();
-    //     foreach ($authors as $doc) {
-    //         if ($doc->exists()) {
-    //             $author = $doc->data();
-    //             $author['id'] = $doc->id();
-    //             return $author;
-    //         }
-    //     }
-    //     $id = $this->createAuthor(['name' => $name]);
-    //     return [ 'id' => $id, 'name' => $name ];
-    // }
-    // /**
-    //  * @param array $data
-    //  * @return string
-    //  */
-    // public function createAuthor(array $data)
-    // {
-    //     $docRef = $this->db->collection('authors')->add($data);
-    //     return $docRef->id();
-    // }
-
-    /**
-     * @return array|null
-     */
-    public function getAuthor(string $id)
-    {
-        $snap = $this->db->collection('authors')->document($id)->snapshot();
-        if (!$snap->exists()) {
-            return null;
-        }
-        $author = $snap->data();
-        $author['id'] = $id;
-
-        return $author;
-    }
-
-    /**
-     * Get a list of unique authors that are currently being used in books
-     *
-     * @return array
-     */
-    public function listAuthors()
+    public function getUsersForMessaging(): array
     {
         try {
             if (!$this->db) {
                 return [];
             }
-            $allBooks = $this->db->collection('books')->documents();
-            $authors = [];
-            foreach ($allBooks as $bookDoc) {
-                if ($bookDoc->exists()) {
-                    $bookData = $bookDoc->data();
-                    $authorData = null;
-                    if (isset($bookData['authors']) && is_array($bookData['authors'])) {
-                        $authorData = $bookData['authors'];
-                    } elseif (isset($bookData['author']) && is_array($bookData['author'])) {
-                        $authorData = $bookData['author'];
-                    }
-                    if ($authorData) {
-                        foreach ($authorData as $authorName) {
-                            if (is_string($authorName) && !empty($authorName)) {
-                                $authors[$authorName] = true;
-                            }
-                        }
-                    } elseif (
-                        isset($bookData['author']) &&
-                        is_string($bookData['author']) &&
-                        !empty($bookData['author'])
-                    ) {
-                        $authors[$bookData['author']] = true;
-                    }
+
+            $users = [];
+            $query = $this->db->collection('users')
+                ->where('notifications_enabled', '=', true);
+
+            $documents = $query->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $users[] = array_merge(['id' => $document->id()], $document->data());
                 }
             }
-            $uniqueAuthors = array_keys($authors);
-            sort($uniqueAuthors);
 
-            return $uniqueAuthors;
+            return $users;
         } catch (\Exception $e) {
-            Log::error('Firestore listAuthors failed: ' . $e->getMessage());
-
+            \Log::error('Error getting users for messaging: ' . $e->getMessage());
             return [];
         }
     }
 
-    /**
-     * Search for author names starting with a given term.
-     *
-     * @param  string  $term  The search term.
-     * @return array A list of unique author names.
-     */
-    public function searchAuthorsByName(string $term): array
-    {
-        if (empty($term)) {
-            return [];
-        }
-        $termLower = strtolower($term);
-        $allAuthors = $this->listAuthors(); // Leverage existing method to get all unique authors
-        $matches = [];
-        foreach ($allAuthors as $authorName) {
-            if (stripos($authorName, $termLower) === 0) { // Case-insensitive starts-with
-                $matches[] = $authorName;
-            }
-        }
-
-        // Firestore might return them sorted, but ensure sorting if listAuthors changes
-        // sort($matches);
-        return $matches;
-    }
-
-    /**
-     * Search for narrator names starting with a given term.
-     *
-     * @param  string  $term  The search term.
-     * @return array A list of unique narrator names.
-     */
-    public function searchNarratorsByName(string $term): array
-    {
-        if (empty($term)) {
-            return [];
-        }
-        $termLower = strtolower($term);
-        $matches = [];
-
-        // Get all books and extract unique narrators
-        if ($this->db) {
-            $booksRef = $this->db->collection('books');
-            $query = $booksRef->limit(100); // Limit to prevent excessive reads
-            $snapshot = $query->documents();
-
-            foreach ($snapshot as $document) {
-                $book = $document->data();
-                if (isset($book['narrator'])) {
-                    if (is_array($book['narrator'])) {
-                        foreach ($book['narrator'] as $narrator) {
-                            if (stripos($narrator, $termLower) === 0) {
-                                $matches[] = $narrator;
-                            }
-                        }
-                    } else {
-                        if (stripos($book['narrator'], $termLower) === 0) {
-                            $matches[] = $book['narrator'];
-                        }
-                    }
-                }
-            }
-        }
-
-        return array_unique($matches);
-    }
-
-    public function updateAuthor(string $id, array $data): void
-    {
-        $this->db->collection('authors')->document($id)->set($data, ['merge' => true]);
-    }
-
-    public function deleteAuthor(string $id): void
-    {
-        $this->db->collection('authors')->document($id)->delete();
-    }
-
-    // GENRES CRUD
-    /**
-     * @return string
-     */
     public function createGenre(array $data)
     {
-        $docRef = $this->db->collection('genres')->add($data);
+        try {
+            if (!$this->db) {
+                return null;
+            }
 
-        return $docRef->id();
+            $docRef = $this->db->collection('genres')->newDocument();
+            $docRef->set($data);
+
+            return $docRef->id();
+        } catch (\Exception $e) {
+            Log::error('Error creating genre: ' . $e->getMessage());
+            return null;
+        }
     }
 
-    // SERIES CRUD
-    /**
-     * Finds a series by name, or creates one if not found.
-     *
-     * @return array Series data including id
-     */
+    public function getGenre(string $id): ?array
+    {
+        try {
+            if (!$this->db) {
+                return null;
+            }
+
+            $docRef = $this->db->collection('genres')->document($id);
+            $snapshot = $docRef->snapshot();
+
+            if ($snapshot->exists()) {
+                return array_merge(['id' => $snapshot->id()], $snapshot->data());
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            Log::error('Error getting genre: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    public function listGenres()
+    {
+        try {
+            if (!$this->db) {
+                return [];
+            }
+
+            $genres = [];
+            $documents = $this->db->collection('genres')->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $genres[] = array_merge(['id' => $document->id()], $document->data());
+                }
+            }
+
+            return $genres;
+        } catch (\Exception $e) {
+            \Log::error('Error listing genres: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function deleteGenre(string $id)
+    {
+        try {
+            if (!$this->db) {
+                return false;
+            }
+
+            $docRef = $this->db->collection('genres')->document($id);
+            $docRef->delete();
+
+            return true;
+        } catch (\Exception $e) {
+            \Log::error('Error deleting genre: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function updateGenre(string $id, array $data): bool
+    {
+        try {
+            if (!$this->db) {
+                return false;
+            }
+
+            $docRef = $this->db->collection('genres')->document($id);
+            $docRef->set($data, ['merge' => true]);
+
+            return true;
+        } catch (\Exception $e) {
+            \Log::error('Error updating genre: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function createSeries(string $name)
+    {
+        try {
+            if (!$this->db) {
+                return null;
+            }
+
+            $data = [
+                'name' => $name,
+                'created_at' => new Timestamp(new \DateTime()),
+                'updated_at' => new Timestamp(new \DateTime()),
+            ];
+
+            $docRef = $this->db->collection('series')->newDocument();
+            $docRef->set($data);
+
+            return $docRef->id();
+        } catch (\Exception $e) {
+            \Log::error('Error creating series: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    public function getSeriesByName(string $name): ?array
+    {
+        try {
+            if (!$this->db) {
+                return null;
+            }
+
+            $query = $this->db->collection('series')
+                ->where('name', '=', $name)
+                ->limit(1);
+
+            $documents = $query->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    return array_merge(['id' => $document->id()], $document->data());
+                }
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            \Log::error('Error getting series by name: ' . $e->getMessage());
+            return null;
+        }
+    }
+
     public function findOrCreateSeriesByName(string $name)
     {
-        $series = $this->db->collection('series')->where('name', '=', $name)->documents();
-        foreach ($series as $doc) {
-            if ($doc->exists()) {
-                $ser = $doc->data();
-                $ser['id'] = $doc->id();
+        $series = $this->getSeriesByName($name);
 
-                return $ser;
-            }
+        if ($series) {
+            return $series['id'];
         }
-        $id = $this->createSeries(['name' => $name]);
 
-        return ['id' => $id, 'name' => $name];
-    }
-
-    public function createSeries(array $data)
-    {
-        $docRef = $this->db->collection('series')->add($data);
-
-        return $docRef->id();
+        return $this->createSeries($name);
     }
 
     public function getSeries(string $id)
     {
-        $snap = $this->db->collection('series')->document($id)->snapshot();
-        if (!$snap->exists()) {
+        try {
+            if (!$this->db) {
+                return null;
+            }
+
+            $docRef = $this->db->collection('series')->document($id);
+            $snapshot = $docRef->snapshot();
+
+            if ($snapshot->exists()) {
+                return array_merge(['id' => $snapshot->id()], $snapshot->data());
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            \Log::error('Error getting series: ' . $e->getMessage());
             return null;
         }
-        $series = $snap->data();
-        $series['id'] = $id;
+    }
 
-        return $series;
+    public function deleteSeries(string $id): bool
+    {
+        try {
+            if (!$this->db) {
+                return false;
+            }
+
+            $docRef = $this->db->collection('series')->document($id);
+            $docRef->delete();
+
+            return true;
+        } catch (\Exception $e) {
+            \Log::error('Error deleting series: ' . $e->getMessage());
+            return false;
+        }
     }
 
     public function listSeries(): array
@@ -1003,128 +596,293 @@ class FirestoreService implements DocumentStoreServiceInterface
             if (!$this->db) {
                 return [];
             }
-            $allBooks = $this->db->collection('books')->documents();
+
             $series = [];
-            foreach ($allBooks as $bookDoc) {
-                if ($bookDoc->exists()) {
-                    $bookData = $bookDoc->data();
-                    if (isset($bookData['series']) && is_array($bookData['series'])) {
-                        $seriesNames = array_keys($bookData['series']);
-                        foreach ($seriesNames as $seriesName) {
-                            if (is_string($seriesName) && !empty($seriesName)) {
-                                $series[$seriesName] = true;
-                            }
-                        }
-                    }
+            $documents = $this->db->collection('series')
+                ->orderBy('name')
+                ->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $series[] = array_merge(['id' => $document->id()], $document->data());
                 }
             }
-            $uniqueSeries = array_keys($series);
-            sort($uniqueSeries);
 
-            return $uniqueSeries;
+            return $series;
         } catch (\Exception $e) {
-            Log::error('Firestore listSeries failed: ' . $e->getMessage());
-
+            \Log::error('Error listing series: ' . $e->getMessage());
             return [];
         }
     }
 
-    /**
-     * Search for series titles starting with a given term.
-     *
-     * @param  string  $term  The search term.
-     * @return array A list of unique series titles.
-     */
     public function searchSeriesByName(string $term): array
     {
-        if (empty($term)) {
+        try {
+            if (!$this->db) {
+                return [];
+            }
+
+            $query = $this->db->collection('series')
+                ->where('name', '>=', $term)
+                ->where('name', '<=', $term . '\uf8ff')
+                ->orderBy('name');
+
+            $series = [];
+            $documents = $query->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $series[] = array_merge(['id' => $document->id()], $document->data());
+                }
+            }
+
+            return $series;
+        } catch (\Exception $e) {
+            \Log::error('Error searching series by name: ' . $e->getMessage());
             return [];
         }
-        $termLower = strtolower($term);
-        $allSeries = $this->listSeries();
-        $matches = [];
-        foreach ($allSeries as $seriesName) {
-            if (stripos($seriesName, $termLower) === 0) {
-                $matches[] = $seriesName;
-            }
-        }
-
-        // sort($matches);
-        return $matches;
     }
 
-    /**
-     * Find a book by its directory path
-     *
-     * @return array|null Returns book data if found, null otherwise
-     */
-    public function findBookByDirectoryPath(string $directoryPath): ?array
+    public function createAuthor(array $data)
     {
         try {
             if (!$this->db) {
                 return null;
             }
 
-            // First try with camelCase field name
-            $query = $this->db->collection('books')
-                ->where('directoryPath', '=', $directoryPath)
-                ->limit(1);
+            $data['created_at'] = new Timestamp(new \DateTime());
+            $data['updated_at'] = new Timestamp(new \DateTime());
 
-            $documents = $query->documents();
+            $docRef = $this->db->collection('authors')->newDocument();
+            $docRef->set($data);
 
-            foreach ($documents as $document) {
-                if ($document->exists()) {
-                    return array_merge(['id' => $document->id()], $document->data());
-                }
-            }
-
-            // If not found, try with snake_case field name for backward compatibility
-            $query = $this->db->collection('books')
-                ->where('directory_path', '=', $directoryPath)
-                ->limit(1);
-
-            $documents = $query->documents();
-
-            foreach ($documents as $document) {
-                if ($document->exists()) {
-                    return array_merge(['id' => $document->id()], $document->data());
-                }
-            }
-
-            return null;
+            return $docRef->id();
         } catch (\Exception $e) {
-            Log::error('Firestore findBookByDirectoryPath failed: ' . $e->getMessage());
-
+            \Log::error('Error creating author: ' . $e->getMessage());
             return null;
+        }
+    }
+
+    public function listAuthors()
+    {
+        try {
+            if (!$this->db) {
+                return [];
+            }
+
+            $authors = [];
+            $documents = $this->db->collection('authors')
+                ->orderBy('name')
+                ->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $authors[] = array_merge(['id' => $document->id()], $document->data());
+                }
+            }
+
+            return $authors;
+        } catch (\Exception $e) {
+            \Log::error('Error listing authors: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function deleteAuthor(string $id): void
+    {
+        try {
+            if (!$this->db) {
+                return;
+            }
+
+            $docRef = $this->db->collection('authors')->document($id);
+            $docRef->delete();
+        } catch (\Exception $e) {
+            \Log::error('Error deleting author: ' . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    public function searchAuthorsByName(string $term): array
+    {
+        try {
+            if (!$this->db) {
+                return [];
+            }
+
+            $query = $this->db->collection('authors')
+                ->where('name', '>=', $term)
+                ->where('name', '<=', $term . '\uf8ff')
+                ->orderBy('name');
+
+            $authors = [];
+            $documents = $query->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $authors[] = array_merge(['id' => $document->id()], $document->data());
+                }
+            }
+
+            return $authors;
+        } catch (\Exception $e) {
+            \Log::error('Error searching authors by name: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function searchNarratorsByName(string $term): array
+    {
+        try {
+            if (!$this->db) {
+                return [];
+            }
+
+            $query = $this->db->collection('authors')
+                ->where('is_narrator', '==', true)
+                ->where('name', '>=', $term)
+                ->where('name', '<=', $term . '\uf8ff')
+                ->orderBy('name');
+
+            $narrators = [];
+            $documents = $query->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $narrators[] = array_merge(['id' => $document->id()], $document->data());
+                }
+            }
+
+            return $narrators;
+        } catch (\Exception $e) {
+            \Log::error('Error searching narrators by name: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Update a user's book queue with a new list of book IDs
+     *
+     * @param string $userId The user ID
+     * @param array $bookIds List of book IDs for the queue
+     * @return bool Success status
+     */
+    public function updateBookQueue(string $userId, array $bookIds): bool
+    {
+        try {
+            if (!$this->db) {
+                return false;
+            }
+
+            // Get reference to user's queue
+            $queueRef = $this->db->collection('queues')->document($userId);
+
+            // Start a batch operation
+            $batch = $this->db->batch();
+
+            // First, delete all existing books in queue
+            $existingBooks = $queueRef->collection('books')->documents();
+            foreach ($existingBooks as $book) {
+                if ($book->exists()) {
+                    $batch->delete($book->reference());
+                }
+            }
+
+            // Then add all new books
+            $timestamp = time();
+            foreach ($bookIds as $index => $bookId) {
+                $bookRef = $queueRef->collection('books')->document($bookId);
+                $batch->set($bookRef, [
+                    'book_id' => $bookId,
+                    'added_at' => $timestamp,
+                    'position' => $index,
+                ]);
+            }
+
+            // Commit the batch
+            $batch->commit();
+
+            return true;
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Firestore updateBookQueue failed: ' . $e->getMessage());
+            return false;
         }
     }
 
     // BOOK QUEUE (STUBS)
 
-
     /**
-     * Add a book to a user's queue (stub: implement as needed)
+     * Add a book to a user's queue
+     *
+     * @param string $userId The user ID
+     * @param string $bookId The book ID to add
+     * @return bool Success status
      */
-    public function addBookToQueue(string $userId, string $bookId): void
+    public function addBookToQueue(string $userId, string $bookId): bool
     {
-        // Implement as needed
+        try {
+            if (!$this->db) {
+                return false;
+            }
+
+            // Get current queue
+            $queue = $this->getBookQueue($userId);
+
+            // Check if book is already in queue
+            foreach ($queue as $item) {
+                if (($item['id'] ?? '') === $bookId) {
+                    // Book already in queue, nothing to do
+                    return true;
+                }
+            }
+
+            // Add book to queue collection
+            $this->db->collection('queues')
+                ->document($userId)
+                ->collection('books')
+                ->document($bookId)
+                ->set([
+                    'book_id' => $bookId,
+                    'added_at' => time(),
+                ]);
+
+            return true;
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Firestore addBookToQueue failed: ' . $e->getMessage());
+            return false;
+        }
     }
 
     /**
-     * Remove a book from a user's queue (stub: implement as needed)
+     * Remove a book from a user's queue
+     *
+     * @param string $userId The user ID
+     * @param string $bookId The book ID to remove
+     * @return bool Success status
      */
-    public function removeBookFromQueue(string $userId, string $bookId): void
+    public function removeBookFromQueue(string $userId, string $bookId): bool
     {
-        // Implement as needed
+        try {
+            if (!$this->db) {
+                return false;
+            }
+
+            // Delete the book document from the user's queue
+            $this->db->collection('queues')
+                ->document($userId)
+                ->collection('books')
+                ->document($bookId)
+                ->delete();
+
+            return true;
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Firestore removeBookFromQueue failed: ' . $e->getMessage());
+            return false;
+        }
     }
 
     // JOB QUEUE MANAGEMENT
 
-    /**
-     * Create or update a job status in Firestore
-     *
-     * @return string Job ID
-     */
     /**
      * Create or update a job status in Firestore with detailed tracking
      *
@@ -1165,7 +923,7 @@ class FirestoreService implements DocumentStoreServiceInterface
 
             // Calculate duration if we have start time
             if (isset($jobData['started_at'])) {
-                $startTime = \Carbon\Carbon::parse($jobData['started_at']);
+                $startTime = \Carbon\Carbon::parse($jobData['started']);
                 $endTime = now();
                 $jobData['duration'] = $endTime->diffInSeconds($startTime);
             }
@@ -1405,51 +1163,1356 @@ class FirestoreService implements DocumentStoreServiceInterface
 
     public function getManifestForBook(string $bookId): array
     {
-        throw new \Exception('Not implemented');
+        try {
+            if (!$this->db) {
+                return [];
+            }
+            $bookRef = $this->db->collection('books')->document($bookId);
+            $snapshot = $bookRef->snapshot();
+
+            if (!$snapshot->exists()) {
+                return [];
+            }
+
+            $bookData = $snapshot->data();
+            $bookData['id'] = $snapshot->id();
+
+            return $bookData;
+        } catch (\Throwable $e) {
+            Log::error('Firestore getManifestForBook failed: ' . $e->getMessage());
+            return [];
+        }
     }
 
     public function getBookmarks(string $userId, string $bookId): array
     {
-        throw new \Exception('Not implemented');
+        try {
+            if (!$this->db) {
+                return [];
+            }
+
+            $query = $this->db->collection('bookmarks')
+                ->where('user_id', '=', $userId)
+                ->where('book_id', '=', $bookId);
+
+            $documents = $query->documents();
+            $bookmarks = [];
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $data = $document->data();
+                    $data['id'] = $document->id();
+                    $bookmarks[] = $data;
+                }
+            }
+
+            return $bookmarks;
+        } catch (\Throwable $e) {
+            Log::error('Firestore getBookmarks failed: ' . $e->getMessage());
+            return [];
+        }
     }
 
     public function getBookmark(string $bookmarkId, string $userId, string $bookId): ?array
     {
-        throw new \Exception('Not implemented');
+        try {
+            if (!$this->db) {
+                return null;
+            }
+
+            $docRef = $this->db->collection('bookmarks')->document($bookmarkId);
+            $document = $docRef->snapshot();
+
+            if (
+                $document->exists() &&
+                ($document->data()['user_id'] ?? null) === $userId &&
+                ($document->data()['book_id'] ?? null) === $bookId
+            ) {
+                $data = $document->data();
+                $data['id'] = $document->id();
+                return $data;
+            }
+
+            return null;
+        } catch (\Throwable $e) {
+            Log::error('Firestore getBookmark failed: ' . $e->getMessage());
+            return null;
+        }
     }
 
     public function createBookmark(array $data): string
     {
-        throw new \Exception('Not implemented');
+        try {
+            if (!$this->db) {
+                return '';
+            }
+
+            $docRef = $this->db->collection('bookmarks')->add($data);
+            return $docRef->id();
+        } catch (\Throwable $e) {
+            Log::error('Firestore createBookmark failed: ' . $e->getMessage());
+            return '';
+        }
     }
 
     public function updateBookmark(string $bookmarkId, array $data): bool
     {
-        throw new \Exception('Not implemented');
+        try {
+            if (!$this->db) {
+                return false;
+            }
+
+            $docRef = $this->db->collection('bookmarks')->document($bookmarkId);
+            $docRef->set($data, ['merge' => true]);
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('Firestore updateBookmark failed: ' . $e->getMessage());
+            return false;
+        }
     }
 
     public function deleteBookmark(string $bookmarkId, string $userId, string $bookId): bool
     {
-        throw new \Exception('Not implemented');
-    }
+        try {
+            if (!$this->db) {
+                return false;
+            }
 
-    public function updateBookQueue(string $userId, array $bookIds): void
-    {
-        throw new \Exception('Not implemented');
+            $docRef = $this->db->collection('bookmarks')->document($bookmarkId);
+            $document = $docRef->snapshot();
+
+            if (
+                $document->exists() &&
+                ($document->data()['user_id'] ?? null) === $userId &&
+                ($document->data()['book_id'] ?? null) === $bookId
+            ) {
+                $docRef->delete();
+                return true;
+            }
+            return false;
+        } catch (\Throwable $e) {
+            Log::error('Firestore deleteBookmark failed: ' . $e->getMessage());
+            return false;
+        }
     }
 
     public function getJob(string $jobId): ?array
     {
-        throw new \Exception('Not implemented');
+        return $this->getJobStatus($jobId);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getJobs(): array
+    {
+        try {
+            if (!$this->db) {
+                return [];
+            }
+
+            $jobsRef = $this->db->collection('jobs');
+            $documents = $jobsRef->documents();
+
+            $jobs = [];
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $data = $document->data();
+                    $data['id'] = $document->id();
+                    $jobs[] = $data;
+                }
+            }
+
+            return $jobs;
+        } catch (\Throwable $e) {
+            Log::error('Firestore getJobs failed: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getJobCount(): int
+    {
+        try {
+            if (!$this->db) {
+                return 0;
+            }
+
+            $jobsRef = $this->db->collection('jobs');
+            $documents = $jobsRef->documents();
+
+            $count = 0;
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $count++;
+                }
+            }
+
+            return $count;
+        } catch (\Throwable $e) {
+            Log::error('Firestore getJobCount failed: ' . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function clearJobs(): bool
+    {
+        try {
+            if (!$this->db) {
+                return false;
+            }
+
+            $jobsRef = $this->db->collection('jobs');
+            $documents = $jobsRef->documents();
+
+            $batch = $this->db->batch();
+            $hasJobs = false;
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $batch->delete($document->reference());
+                    $hasJobs = true;
+                }
+            }
+
+            if ($hasJobs) {
+                $batch->commit();
+            }
+
+            return $hasJobs;
+        } catch (\Throwable $e) {
+            Log::error('Firestore clearJobs failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function jobExistsByDirectoryPath(string $directoryPath): bool
+    {
+        try {
+            if (!$this->db) {
+                return false;
+            }
+
+            $jobsRef = $this->db->collection('jobs');
+            $query = $jobsRef->where('directory_path', '==', $directoryPath);
+            $documents = $query->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    return true;
+                }
+            }
+
+            return false;
+        } catch (\Throwable $e) {
+            Log::error('Firestore jobExistsByDirectoryPath failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function bookExistsByDirectoryPath(string $directoryPath): bool
+    {
+        try {
+            if (!$this->db) {
+                return false;
+            }
+
+            $booksRef = $this->db->collection('books');
+            $query = $booksRef->where('directory_path', '==', $directoryPath);
+            $documents = $query->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    return true;
+                }
+            }
+
+            return false;
+        } catch (\Throwable $e) {
+            Log::error('Firestore bookExistsByDirectoryPath failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function findOrCreateMany(string $collection, array $names): array
+    {
+        if (!$this->db) {
+            return [];
+        }
+
+        $ids = [];
+        foreach ($names as $name) {
+            $trimmedName = trim($name);
+            if (empty($trimmedName)) {
+                continue;
+            }
+
+            $collectionRef = $this->db->collection($collection);
+            $query = $collectionRef->where('name', '=', $trimmedName)->limit(1);
+            $documents = $query->documents();
+
+            $existingDoc = null;
+            // Need to iterate to get the first document
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $existingDoc = $document;
+                    break;
+                }
+            }
+
+            if ($existingDoc) {
+                $ids[] = $existingDoc->id();
+            } else {
+                $newDocRef = $collectionRef->add(['name' => $trimmedName]);
+                $ids[] = $newDocRef->id();
+            }
+        }
+
+        return $ids;
     }
 
     public function getBooksInSeries(string $seriesId): array
     {
-        throw new \Exception('Not implemented');
+        try {
+            if (!$this->db) {
+                return [];
+            }
+            $query = $this->db->collection('books')->where('series.id', '=', $seriesId);
+            $documents = $query->documents();
+
+            $books = [];
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $data = $document->data();
+                    $data['id'] = $document->id();
+                    $books[] = $data;
+                }
+            }
+
+            return $books;
+        } catch (\Throwable $e) {
+            Log::error('Firestore getBooksInSeries failed: ' . $e->getMessage());
+
+            return [];
+        }
     }
 
-    public function updateJob(string $jobId, array $data): void
+    /**
+     * Get a user by their email address
+     *
+     * @param string $email The email address to search for
+     * @return array|null The user data or null if not found
+     */
+    public function getUserByEmail(string $email): ?array
     {
-        throw new \Exception('Not implemented');
+        try {
+            if (!$this->db) {
+                return null;
+            }
+
+            $query = $this->db->collection('users')
+                ->where('email', '=', $email)
+                ->limit(1);
+
+            $documents = $query->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $userData = $document->data();
+                    $userData['id'] = $document->id();
+                    return $userData;
+                }
+            }
+
+            return null;
+        } catch (\Throwable $e) {
+            Log::error('Firestore getUserByEmail failed: ' . $e->getMessage());
+            return null;
+        }
     }
+
+    /**
+     * Check if a user with the given email exists
+     *
+     * @param string $email The email address to check
+     * @return bool True if a user with this email exists
+     */
+    public function userExistsByEmail(string $email): bool
+    {
+        try {
+            if (!$this->db) {
+                return false;
+            }
+
+            $query = $this->db->collection('users')
+                ->where('email', '=', $email)
+                ->limit(1);
+
+            $documents = $query->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    return true;
+                }
+            }
+
+            return false;
+        } catch (\Throwable $e) {
+            Log::error('Firestore userExistsByEmail failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Check if a user with the given username exists
+     *
+     * @param string $username The username to check
+     * @return bool True if a user with this username exists
+     */
+    public function userExistsByUsername(string $username): bool
+    {
+        try {
+            if (!$this->db) {
+                return false;
+            }
+
+            $query = $this->db->collection('users')
+                ->where('username', '=', $username)
+                ->limit(1);
+
+            $documents = $query->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    return true;
+                }
+            }
+
+            return false;
+        } catch (\Throwable $e) {
+            Log::error('Firestore userExistsByUsername failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Get a user by their username
+     *
+     * @param string $username The username to search for
+     * @return array|null The user data or null if not found
+     */
+    public function getUserByUsername(string $username): ?array
+    {
+        try {
+            if (!$this->db) {
+                return null;
+            }
+
+            $query = $this->db->collection('users')
+                ->where('username', '=', $username)
+                ->limit(1);
+
+            $documents = $query->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $userData = $document->data();
+                    $userData['id'] = $document->id();
+                    return $userData;
+                }
+            }
+
+            return null;
+        } catch (\Throwable $e) {
+            Log::error('Firestore getUserByUsername failed: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Get all admin users
+     *
+     * @return array List of admin users
+     */
+    public function getAdminUsers(): array
+    {
+        try {
+            $admins = $this->db->collection('users')
+                ->where('is_admin', '=', true)
+                ->documents();
+
+            $adminUsers = [];
+            foreach ($admins as $admin) {
+                if ($admin->exists()) {
+                    $adminData = $admin->data();
+                    $adminData['id'] = $admin->id();
+                    $adminUsers[] = $adminData;
+                }
+            }
+
+            return $adminUsers;
+        } catch (\Exception $e) {
+            Log::error('Error getting admin users: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Check if a follow relationship exists
+     *
+     * @param string $userId The ID of the user who is following
+     * @param string $followableType Type of the entity being followed (e.g., 'author', 'series')
+     * @param string $followableId ID of the entity being followed
+     * @return bool True if the follow relationship exists
+     */
+    public function followExists(string $userId, string $followableType, string $followableId): bool
+    {
+        try {
+            $follows = $this->db->collection('follows')
+                ->where('user_id', '=', $userId)
+                ->where('followable_type', '=', $followableType)
+                ->where('followable_id', '=', $followableId)
+                ->limit(1)
+                ->documents();
+
+            return !$follows->isEmpty();
+        } catch (\Exception $e) {
+            Log::error('Error checking if follow exists: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Create a follow relationship
+     *
+     * @param string $userId The ID of the user who is following
+     * @param string $followableType Type of the entity being followed (e.g., 'author', 'series')
+     * @param string $followableId ID of the entity being followed
+     * @return bool True if the follow was created successfully
+     */
+    public function createFollow(string $userId, string $followableType, string $followableId): bool
+    {
+        try {
+            $this->db->collection('follows')->add([
+                'user_id' => $userId,
+                'followable_type' => $followableType,
+                'followable_id' => $followableId,
+                'created_at' => new \DateTime(),
+                'updated_at' => new \DateTime(),
+            ]);
+            return true;
+        } catch (\Exception $e) {
+            Log::error('Error creating follow: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Delete a follow relationship
+     *
+     * @param string $userId The ID of the user who is following
+     * @param string $followableType Type of the entity being followed (e.g., 'author', 'series')
+     * @param string $followableId ID of the entity being followed
+     * @return bool True if the follow was deleted successfully
+     */
+    public function deleteFollow(string $userId, string $followableType, string $followableId): bool
+    {
+        try {
+            $follows = $this->db->collection('follows')
+                ->where('user_id', '=', $userId)
+                ->where('followable_type', '=', $followableType)
+                ->where('followable_id', '=', $followableId)
+                ->documents();
+
+            $batch = $this->db->batch();
+            $deleted = false;
+
+            foreach ($follows as $follow) {
+                if ($follow->exists()) {
+                    $batch->delete($follow->reference());
+                    $deleted = true;
+                }
+            }
+
+            if ($deleted) {
+                $batch->commit();
+            }
+
+            return $deleted;
+        } catch (\Exception $e) {
+            Log::error('Error deleting follow: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Get all users in the system
+     *
+     * @return array List of all users
+     */
+    public function getAllUsers(): array
+    {
+        try {
+            if (!$this->db) {
+                return [];
+            }
+
+            $documents = $this->db->collection('users')->documents();
+            $users = [];
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $userData = $document->data();
+                    $userData['id'] = $document->id();
+                    $users[] = $userData;
+                }
+            }
+
+            return $users;
+        } catch (\Throwable $e) {
+            Log::error('Firestore getAllUsers failed: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Update a job
+     *
+     * @param string $jobId The job ID
+     * @param array $data The updated job data
+     * @return bool Success status
+     */
+    public function updateJob(string $jobId, array $data): bool
+    {
+        try {
+            if (!$this->db) {
+                return false;
+            }
+
+            $jobRef = $this->db->collection('jobs')->document($jobId);
+            $snapshot = $jobRef->snapshot();
+
+            if (!$snapshot->exists()) {
+                return false;
+            }
+
+            // Get current job data
+            $currentData = $snapshot->data();
+
+            // Merge with new data
+            $updateData = [];
+            foreach ($data as $key => $value) {
+                if ($key === 'data' && isset($currentData['data']) && is_array($currentData['data'])) {
+                    // Special handling for nested data field
+                    $updateData[] = ['path' => 'data', 'value' => array_merge($currentData['data'], $value)];
+                } else {
+                    $updateData[] = ['path' => $key, 'value' => $value];
+                }
+            }
+
+            // Always update the timestamp
+            $updateData[] = ['path' => 'updated_at', 'value' => new \Google\Cloud\Firestore\Timestamp(time(), 0)];
+
+            // Perform the update
+            $jobRef->update($updateData);
+
+            return true;
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Firestore updateJob failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Get an author by ID
+     *
+     * @param string $id The author ID
+     * @return array|null The author data or null if not found
+     */
+    public function getAuthor(string $id): ?array
+    {
+        try {
+            if (!$this->db) {
+                return null;
+            }
+            $snap = $this->db->collection('authors')->document($id)->snapshot();
+            if (!$snap->exists()) {
+                return null;
+            }
+            $author = $snap->data();
+            $author['id'] = $id;
+
+            return $author;
+        } catch (\Throwable $e) {
+            Log::error('Firestore getAuthor failed: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Update an author
+     *
+     * @param string $id The author ID
+     * @param array $data The updated author data
+     * @return bool True if the update was successful
+     */
+    public function updateAuthor(string $id, array $data): bool
+    {
+        try {
+            if (!$this->db) {
+                return false;
+            }
+
+            $docRef = $this->db->collection('authors')->document($id);
+            $snap = $docRef->snapshot();
+
+            if (!$snap->exists()) {
+                return false;
+            }
+
+            $docRef->set($data, ['merge' => true]);
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('Firestore updateAuthor failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Create an API token for a user
+     *
+     * @param array $tokenData The token data including user_id, token, etc.
+     * @return string|null The token ID or null on failure
+     */
+    public function createApiToken(array $tokenData): ?string
+    {
+        try {
+            if (!$this->db) {
+                return null;
+            }
+
+            $docRef = $this->db->collection('api_tokens')->add($tokenData);
+            return $docRef->id();
+        } catch (\Throwable $e) {
+            Log::error('Firestore createApiToken failed: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Delete an API token by its value
+     *
+     * @param string $tokenValue The token value to delete
+     * @return bool True if token was deleted, false otherwise
+     */
+    public function deleteApiTokenByValue(string $tokenValue): bool
+    {
+        try {
+            if (!$this->db) {
+                return false;
+            }
+
+            $query = $this->db->collection('api_tokens')
+                ->where('token', '=', $tokenValue);
+
+            $documents = $query->documents();
+            $deleted = false;
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $document->reference()->delete();
+                    $deleted = true;
+                }
+            }
+
+            return $deleted;
+        } catch (\Throwable $e) {
+            Log::error('Firestore deleteApiTokenByValue failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Get pending account requests
+     *
+     * @return array List of pending account requests
+     */
+    public function getPendingAccountRequests(): array
+    {
+        try {
+            if (!$this->db) {
+                return [];
+            }
+
+            $query = $this->db->collection('account_requests')
+                ->where('status', '=', 'pending')
+                ->orderBy('created_at', 'DESC');
+
+            $documents = $query->documents();
+            $requests = [];
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $data = $document->data();
+                    $data['id'] = $document->id();
+                    $requests[] = $data;
+                }
+            }
+
+            return $requests;
+        } catch (\Throwable $e) {
+            Log::error('Firestore getPendingAccountRequests failed: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Get a specific account request by ID
+     *
+     * @param string $id The account request ID
+     * @return array|null The account request data or null if not found
+     */
+    public function getAccountRequest(string $id): ?array
+    {
+        try {
+            if (!$this->db) {
+                return null;
+            }
+
+            $docRef = $this->db->collection('account_requests')->document($id);
+            $document = $docRef->snapshot();
+
+            if ($document->exists()) {
+                $data = $document->data();
+                $data['id'] = $document->id();
+                return $data;
+            }
+
+            return null;
+        } catch (\Throwable $e) {
+            Log::error('Firestore getAccountRequest failed: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Approve an account request
+     *
+     * @param string $id The account request ID
+     * @return bool True if the request was approved successfully
+     */
+    public function approveAccountRequest(string $id): bool
+    {
+        try {
+            if (!$this->db) {
+                return false;
+            }
+
+            // Get the account request
+            $docRef = $this->db->collection('account_requests')->document($id);
+            $document = $docRef->snapshot();
+
+            if (!$document->exists()) {
+                return false;
+            }
+
+            $requestData = $document->data();
+
+            // Update the status to approved
+            $docRef->update([
+                ['path' => 'status', 'value' => 'approved'],
+                ['path' => 'updated_at', 'value' => new \Google\Cloud\Firestore\Timestamp(time(), 0)],
+            ]);
+
+            // Create a new user from the account request data
+            $userData = [
+                'name' => $requestData['name'] ?? '',
+                'email' => $requestData['email'] ?? '',
+                'username' => $requestData['username'] ?? '',
+                'password' => Hash::make($requestData['password'] ?? ''),
+                'created_at' => new \Google\Cloud\Firestore\Timestamp(time(), 0),
+                'updated_at' => new \Google\Cloud\Firestore\Timestamp(time(), 0),
+            ];
+
+            $this->db->collection('users')->add($userData);
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('Firestore approveAccountRequest failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Reject an account request
+     *
+     * @param string $id The account request ID
+     * @return bool True if the request was rejected successfully
+     */
+    public function rejectAccountRequest(string $id): bool
+    {
+        try {
+            if (!$this->db) {
+                return false;
+            }
+
+            // Get the account request
+            $docRef = $this->db->collection('account_requests')->document($id);
+            $document = $docRef->snapshot();
+
+            if (!$document->exists()) {
+                return false;
+            }
+
+            // Update the status to rejected
+            $docRef->update([
+                ['path' => 'status', 'value' => 'rejected'],
+                ['path' => 'updated_at', 'value' => new \Google\Cloud\Firestore\Timestamp(time(), 0)],
+            ]);
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('Firestore rejectAccountRequest failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function getAccountRequests()
+    {
+        try {
+            if (!$this->db) {
+                return [];
+            }
+
+            $accountRequests = [];
+            $documents = $this->db->collection('account_requests')
+                ->orderBy('created_at', 'desc')
+                ->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $accountRequests[] = array_merge(['id' => $document->id()], $document->data());
+                }
+            }
+
+            return $accountRequests;
+        } catch (\Throwable $e) {
+            Log::error('Firestore getAccountRequests failed: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+
+
+    public function deleteAccountRequest(string $id): void
+    {
+        try {
+            if (!$this->db) {
+                return;
+            }
+
+            $docRef = $this->db->collection('account_requests')->document($id);
+            $docRef->delete();
+        } catch (\Throwable $e) {
+            Log::error('Firestore deleteAccountRequest failed: ' . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    public function getAccountRequestsByStatus(string $status): array
+    {
+        try {
+            if (!$this->db) {
+                return [];
+            }
+
+            $accountRequests = [];
+            $documents = $this->db->collection('account_requests')
+                ->where('status', '=', $status)
+                ->orderBy('created_at', 'desc')
+                ->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $accountRequests[] = array_merge(['id' => $document->id()], $document->data());
+                }
+            }
+
+            return $accountRequests;
+        } catch (\Throwable $e) {
+            Log::error('Firestore getAccountRequestsByStatus failed: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function getAccountRequestsByUser(string $userId): array
+    {
+        try {
+            if (!$this->db) {
+                return [];
+            }
+
+            $accountRequests = [];
+            $documents = $this->db->collection('account_requests')
+                ->where('user_id', '=', $userId)
+                ->orderBy('created_at', 'desc')
+                ->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $accountRequests[] = array_merge(['id' => $document->id()], $document->data());
+                }
+            }
+
+            return $accountRequests;
+        } catch (\Throwable $e) {
+            Log::error('Firestore getAccountRequestsByUser failed: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function getAccountRequestsByUserAndStatus(string $userId, string $status): array
+    {
+        try {
+            if (!$this->db) {
+                return [];
+            }
+
+            $accountRequests = [];
+            $documents = $this->db->collection('account_requests')
+                ->where('user_id', '=', $userId)
+                ->where('status', '=', $status)
+                ->orderBy('created_at', 'desc')
+                ->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $accountRequests[] = array_merge(['id' => $document->id()], $document->data());
+                }
+            }
+
+            return $accountRequests;
+        } catch (\Throwable $e) {
+            Log::error('Firestore getAccountRequestsByUserAndStatus failed: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function getAccountRequestsByUserAndStatusAndType(string $userId, string $status, string $type): array
+    {
+        try {
+            if (!$this->db) {
+                return [];
+            }
+
+            $accountRequests = [];
+            $documents = $this->db->collection('account_requests')
+                ->where('user_id', '=', $userId)
+                ->where('status', '=', $status)
+                ->where('type', '=', $type)
+                ->orderBy('created_at', 'desc')
+                ->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $accountRequests[] = array_merge(['id' => $document->id()], $document->data());
+                }
+            }
+
+            return $accountRequests;
+        } catch (\Throwable $e) {
+            Log::error('Firestore getAccountRequestsByUserAndStatusAndType failed: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function getAccountRequestsByUserAndStatusAndTypeAndSource(string $userId, string $status, string $type, string $source): array
+    {
+        try {
+            if (!$this->db) {
+                return [];
+            }
+
+            $accountRequests = [];
+            $documents = $this->db->collection('account_requests')
+                ->where('user_id', '=', $userId)
+                ->where('status', '=', $status)
+                ->where('type', '=', $type)
+                ->where('source', '=', $source)
+                ->orderBy('created_at', 'desc')
+                ->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $accountRequests[] = array_merge(['id' => $document->id()], $document->data());
+                }
+            }
+
+            return $accountRequests;
+        } catch (\Throwable $e) {
+            Log::error('Firestore getAccountRequestsByUserAndStatusAndTypeAndSource failed: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function createMessage(array $messageData): string|null
+    {
+        try {
+            if (!$this->db) {
+                return null;
+            }
+
+            $docRef = $this->db->collection('messages')->add($messageData);
+            return $docRef->id();
+        } catch (\Throwable $e) {
+            Log::error('Firestore createMessage failed: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    public function updateMessage(string $id, array $messageData): bool
+    {
+        try {
+            if (!$this->db) {
+                return false;
+            }
+
+            $docRef = $this->db->collection('messages')->document($id);
+            $document = $docRef->snapshot();
+
+            if (!$document->exists()) {
+                return false;
+            }
+
+            $docRef->update($messageData);
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('Firestore updateMessage failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function deleteMessage(string $id): bool
+    {
+        try {
+            if (!$this->db) {
+                return false;
+            }
+
+            $docRef = $this->db->collection('messages')->document($id);
+            $document = $docRef->snapshot();
+
+            if (!$document->exists()) {
+                return false;
+            }
+
+            $docRef->delete();
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('Firestore deleteMessage failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function getMessage(string $id): ?array
+    {
+        try {
+            if (!$this->db) {
+                return null;
+            }
+
+            $docRef = $this->db->collection('messages')->document($id);
+            $document = $docRef->snapshot();
+
+            if (!$document->exists()) {
+                return null;
+            }
+
+            return $document->data();
+        } catch (\Throwable $e) {
+            Log::error('Firestore getMessage failed: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    public function getBookQueue(string $userId): array
+    {
+        try {
+            if (!$this->db) {
+                return [];
+            }
+
+            $queue = [];
+            $documents = $this->db->collection('users')
+                ->document($userId)
+                ->collection('book_queue')
+                ->orderBy('position')
+                ->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $queue[] = array_merge(['id' => $document->id()], $document->data());
+                }
+            }
+
+            return $queue;
+        } catch (\Throwable $e) {
+            Log::error('Firestore getBookQueue failed: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function getQueueCollection($name): array
+    {
+        try {
+            if (!$this->db) {
+                return [];
+            }
+
+            $queue = [];
+            $documents = $this->db->collection('queues')
+                ->document($name)
+                ->collection('items')
+                ->orderBy('position')
+                ->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $queue[] = array_merge(['id' => $document->id()], $document->data());
+                }
+            }
+
+            return $queue;
+        } catch (\Throwable $e) {
+            Log::error('Firestore getQueueCollection failed: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function resetReadingProgress(string $userId, string $bookId): bool
+    {
+        try {
+            if (!$this->db) {
+                return false;
+            }
+
+            $docRef = $this->db->collection('users')
+                ->document($userId)
+                ->collection('reading_progress')
+                ->document($bookId);
+
+            $docRef->set([
+                'progress' => 0,
+                'updated_at' => new Timestamp(new \DateTime()),
+                'is_finished' => false,
+            ], ['merge' => true]);
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('Firestore resetReadingProgress failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function getDocument(string $collection, string $docId): ?array
+    {
+        try {
+            if (!$this->db) {
+                return null;
+            }
+
+            $docRef = $this->db->collection($collection)->document($docId);
+            $document = $docRef->snapshot();
+
+            if (!$document->exists()) {
+                return null;
+            }
+
+            return array_merge(['id' => $document->id()], $document->data());
+        } catch (\Throwable $e) {
+            Log::error("Firestore getDocument failed for collection {$collection} and ID {$docId}: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    public function updateDocument(string $collection, string $id, array $data): bool
+    {
+        try {
+            if (!$this->db) {
+                return false;
+            }
+
+            $docRef = $this->db->collection($collection)->document($id);
+            $document = $docRef->snapshot();
+
+            if (!$document->exists()) {
+                return false;
+            }
+
+            // Add updated_at timestamp
+            $data['updated_at'] = new Timestamp(new \DateTime());
+
+            $docRef->set($data, ['merge' => true]);
+            return true;
+        } catch (\Throwable $e) {
+            Log::error("Firestore updateDocument failed for collection {$collection} and ID {$id}: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function getClient()
+    {
+        return $this->db;
+    }
+
+    public function getMessages(?string $userId = null, bool $includeAcknowledged = false, int $limit = 100): array
+    {
+        try {
+            if (!$this->db) {
+                return [];
+            }
+
+            $query = $this->db->collection('messages');
+
+            // Filter by user ID if provided
+            if ($userId !== null) {
+                $query = $query->where('user_id', '==', $userId);
+            }
+
+            // Filter out acknowledged messages if needed
+            if (!$includeAcknowledged) {
+                $query = $query->where('acknowledged', '==', false);
+            }
+
+            // Apply limit and order
+            $query = $query->orderBy('created_at', 'DESC')->limit($limit);
+
+            $messages = [];
+            $documents = $query->documents();
+
+            foreach ($documents as $document) {
+                if ($document->exists()) {
+                    $messages[] = array_merge(['id' => $document->id()], $document->data());
+                }
+            }
+
+            return $messages;
+        } catch (\Throwable $e) {
+            Log::error('Firestore getMessages failed: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+
 }

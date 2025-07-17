@@ -16,6 +16,7 @@ class RequireStandardRole
     public function handle(Request $request, Closure $next)
     {
         $user = Auth::user();
+
         // If not logged in or role is not set, block
         if (!$user || !isset($user->role)) {
             return response()->json(['message' => 'Forbidden'], 403);

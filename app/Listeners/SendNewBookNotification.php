@@ -2,15 +2,14 @@
 
 namespace App\Listeners;
 
-use App\Events\NewBookAdded;
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Events\NewBookAdded;
 use Illuminate\Support\Facades\Log;
 use Kreait\Firebase\Messaging\CloudMessage;
 use Kreait\Firebase\Messaging\Notification;
 
 class SendNewBookNotification
 {
-
     protected $documentStore;
 
     public function __construct(DocumentStoreServiceInterface $documentStore)

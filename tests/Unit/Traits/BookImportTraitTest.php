@@ -9,7 +9,7 @@ class BookImportTraitTest extends TestCase
 {
     use BookImportTrait;
 
-    public function testTitleNeedsReviewReturnsNullForNormalTitle()
+    public function test_title_needs_review_returns_null_for_normal_title()
     {
         $this->assertNull($this->titleNeedsReview(
             'The Hobbit',
@@ -19,7 +19,7 @@ class BookImportTraitTest extends TestCase
         ));
     }
 
-    public function testTitleNeedsReviewSeriesEqualsAuthor()
+    public function test_title_needs_review_series_equals_author()
     {
         $reasons = $this->titleNeedsReview(
             'Some Book',
@@ -34,7 +34,7 @@ class BookImportTraitTest extends TestCase
         );
     }
 
-    public function testTitleNeedsReviewTitleEqualsSeries()
+    public function test_title_needs_review_title_equals_series()
     {
         $reasons = $this->titleNeedsReview(
             'Stormlight Archive',
@@ -49,7 +49,7 @@ class BookImportTraitTest extends TestCase
         );
     }
 
-    public function testTitleNeedsReviewTitleNotInPath()
+    public function test_title_needs_review_title_not_in_path()
     {
         $reasons = $this->titleNeedsReview(
             'Odd Title',
@@ -64,7 +64,7 @@ class BookImportTraitTest extends TestCase
         );
     }
 
-    public function testTitleNeedsReviewNumbersAtEndsNoSeries()
+    public function test_title_needs_review_numbers_at_ends_no_series()
     {
         $reasons = $this->titleNeedsReview('123 The Book', null, 'Author', '/fantasy/author/123 The Book');
         $this->assertIsArray($reasons);

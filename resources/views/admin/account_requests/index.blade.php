@@ -22,16 +22,17 @@
             <tbody>
                 @foreach($accountRequests as $request)
                     <tr>
-                        <td>{{ $request->name }}</td>
-                        <td>{{ $request->email }}</td>
-                        <td>{{ $request->status }}</td>
+                        <td>{{ $request['name'] }}</td>
+                        <td>{{ $request['email'] }}</td>
+                        <td>{{ $request['status'] }}</td>
                         <td>
-                            <form action="{{ route('admin.account_requests.approve', $request) }}" method="POST" style="display:inline;">
+                            <form action="{{ route('admin.account_requests.update', ['account_request' => $request['id']]) }}" method="POST" style="display:inline;">
                                 @csrf
                                 <button type="submit" class="btn btn-success btn-sm">Approve</button>
                             </form>
-                            <form action="{{ route('admin.account_requests.reject', $request) }}" method="POST" style="display:inline;">
+                            <form action="{{ route('admin.account_requests.destroy', ['account_request' => $request['id']]) }}" method="POST" style="display:inline;">
                                 @csrf
+                                @method('DELETE')
                                 <button type="submit" class="btn btn-danger btn-sm">Reject</button>
                             </form>
                         </td>

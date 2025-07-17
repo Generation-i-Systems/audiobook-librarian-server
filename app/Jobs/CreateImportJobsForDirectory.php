@@ -17,9 +17,7 @@ class CreateImportJobsForDirectory implements ShouldQueue
     use InteractsWithQueue;
     use Queueable;
     use SerializesModels;
-    /**
-     * @var DocumentStoreServiceInterface
-     */
+
     protected DocumentStoreServiceInterface $documentStoreService;
 
     public function __construct($dir, DocumentStoreServiceInterface $documentStoreService)
@@ -41,8 +39,6 @@ class CreateImportJobsForDirectory implements ShouldQueue
      * @var string
      */
     protected $dir;
-
-
 
     /**
      * Execute the job.

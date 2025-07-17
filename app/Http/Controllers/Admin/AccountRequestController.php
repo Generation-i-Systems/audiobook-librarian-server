@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Http\Controllers\Controller;
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 
 class AccountRequestController extends Controller
@@ -14,53 +14,39 @@ class AccountRequestController extends Controller
     {
         $this->documentStoreService = $documentStoreService;
     }
+
     public function index()
     {
-        $firestore = $this->documentStoreService;
-        $accountRequests = $firestore->getClient()->collection('account_requests')
-            ->where('status', '=', 'pending')->documents();
-        $requests = [];
-        foreach ($accountRequests as $doc) {
-            if ($doc->exists()) {
-                $req = $doc->data();
-                $req['id'] = $doc->id();
-                $requests[] = $req;
-            }
-        }
+        $requests = $this->documentStoreService->getPendingAccountRequests();
 
         return view('admin.account_requests.index', ['accountRequests' => $requests]);
     }
 
-    public function approve($id)
+    public function update($id)
     {
-        $firestore = $this->documentStoreService;
-        $accountRequestDoc = $firestore->getClient()->collection('account_requests')->document($id)->snapshot();
-        if (!$accountRequestDoc->exists()) {
+        $accountRequest = $this->documentStoreService->getAccountRequest($id);
+
+        if (!$accountRequest) {
             return back()->withErrors(['error' => 'Account request not found.']);
         }
-        $accountRequest = $accountRequestDoc->data();
-        // Create a new user
-        $firestore->getClient()->collection('users')->add([
-            'name' => $accountRequest['name'],
-            'email' => $accountRequest['email'],
-            'password' => $accountRequest['password'], // Password already hashed
-            'role' => 'user',
-        ]);
-        // Update request to approved
-        $firestore->getClient()->collection('account_requests')->document($id)->set([
-            'status' => 'approved',
-        ], ['merge' => true]);
 
-        return back()->with('success', 'Account request approved!');
+        $success = $this->documentStoreService->approveAccountRequest($id);
+
+        if ($success) {
+            return back()->with('success', 'Account request approved!');
+        } else {
+            return back()->withErrors(['error' => 'Failed to approve account request.']);
+        }
     }
 
-    public function reject($id)
+    public function destroy($id)
     {
-        $firestore = $this->documentStoreService;
-        $firestore->getClient()->collection('account_requests')->document($id)->set([
-            'status' => 'rejected',
-        ], ['merge' => true]);
+        $success = $this->documentStoreService->rejectAccountRequest($id);
 
-        return back()->with('success', 'Account request rejected!');
+        if ($success) {
+            return back()->with('success', 'Account request rejected!');
+        } else {
+            return back()->withErrors(['error' => 'Failed to reject account request.']);
+        }
     }
 }

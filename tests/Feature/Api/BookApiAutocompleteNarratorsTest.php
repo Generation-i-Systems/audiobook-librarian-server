@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Api;
 
-use Tests\TestCase;
+use App\Auth\DocumentstoreUser;
 use App\Services\MongoService;
 use Mockery;
-use App\Auth\DocumentstoreUser;
+use Tests\TestCase;
 
 class BookApiAutocompleteNarratorsTest extends TestCase
 {
@@ -15,7 +15,7 @@ class BookApiAutocompleteNarratorsTest extends TestCase
     {
         parent::setUp();
         $user = new DocumentstoreUser(['id' => 'test-user', 'name' => 'Test User', 'email' => 'test@example.com']);
-        $this->actingAs($user, 'api');
+        $this->actingAs($user, 'api_test');
     }
 
     /** @test */
@@ -31,7 +31,7 @@ class BookApiAutocompleteNarratorsTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJson([
-                'data' => ['Michael Kramer', 'Kramer Smith']
+                'data' => ['Michael Kramer', 'Kramer Smith'],
             ]);
     }
 

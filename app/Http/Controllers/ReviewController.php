@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Contracts\DocumentStoreServiceInterface;
 
 class ReviewController extends Controller
 {
@@ -15,8 +16,8 @@ class ReviewController extends Controller
             'content_rating' => 'required|string',
         ]);
 
-        $firestore = $this->documentStoreService;
-        $firestore->createReview([
+        $documentStore = app(DocumentStoreServiceInterface::class);
+        $documentStore->createReview([
             'book_id' => $bookId,
             'user_id' => Auth::id(),
             'comment' => $request->comment,

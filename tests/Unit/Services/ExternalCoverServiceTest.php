@@ -7,23 +7,24 @@ use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Mockery;
 use Tests\TestCase;
 
 class ExternalCoverServiceTest extends TestCase
 {
     private ExternalCoverService $externalCoverService;
+
     private string $testDirectoryPath = 'test/directory/path';
+
     private string $testUrl = 'https://example.com/image.jpg';
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->externalCoverService = new ExternalCoverService();
-        
+        $this->externalCoverService = new ExternalCoverService;
+
         // Create a fake storage disk
         Storage::fake('books');
-        
+
         // Allow any Log calls by default
         Log::shouldReceive('info')->byDefault();
         Log::shouldReceive('error')->byDefault();
@@ -32,14 +33,14 @@ class ExternalCoverServiceTest extends TestCase
     /**
      * Test successful image download
      */
-    public function testDownloadCoverImageSuccess(): void
+    public function test_download_cover_image_success(): void
     {
         // Mock HTTP response with a successful image download
         $imageContent = file_get_contents(base_path('tests/fixtures/test-image.jpg')) ?: 'fake image content';
         Http::fake([
             $this->testUrl => Http::response($imageContent, 200, ['Content-Type' => 'image/jpeg']),
         ]);
-        
+
         // Call the method
         $result = $this->externalCoverService->downloadCoverImage(
             $this->testUrl,
@@ -47,15 +48,15 @@ class ExternalCoverServiceTest extends TestCase
             'test',
             '123'
         );
-        
+
         // Assert the result
         $this->assertTrue($result['success']);
         $this->assertNotNull($result['path']);
         $this->assertNull($result['error']);
-        
+
         // Assert the result contains the expected path
         $this->assertStringContainsString($this->testDirectoryPath, $result['path']);
-        
+
         // We can't use assertExists because we're using a fake storage
         // Instead, check that the path is valid and not null
         $this->assertNotNull($result['path']);
@@ -64,7 +65,7 @@ class ExternalCoverServiceTest extends TestCase
     /**
      * Test image download with invalid URL
      */
-    public function testDownloadCoverImageInvalidUrl(): void
+    public function test_download_cover_image_invalid_url(): void
     {
         // Call the method with invalid URL
         $result = $this->externalCoverService->downloadCoverImage(
@@ -73,7 +74,7 @@ class ExternalCoverServiceTest extends TestCase
             'test',
             '123'
         );
-        
+
         // Assert the result
         $this->assertFalse($result['success']);
         $this->assertNull($result['path']);
@@ -83,13 +84,13 @@ class ExternalCoverServiceTest extends TestCase
     /**
      * Test image download with HTTP error
      */
-    public function testDownloadCoverImageHttpError(): void
+    public function test_download_cover_image_http_error(): void
     {
         // Mock HTTP response with an error
         Http::fake([
             $this->testUrl => Http::response('Not Found', 404),
         ]);
-        
+
         // Call the method
         $result = $this->externalCoverService->downloadCoverImage(
             $this->testUrl,
@@ -97,7 +98,7 @@ class ExternalCoverServiceTest extends TestCase
             'test',
             '123'
         );
-        
+
         // Assert the result
         $this->assertFalse($result['success']);
         $this->assertNull($result['path']);
@@ -107,13 +108,13 @@ class ExternalCoverServiceTest extends TestCase
     /**
      * Test image download with empty content
      */
-    public function testDownloadCoverImageEmptyContent(): void
+    public function test_download_cover_image_empty_content(): void
     {
         // Mock HTTP response with empty content
         Http::fake([
             $this->testUrl => Http::response('', 200, ['Content-Type' => 'image/jpeg']),
         ]);
-        
+
         // Call the method
         $result = $this->externalCoverService->downloadCoverImage(
             $this->testUrl,
@@ -121,7 +122,7 @@ class ExternalCoverServiceTest extends TestCase
             'test',
             '123'
         );
-        
+
         // Assert the result
         $this->assertFalse($result['success']);
         $this->assertNull($result['path']);
@@ -131,13 +132,13 @@ class ExternalCoverServiceTest extends TestCase
     /**
      * Test image download with non-image content
      */
-    public function testDownloadCoverImageNonImageContent(): void
+    public function test_download_cover_image_non_image_content(): void
     {
         // Mock HTTP response with non-image content
         Http::fake([
             $this->testUrl => Http::response('This is not an image', 200, ['Content-Type' => 'text/plain']),
         ]);
-        
+
         // Call the method
         $result = $this->externalCoverService->downloadCoverImage(
             $this->testUrl,
@@ -145,7 +146,7 @@ class ExternalCoverServiceTest extends TestCase
             'test',
             '123'
         );
-        
+
         // Assert the result
         $this->assertFalse($result['success']);
         $this->assertNull($result['path']);
@@ -155,21 +156,21 @@ class ExternalCoverServiceTest extends TestCase
     /**
      * Test image download with storage error
      */
-    public function testDownloadCoverImageStorageError(): void
+    public function test_download_cover_image_storage_error(): void
     {
         // Create a mock of the ExternalCoverService with a custom implementation
         $mockService = $this->getMockBuilder(ExternalCoverService::class)
             ->onlyMethods(['downloadCoverImage'])
             ->getMock();
-            
+
         // Configure the mock to return a specific error result
         $mockService->method('downloadCoverImage')
             ->willReturn([
                 'success' => false,
                 'path' => null,
-                'error' => 'Failed to save image: Storage error'
+                'error' => 'Failed to save image: Storage error',
             ]);
-            
+
         // Call the method on the mock
         $result = $mockService->downloadCoverImage(
             $this->testUrl,
@@ -177,7 +178,7 @@ class ExternalCoverServiceTest extends TestCase
             'test',
             '123'
         );
-        
+
         // Assert the result
         $this->assertFalse($result['success']);
         $this->assertNull($result['path']);

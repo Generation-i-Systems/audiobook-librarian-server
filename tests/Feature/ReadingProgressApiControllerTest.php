@@ -13,14 +13,14 @@ class ReadingProgressApiControllerTest extends TestCase
         $mock->shouldReceive('updateReadingProgress')->andReturn(true);
         $mock->shouldReceive('resetReadingProgress')->andReturn(true);
         $mock->shouldReceive('getUserById')->andReturnUsing(function ($id) {
-            return ['id' => $id, 'name' => 'Test User', 'email' => 'test' . $id . '@example.com'];
+            return ['id' => $id, 'name' => 'Test User', 'email' => 'test'.$id.'@example.com'];
         });
         $this->app->instance(\App\Contracts\DocumentStoreServiceInterface::class, $mock);
         $this->withoutMiddleware();
     }
 
     /** @test */
-    public function resetReadingProgress_success()
+    public function reset_reading_progress_success()
     {
         $userId = 1;
         \Illuminate\Support\Facades\Auth::loginUsingId($userId);
@@ -42,7 +42,7 @@ class ReadingProgressApiControllerTest extends TestCase
     }
 
     /** @test */
-    public function resetReadingProgress_failure()
+    public function reset_reading_progress_failure()
     {
         $userId = 2;
         \Illuminate\Support\Facades\Auth::loginUsingId($userId);

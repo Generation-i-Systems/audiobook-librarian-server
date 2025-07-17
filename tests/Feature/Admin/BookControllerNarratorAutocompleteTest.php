@@ -10,14 +10,16 @@ use Tests\TestCase;
 
 /**
  * @covers \App\Http\Controllers\Admin\BookController
+ *
  * @phpstan-ignore-next-line
+ *
  * @psalm-suppress all
  */
 class BookControllerNarratorAutocompleteTest extends TestCase
 {
     protected function setUp(): void
     {
-                parent::setUp();
+        parent::setUp();
 
         // Set a valid app key for encryption
         config(['app.key' => 'base64:'.base64_encode(random_bytes(32))]);
@@ -35,7 +37,7 @@ class BookControllerNarratorAutocompleteTest extends TestCase
      *
      * @return void
      */
-    public function testNarratorAutocomplete()
+    public function test_narrator_autocomplete()
     {
         // Create mock admin user that implements Authenticatable
         /** @var \Illuminate\Contracts\Auth\Authenticatable|\Mockery\MockInterface $user */
@@ -73,7 +75,7 @@ class BookControllerNarratorAutocompleteTest extends TestCase
      *
      * @return void
      */
-    public function testNarratorAutocompleteWithEmptyTerm()
+    public function test_narrator_autocomplete_with_empty_term()
     {
         // Create mock admin user that implements Authenticatable
         /** @var \Illuminate\Contracts\Auth\Authenticatable|\Mockery\MockInterface $user */

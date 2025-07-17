@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Jobs\CreateImportJobsForDirectory;
-use App\Contracts\DocumentStoreServiceInterface;
 use App\Traits\BookImportTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -14,34 +14,32 @@ use Illuminate\Support\Facades\Process;
 class QueueController extends Controller
 {
     use BookImportTrait;
+
     protected DocumentStoreServiceInterface $documentStoreService;
+
 
     public function __construct(DocumentStoreServiceInterface $documentStoreService)
     {
         $this->documentStoreService = $documentStoreService;
     }
 
+
     public function index()
     {
         return view('admin.queue.index');
     }
 
+
     public function list(Request $request)
     {
         $typeFilter = $request->query('type');
-        $jobsDocs = $this->documentStoreService->getClient()->collection('jobs')->documents();
+        $allJobs = $this->documentStoreService->getJobs();
 
         $jobTypeCounts = [];
         $jobTypes = [];
         $jobs = collect();
 
-        foreach ($jobsDocs as $doc) {
-            if (!$doc->exists()) {
-                continue;
-            }
-            $job = $doc->data();
-            $job['id'] = $doc->id(); // Ensure ID is present
-
+        foreach ($allJobs as $job) {
             $jobType = $job['type'] ?? 'Unknown';
             $dir = $job['data']['directoryPath'] ?? null;
 
@@ -74,28 +72,42 @@ class QueueController extends Controller
         ]);
     }
 
+
     public function remove($id)
     {
-        $this->documentStoreService->getClient()->collection('jobs')->document($id)->delete();
+        $job = $this->documentStoreService->getJob($id);
+        if ($job) {
+            $this->documentStoreService->updateJob($id, ['status' => 'deleted']);
+        }
 
         return response()->json(['success' => true]);
     }
+
 
     public function retry($id)
     {
-        $this->documentStoreService->getClient()->collection('jobs')->document($id)->delete();
+        $job = $this->documentStoreService->getJob($id);
+        if ($job) {
+            // Reset job status to pending for retry
+            $this->documentStoreService->updateJob($id, [
+                'status' => 'pending',
+                'data' => array_merge($job['data'] ?? [], ['attempts' => 0]),
+            ]);
+        }
 
         return response()->json(['success' => true]);
     }
+
 
     public function status()
     {
         // Check for running worker (simple: look for process, or use a cache heartbeat)
         $running = Cache::get('queueWorkerHeartbeat') ? true : false;
-        $pending = $this->documentStoreService->getClient()->collection('jobs')->count();
+        $pending = $this->documentStoreService->getJobCount();
 
         return response()->json(['workerRunning' => $running, 'pendingJobs' => $pending]);
     }
+
 
     public function startWorker()
     {
@@ -109,20 +121,17 @@ class QueueController extends Controller
         return response()->json(['started' => true]);
     }
 
+
     public function clear()
     {
-        $docs = $this->documentStoreService->getClient()->collection('jobs')->documents();
-        foreach ($docs as $doc) {
-            if ($doc->exists()) {
-                $doc->reference()->delete();
-            }
-        }
+        $success = $this->documentStoreService->clearJobs();
 
-        return response()->json(['success' => true]);
+        return response()->json(['success' => $success]);
     }
 
+
     /**
-     * Bulk import all book directories under a given path, using Firestore jobs collection for deduplication.
+     * Bulk import all book directories under a given path, using jobs collection for deduplication.
      */
     public function bulkImportBooks(Request $request)
     {
@@ -131,45 +140,30 @@ class QueueController extends Controller
         $absRoot = rtrim($storagePath, '/') . '/' . ltrim($root, '/');
         if (!is_dir($absRoot)) {
             return response()->json([
-                'error' => 'Invalid Google Books API response.',
+                'error' => 'Invalid directory path.',
             ], 422);
         }
+
         // Use BookImportTrait's findBookDirectories
         $bookDirs = $this->findBookDirectories($absRoot);
         $queued = [];
-        $jobsCollection = $this->documentStoreService->getClient()->collection('jobs');
-        $jobsDocs = $jobsCollection->documents();
-        $pendingJobs = collect($jobsDocs)->map(function ($doc) {
-            return $doc->exists() ? $doc->data() : null;
-        })->filter();
+
+        // Get all jobs for checking duplicates
+        $allJobs = $this->documentStoreService->getJobs();
+
         foreach ($bookDirs as $dir) {
             $relDir = ltrim(str_replace($storagePath, '', $dir), '/');
-            $alreadyQueued = false;
-            // Check Firestore jobs collection for queued jobs with this directory
-            foreach ($pendingJobs as $job) {
-                $payload = json_decode($job['payload'] ?? '', true);
-                if (
-                    isset($payload['data']['command']) &&
-                    preg_match('/directoryPath";s:\\d+:"([^"]+)"/', $payload['data']['command'], $matches) &&
-                    $matches[1] === $relDir
-                ) {
-                    $alreadyQueued = true;
-                    break;
-                }
-            }
-            // Check for existing book record in Firestore
-            $bookExists = false;
-            $booksCollection = $this->documentStoreService->getClient()->collection('books');
-            $bookDocs = $booksCollection->where('directoryPath', '=', $relDir)->documents();
-            foreach ($bookDocs as $doc) {
-                if ($doc->exists()) {
-                    $bookExists = true;
-                    break;
-                }
-            }
+
+            // Check if job already exists for this directory
+            $alreadyQueued = $this->documentStoreService->jobExistsByDirectoryPath($relDir);
+
+            // Check if book already exists with this directory path
+            $bookExists = $this->documentStoreService->bookExistsByDirectoryPath($relDir);
+
             if ($bookExists) {
                 $alreadyQueued = true;
             }
+
             if (!$alreadyQueued) {
                 \App\Jobs\ImportBookFromDirectoryJob::dispatch($relDir);
                 $queued[] = $relDir;
@@ -185,6 +179,7 @@ class QueueController extends Controller
             200,
         );
     }
+
 
     /**
      * Bulk import all book directories from a specific directory (recursive, queued)

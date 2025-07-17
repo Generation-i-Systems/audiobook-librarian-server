@@ -14,9 +14,9 @@ use Tests\TestCase;
 class BookDirectoryParserTest extends TestCase
 {
     #[Test]
-    public function testExtractAuthorFromPathWithGenreAndSubgenre()
+    public function test_extract_author_from_path_with_genre_and_subgenre()
     {
-        $parser = new BookDirectoryParser();
+        $parser = new BookDirectoryParser;
         // Patch: set genres so 'Fantasy' is recognized and skipped
         $reflection = new \ReflectionClass($parser);
         $genresProp = $reflection->getProperty('genres');
@@ -85,14 +85,14 @@ class BookDirectoryParserTest extends TestCase
     }
 
     #[Test]
-    public function testParsesAuthorTitleDirectoryStructure()
+    public function test_parses_author_title_directory_structure()
     {
         // Skipping due to vfsStream/Symfony Finder incompatibility
         $this->markTestSkipped('parseDirectory cannot be tested with vfsStream due to Symfony Finder limitations . ');
     }
 
     #[Test]
-    public function testParsesAuthorSeriesTitleDirectoryStructure()
+    public function test_parses_author_series_title_directory_structure()
     {
         // Create directory structure: /genre/author/series/title/
         $structure = [
@@ -139,14 +139,14 @@ class BookDirectoryParserTest extends TestCase
     }
 
     #[Test]
-    public function testMarksBooksWithoutAuthorAsNeedingReview()
+    public function test_marks_books_without_author_as_needing_review()
     {
         // Skipping due to vfsStream/Symfony Finder incompatibility
         $this->markTestSkipped('parseDirectory cannot be tested with vfsStream due to Symfony Finder limitations . ');
     }
 
     #[Test]
-    public function testSkipsDirectoriesWithoutAudioFiles()
+    public function test_skips_directories_without_audio_files()
     {
         // Create directory structure with a directory that has no audio files
         $structure = [
@@ -168,7 +168,7 @@ class BookDirectoryParserTest extends TestCase
     }
 
     #[Test]
-    public function testHandlesMetadataAbsFiles()
+    public function test_handles_metadata_abs_files()
     {
         // Create directory structure with metadata.abs file
         $structure = [
@@ -212,7 +212,7 @@ class BookDirectoryParserTest extends TestCase
     }
 
     #[Test]
-    public function testHandlesMultipleAudioFiles()
+    public function test_handles_multiple_audio_files()
     {
         // Create a book with multiple audio files
         $structure = [
@@ -256,7 +256,7 @@ class BookDirectoryParserTest extends TestCase
     }
 
     #[Test]
-    public function testHandlesEmptyDirectoriesGracefully()
+    public function test_handles_empty_directories_gracefully()
     {
         // Create empty directory structure
         $structure = [
@@ -270,7 +270,7 @@ class BookDirectoryParserTest extends TestCase
     }
 
     #[Test]
-    public function testHandlesInvalidPathsGracefully()
+    public function test_handles_invalid_paths_gracefully()
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Directory does not exist');
@@ -281,7 +281,7 @@ class BookDirectoryParserTest extends TestCase
     }
 
     #[Test]
-    public function testReadsMetadataFromAbsFile()
+    public function test_reads_metadata_from_abs_file()
     {
         // Configure the mock to return no metadata, forcing fallback to file
         $this->mockMetadataService->method('generateBookId')
@@ -361,7 +361,7 @@ EOT;
     }
 
     #[Test]
-    public function testDoesNotIncludeEmptyValues()
+    public function test_does_not_include_empty_values()
     {
         $metadataContent = "title=\nseries=Test Series\nnarrator=\nauthors=\ndescription=\npublishedYear=2023";
 
@@ -395,7 +395,7 @@ EOT;
     }
 
     #[Test]
-    public function testHandlesNestedDirectories()
+    public function test_handles_nested_directories()
     {
         // Create the full path for the nested directory
         $nestedPath = 'nested/dir/structure';
@@ -453,7 +453,7 @@ EOT;
     }
 
     #[Test]
-    public function testHandleSpecialCharactersInPaths()
+    public function test_handle_special_characters_in_paths()
     {
         $metadataContent = "title=Special Chars Test\nauthors=Author C";
 
@@ -473,7 +473,7 @@ EOT;
     }
 
     #[Test]
-    public function testHandleLargeMetadataFiles()
+    public function test_handle_large_metadata_files()
     {
         // Create a large metadata file with many lines
         $metadataContent = "title=Large Metadata Test\n" .
@@ -521,7 +521,7 @@ EOT;
     }
 
     #[Test]
-    public function testHandleDuplicateKeys()
+    public function test_handle_duplicate_keys()
     {
         $metadataContent = "title=First Title\ntitle=Second Title\nseries=Test Series";
 
@@ -544,7 +544,7 @@ EOT;
     }
 
     #[Test]
-    public function testHandleMixedLineEndings()
+    public function test_handle_mixed_line_endings()
     {
         $filename = 'metadata.abs';
         $metadataContent = "title=Mixed Line Endings\n" .
@@ -604,7 +604,7 @@ EOT;
     }
 
     #[Test]
-    public function testLoadMetadataFromServiceFirst()
+    public function test_load_metadata_from_service_first()
     {
         $bookId = 'test-book-123';
         $directoryPath = vfsStream::url('testDir/test-book');

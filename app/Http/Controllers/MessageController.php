@@ -12,11 +12,11 @@ class MessageController extends Controller
     protected DocumentStoreServiceInterface $documentStoreService;
 
 
-
     public function __construct(DocumentStoreServiceInterface $documentStoreService)
     {
         $this->documentStoreService = $documentStoreService;
     }
+
 
     /**
      * Store a new message from a user to admin
@@ -52,6 +52,7 @@ class MessageController extends Controller
         }
     }
 
+
     /**
      * Store a new message from admin to a user
      *
@@ -86,4 +87,6 @@ class MessageController extends Controller
             return back()->with('error', 'An error occurred while sending the message.');
         }
     }
+
+
 }

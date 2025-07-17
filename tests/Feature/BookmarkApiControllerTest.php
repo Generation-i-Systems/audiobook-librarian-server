@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Auth\DocumentstoreUser;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Api\BookmarkApiController;
-use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Foundation\Testing\WithFaker;
 use Illuminate\Support\Facades\Route;
 use Mockery;
@@ -17,9 +16,13 @@ class BookmarkApiControllerTest extends TestCase
     use WithFaker;
 
     protected $mockService;
+
     protected string $userId;
+
     protected string $bookId;
+
     protected string $bookmarkId;
+
     protected array $testBookmark;
 
     protected function setUp(): void
@@ -62,33 +65,33 @@ class BookmarkApiControllerTest extends TestCase
     }
 
     #[Test]
-    public function getBookmarksReturnsBookmarksForUserAndBook()
+    public function get_bookmarks_returns_bookmarks_for_user_and_book()
     {
-        $this->mockService->shouldReceive('getBook')->once()->with($this->bookId)->andReturn((object)['id' => $this->bookId]);
+        $this->mockService->shouldReceive('getBook')->once()->with($this->bookId)->andReturn((object) ['id' => $this->bookId]);
         $this->mockService->shouldReceive('getBookmarks')->once()->with($this->userId, $this->bookId)->andReturn([$this->testBookmark]);
 
         $response = $this->getJson("/api/v1/books/{$this->bookId}/bookmarks");
 
         $expectedBookmark = $this->testBookmark;
-        $expectedBookmark['id'] = (string)$expectedBookmark['_id'];
+        $expectedBookmark['id'] = (string) $expectedBookmark['_id'];
         unset($expectedBookmark['_id'], $expectedBookmark['user_id']);
 
         $response->assertStatus(200)->assertJson(['data' => [$expectedBookmark]]);
     }
 
     #[Test]
-    public function getBookmarksReturns404ForNonexistentBook()
+    public function get_bookmarks_returns404_for_nonexistent_book()
     {
         $this->mockService->shouldReceive('getBook')->once()->with('nonexistent-book')->andReturn(null);
 
-        $response = $this->getJson("/api/v1/books/nonexistent-book/bookmarks");
+        $response = $this->getJson('/api/v1/books/nonexistent-book/bookmarks');
         $response->assertStatus(404);
     }
 
     #[Test]
-    public function createBookmarkCreatesNewBookmarkSuccessfully()
+    public function create_bookmark_creates_new_bookmark_successfully()
     {
-        $this->mockService->shouldReceive('getBook')->once()->with($this->bookId)->andReturn((object)['id' => $this->bookId]);
+        $this->mockService->shouldReceive('getBook')->once()->with($this->bookId)->andReturn((object) ['id' => $this->bookId]);
         $this->mockService->shouldReceive('createBookmark')->once()->andReturn($this->bookmarkId);
 
         $bookmarkData = ['chapter' => 3, 'position' => 150, 'title' => 'Test Bookmark', 'note' => 'Test note content'];
@@ -100,38 +103,38 @@ class BookmarkApiControllerTest extends TestCase
     }
 
     #[Test]
-    public function createBookmarkReturns404ForNonexistentBook()
+    public function create_bookmark_returns404_for_nonexistent_book()
     {
         $this->mockService->shouldReceive('getBook')->once()->with('nonexistent-book')->andReturn(null);
 
         $bookmarkData = ['chapter' => 1, 'position' => 1];
-        $response = $this->postJson("/api/v1/books/nonexistent-book/bookmarks", $bookmarkData);
+        $response = $this->postJson('/api/v1/books/nonexistent-book/bookmarks', $bookmarkData);
         $response->assertStatus(404);
     }
 
     #[Test]
-    public function createBookmarkValidatesInput()
+    public function create_bookmark_validates_input()
     {
         $response = $this->postJson("/api/v1/books/{$this->bookId}/bookmarks", ['chapter' => 'not-an-integer']);
         $response->assertStatus(422);
     }
 
     #[Test]
-    public function getBookmarkReturnsSpecificBookmark()
+    public function get_bookmark_returns_specific_bookmark()
     {
         $this->mockService->shouldReceive('getBookmark')->once()->with($this->bookmarkId, $this->userId, $this->bookId)->andReturn($this->testBookmark);
 
         $response = $this->getJson("/api/v1/books/{$this->bookId}/bookmarks/{$this->bookmarkId}");
 
         $expectedBookmark = $this->testBookmark;
-        $expectedBookmark['id'] = (string)$expectedBookmark['_id'];
+        $expectedBookmark['id'] = (string) $expectedBookmark['_id'];
         unset($expectedBookmark['_id'], $expectedBookmark['user_id']);
 
         $response->assertStatus(200)->assertJson($expectedBookmark);
     }
 
     #[Test]
-    public function getBookmarkReturns404ForNonexistentBookmark()
+    public function get_bookmark_returns404_for_nonexistent_bookmark()
     {
         $this->mockService->shouldReceive('getBookmark')->once()->andReturn(null);
 
@@ -140,7 +143,7 @@ class BookmarkApiControllerTest extends TestCase
     }
 
     #[Test]
-    public function updateBookmarkUpdatesBookmarkSuccessfully()
+    public function update_bookmark_updates_bookmark_successfully()
     {
         $updatedBookmark = array_merge($this->testBookmark, ['chapter' => 4]);
         $this->mockService->shouldReceive('getBookmark')->andReturn($this->testBookmark, $updatedBookmark);
@@ -150,14 +153,14 @@ class BookmarkApiControllerTest extends TestCase
         $response = $this->putJson("/api/v1/books/{$this->bookId}/bookmarks/{$this->bookmarkId}", $updateData);
 
         $expectedBookmark = $updatedBookmark;
-        $expectedBookmark['id'] = (string)$expectedBookmark['_id'];
+        $expectedBookmark['id'] = (string) $expectedBookmark['_id'];
         unset($expectedBookmark['_id'], $expectedBookmark['user_id']);
 
         $response->assertStatus(200)->assertJson($expectedBookmark);
     }
 
     #[Test]
-    public function updateBookmarkReturns404ForNonexistentBookmark()
+    public function update_bookmark_returns404_for_nonexistent_bookmark()
     {
         $this->mockService->shouldReceive('getBookmark')->once()->andReturn(null);
 
@@ -166,14 +169,14 @@ class BookmarkApiControllerTest extends TestCase
     }
 
     #[Test]
-    public function updateBookmarkValidatesInput()
+    public function update_bookmark_validates_input()
     {
         $response = $this->putJson("/api/v1/books/{$this->bookId}/bookmarks/{$this->bookmarkId}", ['chapter' => 'not-an-integer']);
         $response->assertStatus(422);
     }
 
     #[Test]
-    public function deleteBookmarkDeletesBookmarkSuccessfully()
+    public function delete_bookmark_deletes_bookmark_successfully()
     {
         $this->mockService->shouldReceive('deleteBookmark')->once()->with($this->bookmarkId, $this->userId, $this->bookId)->andReturn(true);
 
@@ -182,7 +185,7 @@ class BookmarkApiControllerTest extends TestCase
     }
 
     #[Test]
-    public function deleteBookmarkReturns404ForNonexistentBookmark()
+    public function delete_bookmark_returns404_for_nonexistent_bookmark()
     {
         $this->mockService->shouldReceive('deleteBookmark')->once()->andReturn(false);
 

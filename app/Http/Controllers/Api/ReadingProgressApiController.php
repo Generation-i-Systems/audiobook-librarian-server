@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -11,10 +11,13 @@ class ReadingProgressApiController extends Controller
 {
     protected DocumentStoreServiceInterface $documentStoreService;
 
+
     public function __construct(DocumentStoreServiceInterface $documentStoreService)
     {
         $this->documentStoreService = $documentStoreService;
     }
+
+
     public function update(Request $request)
     {
         $request->validate([
@@ -26,19 +29,23 @@ class ReadingProgressApiController extends Controller
         $userId = Auth::id();
         $bookId = $request->input('book_id');
         $result = $this->documentStoreService->updateReadingProgress($userId, $bookId, $request->current_position);
+
         return response()->json(['success' => $result], $result ? 200 : 500);
     }
+
 
     public function reset(Request $request)
     {
         $userId = Auth::id();
         $bookId = $request->input('book_id');
         $result = $this->documentStoreService->resetReadingProgress($userId, $bookId);
+
         return response()->json([
             'message' => $result ? 'Progress reset.' : 'Failed to reset progress.',
-            'success' => $result
+            'success' => $result,
         ], $result ? 200 : 500);
     }
+
 
     public function get(Request $request)
     {
@@ -47,6 +54,9 @@ class ReadingProgressApiController extends Controller
         $userId = Auth::id();
         $bookId = $request->input('book_id');
         $progress = $this->documentStoreService->getReadingProgress($userId, $bookId);
+
         return response()->json(['progress' => $progress]);
     }
+
+
 }

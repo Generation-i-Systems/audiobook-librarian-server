@@ -10,34 +10,33 @@ use Illuminate\Support\Facades\Log;
  * Controller for sending admin notifications to users (push/broadcast).
  *
  * Uses DocumentStoreServiceInterface for user lookup.
- *
- * @package App\Http\Controllers
  */
 class AdminNotificationController extends Controller
 {
     /**
-     * Send a notification to all users or a specific user by Firestore ID.
+     * Send a notification to all users or a specific user by ID.
      *
-     * @param Request $request
      * @return \Illuminate\Http\RedirectResponse
      */
     public function sendNotification(Request $request)
     {
         $request->validate([
             'message' => 'required|string',
-            'user_id' => 'nullable|string', // Optional: specific user (Firestore id)
+            'user_id' => 'nullable|string', // Optional: specific user (by id)
         ]);
 
         $message = $request->input('message');
         $userId = $request->input('user_id');
 
-        $firestore = app(\App\Contracts\DocumentStoreServiceInterface::class);
+        $documentStore = app(DocumentStoreServiceInterface::class);
         if ($userId) {
             // Send to a specific user
-            $userDoc = $firestore->getClient()->collection('users')->document($userId)->snapshot();
-            if ($userDoc->exists()) {
-                $user = $userDoc->data();
-                $user['id'] = $userDoc->id();
+            $user = $documentStore->getUserById($userId);
+            if ($user) {
+                // Ensure the user array has an 'id' key
+                if (!isset($user['id'])) {
+                    $user['id'] = $userId;
+                }
                 $this->sendPushNotification($user, $message);
 
                 return back()->with('success', 'Notification sent to specific user!');
@@ -46,13 +45,13 @@ class AdminNotificationController extends Controller
             }
         } else {
             // Send to all users
-            $users = $firestore->getClient()->collection('users')->documents();
-            foreach ($users as $userDoc) {
-                if ($userDoc->exists()) {
-                    $user = $userDoc->data();
-                    $user['id'] = $userDoc->id();
-                    $this->sendPushNotification($user, $message);
+            $users = $documentStore->getAllUsers();
+            foreach ($users as $user) {
+                // Ensure each user array has an 'id' key
+                if (!isset($user['id']) && isset($user['_id'])) {
+                    $user['id'] = $user['_id'];
                 }
+                $this->sendPushNotification($user, $message);
             }
 
             return back()->with('success', 'Notification sent to all users!');
@@ -62,8 +61,7 @@ class AdminNotificationController extends Controller
     /**
      * Send a push notification to a user (stub, replace with FCM logic).
      *
-     * @param array $user
-     * @param string $message
+     * @param  array  $user
      * @return void
      */
     private function sendPushNotification($user, string $message)
@@ -71,10 +69,10 @@ class AdminNotificationController extends Controller
         // Implement your push notification logic here (Firebase Cloud Messaging)
         // For example:
         $deviceToken = isset($user['device_token']) ? $user['device_token'] : null;
-        // Store device tokens in the users collection
+        // TBD: Store device tokens by user
         if ($deviceToken) {
             // Send notification
-            // You'll need to use a library like Firebase Admin SDK to send the notification
+            // TBD: You'll need to use a library like Firebase Admin SDK to send the notification
             Log::info(
                 "Sending push notification to user {$user['id']} with message: {$message}"
             );

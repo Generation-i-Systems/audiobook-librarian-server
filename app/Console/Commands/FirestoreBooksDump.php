@@ -2,9 +2,9 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Services\MongoService;
+use Illuminate\Console\Command;
 
 class FirestoreBooksDump extends Command
 {
@@ -28,6 +28,7 @@ class FirestoreBooksDump extends Command
     protected $description = 'Dump the entire Firestore books collection as JSON for MongoDB import';
 
     protected DocumentStoreServiceInterface $documentStoreService;
+
     protected MongoService $mongoService;
 
     public function __construct(DocumentStoreServiceInterface $documentStoreService, MongoService $mongoService)
@@ -51,6 +52,7 @@ class FirestoreBooksDump extends Command
                     $doc['_id'] = $doc['id'];
                     unset($doc['id']);
                 }
+
                 return $doc;
             }, $docs);
             if ($this->option('import-to-mongo')) {
@@ -102,6 +104,7 @@ class FirestoreBooksDump extends Command
                     $arr['id'] = (string) $arr['_id'];
                     unset($arr['_id']);
                 }
+
                 return $arr;
             }, $docs);
             $inserted = 0;

@@ -17,8 +17,8 @@ class CheckAdminRole
     public function handle(Request $request, Closure $next): Response
     {
         if (Auth::check()) {
-            $firestore = app(\App\Services\FirestoreService::class);
-            if ($firestore->isAdmin(Auth::id())) {
+            $documentStore = app(\App\Contracts\DocumentStoreServiceInterface::class);
+            if ($documentStore->isAdmin(Auth::id())) {
                 return $next($request);
             }
         }

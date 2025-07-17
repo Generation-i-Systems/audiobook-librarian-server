@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Http\Controllers\Controller;
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -14,6 +14,7 @@ class DebugController extends Controller
 {
     protected DocumentStoreServiceInterface $documentStoreService;
 
+
     public function __construct(DocumentStoreServiceInterface $documentStoreService)
     {
         $this->documentStoreService = $documentStoreService;
@@ -21,7 +22,7 @@ class DebugController extends Controller
 
 
     /**
-     * Dump a Firestore document as JSON for debugging.
+     * Dump a document as JSON for debugging.
      */
     public function showDocument($collection, $docId): JsonResponse
     {
@@ -33,6 +34,7 @@ class DebugController extends Controller
         }
     }
 
+
     /**
      * Debug route: middleware info
      */
@@ -43,6 +45,7 @@ class DebugController extends Controller
             'web_group' => \Illuminate\Support\Facades\Route::getMiddlewareGroups()['web'] ?? null,
         ]);
     }
+
 
     /**
      * Debug route: authentication/session info
@@ -65,6 +68,7 @@ class DebugController extends Controller
         ]);
     }
 
+
     /**
      * Debug route: session info
      */
@@ -75,6 +79,7 @@ class DebugController extends Controller
             'session_data' => session()->all(),
         ]);
     }
+
 
     /**
      * Debug route: session DB row
@@ -95,6 +100,7 @@ class DebugController extends Controller
         ]);
     }
 
+
     /**
      * Debug route: logout
      */
@@ -105,6 +111,7 @@ class DebugController extends Controller
 
         return response()->json(['status' => 'logged out']);
     }
+
 
     /**
      * Debug route: write to session
@@ -119,23 +126,27 @@ class DebugController extends Controller
         ]);
     }
 
+
     /**
      * Dump all Firestore users (debug)
      */
     public function usersDump(): JsonResponse
     {
-        $result = $this->documentStoreService->dumpAllUsers();
+        $result = $this->documentStoreService->getAllUsers();
 
         return response()->json($result);
     }
+
 
     /**
      * Dump all Firestore books (debug)
      */
     public function booksDump(): JsonResponse
     {
-        $result = $this->documentStoreService->dumpAllBooks();
+        $result = $this->documentStoreService->getAllBooks();
 
         return response()->json($result);
     }
+
+
 }

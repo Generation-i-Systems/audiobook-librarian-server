@@ -19,6 +19,7 @@ class NewBookAdded
      */
     public $book;
 
+
     /**
      * Create a new event instance.
      *
@@ -29,4 +30,6 @@ class NewBookAdded
     {
         $this->book = $book;
     }
+
+
 }

@@ -10,43 +10,49 @@ class BookQueueController extends Controller
 {
     protected DocumentStoreServiceInterface $documentStoreService;
 
+
     public function __construct(DocumentStoreServiceInterface $documentStoreService)
     {
         $this->documentStoreService = $documentStoreService;
     }
+
+
     public function index()
     {
         $user = Auth::user();
-        $firestore = $this->documentStoreService;
-        $queue = $firestore->getBookQueue($user->id);
+        $documentStore = $this->documentStoreService;
+        $queue = $documentStore->getBookQueue($user->id);
 
         return view('queue.index', compact('queue'));
     }
 
+
     public function add($bookId)
     {
         $user = Auth::user();
-        $firestore = $this->documentStoreService;
-        $queue = $firestore->getBookQueue($user->id);
+        $documentStore = $this->documentStoreService;
+        $queue = $documentStore->getBookQueue($user->id);
         foreach ($queue as $item) {
             if ($item['book_id'] == $bookId) {
                 return back()->with('error', 'Book already in queue.');
             }
         }
-        $firestore->addBookToQueue($user->id, $bookId);
+        $documentStore->addBookToQueue($user->id, $bookId);
 
         return back()->with('success', 'Book added to queue!');
     }
 
+
     public function remove($bookId)
     {
         $user = Auth::user();
-        $firestore = $this->documentStoreService;
-        $firestore->removeBookFromQueue($user->id, $bookId);
+        $documentStore = $this->documentStoreService;
+        $documentStore->removeBookFromQueue($user->id, $bookId);
         $this->reorderQueue($user->id);
 
         return back()->with('success', 'Book removed from queue.');
     }
+
 
     public function updateOrder(Request $request)
     {
@@ -56,17 +62,20 @@ class BookQueueController extends Controller
             'queue.*.order' => 'required|integer',
         ]);
         $user = Auth::user();
-        $firestore = $this->documentStoreService;
+        $documentStore = $this->documentStoreService;
 
-        // Implement: update the order of books in queue in Firestore
+        // Implement: update the order of books in queue in document store
 
         // For now, just return success
         return response()->json(['success' => true]);
     }
 
+
     private function reorderQueue($userId)
     {
-        // Optionally implement reordering in Firestore if needed
+        // Optionally implement reordering in document store if needed
         // For now, this is a stub
     }
+
+
 }

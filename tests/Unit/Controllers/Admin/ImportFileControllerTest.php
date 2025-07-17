@@ -19,7 +19,7 @@ class ImportFileControllerTest extends TestCase
 
         // Mock the DocumentStoreService
         $documentStoreMock = Mockery::mock(DocumentStoreServiceInterface::class);
-        
+
         // Create the controller with the mock
         $this->controller = new ImportFileController($documentStoreMock);
     }
@@ -204,7 +204,7 @@ class ImportFileControllerTest extends TestCase
     public function test_extract_file_metadata()
     {
         // Skip test if getID3 class doesn't exist
-        if (! class_exists('\getID3')) {
+        if (!class_exists('\getID3')) {
             $this->markTestSkipped('getID3 class not available');
 
             return;
@@ -220,8 +220,7 @@ class ImportFileControllerTest extends TestCase
         file_put_contents($tempFilePath, str_repeat('0', $fileSize));
 
         // Create a test controller with overridden methods
-        $controller = new class extends ImportFileController
-        {
+        $controller = new class extends ImportFileController {
             public function __construct()
             {
                 // Empty constructor to avoid dependency injection issues
@@ -231,7 +230,7 @@ class ImportFileControllerTest extends TestCase
             public function extractFileMetadata(string $filePath, array &$meta): void
             {
                 // Log debug message to satisfy mock expectation
-                \Illuminate\Support\Facades\Log::debug('Extracting metadata from file: '.$filePath);
+                \Illuminate\Support\Facades\Log::debug('Extracting metadata from file: ' . $filePath);
 
                 // Simulate as if getID3 analysis was done
                 $tags = [
@@ -285,7 +284,7 @@ class ImportFileControllerTest extends TestCase
     public function test_extract_series_from_artist_parentheses()
     {
         // Skip test if getID3 class doesn't exist
-        if (! class_exists('\getID3')) {
+        if (!class_exists('\getID3')) {
             $this->markTestSkipped('getID3 class not available');
 
             return;
@@ -300,8 +299,7 @@ class ImportFileControllerTest extends TestCase
         file_put_contents($tempFilePath, str_repeat('0', 1024));
 
         // Create a test controller with overridden methods
-        $controller = new class extends ImportFileController
-        {
+        $controller = new class extends ImportFileController {
             public function __construct()
             {
                 // Empty constructor to avoid dependency injection issues
@@ -311,7 +309,7 @@ class ImportFileControllerTest extends TestCase
             public function extractFileMetadata(string $filePath, array &$meta): void
             {
                 // Log debug message to satisfy mock expectation
-                \Illuminate\Support\Facades\Log::debug('Extracting metadata from file: '.$filePath);
+                \Illuminate\Support\Facades\Log::debug('Extracting metadata from file: ' . $filePath);
 
                 // Simulate as if getID3 analysis was done
                 $tags = [
@@ -358,7 +356,7 @@ class ImportFileControllerTest extends TestCase
     public function test_extract_series_number_from_album_prefix()
     {
         // Skip test if getID3 class doesn't exist
-        if (! class_exists('\getID3')) {
+        if (!class_exists('\getID3')) {
             $this->markTestSkipped('getID3 class not available');
 
             return;
@@ -373,8 +371,7 @@ class ImportFileControllerTest extends TestCase
         file_put_contents($tempFilePath, str_repeat('0', 1024));
 
         // Create a test controller with overridden methods
-        $controller = new class extends ImportFileController
-        {
+        $controller = new class extends ImportFileController {
             public function __construct()
             {
                 // Empty constructor to avoid dependency injection issues
@@ -384,7 +381,7 @@ class ImportFileControllerTest extends TestCase
             public function extractFileMetadata(string $filePath, array &$meta): void
             {
                 // Log debug message to satisfy mock expectation
-                \Illuminate\Support\Facades\Log::debug('Extracting metadata from file: '.$filePath);
+                \Illuminate\Support\Facades\Log::debug('Extracting metadata from file: ' . $filePath);
 
                 // Simulate as if getID3 analysis was done
                 $tags = [
@@ -433,7 +430,7 @@ class ImportFileControllerTest extends TestCase
     public function test_extract_cover_image_from_picture_tag()
     {
         // Skip test if getID3 class doesn't exist
-        if (! class_exists('\getID3')) {
+        if (!class_exists('\getID3')) {
             $this->markTestSkipped('getID3 class not available');
 
             return;
@@ -448,8 +445,7 @@ class ImportFileControllerTest extends TestCase
         file_put_contents($tempFilePath, str_repeat('0', 1024));
 
         // Create a test controller with overridden methods
-        $controller = new class extends ImportFileController
-        {
+        $controller = new class extends ImportFileController {
             public function __construct()
             {
                 // Empty constructor to avoid dependency injection issues
@@ -459,7 +455,7 @@ class ImportFileControllerTest extends TestCase
             public function extractFileMetadata(string $filePath, array &$meta): void
             {
                 // Log debug message to satisfy mock expectation
-                \Illuminate\Support\Facades\Log::debug('Extracting metadata from file: '.$filePath);
+                \Illuminate\Support\Facades\Log::debug('Extracting metadata from file: ' . $filePath);
 
                 // Simulate as if getID3 analysis was done
                 $tags = [

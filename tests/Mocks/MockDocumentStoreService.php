@@ -10,24 +10,41 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     {
         return [];
     }
+
     public function autocompleteAuthors(string $query, int $limit = 10): array
     {
         return [];
     }
+
     public function autocompleteNarrators(string $query, int $limit = 10): array
     {
         return [];
     }
+
     protected $books = [];
+
     protected $series = [];
+
     protected $genres = [];
+
     protected $authors = [];
+
     protected $users = [];
+
     protected $messages = [];
+
     protected $jobs = [];
+
     protected $queues = [];
+
     protected $readingProgress = [];
+
     protected $narrators = [];
+
+    protected $apiTokens = [];
+
+    protected $accountRequests = [];
+    protected $follows = [];
 
     public function getBook($id)
     {
@@ -44,7 +61,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         $this->books[$id] = $data;
 
         // Verify book was added
-        echo "Books after adding: " . json_encode($this->books) . "\n";
+        echo 'Books after adding: ' . json_encode($this->books) . "\n";
 
         return $id;
     }
@@ -56,6 +73,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         }
 
         $this->books[$id] = array_merge($this->books[$id], $data);
+
         return true;
     }
 
@@ -66,6 +84,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         }
 
         unset($this->books[$id]);
+
         return true;
     }
 
@@ -73,8 +92,10 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     {
         $results = [];
         foreach ($this->books as $book) {
-            if (stripos($book['title'] ?? '', $query) !== false ||
-                stripos($book['author'] ?? '', $query) !== false) {
+            if (
+                stripos($book['title'] ?? '', $query) !== false ||
+                stripos($book['author'] ?? '', $query) !== false
+            ) {
                 $results[] = $book;
             }
 
@@ -159,8 +180,10 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     {
         $results = [];
         foreach ($this->books as $book) {
-            if ((isset($book['author']) && $book['author'] === $author) &&
-                (isset($book['genres']) && in_array($genre, $book['genres']))) {
+            if (
+                (isset($book['author']) && $book['author'] === $author) &&
+                (isset($book['genres']) && in_array($genre, $book['genres']))
+            ) {
                 $results[] = $book;
             }
         }
@@ -211,6 +234,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         $id = $data['id'] ?? uniqid('user_');
         $data['id'] = $id;
         $this->users[$id] = $data;
+
         return $id;
     }
 
@@ -221,6 +245,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         }
 
         $this->users[$id] = array_merge($this->users[$id], $data);
+
         return true;
     }
 
@@ -231,7 +256,121 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         }
 
         unset($this->users[$id]);
+
         return true;
+    }
+
+    /**
+     * Get a user by their email address
+     *
+     * @param string $email The email address to search for
+     * @return array|null The user data or null if not found
+     */
+    public function getUserByEmail(string $email): ?array
+    {
+        foreach ($this->users as $user) {
+            if (isset($user['email']) && $user['email'] === $email) {
+                return $user;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Check if a user with the given email exists
+     *
+     * @param string $email The email address to check
+     * @return bool True if a user with this email exists
+     */
+    public function userExistsByEmail(string $email): bool
+    {
+        foreach ($this->users as $user) {
+            if (isset($user['email']) && $user['email'] === $email) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if a user with the given username exists
+     *
+     * @param string $username The username to check
+     * @return bool True if a user with this username exists
+     */
+    public function userExistsByUsername(string $username): bool
+    {
+        foreach ($this->users as $user) {
+            if (isset($user['username']) && $user['username'] === $username) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Get a user by their username
+     *
+     * @param string $username The username to search for
+     * @return array|null The user data or null if not found
+     */
+    public function getUserByUsername(string $username): ?array
+    {
+        foreach ($this->users as $user) {
+            if (isset($user['username']) && $user['username'] === $username) {
+                return $user;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Get all admin users
+     *
+     * @return array List of admin users
+     */
+    public function getAdminUsers(): array
+    {
+        $admins = [];
+        foreach ($this->users as $id => $user) {
+            if (isset($user['role']) && $user['role'] === 'admin') {
+                $userData = $user;
+                $userData['id'] = $id;
+                $admins[] = $userData;
+            }
+        }
+
+        return $admins;
+    }
+
+    /**
+     * Get all users in the system
+     *
+     * @return array List of all users
+     */
+    public function getAllUsers(): array
+    {
+        $allUsers = [];
+        foreach ($this->users as $id => $user) {
+            $userData = $user;
+            $userData['id'] = $id;
+            $allUsers[] = $userData;
+        }
+
+        return $allUsers;
+    }
+
+    public function isAdmin(string $userId): bool
+    {
+        if (isset($this->users[$userId]) && isset($this->users[$userId]['role']) && $this->users[$userId]['role'] === 'admin') {
+            return true;
+        }
+
+        return false;
     }
 
     public function getUsersForMessaging(): array
@@ -244,12 +383,33 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         $id = $data['id'] ?? uniqid('genre_');
         $data['id'] = $id;
         $this->genres[$id] = $data;
+
         return $id;
     }
 
     public function listGenres()
     {
         return array_values($this->genres);
+    }
+
+    /**
+     * Get a genre by ID
+     *
+     * @param string $id The genre ID
+     * @return array|null The genre data or null if not found
+     */
+    public function getGenre(string $id): ?array
+    {
+        // First check if this is a built-in genre from config
+        $configGenres = config('genres', []);
+        foreach ($configGenres as $genre) {
+            if (($genre['id'] ?? '') === $id) {
+                return $genre;
+            }
+        }
+
+        // If not found in config, try to get from stored genres
+        return $this->genres[$id] ?? null;
     }
 
     public function deleteGenre(string $id)
@@ -259,15 +419,28 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         }
 
         unset($this->genres[$id]);
+
         return true;
     }
 
-    public function createSeries(array $data)
+    public function createSeries(string $name): string
     {
-        $id = $data['id'] ?? uniqid('series_');
-        $data['id'] = $id;
-        $this->series[$id] = $data;
+        $id = 'series_' . uniqid();
+        $newSeries = ['id' => $id, 'seriesName' => $name];
+        $this->series[] = $newSeries;
+
         return $id;
+    }
+
+    public function getSeriesByName(string $name): ?array
+    {
+        foreach ($this->series as $series) {
+            if (isset($series['seriesName']) && $series['seriesName'] === $name) {
+                return $series;
+            }
+        }
+
+        return null;
     }
 
     public function findOrCreateSeriesByName(string $name)
@@ -282,7 +455,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         $id = uniqid('series_');
         $this->series[$id] = [
             'id' => $id,
-            'seriesName' => $name
+            'seriesName' => $name,
         ];
 
         return $this->series[$id];
@@ -300,6 +473,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         }
 
         unset($this->series[$id]);
+
         return true;
     }
 
@@ -325,6 +499,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         $id = $data['id'] ?? uniqid('author_');
         $data['id'] = $id;
         $this->authors[$id] = $data;
+
         return $id;
     }
 
@@ -338,6 +513,34 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         if (isset($this->authors[$id])) {
             unset($this->authors[$id]);
         }
+    }
+
+    public function findOrCreateMany(string $collection, array $names): array
+    {
+        if (!property_exists($this, $collection)) {
+            return [];
+        }
+
+        $ids = [];
+        foreach ($names as $name) {
+            $existingId = null;
+            foreach ($this->{$collection} as $docId => $doc) {
+                if (isset($doc['name']) && $doc['name'] === $name) {
+                    $existingId = $docId;
+                    break;
+                }
+            }
+
+            if ($existingId) {
+                $ids[] = $existingId;
+            } else {
+                $newId = uniqid($collection . '_');
+                $this->{$collection}[$newId] = ['id' => $newId, 'name' => $name];
+                $ids[] = $newId;
+            }
+        }
+
+        return $ids;
     }
 
     public function searchAuthorsByName(string $term): array
@@ -369,6 +572,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         $id = $messageData['id'] ?? uniqid('message_');
         $messageData['id'] = $id;
         $this->messages[$id] = $messageData;
+
         return $id;
     }
 
@@ -398,8 +602,10 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     {
         $results = [];
         foreach ($this->jobs as $job) {
-            if (($type === null || ($job['type'] ?? '') === $type) &&
-                ($status === null || ($job['status'] ?? '') === $status)) {
+            if (
+                ($type === null || ($job['type'] ?? '') === $type) &&
+                ($status === null || ($job['status'] ?? '') === $status)
+            ) {
                 $results[] = $job;
             }
 
@@ -418,6 +624,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         }
 
         unset($this->jobs[$jobId]);
+
         return true;
     }
 
@@ -436,6 +643,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         $key = $userId . '_' . $bookId;
         if (isset($this->readingProgress[$key])) {
             unset($this->readingProgress[$key]);
+
             return true;
         }
 
@@ -460,7 +668,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     public function getClient()
     {
         // Return a mock client object
-        return new class () {
+        return new class {
             public function collection($name)
             {
                 return $this;
@@ -487,6 +695,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     {
         $id = uniqid('series_');
         $this->series[$id] = ['id' => $id, 'seriesName' => $name];
+
         return $id;
     }
 
@@ -494,7 +703,36 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     {
         $id = uniqid('author_');
         $this->authors[$id] = ['id' => $id, 'name' => $name];
+
         return $id;
+    }
+
+    /**
+     * Get an author by ID
+     *
+     * @param string $id The author ID
+     * @return array|null The author data or null if not found
+     */
+    public function getAuthor(string $id): ?array
+    {
+        return $this->authors[$id] ?? null;
+    }
+
+    /**
+     * Update an author
+     *
+     * @param string $id The author ID
+     * @param array $data The updated author data
+     * @return bool True if the update was successful
+     */
+    public function updateAuthor(string $id, array $data): bool
+    {
+        if (!isset($this->authors[$id])) {
+            return false;
+        }
+
+        $this->authors[$id] = array_merge($this->authors[$id], $data);
+        return true;
     }
 
     public function getManifestForBook(string $bookId): array
@@ -533,20 +771,373 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         $this->queues[$userId] = $bookIds;
     }
 
+    /**
+     * Add a book to a user's queue
+     *
+     * @param string $userId The user ID
+     * @param string $bookId The book ID to add
+     * @return bool Success status
+     */
+    public function addBookToQueue(string $userId, string $bookId): bool
+    {
+        if (!isset($this->queues[$userId])) {
+            $this->queues[$userId] = [];
+        }
+
+        // Check if book is already in queue
+        if (in_array($bookId, $this->queues[$userId])) {
+            return true; // Book already in queue
+        }
+
+        // Add book to queue
+        $this->queues[$userId][] = $bookId;
+        return true;
+    }
+
+    /**
+     * Remove a book from a user's queue
+     *
+     * @param string $userId The user ID
+     * @param string $bookId The book ID to remove
+     * @return bool Success status
+     */
+    public function removeBookFromQueue(string $userId, string $bookId): bool
+    {
+        if (!isset($this->queues[$userId])) {
+            return false; // Queue doesn't exist
+        }
+
+        $key = array_search($bookId, $this->queues[$userId]);
+        if ($key === false) {
+            return false; // Book not in queue
+        }
+
+        // Remove book from queue
+        unset($this->queues[$userId][$key]);
+        $this->queues[$userId] = array_values($this->queues[$userId]); // Re-index array
+        return true;
+    }
+
     public function getJob(string $jobId): ?array
     {
         return $this->jobs[$jobId] ?? null;
     }
 
-    public function updateJob(string $jobId, array $data): void
+    public function updateJob(string $jobId, array $data): bool
     {
         if (isset($this->jobs[$jobId])) {
             $this->jobs[$jobId] = array_merge($this->jobs[$jobId], $data);
+            return true;
         }
+        return false;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getJobs(): array
+    {
+        return array_values($this->jobs);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getJobCount(): int
+    {
+        return count($this->jobs);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function updateGenre(string $id, array $data): bool
+    {
+        if (isset($this->genres[$id])) {
+            $this->genres[$id] = array_merge($this->genres[$id], $data);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function followExists(string $userId, string $followableType, string $followableId): bool
+    {
+        if (!isset($this->follows[$userId])) {
+            return false;
+        }
+        
+        return in_array(
+            ['type' => $followableType, 'id' => $followableId],
+            $this->follows[$userId],
+            true
+        );
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function createFollow(string $userId, string $followableType, string $followableId): bool
+    {
+        if (!isset($this->follows[$userId])) {
+            $this->follows[$userId] = [];
+        }
+        
+        $follow = ['type' => $followableType, 'id' => $followableId];
+        
+        if (!in_array($follow, $this->follows[$userId], true)) {
+            $this->follows[$userId][] = $follow;
+            return true;
+        }
+        
+        return false;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function deleteFollow(string $userId, string $followableType, string $followableId): bool
+    {
+        if (!isset($this->follows[$userId])) {
+            return false;
+        }
+        
+        $follow = ['type' => $followableType, 'id' => $followableId];
+        
+        foreach ($this->follows[$userId] as $key => $existingFollow) {
+            if ($existingFollow === $follow) {
+                unset($this->follows[$userId][$key]);
+                $this->follows[$userId] = array_values($this->follows[$userId]);
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getFollowers(string $followableType, string $followableId): array
+    {
+        $followers = [];
+        $target = ['type' => $followableType, 'id' => $followableId];
+        
+        foreach ($this->follows as $followerId => $follows) {
+            if (in_array($target, $follows, true)) {
+                $followers[] = $followerId;
+            }
+        }
+        
+        return $followers;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getFollowing(string $userId, string $followableType = null): array
+    {
+        if (!isset($this->follows[$userId])) {
+            return [];
+        }
+        
+        if ($followableType === null) {
+            return $this->follows[$userId];
+        }
+        
+        return array_filter(
+            $this->follows[$userId],
+            fn($follow) => $follow['type'] === $followableType
+        );
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function cleanupOldJobs(int $daysOld): int
+    {
+        $cutoff = time() - ($daysOld * 24 * 60 * 60);
+        $deleted = 0;
+        
+        foreach ($this->jobs as $id => $job) {
+            if (isset($job['created_at']) && $job['created_at'] < $cutoff) {
+                unset($this->jobs[$id]);
+                $deleted++;
+            }
+        }
+        
+        return $deleted;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function clearJobs(): bool
+    {
+        $hadJobs = !empty($this->jobs);
+        $this->jobs = [];
+        return $hadJobs;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function updateDocument(string $collection, string $id, array $data): bool
+    {
+        $collection = strtolower($collection);
+        
+        if (!property_exists($this, $collection) || !is_array($this->$collection)) {
+            return false;
+        }
+        
+        if (!isset($this->{$collection}[$id])) {
+            return false;
+        }
+        
+        $this->{$collection}[$id] = array_merge($this->{$collection}[$id], $data);
+        return true;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function jobExistsByDirectoryPath(string $directoryPath): bool
+    {
+        foreach ($this->jobs as $job) {
+            if (isset($job['directory_path']) && $job['directory_path'] === $directoryPath) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function bookExistsByDirectoryPath(string $directoryPath): bool
+    {
+        foreach ($this->books as $book) {
+            if (isset($book['directory_path']) && $book['directory_path'] === $directoryPath) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public function getBooksInSeries(string $seriesId): array
     {
         return [];
+    }
+
+    /**
+     * Create an API token for a user
+     *
+     * @param array $tokenData The token data including user_id, token, etc.
+     * @return string|null The token ID or null on failure
+     */
+    public function createApiToken(array $tokenData): ?string
+    {
+        $id = uniqid('token_');
+        $tokenData['id'] = $id;
+        $this->apiTokens[$id] = $tokenData;
+
+        return $id;
+    }
+
+    /**
+     * Delete an API token by its value
+     *
+     * @param string $tokenValue The token value to delete
+     * @return bool True if token was deleted, false otherwise
+     */
+    public function deleteApiTokenByValue(string $tokenValue): bool
+    {
+        foreach ($this->apiTokens as $id => $token) {
+            if (isset($token['token']) && $token['token'] === $tokenValue) {
+                unset($this->apiTokens[$id]);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Get pending account requests
+     *
+     * @return array List of pending account requests
+     */
+    public function getPendingAccountRequests(): array
+    {
+        $pendingRequests = [];
+
+        foreach ($this->accountRequests as $id => $request) {
+            if (isset($request['status']) && $request['status'] === 'pending') {
+                $pendingRequests[$id] = $request;
+            }
+        }
+
+        return array_values($pendingRequests);
+    }
+
+    /**
+     * Get a specific account request by ID
+     *
+     * @param string $id The account request ID
+     * @return array|null The account request data or null if not found
+     */
+    public function getAccountRequest(string $id): ?array
+    {
+        return $this->accountRequests[$id] ?? null;
+    }
+
+    /**
+     * Approve an account request
+     *
+     * @param string $id The account request ID
+     * @return bool True if the request was approved successfully
+     */
+    public function approveAccountRequest(string $id): bool
+    {
+        if (!isset($this->accountRequests[$id])) {
+            return false;
+        }
+
+        // Update status to approved
+        $this->accountRequests[$id]['status'] = 'approved';
+
+        // Create a user from the account request data
+        $userData = [
+            'name' => $this->accountRequests[$id]['name'] ?? '',
+            'email' => $this->accountRequests[$id]['email'] ?? '',
+            'username' => $this->accountRequests[$id]['username'] ?? '',
+            'password' => $this->accountRequests[$id]['password'] ?? '',
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s'),
+        ];
+
+        $this->createUser($userData);
+
+        return true;
+    }
+
+    /**
+     * Reject an account request
+     *
+     * @param string $id The account request ID
+     * @return bool True if the request was rejected successfully
+     */
+    public function rejectAccountRequest(string $id): bool
+    {
+        if (!isset($this->accountRequests[$id])) {
+            return false;
+        }
+
+        // Update status to rejected
+        $this->accountRequests[$id]['status'] = 'rejected';
+
+        return true;
     }
 }

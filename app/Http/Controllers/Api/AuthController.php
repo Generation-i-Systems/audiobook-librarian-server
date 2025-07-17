@@ -2,24 +2,34 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
 use App\Contracts\DocumentStoreServiceInterface;
-use Google\Cloud\Core\Timestamp as GoogleTimestamp;
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
 {
-    protected $firestore;
+    protected $documentStore;
 
-    public function __construct(DocumentStoreServiceInterface $firestore)
+
+    public function __construct(DocumentStoreServiceInterface $documentStore)
     {
-        $this->firestore = $firestore;
+        $this->documentStore = $documentStore;
     }
+
 
     public function register(Request $request)
     {
+        // Log incoming request data
+        Log::debug('Registration request received', [
+            'request_data' => $request->all(),
+            'headers' => $request->headers->all(),
+            'content_type' => $request->header('Content-Type'),
+            'accept' => $request->header('Accept')
+        ]);
+
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:255',
@@ -28,59 +38,47 @@ class AuthController extends Controller
         ]);
 
         if ($validator->fails()) {
+            Log::error('Registration validation failed', [
+                'errors' => $validator->errors(),
+                'input' => $request->all()
+            ]);
             return response()->json($validator->errors(), 400);
         }
 
-        // Check if email already exists in Firestore
-        $existingUser = $this->firestore->getClient()
-            ->collection('users')
-            ->where('email', '=', $request->email)
-            ->documents();
+        // Check if email already exists
+        $existingUser = $this->documentStore->getUserByEmail($request->email);
 
-        if (!$existingUser->isEmpty()) {
+        if ($existingUser) {
             return response()->json(['email' => ['The email has already been taken.']], 400);
         }
 
-        // Check if username already exists in Firestore
-        $existingUsername = $this->firestore->getClient()
-            ->collection('users')
-            ->where('username', '=', $request->username)
-            ->documents();
-
-        if (!$existingUsername->isEmpty()) {
+        // Check if username already exists
+        if ($this->documentStore->userExistsByUsername($request->username)) {
             return response()->json(['username' => ['The username has already been taken.']], 400);
         }
 
-        // Create the user in Firestore
+        // Create the user
         $userData = [
             'name' => $request->name,
             'username' => $request->username,
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'role' => 'unverified',
-            'created_at' => new GoogleTimestamp(new \DateTime()),
-            'updated_at' => new GoogleTimestamp(new \DateTime()),
+            // Let the service handle timestamps
         ];
 
-        $userRef = $this->firestore->getClient()
-            ->collection('users')
-            ->add($userData);
+        $userId = $this->documentStore->createUser($userData);
 
         // Notify all admins about the new user
-        $adminUsers = $this->firestore->getClient()
-            ->collection('users')
-            ->where('role', '=', 'admin')
-            ->documents();
+        $adminUsers = $this->documentStore->getAdminUsers();
 
-        $messagesRef = $this->firestore->getClient()->collection('messages');
-        $now = new GoogleTimestamp(new \DateTime());
         foreach ($adminUsers as $admin) {
-            $messagesRef->add([
-                'user_id' => $admin->id(),
+            $this->documentStore->createMessage([
+                'user_id' => $admin['id'],
                 'content' => 'New user registered: ' . $request->name . ' (' . $request->email . ')',
                 'is_from_admin' => false,
-                'created_at' => $now,
-                'updated_at' => $now,
+                'created_at' => new \DateTime(),
+                'updated_at' => new \DateTime(),
             ]);
         }
 
@@ -88,6 +86,7 @@ class AuthController extends Controller
             'message' => 'Account created. Waiting for admin approval.',
         ], 201);
     }
+
 
     public function login(Request $request)
     {
@@ -102,28 +101,29 @@ class AuthController extends Controller
         }
 
         $loginField = $request->input('email') ?? $request->input('username');
-        $client = $this->firestore->getClient();
 
-        // Try to find user by email or username
-        $users = $client->collection('users')
-            ->where('email', '=', $loginField)
-            ->limit(1)
-            ->documents();
-
-        if ($users->isEmpty()) {
-            $users = $client->collection('users')
-                ->where('username', '=', $loginField)
-                ->limit(1)
-                ->documents();
+        // Try to find user by email
+        $user = null;
+        if (filter_var($loginField, FILTER_VALIDATE_EMAIL)) {
+            $user = $this->documentStore->getUserByEmail($loginField);
         }
 
-        if ($users->isEmpty() || !Hash::check($request->password, $users->rows()[0]->data()['password'])) {
+        // If not found by email, try to find by username
+        if (!$user) {
+            $users = $this->documentStore->getUsersForMessaging();
+            foreach ($users as $potentialUser) {
+                if (isset($potentialUser['username']) && $potentialUser['username'] === $loginField) {
+                    $user = $potentialUser;
+                    break;
+                }
+            }
+        }
+
+        if (!$user || !Hash::check($request->password, $user['password'])) {
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
 
-        $userData = $users->rows()[0];
-        $user = $userData->data();
-        $userId = $userData->id();
+        $userId = $user['id'];
 
         // Check if user is approved
         if ($user['role'] === 'unverified') {
@@ -133,14 +133,16 @@ class AuthController extends Controller
         // Create a simple token (in a real app, use Laravel Sanctum/Passport)
         $token = hash('sha256', $userId . now()->timestamp . uniqid());
 
-        // Store the token in Firestore
-        $client->collection('api_tokens')
-            ->add([
-                'user_id' => $userId,
-                'token' => $token,
-                'created_at' => new GoogleTimestamp(new \DateTime()),
-                'expires_at' => new GoogleTimestamp(now()->addDays(30)->toDateTime()),
-            ]);
+        // Store the token using the interface method
+        $tokenData = [
+            'user_id' => $userId,
+            'token' => $token,
+            'created_at' => new \DateTime(),
+            'expires_at' => now()->addDays(30)->toDateTime(),
+        ];
+
+        // Use the createApiToken interface method
+        $this->documentStore->createApiToken($tokenData);
 
         unset($user['password']);
         $user['id'] = $userId;
@@ -152,20 +154,17 @@ class AuthController extends Controller
         ]));
     }
 
+
     public function logout(Request $request)
     {
         $token = $request->bearerToken();
         if ($token) {
-            $client = $this->firestore->getClient();
-            $tokens = $client->collection('api_tokens')
-                ->where('token', '=', $token)
-                ->documents();
-
-            foreach ($tokens as $tokenDoc) {
-                $tokenDoc->reference()->delete();
-            }
+            // Use the deleteApiTokenByValue interface method
+            $this->documentStore->deleteApiTokenByValue($token);
         }
 
         return response()->json(['message' => 'Successfully logged out']);
     }
+
+
 }

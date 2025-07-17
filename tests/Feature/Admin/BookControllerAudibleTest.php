@@ -18,6 +18,8 @@ class BookControllerAudibleTest extends TestCase
     use WithFaker;
 
     protected $user;
+
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -51,8 +53,6 @@ class BookControllerAudibleTest extends TestCase
 
     /**
      * Test the audible endpoint with a title search
-     *
-     * @return void
      */
     public function testAudibleSearchByTitle(): void
     {
@@ -62,7 +62,7 @@ class BookControllerAudibleTest extends TestCase
         // Mock the searchBooksWithFiltering method
         $mockAudibleService->shouldReceive('searchBooksWithFiltering')
             ->once()
-            ->with('Test Book', '', ['limit' => 10])
+            ->with('Test Book', 'Test Author', ['limit' => 10])
             ->andReturn([
                 [
                     'title' => 'Test Book',
@@ -132,8 +132,6 @@ class BookControllerAudibleTest extends TestCase
 
     /**
      * Test the audible endpoint with an ASIN search
-     *
-     * @return void
      */
     public function testAudibleSearchByAsin(): void
     {
@@ -223,8 +221,6 @@ class BookControllerAudibleTest extends TestCase
 
     /**
      * Test the audible endpoint with a missing title and ASIN
-     *
-     * @return void
      */
     public function testAudibleSearchWithMissingTitleAndAsin(): void
     {
@@ -250,8 +246,6 @@ class BookControllerAudibleTest extends TestCase
 
     /**
      * Test the audible endpoint with author filtering
-     *
-     * @return void
      */
     public function testAudibleSearchWithAuthorFiltering(): void
     {
@@ -348,8 +342,6 @@ class BookControllerAudibleTest extends TestCase
 
     /**
      * Test the audible endpoint with fallback search when no results are found
-     *
-     * @return void
      */
     public function testAudibleSearchWithFallback(): void
     {

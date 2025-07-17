@@ -8,15 +8,13 @@ use Illuminate\Support\Facades\Auth;
 
 class ReadingProgressController extends Controller
 {
-    /**
-     * @var DocumentStoreServiceInterface
-     */
     protected DocumentStoreServiceInterface $documentStoreService;
 
     public function __construct(DocumentStoreServiceInterface $documentStoreService)
     {
         $this->documentStoreService = $documentStoreService;
     }
+
     public function update(Request $request)
     {
         $request->validate([
@@ -27,6 +25,7 @@ class ReadingProgressController extends Controller
         $userId = $user->id;
         $bookId = $request->book_id;
         $this->documentStoreService->setReadingProgress($userId, $bookId, $request->current_position);
+
         return response()->json(['success' => true]);
     }
 
@@ -39,6 +38,7 @@ class ReadingProgressController extends Controller
         $userId = $user->id;
         $bookId = $request->book_id;
         $currentPosition = $this->documentStoreService->getReadingProgress($userId, $bookId);
+
         return response()->json(['current_position' => $currentPosition]);
     }
 }

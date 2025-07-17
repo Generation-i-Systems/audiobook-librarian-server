@@ -49,6 +49,7 @@ class MigrateMongoToMysql extends Command
 
             if ($bookCount === 0) {
                 $this->info('No books found in MongoDB to migrate.');
+
                 return 0;
             }
 
@@ -117,7 +118,6 @@ class MigrateMongoToMysql extends Command
 
             $progressBar->finish();
             $this->info("\nSuccessfully migrated $bookCount books.");
-
         } catch (\Exception $e) {
             $this->error("\nAn error occurred during migration: " . $e->getMessage());
             return 1;

@@ -456,23 +456,42 @@ class AudiobookBayApiService
     {
         $cacheKey = $this->getCacheKey($endpoint, $params);
 
-        return Cache::remember($cacheKey, $this->cacheTtl, function () use ($endpoint, $params) {
-            $this->checkRateLimit();
-            $response = Http::withHeaders($this->getDefaultHeaders())
-                ->get($this->baseUrl . $endpoint, $params);
-            if ($response->successful()) {
-                return (string) $response->body(); // Always return a string
+        $cached = Cache::get($cacheKey);
+
+        if (!is_null($cached)) {
+            if (is_string($cached)) {
+                return $cached;
             }
-            Log::error('API request failed', [
-                'service' => $this->serviceName,
-                'endpoint' => $endpoint,
-                'status' => $response->status(),
-                'response' => $response->body(),
+
+            // Invalid data found in cache
+            Log::warning('AudiobookBayApiService:httpGetResponse - Invalid data found in cache. Discarding.', [
+                'key' => $cacheKey,
+                'type' => gettype($cached),
             ]);
 
-            return null;
-            // Defensive: ensure closure always returns string|null
-        });
+            return null; // Return null to indicate failure due to invalid cache
+        }
+
+        // Cache miss or invalid data, fetch from source
+        $this->checkRateLimit();
+        $response = Http::withHeaders($this->getDefaultHeaders())
+            ->get($this->baseUrl . $endpoint, $params);
+
+        if ($response->successful()) {
+            $responseBody = (string) $response->body();
+            Cache::put($cacheKey, $responseBody, $this->cacheTtl);
+
+            return $responseBody;
+        }
+
+        Log::error('API request failed', [
+            'service' => $this->serviceName,
+            'endpoint' => $endpoint,
+            'status' => $response->status(),
+            'response' => $response->body(),
+        ]);
+
+        return null;
     }
 
     /**
@@ -480,24 +499,22 @@ class AudiobookBayApiService
      */
     protected function httpPost(string $endpoint, array $data = []): ?\Illuminate\Http\Client\Response
     {
-        $cacheKey = $this->getCacheKey($endpoint, $data);
+        $this->checkRateLimit();
+        $response = Http::withHeaders($this->getDefaultHeaders())
+            ->post($this->baseUrl . $endpoint, $data);
 
-        return Cache::remember($cacheKey, $this->cacheTtl, function () use ($endpoint, $data) {
-            $this->checkRateLimit();
-            $response = Http::withHeaders($this->getDefaultHeaders())
-                ->post($this->baseUrl . $endpoint, $data);
-            if ($response->successful()) {
-                return $response;
-            }
-            Log::error('API request failed', [
-                'service' => $this->serviceName,
-                'endpoint' => $endpoint,
-                'status' => $response->status(),
-                'response' => $response->body(),
-            ]);
+        if ($response->successful()) {
+            return $response;
+        }
 
-            return null;
-        });
+        Log::error('API request failed', [
+            'service' => $this->serviceName,
+            'endpoint' => $endpoint,
+            'status' => $response->status(),
+            'response' => $response->body(),
+        ]);
+
+        return null;
     }
 
     /**
@@ -658,7 +675,7 @@ class AudiobookBayApiService
                 }
 
                 return collect($cookies)
-                    ->map(fn ($cookie) => $cookie->getName() . '=' . $cookie->getValue())
+                    ->map(fn($cookie) => $cookie->getName() . '=' . $cookie->getValue())
                     ->implode('; ');
             } catch (\Exception $e) {
                 Log::error('AudiobookBayApiService: Exception during authentication.', [

@@ -1,5 +1,9 @@
+<?php
+use Illuminate\Support\Facades\Route;
+?>
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -14,21 +18,25 @@
     <style>
         body {
             font-family: 'Figtree', sans-serif;
-            background-color: #f8f9fa; /* Light gray background */
-            color: #343a40; /* Dark gray text */
+            background-color: #f8f9fa;
+            /* Light gray background */
+            color: #343a40;
+            /* Dark gray text */
             margin: 0;
             padding: 0;
             display: flex;
             align-items: center;
             justify-content: center;
             height: 100vh;
-            overflow: hidden; /* Hide scrollbars */
+            overflow: hidden;
+            /* Hide scrollbars */
         }
 
         .container {
             text-align: center;
             padding: 3rem;
-            background-color: #fff; /* White container */
+            background-color: #fff;
+            /* White container */
             border-radius: 1rem;
             box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1);
         }
@@ -36,13 +44,15 @@
         h1 {
             font-size: 4rem;
             font-weight: bold;
-            color: #007bff; /* Primary blue */
+            color: #007bff;
+            /* Primary blue */
             margin-bottom: 1rem;
         }
 
         p {
             font-size: 1.5rem;
-            color: #6c757d; /* Medium gray */
+            color: #6c757d;
+            /* Medium gray */
             margin-bottom: 2rem;
         }
 
@@ -73,6 +83,7 @@
             0% {
                 transform: scale(1);
             }
+
             100% {
                 transform: scale(1.1);
             }
@@ -96,6 +107,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <img src="{{ asset('images/audiobook_icon.png') }}" alt="Audiobook Icon" class="animated-image">
@@ -117,4 +129,5 @@
         @endif
     </div>
 </body>
+
 </html>

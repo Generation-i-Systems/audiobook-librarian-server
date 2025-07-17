@@ -6,8 +6,8 @@ use App\Contracts\DocumentStoreServiceInterface;
 use App\Services\FirestoreService;
 use App\Services\MongoService;
 use App\Services\MySqlService;
-use Tests\Mocks\MockDocumentStoreService;
 use Illuminate\Support\ServiceProvider;
+use Tests\Mocks\MockDocumentStoreService;
 
 class DocumentStoreServiceProvider extends ServiceProvider
 {

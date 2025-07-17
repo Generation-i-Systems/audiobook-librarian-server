@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Auth\DocumentstoreUser;
-use App\Http\Controllers\Controller;
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Http\Controllers\Controller;
 use Google\Cloud\Core\Timestamp as GoogleTimestamp;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Support\Facades\Auth;
@@ -25,7 +25,9 @@ class LoginController extends Controller
     |
     */
     use AuthenticatesUsers;
+
     protected DocumentStoreServiceInterface $documentStoreService;
+
 
     public function __construct(DocumentStoreServiceInterface $documentStoreService)
     {
@@ -34,6 +36,7 @@ class LoginController extends Controller
         $this->middleware('auth')->only('logout');
     }
 
+
     /**
      * Allow login with either email or username.
      */
@@ -41,6 +44,7 @@ class LoginController extends Controller
     {
         return 'login';
     }
+
 
     /**
      * Get the needed authorization credentials from the request.
@@ -57,6 +61,7 @@ class LoginController extends Controller
             'password' => $request->input('password'),
         ];
     }
+
 
     /**
      * Where to redirect users after login.
@@ -82,19 +87,17 @@ class LoginController extends Controller
     {
         // Update last login timestamp
         try {
-            $firestore = $this->documentStoreService;
-            $firestore->getClient()->collection('users')
-                ->document($user->getAuthIdentifier())
-                ->update([
-                    ['path' => 'last_login_at', 'value' => new GoogleTimestamp(new \DateTime())],
-                    ['path' => 'updated_at', 'value' => new GoogleTimestamp(new \DateTime())],
-                ]);
+            $this->documentStoreService->updateUser($user->getAuthIdentifier(), [
+                'last_login_at' => new \DateTime(),
+                'updated_at' => new \DateTime(),
+            ]);
         } catch (\Exception $e) {
             Log::error('Error updating last login time: ' . $e->getMessage());
         }
 
         return redirect()->intended($this->redirectPath());
     }
+
 
     /**
      * Redirect the user to the Google authentication page.
@@ -104,6 +107,7 @@ class LoginController extends Controller
         return Socialite::driver('google')->redirect();
     }
 
+
     /**
      * Obtain the user information from Google.
      *
@@ -112,7 +116,7 @@ class LoginController extends Controller
     public function handleGoogleCallback()
     {
         try {
-            $googleUser = Socialite::driver('google')->stateless()->user();
+            $googleUser = Socialite::driver('google')->user();
         } catch (\Exception $e) {
             Log::error('Google login error: ' . $e->getMessage());
 
@@ -123,42 +127,27 @@ class LoginController extends Controller
             return redirect('/login')->withErrors(['google' => 'No email provided by Google.']);
         }
 
-        $firestore = $this->documentStoreService;
-
         try {
             // Check if user exists
-            $userQuery = $firestore->getClient()->collection('users')
-                ->where('email', '=', $googleUser->getEmail())
-                ->limit(1)
-                ->documents();
-
-            $userArr = null;
-            foreach ($userQuery as $doc) {
-                if ($doc->exists()) {
-                    $userArr = $doc->data();
-                    $userArr['id'] = $doc->id();
-                    break;
-                }
-            }
+            $userArr = $this->documentStoreService->getUserByEmail($googleUser->getEmail());
 
             // Create new user if not exists
             if (!$userArr) {
                 $newUserData = [
-                    'name' => $googleUser->getName() ?? $googleUser->getNickname() ??
-                        explode('@', $googleUser->getEmail())[0],
+                    'name' => $googleUser->getName() ?? $googleUser->getNickname() ?? explode('@', $googleUser->getEmail())[0],
                     'email' => $googleUser->getEmail(),
                     'password' => bcrypt(Str::random(32)), // random password, not used
                     'role' => 'user',
-                    'email_verified_at' => new GoogleTimestamp(new \DateTime()),
-                    'created_at' => new GoogleTimestamp(new \DateTime()),
-                    'updated_at' => new GoogleTimestamp(new \DateTime()),
+                    'email_verified_at' => new \DateTime(),
+                    'created_at' => new \DateTime(),
+                    'updated_at' => new \DateTime(),
                     'google_id' => $googleUser->getId(),
                     'avatar' => $googleUser->getAvatar(),
                 ];
 
-                $docRef = $firestore->getClient()->collection('users')->add($newUserData);
+                $userId = $this->documentStoreService->createUser($newUserData);
                 $userArr = $newUserData;
-                $userArr['id'] = $docRef->id();
+                $userArr['id'] = $userId;
 
                 Log::info('New user created via Google login', [
                     'user_id' => $userArr['id'],
@@ -166,13 +155,11 @@ class LoginController extends Controller
                 ]);
             } else {
                 // Update existing user's Google ID and avatar
-                $firestore->getClient()->collection('users')
-                    ->document($userArr['id'])
-                    ->update([
-                        ['path' => 'google_id', 'value' => $googleUser->getId()],
-                        ['path' => 'avatar', 'value' => $googleUser->getAvatar()],
-                        ['path' => 'updated_at', 'value' => new GoogleTimestamp(new \DateTime())],
-                    ]);
+                $this->documentStoreService->updateUser($userArr['id'], [
+                    'google_id' => $googleUser->getId(),
+                    'avatar' => $googleUser->getAvatar(),
+                    'updated_at' => new \DateTime(),
+                ]);
             }
 
             if (empty($userArr)) {
@@ -203,6 +190,7 @@ class LoginController extends Controller
         }
     }
 
+
     /**
      * Log the user out of the application.
      *
@@ -217,4 +205,6 @@ class LoginController extends Controller
 
         return $this->loggedOut($request) ?: redirect('/');
     }
+
+
 }

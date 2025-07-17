@@ -1,3 +1,6 @@
+<?php
+use Illuminate\Support\Facades\Route;
+?>
 @extends('layouts.app')
 
 @section('content')

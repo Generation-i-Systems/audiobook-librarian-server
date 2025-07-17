@@ -52,7 +52,7 @@ abstract class BaseBookService implements BookServiceInterface
                 $result = $this->performSearch($query, $options);
                 Log::info('BaseBookService: performSearch returned (no_cache path).', [
                     'result_is_null' => is_null($result),
-                    'result_count' => is_array($result) ? count($result) : 'N/A'
+                    'result_count' => is_array($result) ? count($result) : 'N/A',
                 ]);
 
                 return $result ?? [];

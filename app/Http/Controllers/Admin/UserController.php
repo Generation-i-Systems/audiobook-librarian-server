@@ -5,33 +5,35 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use App\Contracts\DocumentStoreServiceInterface;
 
 class UserController extends Controller
 {
+    protected DocumentStoreServiceInterface $documentStoreService;
+
+
+    public function __construct(DocumentStoreServiceInterface $documentStoreService)
+    {
+        $this->documentStoreService = $documentStoreService;
+    }
+
+
     public function index()
     {
-        $firestore = $this->documentStoreService;
-        $users = $firestore->getClient()->collection('users')->documents();
-        $userList = [];
-        foreach ($users as $userDoc) {
-            if ($userDoc->exists()) {
-                $user = $userDoc->data();
-                $user['id'] = $userDoc->id();
-                $userList[] = $user;
-            }
-        }
+        $userList = $this->documentStoreService->getAllUsers();
 
         return view('admin.users.index', ['users' => $userList]);
     }
+
 
     public function create()
     {
         return view('admin.users.create');
     }
 
+
     public function store(Request $request)
     {
-        $firestore = $this->documentStoreService;
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:255',
@@ -40,46 +42,34 @@ class UserController extends Controller
             'role' => 'required|string',
         ]);
         // Uniqueness check
-        $existingUser = $firestore->getClient()->collection('users')
-            ->where('username', '=', $validated['username'])
-            ->documents();
-        foreach ($existingUser as $doc) {
-            if ($doc->exists()) {
-                return back()->withErrors(['username' => 'Username already exists.']);
-            }
+        if ($this->documentStoreService->userExistsByUsername($validated['username'])) {
+            return back()->withErrors(['username' => 'Username already exists.']);
         }
-        $existingEmail = $firestore->getClient()->collection('users')
-            ->where('email', '=', $validated['email'])
-            ->documents();
-        foreach ($existingEmail as $doc) {
-            if ($doc->exists()) {
-                return back()->withErrors(['email' => 'Email already exists.']);
-            }
+        if ($this->documentStoreService->userExistsByEmail($validated['email'])) {
+            return back()->withErrors(['email' => 'Email already exists.']);
         }
         // Never store password_confirmation on user record
         unset($validated['password_confirmation']);
         $validated['password'] = Hash::make($validated['password']);
-        $firestore->getClient()->collection('users')->add($validated);
+        $this->documentStoreService->createUser($validated);
 
         return redirect()->route('admin.users.index')->with('success', 'User created successfully.');
     }
 
+
     public function edit($id)
     {
-        $firestore = $this->documentStoreService;
-        $userDoc = $firestore->getClient()->collection('users')->document($id)->snapshot();
-        if (!$userDoc->exists()) {
+        $user = $this->documentStoreService->getUserById($id);
+        if (!$user) {
             abort(404);
         }
-        $user = $userDoc->data();
-        $user['id'] = $userDoc->id();
 
         return view('admin.users.edit', compact('user'));
     }
 
+
     public function update(Request $request, $id)
     {
-        $firestore = $this->documentStoreService;
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:255',
@@ -88,21 +78,13 @@ class UserController extends Controller
             'password' => 'nullable|string|min:6|confirmed',
         ]);
         // Uniqueness check (ignore current user)
-        $existingUser = $firestore->getClient()->collection('users')
-            ->where('username', '=', $validated['username'])
-            ->documents();
-        foreach ($existingUser as $doc) {
-            if ($doc->exists() && $doc->id() !== $id) {
-                return back()->withErrors(['username' => 'Username already exists.']);
-            }
+        $existingUser = $this->documentStoreService->getUserByUsername($validated['username']);
+        if ($existingUser && $existingUser['id'] !== $id) {
+            return back()->withErrors(['username' => 'Username already exists.']);
         }
-        $existingEmail = $firestore->getClient()->collection('users')
-            ->where('email', '=', $validated['email'])
-            ->documents();
-        foreach ($existingEmail as $doc) {
-            if ($doc->exists() && $doc->id() !== $id) {
-                return back()->withErrors(['email' => 'Email already exists.']);
-            }
+        $existingEmail = $this->documentStoreService->getUserByEmail($validated['email']);
+        if ($existingEmail && $existingEmail['id'] !== $id) {
+            return back()->withErrors(['email' => 'Email already exists.']);
         }
         // Never store password_confirmation on user record
         unset($validated['password_confirmation']);
@@ -111,16 +93,18 @@ class UserController extends Controller
         } else {
             unset($validated['password']);
         }
-        $firestore->getClient()->collection('users')->document($id)->set($validated, ['merge' => true]);
+        $this->documentStoreService->updateUser($id, $validated);
 
         return redirect()->route('admin.users.index')->with('success', 'User updated successfully.');
     }
 
+
     public function destroy($id)
     {
-        $firestore = $this->documentStoreService;
-        $firestore->getClient()->collection('users')->document($id)->delete();
+        $this->documentStoreService->deleteUser($id);
 
         return redirect()->route('admin.users.index')->with('success', 'User deleted successfully.');
     }
+
+
 }

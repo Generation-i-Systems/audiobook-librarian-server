@@ -2,18 +2,20 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Http\Controllers\Controller;
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Log;
 
 class MessageController extends Controller
 {
     protected DocumentStoreServiceInterface $documentStoreService;
 
+
     public function __construct(DocumentStoreServiceInterface $documentStoreService)
     {
         $this->documentStoreService = $documentStoreService;
     }
+
 
     /**
      * Display a listing of messages
@@ -38,6 +40,7 @@ class MessageController extends Controller
         }
     }
 
+
     /**
      * Acknowledge a message
      *
@@ -60,4 +63,6 @@ class MessageController extends Controller
             return back()->with('error', 'An error occurred while acknowledging the message.');
         }
     }
+
+
 }

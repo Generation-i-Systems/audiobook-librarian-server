@@ -29,4 +29,5 @@ $importConfig = [
 if (!empty(env('IMPORT_ROOT_1'))) {
     $importConfig['roots'][] = env('IMPORT_ROOT_1');
 }
+
 return $importConfig;

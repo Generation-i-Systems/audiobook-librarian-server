@@ -8,8 +8,8 @@ use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
 use Mockery;
-use Tests\TestCase;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
 
 /**
  * @covers \App\Http\Controllers\AdminNotificationController
@@ -26,42 +26,48 @@ class AdminNotificationControllerTest extends TestCase
         $mock->shouldReceive('getClient')->andReturnSelf();
         $mock->shouldReceive('collection')->with('users')->andReturnSelf();
         $mock->shouldReceive('document')->andReturnSelf();
-        $mock->shouldReceive('snapshot')->andReturn(new class () {
+        $mock->shouldReceive('snapshot')->andReturn(new class
+        {
             public function exists()
             {
                 return true;
             }
+
             public function data()
             {
                 return ['device_token' => 'testtoken', 'id' => 'user123'];
             }
+
             public function id()
             {
                 return 'user123';
             }
         });
         $mock->shouldReceive('documents')->andReturn([
-            new class () {
+            new class
+            {
                 public function exists()
                 {
                     return true;
                 }
+
                 public function data()
                 {
                     return ['device_token' => 'testtoken', 'id' => 'user123'];
                 }
+
                 public function id()
                 {
                     return 'user123';
                 }
-            }
+            },
         ]);
         $this->app->instance(DocumentStoreServiceInterface::class, $mock);
         Log::spy();
     }
 
     #[Test]
-    public function sendNotification_sends_to_specific_user(): void
+    public function send_notification_sends_to_specific_user(): void
     {
         $response = $this->post(route('admin.send.notification'), [
             'message' => 'Test message',
@@ -69,31 +75,32 @@ class AdminNotificationControllerTest extends TestCase
         ]);
         $response->assertSessionHas('success', 'Notification sent to specific user!');
         Log::shouldHaveReceived('info')->withArgs([
-            fn ($msg) => str_contains($msg, 'Sending push notification to user user123 with message: Test message')
+            fn ($msg) => str_contains($msg, 'Sending push notification to user user123 with message: Test message'),
         ]);
     }
 
     #[Test]
-    public function sendNotification_sends_to_all_users(): void
+    public function send_notification_sends_to_all_users(): void
     {
         $response = $this->post(route('admin.send.notification'), [
             'message' => 'Broadcast message',
         ]);
         $response->assertSessionHas('success', 'Notification sent to all users!');
         Log::shouldHaveReceived('info')->withArgs([
-            fn ($msg) => str_contains($msg, 'Sending push notification to user user123 with message: Broadcast message')
+            fn ($msg) => str_contains($msg, 'Sending push notification to user user123 with message: Broadcast message'),
         ]);
     }
 
     #[Test]
-    public function sendNotification_returns_error_for_missing_user(): void
+    public function send_notification_returns_error_for_missing_user(): void
     {
         // Remock with user not found
         $mock = Mockery::mock(DocumentStoreServiceInterface::class);
         $mock->shouldReceive('getClient')->andReturnSelf();
         $mock->shouldReceive('collection')->with('users')->andReturnSelf();
         $mock->shouldReceive('document')->andReturnSelf();
-        $mock->shouldReceive('snapshot')->andReturn(new class () {
+        $mock->shouldReceive('snapshot')->andReturn(new class
+        {
             public function exists()
             {
                 return false;
@@ -109,7 +116,7 @@ class AdminNotificationControllerTest extends TestCase
     }
 
     #[Test]
-    public function sendNotification_requires_message(): void
+    public function send_notification_requires_message(): void
     {
         $response = $this->post(route('admin.send.notification'), [
             'user_id' => 'user123',

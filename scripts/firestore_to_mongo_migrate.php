@@ -19,7 +19,6 @@ if (!function_exists('custom_base_path')) {
     }
 }
 
-
 $FIREBASE_PROJECT_ID = getenv('FIREBASE_PROJECT_ID') ?: ($_ENV['FIREBASE_PROJECT_ID'] ?? '');
 $FIREBASE_CREDENTIALS = getenv('FIREBASE_CREDENTIALS') ?: ($_ENV['FIREBASE_CREDENTIALS'] ?? '');
 $MONGODB_URI = getenv('MONGODB_URI') ?: ($_ENV['MONGODB_URI'] ?? 'mongodb://localhost:27017');
@@ -51,6 +50,7 @@ $collections = [
 foreach ($collections as $collection) {
     if (in_array($collection, $exclude, true)) {
         echo "Skipping $collection\n";
+
         continue;
     }
     echo "Migrating $collection... ";

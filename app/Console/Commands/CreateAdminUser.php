@@ -28,15 +28,10 @@ class CreateAdminUser extends Command
      *
      * @return int
      */
-    /**
-     * @var DocumentStoreServiceInterface
-     */
     protected DocumentStoreServiceInterface $documentStoreService;
 
     /**
      * CreateAdminUser constructor.
-     *
-     * @param DocumentStoreServiceInterface $documentStoreService
      */
     public function __construct(DocumentStoreServiceInterface $documentStoreService)
     {
@@ -56,6 +51,7 @@ class CreateAdminUser extends Command
         ]);
         if ($admin) {
             $this->info('An admin user already exists.');
+
             return 0;
         }
         $password = Str::random(12);

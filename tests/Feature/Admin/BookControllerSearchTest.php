@@ -14,6 +14,8 @@ use Tests\TestCase;
  */
 class BookControllerSearchTest extends TestCase
 {
+
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -43,8 +45,6 @@ class BookControllerSearchTest extends TestCase
 
     /**
      * Test the unified search endpoint with Audible source
-     *
-     * @return void
      */
     public function testSearchBooksWithAudibleSource(): void
     {
@@ -93,8 +93,6 @@ class BookControllerSearchTest extends TestCase
 
     /**
      * Test the unified search endpoint with Google Books source
-     *
-     * @return void
      */
     public function testSearchBooksWithGoogleBooksSource(): void
     {
@@ -142,10 +140,8 @@ class BookControllerSearchTest extends TestCase
 
     /**
      * Test the unified search endpoint with an invalid source
-     *
-     * @return void
      */
-    public function testSearchBooksWithInvalidSource(): void
+    public function testSearchBooksInvalidSource(): void
     {
         // Make the request with an invalid source
         $response = $this->getJson('/admin/books/search?source=invalid&title=Test+Book');
@@ -159,10 +155,8 @@ class BookControllerSearchTest extends TestCase
 
     /**
      * Test the unified search endpoint with missing title and API ID
-     *
-     * @return void
      */
-    public function testSearchBooksWithMissingTitleAndApiId(): void
+    public function testSearchBooksMissingTitleAndApiId(): void
     {
         // Make the request without title or api_id
         $response = $this->getJson('/admin/books/search?source=audible');
@@ -176,10 +170,8 @@ class BookControllerSearchTest extends TestCase
 
     /**
      * Test the unified search endpoint with an error from the service
-     *
-     * @return void
      */
-    public function testSearchBooksWithServiceError(): void
+    public function testSearchBooksServiceError(): void
     {
         // Mock the AudibleService
         $mockAudibleService = Mockery::mock(AudibleService::class);

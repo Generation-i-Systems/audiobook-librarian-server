@@ -7,7 +7,7 @@ interface DocumentStoreServiceInterface
     /**
      * Get a book by ID
      *
-     * @param string $id
+     * @param  string  $id
      * @return array|null
      */
     public function getBook($id);
@@ -15,7 +15,6 @@ interface DocumentStoreServiceInterface
     /**
      * Create a new book
      *
-     * @param array $data
      * @return string The ID of the created book
      */
     public function createBook(array $data);
@@ -23,8 +22,7 @@ interface DocumentStoreServiceInterface
     /**
      * Update an existing book
      *
-     * @param string $id
-     * @param array $data
+     * @param  string  $id
      * @return bool
      */
     public function updateBook($id, array $data);
@@ -32,7 +30,7 @@ interface DocumentStoreServiceInterface
     /**
      * Delete a book
      *
-     * @param string $id
+     * @param  string  $id
      * @return bool
      */
     public function deleteBook($id);
@@ -40,8 +38,8 @@ interface DocumentStoreServiceInterface
     /**
      * Get all books
      *
-     * @param int|null $limit
-     * @param int $offset
+     * @param  int|null  $limit
+     * @param  int  $offset
      * @return array
      */
     public function getAllBooks($limit = null, $offset = 0);
@@ -49,9 +47,9 @@ interface DocumentStoreServiceInterface
     /**
      * Search for books
      *
-     * @param string $query
-     * @param int|null $limit
-     * @param int $offset
+     * @param  string  $query
+     * @param  int|null  $limit
+     * @param  int  $offset
      * @return array
      */
     public function searchBooks($query, $limit = null, $offset = 0);
@@ -59,7 +57,7 @@ interface DocumentStoreServiceInterface
     /**
      * Get books by author
      *
-     * @param string $author
+     * @param  string  $author
      * @return array
      */
     public function getBooksByAuthor($author);
@@ -67,7 +65,7 @@ interface DocumentStoreServiceInterface
     /**
      * Get books by series
      *
-     * @param string $seriesName
+     * @param  string  $seriesName
      * @return array
      */
     public function getBooksBySeries($seriesName);
@@ -75,7 +73,7 @@ interface DocumentStoreServiceInterface
     /**
      * Get books by genre
      *
-     * @param string $genre
+     * @param  string  $genre
      * @return array
      */
     public function getBooksByGenre($genre);
@@ -104,7 +102,7 @@ interface DocumentStoreServiceInterface
     /**
      * Add a genre
      *
-     * @param string $name
+     * @param  string  $name
      * @return string The ID of the created genre
      */
     public function addGenre($name);
@@ -112,7 +110,7 @@ interface DocumentStoreServiceInterface
     /**
      * Add a series
      *
-     * @param string $name
+     * @param  string  $name
      * @return string The ID of the created series
      */
     public function addSeries($name);
@@ -120,7 +118,7 @@ interface DocumentStoreServiceInterface
     /**
      * Add an author
      *
-     * @param string $name
+     * @param  string  $name
      * @return string The ID of the created author
      */
     public function addAuthor($name);

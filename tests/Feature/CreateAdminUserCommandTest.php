@@ -6,8 +6,8 @@ namespace Tests\Feature;
 
 use App\Console\Commands\CreateAdminUser;
 use App\Contracts\DocumentStoreServiceInterface;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Mockery;
 use Tests\TestCase;
 
@@ -16,7 +16,7 @@ class CreateAdminUserCommandTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function testCreatesAdminUserIfNoneExists(): void
+    public function test_creates_admin_user_if_none_exists(): void
     {
         $mock = Mockery::mock(DocumentStoreServiceInterface::class);
         $mock->shouldReceive('getUserByCredentials')->with(['role' => 'admin'])->andReturn(null);
@@ -33,7 +33,7 @@ class CreateAdminUserCommandTest extends TestCase
             ->assertExitCode(0);
     }
 
-    public function testDoesNotCreateIfAdminExists(): void
+    public function test_does_not_create_if_admin_exists(): void
     {
         $mock = Mockery::mock(DocumentStoreServiceInterface::class);
         $mock->shouldReceive('getUserByCredentials')->with(['role' => 'admin'])->andReturn(['id' => 'existing']);

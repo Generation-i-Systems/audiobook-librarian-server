@@ -19,8 +19,6 @@
  * Only files with both an Arabic number and a Roman numeral will be renamed by default, unless --pattern is set, in which case only files matching the pattern will be renamed.
  * Example: '01 - Canto X.mp3' will be renamed to '10 - Canto X.mp3'.
  */
-
-
 function romanToInt($roman)
 {
     $map = [
@@ -50,6 +48,7 @@ function romanToInt($roman)
             }
         }
     }
+
     return $result;
 }
 
@@ -87,7 +86,7 @@ foreach ($argv as $arg) {
 }
 
 if ($showHelp) {
-    echo <<<EOT
+    echo <<<'EOT'
 Script to rename files by replacing the first Arabic number in the filename with the Arabic value of the first Roman numeral found.
 
 Usage:
@@ -100,7 +99,7 @@ Options:
   --dryrun, -n         Only print what would be renamed, do not rename files.
   --verbose, -v        Print all actions (including skips).
   --pattern=REGEX      Regex pattern for replacement. Use {arabic} and {roman} as placeholders.
-                       Example: --pattern='/^Book-([IVXLCDM]+)\\.txt$/i|Book-{arabic}.txt'
+                       Example: --pattern='/^Book-([IVXLCDM]+)\.txt$/i|Book-{arabic}.txt'
                        If --pattern is set, only files matching the pattern will be renamed.
   --digits=N           Pad the Arabic number with leading zeros to N digits (e.g. --digits=3 => 001, 012, 123).
   --help, -h           Show this help message and exit.
@@ -130,6 +129,7 @@ function collectFiles($args)
             $files[] = $arg;
         }
     }
+
     return $files;
 }
 
@@ -217,6 +217,7 @@ foreach ($files as $path) {
             if ($options['verbose']) {
                 echo "SKIP (target exists): $path -> $newPath\n";
             }
+
             continue;
         }
         if ($options['dryrun']) {

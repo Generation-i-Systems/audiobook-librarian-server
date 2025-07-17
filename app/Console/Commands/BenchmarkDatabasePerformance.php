@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Services\FirestoreService;
 use App\Services\MongoService;
 use App\Services\MySqlService;
 use Illuminate\Console\Command;
@@ -25,8 +26,12 @@ class BenchmarkDatabasePerformance extends Command
     protected $description = 'Run a series of queries against database services to benchmark their performance.';
 
     private array $results = [];
+
     private ?DocumentStoreServiceInterface $mongoService = null;
+
     private ?DocumentStoreServiceInterface $mySqlService = null;
+
+    private ?DocumentStoreServiceInterface $firestoreService = null;
 
     /**
      * Execute the console command.
@@ -41,17 +46,20 @@ class BenchmarkDatabasePerformance extends Command
         if ($driver === 'all' || $driver === 'mysql') {
             $this->mySqlService = new MySqlService();
         }
+        if ($driver === 'all' || $driver === 'firestore') {
+            $this->firestoreService = new FirestoreService();
+        }
 
         $this->info('Starting database performance benchmark...');
 
         // Run benchmarks
-        $this->runBenchmark('Get First Book', fn($service) => $service->getBook(1));
-        $this->runBenchmark('List All Books (50 limit)', fn($service) => $service->listBooks()); // Assuming listBooks can be limited or just for comparison
-        $this->runBenchmark('Dump All Books', fn($service) => $service->dumpAllBooks());
-        $this->runBenchmark('Autocomplete Author "King"', fn($service) => $service->autocompleteAuthors('King'));
-        $this->runBenchmark('Autocomplete Narrator "Scott"', fn($service) => $service->autocompleteNarrators('Scott'));
-        $this->runBenchmark('Autocomplete Series "Harry Potter"', fn($service) => $service->autocompleteSeries('Harry Potter'));
-        $this->runBenchmark('Get Books in Series (ID: 1)', fn($service) => $service->getBooksInSeries(1));
+        $this->runBenchmark('Get First Book', fn ($service) => $service->getBook(1));
+        $this->runBenchmark('List All Books (50 limit)', fn ($service) => $service->listBooks()); // Assuming listBooks can be limited or just for comparison
+        $this->runBenchmark('Dump All Books', fn ($service) => $service->dumpAllBooks());
+        $this->runBenchmark('Autocomplete Author "King"', fn ($service) => $service->autocompleteAuthors('King'));
+        $this->runBenchmark('Autocomplete Narrator "Scott"', fn ($service) => $service->autocompleteNarrators('Scott'));
+        $this->runBenchmark('Autocomplete Series "Harry Potter"', fn ($service) => $service->autocompleteSeries('Harry Potter'));
+        $this->runBenchmark('Get Books in Series (ID: 1)', fn ($service) => $service->getBooksInSeries(1));
 
         $this->displayResults();
 
@@ -69,6 +77,10 @@ class BenchmarkDatabasePerformance extends Command
         if ($this->mongoService) {
             $this->results['MongoDB'][$name] = $this->measure($this->mongoService, $callback);
             $this->info('MongoDB... Done.');
+        }
+        if ($this->firestoreService) {
+            $this->results['Firestore'][$name] = $this->measure($this->firestoreService, $callback);
+            $this->info('Firestore... Done.');
         }
     }
 

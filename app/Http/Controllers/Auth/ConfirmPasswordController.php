@@ -26,6 +26,7 @@ class ConfirmPasswordController extends Controller
      */
     protected $redirectTo = '/home';
 
+
     /**
      * Create a new controller instance.
      *
@@ -35,4 +36,6 @@ class ConfirmPasswordController extends Controller
     {
         $this->middleware('auth');
     }
+
+
 }

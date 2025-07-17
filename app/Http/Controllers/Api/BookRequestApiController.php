@@ -12,8 +12,8 @@ class BookRequestApiController extends Controller
      * Normalize legacy or incorrect series input to canonical format.
      * Accepts string, array of strings, or old key-value object.
      * Always returns array of objects with seriesName and number.
-     * @param mixed $seriesInput
-     * @return array
+     *
+     * @param  mixed  $seriesInput
      */
     public static function normalizeSeriesInput($seriesInput): array
     {
@@ -42,9 +42,11 @@ class BookRequestApiController extends Controller
                         $out[] = ['seriesName' => $name, 'number' => (string) $number];
                     }
                 }
+
                 return $out;
             }
         }
+
         return [];
     }
 

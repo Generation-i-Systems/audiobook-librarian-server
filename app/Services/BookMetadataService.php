@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Storage;
-use App\Contracts\DocumentStoreServiceInterface;
 
 class BookMetadataService
 {

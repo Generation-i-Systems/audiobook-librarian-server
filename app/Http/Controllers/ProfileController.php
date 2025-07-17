@@ -6,54 +6,67 @@ use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 
 class ProfileController extends Controller
 {
     protected DocumentStoreServiceInterface $documentStoreService;
 
+
     public function __construct(DocumentStoreServiceInterface $documentStoreService)
     {
         $this->documentStoreService = $documentStoreService;
     }
+
+
     public function index()
     {
-        $firestore = $this->documentStoreService;
         $userId = Auth::id();
+        $user = $this->documentStoreService->getUserById($userId);
 
-        // Fix: Use getCollection method instead of calling collection() directly on the client
-        $usersCollection = $firestore->getCollection('users');
-        $userDoc = $usersCollection->findOne(['_id' => $userId]);
-
-        $user = $userDoc ? $this->normalizeMongoDocument($userDoc) : null;
         if ($user) {
             $user['id'] = $userId;
+        } else {
+            $user = ['id' => $userId, 'name' => 'Guest User'];
+            Log::warning("User {$userId} not found in document store");
         }
 
         return view('profile.index', compact('user'));
     }
 
+
     public function update(Request $request)
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users,email,' . Auth::id(),
-        ]);
-
-        $firestore = $this->documentStoreService;
         $userId = Auth::id();
 
-        // Fix: Use getCollection method instead of calling collection() directly on the client
-        $usersCollection = $firestore->getCollection('users');
-        $usersCollection->updateOne(
-            ['_id' => $userId],
-            ['$set' => [
-                'name' => $request->name,
-                'email' => $request->email,
-            ]]
-        );
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => [
+                'required',
+                'string',
+                'email',
+                'max:255',
+                function ($attribute, $value, $fail) use ($userId) {
+                    $existingUser = $this->documentStoreService->getUserByEmail($value);
+                    if ($existingUser && $existingUser['id'] !== $userId) {
+                        $fail('The email has already been taken.');
+                    }
+                },
+            ],
+        ]);
 
-        return back()->with('success', 'Profile updated successfully!');
+        $success = $this->documentStoreService->updateUser($userId, [
+            'name' => $request->name,
+            'email' => $request->email,
+        ]);
+
+        if ($success) {
+            return back()->with('success', 'Profile updated successfully!');
+        }
+
+        return back()->with('error', 'Failed to update profile. Please try again.');
     }
+
 
     public function changePassword(Request $request)
     {
@@ -62,25 +75,24 @@ class ProfileController extends Controller
             'password' => 'required|string|min:8|confirmed',
         ]);
 
-        $firestore = $this->documentStoreService;
         $userId = Auth::id();
+        $user = $this->documentStoreService->getUserById($userId);
 
-        // Fix: Use getCollection method instead of calling collection() directly on the client
-        $usersCollection = $firestore->getCollection('users');
-        $userDoc = $usersCollection->findOne(['_id' => $userId]);
-
-        $user = $userDoc ? $this->normalizeMongoDocument($userDoc) : null;
-        if (!$user || !Hash::check($request->current_password, $user['password'])) {
+        if (!$user || !Hash::check($request->current_password, $user['password'] ?? '')) {
             return back()->withErrors(['current_password' => 'Incorrect current password.']);
         }
 
-        $usersCollection->updateOne(
-            ['_id' => $userId],
-            ['$set' => ['password' => Hash::make($request->password)]]
-        );
+        $success = $this->documentStoreService->updateUser($userId, [
+            'password' => Hash::make($request->password),
+        ]);
 
-        return back()->with('success', 'Password changed successfully!');
+        if ($success) {
+            return back()->with('success', 'Password changed successfully!');
+        }
+
+        return back()->with('error', 'Failed to update password. Please try again.');
     }
+
 
     public function requestAdminPermissions(Request $request)
     {
@@ -88,45 +100,41 @@ class ProfileController extends Controller
             'content' => 'required|string',
         ]);
 
-        $firestore = $this->documentStoreService;
         $userId = Auth::id();
 
-        // Fix: Use getCollection method instead of calling collection() directly on the client
-        $messagesCollection = $firestore->getCollection('messages');
-        $messagesCollection->insertOne([
+        $messageId = $this->documentStoreService->createMessage([
             'user_id' => $userId,
             'content' => $request->input('content'),
             'is_from_admin' => false,
+            'created_at' => now()->toDateTimeString(),
+            'updated_at' => now()->toDateTimeString(),
         ]);
 
-        return back()->with('success', 'Admin permission request sent!');
+        if ($messageId) {
+            return back()->with('success', 'Admin permission request sent!');
+        }
+
+        return back()->with('error', 'Failed to send admin request. Please try again.');
     }
+
 
     /**
-     * Normalize MongoDB document to PHP array
+     * Normalize document data to array
      *
-     * @param mixed $document
-     * @return array
+     * @param  mixed  $document
      */
-    protected function normalizeMongoDocument($document): array
+    protected function normalizeDocument($document): array
     {
-        if ($document instanceof \MongoDB\Model\BSONDocument) {
-            $document = (array) $document;
+        if (is_array($document)) {
+            return $document;
         }
 
-        // Convert any nested BSONDocument or BSONArray objects to PHP arrays
-        foreach ($document as $key => $value) {
-            if ($value instanceof \MongoDB\Model\BSONDocument || $value instanceof \MongoDB\Model\BSONArray) {
-                $document[$key] = $this->normalizeMongoDocument($value);
-            } elseif (is_array($value)) {
-                $document[$key] = array_map(function ($item) {
-                    return ($item instanceof \MongoDB\Model\BSONDocument || $item instanceof \MongoDB\Model\BSONArray)
-                        ? $this->normalizeMongoDocument($item)
-                        : $item;
-                }, $value);
-            }
+        if (is_object($document) && method_exists($document, 'toArray')) {
+            return $document->toArray();
         }
 
-        return $document;
+        return (array) $document;
     }
+
+
 }

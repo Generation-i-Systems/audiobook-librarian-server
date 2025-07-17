@@ -2,8 +2,16 @@
 
 namespace App\Services;
 
-use MongoDB\Client;
 use App\Contracts\DocumentStoreServiceInterface;
+use Illuminate\Support\Facades\Log;
+use MongoDB\Client;
+use MongoDB\BSON\ObjectId;
+use MongoDB\BSON\UTCDateTime;
+use MongoDB\BSON\Regex;
+use MongoDB\BSON\Timestamp;
+use MongoDB\BSON\Binary;
+use MongoDB\Model\BSONDocument;
+use MongoDB\Operation\FindOneAndUpdate;
 use RuntimeException;
 
 class MongoService implements DocumentStoreServiceInterface
@@ -37,23 +45,27 @@ class MongoService implements DocumentStoreServiceInterface
     public function autocompleteAuthors(string $query, int $limit = 10): array
     {
         $pipeline = [
-            ['$search' => [
-                'index' => 'default',
-                'autocomplete' => [
-                    'query' => $query,
-                    'path' => 'name',
-                    'fuzzy' => [
-                        'maxEdits' => 2,
-                        'prefixLength' => 1,
-                        'maxExpansions' => 50,
+            [
+                '$search' => [
+                    'index' => 'default',
+                    'autocomplete' => [
+                        'query' => $query,
+                        'path' => 'name',
+                        'fuzzy' => [
+                            'maxEdits' => 2,
+                            'prefixLength' => 1,
+                            'maxExpansions' => 50,
+                        ],
                     ],
                 ],
-            ]],
+            ],
             ['$limit' => $limit],
-            ['$project' => [
-                'name' => 1,
-                '_id' => 0
-            ]],
+            [
+                '$project' => [
+                    'name' => 1,
+                    '_id' => 0,
+                ],
+            ],
         ];
         $results = $this->getCollection('authors')->aggregate($pipeline);
         $authors = [];
@@ -75,23 +87,27 @@ class MongoService implements DocumentStoreServiceInterface
     public function autocompleteNarrators(string $query, int $limit = 10): array
     {
         $pipeline = [
-            ['$search' => [
-                'index' => 'default',
-                'autocomplete' => [
-                    'query' => $query,
-                    'path' => 'narrator',
-                    'fuzzy' => [
-                        'maxEdits' => 2,
-                        'prefixLength' => 1,
-                        'maxExpansions' => 50,
+            [
+                '$search' => [
+                    'index' => 'default',
+                    'autocomplete' => [
+                        'query' => $query,
+                        'path' => 'narrator',
+                        'fuzzy' => [
+                            'maxEdits' => 2,
+                            'prefixLength' => 1,
+                            'maxExpansions' => 50,
+                        ],
                     ],
                 ],
-            ]],
+            ],
             ['$limit' => $limit],
-            ['$project' => [
-                'narrator' => 1,
-                '_id' => 0
-            ]],
+            [
+                '$project' => [
+                    'narrator' => 1,
+                    '_id' => 0,
+                ],
+            ],
         ];
         $results = $this->getCollection('books')->aggregate($pipeline);
         $narrators = [];
@@ -119,23 +135,27 @@ class MongoService implements DocumentStoreServiceInterface
     public function autocompleteSeries(string $query, int $limit = 10): array
     {
         $pipeline = [
-            ['$search' => [
-                'index' => 'default',
-                'autocomplete' => [
-                    'query' => $query,
-                    'path' => 'seriesName',
-                    'fuzzy' => [
-                        'maxEdits' => 2,
-                        'prefixLength' => 1,
-                        'maxExpansions' => 50,
+            [
+                '$search' => [
+                    'index' => 'default',
+                    'autocomplete' => [
+                        'query' => $query,
+                        'path' => 'seriesName',
+                        'fuzzy' => [
+                            'maxEdits' => 2,
+                            'prefixLength' => 1,
+                            'maxExpansions' => 50,
+                        ],
                     ],
                 ],
-            ]],
+            ],
             ['$limit' => $limit],
-            ['$project' => [
-                'seriesName' => 1,
-                '_id' => 0
-            ]],
+            [
+                '$project' => [
+                    'seriesName' => 1,
+                    '_id' => 0,
+                ],
+            ],
         ];
         $results = $this->getCollection('series')->aggregate($pipeline);
         $series = [];
@@ -341,6 +361,76 @@ class MongoService implements DocumentStoreServiceInterface
     {
         return $this->getCollection('users')->deleteOne(['_id' => $id]);
     }
+
+    /** @inheritDoc */
+    public function getUserByEmail(string $email): ?array
+    {
+        $doc = $this->getCollection('users')->findOne([
+            'email' => $email,
+        ]);
+
+        if (!$doc) {
+            return null;
+        }
+        // Normalize any BSONArray/BSONDocument fields
+        $doc = $this->normalizeMongoValue($doc);
+        $doc['id'] = (string) $doc['_id'];
+        return $doc;
+    }
+    public function userExistsByEmail(string $email): bool
+    {
+        $count = $this->getCollection('users')->countDocuments([
+            'email' => $email,
+        ]);
+
+        return $count > 0;
+    }
+
+    /** @inheritDoc */
+    public function userExistsByUsername(string $username): bool
+    {
+        $count = $this->getCollection('users')->countDocuments([
+            'username' => $username,
+        ]);
+
+        return $count > 0;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getUserByUsername(string $username): ?array
+    {
+        $doc = $this->getCollection('users')->findOne([
+            'username' => $username,
+        ]);
+
+        if (!$doc) {
+            return null;
+        }
+
+        $user = $this->normalizeMongoValue($doc);
+        $user['id'] = (string) $user['_id'];
+
+        return $user;
+    }
+
+    /** @inheritDoc */
+    public function getAdminUsers(): array
+    {
+        $cursor = $this->getCollection('users')
+            ->find(['role' => 'admin']);
+
+        $admins = [];
+        foreach ($cursor as $doc) {
+            $admin = $this->normalizeMongoValue($doc);
+            $admin['id'] = (string) $admin['_id'];
+            $admins[] = $admin;
+        }
+
+        return $admins;
+    }
+
     /** @inheritDoc */
     public function getUsersForMessaging(): array
     {
@@ -353,6 +443,28 @@ class MongoService implements DocumentStoreServiceInterface
         return $users;
     }
 
+    /**
+     * Get all users in the system
+     *
+     * @return array List of all users
+     */
+    public function getAllUsers(): array
+    {
+        try {
+            $cursor = $this->getCollection('users')->find([]);
+            $users = [];
+            foreach ($cursor as $doc) {
+                $normalizedDoc = $this->normalizeMongoValue($doc);
+                $normalizedDoc['id'] = (string) $doc['_id'];
+                $users[] = $normalizedDoc;
+            }
+            return $users;
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('MongoService getAllUsers failed: ' . $e->getMessage());
+            return [];
+        }
+    }
+
     // GENRES
     /** @inheritDoc */
     public function createGenre(array $data)
@@ -360,50 +472,95 @@ class MongoService implements DocumentStoreServiceInterface
         $result = $this->getCollection('genres')->insertOne($data);
         return (string) $result->getInsertedId();
     }
+
     /** @inheritDoc */
     public function listGenres()
     {
-        return config('genres.list', []);
+        return config('genres');
     }
+
+    public function updateGenre(string $id, array $data): bool
+    {
+        try {
+            $result = $this->getCollection('genres')->updateOne(
+                ['_id' => $id],
+                ['$set' => $data]
+            );
+            return $result->getModifiedCount() > 0;
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('MongoService updateGenre failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Get a genre by ID
+     *
+     * @param string $id The genre ID
+     * @return array|null The genre data or null if not found
+     */
+    public function getGenre(string $id): ?array
+    {
+        try {
+            // First check if this is a built-in genre from config
+            $configGenres = config('genres', []);
+            foreach ($configGenres as $genre) {
+                if (($genre['id'] ?? '') === $id) {
+                    return $genre;
+                }
+            }
+
+            // If not found in config, try to get from database
+            $doc = $this->getCollection('genres')->findOne(['_id' => $id]);
+
+            if (!$doc) {
+                return null;
+            }
+
+            $genre = $this->normalizeMongoValue($doc);
+            $genre['id'] = (string) $doc['_id'];
+
+            return $genre;
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('MongoDB getGenre failed: ' . $e->getMessage());
+            return null;
+        }
+    }
+
     /** @inheritDoc */
     public function deleteGenre(string $id)
     {
-        return $this->getCollection('genres')->deleteOne(['_id' => $id]);
+        return $this->getCollection('genres')->deleteOne(['_id' => new \MongoDB\BSON\ObjectId($id)]);
     }
 
     // SERIES
     /** @inheritDoc */
-    public function createSeries(array $data)
+    public function createSeries(string $name): string
     {
+        $data = ['seriesName' => $name];
         $result = $this->getCollection('series')->insertOne($data);
         return (string) $result->getInsertedId();
     }
+
     /** @inheritDoc */
     public function findOrCreateSeriesByName(string $name)
     {
-        $doc = $this->getCollection('series')->findOne(['name' => $name]);
+        $doc = $this->getCollection('series')->findOne(['seriesName' => $name]);
         if ($doc) {
             if ($doc instanceof \MongoDB\Model\BSONDocument) {
                 $doc = (array) $doc;
             }
-            // Normalize author if present
-            if (isset($doc['author']) && $doc['author'] instanceof \MongoDB\Model\BSONArray) {
-                $doc['author'] = (array) $doc['author'];
-            }
-            // Normalize series if present
-            if (isset($doc['series']) && $doc['series'] instanceof \MongoDB\Model\BSONDocument) {
-                $doc['series'] = (array) $doc['series'];
-            }
             $doc['id'] = (string) $doc['_id'];
             return $doc;
         }
-        $id = $this->createSeries(['name' => $name]);
-        return ['id' => $id, 'name' => $name];
+        $id = $this->createSeries($name);
+        return ['id' => $id, 'seriesName' => $name];
     }
+
     /** @inheritDoc */
     public function getSeries(string $id)
     {
-        $doc = $this->getCollection('series')->findOne(['_id' => $id]);
+        $doc = $this->getCollection('series')->findOne(['_id' => new ObjectId($id)]);
         if (!$doc) {
             return null;
         }
@@ -414,10 +571,11 @@ class MongoService implements DocumentStoreServiceInterface
         $doc['id'] = (string) $doc['_id'];
         return $doc;
     }
+
     /** @inheritDoc */
     public function deleteSeries(string $id)
     {
-        return $this->getCollection('series')->deleteOne(['_id' => $id]);
+        return $this->getCollection('series')->deleteOne(['_id' => new ObjectId($id)]);
     }
 
     /** @inheritDoc */
@@ -442,6 +600,40 @@ class MongoService implements DocumentStoreServiceInterface
     {
         $result = $this->getCollection('authors')->insertOne($data);
         return (string) $result->getInsertedId();
+    }
+
+    /** @inheritDoc */
+    public function getAuthor(string $id): ?array
+    {
+        try {
+            $doc = $this->getCollection('authors')->findOne(['_id' => new ObjectId($id)]);
+
+            if (!$doc) {
+                return null;
+            }
+
+            $doc = $this->normalizeMongoValue($doc);
+            $doc['id'] = (string) $doc['_id'];
+
+            return $doc;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /** @inheritDoc */
+    public function updateAuthor(string $id, array $data): bool
+    {
+        try {
+            $result = $this->getCollection('authors')->updateOne(
+                ['_id' => new ObjectId($id)],
+                ['$set' => $data]
+            );
+
+            return $result->getModifiedCount() > 0;
+        } catch (\Exception $e) {
+            return false;
+        }
     }
     /** @inheritDoc */
     public function listAuthors()
@@ -534,29 +726,29 @@ class MongoService implements DocumentStoreServiceInterface
             [
                 '$project' => [
                     'seriesKeys' => [
-                        '$objectToArray' => '$series'
-                    ]
-                ]
+                        '$objectToArray' => '$series',
+                    ],
+                ],
             ],
             [
-                '$unwind' => '$seriesKeys'
+                '$unwind' => '$seriesKeys',
             ],
             [
                 '$match' => [
                     'seriesKeys.k' => [
                         '$regex' => '^' . preg_quote($term),
-                        '$options' => 'i'
-                    ]
-                ]
+                        '$options' => 'i',
+                    ],
+                ],
             ],
             [
                 '$group' => [
                     '_id' => null,
                     'uniqueKeys' => [
-                        '$addToSet' => '$seriesKeys.k'
-                    ]
-                ]
-            ]
+                        '$addToSet' => '$seriesKeys.k',
+                    ],
+                ],
+            ],
         ];
         $result = $this->getCollection('series')->aggregate($pipeline)->toArray();
         if (isset($result[0]['uniqueKeys'])) {
@@ -576,29 +768,158 @@ class MongoService implements DocumentStoreServiceInterface
         $result = $this->getCollection('messages')->insertOne($messageData);
         return (string) $result->getInsertedId();
     }
+
+    /**
+     * @inheritDoc
+     */
+    public function createApiToken(array $tokenData): ?string
+    {
+        // Ensure timestamps are in the correct format for MongoDB
+        if (isset($tokenData['created_at']) && $tokenData['created_at'] instanceof \DateTime) {
+            $tokenData['created_at'] = new UTCDateTime($tokenData['created_at']);
+        }
+
+        if (isset($tokenData['expires_at']) && $tokenData['expires_at'] instanceof \DateTime) {
+            $tokenData['expires_at'] = new UTCDateTime($tokenData['expires_at']);
+        }
+
+        $result = $this->getCollection('api_tokens')->insertOne($tokenData);
+        return (string) $result->getInsertedId();
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function deleteApiTokenByValue(string $tokenValue): bool
+    {
+        $result = $this->getCollection('api_tokens')->deleteMany([
+            'token' => $tokenValue,
+        ]);
+
+        return $result->getDeletedCount() > 0;
+    }
     /** @inheritDoc */
     public function getMessages(?string $userId = null, bool $includeAcknowledged = false, int $limit = 100): array
     {
         $filter = [];
         if ($userId) {
-            $filter['user_id'] = $userId;
+            $filter['to_user_id'] = $userId;
+            if (!$includeAcknowledged) {
+                $filter['acknowledged'] = ['$ne' => true];
+            }
         }
-        if (!$includeAcknowledged) {
-            $filter['acknowledged_at'] = null;
-        }
-        $cursor = $this->getCollection('messages')->find($filter, ['limit' => $limit, 'sort' => ['created_at' => -1]]);
+
+        $options = [
+            'sort' => ['created_at' => -1],
+            'limit' => $limit,
+        ];
+
+        $cursor = $this->getCollection('messages')->find($filter, $options);
         $messages = [];
+
         foreach ($cursor as $doc) {
-            $doc['id'] = (string) $doc['_id'];
-            $messages[] = $doc;
+            $messages[] = $this->normalizeMongoValue($doc);
         }
+
         return $messages;
     }
 
-    // JOBS
-    /** @inheritDoc */
-    public function listJobs(?string $type = null, ?string $status = null, int $limit = 50, string $orderBy = 'updated_at', string $direction = 'DESC', ?string $startAfterId = null): array
+    /**
+     * Check if a follow relationship exists
+     *
+     * @param string $userId The ID of the user who is following
+     * @param string $followableType Type of the entity being followed (e.g., 'author', 'series')
+     * @param string $followableId ID of the entity being followed
+     * @return bool True if the follow relationship exists
+     */
+    public function followExists(string $userId, string $followableType, string $followableId): bool
     {
+        try {
+            $filter = [
+                'user_id' => $userId,
+                'followable_type' => $followableType,
+                'followable_id' => $followableId,
+            ];
+
+            $count = $this->getCollection('follows')->countDocuments($filter);
+            return $count > 0;
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error checking if follow exists: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Create a follow relationship
+     *
+     * @param string $userId The ID of the user who is following
+     * @param string $followableType Type of the entity being followed (e.g., 'author', 'series')
+     * @param string $followableId ID of the entity being followed
+     * @return bool True if the follow was created successfully
+     */
+    public function createFollow(string $userId, string $followableType, string $followableId): bool
+    {
+        try {
+            $result = $this->getCollection('follows')->insertOne([
+                'user_id' => $userId,
+                'followable_type' => $followableType,
+                'followable_id' => $followableId,
+                'created_at' => new UTCDateTime(),
+                'updated_at' => new UTCDateTime(),
+            ]);
+
+            return $result->isAcknowledged() && $result->getInsertedCount() === 1;
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error creating follow: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Delete a follow relationship
+     *
+     * @param string $userId The ID of the user who is following
+     * @param string $followableType Type of the entity being followed (e.g., 'author', 'series')
+     * @param string $followableId ID of the entity being followed
+     * @return bool True if the follow was deleted successfully
+     */
+    public function deleteFollow(string $userId, string $followableType, string $followableId): bool
+    {
+        try {
+            $filter = [
+                'user_id' => $userId,
+                'followable_type' => $followableType,
+                'followable_id' => $followableId,
+            ];
+
+            $result = $this->getCollection('follows')->deleteMany($filter);
+            return $result->isAcknowledged() && $result->getDeletedCount() > 0;
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error deleting follow: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    // JOBS
+    /**
+     * List jobs with filtering and pagination
+     *
+     * @param string|null $type Filter by job type
+     * @param string|null $status Filter by status
+     * @param int $limit Maximum number of results
+     * @param string $orderBy Field to order by
+     * @param string $direction Order direction ('ASC' or 'DESC')
+     * @param string|null $startAfterId Start after specific job ID for pagination
+     * @return array List of jobs with their data
+     */
+    public function listJobs(
+        ?string $type = null,
+        ?string $status = null,
+        int $limit = 50,
+        string $orderBy = 'updated_at',
+        string $direction = 'DESC',
+        ?string $startAfterId = null
+    ): array {
         $filter = [];
         if ($type) {
             $filter['type'] = $type;
@@ -658,10 +979,82 @@ class MongoService implements DocumentStoreServiceInterface
     /** @inheritDoc */
     public function getBookQueue(string $userId): array
     {
-        // Not implemented: placeholder
-        return [];
+        $user = $this->getUserById($userId);
+        return $user['queue'] ?? [];
     }
+
     /** @inheritDoc */
+    public function addBookToQueue(string $userId, string $bookId): bool
+    {
+        $user = $this->getUserById($userId);
+        if (!$user) {
+            return false;
+        }
+
+        $queue = $user['queue'] ?? [];
+
+        // Check if book is already in queue
+        foreach ($queue as $item) {
+            if ($item['book_id'] === $bookId) {
+                return true; // Book already in queue
+            }
+        }
+
+        // Add book to queue
+        $queue[] = [
+            'book_id' => $bookId,
+            'added_at' => time(),
+            'order' => count($queue) + 1
+        ];
+
+        // Update user document
+        $result = $this->getCollection('users')->updateOne(
+            ['_id' => new ObjectId($userId)],
+            ['$set' => ['queue' => $queue]]
+        );
+
+        return $result->getModifiedCount() > 0;
+    }
+
+    /** @inheritDoc */
+    public function removeBookFromQueue(string $userId, string $bookId): bool
+    {
+        $user = $this->getUserById($userId);
+        if (!$user) {
+            return false;
+        }
+
+        $queue = $user['queue'] ?? [];
+        $newQueue = [];
+        $found = false;
+
+        // Filter out the book to remove
+        foreach ($queue as $item) {
+            if ($item['book_id'] !== $bookId) {
+                $newQueue[] = $item;
+            } else {
+                $found = true;
+            }
+        }
+
+        if (!$found) {
+            return true; // Book wasn't in queue
+        }
+
+        // Reorder remaining books
+        foreach ($newQueue as $index => $item) {
+            $newQueue[$index]['order'] = $index + 1;
+        }
+
+        // Update user document
+        $result = $this->getCollection('users')->updateOne(
+            ['_id' => new ObjectId($userId)],
+            ['$set' => ['queue' => $newQueue]]
+        );
+
+        return $result->getModifiedCount() > 0;
+    }
+
     public function getQueueCollection($name)
     {
         return $this->getCollection($name);
@@ -671,28 +1064,135 @@ class MongoService implements DocumentStoreServiceInterface
     /** @inheritDoc */
     public function getDocument(string $collection, string $docId): ?array
     {
-        $doc = $this->getCollection($collection)->findOne(['_id' => $docId]);
-        if (!$doc) {
+        try {
+            $doc = $this->getCollection($collection)->findOne(['_id' => new ObjectId($docId)]);
+            if (!$doc) {
+                return null;
+            }
+            $doc = $this->normalizeMongoValue($doc);
+            $doc['id'] = (string) $doc['_id'];
+            return $doc;
+        } catch (\Exception $e) {
+            Log::error('Failed to get document: ' . $e->getMessage());
             return null;
         }
-        if ($doc instanceof \MongoDB\Model\BSONDocument) {
-            $doc = (array) $doc;
-        }
-        // Normalize author if present
-        if (isset($doc['author']) && $doc['author'] instanceof \MongoDB\Model\BSONArray) {
-            $doc['author'] = (array) $doc['author'];
-        }
-        // Normalize series if present
-        if (isset($doc['series']) && $doc['series'] instanceof \MongoDB\Model\BSONDocument) {
-            $doc['series'] = (array) $doc['series'];
-        }
-        $doc['id'] = (string) $doc['_id'];
-        return $doc;
     }
-    /** @inheritDoc */
+
+    public function updateDocument(string $collection, string $id, array $data): bool
+    {
+        try {
+            $result = $this->getCollection($collection)->updateOne(
+                ['_id' => new ObjectId($id)],
+                ['$set' => $data]
+            );
+            return $result->getModifiedCount() > 0;
+        } catch (\Exception $e) {
+            Log::error('Failed to update document: ' . $e->getMessage());
+            return false;
+        }
+    }
+
     public function getClient()
     {
         return $this->client;
+    }
+
+    public function cleanupOldJobs(int $daysOld): int
+    {
+        try {
+            $cutoffDate = new UTCDateTime(strtotime("-$daysOld days") * 1000);
+            $result = $this->getCollection('jobs')->deleteMany([
+                'status' => ['$in' => ['completed', 'failed', 'cancelled']],
+                'updated_at' => ['$lt' => $cutoffDate],
+            ]);
+            return $result->getDeletedCount();
+        } catch (\Exception $e) {
+            Log::error('Failed to clean up old jobs: ' . $e->getMessage());
+            return 0;
+        }
+    }
+
+    // ACCOUNT REQUESTS
+
+    /**
+     * @inheritDoc
+     */
+    public function getPendingAccountRequests(): array
+    {
+        $cursor = $this->getCollection('account_requests')->find([
+            'status' => 'pending',
+        ]);
+
+        $requests = [];
+        foreach ($cursor as $doc) {
+            $doc = $this->normalizeMongoValue($doc);
+            $doc['id'] = (string) $doc['_id'];
+            $requests[] = $doc;
+        }
+
+        return $requests;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getAccountRequest(string $id): ?array
+    {
+        $doc = $this->getCollection('account_requests')->findOne([
+            '_id' => new ObjectId($id),
+        ]);
+
+        if (!$doc) {
+            return null;
+        }
+
+        $doc = $this->normalizeMongoValue($doc);
+        $doc['id'] = (string) $doc['_id'];
+
+        return $doc;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function approveAccountRequest(string $id): bool
+    {
+        $request = $this->getAccountRequest($id);
+
+        if (!$request) {
+            return false;
+        }
+
+        // Create a new user from the request data
+        $userData = [
+            'name' => $request['name'],
+            'email' => $request['email'],
+            'password' => $request['password'], // Password already hashed
+            'role' => 'user',
+        ];
+
+        $this->createUser($userData);
+
+        // Update request status to approved
+        $result = $this->getCollection('account_requests')->updateOne(
+            ['_id' => new ObjectId($id)],
+            ['$set' => ['status' => 'approved']]
+        );
+
+        return $result->getModifiedCount() > 0;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function rejectAccountRequest(string $id): bool
+    {
+        $result = $this->getCollection('account_requests')->updateOne(
+            ['_id' => new ObjectId($id)],
+            ['$set' => ['status' => 'rejected']]
+        );
+
+        return $result->getModifiedCount() > 0;
     }
 
     // BOOKMARKS
@@ -701,7 +1201,7 @@ class MongoService implements DocumentStoreServiceInterface
     {
         $cursor = $this->getCollection('bookmarks')->find([
             'user_id' => $userId,
-            'book_id' => $bookId
+            'book_id' => $bookId,
         ]);
 
         $bookmarks = [];
@@ -771,6 +1271,33 @@ class MongoService implements DocumentStoreServiceInterface
     }
 
     /**
+     * @inheritDoc
+     */
+    public function findOrCreateMany(string $collection, array $names): array
+    {
+        $collectionHandle = $this->getCollection($collection);
+        $ids = [];
+
+        foreach ($names as $name) {
+            $trimmedName = trim($name);
+            if (empty($trimmedName)) {
+                continue;
+            }
+
+            $document = $collectionHandle->findOne(['name' => $trimmedName]);
+
+            if ($document) {
+                $ids[] = (string) $document['_id'];
+            } else {
+                $result = $collectionHandle->insertOne(['name' => $trimmedName]);
+                $ids[] = (string) $result->getInsertedId();
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
      * Get the manifest of contents for a book download
      *
      * @param string $bookId
@@ -780,5 +1307,128 @@ class MongoService implements DocumentStoreServiceInterface
     {
         // TODO: Implement getManifestForBook() method.
         return [];
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getSeriesByName(string $name): ?array
+    {
+        $doc = $this->getCollection('series')->findOne(['seriesName' => $name]);
+
+        if (!$doc) {
+            return null;
+        }
+
+        return $this->normalizeMongoValue($doc);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function isAdmin(string $userId): bool
+    {
+        $user = $this->getUserById($userId);
+
+        return !empty($user) && isset($user['role']) && $user['role'] === 'admin';
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getJobs(): array
+    {
+        $cursor = $this->getCollection('jobs')->find([]);
+        $jobs = [];
+
+        foreach ($cursor as $job) {
+            $jobs[] = $this->normalizeMongoValue($job);
+        }
+
+        return $jobs;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getJobCount(): int
+    {
+        return $this->getCollection('jobs')->countDocuments([]);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function clearJobs(): bool
+    {
+        $result = $this->getCollection('jobs')->deleteMany([]);
+        return $result->getDeletedCount() > 0;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function jobExistsByDirectoryPath(string $directoryPath): bool
+    {
+        $count = $this->getCollection('jobs')->countDocuments([
+            'directory_path' => $directoryPath,
+        ]);
+
+        return $count > 0;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function bookExistsByDirectoryPath(string $directoryPath): bool
+    {
+        $count = $this->getCollection('books')->countDocuments([
+            'directory_path' => $directoryPath,
+        ]);
+
+        return $count > 0;
+    }
+
+    /**
+     * Get a job by ID
+     *
+     * @param string $jobId The job ID
+     * @return array|null The job data or null if not found
+     */
+    public function getJob(string $jobId): ?array
+    {
+        try {
+            $job = $this->getCollection('jobs')->findOne(['_id' => new ObjectId($jobId)]);
+            if ($job) {
+                $job = $this->normalizeMongoValue($job);
+                $job['id'] = (string) $job['_id'];
+                return $job;
+            }
+            return null;
+        } catch (\Exception $e) {
+            Log::error('Failed to get job: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Update a job
+     *
+     * @param string $jobId The job ID
+     * @param array $data The updated job data
+     * @return bool Success status
+     */
+    public function updateJob(string $jobId, array $data): bool
+    {
+        try {
+            $result = $this->getCollection('jobs')->updateOne(
+                ['_id' => new ObjectId($jobId)],
+                ['$set' => $data]
+            );
+            return $result->getModifiedCount() > 0;
+        } catch (\Exception $e) {
+            Log::error('Failed to update job: ' . $e->getMessage());
+            return false;
+        }
     }
 }

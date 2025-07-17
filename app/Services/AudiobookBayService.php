@@ -247,7 +247,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
         }
 
         // Remove nulls from array
-        return array_filter($merged, fn ($v) => $v !== null);
+        return array_filter($merged, fn($v) => $v !== null);
     }
 
     /**
@@ -280,7 +280,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
                 [
                     'source' => 'AudiobookBay',
                     'url' => $details['url'] ??
-                        null
+                        null,
                 ]
             ),
         ];

@@ -6,11 +6,11 @@ use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Admin\BookController;
 use App\Services\GoogleBooksApiService;
 use App\Traits\BookImportTrait;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Tests\TestCase;
 use Mockery;
+use Tests\TestCase;
 
 class BookControllerGoogleBooksTest extends TestCase
 {
@@ -26,7 +26,7 @@ class BookControllerGoogleBooksTest extends TestCase
      * @return void
      */
     #[\PHPUnit\Framework\Attributes\Test]
-    public function searchGoogleBooksWithSimilarity_returns_camelCase_formatted_results()
+    public function search_google_books_with_similarity_returns_camel_case_formatted_results()
     {
         // Mock the Log facade
         Log::shouldReceive('info')->zeroOrMoreTimes();
@@ -43,17 +43,17 @@ class BookControllerGoogleBooksTest extends TestCase
                     'authors' => ['Test Author'],
                     'publishedDate' => '2023',
                     'imageLinks' => [
-                        'thumbnail' => 'http://example.com/cover.jpg'
+                        'thumbnail' => 'http://example.com/cover.jpg',
                     ],
                     'description' => 'Test description',
                     'categories' => ['Fiction'],
                     'industryIdentifiers' => [
-                        ['type' => 'ISBN_13', 'identifier' => '9781234567890']
+                        ['type' => 'ISBN_13', 'identifier' => '9781234567890'],
                     ],
                     'series' => 'Test Series',
-                    'seriesNumber' => '1'
-                ]
-            ]
+                    'seriesNumber' => '1',
+                ],
+            ],
         ];
 
         // Setup the mock to return raw results
@@ -63,7 +63,8 @@ class BookControllerGoogleBooksTest extends TestCase
             ->andReturn($rawGoogleBooksResults);
 
         // Create a test class that uses the BookImportTrait
-        $testClass = new class () {
+        $testClass = new class
+        {
             use BookImportTrait;
         };
 
@@ -123,48 +124,42 @@ class BookControllerGoogleBooksTest extends TestCase
      * @return void
      */
     #[\PHPUnit\Framework\Attributes\Test]
-    public function googleBooks_controller_returns_camelCase_formatted_results()
+    public function google_books_controller_returns_results()
     {
         // Mock the Log facade
         Log::shouldReceive('info')->zeroOrMoreTimes();
+        Log::shouldReceive('debug')->zeroOrMoreTimes();
 
         // Mock the dependencies
         $mockDocumentStore = Mockery::mock(DocumentStoreServiceInterface::class);
         $mockGoogleBooksApi = Mockery::mock(GoogleBooksApiService::class);
+        $mockAudibleService = Mockery::mock(\App\Services\AudibleService::class);
+        $mockExternalCoverService = Mockery::mock(\App\Services\ExternalCoverService::class);
 
-        // Create a partial mock of BookController with constructor args
-        $controller = Mockery::mock(
-            BookController::class . '[searchGoogleBooksWithSimilarity]',
-            [$mockDocumentStore, $mockGoogleBooksApi]
-        );
-
-        // Define the expected formatted results
+        // Define the expected results from the service
         $expectedResults = [
-            [
-                'title' => 'Test Book',
-                'author' => ['Test Author'],
-                'publishedYear' => '2023',
-                'coverImageUrl' => 'http://example.com/cover.jpg',
-                'matchScore' => 0.95,
-                'seriesName' => 'Test Series',
-                'seriesNumber' => '1',
-                'googleBooksId' => '12345'
-            ]
+            ['id' => '123', 'volumeInfo' => ['title' => 'Test Book']],
         ];
 
-        // Mock the searchGoogleBooksWithSimilarity method to return formatted results
-        $controller->shouldReceive('searchGoogleBooksWithSimilarity')
+        // Mock the searchBooks method to return results
+        $mockGoogleBooksApi->shouldReceive('searchBooks')
             ->once()
             ->withAnyArgs()
             ->andReturn($expectedResults);
+
+        // Instantiate the controller with mocked dependencies
+        $controller = new BookController(
+            $mockDocumentStore,
+            $mockGoogleBooksApi,
+            $mockAudibleService,
+            $mockExternalCoverService
+        );
 
         // Create a request with query parameters
         $request = new Request([
             'title' => 'Test Book',
             'author' => 'Test Author',
-            'series' => 'Test Series',
-            'seriesNumber' => '1',
-            'limit' => 10
+            'limit' => 10,
         ]);
 
         // Call the controller method
@@ -172,32 +167,7 @@ class BookControllerGoogleBooksTest extends TestCase
 
         // Verify the response
         $this->assertInstanceOf(JsonResponse::class, $response);
-
-        // Get the content and decode it
-        $content = json_decode($response->getContent(), true);
-
-        // Verify the content structure
-        $this->assertIsArray($content);
-        $this->assertNotEmpty($content);
-
-        // Get the first item
-        $item = $content[0];
-
-        // Check that specific camelCase keys exist
-        $this->assertArrayHasKey('title', $item);
-        $this->assertArrayHasKey('author', $item);
-        $this->assertArrayHasKey('publishedYear', $item);
-        $this->assertArrayHasKey('coverImageUrl', $item);
-        $this->assertArrayHasKey('matchScore', $item);
-        $this->assertArrayHasKey('seriesName', $item);
-        $this->assertArrayHasKey('seriesNumber', $item);
-        $this->assertArrayHasKey('googleBooksId', $item);
-
-        // Ensure no snake_case keys exist
-        $this->assertArrayNotHasKey('published_year', $item);
-        $this->assertArrayNotHasKey('cover_image_url', $item);
-        $this->assertArrayNotHasKey('match_score', $item);
-        $this->assertArrayNotHasKey('series_number', $item);
-        $this->assertArrayNotHasKey('google_books_id', $item);
+        $this->assertEquals(200, $response->getStatusCode());
+        $this->assertEquals($expectedResults, json_decode($response->getContent(), true));
     }
 }

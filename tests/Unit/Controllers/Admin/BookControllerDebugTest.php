@@ -14,6 +14,7 @@ use Tests\TestCase;
 class BookControllerDebugTest extends TestCase
 {
     protected $controller;
+
     protected $documentStore;
 
     protected function setUp(): void
@@ -21,7 +22,7 @@ class BookControllerDebugTest extends TestCase
         parent::setUp();
 
         // Create a mock document store service
-        $this->documentStore = new MockDocumentStoreService();
+        $this->documentStore = new MockDocumentStoreService;
 
         // Mock the required services
         $mockGoogleBooksService = $this->createMock(\App\Services\GoogleBooksApiService::class);
@@ -41,7 +42,7 @@ class BookControllerDebugTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
-    public function testDebugBookCreation()
+    public function test_debug_book_creation()
     {
         // Test direct book creation first
         $testBookId = $this->documentStore->createBook([
@@ -65,7 +66,7 @@ class BookControllerDebugTest extends TestCase
             'title' => 'Test Book with Cover',
             'author' => ['Test Author'],
             'genre' => ['Test Genre'],
-            'directoryPath' => 'test/path'
+            'directoryPath' => 'test/path',
         ]);
         $request->files->set('cover', $file);
 
@@ -74,7 +75,7 @@ class BookControllerDebugTest extends TestCase
             'driver' => 'local',
             'root' => storage_path('app/books'),
         ]);
-        putenv('BOOK_STORAGE_PATH=' . storage_path('app/books'));
+        putenv('BOOK_STORAGE_PATH='.storage_path('app/books'));
 
         // Add logging to trace execution
         Log::spy();
@@ -90,41 +91,25 @@ class BookControllerDebugTest extends TestCase
         $directBooks = $this->documentStore->getAllBooks();
         $this->assertNotEmpty($directBooks, 'Direct book addition failed');
 
-        // Add a debug wrapper to the controller's documentStoreService
-        $originalDocumentStore = $this->controller->documentStoreService;
-        $this->controller->documentStoreService = new class ($originalDocumentStore) {
-            private $originalService;
-
-            public function __construct($originalService)
-            {
-                $this->originalService = $originalService;
-            }
-
-            public function createBook(array $data)
-            {
-                echo "\nController's createBook called with: " . json_encode($data) . "\n";
-                $result = $this->originalService->createBook($data);
-                echo "Result of createBook: " . $result . "\n";
-                return $result;
-            }
-
-            public function __call($method, $args)
-            {
-                return call_user_func_array([$this->originalService, $method], $args);
-            }
-        };
+        // Re-create the controller with the standard mock service
+        $this->controller = new BookController(
+            $this->documentStore,
+            $this->createMock(\App\Services\GoogleBooksApiService::class),
+            $this->createMock(\App\Services\AudibleService::class),
+            $this->createMock(\App\Services\ExternalCoverService::class)
+        );
 
         // Call the store method
         $response = $this->controller->store($request);
 
         // Output debug info
-        echo "Response: " . json_encode($response) . "\n";
+        echo 'Response: '.json_encode($response)."\n";
 
         // Output logs
         $logs = Log::logged();
-        echo "Logs: " . json_encode($logs) . "\n";
-        echo "Books after controller store: " . json_encode($this->documentStore->getAllBooks()) . "\n";
-        echo "Raw books array: " . json_encode($this->documentStore->dumpAllBooks()) . "\n";
+        echo 'Logs: '.json_encode($logs)."\n";
+        echo 'Books after controller store: '.json_encode($this->documentStore->getAllBooks())."\n";
+        echo 'Raw books array: '.json_encode($this->documentStore->dumpAllBooks())."\n";
 
         // Get all books from the mock store
         $books = $this->documentStore->getAllBooks();

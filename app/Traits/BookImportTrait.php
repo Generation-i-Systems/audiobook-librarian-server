@@ -337,7 +337,7 @@ trait BookImportTrait
             if (str_contains($author, ',') || stripos($author, ' and ') !== false || str_contains($author, '&')) {
                 $author = str_replace([' and ', ' & '], ',', $author);
                 $authors = array_map('trim', explode(',', $author));
-                $book['author'] = array_values(array_filter($authors, fn ($a) => strlen(trim($a)) > 4));
+                $book['author'] = array_values(array_filter($authors, fn($a) => strlen(trim($a)) > 0));
             } else {
                 $book['author'] = [trim($author)];
             }
@@ -351,6 +351,8 @@ trait BookImportTrait
             $seriesNumber = null;
             $title = '';
             $seriesParent = null;
+            $edition = null;
+            $edition = null;
 
             // If we have more than one part left, the last part is the title, the immediate parent is the series
             if (count($parts) > 1) {
@@ -380,12 +382,38 @@ trait BookImportTrait
                 $series = null;
             }
 
+            // Try to extract additional metadata from filename
+            $metadata = [];
+            $this->extractMetadata($metadata, $title);
+
+            if (isset($metadata['series_number'])) {
+                $seriesNumber = $metadata['series_number'];
+            }
+            if (isset($metadata['edition'])) {
+                $edition = $metadata['edition'];
+            }
+
+            // Try to extract additional metadata from filename
+            $metadata = [];
+            $this->extractMetadata($metadata, $title);
+
+            if (isset($metadata['series_number'])) {
+                $seriesNumber = $metadata['series_number'];
+            }
+            if (isset($metadata['edition'])) {
+                $edition = $metadata['edition'];
+            }
+
             // Set series data if we have a valid series name (string, not numeric)
             if (!empty($series) && is_string($series)) {
                 $book['series'] = empty($seriesNumber) ? [$series => null] : [$series => $seriesNumber];
             }
 
             $book['title'] = trim($title);
+            $book['seriesNumber'] = $seriesNumber;
+            $book['edition'] = $edition;
+            $book['seriesNumber'] = $seriesNumber;
+            $book['edition'] = $edition;
         } catch (\Exception $e) {
             Log::error("Error processing directory path {$directoryPath}: " . $e->getMessage());
             $book['error'] = $e->getMessage();
@@ -476,8 +504,6 @@ trait BookImportTrait
 
     /**
      * Google Books API service instance.
-     *
-     * @var \App\Services\GoogleBooksApiService|null
      */
     protected ?\App\Services\GoogleBooksApiService $googleBooksApiService = null;
 
@@ -499,12 +525,12 @@ trait BookImportTrait
     /**
      * Search Google Books API with similarity scoring and format results for frontend.
      *
-     * @param string $title Book title to search for
-     * @param string $author Optional author name to improve matching
-     * @param string $series Optional series name to improve matching
-     * @param string $seriesNumber Optional series number to improve matching
-     * @param bool $more Whether to include more results
-     * @param int $limit Maximum number of results to return
+     * @param  string  $title  Book title to search for
+     * @param  string  $author  Optional author name to improve matching
+     * @param  string  $series  Optional series name to improve matching
+     * @param  string  $seriesNumber  Optional series number to improve matching
+     * @param  bool  $more  Whether to include more results
+     * @param  int  $limit  Maximum number of results to return
      * @return array Array of formatted book results ready for frontend consumption
      */
     public function searchGoogleBooksWithSimilarity(
@@ -520,6 +546,7 @@ trait BookImportTrait
 
         if (empty($results)) {
             Log::info('BookImportTrait: Received items from Google Books', ['count' => 0]);
+
             return [];
         }
 
@@ -543,7 +570,7 @@ trait BookImportTrait
                         'authors' => $info['authors'],
                     ]);
                     // Flatten nested author arrays (e.g., [ [ 'author' => [ 'name' => ... ] ] ])
-                    $authorNames = array();
+                    $authorNames = [];
                     foreach ($info['authors'] as $authorEntry) {
                         if (is_array($authorEntry)) {
                             if (isset($authorEntry['name'])) {
@@ -636,7 +663,7 @@ trait BookImportTrait
             $info = isset($item['volumeInfo']) && is_array($item['volumeInfo']) ? $item['volumeInfo'] : $item;
 
             // Extract only author.name fields into a flat author array
-            $authorArray = array();
+            $authorArray = [];
             if (isset($info['authors']) && is_array($info['authors'])) {
                 foreach ($info['authors'] as $authorEntry) {
                     if (is_array($authorEntry) && isset($authorEntry['name'])) {

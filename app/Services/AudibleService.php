@@ -85,9 +85,9 @@ class AudibleService extends BaseBookService
     /**
      * Search for books with filtering and fallback logic
      *
-     * @param string|null $title The title to search for
-     * @param string|null $author The author to filter by
-     * @param array $options Additional options for the search
+     * @param  string|null  $title  The title to search for
+     * @param  string|null  $author  The author to filter by
+     * @param  array  $options  Additional options for the search
      * @return array The search results after filtering
      */
     public function searchBooksWithFiltering(?string $title, ?string $author = null, array $options = []): array
@@ -155,14 +155,15 @@ class AudibleService extends BaseBookService
         }
 
         $this->log('AudibleService: searchBooksWithFiltering results: ' . count($results) . ' items');
+
         return $results;
     }
 
     /**
      * Helper method to check if an author name exists in an array of authors
      *
-     * @param array $authorArray The array of authors to search in
-     * @param string $authorName The author name to search for
+     * @param  array  $authorArray  The array of authors to search in
+     * @param  string  $authorName  The author name to search for
      * @return bool Whether the author name exists in the array
      */
     protected function authorArrayContains(array $authorArray, string $authorName): bool
@@ -172,6 +173,7 @@ class AudibleService extends BaseBookService
                 return true;
             }
         }
+
         return false;
     }
 
@@ -626,7 +628,7 @@ class AudibleService extends BaseBookService
     /**
      * Convert all keys in an array to camelCase.
      *
-     * @param array $array The array with keys to convert
+     * @param  array  $array  The array with keys to convert
      * @return array Array with camelCase keys
      */
     private function convertKeysToCamelCase(array $array): array

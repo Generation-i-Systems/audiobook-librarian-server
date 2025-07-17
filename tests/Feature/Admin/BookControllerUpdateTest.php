@@ -4,10 +4,6 @@ namespace Tests\Feature\Admin;
 
 use App\Auth\DocumentstoreUser;
 use App\Http\Controllers\Admin\BookController;
-use App\Contracts\DocumentStoreServiceInterface;
-use App\Services\GoogleBooksApiService;
-use App\Services\AudibleService;
-use App\Services\ExternalCoverService;
 use Illuminate\Foundation\Testing\WithoutMiddleware;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -15,17 +11,18 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Tests\TestCase;
-use Mockery;
 
 class BookControllerUpdateTest extends TestCase
 {
     use WithoutMiddleware;
 
     private $controller;
+
     private $documentStoreService;
+
     private $user;
+
 
     protected function setUp(): void
     {
@@ -53,7 +50,7 @@ class BookControllerUpdateTest extends TestCase
             'id' => 'test-user-1',
             'name' => 'Test Admin',
             'email' => 'admin@example.com',
-            'roles' => ['admin']
+            'roles' => ['admin'],
         ]);
 
         // Mock Auth facade
@@ -62,7 +59,7 @@ class BookControllerUpdateTest extends TestCase
 
         // Set up request binding to ensure controller receives the request
         $this->app->bind('request', function () {
-            return new Request();
+            return new Request;
         });
     }
 
@@ -197,7 +194,7 @@ class BookControllerUpdateTest extends TestCase
         // Create request with minimal data
         $request = new Request([
             'title' => 'T',
-            'genre' => ['G']
+            'genre' => ['G'],
         ]);
         $this->app->instance('request', $request);
 
@@ -240,7 +237,7 @@ class BookControllerUpdateTest extends TestCase
             'narrators' => ['Old Narrator'],
             'genre' => ['Old Genre'],
             'directoryPath' => 'test/path',
-            'audibleId' => $asin
+            'audibleId' => $asin,
         ];
 
         // Set up DocumentStoreService expectations
@@ -267,7 +264,7 @@ class BookControllerUpdateTest extends TestCase
             'description' => 'Updated desc',
             'directoryPath' => 'test/path',
             'audible_cover_image_url' => 'https://images-na.ssl-images-amazon.com/images/I/B01234ABCD.jpg',
-            'audibleId' => $asin
+            'audibleId' => $asin,
         ]);
         $this->app->instance('request', $request);
 

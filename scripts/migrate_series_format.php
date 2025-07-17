@@ -8,8 +8,8 @@
  * Usage: php scripts/migrate_series_format.php
  */
 
-use MongoDB\Client as MongoClient;
 use Google\Cloud\Firestore\FirestoreClient;
+use MongoDB\Client as MongoClient;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
@@ -24,17 +24,19 @@ function canonicalizeSeries($series, $seriesName = null, $seriesNumber = null)
         $out = [];
         foreach ($series as $item) {
             foreach ($item as $name => $number) {
-                $out[] = ['seriesName' => $name, 'number' => (string)$number];
+                $out[] = ['seriesName' => $name, 'number' => (string) $number];
             }
         }
+
         return $out;
     }
     // Legacy: key-value object
     if (is_array($series) && count(array_filter(array_keys($series), 'is_string'))) {
         $out = [];
         foreach ($series as $name => $number) {
-            $out[] = ['seriesName' => $name, 'number' => (string)$number];
+            $out[] = ['seriesName' => $name, 'number' => (string) $number];
         }
+
         return $out;
     }
     // Single string
@@ -48,6 +50,7 @@ function canonicalizeSeries($series, $seriesName = null, $seriesNumber = null)
     if ($seriesName) {
         return [['seriesName' => $seriesName, 'number' => $seriesNumber ?? '']];
     }
+
     return [];
 }
 

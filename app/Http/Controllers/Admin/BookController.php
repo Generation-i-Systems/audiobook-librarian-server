@@ -11,6 +11,7 @@ use App\Services\GoogleBooksApiService;
 use App\Traits\BookImportTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use App\Http\Controllers\Admin\ImportFileController;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -19,6 +20,37 @@ use ZipArchive;
 class BookController extends Controller
 {
     use BookImportTrait;
+
+    /**
+     * Store the cover image from a file, URL, or base64 string.
+     *
+     * @param \Illuminate\Http\UploadedFile|string $coverSource
+     * @param string $bookId
+     * @return string|null
+     */
+    private function storeCoverImage($coverSource, string $bookId): ?string
+    {
+        Log::debug('BookController@storeCoverImage: Method started', ['coverType' => gettype($coverSource)]);
+        if ($coverSource instanceof \Illuminate\Http\UploadedFile) {
+            return $coverSource->store($bookId, 'covers');
+        }
+
+        if (filter_var($coverSource, FILTER_VALIDATE_URL)) {
+            return $this->importCoverImageFromUrl($coverSource, $bookId);
+        }
+
+        if (is_string($coverSource) && Str::startsWith($coverSource, 'data:image')) {
+            $extension = Str::after(Str::before($coverSource, ';'), 'data:image/');
+            $data = base64_decode(Str::after($coverSource, ','));
+            $path = $bookId . '/cover.' . $extension;
+            Storage::disk('covers')->put($path, $data);
+
+            Log::debug('BookController@storeCoverImage: Method completed', ['path' => $path]);
+            return $path;
+        }
+
+        return null;
+    }
 
     /**
      * Set the document store service (for testing)
@@ -485,24 +517,25 @@ class BookController extends Controller
                 unset($validated['cover_url']);
             }
 
-            // Process series data - ensure we use seriesName instead of name
+            // Handle series
             if (!empty($validated['series'])) {
-                Log::debug('Processing series data', ['series' => $validated['series']]);
-                $seriesData = [];
-                foreach ($validated['series'] as $series) {
-                    $seriesName = $series['seriesName'] ?? $series['name'] ?? null;
-                    $seriesNumber = $series['number'] ?? '';
-                    if (!empty($seriesName)) {
-                        // Normalize the series name
-                        $seriesName = $this->normalizeSeriesName($seriesName);
-                        $seriesData[] = [
-                            'seriesName' => $seriesName,
-                            'number' => $seriesNumber,
+                $seriesLinks = [];
+                foreach ($validated['series'] as $seriesData) {
+                    // Use null coalescing to handle both 'seriesName' and legacy 'name'
+                    $seriesName = $seriesData['seriesName'] ?? $seriesData['name'] ?? null;
+
+                    if ($seriesName) {
+                        $seriesDoc = $this->documentStoreService->getSeriesByName($seriesName);
+                        $seriesId = $seriesDoc['id'] ?? $this->documentStoreService->createSeries($seriesName);
+
+                        $seriesLinks[] = [
+                            'id' => $seriesId,
+                            'name' => $seriesName,
+                            'number' => $seriesData['number'] ?? null
                         ];
                     }
                 }
-                $validated['series'] = $seriesData;
-                Log::debug('Processed series data', ['processed_series' => $validated['series']]);
+                $validated['series'] = $seriesLinks;
             }
 
             // Add import metadata if available
@@ -746,382 +779,182 @@ class BookController extends Controller
     /**
      * Store a newly created book in storage.
      *
-     * @return \Illuminate\Http\Response|\Illuminate\Http\RedirectResponse
+     * @param \Illuminate\Http\Request $request
+     * @param ImportFileController $importFileController
+     * @return \Illuminate\Http\JsonResponse|\Illuminate\Http\RedirectResponse
      */
-    public function store(Request $request)
+    public function store(Request $request, ImportFileController $importFileController)
     {
-        Log::info('Book creation started', ['request_data' => $request->except(['cover', 'coverImage'])]);
-
+        Log::debug('BookController@store: Method started');
         try {
-            Log::debug('Validating book creation request', ['request_data' => $request->all()]);
+            Log::debug('BookController@store method entered.');
+            Log::info('Book creation started', ['request_data' => $request->except(['cover', 'coverImage'])]);
 
+            Log::debug('STEP 1: Validating book creation request.');
             $validated = $request->validate([
-                'title' => 'required|string|max:255',
-                'author' => 'required|array',
-                'author.*' => 'required|string|max:255',
-                'genre' => 'required|array',
-                'genre.*' => 'required|string|max:255',
-                'narrator' => 'nullable|array',
-                'narrator.*' => 'nullable|string|max:255',
-                'series' => 'nullable|array',
-                'series.*.seriesName' => 'nullable|string|max:255',
-                'series.*.name' => 'nullable|string|max:255', // For backward compatibility
-                'series.*.number' => 'nullable|string|max:50',
-                'description' => 'nullable|string',
-                'publishedYear' => 'nullable|integer|min:1000|max:' . (date('Y') + 10),
-                'directoryPath' => 'nullable|string',
-                'duration' => 'nullable|string|max:50',
-                'coverImage' => 'nullable|string',
-                'cover' => 'nullable|image|max:5120',
-                'language' => 'nullable|string|max:50',
-                'sourcePath' => 'nullable|string',
-                'sourceRoot' => 'nullable|string',
-                'sourceRelPath' => 'nullable|string',
-                'sourceType' => 'nullable|string',
-                'importMode' => 'nullable|boolean',
-                'publisher' => 'nullable|string|max:255',
-                'isbn' => 'nullable|string|max:50',
-                'asin' => 'nullable|string|max:50',
-                'googleBooksId' => 'nullable|string|max:50',
-                'goodreadsId' => 'nullable|string|max:50',
-                // Import-specific fields
-                'genrePath' => 'nullable|string',
-            ]);
+                    'title' => 'required|string|max:255',
+                    'subtitle' => 'nullable|string|max:255',
+                    'authors' => 'nullable|array',
+                    'narrators' => 'nullable|array',
+                    'series' => 'nullable|array',
+                    'genres' => 'nullable|array',
+                    'publisher' => 'nullable|string|max:255',
+                    'release_date' => 'nullable|date',
+                    'published_year' => 'nullable|digits:4',
+                    'description' => 'nullable|string',
+                    'comment' => 'nullable|string',
+                    'tags' => 'nullable|string',
+                    'rating' => 'nullable|numeric|min:0|max:5',
+                    'language' => 'nullable|string|max:255',
+                    'asin' => 'nullable|string|max:255',
+                    'isbn' => 'nullable|string|max:255',
+                    'cover' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+                    'coverImage' => 'nullable|string',
+                    'coverImageSource' => 'nullable|string',
+                    'importMode' => 'nullable|string',
+                    'sourcePath' => 'nullable|string',
+                    'sourceRoot' => 'nullable|string',
+                    'sourceRelPath' => 'nullable|string',
+                    'sourceType' => 'nullable|string',
+                    'directoryPath' => 'nullable|string',
+                    'returnUrl' => 'nullable|string',
+                ]);
+                Log::debug('STEP 2: Validation successful.', ['validated_data' => array_keys($validated)]);
 
-            // Generate a unique ID for the new book
             $id = (string) Str::uuid();
             $validated['id'] = $id;
+            Log::debug('STEP 3: Generated new book ID.', ['id' => $id]);
 
-            // Handle empty arrays
-            if (empty($validated['author'])) {
-                $validated['author'] = ['Unknown'];
-            }
-
-            if (empty($validated['genre'])) {
-                $validated['genre'] = ['Uncategorized'];
-            }
-
-            // Handle cover image upload
+            Log::debug('STEP 4: Processing cover image.');
             if ($request->hasFile('cover')) {
-                Log::info('Processing cover image upload');
-                $file = $request->file('cover');
-                $directoryPath = $validated['directoryPath'] ?? 'uploads/' . date('Y-m-d');
-
-                // Get storage path from environment or use default
-                $storageBasePath = env('BOOK_STORAGE_PATH');
-
-                if (!empty($storageBasePath)) {
-                    // Ensure directory exists if we have a storage path
-                    $fullDirectoryPath = rtrim($storageBasePath, '/') . '/' . ltrim($directoryPath, '/');
-                    if (!is_dir($fullDirectoryPath)) {
-                        mkdir($fullDirectoryPath, 0755, true);
-                    }
-                } else {
-                    Log::warning('BOOK_STORAGE_PATH environment variable not set, using default storage');
-                }
-
-                $coverName = 'cover.' . $file->getClientOriginalExtension();
-                $file->storeAs($directoryPath, $coverName, 'books');
-                $validated['coverImage'] = $coverName;
-                Log::info('Cover image saved', ['path' => $directoryPath . '/' . $coverName]);
-            } elseif ($request->filled('coverImageUrl')) {
-                // Handle external cover image URL from Google Books
-                $coverUrl = $request->input('coverImageUrl');
-                $directoryPath = $validated['directoryPath'] ?? '';
-                $googleBooksId = $request->input('googleBooksId') ?? $validated['googleBooksId'] ?? null;
-
-                if (!empty($directoryPath)) {
-                    try {
-                        // Validate URL before attempting to download
-                        if (!filter_var($coverUrl, FILTER_VALIDATE_URL)) {
-                            Log::error('Invalid Google Books cover image URL format', ['url' => $coverUrl]);
-                            return back()
-                                ->withInput()
-                                ->withErrors(['coverImageUrl' => 'Invalid image URL format']);
-                        }
-
-                        $result = $this->externalCoverService->downloadCoverImage(
-                            $coverUrl,
-                            $directoryPath,
-                            'googlebooks',
-                            $googleBooksId
-                        );
-
-                        if ($result['success']) {
-                            $validated['coverImage'] = basename($result['path']);
-                            Log::info('Google Books cover image downloaded successfully', [
-                                'path' => $result['path'],
-                            ]);
-                        } else {
-                            // Return with error if download fails
-                            Log::error('Failed to download Google Books cover image', [
-                                'url' => $coverUrl,
-                                'error' => $result['error'] ?? 'Unknown error'
-                            ]);
-
-                            return back()
-                                ->withInput()
-                                ->withErrors(['coverImageUrl' => 'Failed to download cover image: ' . ($result['error'] ?? 'Unknown error')]);
-                        }
-                    } catch (\Exception $e) {
-                        Log::error('Exception while downloading Google Books cover image', [
-                            'url' => $coverUrl,
-                            'error' => $e->getMessage(),
-                            'trace' => $e->getTraceAsString(),
-                        ]);
-
-                        return back()
-                            ->withInput()
-                            ->withErrors(['coverImageUrl' => 'Error downloading cover image: ' . $e->getMessage()]);
-                    }
-                } else {
-                    // No directory path, can't download
-                    Log::error('No directory path for Google Books cover download', ['url' => $coverUrl]);
-                    return back()
-                        ->withInput()
-                        ->withErrors(['directoryPath' => 'Directory path is required to download cover image']);
-                }
-            } elseif ($request->filled('audibleCoverImageUrl')) {
-                // Handle Audible cover image URL
-                $coverUrl = $request->input('audibleCoverImageUrl');
-                $directoryPath = $validated['directoryPath'] ?? '';
-                $asin = $request->input('audibleId') ?? $validated['asin'] ?? null;
-
-                if (!empty($directoryPath)) {
-                    try {
-                        // Validate URL before attempting to download
-                        if (!filter_var($coverUrl, FILTER_VALIDATE_URL)) {
-                            Log::error('Invalid Audible cover image URL format', ['url' => $coverUrl]);
-                            return back()
-                                ->withInput()
-                                ->withErrors(['audibleCoverImageUrl' => 'Invalid image URL format']);
-                        }
-
-                        $result = $this->externalCoverService->downloadCoverImage(
-                            $coverUrl,
-                            $directoryPath,
-                            'audible',
-                            $asin
-                        );
-
-                        if ($result['success']) {
-                            $validated['coverImage'] = basename($result['path']);
-                            Log::info('Audible cover image downloaded successfully', [
-                                'path' => $result['path'],
-                            ]);
-                        } else {
-                            // Return with error if download fails
-                            Log::error('Failed to download Audible cover image', [
-                                'url' => $coverUrl,
-                                'error' => $result['error'] ?? 'Unknown error'
-                            ]);
-
-                            return back()
-                                ->withInput()
-                                ->withErrors(['audibleCoverImageUrl' => 'Failed to download cover image: ' . ($result['error'] ?? 'Unknown error')]);
-                        }
-                    } catch (\Exception $e) {
-                        Log::error('Exception while downloading Audible cover image', [
-                            'url' => $coverUrl,
-                            'error' => $e->getMessage(),
-                            'trace' => $e->getTraceAsString(),
-                        ]);
-
-                        return back()
-                            ->withInput()
-                            ->withErrors(['audibleCoverImageUrl' => 'Error downloading cover image: ' . $e->getMessage()]);
-                    }
-                } else {
-                    // No directory path, can't download
-                    Log::error('No directory path for Audible cover download', ['url' => $coverUrl]);
-                    return back()
-                        ->withInput()
-                        ->withErrors(['directoryPath' => 'Directory path is required to download cover image']);
-                }
-            } elseif (!empty($validated['coverImage'])) {
-                // Handle coverImage from import metadata (could be URL or embedded data)
-                $coverImage = $validated['coverImage'];
-                $directoryPath = $validated['directoryPath'] ?? '';
-
-                // Check if user selected embedded cover from import
-                if ($coverImage === 'embedded_from_import' && session()->has('import_cover_image')) {
-                    $coverImage = session('import_cover_image');
-                    session()->forget('import_cover_image');
-                }
-
-                if (!empty($directoryPath)) {
-                    // Check if it's a URL
-                    if (filter_var($coverImage, FILTER_VALIDATE_URL)) {
-                        try {
-                            $localCoverPath = $this->importCoverImageFromUrl($coverImage, $directoryPath);
-                            if ($localCoverPath) {
-                                $validated['coverImage'] = basename($localCoverPath);
-                                Log::info('Cover image downloaded from import URL', [
-                                    'url' => $coverImage,
-                                    'path' => $localCoverPath,
-                                ]);
-                            }
-                        } catch (\Exception $e) {
-                            Log::warning('Failed to download cover from import URL', [
-                                'url' => $coverImage,
-                                'error' => $e->getMessage(),
-                            ]);
-                        }
-                    } elseif (is_array($coverImage) && isset($coverImage['data'])) {
-                        // Handle embedded image data from audio metadata
-                        try {
-                            $imageData = $coverImage['data'];
-                            $mimeType = $coverImage['mime'] ?? 'image/jpeg';
-
-                            // Determine file extension from MIME type
-                            $ext = 'jpg';
-                            if (strpos($mimeType, 'png') !== false) {
-                                $ext = 'png';
-                            } elseif (strpos($mimeType, 'gif') !== false) {
-                                $ext = 'gif';
-                            }
-
-                            // Save embedded image to directory
-                            $storagePath = env('BOOK_STORAGE_PATH');
-                            $fullDir = rtrim($storagePath, '/') . '/' . ltrim($directoryPath, '/');
-
-                            if (!is_dir($fullDir)) {
-                                mkdir($fullDir, 0775, true);
-                            }
-
-                            $filename = 'cover.' . $ext;
-                            $fullPath = $fullDir . '/' . $filename;
-
-                            if (file_put_contents($fullPath, $imageData) !== false) {
-                                $validated['coverImage'] = $filename;
-                                Log::info('Embedded cover image saved', ['path' => $fullPath]);
-                            }
-                        } catch (\Exception $e) {
-                            Log::warning('Failed to save embedded cover image', [
-                                'error' => $e->getMessage(),
-                            ]);
-                        }
-                    }
-                }
-            }
-
-            // Process series data - ensure we use seriesName instead of name
-            if (!empty($validated['series'])) {
-                Log::debug('Processing series data', ['series' => $validated['series']]);
-                $seriesData = [];
-                foreach ($validated['series'] as $series) {
-                    // Check if we have seriesName (new format) or name (old format)
-                    $seriesName = $series['seriesName'] ?? $series['name'] ?? null;
-                    $seriesNumber = $series['number'] ?? '';
-
-                    if (!empty($seriesName)) {
-                        // Create properly structured series entry with seriesName field
-                        $seriesData[] = [
-                            'seriesName' => $seriesName,
-                            'number' => $seriesNumber,
-                        ];
-                    }
-                }
-                $validated['series'] = $seriesData;
-                Log::debug('Processed series data', ['processed_series' => $validated['series']]);
-            }
-
-            // Create the book
-            $documentStore = $this->documentStoreService;
-            $actualId = $documentStore->createBook($validated);
-
-            if (!$actualId) {
-                throw new \Exception('Failed to create book in document store');
-            }
-
-            // Use the actual document ID for all subsequent operations
-            $id = $actualId;
-            Log::info('Book created successfully', ['id' => $id]);
-
-            // Handle import file moving if this is from import
-            if (
-                !empty($validated['importMode']) &&
-                !empty($validated['sourcePath']) &&
-                !empty($validated['sourceRoot']) &&
-                !empty($validated['directoryPath'])
-            ) {
-
+                Log::debug('BookController@store: Processing cover image', ['type' => gettype($request->file('cover'))]);
                 try {
-                    $importFileController = app()->make('App\Http\Controllers\Admin\ImportFileController');
-
-                    $moveSuccess = $importFileController->moveImportedFiles(
-                        $validated['sourcePath'],
-                        $validated['sourceRoot'],
-                        $validated['sourceRelPath'] ?? '',
-                        $validated['sourceType'] ?? 'dir',
-                        $validated['directoryPath']
-                    );
-
-                    if ($moveSuccess) {
-                        Log::info('Import files moved successfully', [
-                            'bookId' => $id,
-                            'from' => $validated['sourcePath'],
-                            'to' => $validated['directoryPath'],
-                        ]);
-                    } else {
-                        Log::warning('Failed to move import files', [
-                            'bookId' => $id,
-                            'from' => $validated['sourcePath'],
-                            'to' => $validated['directoryPath'],
-                        ]);
-                    }
-                } catch (\Exception $moveException) {
-                    // Log but don't fail the book creation
-                    Log::error('Exception during import file move', [
-                        'bookId' => $id,
-                        'error' => $moveException->getMessage(),
-                        'sourcePath' => $validated['sourcePath'],
-                    ]);
+                    $validated['cover'] = $this->storeCoverImage($request->file('cover'), $id);
+                    Log::debug('BookController@store: Cover image processed successfully', ['cover' => $validated['cover']]);
+                } catch (\Exception $e) {
+                    Log::error('BookController@store: Error processing cover image', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+                    throw $e;
+                }
+            } elseif ($request->filled('coverImageSource')) {
+                Log::debug('BookController@store: Processing cover image', ['type' => gettype($request->input('coverImageSource'))]);
+                try {
+                    $validated['cover'] = $this->storeCoverImage($request->input('coverImageSource'), $id);
+                    Log::debug('BookController@store: Cover image processed successfully', ['cover' => $validated['cover']]);
+                } catch (\Exception $e) {
+                    Log::error('BookController@store: Error processing cover image', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+                    throw $e;
+                }
+            } elseif ($request->filled('coverImage')) {
+                Log::debug('BookController@store: Processing cover image', ['type' => gettype($request->input('coverImage'))]);
+                try {
+                    $validated['cover'] = $this->storeCoverImage($request->input('coverImage'), $id);
+                    Log::debug('BookController@store: Cover image processed successfully', ['cover' => $validated['cover']]);
+                } catch (\Exception $e) {
+                    Log::error('BookController@store: Error processing cover image', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+                    throw $e;
                 }
             }
+            Log::debug('STEP 5: Cover image processing complete.');
 
-            // Fire event for any listeners
-            event(new NewBookAdded(['id' => $id, 'title' => $validated['title']]));
+            Log::debug('STEP 6: Processing authors, narrators, and genres.');
+            $authors = collect($validated['authors'] ?? []);
+            $narrators = collect($validated['narrators'] ?? []);
+            $genres = collect($validated['genres'] ?? []);
+            Log::debug('BookController@store: Processing authors', ['authors' => $validated['authors']]);
+            try {
+                $validated['authors'] = $this->documentStoreService->findOrCreateMany('authors', $authors->all());
+                Log::debug('BookController@store: Authors processed successfully', ['authors' => $validated['authors']]);
+            } catch (\Exception $e) {
+                Log::error('BookController@store: Error processing authors', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+                throw $e;
+            }
+            Log::debug('BookController@store: Processing narrators', ['narrators' => $validated['narrators']]);
+            try {
+                $validated['narrators'] = $this->documentStoreService->findOrCreateMany('narrators', $narrators->all());
+                Log::debug('BookController@store: Narrators processed successfully', ['narrators' => $validated['narrators']]);
+            } catch (\Exception $e) {
+                Log::error('BookController@store: Error processing narrators', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+                throw $e;
+            }
+            Log::debug('BookController@store: Processing genres', ['genres' => $validated['genres']]);
+            try {
+                $validated['genres'] = $this->documentStoreService->findOrCreateMany('genres', $genres->all());
+                Log::debug('BookController@store: Genres processed successfully', ['genres' => $validated['genres']]);
+            } catch (\Exception $e) {
+                Log::error('BookController@store: Error processing genres', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+                throw $e;
+            }
+            Log::debug('STEP 7: Finished processing authors, narrators, and genres.');
 
-            if ($request->ajax()) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Book created successfully',
-                    'id' => $id,
-                    'redirect_url' => $request->input('returnUrl') ?: route('admin.books.edit', ['book' => $id]),
-                ]);
+            Log::debug('STEP 8: Processing series data.');
+            if (!empty($validated['series'])) {
+                Log::debug('BookController@store: Processing series', ['series' => $validated['series']]);
+                try {
+                    $seriesLinks = collect($validated['series'])->map(function ($seriesEntry) {
+                        $seriesName = trim($seriesEntry['seriesName'] ?? $seriesEntry['name'] ?? '');
+                        if (empty($seriesName)) {
+                            return null;
+                        }
+
+                        $existingSeries = $this->documentStoreService->getSeriesByName($seriesName);
+                        $seriesId = $existingSeries['id'] ?? null;
+
+                        if (!$seriesId) {
+                            $seriesId = $this->documentStoreService->createSeries($seriesName);
+                        }
+
+                        return [
+                            'id' => $seriesId,
+                            'name' => $seriesName,
+                            'number' => $seriesEntry['number'] ?? null,
+                        ];
+                    })->filter()->values();
+
+                    $validated['series'] = $seriesLinks->all();
+                    Log::debug('BookController@store: Series processed successfully', ['processed_series' => $validated['series']]);
+                } catch (\Exception $e) {
+                    Log::error('BookController@store: Error processing series', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+                    throw $e;
+                }
+            }
+            Log::debug('STEP 9: Finished processing series data.');
+
+            Log::debug('STEP 10: Calling createBook service method.', ['book_data' => $validated]);
+            Log::debug('BookController@store: Creating book', ['validated' => $validated]);
+            try {
+                $bookId = $this->documentStoreService->createBook($validated);
+                Log::debug('BookController@store: Book created successfully', ['bookId' => $bookId]);
+            } catch (\Exception $e) {
+                Log::error('BookController@store: Error creating book', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+                throw $e;
             }
 
-            // Redirect to returnUrl if present, else go to edit page
             $returnUrl = $request->input('returnUrl');
             if ($returnUrl) {
                 return redirect($returnUrl)->with('success', 'Book created successfully.');
             }
 
-            return redirect()->route('admin.books.edit', ['book' => $id])
-                ->with('success', 'Book created successfully.');
+            Log::debug('BookController@store: Method completed successfully', ['bookId' => $bookId]);
+            return redirect()->route('admin.books.edit', ['book' => $bookId])->with('success', 'Book created successfully.');
         } catch (\Illuminate\Validation\ValidationException $e) {
-            Log::warning('Book creation validation failed', [
-                'errors' => $e->errors(),
-            ]);
-            throw $e;
+            Log::error('Book creation validation failed', ['errors' => $e->errors(), 'input' => $request->all()]);
+            if ($request->ajax()) {
+                return response()->json(['success' => false, 'errors' => $e->errors()], 422);
+            }
+            return redirect()->back()->withErrors($e->errors())->withInput();
         } catch (\Exception $e) {
-            Log::error('Book creation failed', [
-                'exception' => get_class($e),
+            Log::error('An unexpected error occurred during book creation', [
                 'message' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
+                'input' => $request->except(['cover', 'coverImage']),
             ]);
 
             if ($request->ajax()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Failed to create book: ' . $e->getMessage(),
-                ], 500);
+                return response()->json(['success' => false, 'message' => 'An unexpected error occurred.'], 500);
             }
 
-            return redirect()->back()
-                ->withInput()
-                ->withErrors(['error' => 'Failed to create book: ' . $e->getMessage()]);
+            return redirect()->back()->with('error', 'An unexpected error occurred while creating the book.')
+                ->withInput($request->except(['cover', 'coverImage']));
         }
     }
 
@@ -1968,19 +1801,19 @@ class BookController extends Controller
         // Support both 'term' (legacy) and 'query' (book-autocomplete.js) parameters
         $term = $request->input('query', $request->input('term', ''));
         $limit = $request->input('limit', 10);
-        
+
         if (empty($term) || strlen($term) < 2) {
             return response()->json(['data' => []]);
         }
-        
+
         // Get series data from document store (only pass the search term)
         $series = $this->documentStoreService->searchSeriesByName($term);
-        
+
         // Apply limit after fetching results
         if (count($series) > $limit) {
             $series = array_slice($series, 0, $limit);
         }
-        
+
         // Format response based on whether we're using the legacy or new format
         if ($request->has('query')) {
             // New format for book-autocomplete.js

@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Api;
 
-use Tests\TestCase;
+use App\Auth\DocumentstoreUser;
 use App\Services\MongoService;
 use Mockery;
-use App\Auth\DocumentstoreUser;
+use Tests\TestCase;
 
 class BookApiAutocompleteSeriesTest extends TestCase
 {
@@ -31,7 +31,7 @@ class BookApiAutocompleteSeriesTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJson([
-                'data' => ['Super Powereds', 'Super Heroes']
+                'data' => ['Super Powereds', 'Super Heroes'],
             ]);
     }
 

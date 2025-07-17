@@ -42,6 +42,7 @@ foreach ($byDir as $dir => $group) {
             if ($aUpdated !== $bUpdated) {
                 return $bUpdated <=> $aUpdated;
             }
+
             return $bFields <=> $aFields;
         });
         // Keep first, delete rest
@@ -52,7 +53,7 @@ foreach ($byDir as $dir => $group) {
 }
 if ($toDelete) {
     $books->deleteMany(['_id' => ['$in' => $toDelete]]);
-    echo "Deleted " . count($toDelete) . " duplicate books by directoryPath\n";
+    echo 'Deleted ' . count($toDelete) . " duplicate books by directoryPath\n";
 }
 
 // 2. Flag books for review
@@ -75,6 +76,7 @@ function parseDirectoryPath($dir)
             'title' => $parts[count($parts) - 1],
         ];
     }
+
     return [];
 }
 
@@ -154,4 +156,4 @@ foreach ($needsReview as $entry) {
         ],
     ]);
 }
-echo "Flagged " . count($needsReview) . " books for review\n";
+echo 'Flagged ' . count($needsReview) . " books for review\n";

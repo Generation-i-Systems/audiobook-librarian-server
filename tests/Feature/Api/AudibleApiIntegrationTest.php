@@ -178,7 +178,7 @@ XML;
     }
 
     #[Test]
-    public function testItCanSearchAudiobooks()
+    public function test_it_can_search_audiobooks()
     {
         $apiBaseUrl = $this->apiBaseUrl;
         $mockSearchResponse = $this->getMockSearchResponse();
@@ -188,7 +188,7 @@ XML;
             $queryString = $urlParts['query'] ?? '';
             parse_str($queryString, $queryParams);
 
-            $urlWithoutQuery = ($urlParts['scheme'] ?? 'http') . '://' . ($urlParts['host'] ?? '') .
+            $urlWithoutQuery = ($urlParts['scheme'] ?? 'http').'://'.($urlParts['host'] ?? '').
                 ($urlParts['path'] ?? '');
             $rtrimmedUrlWithoutQuery = rtrim($urlWithoutQuery, '/');
             $rtrimmedApiBaseUrl = rtrim($apiBaseUrl, '/');
@@ -209,7 +209,7 @@ XML;
                 'base_url_expected' => $apiBaseUrl,
             ]);
 
-            return Http::response('Mock not found for integration search: ' . $request->url(), 404, [
+            return Http::response('Mock not found for integration search: '.$request->url(), 404, [
                 'Content-Type' => 'text/plain',
             ]);
         });
@@ -224,7 +224,7 @@ XML;
     }
 
     #[Test]
-    public function testItCanGetAudiobookDetails()
+    public function test_it_can_get_audiobook_details()
     {
         $apiBaseUrl = $this->apiBaseUrl;
         $mockDetailsResponse = $this->getMockDetailsResponse();
@@ -234,7 +234,7 @@ XML;
             $queryString = $urlParts['query'] ?? '';
             parse_str($queryString, $queryParams);
 
-            $urlWithoutQuery = ($urlParts['scheme'] ?? 'http') . '://' . ($urlParts['host'] ?? '') .
+            $urlWithoutQuery = ($urlParts['scheme'] ?? 'http').'://'.($urlParts['host'] ?? '').
                 ($urlParts['path'] ?? '');
             $rtrimmedUrlWithoutQuery = rtrim($urlWithoutQuery, '/');
             $rtrimmedApiBaseUrl = rtrim($apiBaseUrl, '/');
@@ -256,7 +256,7 @@ XML;
                 'base_url_expected' => $apiBaseUrl,
             ]);
 
-            return Http::response('Mock not found for integration details: ' . $request->url(), 404, [
+            return Http::response('Mock not found for integration details: '.$request->url(), 404, [
                 'Content-Type' => 'text/plain',
             ]);
         });

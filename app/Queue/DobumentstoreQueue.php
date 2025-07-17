@@ -2,8 +2,8 @@
 
 namespace App\Queue;
 
-use App\Queue\Jobs\DocumentstoreJob;
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Queue\Jobs\DocumentstoreJob;
 use Carbon\Carbon;
 use Illuminate\Contracts\Queue\Queue as QueueContract;
 use Illuminate\Queue\Queue;

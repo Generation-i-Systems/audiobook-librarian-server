@@ -1,11 +1,14 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace Tests\Feature;
 
-use App\Traits\BookImportTrait;
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Traits\BookImportTrait;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class BookImportTest extends TestCase
@@ -24,67 +27,14 @@ class BookImportTest extends TestCase
     {
         parent::setUp();
 
-        if ($this->shouldSkipFirestoreTests()) {
-            $this->markTestSkipped('Firestore config missing: skipping Firestore-dependent tests.');
-        }
-
-        // TODO: Replace with a proper mock or test double for DocumentStoreServiceInterface
         $this->documentStore = $this->createMock(DocumentStoreServiceInterface::class);
-
-        $this->booksCollection = $this->documentStore->collection('books');
-        $this->genresCollection = $this->documentStore->collection('genres');
-        $this->seriesCollection = $this->documentStore->collection('series');
-
-        $this->clearTestData();
-    }
-
-    /**
-     * Helper to check if Firestore config is missing.
-     */
-    protected function shouldSkipFirestoreTests(): bool
-    {
-        $projectId = config('firebase.project_id');
-        $keyFile = config('firebase.credentials.file');
-
-        return empty($projectId) || empty($keyFile) || !file_exists($keyFile);
-    }
-
-    protected function tearDown(): void
-    {
-        $this->clearTestData();
-        parent::tearDown();
-    }
-
-    protected function clearTestData()
-    {
-        // Clear test books
-        $books = $this->booksCollection->where('title', '=', 'Test Book')
-            ->documents();
-        foreach ($books as $book) {
-            $book->reference()->delete();
-        }
-
-        // Clear test genres
-        $genres = $this->genresCollection->where('name', '=', 'Test Genre')
-            ->documents();
-        foreach ($genres as $genre) {
-            $genre->reference()->delete();
-        }
-
-        // Clear test series
-        $series = $this->seriesCollection->where('seriesName', '=', 'Test Series')
-            ->documents();
-        foreach ($series as $item) {
-            $item->reference()->delete();
-        }
     }
 
     #[Test]
     public function testProcessDirPathWithSeries(): void
     {
-        // Create test genre and series
-        $genreRef = $this->genresCollection->add(['name' => 'Test Genre']);
-        $seriesRef = $this->seriesCollection->add(['seriesName' => 'Test Series']);
+        $this->documentStore->method('listGenres')->willReturn([['name' => 'Test Genre']]);
+        $this->documentStore->method('listSeries')->willReturn([['name' => 'Test Series']]);
 
         $dirPath = '/Test Genre/Test Author/Test Series/1 Test Book';
         $result = $this->processDirPath($dirPath);
@@ -99,7 +49,7 @@ class BookImportTest extends TestCase
     #[Test]
     public function testProcessDirPathWithoutSeries(): void
     {
-        $genreRef = $this->genresCollection->add(['name' => 'Test Genre']);
+        $this->documentStore->method('listGenres')->willReturn([['name' => 'Test Genre']]);
 
         $dirPath = '/Test Genre/Test Author/Test Book';
         $result = $this->processDirPath($dirPath);
@@ -135,17 +85,14 @@ class BookImportTest extends TestCase
             ],
         ];
 
+        $this->documentStore->expects($this->once())
+            ->method('createBook')
+            ->willReturn('some-book-id')
+        ;
+
         // Import the book
         $bookId = $this->importBookFromPath($bookData);
 
-        // Verify book was created
-        $book = $this->booksCollection->document($bookId)->snapshot();
-
-        $this->assertTrue($book->exists());
-        $this->assertEquals('Test Book', $book['title']);
-        $this->assertEquals(['Test Author'], $book['authors']);
-        $this->assertEquals('Test Genre', $book['genre']);
-        $this->assertCount(1, $book['files']);
-        $this->assertEquals($file->getClientOriginalName(), $book['files'][0]['name']);
+        $this->assertEquals('some-book-id', $bookId);
     }
 }

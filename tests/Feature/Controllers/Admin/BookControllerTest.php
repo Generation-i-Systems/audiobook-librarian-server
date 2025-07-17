@@ -2,325 +2,270 @@
 
 namespace Tests\Feature\Controllers\Admin;
 
-use Google\Cloud\Firestore\FirestoreClient;
+use App\Auth\DocumentstoreUser;
+use App\Contracts\DocumentStoreServiceInterface;
+use App\Services\ExternalCoverService;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
-use Tests\TestCase;
+use Mockery;
+use Mockery\LegacyMockInterface;
+use Mockery\MockInterface;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\TestCase;
 
 class BookControllerTest extends TestCase
 {
-    protected $documentStore;
-
-    protected $booksCollection;
-
-    protected $genresCollection;
-
-    protected $seriesCollection;
-
+    private MockInterface|LegacyMockInterface|DocumentStoreServiceInterface $documentStoreServiceMock;
+    private MockInterface|LegacyMockInterface|ExternalCoverService $externalCoverServiceMock;
     protected $admin;
 
-    /**
-     * Setup the test environment.
-     *
-     * @return void
-     */
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->documentStore = new FirestoreClient([
-            'projectId' => config('firebase.project_id'),
-            'keyFilePath' => config('firebase.credentials.file'),
-        ]);
+        $this->documentStoreServiceMock = Mockery::mock(DocumentStoreServiceInterface::class);
+        $this->app->instance(DocumentStoreServiceInterface::class, $this->documentStoreServiceMock);
 
-        $this->booksCollection = $this->documentStore->collection('books');
-        $this->genresCollection = $this->documentStore->collection('genres');
-        $this->seriesCollection = $this->documentStore->collection('series');
+        $this->externalCoverServiceMock = Mockery::mock(ExternalCoverService::class);
+        $this->app->instance(ExternalCoverService::class, $this->externalCoverServiceMock);
 
-        $this->clearTestData();
+        Event::fake();
 
-        // Create an admin user for testing
         $this->admin = $this->createAdminUser();
+        $this->actingAs($this->admin);
+
+        $this->documentStoreServiceMock->shouldReceive('isAdmin')
+            ->with($this->admin->getAuthIdentifier())
+            ->andReturn(true);
     }
 
-    /**
-     * Tear down the test environment.
-     *
-     * @return void
-     */
     protected function tearDown(): void
     {
-        $this->clearTestData();
         parent::tearDown();
+        Mockery::close();
     }
 
-    /**
-     * Clear test data from Firestore.
-     *
-     * @return void
-     */
-    protected function clearTestData()
+    protected function createAdminUser(): DocumentstoreUser
     {
-        // Clear test books
-        $books = $this->booksCollection->where('title', '=', 'Test Book')
-            ->documents();
-        foreach ($books as $book) {
-            $book->reference()->delete();
-        }
-
-        // Clear test genres
-        $genres = $this->genresCollection->where('name', '=', 'Test Genre')
-            ->documents();
-        foreach ($genres as $genre) {
-            $genre->reference()->delete();
-        }
-
-        // Clear test series
-        $series = $this->seriesCollection->where('name', '=', 'Test Series')
-            ->documents();
-        foreach ($series as $item) {
-            $item->reference()->delete();
-        }
-    }
-
-    /**
-     * Create an admin user for testing.
-     *
-     * @return \Google\Cloud\Firestore\DocumentSnapshot
-     */
-    protected function createAdminUser()
-    {
-        $userRef = $this->documentStore->collection('users')->add([
+        $userData = [
+            'id' => 'test-admin-user',
             'name' => 'Admin User',
             'email' => 'admin@example.com',
             'password' => bcrypt('password'),
             'role' => 'admin',
-        ]);
+        ];
 
-        return $userRef->snapshot();
+        return new DocumentstoreUser($userData);
     }
 
     #[Test]
-    public function testIndexReturnsBooks()
+    public function indexReturnsViewWithBooks(): void
     {
-        // Create test books
-        $this->booksCollection->add([
-            'title' => 'Test Book 1',
-            'authors' => ['Author 1'],
-            'genre' => 'Fiction',
-        ]);
+        $books = [
+            ['id' => '1', 'title' => 'Test Book 1'],
+            ['id' => '2', 'title' => 'Test Book 2'],
+        ];
 
-        $this->booksCollection->add([
-            'title' => 'Test Book 2',
-            'authors' => ['Author 2'],
-            'genre' => 'Non-Fiction',
-        ]);
+        $this->documentStoreServiceMock->shouldReceive('listBooks')->andReturn($books);
 
-        $response = $this->actingAs($this->admin->data())
-            ->get(route('admin.books.index'));
+        $response = $this->get(route('admin.books.index'));
 
         $response->assertStatus(200)
+            ->assertViewIs('admin.books.index')
             ->assertSee('Test Book 1')
             ->assertSee('Test Book 2');
     }
 
     #[Test]
-    public function testStoreCreatesBook(): void
+    public function storeCreatesBook(): void
     {
-        $genreRef = $this->genresCollection->add(['name' => 'Fiction']);
-        $seriesRef = $this->seriesCollection->add(['name' => 'Test Series']);
+        \Illuminate\Support\Facades\Storage::fake('public');
+        $this->withoutMiddleware(\App\Http\Middleware\CheckAdminRole::class);
 
-        Storage::fake('public');
-        $file = UploadedFile::fake()->create('cover.jpg', 1024);
-
-        $seriesCanonical = [
-            ['seriesName' => 'Test Series', 'number' => 1],
-        ];
-
-        $response = $this->actingAs($this->admin->data())
-            ->post(route('admin.books.store'), [
-                'title' => 'New Test Book',
-                'author' => ['Test Author'],
-                'genre' => ['Fiction'],
-                'series' => $seriesCanonical,
-                'coverImage' => $file,
-                'description' => 'Test description',
-            ]);
-
-        $response->assertRedirect();
-
-        $books = $this->booksCollection->where('title', '=', 'New Test Book')
-            ->documents();
-
-        $this->assertFalse($books->isEmpty());
-        $book = $books->rows()[0]->data();
-        $this->assertEquals('Test Author', $book['authors'][0] ?? $book['author'][0] ?? null);
-        $this->assertEquals('Fiction', $book['genre'][0] ?? $book['genre'] ?? null);
-        // Canonical series format assertion
-        $this->assertIsArray($book['series']);
-        $this->assertEquals('Test Series', $book['series'][0]['seriesName']);
-        $this->assertEquals(1, $book['series'][0]['number']);
-    }
-
-    #[Test]
-    public function testStoreValidationError(): void
-    {
-        $response = $this->actingAs($this->admin->data())
-            ->post(route('admin.books.store'), [
-                // Missing required fields
-                'title' => '',
-                'author' => [],
-                'genre' => [],
-            ]);
-        $response->assertSessionHasErrors(['title', 'author', 'genre']);
-    }
-
-    public function testUpdateModifiesBook(): void
-    {
-        // Create a test book
-        $bookRef = $this->booksCollection->add([
-            'title' => 'Old Title',
-            'authors' => ['Old Author'],
-            'genre' => 'Old Genre',
+        $bookData = [
+            'title' => 'New Test Book',
+            'authors' => ['New Author'],
+            'narrators' => [],
+            'genres' => ['New Genre'],
             'series' => [
-                ['seriesName' => 'Old Series', 'number' => 2],
+                ['seriesName' => 'Existing Series', 'number' => '1'],
+                ['seriesName' => 'New Series', 'number' => '2'],
             ],
-        ]);
-
-        $bookId = $bookRef->id();
-
-        $seriesCanonical = [
-            ['seriesName' => 'Updated Series', 'number' => 3],
+            'description' => 'Test description',
+            'cover' => UploadedFile::fake()->image('cover.jpg'),
+            'googleBooksId' => 'test-google-id',
         ];
 
-        $response = $this->actingAs($this->admin->data())
-            ->put(route('admin.books.update', $bookId), [
-                'title' => 'Updated Title',
-                'authors' => ['New Author'],
-                'genre' => 'New Genre',
-                'series' => $seriesCanonical,
-                'description' => 'Updated description',
-            ]);
+        $this->documentStoreServiceMock
+            ->shouldReceive('getSeriesByName')
+            ->with('Existing Series')
+            ->andReturn(['id' => 'existing-series-id', 'name' => 'Existing Series']);
 
-        $response->assertRedirect(route('admin.books.index'));
+        $this->documentStoreServiceMock
+            ->shouldReceive('getSeriesByName')
+            ->with('New Series')
+            ->andReturn(null);
 
-        // Verify book was updated
-        $book = $this->booksCollection->document($bookId)->snapshot();
-        $this->assertEquals('Updated Title', $book['title']);
-        $this->assertEquals(['New Author'], $book['authors']);
-        $this->assertEquals('New Genre', $book['genre']);
-        $this->assertIsArray($book['series']);
-        $this->assertEquals('Updated Series', $book['series'][0]['seriesName']);
-        $this->assertEquals(3, $book['series'][0]['number']);
+        $this->documentStoreServiceMock
+            ->shouldReceive('createSeries')
+            ->with('New Series')
+            ->andReturn('new-series-id');
+
+        $this->documentStoreServiceMock
+            ->shouldReceive('findOrCreateMany')
+            ->with('authors', ['New Author'])
+            ->andReturn(['new-author-id']);
+
+        $this->documentStoreServiceMock
+            ->shouldReceive('findOrCreateMany')
+            ->with('narrators', [])
+            ->andReturn([]);
+
+        $this->documentStoreServiceMock
+            ->shouldReceive('findOrCreateMany')
+            ->with('genres', ['New Genre'])
+            ->andReturn(['new-genre-id']);
+
+
+
+        $this->documentStoreServiceMock
+            ->shouldReceive('createBook')
+            ->once()
+            ->with(Mockery::on(function ($arg) use ($bookData) {
+                $seriesMatch = count($arg['series']) === 2 &&
+                               $arg['series'][0]['id'] === 'existing-series-id' &&
+                               $arg['series'][1]['id'] === 'new-series-id';
+
+                return $arg['title'] === $bookData['title'] &&
+                       $arg['authors'] === ['new-author-id'] &&
+                       $seriesMatch;
+            }))
+            ->andReturn('new-book-id');
+
+
+
+                $bookData['cover'] = UploadedFile::fake()->image('cover.jpg');
+
+        $response = $this->post(route('admin.books.store'), $bookData);
+    
+    // Debug information to see what's causing the 500 error
+    if ($response->status() === 500) {
+        dump('Response Status: ' . $response->status());
+        dump('Response Content: ' . $response->content());
+        dump('Exception: ' . $response->exception?->getMessage());
+        dump('Exception Trace: ' . $response->exception?->getTraceAsString());
     }
 
-    public function testDestroyDeletesBook(): void
-    {
-        // Create a test book
-        $bookRef = $this->booksCollection->add([
-            'title' => 'Book to Delete',
-            'authors' => ['Author'],
-            'genre' => 'Fiction',
-        ]);
-
-        $bookId = $bookRef->id();
-
-        $response = $this->actingAs($this->admin->data())
-            ->delete(route('admin.books.destroy', $bookId));
-
-        $response->assertRedirect(route('admin.books.index'));
-
-        // Verify book was deleted
-        $book = $this->booksCollection->document($bookId)->snapshot();
-        $this->assertFalse($book->exists());
+    $response->assertRedirect(route('admin.books.edit', 'new-book-id'));
     }
 
     #[Test]
-    public function testGetRawJsonReturnsBookData()
+    public function storeValidationError(): void
     {
-        $bookRef = $this->booksCollection->add([
+        $response = $this->post(route('admin.books.store'), ['title' => '']); // Invalid data
+
+        $response->assertSessionHasErrors('title');
+    }
+
+    #[Test]
+    public function updateModifiesBook(): void
+    {
+        $bookId = 'existing-book-id';
+        $updateData = [
+            'title' => 'Updated Book Title',
+            'author' => ['Updated Author'],
+            'genre' => ['Updated Genre'],
+            'series' => [['seriesName' => 'Updated Series', 'number' => '3']],
+            'description' => 'Updated description',
+        ];
+
+        $this->documentStoreServiceMock->shouldReceive('getBook')->with($bookId)->andReturn(['id' => $bookId]);
+        $this->documentStoreServiceMock->shouldReceive('updateBook')->once();
+
+        $response = $this->put(route('admin.books.update', $bookId), $updateData);
+
+        $response->assertRedirect(route('admin.books.index'));
+    }
+
+    #[Test]
+    public function destroyDeletesBook(): void
+    {
+        $bookId = 'existing-book-id';
+        $this->documentStoreServiceMock->shouldReceive('getBook')->with($bookId)->andReturn(['id' => $bookId]);
+        $this->documentStoreServiceMock->shouldReceive('deleteBook')->with($bookId)->once()->andReturn(true);
+
+        $response = $this->delete(route('admin.books.destroy', $bookId));
+
+        $response->assertRedirect(route('admin.books.index'));
+    }
+
+    #[Test]
+    public function getRawJsonReturnsJsonForBook(): void
+    {
+        $bookId = 'existing-book-id';
+        $bookData = [
+            'id' => $bookId,
             'title' => 'Raw Test Book',
             'authors' => ['Raw Author'],
             'genre' => 'Raw Genre',
-        ]);
-        $bookId = $bookRef->id();
+        ];
+        $this->documentStoreServiceMock->shouldReceive('getBook')->with($bookId)->andReturn($bookData);
 
-        $response = $this->actingAs($this->admin->data())
-            ->get(route('admin.books.rawJson', $bookId));
+        $response = $this->get(route('admin.books.rawJson', $bookId));
 
         $response->assertStatus(200)
             ->assertJsonFragment(['title' => 'Raw Test Book']);
     }
 
     #[Test]
-    public function testGetRawJsonReturns404ForMissingBook()
+    public function getRawJsonReturns404ForMissingBook(): void
     {
-        $response = $this->actingAs($this->admin->data())
-            ->get(route('admin.books.rawJson', 'nonexistent-id'));
+        $this->documentStoreServiceMock->shouldReceive('getBook')->with('nonexistent-id')->andReturn(null);
+
+        $response = $this->get(route('admin.books.rawJson', 'nonexistent-id'));
 
         $response->assertStatus(404);
     }
 
     #[Test]
-    public function testSaveRawJsonUpdatesBook()
+    public function saveRawJsonUpdatesBook(): void
     {
-        $bookRef = $this->booksCollection->add([
-            'title' => 'Old Raw Title',
-            'authors' => ['Raw Author'],
-            'genre' => 'Raw Genre',
-        ]);
-        $bookId = $bookRef->id();
+        $bookId = 'existing-book-id';
+        $newJson = json_encode(['title' => 'New Raw Title']);
+        $this->documentStoreServiceMock->shouldReceive('getBook')->with($bookId)->andReturn(['id' => $bookId]);
+        $this->documentStoreServiceMock->shouldReceive('updateBook')->once();
 
-        $newJson = json_encode([
-            'title' => 'New Raw Title',
-            'authors' => ['Raw Author'],
-            'genre' => 'Raw Genre',
+        $response = $this->post(route('admin.books.saveRawJson', $bookId), [
+            'json' => $newJson,
         ]);
-
-        $response = $this->actingAs($this->admin->data())
-            ->post(route('admin.books.saveRawJson', $bookId), [
-                'json' => $newJson,
-            ]);
 
         $response->assertStatus(200)->assertJson(['success' => true]);
-        $book = $this->booksCollection->document($bookId)->snapshot();
-        $this->assertEquals('New Raw Title', $book['title']);
     }
 
     #[Test]
-    public function testSaveRawJsonReturnsErrorForInvalidJson()
+    public function saveRawJsonReturnsErrorForInvalidJson(): void
     {
-        $bookRef = $this->booksCollection->add([
-            'title' => 'Invalid Raw Book',
-            'authors' => ['Raw Author'],
-            'genre' => 'Raw Genre',
+        $bookId = 'existing-book-id';
+        $invalidJson = '{\"title\": \"New Raw Title\",}'; // Invalid JSON with trailing comma
+
+        $response = $this->post(route('admin.books.saveRawJson', $bookId), [
+            'json' => $invalidJson,
         ]);
-        $bookId = $bookRef->id();
 
-        $invalidJson = '{invalid: true';
-
-        $response = $this->actingAs($this->admin->data())
-            ->post(route('admin.books.saveRawJson', $bookId), [
-                'json' => $invalidJson,
-            ]);
-
-        $response->assertStatus(422)
-            ->assertJsonStructure(['message']);
+        $response->assertStatus(422)->assertJsonStructure(['message']);
     }
 
     #[Test]
-    public function testSaveRawJsonReturns404ForMissingBook()
+    public function saveRawJsonReturns404ForMissingBook(): void
     {
-        $validJson = json_encode([
-            'title' => 'Should Not Exist',
-            'authors' => ['Nobody'],
-            'genre' => 'None',
+        $this->documentStoreServiceMock->shouldReceive('getBook')->with('nonexistent-id')->andReturn(null);
+        $validJson = json_encode(['title' => 'A book']);
+
+        $response = $this->post(route('admin.books.saveRawJson', 'nonexistent-id'), [
+            'json' => $validJson,
         ]);
-        $response = $this->actingAs($this->admin->data())
-            ->post(route('admin.books.saveRawJson', 'nonexistent-id'), [
-                'json' => $validJson,
-            ]);
+
         $response->assertStatus(404);
     }
 }

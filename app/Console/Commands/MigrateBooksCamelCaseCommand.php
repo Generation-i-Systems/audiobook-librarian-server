@@ -25,8 +25,6 @@ class MigrateBooksCamelCaseCommand extends Command
 
     /**
      * The Firestore service instance.
-     *
-     * @var DocumentStoreServiceInterface
      */
     protected DocumentStoreServiceInterface $documentStoreService;
 

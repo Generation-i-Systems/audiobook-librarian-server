@@ -11,7 +11,6 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
 {
     /**
      * The base URL for Google Books API requests.
-     * @var string
      */
     protected string $baseUrl = 'https://www.googleapis.com/books/v1/';
 
@@ -167,7 +166,6 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
 
     protected $apiKey;
 
-
     protected int $defaultLimit = 5;
 
     protected int $cacheTtl = 129600; // 3 months in minutes
@@ -228,11 +226,12 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
                     if (empty($book['authors'])) {
                         return false;
                     }
-                    foreach ((array)$book['authors'] as $bookAuthor) {
+                    foreach ((array) $book['authors'] as $bookAuthor) {
                         if (mb_stripos($bookAuthor['author']['name'] ?? $bookAuthor, $authorLower) !== false) {
                             return true;
                         }
                     }
+
                     return false;
                 });
                 $results = array_values($results); // reindex
@@ -242,6 +241,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
                     'after_count' => count($results),
                 ]);
             }
+
             return $results;
         } catch (\Exception $e) {
             Log::error('Google Books API search failed', [
@@ -265,6 +265,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
             if ($response === null) {
                 return null;
             }
+
             return $this->transform($response);
         } catch (\Exception $e) {
             Log::error('Failed to get book details from Google Books API', [
@@ -337,7 +338,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
     /**
      * Format book details from Google Books API
      *
-     * @param array|null $item The book details from Google Books API
+     * @param  array|null  $item  The book details from Google Books API
      * @return array The formatted book details
      */
     protected function formatBookDetails(?array $item): array
@@ -443,7 +444,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
     /**
      * Transform a Google Books API result into a consistent format for frontend consumption.
      *
-     * @param array $item The Google Books API result to transform
+     * @param  array  $item  The Google Books API result to transform
      * @return array The transformed result
      */
     public function transform(array $item): array
@@ -531,7 +532,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
     /**
      * Convert all keys in an array to camelCase.
      *
-     * @param array $array The array with keys to convert
+     * @param  array  $array  The array with keys to convert
      * @return array Array with camelCase keys
      */
     private function convertKeysToCamelCase(array $array): array

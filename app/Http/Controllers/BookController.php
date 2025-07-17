@@ -12,29 +12,18 @@ use Illuminate\Support\Facades\Storage;
 
 class BookController extends Controller
 {
-    /**
-     * @var DocumentStoreServiceInterface
-     */
     protected DocumentStoreServiceInterface $documentStoreService;
 
-    /**
-     * @var GoogleBooksApiService
-     */
     protected GoogleBooksApiService $googleBooksApiService;
 
     /**
      * BookController constructor.
-     *
-     * @param  DocumentStoreServiceInterface  $documentStoreService
-     * @param  GoogleBooksApiService  $googleBooksApiService
      */
     public function __construct(DocumentStoreServiceInterface $documentStoreService, GoogleBooksApiService $googleBooksApiService)
     {
         $this->documentStoreService = $documentStoreService;
         $this->googleBooksApiService = $googleBooksApiService;
     }
-
-
 
     /**
      * Display the main books index page
@@ -214,8 +203,8 @@ class BookController extends Controller
      */
     public function download(Request $request, $id)
     {
-        $firestore = app(\App\Contracts\DocumentStoreServiceInterface::class);
-        $book = $firestore->getBook($id);
+        $documentStoreService = app(DocumentStoreServiceInterface::class);
+        $book = $documentStoreService->getBook($id);
 
         if (!$book || !isset($book['file_path'])) {
             return redirect()->route('books.index')->with('error', 'Book file not found');

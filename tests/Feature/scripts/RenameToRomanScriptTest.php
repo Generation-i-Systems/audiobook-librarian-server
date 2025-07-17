@@ -43,7 +43,7 @@ class RenameToRomanScriptTest extends TestCase
         rmdir($dir);
     }
 
-    public function testRenamesRomanNumeralToArabicAtStart(): void
+    public function test_renames_roman_numeral_to_arabic_at_start(): void
     {
         $src = $this->testDir . '/01 - Canto X.mp3';
         $expected = $this->testDir . '/10 - Canto X.mp3';
@@ -58,7 +58,7 @@ class RenameToRomanScriptTest extends TestCase
         $this->assertStringContainsString('Renamed', $output);
     }
 
-    public function testNoChangeIfNoRoman(): void
+    public function test_no_change_if_no_roman(): void
     {
         $src = $this->testDir . '/01 - Canto.mp3';
         touch($src);
@@ -71,7 +71,7 @@ class RenameToRomanScriptTest extends TestCase
         $this->assertStringContainsString('No change', $output);
     }
 
-    public function testDigitsOptionDefault(): void
+    public function test_digits_option_default(): void
     {
         $src = $this->testDir . '/01 - Canto X.mp3';
         $expected = $this->testDir . '/010 - Canto X.mp3';
@@ -86,7 +86,7 @@ class RenameToRomanScriptTest extends TestCase
         $this->assertStringContainsString('Renamed', $output);
     }
 
-    public function testDigitsOptionPattern(): void
+    public function test_digits_option_pattern(): void
     {
         $src = $this->testDir . '/Book-X.txt';
         $expected = $this->testDir . '/Book-0010.txt';
@@ -102,7 +102,7 @@ class RenameToRomanScriptTest extends TestCase
         $this->assertStringContainsString('Renamed', $output);
     }
 
-    public function testPatternOption(): void
+    public function test_pattern_option(): void
     {
         $src = $this->testDir . '/Book-X.txt';
         $expected = $this->testDir . '/Book-10.txt';

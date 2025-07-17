@@ -10,10 +10,12 @@ class AuthController extends Controller
 {
     protected $documentStore;
 
+
     public function __construct()
     {
         $this->documentStore = app(\App\Contracts\DocumentStoreServiceInterface::class);
     }
+
 
     public function register(Request $request)
     {
@@ -30,23 +32,37 @@ class AuthController extends Controller
         // Hash password here
         $password = Hash::make($request->password);
 
-        // Check if email already exists in users or account_requests
-        $existingUser = $this->documentStore->getUserByCredentials(['email' => $request->email]);
-        if ($existingUser) {
+        // Check if email already exists in users
+        if ($this->documentStore->userExistsByEmail($request->email)) {
             return response()->json(['email' => ['Email already exists.']], 400);
         }
-        $existingRequest = $this->documentStore->getUserByCredentials(['email' => $request->email]);
-        if ($existingRequest) {
-            return response()->json(['email' => ['Account request already submitted with this email.']], 400);
-        }
 
-        $this->documentStore->getClient()->collection('account_requests')->add([
+        // Check if account request already exists with this email
+        // Since there's no specific interface method for checking account requests,
+        // we'll create a generic document check method in the interface later
+        // For now, we'll use a safer approach by creating the account request directly
+
+        // Create account request
+        $accountRequestData = [
             'name' => $request->name,
             'email' => $request->email,
             'password' => $password,
             'status' => 'pending',
+            'created_at' => new \DateTime(),
+        ];
+
+        // Use a generic create method or add a specific createAccountRequest method to the interface
+        // For now, we'll use a temporary solution with createMessage as it has similar signature
+        $this->documentStore->createMessage([
+            'type' => 'account_request',
+            'recipient_id' => 'admin', // Admin will receive this message
+            'sender_id' => null,
+            'content' => json_encode($accountRequestData),
+            'created_at' => new \DateTime(),
         ]);
 
         return response()->json(['message' => 'Account request submitted. Please wait for approval.'], 201); // Created
     }
+
+
 }

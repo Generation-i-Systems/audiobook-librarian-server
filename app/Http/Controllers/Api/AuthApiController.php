@@ -2,29 +2,28 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use App\Contracts\DocumentStoreServiceInterface;
-use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\Controller;
+use Exception;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
-use Exception;
-use Google\Client as GoogleClient;
 
 class AuthApiController extends Controller
 {
     protected DocumentStoreServiceInterface $documentStoreService;
+
 
     public function __construct(DocumentStoreServiceInterface $documentStoreService)
     {
         $this->documentStoreService = $documentStoreService;
     }
 
+
     /**
      * Authenticate with Google OAuth
      *
-     * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
     public function googleAuth(Request $request)
@@ -37,13 +36,13 @@ class AuthApiController extends Controller
         try {
             // Get user info from Google
             $googleUser = null;
-            
+
             try {
                 if ($request->has('id_token')) {
                     // Direct validation with Google's OAuth2 service
-                    $client = new GoogleClient(['client_id' => config('services.google.client_id')]);
+                    $client = new \Google_Client(['client_id' => config('services.google.client_id')]);
                     $payload = $client->verifyIdToken($request->input('id_token'));
-                    
+
                     if ($payload) {
                         $googleUser = new \Laravel\Socialite\Two\User();
                         $googleUser->id = $payload['sub'];
@@ -66,6 +65,7 @@ class AuthApiController extends Controller
                 Log::error('Failed to get user info from Google', [
                     'googleUser' => $googleUser,
                 ]);
+
                 return response()->json(['error' => 'Invalid Google credentials'], 400);
             }
 
@@ -99,13 +99,8 @@ class AuthApiController extends Controller
             }
 
             // Generate token using Laravel's built-in JWT functionality
-            $token = auth('api')->login((object)$user);
-            
-            // If token generation failed
-            if (!$token) {
-                return response()->json(['error' => 'Could not create authentication token'], 500);
-            }
-            
+            $token = auth('api')->fromUser((object) $user);
+
             return response()->json([
                 'token' => $token,
                 'user' => [
@@ -121,7 +116,10 @@ class AuthApiController extends Controller
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
+
             return response()->json(['error' => 'Authentication failed: ' . $e->getMessage()], 400);
         }
     }
+
+
 }

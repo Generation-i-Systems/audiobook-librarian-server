@@ -8,15 +8,13 @@ use Illuminate\Support\Facades\Auth;
 
 class FollowController extends Controller
 {
-    /**
-     * @var DocumentStoreServiceInterface
-     */
     protected DocumentStoreServiceInterface $documentStoreService;
 
     public function __construct(DocumentStoreServiceInterface $documentStoreService)
     {
         $this->documentStoreService = $documentStoreService;
     }
+
     public function follow(Request $request, $followableType, $followableId)
     {
         // Validate input

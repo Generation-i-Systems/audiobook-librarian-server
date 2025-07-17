@@ -34,16 +34,12 @@ class ImportBookFromDirectoryJob implements ShouldQueue
      */
     protected $directoryPath;
 
-    /**
-     * @var DocumentStoreServiceInterface
-     */
     protected DocumentStoreServiceInterface $documentStoreService;
 
     /**
      * Create a new job instance.
      *
-     * @param string $directoryPath
-     * @param DocumentStoreServiceInterface $documentStoreService
+     * @param  string  $directoryPath
      */
     public function __construct($directoryPath, DocumentStoreServiceInterface $documentStoreService)
     {
@@ -236,15 +232,6 @@ class ImportBookFromDirectoryJob implements ShouldQueue
                         $seriesName,
                         $seriesNumber
                     );
-
-                    function getPublishedYear($info)
-                    {
-                        if (isset($info['publishedDate'])) {
-                            return $info['publishedDate'];
-                        } else {
-                            return isset($info['publishedDate']) ? substr($info['publishedDate'], 0, 4) : null;
-                        }
-                    }
 
                     if ($closeMatch) {
                         $info = $closeMatch['volumeInfo'];
@@ -447,6 +434,18 @@ class ImportBookFromDirectoryJob implements ShouldQueue
         }
     }
 
+
+
+    public function getPublishedYear($info)
+    {
+        if (isset($info['publishedDate'])) {
+            return $info['publishedDate'];
+        } else {
+            return isset($info['publishedDate']) ? substr($info['publishedDate'], 0, 4) : null;
+        }
+    }
+
+
     /**
      * Notify admin of Google Books API quota failure.
      */
@@ -456,7 +455,7 @@ class ImportBookFromDirectoryJob implements ShouldQueue
         $jobId = 'quota_failure_' . md5(($book['title'] ?? '') . '_' . now()->timestamp);
 
         // Log the quota failure as a special job type
-        $documentStore->updateJobStatus(
+        $documentStore->updateJob(
             $jobId,
             'quota_failure',
             'failed',

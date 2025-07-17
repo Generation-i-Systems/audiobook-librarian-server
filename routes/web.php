@@ -139,22 +139,22 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::prefix('import')->group(function () {
         Route::get('roots', [
             \App\Http\Controllers\Admin\ImportFileController::class,
-            'roots'
+            'roots',
         ])->name('import.roots');
 
         Route::get('list', [
             \App\Http\Controllers\Admin\ImportFileController::class,
-            'list'
+            'list',
         ])->name('import.list');
 
         Route::post('extract', [
             \App\Http\Controllers\Admin\ImportFileController::class,
-            'extract'
+            'extract',
         ])->name('import.extract');
 
         Route::post('move', [
             \App\Http\Controllers\Admin\ImportFileController::class,
-            'moveSelected'
+            'moveSelected',
         ])->name('import.move');
     });
     // Unified search endpoint for all book APIs
@@ -203,8 +203,6 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         'importFromTitle',
     ])->name('books.importFromTitle');
 
-
-
     Route::post('/books/import-from-google-books', [
         Admin\BookController::class,
         'importFromGoogleBooks',
@@ -242,8 +240,6 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         Route::post('/queue/start', [Admin\QueueController::class, 'startWorker']);
         Route::post('/queue/clear', [Admin\QueueController::class, 'clear'])->name('queue.clear');
     });
-
-
 
     Route::resource('messages', Admin\MessageController::class);
     // Admin messaging system
