@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use App\Models\Series;
 
 class Book extends Model
 {
@@ -14,20 +15,45 @@ class Book extends Model
     protected $fillable = [
         'title',
         'description',
-        'publication_year',
+        'directory_path',
+        'release_date',
         'cover_image',
         'language',
-        'book_number',
-        'path',
         'source',
-        'audio_sample_path',
         'series_id',
+        'duration',
+        'publisher',
+        'needs_review',
+        'needs_review_reasons',
+        'audio_file_count',
+        'mongo_id',
+        'mongo_record',
+        'file_tags',
+        'audible_info',
+        'google_books_info',
+        'hardcover_info',
+        'audiobook_bay_info',
     ];
 
-    public function series(): BelongsTo
-    {
-        return $this->belongsTo(Series::class);
-    }
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array
+     */
+    protected $casts = [
+        'release_date' => 'date:Y-m-d',
+        'duration' => 'integer',
+        'needs_review' => 'boolean',
+        'audio_file_count' => 'integer',
+        'mongo_record' => 'array',
+        'file_tags' => 'array',
+        'audible_info' => 'array',
+        'google_books_info' => 'array',
+        'hardcover_info' => 'array',
+        'audiobook_bay_info' => 'array',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+    ];
 
     public function users(): BelongsToMany
     {
@@ -47,6 +73,12 @@ class Book extends Model
     public function narrators()
     {
         return $this->belongsToMany(Narrator::class);
+    }
+
+    public function series()
+    {
+        return $this->belongsToMany(Series::class, 'book_series')
+            ->withTimestamps();
     }
 
     public function genres()

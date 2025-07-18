@@ -614,7 +614,10 @@ class BookController extends Controller
             }
 
             // Fire the NewBookAdded event
-            event(new NewBookAdded(['id' => $id, 'title' => $validated['title']]));
+            $bookData = ['id' => $id, 'title' => $validated['title']];
+            Log::debug('Dispatching NewBookAdded event', ['bookData' => $bookData]);
+            event(new NewBookAdded($bookData));
+            Log::debug('NewBookAdded event dispatched');
 
             if ($request->ajax()) {
                 return response()->json([
@@ -792,34 +795,34 @@ class BookController extends Controller
 
             Log::debug('STEP 1: Validating book creation request.');
             $validated = $request->validate([
-                    'title' => 'required|string|max:255',
-                    'subtitle' => 'nullable|string|max:255',
-                    'authors' => 'nullable|array',
-                    'narrators' => 'nullable|array',
-                    'series' => 'nullable|array',
-                    'genres' => 'nullable|array',
-                    'publisher' => 'nullable|string|max:255',
-                    'release_date' => 'nullable|date',
-                    'published_year' => 'nullable|digits:4',
-                    'description' => 'nullable|string',
-                    'comment' => 'nullable|string',
-                    'tags' => 'nullable|string',
-                    'rating' => 'nullable|numeric|min:0|max:5',
-                    'language' => 'nullable|string|max:255',
-                    'asin' => 'nullable|string|max:255',
-                    'isbn' => 'nullable|string|max:255',
-                    'cover' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-                    'coverImage' => 'nullable|string',
-                    'coverImageSource' => 'nullable|string',
-                    'importMode' => 'nullable|string',
-                    'sourcePath' => 'nullable|string',
-                    'sourceRoot' => 'nullable|string',
-                    'sourceRelPath' => 'nullable|string',
-                    'sourceType' => 'nullable|string',
-                    'directoryPath' => 'nullable|string',
-                    'returnUrl' => 'nullable|string',
-                ]);
-                Log::debug('STEP 2: Validation successful.', ['validated_data' => array_keys($validated)]);
+                'title' => 'required|string|max:255',
+                'subtitle' => 'nullable|string|max:255',
+                'authors' => 'nullable|array',
+                'narrators' => 'nullable|array',
+                'series' => 'nullable|array',
+                'genres' => 'nullable|array',
+                'publisher' => 'nullable|string|max:255',
+                'release_date' => 'nullable|date',
+                'published_year' => 'nullable|digits:4',
+                'description' => 'nullable|string',
+                'comment' => 'nullable|string',
+                'tags' => 'nullable|string',
+                'rating' => 'nullable|numeric|min:0|max:5',
+                'language' => 'nullable|string|max:255',
+                'asin' => 'nullable|string|max:255',
+                'isbn' => 'nullable|string|max:255',
+                'cover' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+                'coverImage' => 'nullable|string',
+                'coverImageSource' => 'nullable|string',
+                'importMode' => 'nullable|string',
+                'sourcePath' => 'nullable|string',
+                'sourceRoot' => 'nullable|string',
+                'sourceRelPath' => 'nullable|string',
+                'sourceType' => 'nullable|string',
+                'directoryPath' => 'nullable|string',
+                'returnUrl' => 'nullable|string',
+            ]);
+            Log::debug('STEP 2: Validation successful.', ['validated_data' => array_keys($validated)]);
 
             $id = (string) Str::uuid();
             $validated['id'] = $id;
@@ -924,6 +927,13 @@ class BookController extends Controller
             try {
                 $bookId = $this->documentStoreService->createBook($validated);
                 Log::debug('BookController@store: Book created successfully', ['bookId' => $bookId]);
+
+                // Get the created book to pass to the event
+                $book = $this->documentStoreService->getBook($bookId);
+
+                // Dispatch the NewBookAdded event
+                event(new NewBookAdded($book));
+
             } catch (\Exception $e) {
                 Log::error('BookController@store: Error creating book', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
                 throw $e;

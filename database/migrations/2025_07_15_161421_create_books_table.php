@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     /**
      * Run the migrations.
      */
@@ -13,16 +12,26 @@ return new class extends Migration
     {
         Schema::create('books', function (Blueprint $table) {
             $table->id();
+            $table->string('mongo_id')->nullable()->index();
             $table->string('title');
             $table->text('description')->nullable();
-            $table->unsignedInteger('publication_year')->nullable();
+            $table->string('directory_path')->nullable();
+            $table->date('release_date')->nullable();
             $table->string('cover_image')->nullable();
             $table->string('language')->nullable();
-            $table->string('book_number')->nullable();
-            $table->string('path')->nullable();
             $table->string('source')->nullable();
-            $table->string('audio_sample_path')->nullable();
             $table->foreignId('series_id')->nullable()->constrained()->onDelete('set null');
+            $table->integer('duration')->nullable();
+            $table->string('publisher')->nullable();
+            $table->boolean('needs_review')->default(false);
+            $table->text('needs_review_reasons')->nullable();
+            $table->integer('audio_file_count')->nullable();
+            $table->json('file_tags')->nullable();
+            $table->json('audible_info')->nullable();
+            $table->json('google_books_info')->nullable();
+            $table->json('audiobook_bay_info')->nullable();
+            $table->json('hardcover_info')->nullable();
+            $table->json('mongo_record')->nullable();
             $table->timestamps();
         });
     }

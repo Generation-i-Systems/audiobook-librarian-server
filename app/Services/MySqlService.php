@@ -15,6 +15,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class MySqlService implements DocumentStoreServiceInterface
 {
@@ -28,7 +29,7 @@ class MySqlService implements DocumentStoreServiceInterface
     public function listBooks(
         string $orderBy = 'title',
         string $direction = 'asc',
-        int $limit = 20,
+        int $limit = -1,
         ?string $startAfter = null
     ): array {
         $query = Book::with(['authors', 'narrators', 'genres', 'series'])
@@ -37,8 +38,11 @@ class MySqlService implements DocumentStoreServiceInterface
         if ($startAfter) {
             $query->where('id', $direction === 'asc' ? '>' : '<', $startAfter);
         }
+        if ($limit > 0) {
+            return $query->limit($limit)->get()->toArray();
+        }
 
-        return $query->limit($limit)->get()->toArray();
+        return $query->get()->toArray();
     }
 
     public function dumpAllBooks()
@@ -122,51 +126,40 @@ class MySqlService implements DocumentStoreServiceInterface
         return Series::where('name', 'like', "%$query%")->limit($limit)->get()->toArray();
     }
 
+    public function listNarrators(): array
+    {
+        return Narrator::orderBy('name')->get()->toArray();
+    }
+
     // --- Placeholder Implementations ---
 
     public function createBook(array $data)
     {
         $book = Book::create([
             'title' => $data['title'],
-            'subtitle' => $data['subtitle'] ?? null,
-            'summary' => $data['summary'] ?? null,
-            'year' => $data['year'] ?? null,
-            'cover' => $data['cover'] ?? null,
-            'play_time' => $data['play_time'] ?? null,
+            'description' => $data['description'] ?? null,
+            'release_date' => $data['release_date'] ?? null,
+            'cover_image' => $data['cover_image'] ?? null,
+            'language' => $data['language'] ?? 'en',
+            'source' => $data['source'] ?? 'unknown',
+            'series_id' => $data['series_id'] ?? null,
+            'mongo_id' => $data['mongo_id'] ?? null,
+            // add all missing fields from Book model
+            'directory_path' => $data['directory_path'] ?? null,
+            'duration' => $data['duration'] ?? null,
+            'publisher' => $data['publisher'] ?? null,
+            'needs_review' => $data['needs_review'] ?? null,
+            'needs_review_reasons' => $data['needs_review_reasons'] ?? null,
+            'audio_file_count' => $data['audio_file_count'] ?? null,
+            'mongo_record' => $data['mongo_record'] ?? null,
+            'file_tags' => $data['file_tags'] ?? null,
+            'audible_info' => $data['audible_info'] ?? null,
+            'google_books_info' => $data['google_books_info'] ?? null,
+            'hardcover_info' => $data['hardcover_info'] ?? null,
+            'audiobook_bay_info' => $data['audiobook_bay_info'] ?? null,
         ]);
 
-        if (!empty($data['authors'])) {
-            $authorIds = [];
-            foreach ($data['authors'] as $authorName) {
-                $author = Author::firstOrCreate(['name' => $authorName]);
-                $authorIds[] = $author->id;
-            }
-            $book->authors()->sync($authorIds);
-        }
 
-        if (!empty($data['narrators'])) {
-            $narratorIds = [];
-            foreach ($data['narrators'] as $narratorName) {
-                $narrator = Narrator::firstOrCreate(['name' => $narratorName]);
-                $narratorIds[] = $narrator->id;
-            }
-            $book->narrators()->sync($narratorIds);
-        }
-
-        if (!empty($data['genres'])) {
-            $genreIds = [];
-            foreach ($data['genres'] as $genreName) {
-                $genre = Genre::firstOrCreate(['name' => $genreName]);
-                $genreIds[] = $genre->id;
-            }
-            $book->genres()->sync($genreIds);
-        }
-
-        if (!empty($data['series_name'])) {
-            $series = Series::firstOrCreate(['name' => $data['series_name']]);
-            $book->series()->associate($series);
-            $book->save();
-        }
 
         if (!empty($data['chapters'])) {
             foreach ($data['chapters'] as $chapterData) {
@@ -174,7 +167,7 @@ class MySqlService implements DocumentStoreServiceInterface
             }
         }
 
-        return $book->id;
+        return $book;
     }
 
     public function updateBook(string $id, array $data)
@@ -183,11 +176,25 @@ class MySqlService implements DocumentStoreServiceInterface
 
         $book->update([
             'title' => $data['title'] ?? $book->title,
-            'subtitle' => $data['subtitle'] ?? $book->subtitle,
-            'summary' => $data['summary'] ?? $book->summary,
-            'year' => $data['year'] ?? $book->year,
-            'cover' => $data['cover'] ?? $book->cover,
-            'play_time' => $data['play_time'] ?? $book->play_time,
+            'description' => $data['description'] ?? $book->description,
+            'language' => $data['language'] ?? $book->language,
+            'source' => $data['source'] ?? $book->source,
+            'series_id' => $data['series_id'] ?? $book->series_id,
+            'mongo_id' => $data['mongo_id'] ?? $book->mongo_id,
+            'release_date' => $data['release_date'] ?? $book->release_date,
+            'cover_image' => $data['cover_image'] ?? $book->cover_image,
+            'directory_path' => $data['directory_path'] ?? $book->directory_path,
+            'duration' => $data['duration'] ?? $book->duration,
+            'publisher' => $data['publisher'] ?? $book->publisher,
+            'needs_review' => $data['needs_review'] ?? $book->needs_review,
+            'needs_review_reasons' => $data['needs_review_reasons'] ?? $book->needs_review_reasons,
+            'audio_file_count' => $data['audio_file_count'] ?? $book->audio_file_count,
+            'mongo_record' => $data['mongo_record'] ?? $book->mongo_record,
+            'file_tags' => $data['file_tags'] ?? $book->file_tags,
+            'audible_info' => $data['audible_info'] ?? $book->audible_info,
+            'google_books_info' => $data['google_books_info'] ?? $book->google_books_info,
+            'hardcover_info' => $data['hardcover_info'] ?? $book->hardcover_info,
+            'audiobook_bay_info' => $data['audiobook_bay_info'] ?? $book->audiobook_bay_info,
         ]);
 
         if (isset($data['authors'])) {
@@ -288,8 +295,11 @@ class MySqlService implements DocumentStoreServiceInterface
     {
         return User::create([
             'name' => $data['name'],
+            'username' => $data['username'],
             'email' => $data['email'],
             'password' => $data['password'], // Hashed automatically by model cast
+            'role' => $data['role'] ?? 'user',
+            'email_verified_at' => $data['email_verified_at'] ?? null,
         ]);
     }
 
@@ -777,6 +787,18 @@ class MySqlService implements DocumentStoreServiceInterface
         }
     }
 
+
+
+    public function followExists(string $userId, string $followableType, string $followableId): bool
+    {
+        return false;
+    }
+
+    public function getQueueCollection($name)
+    {
+        return null;
+    }
+
     public function getClient()
     {
         return null; // MySQL does not have a direct "client" object like NoSQL databases
@@ -791,31 +813,23 @@ class MySqlService implements DocumentStoreServiceInterface
         return $deletedCount;
     }
 
-    public function findOrCreateMany(string $collection, array $names): array
+    public function findOrCreateMany(string $type, array $items): array
     {
-        $modelMap = [
-            'authors' => Author::class,
-            'narrators' => Narrator::class,
-            'genres' => Genre::class,
-        ];
-
-        if (!isset($modelMap[$collection])) {
-            return [];
-        }
-
-        $modelClass = $modelMap[$collection];
-        $ids = [];
-
-        foreach ($names as $name) {
-            $trimmedName = trim($name);
-            if (empty($trimmedName)) {
+        $createdIds = [];
+        foreach ($items as $item) {
+            $method = 'findOrCreate' . ucfirst($type);
+            if (is_array($item) && isset($item['name'])) {
+                $model = $this->$method(['name' => $item['name']]);
+            } else if (is_string($item)) {
+                $model = $this->$method(['name' => $item]);
+            } else {
+                // Log a warning or throw an exception if this case should not happen
+                Log::warning("Unexpected item format in findOrCreateMany: " . json_encode($item));
                 continue;
             }
-            $model = $modelClass::firstOrCreate(['name' => $trimmedName]);
-            $ids[] = $model->id;
+            $createdIds[] = $model->id;
         }
-
-        return $ids;
+        return $createdIds;
     }
 
     public function getManifestForBook(string $bookId): array
@@ -1020,16 +1034,7 @@ class MySqlService implements DocumentStoreServiceInterface
 
     public function createGenre(array $data)
     {
-        try {
-            $genre = Genre::create([
-                'name' => $data['name'],
-                'description' => $data['description'] ?? null,
-            ]);
-            return $genre ? true : false;
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('MySqlService createGenre failed: ' . $e->getMessage());
-            return false;
-        }
+        return Genre::create($data);
     }
 
     public function createMessage(array $messageData): ?string
@@ -1050,29 +1055,19 @@ class MySqlService implements DocumentStoreServiceInterface
 
     public function createNarrator(array $data)
     {
-        try {
-            $narrator = Narrator::create([
-                'name' => $data['name'],
-                'description' => $data['description'] ?? null,
-            ]);
-            return $narrator ? true : false;
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('MySqlService createNarrator failed: ' . $e->getMessage());
-            return false;
-        }
+        return Narrator::create($data);
     }
 
-    public function createSeries(array $data)
+    public function createSeries(string $name)
     {
         try {
             $series = Series::create([
-                'name' => $data['name'],
-                'description' => $data['description'] ?? null,
+                'name' => $name,
             ]);
-            return $series ? true : false;
+            return $series->id;
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('MySqlService createSeries failed: ' . $e->getMessage());
-            return false;
+            return null;
         }
     }
 
@@ -1185,18 +1180,16 @@ class MySqlService implements DocumentStoreServiceInterface
         }
     }
 
-    public function deleteAuthor(string $authorId): bool
+    public function deleteAuthor(string $authorId): void
     {
         try {
             $author = Author::where('id', $authorId)->first();
             if (!$author) {
-                return false;
+                return;
             }
             $author->delete();
-            return true;
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('MySqlService deleteAuthor failed: ' . $e->getMessage());
-            return false;
         }
     }
 

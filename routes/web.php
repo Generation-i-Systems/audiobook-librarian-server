@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin;
+use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\AdminNotificationController;
 use App\Http\Controllers\BookController;
 use App\Http\Controllers\FollowController;
@@ -13,7 +14,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Session;
 
-// --- DEBUG AUTH/SESSION ROUTES (local only) ---
+// --- DEBUG ROUTES (local only) ---
 if (app()->environment('local')) {
     // Move all /debug/ routes to DebugController
     Route::get('/debug/middleware', [Admin\DebugController::class, 'debugMiddleware']);
@@ -28,6 +29,16 @@ if (app()->environment('local')) {
     // Dump all Firestore users/books via DebugController
     Route::get('/debug/firestore-users-dump', [Admin\DebugController::class, 'firestoreUsersDump']);
     Route::get('/debug/firestore-books-dump', [Admin\DebugController::class, 'firestoreBooksDump']);
+
+    // Debug database relationships
+    Route::get('/debug/relationships', function () {
+        return [
+            'author_book' => DB::table('author_book')->get(),
+            'book_narrator' => DB::table('book_narrator')->get(),
+            'book_genre' => DB::table('book_genre')->get(),
+            'books' => \App\Models\Book::with(['authors', 'narrators', 'genres'])->limit(5)->get(),
+        ];
+    });
 }
 
 Route::get('/', function () {

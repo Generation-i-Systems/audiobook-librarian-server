@@ -413,7 +413,7 @@ class BookApiController extends Controller
      */
     public function authorsByGenreSimple($genreId, Request $request)
     {
-        $documentSt ore = $this->documentStoreService;
+        $documentStore = $this->documentStoreService;
         $genre = $documentStore->getGenre($genreId);
         if (!$genre) {
             return response()->json(['error' => 'Genre not found'], 404);
@@ -540,7 +540,7 @@ class BookApiController extends Controller
             ], 404);
         }
         // Sort books by series name, series number, and title
-        usort($books, fn($a, $b) => {
+        usort($books, function($a, $b) {
             $seriesA = $a['series']['name'] ?? '';
             $seriesB = $b['series']['name'] ?? '';
             if ($seriesA !== $seriesB) {

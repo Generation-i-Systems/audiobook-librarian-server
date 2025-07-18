@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use Google\Cloud\Firestore\Timestamp as FirestoreTimestamp;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
@@ -10,8 +10,6 @@ use Illuminate\Support\Str;
 
 class AdminUserSeeder extends Seeder
 {
-
-
     /**
      * Run the database seeds.
      */
@@ -37,28 +35,18 @@ class AdminUserSeeder extends Seeder
 
         if ($validator->fails()) {
             $this->command->error('Validation failed: ' . $validator->errors()->first());
-
             return;
         }
 
-        $firestore = app(\App\Contracts\DocumentStoreServiceInterface::class);
-
-        // Generate a unique ID for the user
-        $userId = (string) Str::uuid();
-
-        $userData = [
-            'id' => $userId,
+        // Create the admin user in MySQL
+        $user = User::create([
             'name' => $name,
             'username' => $username,
             'email' => $email,
             'password' => Hash::make($password),
+            'email_verified_at' => now(),
             'role' => 'admin',
-            // 'created_at' => new FirestoreTimestamp(new \DateTime()),
-            // 'updated_at' => new FirestoreTimestamp(new \DateTime()),
-        ];
-
-        // Add the user to Firestore
-        $firestore->getClient()->collection('users')->document($userId)->set($userData);
+        ]);
 
         $this->command->info('Admin user created successfully!');
     }

@@ -1,0 +1,10 @@
+prompts
+
+
+round 'duration' to be a whole number
+
+use camelCase for 'file_tags' , 'needs_review', 'cover_image', 'directory_path', 'published_year', 'created_at', 'updated_at' in the json from books:parse and in all firestore fileds 
+make any other firestore or books:parse fields camelCase
+make any other changes needed to the json from books:parse to be compatible with the firestore schema 
+
+build a command that updates all firestore book collection records from snake_case to camelCase

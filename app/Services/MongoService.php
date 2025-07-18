@@ -474,9 +474,20 @@ class MongoService implements DocumentStoreServiceInterface
     }
 
     /** @inheritDoc */
+
+
+
+
     public function listGenres()
     {
-        return config('genres');
+        $cursor = $this->getCollection('genres')->find();
+        $genres = [];
+        foreach ($cursor as $doc) {
+            if (isset($doc['name'])) {
+                $genres[] = $doc['name'];
+            }
+        }
+        return array_unique($genres);
     }
 
     public function updateGenre(string $id, array $data): bool
@@ -638,15 +649,38 @@ class MongoService implements DocumentStoreServiceInterface
     /** @inheritDoc */
     public function listAuthors()
     {
-        $cursor = $this->getCollection('authors')->find();
-        $names = [];
-        foreach ($cursor as $doc) {
+        $pipeline = [
+            ['$unwind' => '$author'],
+            ['$group' => ['_id' => '$author']],
+            ['$project' => ['_id' => 0, 'name' => '$_id']],
+        ];
+        $results = $this->getCollection('books')->aggregate($pipeline);
+        $authors = [];
+        foreach ($results as $doc) {
             if (isset($doc['name'])) {
-                $names[] = $doc['name'];
+                $authors[] = ['name' => $doc['name']];
             }
         }
-        return array_unique($names);
+        return $authors;
     }
+
+    public function listNarrators(): array
+    {
+        $pipeline = [
+            ['$unwind' => '$narrator'],
+            ['$group' => ['_id' => '$narrator']],
+            ['$project' => ['_id' => 0, 'name' => '$_id']],
+        ];
+        $results = $this->getCollection('books')->aggregate($pipeline);
+        $narrators = [];
+        foreach ($results as $doc) {
+            if (isset($doc['name'])) {
+                $narrators[] = ['name' => $doc['name']];
+            }
+        }
+        return $narrators;
+    }
+
     /** @inheritDoc */
     public function deleteAuthor(string $id): void
     {

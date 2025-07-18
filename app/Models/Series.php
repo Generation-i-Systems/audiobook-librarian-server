@@ -11,8 +11,10 @@ class Series extends Model
 
     protected $fillable = ['name'];
 
-    public function books()
+    public function books(): BelongsToMany
     {
-        return $this->hasMany(Book::class);
+        return $this->belongsToMany(Book::class, 'book_series')
+            ->withPivot('series_number')
+            ->withTimestamps();
     }
 }

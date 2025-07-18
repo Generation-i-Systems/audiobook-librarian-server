@@ -1,5 +1,29 @@
 # Audiobook Librarian
 
+## MongoDB to MySQL Migration
+
+### Features
+- Comprehensive data migration from MongoDB to MySQL
+- Support for all book metadata including series relationships
+- Preservation of file paths and directory structures
+- Handling of complex relationships (authors, narrators, genres, series)
+- Data integrity checks and validation
+
+### Migration Command
+Run the migration with:
+```bash
+php artisan app:migrate-mongo-to-mysql
+```
+
+### Data Structure
+- **Books**: Full book metadata including title, description, publication year, etc.
+- **Series**: Book series information with proper relationships
+- **Pivot Tables**:
+  - `book_series`: Maps books to series with `series_number` for ordering
+  - `author_book`: Maps books to authors
+  - `book_narrator`: Maps books to narrators
+  - `book_genre`: Maps books to genres
+
 ## MongoDB Atlas Search Series Autocomplete
 
 ### API Endpoints

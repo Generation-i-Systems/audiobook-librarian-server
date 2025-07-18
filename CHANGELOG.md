@@ -1,5 +1,9 @@
 ## [Unreleased]
 ### Added
+- MongoDB to MySQL migration for series data with pivot table support
+  - Added `series_number` field to `book_series` pivot table
+  - Updated `Book` and `Series` models to use `BelongsToMany` relationship
+  - Enhanced `MigrateMongoToMysql` command to handle series relationships
 - MongoDB Atlas Search autocomplete integration for series (fuzzy, prefix, $search aggregation)
 - New API endpoint: `/api/v1/series/autocomplete` via `BookApiController@autocompleteSeries`
 - Service method: `MongoService::autocompleteSeries`
