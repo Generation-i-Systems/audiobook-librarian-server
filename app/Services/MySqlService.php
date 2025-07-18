@@ -351,6 +351,24 @@ class MySqlService implements DocumentStoreServiceInterface
         return User::where('username', $username)->exists();
     }
 
+    public function validateUserCredentials($user, array $credentials): bool
+    {
+        if (!isset($credentials['password'])) {
+            return false;
+        }
+
+        // If $user is an array (from getUserByCredentials), convert it to a model
+        if (is_array($user)) {
+            $user = User::find($user['id'] ?? null);
+            if (!$user) {
+                return false;
+            }
+        }
+
+        // Check if the provided password matches the hashed password in the database
+        return Hash::check($credentials['password'], $user->password);
+    }
+
     /**
      * Get a user by their username
      *
@@ -376,8 +394,16 @@ class MySqlService implements DocumentStoreServiceInterface
     public function isAdmin(string $userId): bool
     {
         $user = User::find($userId);
-
         return $user && $user->role === 'admin';
+    }
+
+    public function updateRememberToken(string $identifier, string $token): void
+    {
+        $user = User::find($identifier);
+        if ($user) {
+            $user->setRememberToken($token);
+            $user->save();
+        }
     }
 
     public function getJob(string $jobId): ?array

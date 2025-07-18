@@ -42,6 +42,15 @@ interface DocumentStoreServiceInterface
     public function getUserByRememberToken($identifier, $token);
 
     /**
+     * Validate a user's credentials.
+     *
+     * @param mixed $user The user object
+     * @param array $credentials The credentials to validate
+     * @return bool
+     */
+    public function validateUserCredentials($user, array $credentials): bool;
+
+    /**
      * Get a user by their username
      *
      * @param string $username The username to search for
@@ -82,6 +91,15 @@ interface DocumentStoreServiceInterface
     public function isAdmin(string $userId): bool;
 
     public function getUsersForMessaging(): array;
+
+    /**
+     * Update the "remember me" token for the given user.
+     *
+     * @param string $identifier The user's identifier
+     * @param string $token The new remember token
+     * @return void
+     */
+    public function updateRememberToken(string $identifier, string $token): void;
 
     /**
      * Get all users in the system

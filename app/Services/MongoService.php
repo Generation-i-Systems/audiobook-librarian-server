@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Contracts\DocumentStoreServiceInterface;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
@@ -1363,8 +1364,45 @@ class MongoService implements DocumentStoreServiceInterface
     public function isAdmin(string $userId): bool
     {
         $user = $this->getUserById($userId);
+        return $user && ($user['is_admin'] ?? false);
+    }
 
-        return !empty($user) && isset($user['role']) && $user['role'] === 'admin';
+    public function validateUserCredentials($user, array $credentials): bool
+    {
+        if (!isset($credentials['password'])) {
+            return false;
+        }
+
+        // Handle DocumentstoreUser object
+        if ($user instanceof \App\Auth\DocumentstoreUser) {
+            $password = $user->getAuthPassword();
+            return $password && Hash::check($credentials['password'], $password);
+        }
+
+        // If $user is an array (from getUserByCredentials), get the user by ID
+        if (is_array($user)) {
+            // If we have an _id, try to get the full user record
+            if (isset($user['_id'])) {
+                $user = $this->getUserById($user['_id']);
+                if (!$user) {
+                    return false;
+                }
+            }
+            // Check the password directly from the array
+            if (isset($user['password'])) {
+                return Hash::check($credentials['password'], $user['password']);
+            }
+        }
+
+        return false;
+    }
+
+    public function updateRememberToken(string $identifier, string $token): void
+    {
+        $this->getCollection('users')->updateOne(
+            ['_id' => $identifier],
+            ['$set' => ['remember_token' => $token]]
+        );
     }
 
     /**

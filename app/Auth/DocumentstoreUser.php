@@ -8,9 +8,19 @@ class DocumentstoreUser implements Authenticatable
 {
     protected $user;
 
-    public function __construct(array $user)
+    /**
+     * @param array|\App\Models\User $user User data as array or Eloquent User model
+     */
+    public function __construct($user)
     {
-        $this->user = $user;
+        if (is_array($user)) {
+            $this->user = $user;
+        } elseif (is_object($user) && method_exists($user, 'toArray')) {
+            // Handle Eloquent model
+            $this->user = $user->toArray();
+        } else {
+            throw new \InvalidArgumentException('User must be an array or an Eloquent model');
+        }
     }
 
     public function getAuthIdentifierName()
@@ -20,7 +30,7 @@ class DocumentstoreUser implements Authenticatable
 
     public function getAuthIdentifier()
     {
-        return $this->user['id'] ?? null;
+        return $this->user['id'] ?? $this->user['_id'] ?? null;
     }
 
     public function getAuthPassword()
