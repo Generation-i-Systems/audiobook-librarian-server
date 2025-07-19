@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Traits\CamelCaseAttributeAccess;
 
 class Chapter extends Model
 {
-    use HasFactory;
+    use HasFactory, CamelCaseAttributeAccess;
 
     protected $fillable = [
         'book_id',

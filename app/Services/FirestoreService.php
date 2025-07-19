@@ -275,7 +275,7 @@ class FirestoreService implements DocumentStoreServiceInterface
     {
         try {
             if (!$this->db) {
-                \Log::error('Firestore DB connection not initialized');
+                Log::error('Firestore DB connection not initialized');
                 return null;
             }
 
@@ -289,17 +289,17 @@ class FirestoreService implements DocumentStoreServiceInterface
             $data['created_at'] = $now;
             $data['updated_at'] = $now;
 
-            \Log::debug('Creating user in Firestore', $data);
+            Log::debug('Creating user in Firestore', $data);
             
             $docRef = $this->db->collection('users')->newDocument();
             $docRef->set($data);
             $userId = $docRef->id();
             
-            \Log::debug('User created successfully', ['user_id' => $userId]);
+            Log::debug('User created successfully', ['user_id' => $userId]);
             
             return $userId;
         } catch (\Exception $e) {
-            \Log::error('Error creating user: ' . $e->getMessage(), [
+            Log::error('Error creating user: ' . $e->getMessage(), [
                 'exception' => get_class($e),
                 'trace' => $e->getTraceAsString()
             ]);
@@ -327,7 +327,7 @@ class FirestoreService implements DocumentStoreServiceInterface
 
             return true;
         } catch (\Exception $e) {
-            \Log::error('Error updating user: ' . $e->getMessage());
+            Log::error('Error updating user: ' . $e->getMessage());
             return false;
         }
     }

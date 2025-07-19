@@ -22,7 +22,40 @@ interface DocumentStoreServiceInterface
     // BOOKS
     public function getBook(string $id);
 
-    public function listBooks();
+    /**
+     * List books with pagination and optional filtering
+     *
+     * @param int $page Page number (1-based)
+     * @param int $perPage Number of items per page
+     * @param array $filters Optional filters (e.g., ['author' => 'John Doe', 'genre' => 'Fiction'])
+     * @param bool $withRelated Whether to load related data (authors, series)
+     * @return array [
+     *     'data' => array,  // The paginated list of books
+     *     'total' => int,   // Total number of books matching filters
+     *     'per_page' => int,// Number of items per page
+     *     'current_page' => int, // Current page number
+     *     'last_page' => int,    // Last available page number
+     * ]
+     */
+    public function listBooks(int $page = 1, int $perPage = 24, array $filters = [], bool $withRelated = true);
+
+    /**
+     * Get recently added books
+     *
+     * @param int $limit Maximum number of recent books to return
+     * @param int $days Number of days to look back for recent books
+     * @return array Array of recent books with related data
+     */
+    public function getRecentBooks(int $limit = 10, int $days = 30);
+    
+    /**
+     * Get unique values for a specific field across all books
+     * 
+     * @param string $field The field to get unique values for (e.g., 'genre', 'author')
+     * @param string $subField Optional subfield for nested data (e.g., 'seriesName' when field is 'series')
+     * @return array Array of unique values
+     */
+    public function getUniqueValues(string $field, string $subField = null): array;
 
     public function createBook(array $data);
 
@@ -40,7 +73,7 @@ interface DocumentStoreServiceInterface
     public function getUserByCredentials($credentials);
 
     public function getUserByRememberToken($identifier, $token);
-
+    
     /**
      * Validate a user's credentials.
      *

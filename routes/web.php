@@ -16,6 +16,99 @@ use Illuminate\Support\Facades\Session;
 
 // --- DEBUG ROUTES (local only) ---
 if (app()->environment('local')) {
+    // Reset test user password to a known value
+    Route::get('/reset-test-password', function () {
+        $user = \App\Models\User::where('email', 'eric@thelin.org')->first();
+
+        if (!$user) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Test user not found',
+            ], 404);
+        }
+
+        $newPassword = 'password123';
+        $user->password = \Illuminate\Support\Facades\Hash::make($newPassword);
+        $user->save();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Test user password has been reset',
+            'email' => $user->email,
+            'new_password' => $newPassword,
+        ]);
+    });
+
+    // Test authentication with MySQL
+    Route::get('/test-auth', function () {
+        // Test authentication with the test user
+        $user = \App\Models\User::where('email', 'eric@thelin.org')->first();
+
+        if (!$user) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Test user not found',
+            ], 404);
+        }
+
+        $password = 'password123'; // This should match the password set in /reset-test-password
+        $credentials = [
+            'email' => 'eric@thelin.org',
+            'password' => $password,
+        ];
+
+        // Direct password check for debugging
+        $directPasswordCheck = $user->password && \Illuminate\Support\Facades\Hash::check($password, $user->password);
+
+        // Debug information
+        $debugInfo = [
+            'user_found' => true,
+            'user_id' => $user->id,
+            'user_email' => $user->email,
+            'password_provided' => $password,
+            'password_hash_in_db' => $user->password,
+            'direct_password_check' => $directPasswordCheck,
+            'auth_driver' => config('auth.defaults.guard'),
+            'auth_provider' => config('auth.guards.web.provider'),
+            'user_provider' => config('auth.providers.users.driver'),
+            'auth_guards' => config('auth.guards'),
+            'auth_providers' => config('auth.providers'),
+            'user_model' => get_class($user),
+            'user_attributes' => $user->toArray(),
+        ];
+
+        if (Auth::attempt($credentials)) {
+            $user = Auth::user();
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Authentication successful',
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'role' => $user->role,
+                ],
+                'session' => session()->all(),
+                'debug' => $debugInfo,
+            ]);
+        } else {
+            // Add more detailed error information
+            $errorInfo = [
+                'auth_check' => Auth::check(),
+                'auth_user' => Auth::user() ? Auth::user()->only(['id', 'name', 'email']) : null,
+                'session_data' => session()->all(),
+                'debug' => $debugInfo,
+            ];
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Authentication failed',
+                'error' => 'Invalid credentials',
+                'details' => $errorInfo,
+            ], 401);
+        }
+    });
+
     // Move all /debug/ routes to DebugController
     Route::get('/debug/middleware', [Admin\DebugController::class, 'debugMiddleware']);
     Route::get('/debug/auth', [Admin\DebugController::class, 'auth']);
@@ -94,9 +187,7 @@ Route::middleware(['auth'])->group(function () {
 
 Route::post('/messages', [MessageController::class, 'store'])->name('messages.store');
 
-// Regular book routes
-Route::get('/books', [BookController::class, 'index'])->name('books.index');
-Route::get('/books/{id?}', [BookController::class, 'show'])->name('books.show');
+// Regular book routes (handled by the auth middleware group above)
 
 // JSON API endpoints for AJAX requests
 Route::get('/api/books/json', [BookController::class, 'jsonIndex'])->name('api.books.json');

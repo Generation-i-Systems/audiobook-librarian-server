@@ -31,15 +31,13 @@ class MigrateMongoToMysql extends Command
      */
     protected $description = 'Migrate data from MongoDB to MySQL';
 
-    protected DocumentStoreServiceInterface $mongoService;
     protected MySqlService $mysqlService;
     protected $processedBooks = 0;
     protected $bookLimit = 0;
 
-    public function __construct(DocumentStoreServiceInterface $mongoService, MySqlService $mysqlService)
+    public function __construct(MySqlService $mysqlService)
     {
         parent::__construct();
-        $this->mongoService = $mongoService;
         $this->mysqlService = $mysqlService;
     }
 
@@ -48,13 +46,20 @@ class MigrateMongoToMysql extends Command
      */
     public function handle()
     {
+        // Explicitly resolve MongoService here to ensure we always use it for MongoDB operations
+        $this->mongoService = app(\App\Services\MongoService::class);
+
         $this->info('Starting data migration from MongoDB to MySQL...');
 
+        Log::debug("MigrateMongoToMysql: Before truncateTables()");
         $this->truncateTables();
+        Log::debug("MigrateMongoToMysql: After truncateTables()");
 
         try {
             $this->info("Migrating users...");
+            Log::debug("MigrateMongoToMysql: Before getAllUsers()");
             $mongoUsers = $this->mongoService->getAllUsers();
+            Log::debug("MigrateMongoToMysql: After getAllUsers(), found " . count($mongoUsers) . " users.");
             $userProgressBar = $this->output->createProgressBar(count($mongoUsers));
             $userProgressBar->start();
 
@@ -93,8 +98,11 @@ class MigrateMongoToMysql extends Command
             $userProgressBar->finish();
             $this->info("Successfully migrated " . count($mongoUsers) . " users.");
 
-            $mongoBooks = $this->mongoService->dumpAllBooks();
-            $totalBooks = count($mongoBooks);
+            Log::debug("MigrateMongoToMysql: Before dumpAllBooks()");
+            $mongoBooksResult = $this->mongoService->dumpAllBooks();
+            $mongoBooks = $mongoBooksResult['data'];
+            $totalBooks = $mongoBooksResult['total'];
+            Log::debug("MigrateMongoToMysql: After dumpAllBooks(), found " . count($mongoBooks) . " books.");
             $this->bookLimit = (int) $this->option('limit');
 
             if ($this->bookLimit > 0 && $this->bookLimit < $totalBooks) {
@@ -218,6 +226,26 @@ class MigrateMongoToMysql extends Command
 
     private function createOrUpdateBook($mongoBook, MySqlService $mysqlService, array $mysqlAuthorsMap, array $mysqlNarratorsMap, array $mysqlGenresMap)
     {
+        // Helper function to normalize names
+        $normalizeName = function ($name) {
+            if (!is_string($name)) {
+                return null;
+            }
+
+            // Convert to UTF-8 if not already
+            $name = mb_convert_encoding($name, 'UTF-8', 'UTF-8');
+
+            // Remove BOM if present
+            $bom = pack('H*', 'EFBBBF');
+            $name = preg_replace("/^$bom/", '', $name);
+
+            // Normalize line endings and whitespace
+            $name = preg_replace('/\s+/', ' ', trim($name));
+
+            // Convert to lowercase for case-insensitive comparison
+            return mb_strtolower($name, 'UTF-8');
+        };
+
         // Process authors
         $authors = [];
         $authorData = $mongoBook['author'] ?? null;
@@ -225,37 +253,62 @@ class MigrateMongoToMysql extends Command
 
         if (is_array($authorData)) {
             // Handle case where author is an array of names or objects
-            $authorNames = $authorData;
+            foreach ($authorData as $authorItem) {
+                $name = is_array($authorItem) ? ($authorItem['name'] ?? $authorItem['author']['name'] ?? null) : $authorItem;
+                if ($name && $normalizedName = $normalizeName($name)) {
+                    $authorNames[] = $normalizedName;
+                }
+            }
         } elseif (is_string($authorData)) {
             // Handle case where author is a single string
-            $authorNames = [$authorData];
+            if ($normalizedName = $normalizeName($authorData)) {
+                $authorNames[] = $normalizedName;
+            }
         } elseif (isset($mongoBook['authors']) && is_array($mongoBook['authors'])) {
             // Fallback to 'authors' field if 'author' is not set
-            $authorNames = $mongoBook['authors'];
+            foreach ($mongoBook['authors'] as $authorItem) {
+                $name = is_array($authorItem) ? ($authorItem['name'] ?? $authorItem['author']['name'] ?? null) : $authorItem;
+                if ($name && $normalizedName = $normalizeName($name)) {
+                    $authorNames[] = $normalizedName;
+                }
+            }
         }
 
-        // Log author data for debugging
-        $this->info('Author data: ' . json_encode([
-            'authorData' => $authorData,
-            'authorNames' => $authorNames,
-            'authorsField' => $mongoBook['authors'] ?? null,
-            'mysqlAuthorsMap' => array_slice($mysqlAuthorsMap, 0, 5, true) // First 5 entries for debugging
-        ]));
+        // Remove duplicates while preserving original case in the map
+        $uniqueAuthors = [];
+        foreach (array_unique($authorNames) as $name) {
+            if (empty($name)) continue;
+            $uniqueAuthors[$name] = $name; // Use normalized name as key, original as value
+        }
 
-        foreach ($authorNames as $author) {
-            $name = is_array($author) ? ($author['name'] ?? $author['author']['name'] ?? null) : $author;
-            if ($name) {
-                // Try to find the author in the map, if not found, create a new one
-                if (isset($mysqlAuthorsMap[$name])) {
-                    $authors[] = $mysqlAuthorsMap[$name];
-                } else {
-                    $this->warn("Author not found in map: " . $name);
-                    // Create the author if it doesn't exist
-                    $authorModel = Author::firstOrCreate(['name' => $name]);
-                    $authors[] = $authorModel->id;
-                    // Update the map for future references
-                    $mysqlAuthorsMap[$name] = $authorModel->id;
+        foreach ($uniqueAuthors as $normalizedName) {
+            $authorId = null;
+            $found = false;
+
+            // Try to find in the current map first (case-insensitive)
+            foreach ($mysqlAuthorsMap as $storedName => $id) {
+                if ($normalizeName($storedName) === $normalizedName) {
+                    $authorId = $id;
+                    $found = true;
+                    break;
                 }
+            }
+
+            if ($found) {
+                $authors[] = $authorId;
+            } else {
+                // Try to find existing author in DB with case-insensitive search
+                $authorModel = Author::whereRaw('LOWER(name) = ?', [$normalizedName])->first();
+
+                if (!$authorModel) {
+                    // Create new author if not found
+                    $authorModel = Author::create(['name' => $normalizedName]); // Store normalized name
+                    $this->info("Created author: " . $normalizedName);
+                }
+
+                $authors[] = $authorModel->id;
+                // Update the map with the actual name from the DB and its ID
+                $mysqlAuthorsMap[$authorModel->name] = $authorModel->id;
             }
         }
 
@@ -264,15 +317,18 @@ class MigrateMongoToMysql extends Command
         $narratorData = $mongoBook['narrator'] ?? $mongoBook['narrators'] ?? null;
         $narratorNames = [];
 
+        Log::debug("Narrator data from MongoDB: " . json_encode($narratorData));
+
         // Helper function to normalize names
-        $normalizeName = function($name) {
-            if (!is_string($name)) return null;
+        $normalizeName = function ($name) {
+            if (!is_string($name))
+                return null;
 
             // Normalize to UTF-8
             $name = mb_convert_encoding($name, 'UTF-8', 'UTF-8');
 
             // Remove BOM if present
-            $bom = pack('H*','EFBBBF');
+            $bom = pack('H*', 'EFBBBF');
             $name = preg_replace("/^$bom/", '', $name);
 
             // Normalize line endings and whitespace
@@ -317,10 +373,13 @@ class MigrateMongoToMysql extends Command
             }
         }
 
+        Log::debug("Extracted narrator names (before unique): " . json_encode($narratorNames));
+
         // Remove duplicates while preserving original case in the map
         $uniqueNarrators = [];
         foreach (array_unique($narratorNames) as $name) {
-            if (empty($name)) continue;
+            if (empty($name))
+                continue;
 
             $lowerName = mb_strtolower($name, 'UTF-8');
             if (!isset($uniqueNarrators[$lowerName])) {
@@ -328,8 +387,11 @@ class MigrateMongoToMysql extends Command
             }
         }
 
+        Log::debug("Unique narrators (normalized => original): " . json_encode($uniqueNarrators));
+
         // Process each unique narrator
         foreach ($uniqueNarrators as $normalized => $originalName) {
+            Log::debug("Processing unique narrator: {$originalName} (Normalized: {$normalized})");
             // Check if we already have this narrator in our map (case-insensitive)
             $found = false;
             $narratorId = null;
@@ -338,6 +400,7 @@ class MigrateMongoToMysql extends Command
                 if (mb_strtolower($storedName, 'UTF-8') === $normalized) {
                     $found = true;
                     $narratorId = $id;
+                    Log::debug("  -> Found in MySQL map: {$storedName} (ID: {$id})");
                     break;
                 }
             }
@@ -353,12 +416,16 @@ class MigrateMongoToMysql extends Command
                         // Create new narrator if not found
                         $narratorModel = Narrator::create(['name' => $originalName]);
                         $this->info("Created narrator: " . $originalName);
+                        Log::debug("  -> Created new narrator: {$originalName} (ID: {$narratorModel->id})");
+                    } else {
+                        Log::debug("  -> Found existing narrator in DB (case-insensitive): {$narratorModel->name} (ID: {$narratorModel->id})");
                     }
 
                     $narrators[] = $narratorModel->id;
                     $mysqlNarratorsMap[$originalName] = $narratorModel->id;
                 } catch (\Exception $e) {
                     $this->error("Error processing narrator '$originalName': " . $e->getMessage());
+                    Log::error("Error processing narrator '$originalName': " . $e->getMessage() . "\n" . $e->getTraceAsString());
                 }
             }
         }
@@ -464,7 +531,7 @@ class MigrateMongoToMysql extends Command
         $bookData = [
             // Basic fields
             'mongo_id' => $mongoId,
-            'title' => $mongoBook['title'] ?? 'Untitled',
+            'title' => !empty($mongoBook['title']) ? $mongoBook['title'] : 'Untitled',
             'description' => $mongoBook['description'] ?? $mongoBook['summary'] ?? null,
             'release_date' => $mongoBook['release_date'] ?? $mongoBook['publication_year'] ?? $mongoBook['year'] ?? null,
             'cover_image' => $mongoBook['cover_image'] ?? $mongoBook['coverImage'] ?? null,
@@ -635,7 +702,17 @@ class MigrateMongoToMysql extends Command
                 $this->warn("Author count mismatch!");
 
                 // Extract names safely
-                $mongoAuthorNames = is_iterable($mongoAuthors) ? $mongoAuthors : [];
+                $mongoAuthorNames = [];
+                if (is_iterable($mongoAuthors)) {
+                    foreach ($mongoAuthors as $author) {
+                        $name = is_array($author)
+                            ? ($author['name'] ?? null)
+                            : (is_object($author) ? ($author->name ?? null) : $author);
+                        if ($name) {
+                            $mongoAuthorNames[] = $name;
+                        }
+                    }
+                }
                 $mysqlAuthorNames = [];
 
                 // For MySQL, extract names from the author objects/arrays
@@ -655,11 +732,15 @@ class MigrateMongoToMysql extends Command
 
                 if (!empty($missingAuthors)) {
                     $this->info("Missing Authors in MySQL:");
-                    foreach ($missingAuthors as $author) {
-                        $this->info(
-                            "  - " . $author . " (Hex: " .
-                            (is_string($author) ? bin2hex($author) : 'N/A') . ")"
-                        );
+                    if (count($missingAuthors) <= 20) {
+                        foreach ($missingAuthors as $author) {
+                            $this->info(
+                                "  - " . $author . " (Hex: " .
+                                (is_string($author) ? bin2hex($author) : 'N/A') . ")"
+                            );
+                        }
+                    } else {
+                        $this->info("  (Too many missing authors to list: " . count($missingAuthors) . ")");
                     }
                 }
 
@@ -667,8 +748,12 @@ class MigrateMongoToMysql extends Command
                 $extraAuthors = array_diff($mysqlAuthorNames, $mongoAuthorNames);
                 if (!empty($extraAuthors)) {
                     $this->info("Extra Authors in MySQL (not in MongoDB):");
-                    foreach ($extraAuthors as $author) {
-                        $this->info("  + " . $author);
+                    if (count($extraAuthors) <= 20) {
+                        foreach ($extraAuthors as $author) {
+                            $this->info("  + " . $author);
+                        }
+                    } else {
+                        $this->info("  (Too many extra authors to list: " . count($extraAuthors) . ")");
                     }
                 }
             } else {
@@ -723,11 +808,15 @@ class MigrateMongoToMysql extends Command
 
                 if (!empty($missingNarrators)) {
                     $this->info("Missing Narrators in MySQL:");
-                    foreach ($missingNarrators as $narrator) {
-                        $this->info(
-                            "  - " . $narrator . " (Hex: " .
-                            (is_string($narrator) ? bin2hex($narrator) : 'N/A') . ")"
-                        );
+                    if (count($missingNarrators) <= 20) {
+                        foreach ($missingNarrators as $narrator) {
+                            $this->info(
+                                "  - " . $narrator . " (Hex: " .
+                                (is_string($narrator) ? bin2hex($narrator) : 'N/A') . ")"
+                            );
+                        }
+                    } else {
+                        $this->info("  (Too many missing narrators to list: " . count($missingNarrators) . ")");
                     }
                 }
 
@@ -735,8 +824,12 @@ class MigrateMongoToMysql extends Command
                 $extraNarrators = array_diff($mysqlNarratorNames, $mongoNarratorNames);
                 if (!empty($extraNarrators)) {
                     $this->info("Extra Narrators in MySQL (not in MongoDB):");
-                    foreach ($extraNarrators as $narrator) {
-                        $this->info("  + " . $narrator);
+                    if (count($extraNarrators) <= 20) {
+                        foreach ($extraNarrators as $narrator) {
+                            $this->info("  + " . $narrator);
+                        }
+                    } else {
+                        $this->info("  (Too many extra narrators to list: " . count($extraNarrators) . ")");
                     }
                 }
             } else {

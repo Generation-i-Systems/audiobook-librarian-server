@@ -10,48 +10,28 @@
         <div class="row">
             <div class="col-md-4">
                 @php
-                    $cover = isset($book['coverImage']) && $book['coverImage'] ? route('cover.proxy', ['path' => $book['coverImage']]) : url('images/placeholder.png');
+                    $cover = isset($book['coverImage']) && $book['coverImage'] ? url($book['coverImage']) : url('images/placeholder.png');
                 @endphp
                 <img src="{{ $cover }}" alt="{{ $book['title'] }}" class="img-fluid">
             </div>
             <div class="col-md-8">
                 <p><strong>Author:</strong>
-                    @if(isset($book['author']) && is_array($book['author']) && !empty($book['author']))
-                        {{ implode(', ', $book['author']) }}
+                    @if(isset($book['authors']) && is_array($book['authors']) && !empty($book['authors']))
+                        {{ implode(', ', $book['authors']) }}
                     @else
                         Unknown
                     @endif
                 </p>
-                @php
-                    $hasSeries = false;
-                    if (isset($book['series']) && !empty($book['series'])) {
-                        $hasSeries = true;
-                    }
-                @endphp
-                @if($hasSeries)
+                @if(!empty($book['series']))
                     <p><strong>Series:</strong>
-                        @php
-                            $seriesStr = '';
-                            if (is_array($book['series']) && isset($book['series'][0]['seriesName'])) {
-                                $parts = [];
-                                foreach ($book['series'] as $seriesEntry) {
-                                    $name = $seriesEntry['seriesName'] ?? '';
-                                    $number = $seriesEntry['number'] ?? '';
-                                    if ($name !== '') {
-                                        $parts[] = $name . ($number !== '' ? ' (Book ' . $number . ')' : '');
-                                    }
-                                }
-                                $seriesStr = implode(', ', $parts);
-                            } else {
-                                $seriesStr = (string) $book['series'];
-                            }
-                        @endphp
-                        {{ $seriesStr }}@if(isset($book['series_number'])) (Book {{ $book['series_number'] }})@endif
+                        @foreach($book['series'] as $series)
+                            {{ $series['seriesName'] }}@if(isset($series['number'])) (Book {{ $series['number'] }})@endif
+                        @endforeach
                     </p>
                 @endif
                 <p><strong>Genre:</strong>
-                    @if(isset($book['genre']) && is_array($book['genre']) && !empty($book['genre']))
-                        {{ implode(', ', $book['genre']) }}
+                    @if(isset($book['genres']) && is_array($book['genres']) && !empty($book['genres']))
+                        {{ implode(', ', $book['genres']) }}
                     @else
                         Unknown
                     @endif
@@ -77,7 +57,7 @@
                                 <div class="card h-100">
                                     @php
                                         $relatedCover = isset($relatedBook['coverImage']) && $relatedBook['coverImage'] ?
-                                            route('cover.proxy', ['path' => $relatedBook['coverImage']]) :
+                                            url($relatedBook['coverImage']) :
                                             url('images/placeholder.png');
                                     @endphp
                                     <img src="{{ $relatedCover }}" class="card-img-top" alt="{{ $relatedBook['title'] }}"

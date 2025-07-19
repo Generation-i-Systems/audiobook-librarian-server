@@ -46,6 +46,97 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     protected $accountRequests = [];
     protected $follows = [];
 
+    /**
+     * Get unique values for a specific field across all books
+     *
+     * @param string $field The field to get unique values for (e.g., 'genre', 'author')
+     * @param string|null $subField Optional subfield for nested data (e.g., 'seriesName' when field is 'series')
+     * @return array Array of unique values
+     */
+    public function getUniqueValues(string $field, ?string $subField = null): array
+    {
+        $results = [];
+
+        switch ($field) {
+            case 'author':
+                $values = [];
+                foreach ($this->books as $book) {
+                    if (isset($book['authors']) && is_array($book['authors'])) {
+                        foreach ($book['authors'] as $author) {
+                            if (isset($author['name'])) {
+                                $values[$author['name']] = true;
+                            }
+                        }
+                    }
+                }
+                $results = array_keys($values);
+                sort($results);
+                break;
+
+            case 'genre':
+                $values = [];
+                foreach ($this->books as $book) {
+                    if (isset($book['genres']) && is_array($book['genres'])) {
+                        foreach ($book['genres'] as $genre) {
+                            if (isset($genre['name'])) {
+                                $values[$genre['name']] = true;
+                            }
+                        }
+                    }
+                }
+                $results = array_keys($values);
+                sort($results);
+                break;
+
+            case 'series':
+                if ($subField === 'seriesName') {
+                    $values = [];
+                    foreach ($this->books as $book) {
+                        if (isset($book['series']) && is_array($book['series'])) {
+                            foreach ($book['series'] as $series) {
+                                if (isset($series['seriesName'])) {
+                                    $values[$series['seriesName']] = true;
+                                }
+                            }
+                        }
+                    }
+                    $results = array_keys($values);
+                    sort($results);
+                }
+                break;
+        }
+
+        return $results;
+    }
+
+    public function validateUserCredentials($user, array $credentials): bool
+    {
+        $email = $credentials['email'] ?? null;
+        $password = $credentials['password'] ?? null;
+
+        if (!$email || !$password) {
+            return false;
+        }
+
+        $user = collect($this->users)->firstWhere('email', $email);
+
+        if (!$user) {
+            return false;
+        }
+
+        return password_verify($password, $user['password'] ?? '');
+    }
+
+    public function updateRememberToken(string $identifier, string $token): void
+    {
+        $this->users = array_map(function ($u) use ($identifier, $token) {
+            if ($u['id'] === $identifier || $u['email'] === $identifier) {
+                $u['remember_token'] = $token;
+            }
+            return $u;
+        }, $this->users);
+    }
+
     public function getBook($id)
     {
         return $this->books[$id] ?? null;
@@ -171,9 +262,217 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         return $results;
     }
 
-    public function listBooks()
+    /**
+     * @inheritdoc
+     */
+    public function listBooks(int $page = 1, int $perPage = 24, array $filters = [], bool $withRelated = true)
     {
-        return array_values($this->books);
+        // Apply filters
+        $filteredBooks = array_filter($this->books, function($book) use ($filters) {
+            // Filter by author
+            if (!empty($filters['author'])) {
+                $authorMatch = false;
+                $authors = is_array($book['author'] ?? null) ? $book['author'] : [$book['author'] ?? ''];
+
+                foreach ($authors as $author) {
+                    $authorName = is_array($author) ? ($author['name'] ?? '') : $author;
+                    if (stripos($authorName, $filters['author']) !== false) {
+                        $authorMatch = true;
+                        break;
+                    }
+                }
+
+                if (!$authorMatch) {
+                    return false;
+                }
+            }
+
+            // Filter by genre
+            if (!empty($filters['genre'])) {
+                $genres = is_array($book['genre'] ?? null) ? $book['genre'] : [$book['genre'] ?? ''];
+                if (!in_array($filters['genre'], $genres, true)) {
+                    return false;
+                }
+            }
+
+            // Filter by series
+            if (!empty($filters['series'])) {
+                $seriesMatch = false;
+                $seriesList = is_array($book['series'] ?? null) ? $book['series'] : ($book['series'] ? [$book['series']] : []);
+
+                foreach ($seriesList as $series) {
+                    $seriesName = '';
+                    if (is_array($series)) {
+                        $seriesName = $series['seriesName'] ?? $series['name'] ?? '';
+                    } else if (is_string($series)) {
+                        $seriesName = $series;
+                    }
+
+                    if (stripos($seriesName, $filters['series']) !== false) {
+                        $seriesMatch = true;
+                        break;
+                    }
+                }
+
+                if (!$seriesMatch) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+
+        // Get total count before pagination
+        $total = count($filteredBooks);
+
+        // Calculate pagination
+        $offset = ($page - 1) * $perPage;
+        $paginatedBooks = array_slice($filteredBooks, $offset, $perPage);
+
+        // Ensure all book fields are properly formatted
+        $result = [];
+        foreach ($paginatedBooks as $book) {
+            $formattedBook = $this->ensureBookFields($book);
+
+            // Load related data if requested
+            if ($withRelated) {
+                $formattedBook = $this->loadRelatedData($formattedBook);
+            }
+
+            $result[] = $formattedBook;
+        }
+
+        return [
+            'data' => $result,
+            'total' => $total,
+            'per_page' => $perPage,
+            'current_page' => $page,
+            'last_page' => max(1, ceil($total / $perPage)),
+        ];
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function getRecentBooks(int $limit = 10, int $days = 30): array
+    {
+        // Sort books by created_at in descending order
+        $sortedBooks = $this->books;
+        usort($sortedBooks, function($a, $b) {
+            $aTime = strtotime($a['created_at'] ?? 'now');
+            $bTime = strtotime($b['created_at'] ?? 'now');
+            return $bTime - $aTime;
+        });
+
+        // Filter books from the last $days days
+        $cutoffDate = strtotime("-$days days");
+        $recentBooks = array_filter($sortedBooks, function($book) use ($cutoffDate) {
+            $bookTime = strtotime($book['created_at'] ?? 'now');
+            return $bookTime >= $cutoffDate;
+        });
+
+        // Limit the number of results
+        $recentBooks = array_slice($recentBooks, 0, $limit);
+
+        // Format the books and load related data
+        $result = [];
+        foreach ($recentBooks as $book) {
+            $formattedBook = $this->ensureBookFields($book);
+            $formattedBook = $this->loadRelatedData($formattedBook);
+            $result[] = $formattedBook;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Ensure all required book fields are present and properly formatted
+     *
+     * @param array $book
+     * @return array
+     */
+    protected function ensureBookFields(array $book): array
+    {
+        $defaults = [
+            'id' => uniqid(),
+            'title' => 'Untitled',
+            'author' => [],
+            'series' => [],
+            'genre' => [],
+            'description' => '',
+            'cover_image' => null,
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s'),
+        ];
+
+        $book = array_merge($defaults, $book);
+
+        // Ensure author is an array of arrays with name
+        if (!empty($book['author'])) {
+            $authors = is_array($book['author']) ? $book['author'] : [$book['author']];
+            $book['author'] = array_map(function($author) {
+                if (is_array($author) && isset($author['name'])) {
+                    return $author;
+                }
+                return ['name' => (string)$author];
+            }, $authors);
+        }
+
+        // Ensure series is an array of arrays with seriesName
+        if (!empty($book['series'])) {
+            $seriesList = is_array($book['series']) ? $book['series'] : [$book['series']];
+            $book['series'] = array_map(function($series) {
+                if (is_array($series)) {
+                    // Convert 'name' to 'seriesName' if needed
+                    if (isset($series['name']) && !isset($series['seriesName'])) {
+                        $series['seriesName'] = $series['name'];
+                        unset($series['name']);
+                    }
+                    return $series;
+                }
+                return ['seriesName' => (string)$series];
+            }, $seriesList);
+        }
+
+        // Ensure genre is an array of strings
+        if (!empty($book['genre'])) {
+            $book['genre'] = is_array($book['genre']) ? $book['genre'] : [$book['genre']];
+        }
+
+        return $book;
+    }
+
+    /**
+     * Load related data for a book
+     *
+     * @param array $book
+     * @return array
+     */
+    protected function loadRelatedData(array $book): array
+    {
+        // In a real implementation, this would load related data from the database
+        // For the mock, we'll just ensure the structure is correct
+
+        // Ensure authors have all required fields
+        if (!empty($book['author'])) {
+            $book['authors'] = $book['author'];
+            unset($book['author']);
+        }
+
+        // Ensure series have all required fields
+        if (!empty($book['series'])) {
+            $book['series'] = array_map(function($series) {
+                if (is_array($series)) {
+                    return [
+                        'seriesName' => $series['seriesName'] ?? $series['name'] ?? 'Unknown Series',
+                        'position' => $series['position'] ?? null,
+                    ];
+                }
+                return ['seriesName' => (string)$series];
+            }, $book['series']);
+        }
+
+        return $book;
     }
 
     public function getBooksByAuthorAndGenre($author, $genre)

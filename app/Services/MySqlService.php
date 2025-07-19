@@ -19,36 +19,197 @@ use Illuminate\Support\Facades\Log;
 
 class MySqlService implements DocumentStoreServiceInterface
 {
-    public function getBook(string $id)
+    public function getBook(string $id): ?array
     {
         $book = Book::with(['authors', 'narrators', 'genres', 'series', 'chapters'])->find($id);
 
-        return $book ? $book->toArray() : null;
+        if (!$book) {
+            return null;
+        }
+
+        $bookArray = $book->toArray();
+        $camelCasedBook = [];
+
+        foreach ($bookArray as $key => $value) {
+            $camelKey = \Illuminate\Support\Str::camel($key);
+
+            if ($key === 'authors' || $key === 'narrators' || $key === 'genres') {
+                $camelCasedBook[$camelKey] = collect($value)->pluck('name')->all();
+            } elseif ($key === 'series' && $value) {
+                $camelCasedBook[$camelKey] = collect($value)->map(function ($series) use ($book) {
+                    return [
+                        'number' => $series['pivot']['number'] ?? null,
+                        'seriesName' => $series['name'] ?? null,
+                    ];
+                })->all();
+            } else {
+                $camelCasedBook[$camelKey] = $value;
+            }
+        }
+
+        return $camelCasedBook;
+    }
+    
+    /**
+     * Get unique values for a specific field across all books
+     * 
+     * @param string $field The field to get unique values for (e.g., 'genre', 'author')
+     * @param string|null $subField Optional subfield for nested data (e.g., 'seriesName' when field is 'series')
+     * @return array Array of unique values
+     */
+    public function getUniqueValues(string $field, ?string $subField = null): array
+    {
+        try {
+            switch ($field) {
+                case 'author':
+                    return Author::select('name')
+                        ->distinct()
+                        ->orderBy('name')
+                        ->pluck('name')
+                        ->filter()
+                        ->values()
+                        ->toArray();
+                        
+                case 'genre':
+                    return Genre::select('name')
+                        ->distinct()
+                        ->orderBy('name')
+                        ->pluck('name')
+                        ->filter()
+                        ->values()
+                        ->toArray();
+                        
+                case 'series':
+                    if ($subField === 'seriesName') {
+                        return Series::select('seriesName')
+                            ->distinct()
+                            ->orderBy('seriesName')
+                            ->pluck('seriesName')
+                            ->filter()
+                            ->values()
+                            ->toArray();
+                    }
+                    return [];
+                    
+                default:
+                    return [];
+            }
+        } catch (\Exception $e) {
+            Log::error("Error getting unique values for field {$field}", [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return [];
+        }
     }
 
     public function listBooks(
-        string $orderBy = 'title',
-        string $direction = 'asc',
-        int $limit = -1,
-        ?string $startAfter = null
+        int $page = 1,
+        int $perPage = 24,
+        array $filters = [],
+        bool $withRelated = true
     ): array {
-        $query = Book::with(['authors', 'narrators', 'genres', 'series'])
-            ->orderBy($orderBy, $direction);
+        // Start building the query
+        $query = Book::query();
 
-        if ($startAfter) {
-            $query->where('id', $direction === 'asc' ? '>' : '<', $startAfter);
-        }
-        if ($limit > 0) {
-            return $query->limit($limit)->get()->toArray();
+        // Apply filters if provided
+        if (!empty($filters['author'])) {
+            $query->whereHas('authors', function ($q) use ($filters) {
+                $q->where('name', 'like', '%' . $filters['author'] . '%');
+            });
         }
 
-        return $query->get()->toArray();
+        if (!empty($filters['genre'])) {
+            $query->whereHas('genres', function ($q) use ($filters) {
+                $q->where('name', $filters['genre']);
+            });
+        }
+
+        if (!empty($filters['series'])) {
+            $query->whereHas('series', function ($q) use ($filters) {
+                $q->where('name', 'like', '%' . $filters['series'] . '%');
+            });
+        }
+
+        // Get the total count before pagination
+        $total = $query->count();
+
+        // Apply pagination
+        $query->skip(($page - 1) * $perPage)
+            ->take($perPage);
+
+        // Eager load relationships if requested
+        if ($withRelated) {
+            $query->with(['authors', 'narrators', 'genres', 'series']);
+        }
+
+        // Execute the query
+        $books = $query->get();
+
+        // Transform the data
+        $transformedData = $books->map(function ($book) {
+            $bookArray = $book->toArray();
+            $camelCasedBook = [];
+
+            foreach ($bookArray as $key => $value) {
+                $camelKey = Str::camel($key);
+
+                if ($key === 'authors' || $key === 'narrators' || $key === 'genres') {
+                    $camelCasedBook[$camelKey] = collect($value)->pluck('name')->all();
+                } elseif ($key === 'series') {
+                    $camelCasedBook[$camelKey] = collect($value)->map(function ($series) use ($book) {
+                        return [
+                            'number' => $series['pivot']['number'] ?? null,
+                            'seriesName' => $series['name'] ?? null,
+                        ];
+                    })->all();
+                } else {
+                    $camelCasedBook[$camelKey] = $value;
+                }
+            }
+            return $camelCasedBook;
+        });
+
+        // Return paginated results in the expected format
+        return [
+            'data' => $transformedData,
+            'total' => $total,
+            'perPage' => $perPage,
+            'currentPage' => $page,
+            'lastPage' => max(1, ceil($total / $perPage)),
+        ];
     }
 
     public function dumpAllBooks()
     {
         // This is memory intensive, but matches the existing interface.
         return Book::with(['authors', 'narrators', 'genres', 'series', 'chapters'])->get()->toArray();
+    }
+    
+    /**
+     * Get recently added books
+     *
+     * @param int $limit Maximum number of recent books to return
+     * @param int $days Number of days to look back for recent books
+     * @return array
+     */
+    public function getRecentBooks(int $limit = 10, int $days = 30): array
+    {
+        try {
+            $dateThreshold = now()->subDays($days);
+            
+            return Book::query()
+                ->with(['authors', 'narrators', 'genres', 'series'])
+                ->where('created_at', '>=', $dateThreshold)
+                ->orderBy('created_at', 'desc')
+                ->limit($limit)
+                ->get()
+                ->toArray();
+        } catch (\Exception $e) {
+            // Log the error and return an empty array as fallback
+            Log::error('Error fetching recent books: ' . $e->getMessage());
+            return [];
+        }
     }
 
     public function listAuthors()
