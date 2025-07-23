@@ -1,0 +1,1 @@
+/home/eric-22/CLAUDE.md
