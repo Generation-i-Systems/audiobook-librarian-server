@@ -14,6 +14,11 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Session;
 
+// --- EMERGENCY ROUTES ---
+// Emergency book routes that bypass memory-intensive models
+Route::get('/emergency/books', [App\Http\Controllers\EmergencyBookController::class, 'index'])
+    ->name('emergency.books.index');
+
 // --- DEBUG ROUTES (local only) ---
 if (app()->environment('local')) {
     // Memory test route
