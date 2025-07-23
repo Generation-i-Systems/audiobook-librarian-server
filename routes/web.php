@@ -16,6 +16,9 @@ use Illuminate\Support\Facades\Session;
 
 // --- DEBUG ROUTES (local only) ---
 if (app()->environment('local')) {
+    // Memory test route
+    Route::get('/test-memory', [App\Http\Controllers\TestController::class, 'memoryTest']);
+    
     // Reset test user password to a known value
     Route::get('/reset-test-password', function () {
         $user = \App\Models\User::where('email', 'eric@thelin.org')->first();

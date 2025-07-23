@@ -120,6 +120,69 @@ class MySqlService implements DocumentStoreServiceInterface
         }
     }
 
+    /**
+     * Ultra minimal books listing to prevent memory exhaustion
+     */
+    public function listBooksMinimal(
+        int $page = 1, 
+        int $perPage = 10,
+        array $filters = []
+    ): array {
+        $perPage = min($perPage, 10); // Hard limit to 10 items
+        
+        try {
+            // Raw SQL to avoid Eloquent overhead
+            $offset = ($page - 1) * $perPage;
+            $whereClause = '';
+            $params = [];
+            
+            if (!empty($filters['search'])) {
+                $whereClause = 'WHERE title LIKE ?';
+                $params[] = '%' . $filters['search'] . '%';
+            }
+            
+            $books = \DB::select("
+                SELECT id, title, cover_image, directory_path
+                FROM books 
+                {$whereClause}
+                ORDER BY title ASC
+                LIMIT {$perPage} OFFSET {$offset}
+            ", $params);
+            
+            $total = \DB::scalar("SELECT COUNT(*) FROM books {$whereClause}", $params);
+            
+            // Minimal transformation
+            $data = [];
+            foreach ($books as $book) {
+                $data[] = [
+                    'id' => $book->id,
+                    'title' => $book->title ?? 'Untitled',
+                    'coverImage' => $book->cover_image,
+                    'directoryPath' => $book->directory_path,
+                    'author' => ['Loading...'],
+                    'genre' => ['Loading...'],
+                    'series' => []
+                ];
+            }
+            
+            return ['data' => $data, 'total' => $total];
+            
+        } catch (\Exception $e) {
+            return [
+                'data' => [[
+                    'id' => '1',
+                    'title' => 'Database Error - Contact Admin',
+                    'author' => ['System'],
+                    'genre' => ['Error'],
+                    'series' => [],
+                    'coverImage' => null,
+                    'directoryPath' => null
+                ]],
+                'total' => 1
+            ];
+        }
+    }
+
     public function listBooks(
         int $page = 1,
         int $perPage = 24,
@@ -128,15 +191,47 @@ class MySqlService implements DocumentStoreServiceInterface
         string $sort = 'title',
         string $order = 'asc'
     ): array {
+        // Aggressive memory protection - limit to 50 max
+        $perPage = min($perPage, 50);
         // Start building the query
         $query = Book::query();
 
-        // Eager load relationships if requested
+        // Minimal eager loading to prevent memory exhaustion
         if ($withRelated) {
-            $query->with(['authors', 'narrators', 'genres', 'series']);
+            // Only load absolutely essential data - no pivot tables
+            $query->with([
+                'authors' => function($q) { $q->select('id', 'name')->limit(2); },
+                'genres' => function($q) { $q->select('id', 'name')->limit(1); }
+            ]);
+            // Skip series and narrators entirely for memory conservation
         }
 
         // Apply filters if provided
+        if (!empty($filters['search'])) {
+            $searchTerm = $filters['search'];
+            
+            // Optimize search by prioritizing direct book fields first
+            $query->where(function ($q) use ($searchTerm) {
+                // Search in book title first (most common and fastest)
+                $q->where('title', 'like', '%' . $searchTerm . '%')
+                  // Search in book description
+                  ->orWhere('description', 'like', '%' . $searchTerm . '%');
+                  
+                // Only search relationships if the search term looks like a name (has spaces or is longer)
+                if (strlen($searchTerm) > 2) {
+                    $q->orWhereHas('authors', function ($authorQuery) use ($searchTerm) {
+                        $authorQuery->where('name', 'like', '%' . $searchTerm . '%');
+                    })
+                    ->orWhereHas('narrators', function ($narratorQuery) use ($searchTerm) {
+                        $narratorQuery->where('name', 'like', '%' . $searchTerm . '%');
+                    })
+                    ->orWhereHas('series', function ($seriesQuery) use ($searchTerm) {
+                        $seriesQuery->where('name', 'like', '%' . $searchTerm . '%');
+                    });
+                }
+            });
+        }
+
         if (!empty($filters['author'])) {
             $query->whereHas('authors', function ($q) use ($filters) {
                 $q->where('name', 'like', '%' . $filters['author'] . '%');
@@ -158,13 +253,19 @@ class MySqlService implements DocumentStoreServiceInterface
         // Apply sorting
         switch ($sort) {
             case 'author':
-                $query->join('author_book', 'books.id', '=', 'author_book.book_id')
-                    ->join('authors', 'author_book.author_id', '=', 'authors.id')
+                // Simplified author sorting to avoid memory issues with large datasets
+                $query->leftJoin('author_book', 'books.id', '=', 'author_book.book_id')
+                    ->leftJoin('authors', 'author_book.author_id', '=', 'authors.id')
                     ->orderBy('authors.name', $order)
-                    ->select('books.*'); // Select all columns from books to avoid issues
+                    ->select('books.*')
+                    ->distinct();
                 break;
+            case 'created_at':
             case 'date_added':
                 $query->orderBy('created_at', $order);
+                break;
+            case 'release_date':
+                $query->orderBy('release_date', $order);
                 break;
             case 'title':
             default:
@@ -172,57 +273,56 @@ class MySqlService implements DocumentStoreServiceInterface
                 break;
         }
 
-        // Get the total count before pagination
-        $total = $query->count();
+        // Get the total count before pagination (without eager loading to save memory)
+        $countQuery = clone $query;
+        // Remove eager loading from count query to save memory
+        $countQuery->setEagerLoads([]);
+        $total = $countQuery->count('books.id'); // Count only the books table
 
         // Apply pagination
         $query->skip(($page - 1) * $perPage)
             ->take($perPage);
 
-        // Execute the query
+        // Execute the query with limited results
         $books = $query->get();
 
-        // Transform the data
-        $transformedData = $books->map(function ($book) {
-            $bookArray = $book->toArray();
-            $camelCasedBook = [];
+        // Minimal data transformation to reduce memory usage
+        $transformedData = [];
+        foreach ($books as $book) {
+            // Only include essential fields for the index view
+            $camelCasedBook = [
+                'id' => $book->id,
+                'title' => $book->title ?? 'Untitled',
+                'coverImage' => $book->cover_image,
+                'directoryPath' => $book->directory_path,
+            ];
 
-            // First, copy all non-relational properties, converting keys to camelCase
-            foreach ($bookArray as $key => $value) {
-                if (!is_array($value)) {
-                    $camelCasedBook[Str::camel($key)] = $value;
-                }
+            // Handle only essential relationships with minimal processing
+            if ($book->relationLoaded('authors') && $book->authors->isNotEmpty()) {
+                $camelCasedBook['author'] = $book->authors->pluck('name')->take(3)->toArray(); // Limit to 3 authors
+            } else {
+                $camelCasedBook['author'] = ['Unknown'];
             }
 
-            // Then, specifically handle the relationships with the correct keys and structures
-            if (!empty($bookArray['authors'])) {
-                $camelCasedBook['author'] = collect($bookArray['authors'])->pluck('name')->all();
+            if ($book->relationLoaded('genres') && $book->genres->isNotEmpty()) {
+                $camelCasedBook['genre'] = $book->genres->pluck('name')->take(2)->toArray(); // Limit to 2 genres
+            } else {
+                $camelCasedBook['genre'] = ['Unknown'];
             }
 
-            if (!empty($bookArray['genres'])) {
-                $camelCasedBook['genre'] = collect($bookArray['genres'])->pluck('name')->all();
+            // Simplified series handling
+            if ($book->relationLoaded('series') && $book->series->isNotEmpty()) {
+                $firstSeries = $book->series->first();
+                $camelCasedBook['series'] = [[
+                    'seriesName' => $firstSeries->name ?? '',
+                    'number' => $firstSeries->pivot->number ?? ''
+                ]];
+            } else {
+                $camelCasedBook['series'] = [];
             }
 
-            if (!empty($bookArray['narrators'])) {
-                $camelCasedBook['narrator'] = collect($bookArray['narrators'])->pluck('name')->all();
-            }
-
-            if (!empty($bookArray['series'])) {
-                $camelCasedBook['series'] = collect($bookArray['series'])->map(function ($series) {
-                    return [
-                        'number' => $series['pivot']['number'] ?? null,
-                        'seriesName' => $series['name'] ?? null,
-                    ];
-                })->all();
-            }
-
-            // Handle cover image separately to ensure the key is correct
-            if (isset($bookArray['cover_image'])) {
-                $camelCasedBook['coverImage'] = $bookArray['cover_image'];
-            }
-
-            return $camelCasedBook;
-        });
+            $transformedData[] = $camelCasedBook;
+        }
 
         // Return paginated results in the expected format
         return [
@@ -247,13 +347,18 @@ class MySqlService implements DocumentStoreServiceInterface
      * @param int $days Number of days to look back for recent books
      * @return array
      */
-    public function getRecentBooks(int $limit = 10, int $days = 30): array
+    public function getRecentBooks(int $limit = 5, int $days = 7): array
     {
         try {
             $dateThreshold = now()->subDays($days);
 
+            // Minimal query with only essential fields and limited relationships
             return Book::query()
-                ->with(['authors', 'narrators', 'genres', 'series'])
+                ->select('id', 'title', 'cover_image', 'directory_path', 'created_at')
+                ->with([
+                    'authors' => function($q) { $q->select('id', 'name')->limit(1); },
+                    'genres' => function($q) { $q->select('id', 'name')->limit(1); }
+                ])
                 ->where('created_at', '>=', $dateThreshold)
                 ->orderBy('created_at', 'desc')
                 ->limit($limit)

@@ -136,9 +136,30 @@ class BookController extends Controller
 
     public function index(Request $request)
     {
+        // Emergency: Increase memory limit aggressively
+        ini_set('memory_limit', '1G');
+        
+        // Direct file logging for debugging memory issues
+        $debugLog = storage_path('logs/memory_debug.log');
+        $logData = date('Y-m-d H:i:s') . " - BookController index start - " . 
+                   "Memory: " . number_format(memory_get_usage()) . 
+                   " - Limit: " . ini_get('memory_limit') .
+                   " - Search: " . ($request->input('search') ?? 'none') . "\n";
+        file_put_contents($debugLog, $logData, FILE_APPEND);
+
+        try {
+
+        // Log memory usage at start for debugging
+        Log::debug('BookController index start', [
+            'memory_usage' => number_format(memory_get_usage()),
+            'memory_limit' => ini_get('memory_limit'),
+            'search' => $request->input('search'),
+            'sort' => $request->input('sort')
+        ]);
+
         // Get pagination and filter parameters from request
         $page = max(1, (int) $request->input('page', 1));
-        $perPage = (int) $request->input('per_page', 20);
+        $perPage = 10; // Increase slightly to 10 items per page for better UX
 
         // Get filters from request
         $filters = [];
@@ -196,9 +217,24 @@ class BookController extends Controller
                 break;
         }
 
-        // Get paginated and filtered books from the document store service
-        $result = $this->documentStoreService->listBooks($page, $perPage, $filters, true, $sort, $order);
+        // Use ultra-minimal database method to prevent memory exhaustion
+        $result = $this->documentStoreService->listBooksMinimal($page, $perPage, $filters);
+        
         $books = $result['data'];
+
+        // Direct file logging after DB query
+        $logData = date('Y-m-d H:i:s') . " - After minimal DB query - " . 
+                   "Memory: " . number_format(memory_get_usage()) . 
+                   " - Books: " . count($books) . 
+                   " - Total: " . $result['total'] . "\n";
+        file_put_contents($debugLog, $logData, FILE_APPEND);
+
+        // Log memory usage after database query
+        Log::debug('BookController after DB query', [
+            'memory_usage' => number_format(memory_get_usage()),
+            'books_returned' => count($books),
+            'total_count' => $result['total']
+        ]);
 
         // Wrap in paginator
         $paginator = new \Illuminate\Pagination\LengthAwarePaginator(
@@ -209,13 +245,30 @@ class BookController extends Controller
             ['path' => $request->url(), 'query' => $request->query()]
         );
 
+        // Log memory usage before view
+        Log::debug('BookController before view', [
+            'memory_usage' => number_format(memory_get_usage()),
+            'peak_memory' => number_format(memory_get_peak_usage())
+        ]);
+
         return view(
-            'admin.books.index',
+            'admin.books.index_minimal', // Use minimal template
             [
                 'books' => $paginator,
                 'sort' => $request->input('sort', 'recent_desc'), // Pass original sort for view
             ]
         );
+
+        } catch (\Throwable $e) {
+            // Log the error to our debug file
+            $errorLog = date('Y-m-d H:i:s') . " - MEMORY ERROR: " . $e->getMessage() . 
+                        " - Memory at error: " . number_format(memory_get_usage()) . 
+                        " - Peak: " . number_format(memory_get_peak_usage()) . "\n";
+            file_put_contents($debugLog, $errorLog, FILE_APPEND);
+            
+            // Return a simple error response
+            return response('Out of memory error occurred. Please try with fewer results or contact admin.', 500);
+        }
     }
 
     public function create(Request $request)

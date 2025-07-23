@@ -802,7 +802,5 @@ document.addEventListener('DOMContentLoaded', function() {
   </div>
 </div>
 
-@push('scripts')
-    @vite(['resources/js/admin/book-autocomplete.js'])
-@endpush
+{{-- Removed duplicate book-autocomplete.js - form.js already handles autocomplete with jQuery UI --}}
 @endsection

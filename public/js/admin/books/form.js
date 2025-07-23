@@ -233,6 +233,7 @@ function initializeAutocomplete($container, selector, sourceUrl) {
                     });
                 },
                 select: function (event, ui) {
+                    event.preventDefault(); // Prevent any default behavior that might trigger form submission
                     $inputField.val(ui.item.value); // Set the input field's value to the selected item
                     // You might want to trigger a 'change' event if other parts of your code listen for it
                     // $inputField.trigger('change');
@@ -542,12 +543,17 @@ window.initBookForm = function (formContainerSelector) {
         ".add-genre-row",
     );
 
-    // Initialize autocomplete for all author and series fields on page load
+    // Initialize autocomplete for all author, narrator, and series fields on page load
     if (typeof initializeAutocomplete === "function") {
         initializeAutocomplete(
             $container,
             ".author-autocomplete",
             window.BOOK_FORM_ROUTES.authorsAutocomplete,
+        );
+        initializeAutocomplete(
+            $container,
+            ".narrator-autocomplete",
+            window.BOOK_FORM_ROUTES.narratorsAutocomplete,
         );
         initializeAutocomplete(
             $container,

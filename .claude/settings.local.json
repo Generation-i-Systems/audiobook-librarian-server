@@ -6,7 +6,9 @@
       "Bash(find:*)",
       "Bash(./vendor/bin/phpunit:*)",
       "Bash(rg:*)",
-      "Bash(php:*)"
+      "Bash(php:*)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "Bash(npm run build:*)"
     ],
     "deny": []
   }

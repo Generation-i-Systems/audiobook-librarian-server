@@ -31,36 +31,12 @@
             <a href="{{ route('admin.genres.index') }}" class="btn btn-outline-secondary ms-2">Manage Genres</a>
         </div>
         @php
-            $genreCounts = [];
-            $totalBooks = count($books);
-            foreach ($books as $book) {
-                $genres = [];
-                if (!empty($book['genre'])) {
-                    if (is_array($book['genre'])) {
-                        foreach ($book['genre'] as $g) {
-                            $genres[] = is_array($g) ? ($g['name'] ?? $g[0] ?? $g) : $g;
-                        }
-                    } else {
-                        $genres[] = $book['genre'];
-                    }
-                }
-                foreach ($genres as $g) {
-                    $g = is_string($g) ? trim($g) : $g;
-                    if ($g === '')
-                        continue;
-                    $genreCounts[$g] = ($genreCounts[$g] ?? 0) + 1;
-                }
-            }
+            // Use pagination total instead of count() which could load all data
+            $totalBooks = $books->total();
         @endphp
         <div class="mb-2 text-muted small">
             <span>Total books: <strong>{{ $totalBooks }}</strong></span>
-            @if(count($genreCounts))
-                    <span class="ms-3">Genres:
-                        {!! collect($genreCounts)->map(function ($count, $genre) {
-                    return e($genre) . ' (' . $count . ')';
-                })->implode(', ') !!}
-                    </span>
-            @endif
+            <span class="ms-3">Showing {{ $books->count() }} of {{ $totalBooks }} books</span>
         </div>
 
         <table class="table">

@@ -34,9 +34,13 @@ class BookController extends Controller
      */
     public function index(Request $request)
     {
+        // Memory monitoring
+        $memoryStart = memory_get_usage();
+        Log::debug('BookController index start', ['memory_mb' => round($memoryStart / 1024 / 1024, 2)]);
+        
         // Get pagination and filter parameters from request
         $page = max(1, (int) $request->get('page', 1));
-        $perPage = (int) session('main_per_page', 24);
+        $perPage = min((int) session('main_per_page', 12), 12); // Reduce from 24 to 12 max
 
         // Get filters from request
         $filters = [];
@@ -50,22 +54,24 @@ class BookController extends Controller
             $filters['series'] = $request->series;
         }
 
-        // Get paginated and filtered books
+        // Get paginated and filtered books with minimal relations
         $result = $this->documentStoreService->listBooks($page, $perPage, $filters, true);
         $books = $result['data'];
 
         Log::debug(sprintf(
             'Fetched %d books (page %d of %d) with filters: %s',
-            $books->count(),
+            count($books),
             $page,
-            $result['lastPage'],
+            $result['lastPage'] ?? 1,
             json_encode($filters)
         ));
 
-        // Ensure all book fields are properly formatted
-        $books = $books->map(function ($book) {
-            return $this->ensureBookFields($book);
-        });
+        // Minimal book field formatting to reduce memory usage
+        $processedBooks = [];
+        foreach ($books as $book) {
+            $processedBooks[] = $this->ensureBookFieldsMinimal($book);
+        }
+        $books = collect($processedBooks);
 
         // Log::debug('Books data passed to books.index view: ' . json_encode($books->toArray(), JSON_PRETTY_PRINT));
 
@@ -74,8 +80,8 @@ class BookController extends Controller
         $authors = $this->documentStoreService->getUniqueValues('author');
         $series = $this->documentStoreService->getUniqueValues('series', 'seriesName');
 
-        // Get recently added books (last 30 days) - limited to 10
-        $recentBooks = $this->getRecentBooks([], 10);
+        // Get recently added books (last 30 days) - limited to 5 for memory conservation
+        $recentBooks = $this->getRecentBooks([], 5);
 
         // Get view preferences from session
         $mainViewType = session('main_view_type', 'grid');
@@ -88,6 +94,15 @@ class BookController extends Controller
             $page,
             ['path' => $request->url(), 'query' => $request->query()]
         );
+
+        // Memory monitoring at end
+        $memoryEnd = memory_get_usage();
+        $memoryPeak = memory_get_peak_usage();
+        Log::debug('BookController index complete', [
+            'memory_end_mb' => round($memoryEnd / 1024 / 1024, 2),
+            'memory_peak_mb' => round($memoryPeak / 1024 / 1024, 2),
+            'memory_used_mb' => round(($memoryEnd - $memoryStart) / 1024 / 1024, 2)
+        ]);
 
         return view('books.index', [
             'books' => $pagination,
@@ -150,16 +165,19 @@ class BookController extends Controller
      * @param int $limit Number of recent books to return
      * @return array
      */
-    protected function getRecentBooks(array $books, int $limit = 10): array
+    protected function getRecentBooks(array $books, int $limit = 5): array
     {
         try {
-            // Use the document store service to get recent books
-            $recentBooks = $this->documentStoreService->getRecentBooks($limit, 30);
-
-            // Ensure all required fields are present in each book
-            return collect($recentBooks)->map(function ($book) {
-                return $this->ensureBookFields($book);
-            })->all();
+            // Use the document store service to get recent books with minimal processing
+            $recentBooks = $this->documentStoreService->getRecentBooks($limit, 7); // Only 7 days back
+            
+            // Minimal processing to reduce memory usage
+            $processedBooks = [];
+            foreach ($recentBooks as $book) {
+                $processedBooks[] = $this->ensureBookFieldsMinimal($book);
+            }
+            
+            return $processedBooks;
         } catch (\Exception $e) {
             // Log the error and return an empty array as fallback
             \Log::error('Error fetching recent books: ' . $e->getMessage());
@@ -450,6 +468,38 @@ class BookController extends Controller
         }
 
         return $book;
+    }
+
+    /**
+     * Minimal book field processing for memory conservation
+     */
+    protected function ensureBookFieldsMinimal(array $book): array
+    {
+        return [
+            'id' => $book['id'] ?? '',
+            'title' => (string) ($book['title'] ?? 'Unknown Title'),
+            'authors' => is_array($book['author'] ?? []) ? array_slice($book['author'], 0, 2) : ['Unknown'],
+            'genres' => is_array($book['genre'] ?? []) ? array_slice($book['genre'], 0, 1) : ['Unknown'],
+            'coverImage' => $this->processCoverImage($book['coverImage'] ?? null),
+            'description' => substr($book['description'] ?? 'No description available.', 0, 200),
+            'series' => is_array($book['series'] ?? []) ? array_slice($book['series'], 0, 1) : [],
+        ];
+    }
+
+    /**
+     * Process cover image URL efficiently
+     */
+    protected function processCoverImage(?string $coverImage): string
+    {
+        if (empty($coverImage)) {
+            return asset('images/placeholder.png');
+        }
+        
+        if (str_starts_with($coverImage, ['http://', 'https://', '/'])) {
+            return $coverImage;
+        }
+        
+        return route('cover.proxy', ['path' => rawurlencode($coverImage)]);
     }
 
 }
