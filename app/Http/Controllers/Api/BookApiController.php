@@ -540,7 +540,7 @@ class BookApiController extends Controller
             ], 404);
         }
         // Sort books by series name, series number, and title
-        usort($books, fn($a, $b) => {
+        usort($books, function ($a, $b) {
             $seriesA = $a['series']['name'] ?? '';
             $seriesB = $b['series']['name'] ?? '';
             if ($seriesA !== $seriesB) {

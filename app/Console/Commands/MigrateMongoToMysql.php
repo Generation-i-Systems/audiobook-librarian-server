@@ -34,6 +34,9 @@ class MigrateMongoToMysql extends Command
     protected MySqlService $mysqlService;
     protected $processedBooks = 0;
     protected $bookLimit = 0;
+    protected int $mergedAuthorCount = 0;
+    protected int $mergedNarratorCount = 0;
+    protected int $failedBookCount = 0;
 
     public function __construct(MySqlService $mysqlService)
     {
@@ -76,7 +79,9 @@ class MigrateMongoToMysql extends Command
                 $username = $mongoUser['username'] ?? null;
                 if (empty($username)) {
                     $username = strtok($email, '@'); // Use part before @ as username
-                    $this->info("Generated username '{$username}' for user with email '{$email}'");
+                    if ($this->option('verbose')) {
+                        $this->info("Generated username '{$username}' for user with email '{$email}'");
+                    }
                 }
 
                 $userData = [
@@ -96,6 +101,7 @@ class MigrateMongoToMysql extends Command
                 $userProgressBar->advance();
             }
             $userProgressBar->finish();
+            $this->output->newLine();
             $this->info("Successfully migrated " . count($mongoUsers) . " users.");
 
             Log::debug("MigrateMongoToMysql: Before dumpAllBooks()");
@@ -108,8 +114,6 @@ class MigrateMongoToMysql extends Command
             if ($this->bookLimit > 0 && $this->bookLimit < $totalBooks) {
                 $this->info("Processing only first {$this->bookLimit} books out of $totalBooks (limited by --limit option)");
                 $mongoBooks = array_slice($mongoBooks, 0, $this->bookLimit);
-            } else {
-                $this->info("Found $totalBooks books in MongoDB");
             }
 
             if (empty($mongoBooks)) {
@@ -133,51 +137,84 @@ class MigrateMongoToMysql extends Command
                 }
             }
 
-            $allAuthors = array_unique(array_filter($allAuthors));
-            $allNarrators = array_unique(array_filter($allNarrators));
+            $normalize = function ($name) {
+                if (!is_string($name)) return null;
+                // Normalize to UTF-8 and remove BOM
+                $name = mb_convert_encoding($name, 'UTF-8', 'UTF-8');
+                $bom = pack('H*', 'EFBBBF');
+                $name = preg_replace("/^$bom/", '', $name);
+                // Standardize whitespace and convert to lowercase
+                return mb_strtolower(preg_replace('/\s+/', ' ', trim($name)), 'UTF-8');
+            };
+
+            // Get unique raw names first
+            $uniqueRawAuthors = array_unique(array_filter($allAuthors));
+            $normalizedAuthors = [];
+            foreach ($uniqueRawAuthors as $authorName) {
+                $normalized = $normalize($authorName);
+                if ($normalized && !isset($normalizedAuthors[$normalized])) {
+                    $normalizedAuthors[$normalized] = $authorName; // Keep first-seen casing
+                }
+            }
+            $this->mergedAuthorCount = count($uniqueRawAuthors) - count($normalizedAuthors);
+            $authorsToInsert = array_values($normalizedAuthors);
+
+            // Normalize and count narrator merges
+            $uniqueRawNarrators = array_unique(array_filter($allNarrators));
+            $normalizedNarrators = [];
+            foreach ($uniqueRawNarrators as $narratorName) {
+                $normalized = $normalize($narratorName);
+                if ($normalized && !isset($normalizedNarrators[$normalized])) {
+                    $normalizedNarrators[$normalized] = $narratorName;
+                }
+            }
+            $this->mergedNarratorCount = count($uniqueRawNarrators) - count($normalizedNarrators);
+            $narratorsToInsert = array_values($normalizedNarrators);
+
             $allGenres = array_unique(array_filter($allGenres));
 
-            $this->info("Found " . count($allAuthors) . " unique authors.");
-            $this->info("Found " . count($allNarrators) . " unique narrators.");
-            $this->info("Found " . count($allGenres) . " unique genres.");
+            if ($this->option('verbose')) {
+                $this->info("Found " . count($authorsToInsert) . " unique authors (after merging {$this->mergedAuthorCount} duplicates). ");
+                $this->info("Found " . count($narratorsToInsert) . " unique narrators (after merging {$this->mergedNarratorCount} duplicates). ");
+                $this->info("Found " . count($allGenres) . " unique genres.");
+            }
 
             // Bulk insert authors, narrators, and genres
-            $this->info("Bulk inserting authors...");
-            $existingAuthors = Author::all()->pluck('id', 'name')->toArray();
+            if ($this->option('verbose')) {
+                $this->info("Bulk inserting authors...");
+            }
             $authorInserts = [];
-            foreach ($allAuthors as $authorName) {
-                if (!isset($existingAuthors[$authorName])) {
-                    $authorInserts[] = ['name' => $authorName];
-                }
+            foreach ($authorsToInsert as $authorName) {
+                $authorInserts[] = ['name' => $authorName];
             }
             if (!empty($authorInserts)) {
                 Author::insertOrIgnore($authorInserts);
             }
 
-            $this->info("Bulk inserting narrators...");
-            $existingNarrators = Narrator::all()->pluck('id', 'name')->toArray();
+            if ($this->option('verbose')) {
+                $this->info("Bulk inserting narrators...");
+            }
             $narratorInserts = [];
-            foreach ($allNarrators as $narratorName) {
-                if (!isset($existingNarrators[$narratorName])) {
-                    $narratorInserts[] = ['name' => $narratorName];
-                }
+            foreach ($narratorsToInsert as $narratorName) {
+                $narratorInserts[] = ['name' => $narratorName];
             }
             if (!empty($narratorInserts)) {
                 Narrator::insertOrIgnore($narratorInserts);
             }
 
-            $this->info("Bulk inserting genres...");
-            $existingGenres = Genre::all()->pluck('id', 'name')->toArray();
+            if ($this->option('verbose')) {
+                $this->info("Bulk inserting genres...");
+            }
             $genreInserts = [];
             foreach ($allGenres as $genreName) {
-                if (!isset($existingGenres[$genreName])) {
-                    $genreInserts[] = ['name' => $genreName];
-                }
+                $genreInserts[] = ['name' => $genreName];
             }
             if (!empty($genreInserts)) {
                 Genre::insertOrIgnore($genreInserts);
             }
-            $this->info("Bulk inserts complete.");
+            if ($this->option('verbose')) {
+                $this->info("Bulk inserts complete.");
+            }
 
             // Fetch all authors, narrators, and genres from MySQL into maps
             $mysqlAuthorsMap = Author::all()->pluck('id', 'name')->toArray();
@@ -194,7 +231,12 @@ class MigrateMongoToMysql extends Command
             }
 
             $progressBar->finish();
+            $this->output->newLine();
             $this->info("Successfully migrated $totalBooks books.");
+
+            if ($this->failedBookCount > 0) {
+                $this->warn("{$this->failedBookCount} books failed to migrate. Details logged to failed_books.log");
+            }
 
             $this->runSanityChecks($this->mysqlService);
 
@@ -297,18 +339,30 @@ class MigrateMongoToMysql extends Command
             if ($found) {
                 $authors[] = $authorId;
             } else {
-                // Try to find existing author in DB with case-insensitive search
-                $authorModel = Author::whereRaw('LOWER(name) = ?', [$normalizedName])->first();
+                try {
+                    // Try to find existing author in DB with case-insensitive search
+                    $authorModel = Author::whereRaw('LOWER(name) = ?', [$normalizedName])->first();
 
-                if (!$authorModel) {
-                    // Create new author if not found
-                    $authorModel = Author::create(['name' => $normalizedName]); // Store normalized name
-                    $this->info("Created author: " . $normalizedName);
+                    if (!$authorModel) {
+                        // Create new author if not found
+                        $authorModel = Author::create(['name' => $normalizedName]); // Store normalized name
+                    }
+
+                    $authors[] = $authorModel->id;
+                    // Update the map with the actual name from the DB and its ID
+                    $mysqlAuthorsMap[$authorModel->name] = $authorModel->id;
+                } catch (\Illuminate\Database\QueryException $e) {
+                    if ($e->errorInfo[1] == 1062) { // Duplicate entry
+                        $this->mergedAuthorCount++;
+                        $authorModel = Author::whereRaw('LOWER(name) = ?', [$normalizedName])->first();
+                        if ($authorModel) {
+                            $authors[] = $authorModel->id;
+                            $mysqlAuthorsMap[$authorModel->name] = $authorModel->id;
+                        }
+                    } else {
+                        throw $e;
+                    }
                 }
-
-                $authors[] = $authorModel->id;
-                // Update the map with the actual name from the DB and its ID
-                $mysqlAuthorsMap[$authorModel->name] = $authorModel->id;
             }
         }
 
@@ -415,14 +469,22 @@ class MigrateMongoToMysql extends Command
                     if (!$narratorModel) {
                         // Create new narrator if not found
                         $narratorModel = Narrator::create(['name' => $originalName]);
-                        $this->info("Created narrator: " . $originalName);
                         Log::debug("  -> Created new narrator: {$originalName} (ID: {$narratorModel->id})");
-                    } else {
-                        Log::debug("  -> Found existing narrator in DB (case-insensitive): {$narratorModel->name} (ID: {$narratorModel->id})");
                     }
 
                     $narrators[] = $narratorModel->id;
                     $mysqlNarratorsMap[$originalName] = $narratorModel->id;
+                } catch (\Illuminate\Database\QueryException $e) {
+                    if ($e->errorInfo[1] == 1062) { // Duplicate entry
+                        $this->mergedNarratorCount++;
+                        $narratorModel = Narrator::whereRaw('LOWER(name) = ?', [mb_strtolower($originalName, 'UTF-8')])->first();
+                        if ($narratorModel) {
+                            $narrators[] = $narratorModel->id;
+                            $mysqlNarratorsMap[$narratorModel->name] = $narratorModel->id;
+                        }
+                    } else {
+                        throw $e;
+                    }
                 } catch (\Exception $e) {
                     $this->error("Error processing narrator '$originalName': " . $e->getMessage());
                     Log::error("Error processing narrator '$originalName': " . $e->getMessage() . "\n" . $e->getTraceAsString());
@@ -449,7 +511,9 @@ class MigrateMongoToMysql extends Command
                 if (isset($mysqlGenresMap[$name])) {
                     $genres[] = $mysqlGenresMap[$name];
                 } else {
-                    $this->warn("Genre not found in map: " . $name);
+                    if ($this->option('verbose')) {
+                        $this->warn("Genre not found in map: " . $name);
+                    }
                     $genreModel = Genre::firstOrCreate(['name' => $name]);
                     $genres[] = $genreModel->id;
                     $mysqlGenresMap[$name] = $genreModel->id;
@@ -484,48 +548,26 @@ class MigrateMongoToMysql extends Command
             $seriesNumber = $mongoBook['series_number'] ?? $mongoBook['book_number'] ?? null;
         }
 
-        // Debug log the MongoDB document structure to a file
-        $debugLog = storage_path('logs/mongo_debug.log');
-        $debugInfo = [
-            'time' => now()->toDateTimeString(),
-            'title' => $mongoBook['title'] ?? 'Unknown',
-            'document_keys' => array_keys($mongoBook),
-            '_id_info' => [
-                'exists' => array_key_exists('_id', $mongoBook),
-                'type' => gettype($mongoBook['_id'] ?? null),
-                'value' => $mongoBook['_id'] ?? null,
-                'string_value' => isset($mongoBook['_id']) ? (string) $mongoBook['_id'] : null,
-            ],
-            'mongo_book' => $mongoBook, // Full document for reference
-        ];
-
-        file_put_contents($debugLog, json_encode($debugInfo, JSON_PRETTY_PRINT) . "\n", FILE_APPEND);
-
         // Get the MongoDB ID with robust checking for $oid format
         $mongoId = null;
         if (isset($mongoBook['_id'])) {
-            // Handle MongoDB ObjectId format
             if (is_object($mongoBook['_id']) && property_exists($mongoBook['_id'], '$oid')) {
                 $mongoId = $mongoBook['_id']->{'$oid'};
-            }
-            // Fallback to string conversion
-            elseif (is_object($mongoBook['_id']) && method_exists($mongoBook['_id'], '__toString')) {
+                Log::debug("Mongo ID (from $oid): " . $mongoId);
+            } elseif (is_object($mongoBook['_id']) && method_exists($mongoBook['_id'], '__toString')) {
                 $mongoId = (string) $mongoBook['_id'];
-            }
-            // Handle scalar values
-            elseif (is_scalar($mongoBook['_id'])) {
+                Log::debug("Mongo ID (from __toString): " . $mongoId);
+            } elseif (is_scalar($mongoBook['_id'])) {
                 $mongoId = (string) $mongoBook['_id'];
+                Log::debug("Mongo ID (from scalar): " . $mongoId);
             }
 
-            // If we still don't have an ID, try to get it from the 'id' field
             if (empty($mongoId) && isset($mongoBook['id'])) {
                 $mongoId = (string) $mongoBook['id'];
+                Log::debug("Mongo ID (from 'id' field): " . $mongoId);
             }
-
-            $this->info("Extracted MongoDB ID: " . ($mongoId ?? 'NULL'));
         }
-
-        $this->info("Processing book: " . ($mongoBook['title'] ?? 'Unknown') . " - MongoDB ID: " . ($mongoId ?? 'NULL'));
+        Log::debug("Final Mongo ID for " . ($mongoBook['title'] ?? 'Unknown') . ": " . ($mongoId ?? 'NULL'));
 
         // Prepare the book data with all fields
         $bookData = [
@@ -555,27 +597,27 @@ class MigrateMongoToMysql extends Command
             'file_tags' => !empty($mongoBook['fileTags'])
                 ? (is_string($mongoBook['fileTags'])
                     ? $mongoBook['fileTags']
-                    : json_encode($mongoBook['fileTags']))
+                    : json_encode((array)$mongoBook['fileTags']))
                 : null,
             'audible_info' => !empty($mongoBook['audible'])
                 ? (is_string($mongoBook['audible'])
                     ? $mongoBook['audible']
-                    : json_encode($mongoBook['audible']))
+                    : json_encode((array)$mongoBook['audible']))
                 : null,
             'google_books_info' => !empty($mongoBook['googleBooks'])
                 ? (is_string($mongoBook['googleBooks'])
                     ? $mongoBook['googleBooks']
-                    : json_encode($mongoBook['googleBooks']))
+                    : json_encode((array)$mongoBook['googleBooks']))
                 : null,
             'hardcover_info' => !empty($mongoBook['hardcover'])
                 ? (is_string($mongoBook['hardcover'])
                     ? $mongoBook['hardcover']
-                    : json_encode($mongoBook['hardcover']))
+                    : json_encode((array)$mongoBook['hardcover']))
                 : null,
             'audiobook_bay_info' => !empty($mongoBook['audiobookBay'])
                 ? (is_string($mongoBook['audiobookBay'])
                     ? $mongoBook['audiobookBay']
-                    : json_encode($mongoBook['audiobookBay']))
+                    : json_encode((array)$mongoBook['audiobookBay']))
                 : null,
 
             // Timestamps - handle both string and Carbon instances
@@ -587,44 +629,64 @@ class MigrateMongoToMysql extends Command
         $bookData = array_map(fn($value) => $value === '' ? null : $value, $bookData);
 
         try {
-            // First try to find existing book by title and author
-            $existingBook = Book::where('title', $bookData['title'])
-                ->whereHas('authors', function ($q) use ($authors) {
-                    $q->whereIn('author_id', $authors);
-                })->first();
+            $book = null;
+            Log::debug("Attempting to find book by mongo_id: " . ($mongoId ?? 'NULL'));
+            // 1. Try to find existing book by mongo_id first (most reliable)
+            if ($mongoId) {
+                $book = Book::where('mongo_id', $mongoId)->first();
+            }
 
-            if ($existingBook) {
-                $book = $existingBook;
+            if ($book) {
+                Log::debug("Book found by mongo_id. Updating book: " . $book->id);
+                // Book found by mongo_id, update it
                 $book->update($bookData);
             } else {
-                $book = $mysqlService->createBook($bookData);
+                Log::debug("Book not found by mongo_id. Attempting to find by title and authors.");
+                // 2. If not found by mongo_id, try to find by title and authors (more flexible matching)
+                $book = Book::where('title', $bookData['title'])
+                    ->whereHas('authors', function ($q) use ($authors) {
+                        $q->whereIn('author_id', $authors);
+                    })
+                    ->first();
+
+                if ($book) {
+                    Log::debug("Book found by title/author. Updating mongo_id and book data for book: " . $book->id);
+                    // Book found by title/author, update its mongo_id and other data
+                    $bookData['mongo_id'] = $mongoId; // Ensure mongo_id is set for existing book
+                    $book->update($bookData);
+                } else {
+                    Log::debug("Book not found by title/author. Creating new book.");
+                    // 3. Otherwise, create a new book
+                    $book = $mysqlService->createBook($bookData);
+                    Log::debug("New book created with ID: " . ($book->id ?? 'NULL'));
+                }
             }
 
             // Sync relationships with additional pivot data if needed
             if (!empty($authors)) {
-                $this->info('Syncing authors: ' . json_encode($authors));
+                Log::debug("Syncing authors for book: " . $book->id);
                 $book->authors()->sync($authors);
-                $this->info('Authors synced successfully');
             } else {
-                $this->warn("No authors to sync for book: " . $book->title);
+                Log::debug("No authors to sync for book: " . ($book->title ?? 'Unknown'));
             }
 
             if (!empty($narrators)) {
+                Log::debug("Syncing narrators for book: " . $book->id);
                 $book->narrators()->sync($narrators);
-                $this->info("Synced " . count($narrators) . " narrators with book: " . $book->title);
             } else {
-                $this->warn("No narrators to sync for book: " . $book->title);
+                Log::debug("No narrators to sync for book: " . ($book->title ?? 'Unknown'));
             }
 
             if (!empty($genres)) {
+                Log::debug("Syncing genres for book: " . $book->id);
                 $book->genres()->sync($genres);
-                $this->info("Synced " . count($genres) . " genres with book: " . $book->title);
             } else {
-                $this->warn("No genres to sync for book: " . $book->title);
+                Log::debug("No genres to sync for book: " . ($book->title ?? 'Unknown'));
             }
 
             // Sync series with series_number in the pivot table if series exists
             if ($series) {
+                Log::debug("Syncing series for book: " . $book->id);
                 // Ensure we have a valid series number (default to null if not set)
                 $seriesNumber ??= null;
 
@@ -633,20 +695,31 @@ class MigrateMongoToMysql extends Command
 
                 // Attach with series_number in the pivot table
                 $book->series()->attach($series->id, ['series_number' => $seriesNumber]);
-
-                $this->info(sprintf(
-                    'Book "%s" associated with series "%s" (number: %s)',
-                    $book->title,
-                    $series->name,
-                    $seriesNumber
-                ));
+            } else {
+                Log::debug("No series to sync for book: " . ($book->title ?? 'Unknown'));
             }
         } catch (\Exception $e) {
-            $this->error("Error processing book {$bookData['title']}: " . $e->getMessage());
+            $this->failedBookCount++;
+            $errorMessage = "Error processing book {$bookData['title']}: " . $e->getMessage();
+            $this->error($errorMessage); // Output to console
+
+            // Log full exception details to the main application log
+            Log::error("Migration Error: " . $errorMessage . "\n" . $e->getTraceAsString());
+
+            // Log failed book details to the dedicated failed_books channel
+            Log::channel('failed_books')->error("Failed Book Migration", [
+                'title' => $bookData['title'],
+                'mongo_id' => $mongoId,
+                'error' => $e->getMessage(),
+                'mongo_document' => $mongoBook,
+                'stack_trace' => $e->getTraceAsString(),
+            ]);
+
             return null;
         }
 
         if (isset($mongoBook['chapters'])) {
+            Log::debug("Processing chapters for book: " . $book->id);
             foreach ($mongoBook['chapters'] as $chapterData) {
                 Chapter::create([
                     'book_id' => $book->id,
@@ -665,17 +738,20 @@ class MigrateMongoToMysql extends Command
 
 
     /**
+     *
      * Run sanity checks to verify data integrity after migration
      *
+     *
      * @param MySqlService $mysqlService
+     *
      * @return void
      */
     private function runSanityChecks(MySqlService $mysqlService): void
     {
         $this->info("\nRunning sanity checks...");
 
-        $mongoBookCount = count($this->mongoService->dumpAllBooks());
-        $mysqlBookCount = count($mysqlService->listBooks());
+        $mongoBookCount = $this->mongoService->dumpAllBooks()['total'];
+        $mysqlBookCount = Book::count();
 
         $this->info("MongoDB books: $mongoBookCount");
         $this->info("MySQL books: $mysqlBookCount");
@@ -695,11 +771,14 @@ class MigrateMongoToMysql extends Command
             $mongoAuthorCount = is_countable($mongoAuthors) ? count($mongoAuthors) : 0;
             $mysqlAuthorCount = is_countable($mysqlAuthors) ? count($mysqlAuthors) : 0;
 
-            $this->info("MongoDB authors: $mongoAuthorCount");
-            $this->info("MySQL authors: $mysqlAuthorCount");
+            $this->info("MongoDB authors (original): $mongoAuthorCount");
+            $this->info("MySQL authors (created): $mysqlAuthorCount");
+            $this->info("Merged authors (due to case/UTF-8 differences): {$this->mergedAuthorCount}");
 
-            if ($mongoAuthorCount !== $mysqlAuthorCount) {
-                $this->warn("Author count mismatch!");
+            $expectedMySqlCount = $mongoAuthorCount - $this->mergedAuthorCount;
+
+            if ($mysqlAuthorCount !== $expectedMySqlCount) {
+                $this->warn("Author count mismatch! Expected {$expectedMySqlCount}, found {$mysqlAuthorCount}");
 
                 // Extract names safely
                 $mongoAuthorNames = [];
@@ -757,7 +836,7 @@ class MigrateMongoToMysql extends Command
                     }
                 }
             } else {
-                $this->info("Author counts match.");
+                $this->info("Author counts match after accounting for merges.");
             }
         } catch (\Exception $e) {
             $this->warn("Error checking author counts: " . $e->getMessage());
@@ -778,11 +857,14 @@ class MigrateMongoToMysql extends Command
                 ? count($mysqlNarrators)
                 : 0;
 
-            $this->info("MongoDB narrators: $mongoNarratorCount");
-            $this->info("MySQL narrators: $mysqlNarratorCount");
+            $this->info("MongoDB narrators (original): $mongoNarratorCount");
+            $this->info("MySQL narrators (created): $mysqlNarratorCount");
+            $this->info("Merged narrators (due to case/UTF-8 differences): {$this->mergedNarratorCount}");
 
-            if ($mongoNarratorCount !== $mysqlNarratorCount) {
-                $this->warn("Narrator count mismatch!");
+            $expectedMySqlCount = $mongoNarratorCount - $this->mergedNarratorCount;
+
+            if ($mysqlNarratorCount !== $expectedMySqlCount) {
+                $this->warn("Narrator count mismatch! Expected {$expectedMySqlCount}, found {$mysqlNarratorCount}");
 
                 // Extract names safely
                 $mongoNarratorNames = is_iterable($mongoNarrators) ? $mongoNarrators : [];
@@ -824,16 +906,17 @@ class MigrateMongoToMysql extends Command
                 $extraNarrators = array_diff($mysqlNarratorNames, $mongoNarratorNames);
                 if (!empty($extraNarrators)) {
                     $this->info("Extra Narrators in MySQL (not in MongoDB):");
-                    if (count($extraNarrators) <= 20) {
-                        foreach ($extraNarrators as $narrator) {
+                    if (count($extraAuthors) <= 20) {
+                        foreach ($extraAuthors as $narrator) {
                             $this->info("  + " . $narrator);
                         }
-                    } else {
-                        $this->info("  (Too many extra narrators to list: " . count($extraNarrators) . ")");
+                    }
+                    else {
+                        $this->info("  (Too many extra narrators to list: " . count($extraAuthors) . ")");
                     }
                 }
             } else {
-                $this->info("Narrator counts match.");
+                $this->info("Narrator counts match after accounting for merges.");
             }
         } catch (\Exception $e) {
             $this->warn("Error checking narrator counts: " . $e->getMessage());
@@ -846,16 +929,19 @@ class MigrateMongoToMysql extends Command
         // Test author filter
         $testAuthor = "Lee Child";
         try {
-            $mongoBooksByAuthor = $this->mongoService->getBooksByAuthorAndGenre($testAuthor, null);
-            $mysqlBooksByAuthor = $mysqlService->getBooksByAuthorAndGenre($testAuthor, null);
+            $mongoResult = $this->mongoService->getBooksByAuthorAndGenre($testAuthor, null);
+            $mongoBooksByAuthor = $mongoResult['data'] ?? [];
+            $mysqlBooksByAuthor = Book::whereHas('authors', function ($q) use ($testAuthor) {
+                $q->where('name', $testAuthor);
+            })->get();
 
             $mongoCount = is_countable($mongoBooksByAuthor) ? count($mongoBooksByAuthor) : 0;
-            $mysqlCount = is_countable($mysqlBooksByAuthor) ? count($mysqlBooksByAuthor) : 0;
+            $mysqlBookCount = is_countable($mysqlBooksByAuthor) ? count($mysqlBooksByAuthor) : 0;
 
             $this->info("Books by author '{$testAuthor}' in MongoDB: $mongoCount");
-            $this->info("Books by author '{$testAuthor}' in MySQL: $mysqlCount");
+            $this->info("Books by author '{$testAuthor}' in MySQL: $mysqlBookCount");
 
-            if ($mongoCount !== $mysqlCount) {
+            if ($mongoCount !== $mysqlBookCount) {
                 $this->warn("Book count mismatch for author '{$testAuthor}'!");
             } else {
                 $this->info("Book counts match for author '{$testAuthor}'.");
@@ -867,16 +953,19 @@ class MigrateMongoToMysql extends Command
         // Test genre filter
         $testGenre = "Fantasy";
         try {
-            $mongoBooksByGenre = $this->mongoService->getBooksByAuthorAndGenre(null, $testGenre);
-            $mysqlBooksByGenre = $mysqlService->getBooksByAuthorAndGenre(null, $testGenre);
+            $mongoResult = $this->mongoService->getBooksByAuthorAndGenre(null, $testGenre);
+            $mongoBooksByGenre = $mongoResult['data'] ?? [];
+            $mysqlBooksByGenre = Book::whereHas('genres', function ($q) use ($testGenre) {
+                $q->where('name', $testGenre);
+            })->get();
 
             $mongoCount = is_countable($mongoBooksByGenre) ? count($mongoBooksByGenre) : 0;
-            $mysqlCount = is_countable($mysqlBooksByGenre) ? count($mysqlBooksByGenre) : 0;
+            $mysqlBookCount = is_countable($mysqlBooksByGenre) ? count($mysqlBooksByGenre) : 0;
 
             $this->info("Books by genre '{$testGenre}' in MongoDB: $mongoCount");
-            $this->info("Books by genre '{$testGenre}' in MySQL: $mysqlCount");
+            $this->info("Books by genre '{$testGenre}' in MySQL: $mysqlBookCount");
 
-            if ($mongoCount !== $mysqlCount) {
+            if ($mongoCount !== $mysqlBookCount) {
                 $this->warn("Book count mismatch for genre '{$testGenre}'!");
             } else {
                 $this->info("Book counts match for genre '{$testGenre}'.");

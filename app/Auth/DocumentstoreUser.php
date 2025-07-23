@@ -18,29 +18,28 @@ class DocumentstoreUser implements Authenticatable
      */
     protected $userData = [
         'id' => null,
+        'name' => null,
         'email' => null,
         'password' => null,
         'remember_token' => null,
-        'is_admin' => false,
+        'role' => 'user', // Default role
     ];
 
     /**
      * @param array|object $user User data as array or object with arrayable interface
      */
-    public function __construct($user)
+    public function __construct(array $user)
     {
-        if (is_array($user)) {
-            $this->userData = array_merge($this->userData, array_intersect_key($user, $this->userData));
-        } elseif (is_object($user)) {
-            // Safely extract data from object
-            $this->userData['id'] = $this->safeGet($user, 'getKey') ?: $this->safeGet($user, 'id');
-            $this->userData['email'] = $this->safeGet($user, 'email');
-            $this->userData['password'] = $this->safeGet($user, 'getAuthPassword') ?: $this->safeGet($user, 'password');
-            $this->userData['remember_token'] = $this->safeGet($user, 'getRememberToken') ?: $this->safeGet($user, 'remember_token');
-            $this->userData['is_admin'] = (bool)($this->safeGet($user, 'isAdmin') ?: $this->safeGet($user, 'is_admin') ?: false);
-        } else {
-            throw new \InvalidArgumentException('User must be an array or an object');
-        }
+        \Illuminate\Support\Facades\Log::debug('DocumentstoreUser constructor called', ['input' => $user]);
+
+        $this->userData['id'] = $user['id'] ?? null;
+        $this->userData['name'] = $user['name'] ?? null;
+        $this->userData['email'] = $user['email'] ?? null;
+        $this->userData['password'] = $user['password'] ?? null;
+        $this->userData['remember_token'] = $user['remember_token'] ?? null;
+        $this->userData['role'] = $user['role'] ?? 'user';
+
+        \Illuminate\Support\Facades\Log::debug('DocumentstoreUser constructed with data', ['userData' => $this->userData]);
     }
 
     public function getAuthIdentifierName()
@@ -159,7 +158,7 @@ class DocumentstoreUser implements Authenticatable
      */
     public function isAdmin(): bool
     {
-        return (bool)($this->userData['is_admin'] ?? false);
+        return ($this->userData['role'] ?? 'user') === 'admin';
     }
 
     /**

@@ -62,14 +62,14 @@ class DocumentUserProvider implements UserProvider
     {
         $user = $this->documentStoreService->getUserById($identifier);
 
-        return $user ? new DocumentstoreUser($user) : null;
+        return $user ? new DocumentstoreUser((array) $user) : null;
     }
 
     public function retrieveByToken($identifier, $token)
     {
         $user = $this->documentStoreService->getUserByRememberToken($identifier, $token);
 
-        return $user ? new DocumentstoreUser($user) : null;
+        return $user ? new DocumentstoreUser((array) $user) : null;
     }
 
     public function updateRememberToken(Authenticatable $user, $token)

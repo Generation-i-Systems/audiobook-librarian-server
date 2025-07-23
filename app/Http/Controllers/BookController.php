@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class BookController extends Controller
 {
@@ -65,6 +66,8 @@ class BookController extends Controller
         $books = $books->map(function ($book) {
             return $this->ensureBookFields($book);
         });
+
+        // Log::debug('Books data passed to books.index view: ' . json_encode($books->toArray(), JSON_PRETTY_PRINT));
 
         // Get filter options using optimized methods
         $genres = $this->documentStoreService->getUniqueValues('genre');
@@ -171,11 +174,54 @@ class BookController extends Controller
      */
     public function jsonIndex(Request $request)
     {
-        $result = $this->documentStoreService->listBooks();
-        $books = $result['data']->all();
-        Log::debug('JSON API: Books fetched from DocumentStoreService: ' . count($books));
+        // Get pagination and filter parameters from request
+        $page = max(1, (int) $request->input('page', 1));
+        $perPage = (int) $request->input('per_page', session('main_per_page', 24));
+        session(['main_per_page' => $perPage]);
 
-        return $this->handleMainBooksAjaxRequest($request, $books);
+        // Get filters from request
+        $filters = [];
+        if ($request->has('search') && !empty($request->input('search'))) {
+            $filters['search'] = $request->input('search');
+        }
+        if ($request->has('author_id') && !empty($request->input('author_id'))) {
+            $filters['author'] = $request->input('author_id');
+        }
+        if ($request->has('genre_id') && !empty($request->input('genre_id'))) {
+            $filters['genre'] = $request->input('genre_id');
+        }
+        if ($request->has('series_id') && !empty($request->input('series_id'))) {
+            $filters['series'] = $request->input('series_id');
+        }
+
+        // Get sorting parameters
+        $sort = $request->input('sort', 'title');
+        $order = $request->input('order', 'asc');
+
+        // Get paginated and filtered books from the document store service
+        $result = $this->documentStoreService->listBooks($page, $perPage, $filters, true, $sort, $order);
+        $books = $result['data'];
+
+        // Ensure all book fields are properly formatted
+        $paginatedBooks = $books->map(function ($book) {
+            return $this->ensureBookFields($book);
+        });
+
+        // Return the books as JSON with pagination info
+        $response = [
+            'books' => $paginatedBooks,
+            'pagination' => [
+                'total' => $result['total'],
+                'per_page' => $result['perPage'],
+                'current_page' => $result['currentPage'],
+                'last_page' => $result['lastPage'],
+            ],
+            'view_type' => $request->input('view_type', session('main_view_type', 'grid')),
+        ];
+
+        // Log::debug('JSON API Response for books.json: ' . json_encode($response, JSON_PRETTY_PRINT));
+
+        return response()->json($response);
     }
 
     /**
@@ -315,155 +361,7 @@ class BookController extends Controller
         return response()->json(['success' => true]);
     }
 
-    /**
-     * Handle AJAX request for main books listing with filtering, sorting, and pagination
-     *
-     * @return \Illuminate\Http\JsonResponse
-     */
-    protected function handleMainBooksAjaxRequest(Request $request, array $books)
-    {
-        // Get view type from session or request
-        $viewType = $request->input('view_type', session('main_view_type', 'grid'));
-        session(['main_view_type' => $viewType]);
 
-        // Apply search filter if provided
-        if ($request->has('search') && !empty($request->input('search'))) {
-            $search = strtolower($request->input('search'));
-            $books = array_filter($books, function ($book) use ($search) {
-                // Search in title
-                if (isset($book['title']) && stripos($book['title'], $search) !== false) {
-                    return true;
-                }
-
-                // Search in author
-                if (isset($book['authors'])) {
-                    foreach ($book['authors'] as $author) {
-                        if (stripos($author, $search) !== false) {
-                            return true;
-                        }
-                    }
-                }
-
-                // Search in series
-                if (isset($book['series'])) {
-                    foreach ($book['series'] as $series) {
-                        if (isset($series['seriesName']) && stripos($series['seriesName'], $search) !== false) {
-                            return true;
-                        }
-                    }
-                }
-
-                return false;
-            });
-        }
-
-        // Apply genre filter if provided
-        if ($request->has('genre_id') && !empty($request->input('genre_id'))) {
-            $genreId = $request->input('genre_id');
-            $books = array_filter($books, function ($book) use ($genreId) {
-                if (!isset($book['genres']) || empty($book['genres'])) {
-                    return false;
-                }
-
-                foreach ($book['genres'] as $genre) {
-                    if (md5($genre) === $genreId) {
-                        return true;
-                    }
-                }
-
-                return false;
-            });
-        }
-
-        // Apply author filter if provided
-        if ($request->has('author_id') && !empty($request->input('author_id'))) {
-            $authorId = $request->input('author_id');
-            $books = array_filter($books, function ($book) use ($authorId) {
-                if (!isset($book['authors']) || empty($book['authors'])) {
-                    return false;
-                }
-
-                foreach ($book['authors'] as $author) {
-                    if (md5($author) === $authorId) {
-                        return true;
-                    }
-                }
-
-                return false;
-            });
-        }
-
-        // Apply series filter if provided
-        if ($request->has('series_id') && !empty($request->input('series_id'))) {
-            $seriesId = $request->input('series_id');
-            $books = array_filter($books, function ($book) use ($seriesId) {
-                if (!isset($book['series']) || empty($book['series'])) {
-                    return false;
-                }
-
-                foreach ($book['series'] as $series) {
-                    if (isset($series['seriesName']) && md5($series['seriesName']) === $seriesId) {
-                        return true;
-                    }
-                }
-
-                return false;
-            });
-        }
-
-        // Apply sorting
-        $sort = $request->input('sort', 'title');
-        $order = $request->input('order', 'asc');
-
-        usort($books, function ($a, $b) use ($sort, $order) {
-            $result = 0;
-
-            switch ($sort) {
-                case 'title':
-                    $result = strcasecmp($a['title'] ?? '', $b['title'] ?? '');
-                    break;
-                case 'author':
-                    $authorA = $a['authors'][0] ?? '';
-                    $authorB = $b['authors'][0] ?? '';
-                    $result = strcasecmp($authorA, $authorB);
-                    break;
-                case 'date_added':
-                    $dateA = isset($a['createdAt']) ? strtotime($a['createdAt']) : 0;
-                    $dateB = isset($b['createdAt']) ? strtotime($b['createdAt']) : 0;
-                    $result = $dateB - $dateA; // desc by default
-                    break;
-                default:
-                    $result = strcasecmp($a['title'] ?? '', $b['title'] ?? '');
-            }
-
-            return $order === 'desc' ? -$result : $result;
-        });
-
-        // Apply pagination
-        $page = max(1, (int) $request->input('page', 1));
-        $perPage = (int) $request->input('per_page', session('main_per_page', 24));
-        session(['main_per_page' => $perPage]);
-
-        $total = count($books);
-        $offset = ($page - 1) * $perPage;
-        $paginatedBooks = array_slice($books, $offset, $perPage);
-
-        // Ensure all required fields are present in each book and filter out non-array values
-        $paginatedBooks = array_filter($paginatedBooks, 'is_array');
-        $paginatedBooks = array_map([$this, 'ensureBookFields'], $paginatedBooks);
-
-        // Return the books as JSON with pagination info
-        return response()->json([
-            'books' => $paginatedBooks,
-            'pagination' => [
-                'total' => $total,
-                'per_page' => $perPage,
-                'current_page' => $page,
-                'last_page' => ceil($total / $perPage),
-            ],
-            'view_type' => $viewType,
-        ]);
-    }
 
     /**
      * Load main books via AJAX for JavaScript-based pagination and view switching
@@ -505,7 +403,6 @@ class BookController extends Controller
 
         // Ensure authors, genres, and narrators are simple arrays of names
         foreach (['authors', 'genres', 'narrators'] as $key) {
-            Log::debug("Before ensureBookFields for $key: " . json_encode($book[$key] ?? 'null'));
             if (isset($book[$key]) && is_array($book[$key])) {
                 $book[$key] = array_map(function ($item) {
                     return is_array($item) && isset($item['name']) ? $item['name'] : (string) $item;
@@ -513,11 +410,9 @@ class BookController extends Controller
             } else {
                 $book[$key] = [];
             }
-            Log::debug("After ensureBookFields for $key: " . json_encode($book[$key] ?? 'null'));
         }
 
         // Ensure series is an array of objects with seriesName and number
-        Log::debug("Before ensureBookFields for series: " . json_encode($book['series'] ?? 'null'));
         if (isset($book['series']) && is_array($book['series'])) {
             $book['series'] = collect($book['series'])->map(function ($seriesItem) {
                 // If it's already an object with seriesName and number, return it
@@ -543,7 +438,16 @@ class BookController extends Controller
         } else {
             $book['series'] = [];
         }
-        Log::debug("After ensureBookFields for series: " . json_encode($book['series'] ?? 'null'));
+
+        // Ensure coverImage is a full URL if it's a relative path
+        if (!empty($book['coverImage'])) {
+            // Only apply route helper if it's a relative path (not already a full URL)
+            if (!Str::startsWith($book['coverImage'], ['http://', 'https://', '/'])) {
+                $book['coverImage'] = route('cover.proxy', ['path' => rawurlencode($book['coverImage'])]);
+            }
+        } else {
+            $book['coverImage'] = asset('images/placeholder.png');
+        }
 
         return $book;
     }

@@ -79,8 +79,12 @@
             <div id="authors-group">
                 @php
                     $authors = old('author') ?? (request()->get('author') ? [request()->get('author')] : null) ?? ($book['author'] ?? null) ?? ($initial['author'] ?? []);
-                    if (!is_array($authors))
+                    if (!is_array($authors)) {
                         $authors = [$authors];
+                    }
+                    if (empty($authors) || (count($authors) === 1 && ($authors[0] === null || $authors[0] === ''))) {
+                        $authors = [''];
+                    }
                 @endphp
                 @php $authorsCount = count($authors); @endphp
                 @foreach($authors as $idx => $author)
@@ -189,6 +193,9 @@
                     if (!is_array($genres)) {
                         $genres = [$genres];
                     }
+                    if (empty($genres) || (count($genres) === 1 && ($genres[0] === null || $genres[0] === ''))) {
+                        $genres = [''];
+                    }
                     $genresCount = count($genres);
                 @endphp
                 @foreach($genres as $idx => $genre)
@@ -238,6 +245,14 @@
             $coverOptions = [];
             $addedCovers = [];
 
+            // Helper function to create a safe, encoded URL
+            $createCoverUrl = function($dir, $file) {
+                if (is_string($dir) && !empty(trim($dir)) && is_string($file) && !empty(trim($file))) {
+                    return route('cover.proxy', ['path' => rawurlencode($dir . '/' . $file)]);
+                }
+                return asset('images/placeholder.png');
+            };
+
             // Get just the filename for the current cover
             $currentCoverFilename = null;
             if (!empty($coverImg)) {
@@ -266,7 +281,7 @@
                 $coverOptions[] = [
                     'type' => $coverType,
                     'value' => $currentCoverFilename,
-                    'src' => route('cover.proxy', ['path' => $directoryPath . '/' . $currentCoverFilename]),
+                    'src' => $createCoverUrl($directoryPath, $currentCoverFilename),
                     'label' => $coverLabel,
                     'display_name' => $currentCoverFilename,
                 ];
@@ -293,7 +308,7 @@
                 $coverOptions[] = [
                     'type' => 'google',
                     'value' => $coverAuto,
-                    'src' => route('cover.proxy', ['path' => $directoryPath . '/' . $coverAuto]),
+                    'src' => $createCoverUrl($directoryPath, $coverAuto),
                     'label' => 'Google Books',
                     'display_name' => $coverAuto,
                 ];
@@ -305,7 +320,7 @@
                 $coverOptions[] = [
                     'type' => 'audible',
                     'value' => $audibleCover,
-                    'src' => route('cover.proxy', ['path' => $directoryPath . '/' . $audibleCover]),
+                    'src' => $createCoverUrl($directoryPath, $audibleCover),
                     'label' => 'Audible',
                     'display_name' => $audibleCover,
                 ];
@@ -322,7 +337,7 @@
                         $coverOptions[] = [
                             'type' => $isAudible ? 'audible' : 'candidate',
                             'value' => $candidate,
-                            'src' => route('cover.proxy', ['path' => $directoryPath . '/' . $candidate]),
+                            'src' => $createCoverUrl($directoryPath, $candidate),
                             'label' => $isAudible ? 'Audible' : 'Candidate',
                             'display_name' => $candidate,
                         ];

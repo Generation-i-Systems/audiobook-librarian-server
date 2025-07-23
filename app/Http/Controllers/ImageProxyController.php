@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use GuzzleHttp\Client;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class ImageProxyController extends Controller
 {
@@ -45,11 +46,16 @@ class ImageProxyController extends Controller
      */
     public function cover($path)
     {
+        Log::info('Cover path: ' . $path);
+        $path = rawurldecode($path);
         $storagePath = env('BOOK_STORAGE_PATH');
         $fullPath = rtrim($storagePath, '/') . '/' . ltrim($path, '/');
+
         if (!file_exists($fullPath)) {
+            Log::error('Cover not found at path: ' . $fullPath);
             abort(404);
         }
+
         $mime = mime_content_type($fullPath);
 
         return response()->file($fullPath, [

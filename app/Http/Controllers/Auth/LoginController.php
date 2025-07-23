@@ -129,46 +129,62 @@ class LoginController extends Controller
 
         try {
             // Check if user exists
-            $userArr = $this->documentStoreService->getUserByEmail($googleUser->getEmail());
+            $existingUserArr = $this->documentStoreService->getUserByEmail($googleUser->getEmail());
+            $userId = null;
 
-            // Create new user if not exists
-            if (!$userArr) {
+            // Create or update user
+            if (!$existingUserArr) {
+                // Create new user
                 $newUserData = [
                     'name' => $googleUser->getName() ?? $googleUser->getNickname() ?? explode('@', $googleUser->getEmail())[0],
                     'email' => $googleUser->getEmail(),
                     'password' => bcrypt(Str::random(32)), // random password, not used
-                    'role' => 'user',
+                    'role' => 'user', // Default role
                     'email_verified_at' => new \DateTime(),
                     'created_at' => new \DateTime(),
                     'updated_at' => new \DateTime(),
                     'google_id' => $googleUser->getId(),
                     'avatar' => $googleUser->getAvatar(),
                 ];
-
                 $userId = $this->documentStoreService->createUser($newUserData);
-                $userArr = $newUserData;
-                $userArr['id'] = $userId;
-
-                Log::info('New user created via Google login', [
-                    'user_id' => $userArr['id'],
-                    'email' => $userArr['email'],
-                ]);
+                Log::info('New user created via Google login', ['user_id' => $userId, 'email' => $newUserData['email']]);
             } else {
-                // Update existing user's Google ID and avatar
-                $this->documentStoreService->updateUser($userArr['id'], [
+                // Update existing user
+                $userId = $existingUserArr['id'];
+                $updateData = [
+                    'name' => $googleUser->getName() ?? $googleUser->getNickname() ?? explode('@', $googleUser->getEmail())[0],
                     'google_id' => $googleUser->getId(),
                     'avatar' => $googleUser->getAvatar(),
                     'updated_at' => new \DateTime(),
-                ]);
+                ];
+                $this->documentStoreService->updateUser($userId, $updateData);
+                Log::info('Existing user updated via Google login', ['user_id' => $userId]);
             }
+
+            if (!$userId) {
+                throw new \Exception('Failed to get user ID after create/update.');
+            }
+
+            // Fetch the canonical user data from the store to ensure the session is fresh
+            $userArr = $this->documentStoreService->getUserByEmail($googleUser->getEmail());
 
             if (empty($userArr)) {
-                throw new \Exception('Failed to create or retrieve user account.');
+                throw new \Exception('Failed to retrieve user account after create/update.');
             }
 
+            Log::debug('User array from DB before creating DocumentstoreUser', ['userArr' => $userArr]);
+
             // Create user object and log in
-            $user = new DocumentstoreUser($userArr);
+            $user = new DocumentstoreUser((array) $userArr);
+            Log::debug('DocumentstoreUser object created', ['user_object_data' => $user->getRawUser()]);
+
             Auth::login($user, true);
+
+            Log::debug('Auth state immediately after login', [
+                'auth_check' => Auth::check(),
+                'auth_user_data' => Auth::user() ? Auth::user()->getRawUser() : null
+            ]);
+
 
             Log::info('User logged in via Google', [
                 'user_id' => $user->getAuthIdentifier(),
@@ -201,6 +217,7 @@ class LoginController extends Controller
         $this->guard()->logout();
 
         $request->session()->invalidate();
+
         $request->session()->regenerateToken();
 
         return $this->loggedOut($request) ?: redirect('/');

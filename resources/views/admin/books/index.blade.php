@@ -80,8 +80,8 @@
                         <td style="vertical-align: middle; text-align: center;">
                             @php
                                 $coverImage = $book['coverImage'] ?? null;
-                                $coverProxyUrl = $coverImage
-                                    ? route('cover.proxy', ['path' => $coverImage])
+                                $coverProxyUrl = (is_string($coverImage) && !empty(trim($coverImage)))
+                                    ? route('cover.proxy', ['path' => rawurlencode($coverImage)])
                                     : asset('images/placeholder.png');
                             @endphp
                             <img src="{{ $coverProxyUrl }}" alt="cover"

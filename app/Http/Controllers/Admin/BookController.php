@@ -15,7 +15,6 @@ use App\Http\Controllers\Admin\ImportFileController;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use ZipArchive;
 
 class BookController extends Controller
 {
@@ -137,61 +136,74 @@ class BookController extends Controller
 
     public function index(Request $request)
     {
-        $books = $this->documentStoreService->listBooks();
+        // Get pagination and filter parameters from request
+        $page = max(1, (int) $request->input('page', 1));
+        $perPage = (int) $request->input('per_page', 20);
 
-        // Filtering
+        // Get filters from request
+        $filters = [];
         if ($request->filled('search')) {
-            $search = strtolower($request->input('search'));
-            $books = array_filter(
-                $books,
-                fn($book) => (
-                    isset($book['title']) && stripos($book['title'], $search) !== false
-                ) || (
-                    isset($book['author']) && (
-                        (is_array($book['author']) ? stripos(implode(', ', $book['author']), $search) !== false : stripos($book['author'], $search) !== false)
-                    )
-                )
-            );
+            $filters['search'] = $request->input('search');
         }
         if ($request->filled('author')) {
-            $books = array_filter(
-                $books,
-                fn($book) => isset($book['author']) && $book['author'] == $request->input('author')
-            );
+            $filters['author'] = $request->input('author');
         }
         if ($request->filled('genre_id')) {
-            $books = array_filter(
-                $books,
-                fn($book) => isset($book['genre_id']) && $book['genre_id'] == $request->input('genre_id')
-            );
+            $filters['genre'] = $request->input('genre_id');
         }
-        // Sorting
-        $sort = $request->input('sort', 'recent_desc');
-        $books = array_values($books);
-        usort(
-            $books,
-            fn($a, $b) => match ($sort) {
-                'recent_desc' => strtotime($b['created_at'] ?? 0) <=> strtotime($a['created_at'] ?? 0),
-                'recent_asc' => strtotime($a['created_at'] ?? 0) <=> strtotime($b['created_at'] ?? 0),
-                'author_asc' => strcmp($a['author_name'] ?? '', $b['author_name'] ?? ''),
-                'author_desc' => strcmp($b['author_name'] ?? '', $a['author_name'] ?? ''),
-                'title_asc' => strcmp($a['title'] ?? '', $b['title'] ?? ''),
-                'title_desc' => strcmp($b['title'] ?? '', $a['title'] ?? ''),
-                'year_asc' => ($a['published_year'] ?? 0) <=> ($b['published_year'] ?? 0),
-                'year_desc' => ($b['published_year'] ?? 0) <=> ($a['published_year'] ?? 0),
-                default => strtotime($b['created_at'] ?? 0) <=> strtotime($a['created_at'] ?? 0)
-            }
-        );
-        // Pagination
-        $page = max(1, (int) $request->input('page', 1));
-        $perPage = 20;
-        $total = count($books);
-        $booksForPage = array_slice($books, ($page - 1) * $perPage, $perPage);
+
+        // Get sorting parameters
+        $sort = $request->input('sort', 'title'); // Default sort by title
+        $order = $request->input('order', 'asc'); // Default order ascending
+
+        // Map admin panel sort options to MySqlService sort options
+        switch ($request->input('sort')) {
+            case 'recent_desc':
+                $sort = 'created_at';
+                $order = 'desc';
+                break;
+            case 'recent_asc':
+                $sort = 'created_at';
+                $order = 'asc';
+                break;
+            case 'author_asc':
+                $sort = 'author';
+                $order = 'asc';
+                break;
+            case 'author_desc':
+                $sort = 'author';
+                $order = 'desc';
+                break;
+            case 'title_asc':
+                $sort = 'title';
+                $order = 'asc';
+                break;
+            case 'title_desc':
+                $sort = 'title';
+                $order = 'desc';
+                break;
+            case 'year_asc':
+                $sort = 'release_date';
+                $order = 'asc';
+                break;
+            case 'year_desc':
+                $sort = 'release_date';
+                $order = 'desc';
+                break;
+            default:
+                $sort = 'title';
+                $order = 'asc';
+                break;
+        }
+
+        // Get paginated and filtered books from the document store service
+        $result = $this->documentStoreService->listBooks($page, $perPage, $filters, true, $sort, $order);
+        $books = $result['data'];
 
         // Wrap in paginator
         $paginator = new \Illuminate\Pagination\LengthAwarePaginator(
-            $booksForPage,
-            $total,
+            $books,
+            $result['total'],
             $perPage,
             $page,
             ['path' => $request->url(), 'query' => $request->query()]
@@ -201,8 +213,7 @@ class BookController extends Controller
             'admin.books.index',
             [
                 'books' => $paginator,
-                'sort' => $sort,
-                // You may not need to pass total, perPage, currentPage anymore
+                'sort' => $request->input('sort', 'recent_desc'), // Pass original sort for view
             ]
         );
     }
@@ -549,7 +560,15 @@ class BookController extends Controller
                 $importPath = $validated['import_path'];
                 $importRoot = $validated['import_root'];
                 $importType = $validated['import_type'] ?? 'dir';
-                $genrePath = $validated['genre_path'] ?? $validated['genre'][0] ?? 'Other';
+
+                if (isset($validated['genre_path'])) {
+                    $genrePath = $validated['genre_path'];
+                } elseif (!empty($validated['genre']) && is_array($validated['genre'])) {
+                    $genrePath = $validated['genre'][0];
+                } else {
+                    $genrePath = 'Other';
+                }
+
                 $directoryPath = $this->buildDirectoryPath($validated);
 
                 $validated['import_metadata'] = [
@@ -655,7 +674,13 @@ class BookController extends Controller
         $parts = [];
 
         // Use the first genre as the genre path if not explicitly provided
-        $genrePath = $bookData['genre_path'] ?? ($bookData['genre'][0] ?? 'Other');
+        if (isset($bookData['genre_path'])) {
+            $genrePath = $bookData['genre_path'];
+        } elseif (!empty($bookData['genre']) && is_array($bookData['genre'])) {
+            $genrePath = $bookData['genre'][0];
+        } else {
+            $genrePath = 'Other';
+        }
         $parts[] = $genrePath;
 
         // Add author (use first author if multiple)
@@ -742,24 +767,27 @@ class BookController extends Controller
             $coverAuto = basename($book['coverImage']);
         }
 
-        // DEBUG: Log type and value of book['genre']
-        Log::debug('BookController@edit: genre raw', [
-            'type' => is_object($book['genre']) ? get_class($book['genre']) : gettype($book['genre']),
-            'value' => $book['genre'],
-        ]);
-        // Hotfix: forcibly cast BSONArray to array if still present
-        if ($book['genre'] instanceof \MongoDB\Model\BSONArray) {
-            $book['genre'] = (array) $book['genre'];
-        }
         // Normalize selected genres for the form
         $genres = [];
-        if (!empty($book['genre'])) {
-            if (is_array($book['genre'])) {
-                foreach ($book['genre'] as $g) {
+        if (isset($book['genre'])) {
+            $bookGenre = $book['genre'];
+
+            Log::debug('BookController@edit: genre raw', [
+                'type' => is_object($bookGenre) ? get_class($bookGenre) : gettype($bookGenre),
+                'value' => $bookGenre,
+            ]);
+
+            // Hotfix: forcibly cast BSONArray to array if still present
+            if (is_object($bookGenre) && $bookGenre instanceof \MongoDB\Model\BSONArray) {
+                $bookGenre = (array) $bookGenre;
+            }
+
+            if (is_array($bookGenre)) {
+                foreach ($bookGenre as $g) {
                     $genres[] = trim((string) $g);
                 }
             } else {
-                $genres[] = trim((string) $book['genre']);
+                $genres[] = trim((string) $bookGenre);
             }
         }
         // Also allow old input to override

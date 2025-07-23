@@ -99,7 +99,7 @@
         <h1>Book Archive</h1>
 
         @php
-            $showFilters = request()->has('search') || request()->has('genre_id') || request()->has('author_id') || request()->has('series');
+$showFilters = request()->has('search') || request()->has('genre_id') || request()->has('author_id') || request()->has('series');
         @endphp
 
         <!-- Show Recently Added Books Only If There Are No Filters And There Are Recent Books -->
@@ -124,9 +124,9 @@
                     <div class="row g-2" id="recent-books-grid" style="display: flex; flex-wrap: wrap;">
                         @foreach($recentBooks as $book)
                             @php
-                                $cover = isset($book['coverImage']) && $book['coverImage'] ? url($book['coverImage']) : url('images/placeholder.png');
-                                $title = $book['title'] ?? 'Untitled';
-                                $title = is_array($title) ? ($title[0] ?? 'Untitled') : $title;
+        $cover = isset($book['coverImage']) && $book['coverImage'] ? url($book['coverImage']) : url('images/placeholder.png');
+        $title = $book['title'] ?? 'Untitled';
+        $title = is_array($title) ? ($title[0] ?? 'Untitled') : $title;
                             @endphp
                             <div class="col-md-2 mb-4">
                                 <a href="{{ route('books.show', $book['id']) }}" class="text-decoration-none card-link"
@@ -168,9 +168,9 @@
                     <div class="row g-2" id="recent-books-compact" style="display: none; flex-wrap: wrap;">
                         @foreach($recentBooks as $book)
                             @php
-                                $cover = isset($book['coverImage']) && $book['coverImage'] ? url($book['coverImage']) : url('images/placeholder.png');
-                                $title = $book['title'] ?? 'Untitled';
-                                $title = is_array($title) ? ($title[0] ?? 'Untitled') : $title;
+        $cover = isset($book['coverImage']) && $book['coverImage'] ? url($book['coverImage']) : url('images/placeholder.png');
+        $title = $book['title'] ?? 'Untitled';
+        $title = is_array($title) ? ($title[0] ?? 'Untitled') : $title;
                             @endphp
                             <div class="col-md-3 col-lg-2 mb-4">
                                 <a href="{{ route('books.show', $book['id']) }}" class="text-decoration-none card-link"
@@ -223,9 +223,9 @@
                                     <tr>
                                         <td>
                                             @php
-                                                $cover = isset($book['coverImage']) && $book['coverImage'] ? url($book['coverImage']) : url('images/placeholder.png');
-                                                $title = $book['title'] ?? 'Untitled';
-                                                $title = is_array($title) ? ($title[0] ?? 'Untitled') : $title;
+        $cover = isset($book['coverImage']) && $book['coverImage'] ? url($book['coverImage']) : url('images/placeholder.png');
+        $title = $book['title'] ?? 'Untitled';
+        $title = is_array($title) ? ($title[0] ?? 'Untitled') : $title;
                                             @endphp
                                             <img src="{{ $cover }}" alt="{{ $title }}"
                                                 style="height: 64px; width: auto; max-width: 48px; object-fit: contain;">
@@ -460,8 +460,7 @@
 
                 // Render books based on view type
                 books.forEach(function (book) {
-                    // Fix cover URL to handle paths with slashes correctly
-                    const cover = book.coverImage ? '{{ url("/cover") }}/' + book.coverImage : '{{ url("images/placeholder.png") }}';
+                    const cover = book.coverImage ? book.coverImage : '{{ url("images/placeholder.png") }}';
                     const title = book.title || 'Unknown Title';
                     const author = book.authors && book.authors.length > 0 ? book.authors.join(', ') : 'Unknown';
 
@@ -474,61 +473,61 @@
                     // Grid view (4 columns)
                     if (mainViewType === 'grid') {
                         $('#main-books-grid').append(`
-                                        <div class="col-md-3 mb-4">
-                                            <a href="${bookShowRoute.replace(':id', book.id)}" class="text-decoration-none card-link" style="color:inherit">
-                                                <div class="card h-100 book-card-hover" style="cursor:pointer;">
-                                                    <div class="pt-3" style="background: #f8f9fa; border-top-left-radius: 0.375rem; border-top-right-radius: 0.375rem;">
-                                                        <img src="${cover}" class="card-img-top book-cover-thumb" alt="${title}"
-                                                             style="height: 160px; width: auto; max-width: 100%; object-fit: contain; display: block; margin-left: auto; margin-right: auto;">
-                                                    </div>
-                                                    <div class="card-body p-2">
-                                                        <h6 class="card-title small mb-0">${title}</h6>
-                                                        <p class="card-text small mb-0">${author}</p>
-                                                        ${seriesText ? `<p class="card-text small text-muted mb-0" style="font-size: 0.75rem;">${seriesText}</p>` : ''}
-                                                    </div>
-                                                </div>
-                                            </a>
-                                        </div>
-                                    `);
+                                                                <div class="col-md-3 mb-4">
+                                                                    <a href="${bookShowRoute.replace(':id', book.id)}" class="text-decoration-none card-link" style="color:inherit">
+                                                                        <div class="card h-100 book-card-hover" style="cursor:pointer;">
+                                                                            <div class="pt-3" style="background: #f8f9fa; border-top-left-radius: 0.375rem; border-top-right-radius: 0.375rem;">
+                                                                                <img src="${cover}" class="card-img-top book-cover-thumb" alt="${title}"
+                                                                                     style="height: 160px; width: auto; max-width: 100%; object-fit: contain; display: block; margin-left: auto; margin-right: auto;">
+                                                                            </div>
+                                                                            <div class="card-body p-2">
+                                                                                <h6 class="card-title small mb-0">${title}</h6>
+                                                                                <p class="card-text small mb-0">${author}</p>
+                                                                                ${seriesText ? `<p class="card-text small text-muted mb-0" style="font-size: 0.75rem;">${seriesText}</p>` : ''}
+                                                                            </div>
+                                                                        </div>
+                                                                    </a>
+                                                                </div>
+                                                            `);
                     }
                     // Compact view (6 columns)
                     else if (mainViewType === 'compact') {
                         $('#main-books-compact').append(`
-                                        <div class="col-md-2 mb-3">
-                                            <a href="${bookShowRoute.replace(':id', book.id)}" class="text-decoration-none card-link" style="color:inherit">
-                                                <div class="card h-100 book-card-hover" style="cursor:pointer;">
-                                                    <div class="pt-2" style="background: #f8f9fa; border-top-left-radius: 0.375rem; border-top-right-radius: 0.375rem;">
-                                                        <img src="${cover}" class="card-img-top book-cover-thumb" alt="${title}"
-                                                             style="height: 120px; width: auto; max-width: 100%; object-fit: contain; display: block; margin-left: auto; margin-right: auto;">
-                                                    </div>
-                                                    <div class="card-body p-2">
-                                                        <h6 class="card-title small mb-0" style="font-size: 0.8rem;">${title}</h6>
-                                                        <p class="card-text small mb-0" style="font-size: 0.75rem;">${author}</p>
-                                                        ${seriesText ? `<p class="card-text small text-muted mb-0" style="font-size: 0.7rem;">${seriesText}</p>` : ''}
-                                                    </div>
-                                                </div>
-                                            </a>
-                                        </div>
-                                    `);
+                                                                <div class="col-md-2 mb-3">
+                                                                    <a href="${bookShowRoute.replace(':id', book.id)}" class="text-decoration-none card-link" style="color:inherit">
+                                                                        <div class="card h-100 book-card-hover" style="cursor:pointer;">
+                                                                            <div class="pt-2" style="background: #f8f9fa; border-top-left-radius: 0.375rem; border-top-right-radius: 0.375rem;">
+                                                                                <img src="${cover}" class="card-img-top book-cover-thumb" alt="${title}"
+                                                                                     style="height: 120px; width: auto; max-width: 100%; object-fit: contain; display: block; margin-left: auto; margin-right: auto;">
+                                                                            </div>
+                                                                            <div class="card-body p-2">
+                                                                                <h6 class="card-title small mb-0" style="font-size: 0.8rem;">${title}</h6>
+                                                                                <p class="card-text small mb-0" style="font-size: 0.75rem;">${author}</p>
+                                                                                ${seriesText ? `<p class="card-text small text-muted mb-0" style="font-size: 0.7rem;">${seriesText}</p>` : ''}
+                                                                            </div>
+                                                                        </div>
+                                                                    </a>
+                                                                </div>
+                                                            `);
                     }
                     // List view
                     else if (mainViewType === 'list') {
                         $('#main-books-list tbody').append(`
-                                        <tr>
-                                            <td>
-                                                <img src="${cover}" alt="${title}" style="height: 64px; width: auto; max-width: 64px; object-fit: contain;">
-                                            </td>
-                                            <td>
-                                                <a href="${bookShowRoute.replace(':id', book.id)}" class="text-decoration-none">${title}</a>
-                                                ${seriesText ? `<div class="small text-muted">${seriesText}</div>` : ''}
-                                            </td>
-                                            <td>${book.author && book.author.length ? book.author.join(', ') : 'Unknown'}</td>
-                                            <td>${book.genre && book.genre.length ? book.genre.join(', ') : 'Unknown'}</td>
-                                            <td>
-                                                <a href="${bookDownloadRoute.replace(':id', book.id)}" class="btn btn-sm btn-secondary"><i class="fas fa-download"></i></a>
-                                            </td>
-                                        </tr>
-                                    `);
+                                                                <tr>
+                                                                    <td>
+                                                                        <img src="${cover}" alt="${title}" style="height: 64px; width: auto; max-width: 64px; object-fit: contain;">
+                                                                    </td>
+                                                                    <td>
+                                                                        <a href="${bookShowRoute.replace(':id', book.id)}" class="text-decoration-none">${title}</a>
+                                                                        ${seriesText ? `<div class="small text-muted">${seriesText}</div>` : ''}
+                                                                    </td>
+                                                                    <td>${book.author && book.author.length ? book.author.join(', ') : 'Unknown'}</td>
+                                                                    <td>${book.genre && book.genre.length ? book.genre.join(', ') : 'Unknown'}</td>
+                                                                    <td>
+                                                                        <a href="${bookDownloadRoute.replace(':id', book.id)}" class="btn btn-sm btn-secondary"><i class="fas fa-download"></i></a>
+                                                                    </td>
+                                                                </tr>
+                                                            `);
                     }
                 });
 
@@ -935,18 +934,18 @@
                     seriesText = book.series.map(s => `${s.seriesName}${s.number ? ' (Book ' + s.number + ')' : ''}`).join(', ');
                 }
                 return `
-                                <a href="/books/${book.id}" class="text-decoration-none">
-                                    <div class="card h-100 book-card-hover">
-                                        <img src="${cover}" class="card-img-top book-cover-thumb" alt="${title}"
-                                             style="height: 150px; width: auto; max-width: 100%; object-fit: contain; background: #f8f9fa; display: block; margin-left: auto; margin-right: auto; padding-top: 15px;">
-                                        <div class="card-body p-2">
-                                            <h6 class="card-title small mb-0">${title}</h6>
-                                            <p class="card-text small text-muted">${author}</p>
-                                            ${seriesText ? `<p class="card-text small text-muted mb-0" style="font-size: 0.75rem;">${seriesText}</p>` : ''}
-                                        </div>
-                                    </div>
-                                </a>
-                            `;
+                                                        <a href="/books/${book.id}" class="text-decoration-none">
+                                                            <div class="card h-100 book-card-hover">
+                                                                <img src="${cover}" class="card-img-top book-cover-thumb" alt="${title}"
+                                                                     style="height: 150px; width: auto; max-width: 100%; object-fit: contain; background: #f8f9fa; display: block; margin-left: auto; margin-right: auto; padding-top: 15px;">
+                                                                <div class="card-body p-2">
+                                                                    <h6 class="card-title small mb-0">${title}</h6>
+                                                                    <p class="card-text small text-muted">${author}</p>
+                                                                    ${seriesText ? `<p class="card-text small text-muted mb-0" style="font-size: 0.75rem;">${seriesText}</p>` : ''}
+                                                                </div>
+                                                            </div>
+                                                        </a>
+                                                    `;
             }
 
             function createCompactCard(book) {
@@ -959,18 +958,18 @@
                     seriesText = book.series.map(s => `${s.seriesName}${s.number ? ' (Book ' + s.number + ')' : ''}`).join(', ');
                 }
                 return `
-                                <a href="/books/${book.id}" class="text-decoration-none">
-                                    <div class="card h-100 book-card-hover">
-                                        <img src="${cover}" class="card-img-top book-cover-thumb" alt="${title}"
-                                             style="height: 120px; width: auto; max-width: 100%; object-fit: contain; background: #f8f9fa; display: block; margin-left: auto; margin-right: auto; padding-top: 10px;">
-                                        <div class="card-body p-2">
-                                            <p class="card-title small mb-0 text-truncate">${title}</p>
-                                            <p class="card-text small mb-0" style="font-size: 0.75rem;">${author}</p>
-                                            ${seriesText ? `<p class="card-text small text-muted mb-0" style="font-size: 0.7rem;">${seriesText}</p>` : ''}
-                                        </div>
-                                    </div>
-                                </a>
-                            `;
+                                                        <a href="/books/${book.id}" class="text-decoration-none">
+                                                            <div class="card h-100 book-card-hover">
+                                                                <img src="${cover}" class="card-img-top book-cover-thumb" alt="${title}"
+                                                                     style="height: 120px; width: auto; max-width: 100%; object-fit: contain; background: #f8f9fa; display: block; margin-left: auto; margin-right: auto; padding-top: 10px;">
+                                                                <div class="card-body p-2">
+                                                                    <p class="card-title small mb-0 text-truncate">${title}</p>
+                                                                    <p class="card-text small mb-0" style="font-size: 0.75rem;">${author}</p>
+                                                                    ${seriesText ? `<p class="card-text small text-muted mb-0" style="font-size: 0.7rem;">${seriesText}</p>` : ''}
+                                                                </div>
+                                                            </div>
+                                                        </a>
+                                                    `;
             }
 
             function createListRow(book) {
@@ -984,21 +983,21 @@
                     seriesText = book.series.map(s => `${s.seriesName}${s.number ? ' (Book ' + s.number + ')' : ''}`).join(', ');
                 }
                 return `
-                                <td>
-                                    <img src="${cover}" alt="${title}" style="height: 48px; width: auto; object-fit: contain;">
-                                </td>
-                                <td>
-                                    <a href="/books/${book.id}">${title}</a>
-                                    ${seriesText ? `<div class="small text-muted">${seriesText}</div>` : ''}
-                                </td>
-                                <td>${author}</td>
-                                <td>${genre}</td>
-                                <td>
-                                    <a href="/books/${book.id}/download" class="btn btn-sm btn-secondary">
-                                        <i class="fas fa-download"></i>
-                                    </a>
-                                </td>
-                            `;
+                                                        <td>
+                                                            <img src="${cover}" alt="${title}" style="height: 48px; width: auto; object-fit: contain;">
+                                                        </td>
+                                                        <td>
+                                                            <a href="/books/${book.id}">${title}</a>
+                                                            ${seriesText ? `<div class="small text-muted">${seriesText}</div>` : ''}
+                                                        </td>
+                                                        <td>${author}</td>
+                                                        <td>${genre}</td>
+                                                        <td>
+                                                            <a href="/books/${book.id}/download" class="btn btn-sm btn-secondary">
+                                                                <i class="fas fa-download"></i>
+                                                            </a>
+                                                        </td>
+                                                    `;
             }
 
             function initializeClickHandlers() {
