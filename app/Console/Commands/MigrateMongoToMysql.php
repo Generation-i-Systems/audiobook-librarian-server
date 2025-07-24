@@ -240,6 +240,11 @@ class MigrateMongoToMysql extends Command
 
             $this->runSanityChecks($this->mysqlService);
 
+            // Run cover image fixing and title processing after migration
+            $this->info("Running cover image fixes and title processing...");
+            $this->call('cover:check');
+            $this->call('books:process-titles-interactive');
+
         } catch (\Exception $e) {
             $this->error("An error occurred during migration: " . $e->getMessage());
             return 1;
