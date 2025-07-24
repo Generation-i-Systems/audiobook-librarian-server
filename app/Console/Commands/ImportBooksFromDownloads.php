@@ -312,7 +312,7 @@ class ImportBooksFromDownloads extends Command
 
         // Step 3: Manual review (unless in auto mode)
         if (!$this->option('auto') && !$this->option('dry-run')) {
-            if (!$this->reviewAndApprove($aiMetadata)) {
+            if (!$this->reviewAndApprove($aiMetadata, $audiobook)) {
                 $this->warn("❌ Import rejected by user");
                 $this->skippedBooks[] = [
                     'path' => $audiobook['path'],
@@ -320,6 +320,14 @@ class ImportBooksFromDownloads extends Command
                 ];
                 return;
             }
+        } elseif ($this->option('auto') && !$this->hasEnrichmentData($aiMetadata)) {
+            // In auto mode, skip books with no enrichment data as the detected fields might be wrong
+            $this->warn("⚠️  No enrichment data found in auto mode - skipping (detected fields might be incorrect)");
+            $this->skippedBooks[] = [
+                'path' => $audiobook['path'],
+                'reason' => 'No enrichment data in auto mode'
+            ];
+            return;
         }
 
         // Step 4: Import to database
@@ -483,16 +491,38 @@ class ImportBooksFromDownloads extends Command
     /**
      * Manual review and approval
      */
-    protected function reviewAndApprove(array &$metadata): bool
+    protected function reviewAndApprove(array &$metadata, array $audiobook = []): bool
     {
         $this->warn("🔍 Manual Review Required");
         
-        // Ask if user wants to accept all fields as shown
-        if ($this->confirm("Accept all metadata as shown in the table above?", true)) {
-            return true;
+        // If no enrichment data found, assume detected fields are wrong and skip auto-approval
+        if (!$this->hasEnrichmentData($metadata)) {
+            $this->warn("⚠️  No external enrichment data found - detected fields may be incorrect");
+            $this->info("📝 Please review and edit the metadata:");
+        } else {
+            // Ask if user wants to accept all fields as shown
+            $this->line("\nOptions:");
+            $this->line("1. Accept all metadata as shown");
+            $this->line("2. Edit individual fields");
+            $this->line("3. Skip this book");
+            
+            $choice = $this->ask("Choose an option (1-3)", '2');
+            
+            switch ($choice) {
+                case '1':
+                    return true;
+                case '2':
+                    // Continue to field editing below
+                    break;
+                case '3':
+                    return false;
+                default:
+                    // Default to editing
+                    break;
+            }
         }
         
-        // If not accepting all, offer individual field editing
+        // Offer individual field editing
         $this->info("📝 Edit individual fields (press Enter to keep current value):");
         
         // Edit title
@@ -541,6 +571,23 @@ class ImportBooksFromDownloads extends Command
         $newYear = $this->ask("Year", $currentYear);
         if ($newYear !== $currentYear) {
             $metadata['year'] = $newYear;
+        }
+
+        // If we started with no enrichment data, try to enrich with the edited metadata
+        if (!$this->hasEnrichmentData($metadata) && !$this->option('skip-enrichment')) {
+            if ($this->confirm("Try to find enrichment data with the edited metadata?", true)) {
+                $this->info("🔍 Attempting to enrich with edited metadata...");
+                $enrichedData = $this->enrichWithExternalData($metadata);
+                if ($enrichedData) {
+                    $metadata = array_merge($metadata, $enrichedData);
+                    $this->info("✅ Found enrichment data with edited metadata!");
+                    $this->newLine();
+                    $this->displayEnrichedMetadata($metadata);
+                    $this->newLine();
+                } else {
+                    $this->warn("⚠️  Still no enrichment data found");
+                }
+            }
         }
 
         return $this->confirm("Import this book with the edited metadata?", true);
@@ -962,7 +1009,7 @@ class ImportBooksFromDownloads extends Command
 
             $targetDir = $bookStoragePath . '/' . $book->directory_path;
             
-            // Check if target directory already exists
+            // Check if target directory already exists before creating it
             if (File::isDirectory($targetDir)) {
                 $conflictAction = $this->handleDirectoryConflict($audiobook, $targetDir);
                 
@@ -975,51 +1022,57 @@ class ImportBooksFromDownloads extends Command
                     case 'replace':
                         $this->info("🗑️  Removing existing directory to replace with new files");
                         File::deleteDirectory($targetDir);
-                        File::makeDirectory($targetDir, 0755, true);
                         break;
                         
                     case 'rename_existing':
                         $newExistingPath = $targetDir . '_backup_' . date('Y-m-d_H-i-s');
                         File::move($targetDir, $newExistingPath);
                         $this->info("📁 Renamed existing directory to: " . basename($newExistingPath));
-                        File::makeDirectory($targetDir, 0755, true);
                         break;
                         
                     case 'rename_new':
                         $targetDir = $targetDir . '_imported_' . date('Y-m-d_H-i-s');
                         $this->info("📁 Importing to renamed directory: " . basename($targetDir));
-                        File::makeDirectory($targetDir, 0755, true);
                         break;
                         
                     case 'cancel':
                         $this->warn("❌ Import cancelled by user");
                         return false;
                 }
-            } else {
-                // Create target directory
-                File::makeDirectory($targetDir, 0755, true);
             }
+            
+            // Create target directory (after handling conflicts)
+            File::makeDirectory($targetDir, 0755, true);
 
-            // Move or copy files (default is move)
+            // Move or copy all files in the directory (not just audio files)
             $copyFiles = $this->option('copy-files');
             $filesMoved = 0;
             $filesCopied = 0;
             
-            foreach ($audiobook['files'] as $sourceFile) {
-                $fileName = basename($sourceFile);
-                $targetFile = $targetDir . '/' . $fileName;
+            // Get all files in the source directory
+            $allFiles = File::allFiles($audiobook['path']);
+            
+            foreach ($allFiles as $sourceFile) {
+                $relativePath = str_replace($audiobook['path'] . '/', '', $sourceFile->getPathname());
+                $targetFile = $targetDir . '/' . $relativePath;
+                
+                // Create subdirectories if needed
+                $targetSubDir = dirname($targetFile);
+                if (!File::isDirectory($targetSubDir)) {
+                    File::makeDirectory($targetSubDir, 0755, true);
+                }
                 
                 if ($copyFiles) {
-                    File::copy($sourceFile, $targetFile);
+                    File::copy($sourceFile->getPathname(), $targetFile);
                     $filesCopied++;
                 } else {
                     // Try to move first, fallback to copy if move fails
                     try {
-                        File::move($sourceFile, $targetFile);
+                        File::move($sourceFile->getPathname(), $targetFile);
                         $filesMoved++;
                     } catch (\Exception $e) {
-                        $this->warn("⚠️  Failed to move {$fileName}, copying instead: " . $e->getMessage());
-                        File::copy($sourceFile, $targetFile);
+                        $this->warn("⚠️  Failed to move {$relativePath}, copying instead: " . $e->getMessage());
+                        File::copy($sourceFile->getPathname(), $targetFile);
                         $filesCopied++;
                     }
                 }
@@ -1595,6 +1648,33 @@ class ImportBooksFromDownloads extends Command
         }
         
         return null;
+    }
+
+    /**
+     * Check if metadata contains enrichment data from external sources
+     */
+    protected function hasEnrichmentData(array $metadata): bool
+    {
+        // Check for data that typically comes from external sources
+        $enrichmentFields = [
+            'audible_raw',
+            'google_books_raw',
+            'audiobook_bay_raw',
+            'cover_url'
+        ];
+        
+        foreach ($enrichmentFields as $field) {
+            if (!empty($metadata[$field])) {
+                return true;
+            }
+        }
+        
+        // Also check if we have a detailed description (usually from external sources)
+        if (!empty($metadata['description']) && strlen($metadata['description']) > 100) {
+            return true;
+        }
+        
+        return false;
     }
 
     /**
