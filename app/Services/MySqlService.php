@@ -141,7 +141,7 @@ class MySqlService implements DocumentStoreServiceInterface
                 $params[] = '%' . $filters['search'] . '%';
             }
             
-            $books = \DB::select("
+            $books = DB::select("
                 SELECT id, title, cover_image, directory_path
                 FROM books 
                 {$whereClause}
@@ -149,7 +149,7 @@ class MySqlService implements DocumentStoreServiceInterface
                 LIMIT {$perPage} OFFSET {$offset}
             ", $params);
             
-            $total = \DB::scalar("SELECT COUNT(*) FROM books {$whereClause}", $params);
+            $total = DB::scalar("SELECT COUNT(*) FROM books {$whereClause}", $params);
             
             // Minimal transformation
             $data = [];
@@ -863,6 +863,21 @@ class MySqlService implements DocumentStoreServiceInterface
     public function searchNarratorsByName(string $term): array
     {
         return $this->autocompleteNarrators($term);
+    }
+
+    public function searchGenresByName(string $term): array
+    {
+        if (empty($term)) {
+            return [];
+        }
+
+        $genres = Genre::where('name', 'LIKE', '%' . $term . '%')
+            ->orderBy('name')
+            ->limit(20)
+            ->pluck('name')
+            ->toArray();
+
+        return $genres;
     }
 
     public function getMessages(?string $userId = null, bool $includeAcknowledged = false, int $limit = 100): array
