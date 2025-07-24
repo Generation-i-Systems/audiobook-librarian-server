@@ -1009,33 +1009,42 @@ class ImportBooksFromDownloads extends Command
             
             // Check if target directory already exists before creating it
             if (File::isDirectory($targetDir)) {
-                $conflictAction = $this->handleDirectoryConflict($audiobook, $targetDir);
+                // Check if the existing directory is empty
+                $existingFiles = File::allFiles($targetDir);
                 
-                switch ($conflictAction) {
-                    case 'skip':
-                        $this->info("⏭️  Skipping file operations - directories are identical");
-                        $this->cleanupSourceDirectory($audiobook, true); // Clean up since files already exist
-                        return true;
-                        
-                    case 'replace':
-                        $this->info("🗑️  Removing existing directory to replace with new files");
-                        File::deleteDirectory($targetDir);
-                        break;
-                        
-                    case 'rename_existing':
-                        $newExistingPath = $targetDir . '_backup_' . date('Y-m-d_H-i-s');
-                        File::move($targetDir, $newExistingPath);
-                        $this->info("📁 Renamed existing directory to: " . basename($newExistingPath));
-                        break;
-                        
-                    case 'rename_new':
-                        $targetDir = $targetDir . '_imported_' . date('Y-m-d_H-i-s');
-                        $this->info("📁 Importing to renamed directory: " . basename($targetDir));
-                        break;
-                        
-                    case 'cancel':
-                        $this->warn("❌ Import cancelled by user");
-                        return false;
+                if (empty($existingFiles)) {
+                    // Directory exists but is empty - no conflict, just proceed
+                    $this->info("📁 Target directory exists but is empty - proceeding with import");
+                } else {
+                    // Directory has files - handle the conflict
+                    $conflictAction = $this->handleDirectoryConflict($audiobook, $targetDir);
+                    
+                    switch ($conflictAction) {
+                        case 'skip':
+                            $this->info("⏭️  Skipping file operations - directories are identical");
+                            $this->cleanupSourceDirectory($audiobook, true); // Clean up since files already exist
+                            return true;
+                            
+                        case 'replace':
+                            $this->info("🗑️  Removing existing directory to replace with new files");
+                            File::deleteDirectory($targetDir);
+                            break;
+                            
+                        case 'rename_existing':
+                            $newExistingPath = $targetDir . '_backup_' . date('Y-m-d_H-i-s');
+                            File::move($targetDir, $newExistingPath);
+                            $this->info("📁 Renamed existing directory to: " . basename($newExistingPath));
+                            break;
+                            
+                        case 'rename_new':
+                            $targetDir = $targetDir . '_imported_' . date('Y-m-d_H-i-s');
+                            $this->info("📁 Importing to renamed directory: " . basename($targetDir));
+                            break;
+                            
+                        case 'cancel':
+                            $this->warn("❌ Import cancelled by user");
+                            return false;
+                    }
                 }
             }
             
