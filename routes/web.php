@@ -195,6 +195,11 @@ Route::middleware(['auth'])->group(function () {
 
 Route::post('/messages', [MessageController::class, 'store'])->name('messages.store');
 
+// CSRF token refresh endpoint
+Route::get('/csrf-token', function () {
+    return response()->json(['csrf_token' => csrf_token()]);
+})->name('csrf.token');
+
 // Regular book routes (handled by the auth middleware group above)
 
 // JSON API endpoints for AJAX requests
