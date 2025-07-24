@@ -11,6 +11,17 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    ->withSchedule(function ($schedule) {
+        // Run database backup nightly at 2:00 AM
+        $schedule->command('backup:database --verify')
+                 ->dailyAt('02:00')
+                 ->appendOutputTo(storage_path('logs/backup-cron.log'));
+                 
+        // Run database backup weekly with extra verification on Sundays at 3:00 AM
+        $schedule->command('backup:database --verify')
+                 ->weeklyOn(0, '03:00') // Sunday at 3:00 AM
+                 ->appendOutputTo(storage_path('logs/backup-cron.log'));
+    })
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->api([
             \Illuminate\Cookie\Middleware\EncryptCookies::class,
