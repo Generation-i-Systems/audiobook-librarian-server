@@ -3,6 +3,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
+use App\Services\AIBookProcessor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
@@ -414,6 +415,219 @@ class ImportFileController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Extract metadata from a file or directory using AI enhancement and redirect to import form.
+     */
+    public function extractWithAI(Request $request)
+    {
+        try {
+            $root = $request->input('root');
+            $relPath = $request->input('path');
+            $type = $request->input('type');
+            $aiModel = $request->input('aiModel', 'gemini-2.5-flash-lite');
+            $redirectToForm = $request->input('redirectToForm', false);
+
+            Log::debug("[ImportFile] AI extraction: root={$root}, path={$relPath}, type={$type}, model={$aiModel}");
+
+            // First, do the regular extraction
+            $regularExtractionRequest = new Request([
+                'root' => $root,
+                'path' => $relPath,
+                'type' => $type,
+                'redirectToForm' => false
+            ]);
+
+            $regularResponse = $this->extract($regularExtractionRequest);
+            $regularData = $regularResponse->getData(true);
+
+            if (!$regularData['success']) {
+                return $regularResponse; // Return the error from regular extraction
+            }
+
+            // Check if AI processing is available for the selected model
+            $provider = $this->determineAIProvider($aiModel);
+            $apiKey = $this->getAPIKey($provider);
+
+            if (empty($apiKey)) {
+                Log::warning("[ImportFile] AI model {$aiModel} requested but API key not configured");
+                // Fall back to regular extraction with a warning
+                $regularData['aiWarning'] = "AI enhancement unavailable: {$provider} API key not configured. Using basic extraction.";
+                return response()->json($regularData);
+            }
+
+            // Enhance with AI processing
+            try {
+                $aiProcessor = new AIBookProcessor($aiModel, true); // Use paid tier for better results
+
+                // Prepare data for AI processing
+                $directoryPath = $regularData['directoryPath'];
+                $audioFiles = [];
+                $fileTags = [];
+
+                // Extract audio file information
+                if (isset($regularData['files']) && is_array($regularData['files'])) {
+                    foreach ($regularData['files'] as $file) {
+                        $audioFiles[] = $file['name'];
+
+                        // Extract tags from the first few files
+                        if (count($fileTags) < 3 && isset($file['path'])) {
+                            $tags = $aiProcessor->extractFileTags($file['path']);
+                            if (!empty($tags)) {
+                                $fileTags[basename($file['path'])] = $tags;
+                            }
+                        }
+                    }
+                }
+
+                // Process with AI
+                $aiMetadata = $aiProcessor->processBookDirectory($directoryPath, $audioFiles, $fileTags);
+
+                // Merge AI results with regular extraction, preferring AI when available and confident
+                if ($aiMetadata['confidence'] >= 70) {
+                    $enhancedData = $this->mergeAIWithRegularExtraction($regularData, $aiMetadata);
+                    $enhancedData['aiEnhanced'] = true;
+                    $enhancedData['aiConfidence'] = $aiMetadata['confidence'];
+                    $enhancedData['aiModel'] = $aiModel;
+
+                    Log::info("[ImportFile] AI enhancement successful", [
+                        'model' => $aiModel,
+                        'confidence' => $aiMetadata['confidence'],
+                        'title' => $aiMetadata['title'] ?? 'N/A'
+                    ]);
+
+                    // If redirectToForm is true, redirect to the import form with AI-enhanced data
+                    if ($redirectToForm) {
+                        $formData = $this->prepareFormDataForRedirect($enhancedData, $enhancedData['directoryPath'], $enhancedData['genrePath']);
+                        return redirect()->route('admin.books.create', $formData);
+                    }
+
+                    return response()->json($enhancedData);
+                } else {
+                    // Low confidence AI result, use regular extraction but include AI suggestions
+                    $regularData['aiSuggestions'] = $aiMetadata;
+                    $regularData['aiModel'] = $aiModel;
+                    $regularData['aiWarning'] = "AI confidence too low ({$aiMetadata['confidence']}%). Using basic extraction with AI suggestions for review.";
+
+                    Log::info("[ImportFile] AI enhancement low confidence", [
+                        'model' => $aiModel,
+                        'confidence' => $aiMetadata['confidence']
+                    ]);
+                }
+
+            } catch (\Exception $e) {
+                Log::error("[ImportFile] AI processing failed: " . $e->getMessage());
+                $regularData['aiWarning'] = "AI processing failed: " . $e->getMessage() . ". Using basic extraction.";
+            }
+
+            // If redirectToForm is true and we're using regular data, redirect with that
+            if ($redirectToForm) {
+                $formData = $this->prepareFormDataForRedirect($regularData, $regularData['directoryPath'], $regularData['genrePath']);
+                return redirect()->route('admin.books.create', $formData);
+            }
+
+            return response()->json($regularData);
+
+        } catch (\Exception $e) {
+            Log::error('[ImportFile] AI-enhanced extraction failed: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'AI-enhanced extraction failed',
+                'details' => $e->getMessage(),
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Determine AI provider from model name
+     */
+    private function determineAIProvider(string $model): string
+    {
+        if (str_starts_with($model, 'gemini-')) {
+            return 'gemini';
+        } elseif (str_starts_with($model, 'claude-')) {
+            return 'claude';
+        } elseif (str_starts_with($model, 'gpt-')) {
+            return 'openai';
+        }
+
+        return 'gemini'; // Default fallback
+    }
+
+    /**
+     * Get API key for the specified provider
+     */
+    private function getAPIKey(string $provider): ?string
+    {
+        switch ($provider) {
+            case 'gemini':
+                return config('services.gemini.api_key');
+            case 'claude':
+                return config('services.claude.api_key');
+            case 'openai':
+                return config('services.openai.api_key');
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * Merge AI metadata with regular extraction results
+     */
+    private function mergeAIWithRegularExtraction(array $regularData, array $aiMetadata): array
+    {
+        $merged = $regularData;
+
+        // Prefer AI results for core metadata when available and confident
+        if (!empty($aiMetadata['title'])) {
+            $merged['title'] = $aiMetadata['title'];
+        }
+
+        if (!empty($aiMetadata['author']) && is_array($aiMetadata['author'])) {
+            $merged['author'] = implode(', ', $aiMetadata['author']);
+        }
+
+        if (!empty($aiMetadata['narrator']) && is_array($aiMetadata['narrator'])) {
+            $merged['narrator'] = implode(', ', $aiMetadata['narrator']);
+        }
+
+        if (!empty($aiMetadata['series'])) {
+            $merged['series'] = $aiMetadata['series'];
+            $merged['seriesName'] = $aiMetadata['series'];
+        }
+
+        if (!empty($aiMetadata['series_number'])) {
+            $merged['seriesNumber'] = $aiMetadata['series_number'];
+        }
+
+        if (!empty($aiMetadata['genre']) && is_array($aiMetadata['genre'])) {
+            $merged['genre'] = implode(', ', $aiMetadata['genre']);
+        }
+
+        if (!empty($aiMetadata['year'])) {
+            $merged['year'] = $aiMetadata['year'];
+            $merged['publishedYear'] = $aiMetadata['year'];
+        }
+
+        if (!empty($aiMetadata['description'])) {
+            $merged['description'] = $aiMetadata['description'];
+        }
+
+        if (!empty($aiMetadata['publisher'])) {
+            $merged['publisher'] = $aiMetadata['publisher'];
+        }
+
+        if (!empty($aiMetadata['language'])) {
+            $merged['language'] = $aiMetadata['language'];
+        }
+
+        if (!empty($aiMetadata['isbn'])) {
+            $merged['isbn'] = $aiMetadata['isbn'];
+        }
+
+        return $merged;
     }
 
 

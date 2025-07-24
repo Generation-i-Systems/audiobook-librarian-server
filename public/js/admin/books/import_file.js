@@ -16,6 +16,7 @@
         const ajaxRootsUrl = options.ajaxRootsUrl || '/admin/import/roots';
         const ajaxListUrl = options.ajaxListUrl || '/admin/import/list';
         const ajaxExtractUrl = options.ajaxExtractUrl || '/admin/import/extract';
+        const ajaxExtractAIUrl = options.ajaxExtractAIUrl || '/admin/import/extract-ai';
         const ajaxMoveUrl = options.ajaxMoveUrl || '/admin/import/move';
         const ajaxProcessImportUrl = options.ajaxProcessImportUrl || '/admin/books/processImport';
 
@@ -43,6 +44,9 @@
 
         // Initialize the browser
         init();
+
+        // AI processing handlers
+        initAIHandlers();
 
         // Initialize
         function init() {
@@ -98,6 +102,54 @@
                 $root.find('#import-directory-list').html('<div class="text-danger">Failed to load directory: ' + xhr.statusText + '</div>');
             });
         }
+
+        // Initialize AI processing handlers
+        function initAIHandlers() {
+            // AI checkbox toggle handler
+            $root.on('change', '#enable-ai-processing', function() {
+                const isEnabled = $(this).is(':checked');
+                const $modelSelection = $root.find('#ai-model-selection');
+                const $costInfo = $root.find('#ai-cost-info');
+                const $btnText = $root.find('#import-btn-text');
+
+                if (isEnabled) {
+                    $modelSelection.show();
+                    $btnText.text('Select & Process with AI');
+                    updateCostInfo();
+                } else {
+                    $modelSelection.hide();
+                    $costInfo.text('💰 Basic extraction (no AI cost)');
+                    $btnText.text('Select & Extract');
+                }
+            });
+
+            // AI model selection change handler
+            $root.on('change', '#ai-model-select', function() {
+                updateCostInfo();
+            });
+
+            // Initialize cost info
+            updateCostInfo();
+        }
+
+        // Update cost information based on selected model
+        function updateCostInfo() {
+            const $costInfo = $root.find('#ai-cost-info');
+            const selectedModel = $root.find('#ai-model-select').val();
+
+            const costInfo = {
+                'gemini-2.5-flash-lite': '💰 Free tier - 1,000 requests/day',
+                'gemini-2.0-flash-lite': '💰 Free tier - 200 requests/day',
+                'gpt-4o-mini': '💰 ~$0.0002 per book (~$0.22/1000 books)',
+                'gpt-3.5-turbo': '💰 ~$0.0006 per book (~$0.60/1000 books)',
+                'claude-3-5-haiku': '💰 ~$0.0012 per book (~$1.20/1000 books)',
+                'gpt-4o': '💰 ~$0.0038 per book (~$3.75/1000 books)',
+                'claude-3-5-sonnet': '💰 ~$0.0045 per book (~$4.50/1000 books)'
+            };
+
+            $costInfo.text(costInfo[selectedModel] || '💰 Cost varies by usage');
+        }
+
         function renderDirectoryList(data) {
             const $list = $('<ul class="list-group"></ul>');
             if (data.parent) {
@@ -148,7 +200,7 @@
             currentRoot = $(this).val();
             loadDirectory('');
         });
-        // Updated click handler for new simplified workflow
+        // Updated click handler for new simplified workflow with AI support
         $root.on('click', '#import-select-btn', function () {
             // Determine the selected item (file or directory)
             const $selectedItem = $root.find('.list-group-item.active');
@@ -164,9 +216,13 @@
                 selectedType = 'dir';
             }
 
+            // Check if AI processing is enabled
+            const aiEnabled = $root.find('#enable-ai-processing').is(':checked');
+            const aiModel = $root.find('#ai-model-select').val();
+
             // Show loading state
             const $btn = $(this);
-            const originalText = $btn.text();
+            const originalText = $btn.html();
             $btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...');
 
             // Prepare payload for metadata extraction and redirect
@@ -177,9 +233,17 @@
                 redirectToForm: true
             };
 
+            // Add AI parameters if enabled
+            if (aiEnabled) {
+                payload.aiModel = aiModel;
+            }
+
+            // Choose the appropriate endpoint
+            const extractUrl = aiEnabled ? ajaxExtractAIUrl : ajaxExtractUrl;
+
             // Create a form to submit the data via POST
             const $form = $('<form>', {
-                action: ajaxExtractUrl,
+                action: extractUrl,
                 method: 'POST',
                 style: 'display: none;'
             });
@@ -207,7 +271,7 @@
 
             // Re-enable button after delay (form will redirect)
             setTimeout(function() {
-                $btn.prop('disabled', false).text(originalText);
+                $btn.prop('disabled', false).html(originalText);
             }, 2000);
         });
         // This function is no longer needed in the new simplified workflow

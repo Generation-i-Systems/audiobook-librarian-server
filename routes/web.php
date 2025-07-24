@@ -267,6 +267,11 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
             'extract',
         ])->name('import.extract');
 
+        Route::post('extract-ai', [
+            \App\Http\Controllers\Admin\ImportFileController::class,
+            'extractWithAI',
+        ])->name('import.extract.ai');
+
         Route::post('move', [
             \App\Http\Controllers\Admin\ImportFileController::class,
             'moveSelected',

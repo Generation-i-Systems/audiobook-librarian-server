@@ -103,6 +103,13 @@ A Laravel-based audiobook library and management system for personal and family 
 - User authentication (API & web)
 - Dynamic add/remove for authors, series, genres
 - Directory resync for metadata
+- **AI-Powered Book Processing** with multi-provider support
+  - Google Gemini models (free + paid tiers)
+  - Anthropic Claude models (paid tier)
+  - OpenAI ChatGPT models (paid tier)
+  - Automatic metadata extraction from directory paths, filenames, and audio tags
+  - Cost estimation and rate limiting
+  - Confidence-based processing with manual review options
 - Import-from-file feature for adding books directly from audio files
   - Browser interface for selecting files/directories
   - Automatic metadata extraction from audio files
@@ -332,6 +339,40 @@ GET /api/v1/books?page=2&per_page=10
 
 ---
 
+## AI-Powered Book Processing
+
+The system includes advanced AI-driven metadata extraction using **Google Gemini**, **Anthropic Claude**, and **OpenAI ChatGPT** models. Automatically extract and improve book metadata from directory paths, filenames, and audio file tags.
+
+### Quick Start
+```bash
+# Free tier processing (recommended to start)
+php artisan books:process-ai --model=gemini-2.5-flash-lite
+
+# Best paid value option
+php artisan books:process-ai --model=gpt-4o-mini
+
+# Premium quality processing
+php artisan books:process-ai --model=claude-3-5-haiku
+```
+
+### Key Features
+- **🆓 Free Tier Available**: Gemini models offer up to 1,000 free requests/day
+- **💰 Cost Control**: Automatic cost estimation and confirmation prompts
+- **🎯 Smart Processing**: Confidence-based auto-application with manual review
+- **⚡ Rate Limiting**: Respects API limits across all providers
+- **🔄 Fallback Support**: Basic extraction if AI processing fails
+
+### Cost Comparison (per 1,000 books)
+- **Gemini 2.5 Flash Lite (Free)**: $0.00 ⭐ *Best for starting*
+- **GPT-4o Mini**: ~$0.22 ⭐ *Best paid value*
+- **Claude 3.5 Haiku**: ~$1.20 ⭐ *Best quality/cost*
+- **GPT-4o**: ~$3.75 *Latest capabilities*
+- **Claude 4 Opus**: ~$22.50 *Maximum quality*
+
+📖 **For complete setup instructions, model comparisons, and advanced usage**: See [AI Processing Documentation](docs/AI_PROCESSING_SETUP.md)
+
+---
+
 ## Console Commands & Jobs
 
 ### `php artisan books:repair`
@@ -380,6 +421,32 @@ Finds books whose directories contain no audio files.
   ```
 - **On Failure:**
   - Logs warnings for missing directories or permission errors.
+
+### `php artisan books:process-ai`
+Processes books using AI to extract and improve metadata from directory paths, filenames, and audio tags.
+- **Options:**
+  - `--model`: AI model to use (gemini-2.5-flash-lite, gpt-4o-mini, claude-3-5-haiku, etc.)
+  - `--limit`: Number of books to process (default: 10)
+  - `--min-confidence`: Minimum confidence level to auto-apply changes (default: 70)
+  - `--dry-run`: Show what would be processed without making changes
+  - `--force`: Skip confirmation prompts
+  - `--book`: Process specific book IDs
+- **Behavior:**
+  - Uses AI to analyze directory paths, filenames, and audio file tags
+  - Extracts metadata including title, author, narrator, series, genre, year, etc.
+  - Applies changes based on confidence scores
+  - Saves low-confidence suggestions for manual review
+- **Sample Output:**
+  ```
+  [INFO] Starting AI-powered book processing...
+  [INFO] Using model: gpt-4o-mini (paid tier)
+  [INFO] Found 25 books to process.
+  [INFO] 💰 Estimated cost: $0.06 ($0.002 per book)
+  [▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓] 25/25
+  [INFO] Total processed: 25
+  [INFO] Books updated: 20
+  [INFO] 5 books saved for manual review due to low confidence.
+  ```
 
 ### `php artisan make:admin`
 Creates a new admin user.
