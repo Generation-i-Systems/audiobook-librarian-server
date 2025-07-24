@@ -7,11 +7,18 @@ use Illuminate\Console\Command;
 
 class UpdateNarratorNormalizedNames extends Command
 {
-    protected $signature = 'narrators:normalize-names';
-    protected $description = 'Update the normalized_name field for all narrators';
+    protected $signature = 'narrators:normalize-names {--no-backup : Skip automatic database backup}';
+    protected $description = 'Update the normalized_name field for all narrators (creates a database backup by default)';
 
     public function handle()
     {
+        // Create a database backup unless --no-backup is specified
+        if (!$this->option('no-backup')) {
+            $this->info('Creating a database backup before normalizing narrator names...');
+            $this->call('backup:database');
+            $this->info('Database backup created.');
+        }
+
         $this->info('Starting to normalize narrator names...');
         $count = 0;
         

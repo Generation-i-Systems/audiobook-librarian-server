@@ -13,14 +13,14 @@ class FixBooksCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'books:fix-duplicates-and-review-flags {--dry-run} {--ids=}'; // --ids=comma,separated,ids
+    protected $signature = 'books:fix-duplicates-and-review-flags {--dry-run} {--ids=} {--no-backup : Skip automatic database backup}'; // --ids=comma,separated,ids
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Remove duplicate books by directoryPath and flag books for review with needsReviewReasons.';
+    protected $description = 'Remove duplicate books by directoryPath and flag books for review with needsReviewReasons (creates a database backup by default).';
 
     /**
      * Create a new command instance.
@@ -39,6 +39,13 @@ class FixBooksCommand extends Command
      */
     public function handle()
     {
+        // Create a database backup unless --no-backup is specified
+        if (!$this->option('no-backup')) {
+            $this->info('Creating a database backup before fixing books...');
+            $this->call('backup:database');
+            $this->info('Database backup created.');
+        }
+
         $this->info('Starting fix for duplicate books and review flags...');
         $mongoUri = config('mongodb.uri');
         $mongoDb = config('mongodb.database');

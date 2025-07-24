@@ -22,14 +22,14 @@ class MigrateMongoToMysql extends Command
      *
      * @var string
      */
-    protected $signature = 'app:migrate-mongo-to-mysql {--force : Skip confirmation prompt} {--limit=0 : Limit the number of books to process (0 for no limit)}';
+    protected $signature = 'app:migrate-mongo-to-mysql {--force : Skip confirmation prompt} {--limit=0 : Limit the number of books to process (0 for no limit)} {--no-backup : Skip automatic database backup}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Migrate data from MongoDB to MySQL';
+    protected $description = 'Migrate data from MongoDB to MySQL (creates a database backup by default)';
 
     protected MySqlService $mysqlService;
     protected $processedBooks = 0;
@@ -49,6 +49,13 @@ class MigrateMongoToMysql extends Command
      */
     public function handle()
     {
+        // Create a database backup unless --no-backup is specified
+        if (!$this->option('no-backup')) {
+            $this->info('Creating a database backup before migration...');
+            $this->call('backup:database');
+            $this->info('Database backup created.');
+        }
+
         // Explicitly resolve MongoService here to ensure we always use it for MongoDB operations
         $this->mongoService = app(\App\Services\MongoService::class);
 

@@ -16,20 +16,27 @@ class ProcessTitlesInteractive extends Command
      *
      * @var string
      */
-    protected $signature = 'books:process-titles-interactive {--force : Skip confirmation prompts}';
+    protected $signature = 'books:process-titles-interactive {--force : Skip confirmation prompts} {--no-backup : Skip automatic database backup}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Interactively process book titles to clean up formatting, extract series info, narrators, and years';
+    protected $description = 'Interactively process book titles to clean up formatting, extract series info, narrators, and years (creates a database backup by default)';
 
     /**
      * Execute the console command.
      */
     public function handle()
     {
+        // Create a database backup unless --no-backup is specified
+        if (!$this->option('no-backup')) {
+            $this->info('Creating a database backup before interactive title processing...');
+            $this->call('backup:database');
+            $this->info('Database backup created.');
+        }
+
         $this->info('Starting interactive title processing...');
         
         $books = Book::all();

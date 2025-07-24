@@ -28,14 +28,15 @@ class ProcessBooksWithAI extends Command
                             {--dry-run : Show what would be processed without making changes}
                             {--reprocess : Process books even if already AI-processed}
                             {--model=gemini-2.5-flash-lite : Model to use (gemini-2.0-flash, gemini-2.0-flash-lite, gemini-2.5-flash, gemini-2.5-flash-lite, gemini-2.5-pro, claude-3-5-haiku, claude-3-5-sonnet, claude-4-sonnet, claude-4-opus, gpt-4o-mini, gpt-4o, gpt-4-turbo, gpt-3.5-turbo)}
-                            {--paid-tier : Use paid tier limits and pricing (requires billing setup)}';
+                            {--paid-tier : Use paid tier limits and pricing (requires billing setup)}
+                            {--no-backup : Skip automatic database backup}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Process books using AI to extract and improve metadata from directory paths, filenames, and audio tags';
+    protected $description = 'Process books using AI to extract and improve metadata from directory paths, filenames, and audio tags (creates a database backup by default)';
 
     protected AIBookProcessor $aiProcessor;
     protected int $processedCount = 0;
@@ -52,6 +53,13 @@ class ProcessBooksWithAI extends Command
      */
     public function handle()
     {
+        // Create a database backup unless --no-backup is specified
+        if (!$this->option('no-backup')) {
+            $this->info('Creating a database backup before AI processing...');
+            $this->call('backup:database');
+            $this->info('Database backup created.');
+        }
+
         // Check API keys based on model
         $model = $this->option('model');
         $isClaudeModel = str_starts_with($model, 'claude-');

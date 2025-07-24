@@ -11,17 +11,24 @@ class MigrateSeriesFormat extends Command
      *
      * @var string
      */
-    protected $signature = 'books:migrate-series-format';
+    protected $signature = 'books:migrate-series-format {--no-backup : Skip automatic database backup}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Normalize the series field for all books in both MongoDB and Firestore to the canonical format.';
+    protected $description = 'Normalize the series field for all books in both MongoDB and Firestore to the canonical format (creates a database backup by default).';
 
     public function handle()
     {
+        // Create a database backup unless --no-backup is specified
+        if (!$this->option('no-backup')) {
+            $this->info('Creating a database backup before migrating series format...');
+            $this->call('backup:database');
+            $this->info('Database backup created.');
+        }
+
         $this->info('Starting MongoDB migration...');
         $this->updateMongoDB();
         $this->info('Starting Firestore migration...');

@@ -8,12 +8,19 @@ use Illuminate\Support\Facades\Storage;
 class RepairBooksNoAudio extends Command
 {
     protected $signature = 'books:repair-no-audio {parent_path?} {--delete : Delete books with no audio files} ' .
-        '{--interactive : Interactively review each book with no audio files}';
+        '{--interactive : Interactively review each book with no audio files} {--no-backup : Skip automatic database backup}';
 
-    protected $description = 'Find (and optionally delete) books whose directory contains no audio files.';
+    protected $description = 'Find (and optionally delete) books whose directory contains no audio files (creates a database backup by default).';
 
     public function handle()
     {
+        // Create a database backup unless --no-backup is specified
+        if (!$this->option('no-backup')) {
+            $this->info('Creating a database backup before checking for books with no audio...');
+            $this->call('backup:database');
+            $this->info('Database backup created.');
+        }
+
         $this->info('Scanning for books with no audio files...');
         //     $disk = Storage::disk('books');
         //     $parent = $this->argument('parent_path');

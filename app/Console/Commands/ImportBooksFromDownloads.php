@@ -35,12 +35,13 @@ class ImportBooksFromDownloads extends Command
                             {--limit=10 : Maximum number of books to process per run}
                             {--force : Skip confirmation prompts}
                             {--skip-enrichment : Skip external data enrichment (Audible, Google Books)}
-                            {--copy-files : Copy files after successful import instead of moving (default is move)}';
+                            {--copy-files : Copy files after successful import instead of moving (default is move)}
+                            {--no-backup : Skip automatic database backup}';
 
     /**
      * The console command description.
      */
-    protected $description = 'Import audiobooks from download directories using AI processing and external data enrichment';
+    protected $description = 'Import audiobooks from download directories using AI processing and external data enrichment (creates a database backup by default)';
 
     protected ?AIBookProcessor $aiProcessor = null;
     protected ?AudioFileAnalyzer $audioAnalyzer = null;
@@ -57,6 +58,13 @@ class ImportBooksFromDownloads extends Command
      */
     public function handle()
     {
+        // Create a database backup unless --no-backup is specified
+        if (!$this->option('no-backup')) {
+            $this->info('Creating a database backup before importing books...');
+            $this->call('backup:database');
+            $this->info('Database backup created.');
+        }
+
         $this->info("🚀 Starting automated audiobook import from download directories...");
         
         // Initialize AI processor
