@@ -107,12 +107,14 @@ class CheckCoverImages extends Command
                 $bestImage = $this->findBestCoverImage($book, $diskName);
 
                 if ($bestImage) {
-                    $book->coverImage = $bestImage;
+                    // Check if the best image needs directoryPath prefix
+                    $finalCoverPath = $this->processCoverImagePath($bestImage, $directoryPath);
+                    $book->coverImage = $finalCoverPath;
                     $book->needs_review = false; // Clear needs_review if fixed
                     $needsReviewReasons = array_diff($needsReviewReasons, ['invalid image']); // Remove reason
                     $book->needs_review_reasons = json_encode(array_values($needsReviewReasons));
                     $book->save();
-                    $this->info("  -> Fixed Book ID: {$book->id} - new coverImage: {$bestImage}");
+                    $this->info("  -> Fixed Book ID: {$book->id} - new coverImage: {$finalCoverPath}");
                     $fixedCount++;
                 } else {
                     $this->error("  -> Could not find a suitable cover image for Book ID: {$book->id} in directory: {$directoryPath}");
@@ -278,5 +280,41 @@ class CheckCoverImages extends Command
         }
 
         return $bestCoverCandidate ?? $audibleGoogleCandidate ?? $bestTitleMatchCandidate ?? $anyImageCandidate;
+    }
+
+    /**
+     * Process cover image path to ensure it includes directoryPath if needed
+     *
+     * @param string $coverImagePath
+     * @param string|null $directoryPath
+     * @return string
+     */
+    protected function processCoverImagePath(string $coverImagePath, ?string $directoryPath = null): string
+    {
+        if (empty($directoryPath)) {
+            return $coverImagePath;
+        }
+
+        // If the cover image path already contains the directory path, return as-is
+        if (Str::contains($coverImagePath, $directoryPath)) {
+            return $coverImagePath;
+        }
+
+        // Check if file exists without directoryPath prefix
+        $diskName = 'books';
+        $bookStoragePath = env('BOOK_STORAGE_PATH', '/media/audiobooks/books');
+        
+        // If the coverImagePath is just a filename, check if it needs directoryPath prefix
+        $baseFileName = basename($coverImagePath);
+        $coverWithoutDir = rtrim($directoryPath, '/') . '/' . $baseFileName;
+        $coverWithDir = $coverImagePath;
+        
+        // Check if file exists with directoryPath prefix
+        if (Storage::disk($diskName)->exists($coverWithoutDir)) {
+            $this->info("    -> Adding directoryPath prefix to cover: {$coverWithoutDir}");
+            return $coverWithoutDir;
+        }
+
+        return $coverImagePath;
     }
 }
