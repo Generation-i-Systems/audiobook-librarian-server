@@ -224,11 +224,35 @@ class ImportBooksFromDownloads extends Command
     /**
      * Check if audiobook is already imported
      */
-    protected function isAlreadyImported(string $path): bool
+    protected function isAlreadyImported(string $path, array $metadata = []): bool
     {
         $baseName = basename($path);
         
-        // Check if we have a book with similar directory path or title
+        // First check by ISBN if available (most reliable)
+        if (!empty($metadata['isbn'])) {
+            $existingBook = Book::where('isbn', $metadata['isbn'])->first();
+            if ($existingBook) {
+                return true;
+            }
+        }
+        
+        // Then check by exact title and author combination (if available)
+        if (!empty($metadata['title']) && !empty($metadata['author'])) {
+            $title = $metadata['title'];
+            $author = is_array($metadata['author']) ? $metadata['author'][0] : $metadata['author'];
+            
+            $existingBook = Book::where('title', $title)
+                ->whereHas('authors', function($query) use ($author) {
+                    $query->where('name', $author);
+                })
+                ->first();
+                
+            if ($existingBook) {
+                return true;
+            }
+        }
+        
+        // Fallback to directory path and title similarity
         $existingBook = Book::where('directory_path', 'like', '%' . $baseName . '%')
             ->orWhere('title', 'like', '%' . $baseName . '%')
             ->first();
@@ -259,6 +283,16 @@ class ImportBooksFromDownloads extends Command
         }
 
         $this->info("✅ AI processing successful (confidence: {$aiMetadata['confidence']}%)");
+        
+        // Check for duplicates with AI-extracted metadata (more accurate than path-based check)
+        if ($this->isAlreadyImported($audiobook['path'], $aiMetadata)) {
+            $this->warn("⚠️  Book already exists (detected after AI processing) - skipping");
+            $this->skippedBooks[] = [
+                'path' => $audiobook['path'],
+                'reason' => 'Duplicate book detected'
+            ];
+            return;
+        }
         
         // Step 2: External data enrichment (before manual review)
         if (!$this->option('skip-enrichment')) {
@@ -371,6 +405,7 @@ class ImportBooksFromDownloads extends Command
             ['Year', $metadata['year'] ?? 'N/A'],
             ['Publisher', $arrayToString($metadata['publisher'])],
             ['Language', $metadata['language'] ?? 'N/A'],
+            ['ISBN', $metadata['isbn'] ?? 'N/A'],
             ['Confidence', $metadata['confidence'] . '%'],
         ];
         
@@ -521,57 +556,51 @@ class ImportBooksFromDownloads extends Command
 
         // Try to get data from Audible first (most comprehensive for audiobooks)
         if (!empty($metadata['title']) && !empty($metadata['author'])) {
-            try {
-                $audibleData = $this->searchAudible($metadata['title'], is_array($metadata['author']) ? $metadata['author'][0] : $metadata['author']);
-                if ($audibleData) {
-                    $enrichedData = array_merge($enrichedData, $audibleData);
-                    $enrichmentResults['audible'] = 'success';
-                    $this->info("📚 Found Audible data");
-                } else {
-                    $enrichmentResults['audible'] = 'no_data';
-                    $this->warn("⚠️  Audible: No data found");
-                }
-            } catch (\Exception $e) {
-                $enrichmentResults['audible'] = 'failed';
-                $this->error("❌ Audible: Search failed - " . $e->getMessage());
-                Log::error("Audible enrichment failed", ['error' => $e->getMessage()]);
+            $audibleData = $this->retryApiCall(function() use ($metadata) {
+                return $this->searchAudible($metadata['title'], is_array($metadata['author']) ? $metadata['author'][0] : $metadata['author']);
+            }, 'Audible');
+            
+            if ($audibleData) {
+                $enrichedData = array_merge($enrichedData, $audibleData);
+                $enrichmentResults['audible'] = 'success';
+                $this->info("📚 Found Audible data");
+            } else {
+                $enrichmentResults['audible'] = 'no_data';
+                $this->warn("⚠️  Audible: No data found");
             }
         }
 
         // Try Google Books if we still need description or cover
         if ((empty($enrichedData['description']) || empty($enrichedData['cover_url'])) && !empty($metadata['title'])) {
-            try {
-                $googleData = $this->searchGoogleBooks($metadata['title'], is_array($metadata['author']) ? $metadata['author'][0] : $metadata['author']);
-                if ($googleData) {
-                    // Only merge data we don't already have (prioritize Audible)
-                    if (empty($enrichedData['description']) && !empty($googleData['description'])) {
-                        $enrichedData['description'] = $googleData['description'];
-                    }
-                    if (empty($enrichedData['cover_url']) && !empty($googleData['cover_url'])) {
-                        $enrichedData['cover_url'] = $googleData['cover_url'];
-                    }
-                    if (empty($enrichedData['publisher']) && !empty($googleData['publisher'])) {
-                        $enrichedData['publisher'] = $googleData['publisher'];
-                    }
-                    if (empty($enrichedData['year']) && !empty($googleData['year'])) {
-                        $enrichedData['year'] = $googleData['year'];
-                    }
-                    
-                    // Always merge raw data for reference
-                    if (!empty($googleData['google_books_raw'])) {
-                        $enrichedData['google_books_raw'] = $googleData['google_books_raw'];
-                    }
-                    
-                    $enrichmentResults['google_books'] = 'success';
-                    $this->info("📖 Found Google Books data");
-                } else {
-                    $enrichmentResults['google_books'] = 'no_data';
-                    $this->warn("⚠️  Google Books: No data found");
+            $googleData = $this->retryApiCall(function() use ($metadata) {
+                return $this->searchGoogleBooks($metadata['title'], is_array($metadata['author']) ? $metadata['author'][0] : $metadata['author']);
+            }, 'Google Books');
+            
+            if ($googleData) {
+                // Only merge data we don't already have (prioritize Audible)
+                if (empty($enrichedData['description']) && !empty($googleData['description'])) {
+                    $enrichedData['description'] = $googleData['description'];
                 }
-            } catch (\Exception $e) {
-                $enrichmentResults['google_books'] = 'failed';
-                $this->error("❌ Google Books: Search failed - " . $e->getMessage());
-                Log::error("Google Books enrichment failed", ['error' => $e->getMessage()]);
+                if (empty($enrichedData['cover_url']) && !empty($googleData['cover_url'])) {
+                    $enrichedData['cover_url'] = $googleData['cover_url'];
+                }
+                if (empty($enrichedData['publisher']) && !empty($googleData['publisher'])) {
+                    $enrichedData['publisher'] = $googleData['publisher'];
+                }
+                if (empty($enrichedData['year']) && !empty($googleData['year'])) {
+                    $enrichedData['year'] = $googleData['year'];
+                }
+                
+                // Always merge raw data for reference
+                if (!empty($googleData['google_books_raw'])) {
+                    $enrichedData['google_books_raw'] = $googleData['google_books_raw'];
+                }
+                
+                $enrichmentResults['google_books'] = 'success';
+                $this->info("📖 Found Google Books data");
+            } else {
+                $enrichmentResults['google_books'] = 'no_data';
+                $this->warn("⚠️  Google Books: No data found");
             }
         }
 
@@ -766,6 +795,7 @@ class ImportBooksFromDownloads extends Command
                 $book->description = $metadata['description'] ?? null;
                 $book->directory_path = $this->generateDirectoryPath($metadata);
                 $book->language = $metadata['language'] ?? 'en';
+                $book->isbn = $metadata['isbn'] ?? null;
                 
                 // Handle publisher (may be array from external services)
                 if (!empty($metadata['publisher'])) {
@@ -1135,6 +1165,7 @@ class ImportBooksFromDownloads extends Command
                 if (isset($xml->genre)) $data['genre'] = (string)$xml->genre;
                 if (isset($xml->year)) $data['year'] = (string)$xml->year;
                 if (isset($xml->publisher)) $data['publisher'] = (string)$xml->publisher;
+                if (isset($xml->isbn)) $data['isbn'] = (string)$xml->isbn;
                 if (isset($xml->plot)) $data['description'] = (string)$xml->plot;
                 if (isset($xml->description)) $data['description'] = (string)$xml->description;
             }
@@ -1174,6 +1205,8 @@ class ImportBooksFromDownloads extends Command
                 $data['year'] = trim($matches[1]);
             } elseif (preg_match('/^publisher\s*[:\-=]\s*(.+)$/i', $line, $matches)) {
                 $data['publisher'] = trim($matches[1]);
+            } elseif (preg_match('/^isbn\s*[:\-=]\s*(.+)$/i', $line, $matches)) {
+                $data['isbn'] = trim($matches[1]);
             } elseif (preg_match('/^(?:description|plot|summary)\s*[:\-=]\s*(.+)$/i', $line, $matches)) {
                 $data['description'] = trim($matches[1]);
             }
@@ -1558,6 +1591,43 @@ class ImportBooksFromDownloads extends Command
             if ($genreStats && $genreStats->count >= 2) {
                 // If author has 2+ books in the same genre, use that genre
                 return $genreStats->name;
+            }
+        }
+        
+        return null;
+    }
+
+    /**
+     * Retry API calls with exponential backoff
+     */
+    protected function retryApiCall(callable $apiCall, string $serviceName, int $maxRetries = 3): mixed
+    {
+        $attempt = 1;
+        
+        while ($attempt <= $maxRetries) {
+            try {
+                $result = $apiCall();
+                
+                // If we get a result, return it (could be null for "no data found")
+                return $result;
+                
+            } catch (\Exception $e) {
+                if ($attempt === $maxRetries) {
+                    // Last attempt failed, log and return null
+                    $this->error("❌ {$serviceName}: All {$maxRetries} attempts failed - " . $e->getMessage());
+                    Log::error("{$serviceName} enrichment failed after {$maxRetries} attempts", [
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString()
+                    ]);
+                    return null;
+                }
+                
+                // Calculate backoff delay (exponential: 1s, 2s, 4s...)
+                $delay = pow(2, $attempt - 1);
+                $this->warn("⚠️  {$serviceName}: Attempt {$attempt} failed, retrying in {$delay}s... ({$e->getMessage()})");
+                sleep($delay);
+                
+                $attempt++;
             }
         }
         
