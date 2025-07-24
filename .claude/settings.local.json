@@ -9,6 +9,8 @@
       "Bash(php:*)",
       "WebFetch(domain:docs.anthropic.com)",
       "Bash(npm run build:*)"
+      "Bash(curl:*)",
+      "Bash(ls:*)"
     ],
     "deny": []
   }
