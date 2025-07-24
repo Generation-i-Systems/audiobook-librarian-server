@@ -213,7 +213,7 @@ class BookController extends Controller
         $books = $result['data'];
 
         // Ensure all book fields are properly formatted
-        $paginatedBooks = $books->map(function ($book) {
+        $paginatedBooks = collect($books)->map(function ($book) {
             return $this->ensureBookFields($book);
         });
 
@@ -487,7 +487,7 @@ class BookController extends Controller
             return asset('images/placeholder.png');
         }
         
-        if (str_starts_with($coverImage, ['http://', 'https://', '/'])) {
+        if (Str::startsWith($coverImage, ['http://', 'https://', '/'])) {
             return $coverImage;
         }
         
