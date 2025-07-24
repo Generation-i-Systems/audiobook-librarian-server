@@ -242,7 +242,7 @@ class BookController extends Controller
     public function jsonRecent(Request $request)
     {
         $result = $this->documentStoreService->listBooks();
-        $books = $result['data']->all();
+        $books = is_array($result['data']) ? $result['data'] : $result['data']->all();
         Log::debug('JSON API: Recent books fetched from DocumentStoreService: ' . count($books));
 
         // Force sorting by date_added for recent books
@@ -449,15 +449,8 @@ class BookController extends Controller
             $book['series'] = [];
         }
 
-        // Ensure coverImage is a full URL if it's a relative path
-        if (!empty($book['coverImage'])) {
-            // Only apply route helper if it's a relative path (not already a full URL)
-            if (!Str::startsWith($book['coverImage'], ['http://', 'https://', '/'])) {
-                $book['coverImage'] = route('cover.proxy', ['path' => rawurlencode($book['coverImage'])]);
-            }
-        } else {
-            $book['coverImage'] = asset('images/placeholder.png');
-        }
+        // Process cover image with directory path handling
+        $book['coverImage'] = $this->processCoverImage($book['coverImage'] ?? null, $book['directoryPath'] ?? null);
 
         return $book;
     }
@@ -467,31 +460,79 @@ class BookController extends Controller
      */
     protected function ensureBookFieldsMinimal(array $book): array
     {
+        // Handle authors - support both MongoDB format (author) and MySQL format (authors with relationships)
+        $authors = ['Unknown'];
+        if (isset($book['authors']) && is_array($book['authors'])) {
+            $authors = array_map(function ($author) {
+                return is_array($author) && isset($author['name']) ? $author['name'] : (string) $author;
+            }, array_slice($book['authors'], 0, 2));
+        } elseif (isset($book['author']) && is_array($book['author'])) {
+            $authors = array_slice($book['author'], 0, 2);
+        }
+
+        // Handle genres - support both MongoDB format (genre) and MySQL format (genres with relationships)
+        $genres = ['Unknown'];
+        if (isset($book['genres']) && is_array($book['genres'])) {
+            $genres = array_map(function ($genre) {
+                return is_array($genre) && isset($genre['name']) ? $genre['name'] : (string) $genre;
+            }, array_slice($book['genres'], 0, 1));
+        } elseif (isset($book['genre']) && is_array($book['genre'])) {
+            $genres = array_slice($book['genre'], 0, 1);
+        }
+
+        // Handle series - support both formats
+        $series = [];
+        if (isset($book['series']) && is_array($book['series'])) {
+            $series = array_slice($book['series'], 0, 1);
+        }
+
         return [
             'id' => $book['id'] ?? '',
             'title' => (string) ($book['title'] ?? 'Unknown Title'),
-            'authors' => is_array($book['author'] ?? []) ? array_slice($book['author'], 0, 2) : ['Unknown'],
-            'genres' => is_array($book['genre'] ?? []) ? array_slice($book['genre'], 0, 1) : ['Unknown'],
-            'coverImage' => $this->processCoverImage($book['coverImage'] ?? null),
+            'authors' => $authors,
+            'genres' => $genres,
+            'coverImage' => $this->processCoverImage($book['coverImage'] ?? null, $book['directoryPath'] ?? null),
             'description' => substr($book['description'] ?? 'No description available.', 0, 200),
-            'series' => is_array($book['series'] ?? []) ? array_slice($book['series'], 0, 1) : [],
+            'series' => $series,
         ];
     }
 
     /**
-     * Process cover image URL efficiently
+     * Process cover image URL efficiently with directory path handling
      */
-    protected function processCoverImage(?string $coverImage): string
+    protected function processCoverImage(?string $coverImage, ?string $directoryPath = null): string
     {
         if (empty($coverImage)) {
             return asset('images/placeholder.png');
         }
         
-        if (Str::startsWith($coverImage, ['http://', 'https://', '/'])) {
+        // If it's already a full URL, return as-is (avoid double processing)
+        if (Str::startsWith($coverImage, ['http://', 'https://'])) {
             return $coverImage;
         }
         
-        return route('cover.proxy', ['path' => rawurlencode($coverImage)]);
+        // If it's an absolute path (like /images/placeholder.png), convert to asset URL
+        if (Str::startsWith($coverImage, '/')) {
+            return url($coverImage);
+        }
+        
+        // Handle relative paths that might need directory path prefix
+        $finalCoverPath = $coverImage;
+        $bookStoragePath = env('BOOK_STORAGE_PATH', '/media/audiobooks/books');
+        
+        // If we have a directory path and the cover image doesn't contain it
+        if (!empty($directoryPath) && !Str::contains($coverImage, $directoryPath)) {
+            // Check if the file exists without directory path
+            $coverWithoutDir = rtrim($bookStoragePath, '/') . '/' . ltrim($coverImage, '/');
+            $coverWithDir = rtrim($bookStoragePath, '/') . '/' . ltrim($directoryPath, '/') . '/' . ltrim($coverImage, '/');
+            
+            // If file doesn't exist without directory but does exist with directory, use directory version
+            if (!file_exists($coverWithoutDir) && file_exists($coverWithDir)) {
+                $finalCoverPath = $directoryPath . '/' . $coverImage;
+            }
+        }
+        
+        return route('cover.proxy', ['path' => rawurlencode($finalCoverPath)]);
     }
 
 }
