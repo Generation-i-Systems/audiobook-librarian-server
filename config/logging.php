@@ -133,6 +133,13 @@ return [
             'level' => 'debug',
         ],
 
+        'audit_trail' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/audit_trail.log'),
+            'level' => 'info',
+            'days' => 365, // Keep audit logs for a year
+        ],
+
     ],
 
 ];

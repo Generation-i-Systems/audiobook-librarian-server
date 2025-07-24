@@ -8,10 +8,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use App\Models\Series;
 use App\Traits\CamelCaseAttributeAccess;
+use App\Traits\Auditable;
 
 class Book extends Model
 {
-    use HasFactory, CamelCaseAttributeAccess;
+    use HasFactory, CamelCaseAttributeAccess, Auditable;
 
     protected $fillable = [
         'title',
