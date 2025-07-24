@@ -866,6 +866,18 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         return $results;
     }
 
+    public function searchGenresByName(string $term): array
+    {
+        $results = [];
+        foreach ($this->genres as $genre) {
+            if (isset($genre['name']) && stripos($genre['name'], $term) !== false) {
+                $results[] = $genre;
+            }
+        }
+
+        return $results;
+    }
+
     public function createMessage(array $messageData): ?string
     {
         $id = $messageData['id'] ?? uniqid('message_');

@@ -18,6 +18,7 @@ return new class extends Migration {
             $table->string('directory_path')->nullable();
             $table->date('release_date')->nullable();
             $table->string('cover_image')->nullable();
+            $table->string('isbn')->nullable(); // Added ISBN column
             $table->string('language')->nullable();
             $table->string('source')->nullable();
             $table->foreignId('series_id')->nullable()->constrained()->onDelete('set null');

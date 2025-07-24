@@ -16,8 +16,6 @@ return new class extends Migration
             $table->integer('ai_confidence')->nullable()->after('ai_processed');
             $table->timestamp('ai_processed_at')->nullable()->after('ai_confidence');
             $table->json('ai_suggestions')->nullable()->after('ai_processed_at');
-            $table->string('language', 10)->default('en')->after('isbn');
-            $table->string('publisher', 255)->nullable()->after('language');
         });
     }
 
@@ -32,8 +30,6 @@ return new class extends Migration
                 'ai_confidence', 
                 'ai_processed_at',
                 'ai_suggestions',
-                'language',
-                'publisher'
             ]);
         });
     }
