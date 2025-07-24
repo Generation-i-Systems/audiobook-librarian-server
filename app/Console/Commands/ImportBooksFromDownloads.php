@@ -506,7 +506,12 @@ class ImportBooksFromDownloads extends Command
             $this->line("2. Edit individual fields");
             $this->line("3. Skip this book");
             
-            $choice = $this->ask("Choose an option (1-3)", '2');
+            // Default to accept all if confidence is over 80%, otherwise default to edit
+            $confidence = $metadata['confidence'] ?? 0;
+            $defaultChoice = $confidence > 80 ? '1' : '2';
+            $confidenceNote = $confidence > 80 ? " (high confidence: {$confidence}%)" : " (confidence: {$confidence}%)";
+            
+            $choice = $this->ask("Choose an option (1-3){$confidenceNote}", $defaultChoice);
             
             switch ($choice) {
                 case '1':
@@ -517,7 +522,10 @@ class ImportBooksFromDownloads extends Command
                 case '3':
                     return false;
                 default:
-                    // Default to editing
+                    // Use the determined default behavior
+                    if ($defaultChoice === '1') {
+                        return true;
+                    }
                     break;
             }
         }
