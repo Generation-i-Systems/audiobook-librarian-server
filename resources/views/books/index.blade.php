@@ -124,7 +124,7 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                     <div class="row g-2" id="recent-books-grid" style="display: flex; flex-wrap: wrap;">
                         @foreach($recentBooks as $book)
                             @php
-                                $cover = isset($book['coverImage']) && $book['coverImage'] ? url('/cover/' . $book['coverImage']) : url('/images/placeholder.png');
+                                $cover = isset($book['coverImage']) && $book['coverImage'] ? $book['coverImage'] : url('/images/placeholder.png');
                                 $title = $book['title'] ?? 'Untitled';
                                 $title = is_array($title) ? ($title[0] ?? 'Untitled') : $title;
                             @endphp
@@ -168,7 +168,7 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                     <div class="row g-2" id="recent-books-compact" style="display: none; flex-wrap: wrap;">
                         @foreach($recentBooks as $book)
                             @php
-                                $cover = isset($book['coverImage']) && $book['coverImage'] ? url('/cover/' . $book['coverImage']) : url('/images/placeholder.png');
+                                $cover = isset($book['coverImage']) && $book['coverImage'] ? $book['coverImage'] : url('/images/placeholder.png');
                                 $title = $book['title'] ?? 'Untitled';
                                 $title = is_array($title) ? ($title[0] ?? 'Untitled') : $title;
                             @endphp
@@ -223,7 +223,7 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                                     <tr>
                                         <td>
                                             @php
-                                                $cover = isset($book['coverImage']) && $book['coverImage'] ? url('/cover/' . $book['coverImage']) : url('/images/placeholder.png');
+                                                $cover = isset($book['coverImage']) && $book['coverImage'] ? $book['coverImage'] : url('/images/placeholder.png');
                                                 $title = $book['title'] ?? 'Untitled';
                                                 $title = is_array($title) ? ($title[0] ?? 'Untitled') : $title;
                                             @endphp
@@ -278,26 +278,20 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                     <input type="text" class="form-control" id="search" name="search" value="{{ request('search') }}">
                 </div>
                 <div class="col-md-2">
-                    <label for="genre_id" class="form-label">Genre:</label>
-                    <select name="genre_id" id="genre_id" class="form-select">
+                    <label for="genre" class="form-label">Genre:</label>
+                    <select name="genre" id="genre" class="form-select">
                         <option value="">All Genres</option>
                         @foreach ($genres as $genreId => $genreName)
-                            <option value="{{ $genreId }}" {{ request('genre_id') == $genreId ? 'selected' : '' }}>
+                            <option value="{{ $genreName }}" {{ request('genre') == $genreName ? 'selected' : '' }}>
                                 {{ $genreName }}
                             </option>
                         @endforeach
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label for="author_id" class="form-label">Author:</label>
-                    <select name="author_id" id="author_id" class="form-select">
-                        <option value="">All Authors</option>
-                        @foreach ($authors as $authorId => $authorName)
-                            <option value="{{ $authorId }}" {{ request('author_id') == $authorId ? 'selected' : '' }}>
-                                {{ $authorName }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <label for="author" class="form-label">Author:</label>
+                    <input type="text" class="form-control autocomplete-author" id="author" name="author" 
+                           value="{{ request('author') }}" placeholder="Type to search authors...">
                 </div>
                 <div class="col-md-2">
                     <label for="series" class="form-label">Series:</label>
@@ -431,8 +425,8 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
             const bookDownloadRoute = '{{ route("books.download", ":id") }}';
             let mainSearchParams = {
                 "search": '{{ request()->input("search", "") }}',
-                "genre_id": '{{ request()->input("genre_id", "") }}',
-                "author_id": '{{ request()->input("author_id", "") }}',
+                "genre": '{{ request()->input("genre", "") }}',
+                "author": '{{ request()->input("author", "") }}',
                 "series": '{{ request()->input("series", "") }}'
             };
 
@@ -716,8 +710,8 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                 // Collect search parameters
                 mainSearchParams = {
                     "search": $('#search').val(),
-                    "genre_id": $('#genre_id').val(),
-                    "author_id": $('#author_id').val(),
+                    "genre": $('#genre').val(),
+                    "author": $('#author').val(),
                     "series": $('#series').val()
                 };
 
@@ -745,6 +739,47 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
 
                 // Debug initial view type
                 console.log('Initial view type:', mainViewType);
+                
+                // Initialize autocomplete for authors
+                $('.autocomplete-author').autocomplete({
+                    source: function(request, response) {
+                        $.ajax({
+                            url: '{{ route("admin.books.autocomplete.authors") }}',
+                            type: 'GET',
+                            data: { term: request.term },
+                            success: function(data) {
+                                response(data);
+                            }
+                        });
+                    },
+                    minLength: 2,
+                    select: function(event, ui) {
+                        $(this).val(ui.item.value);
+                    }
+                });
+                
+                // Initialize autocomplete for series
+                $('#series').autocomplete({
+                    source: function(request, response) {
+                        $.ajax({
+                            url: '{{ route("admin.books.autocomplete.series") }}',
+                            type: 'GET',
+                            data: { query: request.term },
+                            success: function(data) {
+                                // Handle the series response format
+                                if (data.data) {
+                                    response(data.data);
+                                } else {
+                                    response(data);
+                                }
+                            }
+                        });
+                    },
+                    minLength: 2,
+                    select: function(event, ui) {
+                        $(this).val(ui.item.value);
+                    }
+                });
             });
 
             // Handle recent books view toggle
