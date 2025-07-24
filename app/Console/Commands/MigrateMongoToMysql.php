@@ -22,14 +22,14 @@ class MigrateMongoToMysql extends Command
      *
      * @var string
      */
-    protected $signature = 'app:migrate-mongo-to-mysql {--force : Skip confirmation prompt} {--limit=0 : Limit the number of books to process (0 for no limit)} {--no-backup : Skip automatic database backup}';
+    protected $signature = 'app:migrate-mongo-to-mysql {--force : Skip confirmation prompt} {--limit=0 : Limit the number of books to process (0 for no limit)} {--no-backup : Skip automatic database backup} {--fix-data : Apply data fixing logic during migration}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Migrate data from MongoDB to MySQL (creates a database backup by default)';
+    protected $description = 'Migrate data from MongoDB to MySQL (creates a database backup by default, with optional data fixing)';
 
     protected MySqlService $mysqlService;
     protected $processedBooks = 0;
@@ -123,8 +123,32 @@ class MigrateMongoToMysql extends Command
                 $mongoBooks = array_slice($mongoBooks, 0, $this->bookLimit);
             }
 
+            if ($this->option('fix-data')) {
+                $this->info('Identifying and filtering duplicate books by directoryPath...');
+                $uniqueMongoBooks = [];
+                $seenDirectoryPaths = [];
+                $skippedDuplicates = 0;
+
+                foreach ($mongoBooks as $book) {
+                    $dir = $book['directoryPath'] ?? null;
+                    if ($dir) {
+                        if (isset($seenDirectoryPaths[$dir])) {
+                            // This is a duplicate, skip it
+                            $this->warn("Skipping duplicate book by directoryPath: {$dir} (ID: {$book['_id']})");
+                            $skippedDuplicates++;
+                            continue;
+                        } else {
+                            $seenDirectoryPaths[$dir] = true;
+                        }
+                    }
+                    $uniqueMongoBooks[] = $book;
+                }
+                $mongoBooks = $uniqueMongoBooks;
+                $this->info("Skipped {$skippedDuplicates} duplicate books based on directoryPath.");
+            }
+
             if (empty($mongoBooks)) {
-                $this->info('No books found in MongoDB to migrate.');
+                $this->info('No books found in MongoDB to migrate after filtering.');
                 return 0;
             }
 
@@ -637,6 +661,27 @@ class MigrateMongoToMysql extends Command
             'updated_at' => $mongoBook['updatedAt'] ?? $mongoBook['updated_at'] ?? now(),
         ];
 
+        // Apply data fixing if --fix-data option is enabled
+        if ($this->option('fix-data')) {
+            // Fix title: remove leading spaces/dashes and extract leading numbers as series number
+            $titleInfo = $this->extractLeadingNumberAsSeries($bookData['title']);
+            $bookData['title'] = $this->cleanLeadingChars($titleInfo['title']);
+            if ($titleInfo['seriesNumber'] !== null) {
+                $seriesNumber = $titleInfo['seriesNumber'];
+            }
+
+            // Fix cover image path
+            if (!empty($bookData['cover_image']) && !empty($bookData['directory_path'])) {
+                $bookData['cover_image'] = $this->processCoverImagePath($bookData['cover_image'], $bookData['directory_path']);
+            } elseif (empty($bookData['cover_image']) && !empty($bookData['directory_path'])) {
+                // If no cover image is set, try to find the best one in the directory
+                $bestImage = $this->findBestCoverImage($bookData, 'books');
+                if ($bestImage) {
+                    $bookData['cover_image'] = $bestImage;
+                }
+            }
+        }
+
         // Clean up any empty strings that should be null
         $bookData = array_map(fn($value) => $value === '' ? null : $value, $bookData);
 
@@ -748,6 +793,110 @@ class MigrateMongoToMysql extends Command
     }
 
 
+
+    protected function cleanLeadingChars(string $title): string
+    {
+        return preg_replace('/^[\s\-]+/', '', trim($title));
+    }
+
+    protected function extractLeadingNumberAsSeries(string $title): array
+    {
+        $seriesNumber = null;
+        $cleanedTitle = $title;
+
+        if (preg_match('/^(\d+)[\s\-]* (.*)$/', $title, $matches)) {
+            $extractedNumber = (int)$matches[1];
+            $remainingTitle = $matches[2];
+
+            // Simple heuristic: if it's a small number and not a year
+            if ($extractedNumber > 0 && $extractedNumber < 1000) {
+                $seriesNumber = $extractedNumber;
+                $cleanedTitle = $remainingTitle;
+            }
+        }
+        return ['title' => $cleanedTitle, 'seriesNumber' => $seriesNumber];
+    }
+
+    protected function findBestCoverImage(array $bookData, string $diskName): ?string
+    {
+        $directoryPath = $bookData['directory_path'] ?? null;
+        if (empty($directoryPath)) {
+            return null;
+        }
+
+        $fullBookDirPath = rtrim($directoryPath, '/');
+
+        if (!Storage::disk($diskName)->exists($fullBookDirPath)) {
+            return null;
+        }
+
+        $filesInDir = Storage::disk($diskName)->files($fullBookDirPath);
+
+        $bestCoverCandidate = null;
+        $audibleGoogleCandidate = null;
+        $bestTitleMatchCandidate = null;
+        $anyImageCandidate = null;
+
+        $normalizedBookTitle = Str::slug($bookData['title'] ?? '');
+
+        $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+
+        foreach ($filesInDir as $filePath) {
+            $extension = pathinfo($filePath, PATHINFO_EXTENSION);
+            if (!in_array(strtolower($extension), $imageExtensions)) {
+                continue;
+            }
+
+            $fileName = basename($filePath);
+            $normalizedFileName = Str::slug(pathinfo($fileName, PATHINFO_FILENAME));
+
+            if (Str::contains(strtolower($fileName), 'cover')) {
+                $bestCoverCandidate = $filePath;
+                break;
+            }
+
+            if (Str::contains(strtolower($fileName), ['audible', 'google'])) {
+                if (empty($audibleGoogleCandidate)) {
+                    $audibleGoogleCandidate = $filePath;
+                }
+            }
+
+            if (!empty($normalizedBookTitle) && Str::contains($normalizedFileName, $normalizedBookTitle)) {
+                if (empty($bestTitleMatchCandidate)) {
+                    $bestTitleMatchCandidate = $filePath;
+                }
+            }
+
+            if (empty($anyImageCandidate)) {
+                $anyImageCandidate = $filePath;
+            }
+        }
+
+        return $bestCoverCandidate ?? $audibleGoogleCandidate ?? $bestTitleMatchCandidate ?? $anyImageCandidate;
+    }
+
+    protected function processCoverImagePath(string $coverImagePath, ?string $directoryPath = null): string
+    {
+        if (empty($directoryPath)) {
+            return $coverImagePath;
+        }
+
+        // If the cover image path already contains the directory path, return as-is
+        if (Str::startsWith($coverImagePath, $directoryPath)) {
+            return $coverImagePath;
+        }
+
+        // If the coverImagePath is just a filename, check if it needs directoryPath prefix
+        $baseFileName = basename($coverImagePath);
+        $coverWithoutDir = rtrim($directoryPath, '/') . '/' . $baseFileName;
+        
+        // Check if file exists with directoryPath prefix
+        if (Storage::disk('books')->exists($coverWithoutDir)) {
+            return $coverWithoutDir;
+        }
+
+        return $coverImagePath;
+    }
 
     /**
      *
