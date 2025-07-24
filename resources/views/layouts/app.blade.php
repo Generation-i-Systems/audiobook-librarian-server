@@ -148,7 +148,7 @@ use Illuminate\Support\Facades\Route;
 
                                     <a class="dropdown-item" href="{{ route('logout') }}"
                                         onclick="event.preventDefault();
-                                                                                             document.getElementById('logout-form').submit();">
+                                                 refreshCsrfAndLogout();">
                                         {{ __('Logout') }}
                                     </a>
 
@@ -202,7 +202,32 @@ use Illuminate\Support\Facades\Route;
         });
     </script>
 
-
+    <script>
+        function refreshCsrfAndLogout() {
+            // Get fresh CSRF token
+            fetch('/csrf-token', {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Update the CSRF token in the logout form
+                const tokenInput = document.querySelector('#logout-form input[name="_token"]');
+                if (tokenInput && data.csrf_token) {
+                    tokenInput.value = data.csrf_token;
+                }
+                // Submit the form
+                document.getElementById('logout-form').submit();
+            })
+            .catch(error => {
+                console.error('CSRF refresh failed:', error);
+                // Fall back to original logout attempt
+                document.getElementById('logout-form').submit();
+            });
+        }
+    </script>
 
 </body>
 
