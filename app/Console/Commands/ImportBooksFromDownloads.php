@@ -573,20 +573,18 @@ class ImportBooksFromDownloads extends Command
             $metadata['year'] = $newYear;
         }
 
-        // If we started with no enrichment data, try to enrich with the edited metadata
+        // If we started with no enrichment data, automatically try to enrich with the edited metadata
         if (!$this->hasEnrichmentData($metadata) && !$this->option('skip-enrichment')) {
-            if ($this->confirm("Try to find enrichment data with the edited metadata?", true)) {
-                $this->info("🔍 Attempting to enrich with edited metadata...");
-                $enrichedData = $this->enrichWithExternalData($metadata);
-                if ($enrichedData) {
-                    $metadata = array_merge($metadata, $enrichedData);
-                    $this->info("✅ Found enrichment data with edited metadata!");
-                    $this->newLine();
-                    $this->displayEnrichedMetadata($metadata);
-                    $this->newLine();
-                } else {
-                    $this->warn("⚠️  Still no enrichment data found");
-                }
+            $this->info("🔍 Attempting to enrich with edited metadata...");
+            $enrichedData = $this->enrichWithExternalData($metadata);
+            if ($enrichedData) {
+                $metadata = array_merge($metadata, $enrichedData);
+                $this->info("✅ Found enrichment data with edited metadata!");
+                $this->newLine();
+                $this->displayEnrichedMetadata($metadata);
+                $this->newLine();
+            } else {
+                $this->warn("⚠️  Still no enrichment data found");
             }
         }
 
