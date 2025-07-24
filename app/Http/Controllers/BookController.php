@@ -95,14 +95,6 @@ class BookController extends Controller
             ['path' => $request->url(), 'query' => $request->query()]
         );
 
-        // Memory monitoring at end
-        $memoryEnd = memory_get_usage();
-        $memoryPeak = memory_get_peak_usage();
-        Log::debug('BookController index complete', [
-            'memory_end_mb' => round($memoryEnd / 1024 / 1024, 2),
-            'memory_peak_mb' => round($memoryPeak / 1024 / 1024, 2),
-            'memory_used_mb' => round(($memoryEnd - $memoryStart) / 1024 / 1024, 2)
-        ]);
 
         return view('books.index', [
             'books' => $pagination,
@@ -180,7 +172,7 @@ class BookController extends Controller
             return $processedBooks;
         } catch (\Exception $e) {
             // Log the error and return an empty array as fallback
-            \Log::error('Error fetching recent books: ' . $e->getMessage());
+            Log::error('Error fetching recent books: ' . $e->getMessage());
             return [];
         }
     }

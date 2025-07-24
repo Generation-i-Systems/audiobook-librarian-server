@@ -10,7 +10,7 @@
         <div class="row">
             <div class="col-md-4">
                 @php
-                    $cover = isset($book['coverImage']) && $book['coverImage'] ? url($book['coverImage']) : url('images/placeholder.png');
+                    $cover = isset($book['coverImage']) && $book['coverImage'] ? url('/cover/' . $book['coverImage']) : url('/images/placeholder.png');
                 @endphp
                 <img src="{{ $cover }}" alt="{{ $book['title'] }}" class="img-fluid">
             </div>
@@ -57,8 +57,8 @@
                                 <div class="card h-100">
                                     @php
                                         $relatedCover = isset($relatedBook['coverImage']) && $relatedBook['coverImage'] ?
-                                            url($relatedBook['coverImage']) :
-                                            url('images/placeholder.png');
+                                            url('/cover/' . $relatedBook['coverImage']) :
+                                            url('/images/placeholder.png');
                                     @endphp
                                     <img src="{{ $relatedCover }}" class="card-img-top" alt="{{ $relatedBook['title'] }}"
                                         style="height: 150px; object-fit: contain;">

@@ -124,9 +124,9 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                     <div class="row g-2" id="recent-books-grid" style="display: flex; flex-wrap: wrap;">
                         @foreach($recentBooks as $book)
                             @php
-        $cover = isset($book['coverImage']) && $book['coverImage'] ? url($book['coverImage']) : url('images/placeholder.png');
-        $title = $book['title'] ?? 'Untitled';
-        $title = is_array($title) ? ($title[0] ?? 'Untitled') : $title;
+                                $cover = isset($book['coverImage']) && $book['coverImage'] ? url('/cover/' . $book['coverImage']) : url('/images/placeholder.png');
+                                $title = $book['title'] ?? 'Untitled';
+                                $title = is_array($title) ? ($title[0] ?? 'Untitled') : $title;
                             @endphp
                             <div class="col-md-2 mb-4">
                                 <a href="{{ route('books.show', $book['id']) }}" class="text-decoration-none card-link"
@@ -168,9 +168,9 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                     <div class="row g-2" id="recent-books-compact" style="display: none; flex-wrap: wrap;">
                         @foreach($recentBooks as $book)
                             @php
-        $cover = isset($book['coverImage']) && $book['coverImage'] ? url($book['coverImage']) : url('images/placeholder.png');
-        $title = $book['title'] ?? 'Untitled';
-        $title = is_array($title) ? ($title[0] ?? 'Untitled') : $title;
+                                $cover = isset($book['coverImage']) && $book['coverImage'] ? url('/cover/' . $book['coverImage']) : url('/images/placeholder.png');
+                                $title = $book['title'] ?? 'Untitled';
+                                $title = is_array($title) ? ($title[0] ?? 'Untitled') : $title;
                             @endphp
                             <div class="col-md-3 col-lg-2 mb-4">
                                 <a href="{{ route('books.show', $book['id']) }}" class="text-decoration-none card-link"
@@ -223,9 +223,9 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                                     <tr>
                                         <td>
                                             @php
-        $cover = isset($book['coverImage']) && $book['coverImage'] ? url($book['coverImage']) : url('images/placeholder.png');
-        $title = $book['title'] ?? 'Untitled';
-        $title = is_array($title) ? ($title[0] ?? 'Untitled') : $title;
+                                                $cover = isset($book['coverImage']) && $book['coverImage'] ? url('/cover/' . $book['coverImage']) : url('/images/placeholder.png');
+                                                $title = $book['title'] ?? 'Untitled';
+                                                $title = is_array($title) ? ($title[0] ?? 'Untitled') : $title;
                                             @endphp
                                             <img src="{{ $cover }}" alt="{{ $title }}"
                                                 style="height: 64px; width: auto; max-width: 48px; object-fit: contain;">
