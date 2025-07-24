@@ -29,7 +29,6 @@ class BookController extends Controller
      */
     private function storeCoverImage($coverSource, string $bookId): ?string
     {
-        Log::debug('BookController@storeCoverImage: Method started', ['coverType' => gettype($coverSource)]);
         if ($coverSource instanceof \Illuminate\Http\UploadedFile) {
             return $coverSource->store($bookId, 'covers');
         }
@@ -137,137 +136,100 @@ class BookController extends Controller
     public function index(Request $request)
     {
         // Emergency: Increase memory limit aggressively
-        ini_set('memory_limit', '1G');
-        
-        // Direct file logging for debugging memory issues
-        $debugLog = storage_path('logs/memory_debug.log');
-        $logData = date('Y-m-d H:i:s') . " - BookController index start - " . 
-                   "Memory: " . number_format(memory_get_usage()) . 
-                   " - Limit: " . ini_get('memory_limit') .
-                   " - Search: " . ($request->input('search') ?? 'none') . "\n";
-        file_put_contents($debugLog, $logData, FILE_APPEND);
-
         try {
 
-        // Log memory usage at start for debugging
-        Log::debug('BookController index start', [
-            'memory_usage' => number_format(memory_get_usage()),
-            'memory_limit' => ini_get('memory_limit'),
-            'search' => $request->input('search'),
-            'sort' => $request->input('sort')
-        ]);
+            // Get pagination and filter parameters from request
+            $page = max(1, (int) $request->input('page', 1));
+            $perPage = 20;
 
-        // Get pagination and filter parameters from request
-        $page = max(1, (int) $request->input('page', 1));
-        $perPage = 10; // Increase slightly to 10 items per page for better UX
+            // Get filters from request
+            $filters = [];
+            if ($request->filled('search')) {
+                $filters['search'] = $request->input('search');
+            }
+            if ($request->filled('author')) {
+                $filters['author'] = $request->input('author');
+            }
+            if ($request->filled('genre_id')) {
+                $filters['genre'] = $request->input('genre_id');
+            }
 
-        // Get filters from request
-        $filters = [];
-        if ($request->filled('search')) {
-            $filters['search'] = $request->input('search');
-        }
-        if ($request->filled('author')) {
-            $filters['author'] = $request->input('author');
-        }
-        if ($request->filled('genre_id')) {
-            $filters['genre'] = $request->input('genre_id');
-        }
+            // Get sorting parameters
+            $sort = $request->input('sort', 'title');
+            $order = $request->input('order', 'asc');
 
-        // Get sorting parameters
-        $sort = $request->input('sort', 'title'); // Default sort by title
-        $order = $request->input('order', 'asc'); // Default order ascending
+            // Map admin panel sort options to MySqlService sort options
+            switch ($request->input('sort')) {
+                case 'recent_desc':
+                    $sort = 'created_at';
+                    $order = 'desc';
+                    break;
+                case 'recent_asc':
+                    $sort = 'created_at';
+                    $order = 'asc';
+                    break;
+                case 'author_asc':
+                    $sort = 'author';
+                    $order = 'asc';
+                    break;
+                case 'author_desc':
+                    $sort = 'author';
+                    $order = 'desc';
+                    break;
+                case 'title_asc':
+                    $sort = 'title';
+                    $order = 'asc';
+                    break;
+                case 'title_desc':
+                    $sort = 'title';
+                    $order = 'desc';
+                    break;
+                case 'year_asc':
+                    $sort = 'release_date';
+                    $order = 'asc';
+                    break;
+                case 'year_desc':
+                    $sort = 'release_date';
+                    $order = 'desc';
+                    break;
+                default:
+                    $sort = 'title';
+                    $order = 'asc';
+                    break;
+            }
 
-        // Map admin panel sort options to MySqlService sort options
-        switch ($request->input('sort')) {
-            case 'recent_desc':
-                $sort = 'created_at';
-                $order = 'desc';
-                break;
-            case 'recent_asc':
-                $sort = 'created_at';
-                $order = 'asc';
-                break;
-            case 'author_asc':
-                $sort = 'author';
-                $order = 'asc';
-                break;
-            case 'author_desc':
-                $sort = 'author';
-                $order = 'desc';
-                break;
-            case 'title_asc':
-                $sort = 'title';
-                $order = 'asc';
-                break;
-            case 'title_desc':
-                $sort = 'title';
-                $order = 'desc';
-                break;
-            case 'year_asc':
-                $sort = 'release_date';
-                $order = 'asc';
-                break;
-            case 'year_desc':
-                $sort = 'release_date';
-                $order = 'desc';
-                break;
-            default:
-                $sort = 'title';
-                $order = 'asc';
-                break;
-        }
+            // Get paginated and filtered books from the document store service
+            $result = $this->documentStoreService->listBooks($page, $perPage, $filters, true, $sort, $order);
 
-        // Use ultra-minimal database method to prevent memory exhaustion
-        $result = $this->documentStoreService->listBooksMinimal($page, $perPage, $filters);
-        
-        $books = $result['data'];
+            $books = $result['data'];
 
-        // Direct file logging after DB query
-        $logData = date('Y-m-d H:i:s') . " - After minimal DB query - " . 
-                   "Memory: " . number_format(memory_get_usage()) . 
-                   " - Books: " . count($books) . 
-                   " - Total: " . $result['total'] . "\n";
-        file_put_contents($debugLog, $logData, FILE_APPEND);
+            // Wrap in paginator
+            $paginator = new \Illuminate\Pagination\LengthAwarePaginator(
+                $books,
+                $result['total'],
+                $perPage,
+                $page,
+                ['path' => $request->url(), 'query' => $request->query()]
+            );
 
-        // Log memory usage after database query
-        Log::debug('BookController after DB query', [
-            'memory_usage' => number_format(memory_get_usage()),
-            'books_returned' => count($books),
-            'total_count' => $result['total']
-        ]);
 
-        // Wrap in paginator
-        $paginator = new \Illuminate\Pagination\LengthAwarePaginator(
-            $books,
-            $result['total'],
-            $perPage,
-            $page,
-            ['path' => $request->url(), 'query' => $request->query()]
-        );
-
-        // Log memory usage before view
-        Log::debug('BookController before view', [
-            'memory_usage' => number_format(memory_get_usage()),
-            'peak_memory' => number_format(memory_get_peak_usage())
-        ]);
-
-        return view(
-            'admin.books.index_minimal', // Use minimal template
-            [
+            return view('admin.books.index', [
                 'books' => $paginator,
-                'sort' => $request->input('sort', 'recent_desc'), // Pass original sort for view
-            ]
-        );
+                'sort' => $request->input('sort', 'recent_desc'),
+            ]);
 
         } catch (\Throwable $e) {
-            // Log the error to our debug file
-            $errorLog = date('Y-m-d H:i:s') . " - MEMORY ERROR: " . $e->getMessage() . 
-                        " - Memory at error: " . number_format(memory_get_usage()) . 
-                        " - Peak: " . number_format(memory_get_peak_usage()) . "\n";
-            file_put_contents($debugLog, $errorLog, FILE_APPEND);
-            
+            // Log the error using Laravel's logging system
+            Log::error('Admin BookController error', [
+                'message' => $e->getMessage(),
+                'memory_usage' => number_format(memory_get_usage()),
+                'peak_memory' => number_format(memory_get_peak_usage()),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
             // Return a simple error response
-            return response('Out of memory error occurred. Please try with fewer results or contact admin.', 500);
+            // return response('Out of memory error occurred. Please try with fewer results or contact admin. ' . $e->getMessage(), 500);
+            throw $e;
         }
     }
 
@@ -869,9 +831,7 @@ class BookController extends Controller
      */
     public function store(Request $request, ImportFileController $importFileController)
     {
-        Log::debug('BookController@store: Method started');
         try {
-            Log::debug('BookController@store method entered.');
             Log::info('Book creation started', ['request_data' => $request->except(['cover', 'coverImage'])]);
 
             Log::debug('STEP 1: Validating book creation request.');
@@ -1929,6 +1889,20 @@ class BookController extends Controller
         $narrators = $this->documentStoreService->searchNarratorsByName($term);
 
         return response()->json($narrators);
+    }
+
+    /**
+     * Provides autocomplete suggestions for genre names.
+     */
+    public function autocompleteGenres(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $term = $request->input('query', $request->input('term', ''));
+        if (empty($term)) {
+            return response()->json([]);
+        }
+        $genres = $this->documentStoreService->searchGenresByName($term);
+
+        return response()->json($genres);
     }
 
     /**
