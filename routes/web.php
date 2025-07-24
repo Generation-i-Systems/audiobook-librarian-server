@@ -312,6 +312,11 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         'autocompleteNarrators',
     ])->name('books.autocomplete.narrators');
 
+    Route::get('/books/autocomplete/genres', [
+        Admin\BookController::class,
+        'autocompleteGenres',
+    ])->name('books.autocomplete.genres');
+
     Route::resource('account_requests', Admin\AccountRequestController::class);
     Route::get('/books/import-from-title', [
         Admin\BookController::class,

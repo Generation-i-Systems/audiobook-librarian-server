@@ -214,6 +214,11 @@ interface DocumentStoreServiceInterface
      */
     public function searchNarratorsByName(string $term): array;
 
+    /**
+     * Search for genres by name
+     */
+    public function searchGenresByName(string $term): array;
+
     // MESSAGES
     public function createMessage(array $messageData): ?string;
 

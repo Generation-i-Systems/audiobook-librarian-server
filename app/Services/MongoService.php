@@ -1777,4 +1777,46 @@ class MongoService implements DocumentStoreServiceInterface
             return false;
         }
     }
+
+    /**
+     * Search for genres by name
+     *
+     * @param  string  $term  The search term.
+     * @return array A list of unique genre names.
+     */
+    public function searchGenresByName(string $term): array
+    {
+        if (empty($term)) {
+            return [];
+        }
+
+        try {
+            $collection = $this->getCollection('books');
+            
+            // Use aggregation to find genres that match the search term
+            $pipeline = [
+                ['$unwind' => '$genre'],
+                [
+                    '$match' => [
+                        'genre' => new \MongoDB\BSON\Regex($term, 'i')
+                    ]
+                ],
+                ['$group' => ['_id' => '$genre']],
+                ['$sort' => ['_id' => 1]],
+                ['$limit' => 20]
+            ];
+
+            $cursor = $collection->aggregate($pipeline);
+            $genres = [];
+            
+            foreach ($cursor as $doc) {
+                $genres[] = $doc['_id'];
+            }
+
+            return $genres;
+        } catch (\Exception $e) {
+            Log::error('Failed to search genres: ' . $e->getMessage());
+            return [];
+        }
+    }
 }
