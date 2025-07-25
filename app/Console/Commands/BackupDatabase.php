@@ -13,7 +13,7 @@ class BackupDatabase extends Command
      *
      * @var string
      */
-    protected $signature = 'backup:database {--verify : Verify backup integrity after creation}';
+    protected $signature = 'backup:database {--verify : Verify backup integrity after creation} {--suffix= : Add a suffix to distinguish backup source}';
 
     /**
      * The console command description.
@@ -44,7 +44,9 @@ class BackupDatabase extends Command
         
         // Generate backup filename
         $timestamp = now()->format('Ymd_His');
-        $backupFile = "{$backupDir}/backup_{$dbName}_{$timestamp}.sql";
+        $suffix = $this->option('suffix');
+        $suffixPart = $suffix ? "_{$suffix}" : '';
+        $backupFile = "{$backupDir}/backup_{$dbName}{$suffixPart}_{$timestamp}.sql";
         
         // Build mysqldump command
         $command = sprintf(
@@ -79,7 +81,8 @@ class BackupDatabase extends Command
                 Log::info('Database backup created', [
                     'file' => basename($compressedFile),
                     'size' => $fileSize,
-                    'database' => $dbName
+                    'database' => $dbName,
+                    'suffix' => $suffix ?: 'none'
                 ]);
                 
                 // Verify backup if requested

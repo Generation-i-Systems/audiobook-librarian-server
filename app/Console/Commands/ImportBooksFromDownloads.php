@@ -61,7 +61,7 @@ class ImportBooksFromDownloads extends Command
         // Create a database backup unless --no-backup is specified
         if (!$this->option('no-backup')) {
             $this->info('Creating a database backup before importing books...');
-            $this->call('backup:database');
+            $this->call('backup:database', ['--suffix' => 'import-books']);
             $this->info('Database backup created.');
         }
 
