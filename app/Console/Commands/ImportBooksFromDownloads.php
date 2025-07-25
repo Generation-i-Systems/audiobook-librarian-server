@@ -205,6 +205,15 @@ class ImportBooksFromDownloads extends Command
             // Filter out directories with too few files or too small size
             foreach ($potentialBooks as $bookData) {
                 if (count($bookData['files']) >= 1 && $bookData['total_size'] > 10 * 1024 * 1024) { // At least 10MB
+                    // Skip if this is one of the parent scan directories
+                    if (in_array($bookData['path'], $directories)) {
+                        $this->skippedBooks[] = [
+                            'path' => $bookData['path'],
+                            'reason' => 'Parent scan directory - contains subdirectories'
+                        ];
+                        continue;
+                    }
+                    
                     // Check if already imported
                     if (!$this->isAlreadyImported($bookData['path'])) {
                         $audiobooks[] = $bookData;
@@ -261,10 +270,59 @@ class ImportBooksFromDownloads extends Command
     }
 
     /**
+     * Find existing book in database (returns Book model instead of boolean)
+     */
+    protected function findExistingBook(string $path, array $metadata = []): ?Book
+    {
+        $baseName = basename($path);
+        
+        // First check by ISBN if available (most reliable)
+        if (!empty($metadata['isbn'])) {
+            $existingBook = Book::where('isbn', $metadata['isbn'])->first();
+            if ($existingBook) {
+                return $existingBook;
+            }
+        }
+        
+        // Then check by exact title and author combination (if available)
+        if (!empty($metadata['title']) && !empty($metadata['author'])) {
+            $title = $metadata['title'];
+            $author = is_array($metadata['author']) ? $metadata['author'][0] : $metadata['author'];
+            
+            $existingBook = Book::where('title', $title)
+                ->whereHas('authors', function($query) use ($author) {
+                    $query->where('name', $author);
+                })
+                ->first();
+                
+            if ($existingBook) {
+                return $existingBook;
+            }
+        }
+        
+        // Fallback to directory path and title similarity
+        $existingBook = Book::where('directory_path', 'like', '%' . $baseName . '%')
+            ->orWhere('title', 'like', '%' . $baseName . '%')
+            ->first();
+            
+        return $existingBook;
+    }
+
+    /**
      * Process a single audiobook with AI and external enrichment
      */
     protected function processAudiobook(array $audiobook): void
     {
+        // Skip directories with no audio files
+        if (empty($audiobook['files']) || count($audiobook['files']) === 0) {
+            $this->warn("⚠️  Skipping {$audiobook['name']} - no audio files found");
+            $this->skippedBooks[] = [
+                'path' => $audiobook['path'],
+                'reason' => 'No audio files found'
+            ];
+            return;
+        }
+        
         $this->newLine();
         $this->info("📖 Processing: " . $audiobook['name']);
         $this->line("📁 Path: " . $audiobook['path']);
@@ -284,9 +342,64 @@ class ImportBooksFromDownloads extends Command
 
         $this->info("✅ AI processing successful (confidence: {$aiMetadata['confidence']}%)");
         
+        // Check for multi-book directory pattern first
+        $multiBookInfo = $this->detectMultiBookPattern($audiobook['name']);
+        if ($multiBookInfo) {
+            // Clean series name by removing author names
+            $authors = is_array($aiMetadata['author']) ? $aiMetadata['author'] : [$aiMetadata['author']];
+            $cleanedSeriesName = $this->cleanSeriesName($multiBookInfo['series_name'], $authors);
+            $multiBookInfo['series_name'] = $cleanedSeriesName;
+            
+            $this->info("📚 Detected multi-book directory: {$cleanedSeriesName} [{$multiBookInfo['start_number']}-{$multiBookInfo['end_number']}]");
+            
+            // Analyze files to see if they can be split
+            $splitGroups = $this->analyzeMultiBookFiles($audiobook, $multiBookInfo);
+            
+            if (count($splitGroups) >= 2) {
+                $this->info("🔍 Found individual book files - will split during import");
+                $this->processMultiBookSplit($audiobook, $multiBookInfo, $splitGroups, $aiMetadata);
+                return;
+            } else {
+                $this->info("📖 No individual book files found - will create combined entry with multiple series numbers");
+                // Update metadata to reflect multi-book nature
+                $aiMetadata['series'] = $cleanedSeriesName;
+                $aiMetadata['multi_book_numbers'] = $multiBookInfo['numbers'];
+                $aiMetadata['title'] = $cleanedSeriesName; // Clean title
+            }
+        } else {
+            // Extract series number from title if present (single book)
+            $this->extractSeriesNumberFromTitle($aiMetadata);
+        }
+        
         // Check for duplicates with AI-extracted metadata (more accurate than path-based check)
-        if ($this->isAlreadyImported($audiobook['path'], $aiMetadata)) {
-            $this->warn("⚠️  Book already exists (detected after AI processing) - skipping");
+        $existingBook = $this->findExistingBook($audiobook['path'], $aiMetadata);
+        if ($existingBook) {
+            $this->warn("⚠️  Book already exists (detected after AI processing)");
+            
+            // Get the existing book's directory path in the library
+            $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
+            if ($bookStoragePath && $existingBook->directory_path) {
+                $existingDir = $bookStoragePath . '/' . $existingBook->directory_path;
+                
+                // Compare directories to see if they're identical
+                if (File::isDirectory($existingDir)) {
+                    $comparison = $this->compareDirectories($audiobook['path'], $existingDir);
+                    
+                    if ($comparison['identical']) {
+                        $this->info("🔍 Source and existing directories are identical - cleaning up source");
+                        $this->cleanupSourceDirectory($audiobook, true);
+                        $this->skippedBooks[] = [
+                            'path' => $audiobook['path'],
+                            'reason' => 'Duplicate - source cleaned up (identical to existing)'
+                        ];
+                        return;
+                    } else {
+                        $this->warn("📁 Directories differ - keeping source directory");
+                        $this->displayDirectoryComparison($comparison);
+                    }
+                }
+            }
+            
             $this->skippedBooks[] = [
                 'path' => $audiobook['path'],
                 'reason' => 'Duplicate book detected'
@@ -403,12 +516,20 @@ class ImportBooksFromDownloads extends Command
             return $value ?? 'N/A';
         };
 
+        // Clean series name for display
+        $displaySeries = '';
+        if (!empty($metadata['series'])) {
+            $authors = is_array($metadata['author']) ? $metadata['author'] : [$metadata['author']];
+            $cleanedSeriesName = $this->cleanSeriesName($metadata['series'], $authors);
+            $displaySeries = $cleanedSeriesName . ($metadata['series_number'] ? " #{$metadata['series_number']}" : '');
+        }
+
         // Build the basic metadata table
         $tableData = [
             ['Title', $arrayToString($metadata['title'])],
             ['Author', $arrayToString($metadata['author'])],
             ['Narrator', $arrayToString($metadata['narrator'])],
-            ['Series', ($metadata['series'] ?? '') . ($metadata['series_number'] ? " #{$metadata['series_number']}" : '')],
+            ['Series', $displaySeries],
             ['Genre', $arrayToString($metadata['genre'])],
             ['Year', $metadata['year'] ?? 'N/A'],
             ['Publisher', $arrayToString($metadata['publisher'])],
@@ -581,6 +702,9 @@ class ImportBooksFromDownloads extends Command
             $metadata['year'] = $newYear;
         }
 
+        // Extract series number from edited title if present
+        $this->extractSeriesNumberFromTitle($metadata);
+        
         // If we started with no enrichment data, automatically try to enrich with the edited metadata
         if (!$this->hasEnrichmentData($metadata) && !$this->option('skip-enrichment')) {
             $this->info("🔍 Attempting to enrich with edited metadata...");
@@ -597,6 +721,338 @@ class ImportBooksFromDownloads extends Command
         }
 
         return $this->confirm("Import this book with the edited metadata?", true);
+    }
+
+    /**
+     * Detect multi-book directory patterns like "Series [2-3]" or "Series [1-4]"
+     */
+    protected function detectMultiBookPattern(string $title): ?array
+    {
+        // Patterns for multi-book directories
+        $patterns = [
+            '/^(.+?)\s*\[(\d+)-(\d+)\]$/i',          // "Series [2-3]"
+            '/^(.+?)\s*\[(\d+)–(\d+)\]$/i',          // "Series [2–3]" (em dash)
+            '/^(.+?)\s*\[(\d+)—(\d+)\]$/i',          // "Series [2—3]" (em dash variant)
+            '/^(.+?)\s*\((\d+)-(\d+)\)$/i',          // "Series (2-3)"
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $title, $matches)) {
+                $seriesName = trim($matches[1]);
+                $startNum = (int)$matches[2];
+                $endNum = (int)$matches[3];
+                
+                if ($startNum < $endNum && $endNum - $startNum <= 10) { // Reasonable range limit
+                    return [
+                        'series_name' => $seriesName,
+                        'start_number' => $startNum,
+                        'end_number' => $endNum,
+                        'numbers' => range($startNum, $endNum)
+                    ];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Analyze files in multi-book directory to determine if they can be split
+     */
+    protected function analyzeMultiBookFiles(array $audiobook, array $multiBookInfo): array
+    {
+        $files = $audiobook['files'];
+        $numbers = $multiBookInfo['numbers'];
+        $splitGroups = [];
+
+        // Look for files that clearly indicate individual books
+        foreach ($files as $file) {
+            $filename = basename($file);
+            
+            // Check if filename contains any of the expected book numbers
+            foreach ($numbers as $bookNum) {
+                $patterns = [
+                    "/\[0?{$bookNum}\]/i",                   // "[02]", "[2]" - bracket notation
+                    "/book\s*0?{$bookNum}[^\d]/i",           // "Book 2", "Book 02"
+                    "/part\s*0?{$bookNum}[^\d]/i",           // "Part 2", "Part 02"
+                    "/vol\s*0?{$bookNum}[^\d]/i",            // "Vol 2", "Vol 02"
+                    "/volume\s*0?{$bookNum}[^\d]/i",         // "Volume 2"
+                    "/^0?{$bookNum}[\s\-_]/i",               // "2 - Title", "02_Title"
+                    "/[\s\-_]0?{$bookNum}[\s\-_]/i",         // "Title_2_Chapter", "Title-02-"
+                ];
+                
+                foreach ($patterns as $pattern) {
+                    if (preg_match($pattern, $filename)) {
+                        if (!isset($splitGroups[$bookNum])) {
+                            $splitGroups[$bookNum] = [];
+                        }
+                        
+                        // Extract individual book title from filename
+                        $bookTitle = $this->extractBookTitleFromFilename($filename, $multiBookInfo['series_name'], $bookNum);
+                        
+                        $splitGroups[$bookNum][] = [
+                            'file' => $file,
+                            'title' => $bookTitle
+                        ];
+                        break 2; // Break both loops
+                    }
+                }
+            }
+        }
+
+        return $splitGroups;
+    }
+
+    /**
+     * Extract individual book title from filename
+     */
+    protected function extractBookTitleFromFilename(string $filename, string $seriesName, int $bookNumber): string
+    {
+        // Remove file extension
+        $name = preg_replace('/\.[^.]+$/', '', $filename);
+        
+        // Remove author names if present at the beginning
+        $name = preg_replace('/^[^-]+-\s*/', '', $name);
+        
+        // Remove series name if present
+        $name = preg_replace('/' . preg_quote($seriesName, '/') . '\s*/i', '', $name);
+        
+        // Remove book number patterns
+        $patterns = [
+            "/\[0?{$bookNumber}\]\s*-?\s*/i",        // "[02] - " or "[2] - "
+            "/book\s*0?{$bookNumber}\s*-?\s*/i",     // "Book 02 - " or "Book 2 - "
+            "/part\s*0?{$bookNumber}\s*-?\s*/i",     // "Part 02 - "
+            "/vol\s*0?{$bookNumber}\s*-?\s*/i",      // "Vol 02 - "
+            "/volume\s*0?{$bookNumber}\s*-?\s*/i",   // "Volume 02 - "
+        ];
+        
+        foreach ($patterns as $pattern) {
+            $name = preg_replace($pattern, '', $name);
+        }
+        
+        // Clean up remaining separators and whitespace
+        $name = preg_replace('/^[\s\-_]+|[\s\-_]+$/', '', $name);
+        $name = trim($name);
+        
+        // If we couldn't extract a meaningful title, use series name + book number
+        if (empty($name) || strlen($name) < 2) {
+            $name = $seriesName . " Book " . $bookNumber;
+        }
+        
+        return $name;
+    }
+
+    /**
+     * Clean series name by removing author names if present
+     */
+    protected function cleanSeriesName(string $seriesName, array $authors): string
+    {
+        $originalSeries = $seriesName;
+        $cleanedSeries = $seriesName;
+        
+        // First try to remove the complete author list as a combined string
+        $combinedAuthors = implode(', ', $authors);
+        $combinedPatterns = [
+            '/^' . preg_quote($combinedAuthors, '/') . '\s*-\s*/i',     // "Author1, Author2, Author3 - Series"
+            '/^' . preg_quote($combinedAuthors, '/') . '\s+/i',         // "Author1, Author2, Author3 Series"
+            '/\s*-\s*' . preg_quote($combinedAuthors, '/') . '$/i',     // "Series - Author1, Author2, Author3"
+        ];
+        
+        foreach ($combinedPatterns as $pattern) {
+            $before = $cleanedSeries;
+            $cleanedSeries = preg_replace($pattern, '', $cleanedSeries);
+            if ($before !== $cleanedSeries) {
+                // If we found a match with combined authors, we can return early
+                $cleanedSeries = preg_replace('/^[\s\-_]+|[\s\-_]+$/', '', $cleanedSeries);
+                $cleanedSeries = trim($cleanedSeries);
+                if (!empty($cleanedSeries) && strlen($cleanedSeries) >= 2) {
+                    return $cleanedSeries;
+                }
+            }
+        }
+        
+        // If combined pattern didn't work, try individual authors
+        foreach ($authors as $author) {
+            $authorName = trim($author);
+            
+            // Try different patterns to remove author names from series
+            $patterns = [
+                '/^' . preg_quote($authorName, '/') . '\s*-\s*/i',     // "Author - Series"
+                '/^' . preg_quote($authorName, '/') . '\s+/i',         // "Author Series"
+                '/\s*-\s*' . preg_quote($authorName, '/') . '$/i',     // "Series - Author"
+                '/\s+' . preg_quote($authorName, '/') . '$/i',         // "Series Author"
+            ];
+            
+            foreach ($patterns as $pattern) {
+                $cleanedSeries = preg_replace($pattern, '', $cleanedSeries);
+            }
+            
+            // Also try with normalized author name (with periods)
+            $normalizedAuthor = $this->normalizeAuthorName($authorName);
+            if ($normalizedAuthor !== $authorName) {
+                $patterns = [
+                    '/^' . preg_quote($normalizedAuthor, '/') . '\s*-\s*/i',
+                    '/^' . preg_quote($normalizedAuthor, '/') . '\s+/i',
+                    '/\s*-\s*' . preg_quote($normalizedAuthor, '/') . '$/i',
+                    '/\s+' . preg_quote($normalizedAuthor, '/') . '$/i',
+                ];
+                
+                foreach ($patterns as $pattern) {
+                    $cleanedSeries = preg_replace($pattern, '', $cleanedSeries);
+                }
+            }
+        }
+        
+        // Clean up any remaining separators and whitespace
+        $cleanedSeries = preg_replace('/^[\s\-_]+|[\s\-_]+$/', '', $cleanedSeries);
+        $cleanedSeries = trim($cleanedSeries);
+        
+        // If we cleaned too much and ended up with nothing, return original
+        if (empty($cleanedSeries) || strlen($cleanedSeries) < 2) {
+            return $seriesName;
+        }
+        
+        return $cleanedSeries;
+    }
+
+    /**
+     * Process multi-book directory by splitting into individual books
+     */
+    protected function processMultiBookSplit(array $audiobook, array $multiBookInfo, array $splitGroups, array $aiMetadata): void
+    {
+        $this->info("🔄 Processing {$multiBookInfo['series_name']} as split books...");
+        
+        foreach ($splitGroups as $bookNumber => $fileInfos) {
+            $this->info("📖 Processing Book {$bookNumber} with " . count($fileInfos) . " files");
+            
+            // Extract files and get the title from the first file info
+            $files = array_map(function($fileInfo) { return $fileInfo['file']; }, $fileInfos);
+            $bookTitle = $fileInfos[0]['title']; // Use title from first file
+            
+            $this->info("📚 Book title: {$bookTitle}");
+            
+            // Create metadata for this individual book
+            $bookMetadata = $aiMetadata;
+            $bookMetadata['title'] = $bookTitle; // Use extracted individual book title
+            $bookMetadata['series'] = $multiBookInfo['series_name']; // This is already cleaned
+            $bookMetadata['series_number'] = $bookNumber;
+            
+            // Ensure any original uncleaned series name is overwritten
+            unset($bookMetadata['series_original']);
+            
+            // Create a virtual audiobook entry for this book
+            $virtualAudiobook = [
+                'path' => $audiobook['path'], // Keep original path
+                'name' => $bookTitle,
+                'files' => $files,
+                'total_size' => array_sum(array_map('filesize', $files)),
+                'is_multi_book_part' => true, // Flag to indicate this is part of a multi-book
+                'multi_book_files_only' => $files // Specific files for this book
+            ];
+            
+            // Process this book individually
+            $this->processSingleBook($virtualAudiobook, $bookMetadata);
+        }
+    }
+
+    /**
+     * Process a single book (used for both regular books and split multi-books)
+     */
+    protected function processSingleBook(array $audiobook, array $metadata): void
+    {
+        // Continue with enrichment and import process
+        if (!$this->option('skip-enrichment')) {
+            $this->info("🔍 Enriching with external data...");
+            $enrichedData = $this->enrichWithExternalData($metadata);
+            if ($enrichedData) {
+                $metadata = array_merge($metadata, $enrichedData);
+                $this->info("✅ External data enrichment completed");
+            }
+        }
+        
+        // Show expected directory path
+        $expectedPath = $this->generateDirectoryPath($metadata);
+        $this->info("📁 Expected directory path: {$expectedPath}");
+        
+        $this->displayEnrichedMetadata($metadata);
+
+        // Manual review (unless in auto mode)
+        if (!$this->option('auto') && !$this->option('dry-run')) {
+            if (!$this->reviewAndApprove($metadata)) {
+                $this->warn("❌ Import rejected by user");
+                $this->skippedBooks[] = [
+                    'path' => $audiobook['path'],
+                    'reason' => 'Rejected by user'
+                ];
+                return;
+            }
+        } elseif ($this->option('auto') && !$this->hasEnrichmentData($metadata)) {
+            // In auto mode, skip books with no enrichment data
+            $this->warn("⚠️  No enrichment data found in auto mode - skipping (detected fields might be incorrect)");
+            $this->skippedBooks[] = [
+                'path' => $audiobook['path'],
+                'reason' => 'No enrichment data in auto mode'
+            ];
+            return;
+        }
+
+        // Import to database
+        if (!$this->option('dry-run')) {
+            $book = $this->createBookFromMetadata($metadata, $audiobook);
+            if ($book) {
+                $this->info("✅ Book imported successfully: {$book->title} (ID: {$book->id})");
+                
+                // Move/copy files
+                $this->moveFilesToLibrary($audiobook, $book);
+                
+                $this->processedBooks[] = [
+                    'path' => $audiobook['path'],
+                    'book_id' => $book->id,
+                    'title' => $book->title
+                ];
+            }
+        } else {
+            $this->info("🔍 [DRY RUN] Would import: {$metadata['title']}");
+        }
+    }
+
+    /**
+     * Extract series number from title and clean the title
+     */
+    protected function extractSeriesNumberFromTitle(array &$metadata): void
+    {
+        if (empty($metadata['title'])) {
+            return;
+        }
+
+        $title = trim($metadata['title']);
+        
+        // Common patterns for book numbers in titles
+        $patterns = [
+            '/^(.+?),\s*Book\s+(\d+)$/i',            // "Title, Book 1"
+            '/^(.+?)\s+Book\s+(\d+)$/i',             // "Title Book 1"
+            '/^(.+?),\s*Volume\s+(\d+)$/i',          // "Title, Volume 1"
+            '/^(.+?)\s+Volume\s+(\d+)$/i',           // "Title Volume 1"
+            '/^(.+?),\s*#(\d+)$/i',                  // "Title, #1"
+            '/^(.+?)\s+#(\d+)$/i',                   // "Title #1"
+            '/^(.+?),\s*Part\s+(\d+)$/i',            // "Title, Part 1"  
+            '/^(.+?)\s+Part\s+(\d+)$/i',             // "Title Part 1"
+            '/^(.+?)\s+(\d+)$/',                     // "Title 1" (last resort)
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $title, $matches)) {
+                $cleanTitle = trim($matches[1]);
+                $bookNumber = (int)$matches[2];
+
+                // Apply the extraction
+                $metadata['title'] = $cleanTitle;
+                $metadata['series_number'] = $bookNumber;
+                
+                $this->info("📚 Extracted series number {$bookNumber} from title: '{$title}' → '{$cleanTitle}'");
+                return; // Exit after first match
+            }
+        }
     }
 
     /**
@@ -940,12 +1396,38 @@ class ImportBooksFromDownloads extends Command
 
                 // Handle series
                 if (!empty($metadata['series'])) {
-                    $series = Series::firstOrCreate(['name' => trim($metadata['series'])]);
-                    $seriesNumber = $metadata['series_number'] ?? 1;
+                    // Clean series name by removing author names
+                    $authors = is_array($metadata['author']) ? $metadata['author'] : [$metadata['author']];
+                    $cleanedSeriesName = $this->cleanSeriesName($metadata['series'], $authors);
                     
-                    $book->series()->sync([
-                        $series->id => ['series_number' => $seriesNumber]
-                    ]);
+                    $series = Series::firstOrCreate(['name' => trim($cleanedSeriesName)]);
+                    
+                    // Handle multi-book entries (e.g., books 2-3 combined)
+                    if (!empty($metadata['multi_book_numbers'])) {
+                        $seriesData = [];
+                        foreach ($metadata['multi_book_numbers'] as $number) {
+                            $seriesData[$series->id] = ['series_number' => $number];
+                        }
+                        
+                        // Note: This might require updating the pivot table to allow multiple entries
+                        // For now, we'll use the first number and log the multi-book nature
+                        $firstNumber = $metadata['multi_book_numbers'][0];
+                        $lastNumber = end($metadata['multi_book_numbers']);
+                        
+                        $book->series()->sync([
+                            $series->id => [
+                                'series_number' => $firstNumber,
+                                'series_end_number' => $lastNumber // This field may need to be added to the pivot table
+                            ]
+                        ]);
+                        
+                        $this->info("📚 Multi-book entry: Books {$firstNumber}-{$lastNumber} combined");
+                    } else {
+                        $seriesNumber = $metadata['series_number'] ?? 1;
+                        $book->series()->sync([
+                            $series->id => ['series_number' => $seriesNumber]
+                        ]);
+                    }
                 }
 
                 return $book;
@@ -975,12 +1457,30 @@ class ImportBooksFromDownloads extends Command
         }
         
         if (!empty($metadata['author'])) {
-            $author = is_array($metadata['author']) ? $metadata['author'][0] : $metadata['author'];
-            $parts[] = $author;
+            $authors = is_array($metadata['author']) ? $metadata['author'] : [$metadata['author']];
+            
+            // Check for existing author directory first (use cleaned series name)
+            $cleanedSeries = null;
+            if (!empty($metadata['series'])) {
+                $cleanedSeries = $this->cleanSeriesName($metadata['series'], $authors);
+            }
+            $existingAuthorDir = $this->findExistingAuthorDirectory($authors, $cleanedSeries);
+            
+            if ($existingAuthorDir) {
+                $this->info("📁 Found existing author directory: {$existingAuthorDir}");
+                $parts[] = $existingAuthorDir;
+            } else {
+                // Use formatted author names with & separator and normalized initials
+                $authorDir = $this->formatAuthorsForDirectory($authors);
+                $parts[] = $authorDir;
+            }
         }
         
         if (!empty($metadata['series'])) {
-            $parts[] = $metadata['series'];
+            // Clean series name by removing author names for directory path
+            $authors = is_array($metadata['author']) ? $metadata['author'] : [$metadata['author']];
+            $cleanedSeriesName = $this->cleanSeriesName($metadata['series'], $authors);
+            $parts[] = $cleanedSeriesName;
         }
         
         if (!empty($metadata['title'])) {
@@ -1015,38 +1515,44 @@ class ImportBooksFromDownloads extends Command
 
             $targetDir = $bookStoragePath . '/' . $book->directory_path;
             
-            // Check if target directory already exists before creating it
+            // Handle target directory existence and conflicts
+            $needToCreateDirectory = true;
+            
             if (File::isDirectory($targetDir)) {
-                // Check if the existing directory is empty
-                $existingFiles = File::allFiles($targetDir);
+                // Check if the existing directory has any relevant files (same logic as comparison)
+                $targetInfo = $this->getDirectoryInfo($targetDir);
                 
-                if (empty($existingFiles)) {
-                    // Directory exists but is empty - no conflict, just proceed
-                    $this->info("📁 Target directory exists but is empty - proceeding with import");
+                if ($targetInfo['count'] === 0) {
+                    // Directory exists but has no audio files - no conflict, just proceed
+                    $this->info("📁 Target directory exists but has no audio files - proceeding with import");
+                    $needToCreateDirectory = false; // Directory already exists
                 } else {
-                    // Directory has files - handle the conflict
+                    // Directory has audio files - handle the conflict
                     $conflictAction = $this->handleDirectoryConflict($audiobook, $targetDir);
                     
                     switch ($conflictAction) {
                         case 'skip':
-                            $this->info("⏭️  Skipping file operations - directories are identical");
+                            $this->info("🗑️  Cleaning up duplicate source directory");
                             $this->cleanupSourceDirectory($audiobook, true); // Clean up since files already exist
                             return true;
                             
                         case 'replace':
                             $this->info("🗑️  Removing existing directory to replace with new files");
                             File::deleteDirectory($targetDir);
+                            // Directory will be recreated below
                             break;
                             
                         case 'rename_existing':
                             $newExistingPath = $targetDir . '_backup_' . date('Y-m-d_H-i-s');
                             File::move($targetDir, $newExistingPath);
                             $this->info("📁 Renamed existing directory to: " . basename($newExistingPath));
+                            // Directory will be recreated below
                             break;
                             
                         case 'rename_new':
                             $targetDir = $targetDir . '_imported_' . date('Y-m-d_H-i-s');
                             $this->info("📁 Importing to renamed directory: " . basename($targetDir));
+                            // New directory name will be created below
                             break;
                             
                         case 'cancel':
@@ -1056,19 +1562,29 @@ class ImportBooksFromDownloads extends Command
                 }
             }
             
-            // Create target directory (after handling conflicts)
-            File::makeDirectory($targetDir, 0755, true);
+            // Create target directory only if needed
+            if ($needToCreateDirectory) {
+                File::makeDirectory($targetDir, 0755, true);
+            }
 
             // Move or copy all files in the directory (not just audio files)
             $copyFiles = $this->option('copy-files');
             $filesMoved = 0;
             $filesCopied = 0;
             
-            // Get all files in the source directory
-            $allFiles = File::allFiles($audiobook['path']);
+            // Get files to move - either all files in directory or specific files for multi-book
+            if (isset($audiobook['is_multi_book_part']) && $audiobook['is_multi_book_part']) {
+                // For multi-book parts, only move the specific files for this book
+                $filesToMove = $audiobook['multi_book_files_only'];
+                $this->info("📁 Moving " . count($filesToMove) . " files for this book part");
+            } else {
+                // For regular books, move all files in the directory
+                $allFiles = File::allFiles($audiobook['path']);
+                $filesToMove = array_map(function($file) { return $file->getPathname(); }, $allFiles);
+            }
             
-            foreach ($allFiles as $sourceFile) {
-                $relativePath = str_replace($audiobook['path'] . '/', '', $sourceFile->getPathname());
+            foreach ($filesToMove as $sourceFilePath) {
+                $relativePath = str_replace($audiobook['path'] . '/', '', $sourceFilePath);
                 $targetFile = $targetDir . '/' . $relativePath;
                 
                 // Create subdirectories if needed
@@ -1078,17 +1594,29 @@ class ImportBooksFromDownloads extends Command
                 }
                 
                 if ($copyFiles) {
-                    File::copy($sourceFile->getPathname(), $targetFile);
+                    File::copy($sourceFilePath, $targetFile);
                     $filesCopied++;
                 } else {
                     // Try to move first, fallback to copy if move fails
                     try {
-                        File::move($sourceFile->getPathname(), $targetFile);
+                        File::move($sourceFilePath, $targetFile);
                         $filesMoved++;
                     } catch (\Exception $e) {
-                        $this->warn("⚠️  Failed to move {$relativePath}, copying instead: " . $e->getMessage());
-                        File::copy($sourceFile->getPathname(), $targetFile);
-                        $filesCopied++;
+                        // Check if source file still exists before trying to copy
+                        if (File::exists($sourceFilePath)) {
+                            $this->warn("⚠️  Failed to move {$relativePath}, copying instead: " . $e->getMessage());
+                            try {
+                                File::copy($sourceFilePath, $targetFile);
+                                $filesCopied++;
+                            } catch (\Exception $copyException) {
+                                $this->error("❌ Failed to copy {$relativePath}: " . $copyException->getMessage());
+                                throw $copyException;
+                            }
+                        } else {
+                            // File was moved successfully despite the exception (common with inter-device moves)
+                            $this->info("📁 File {$relativePath} moved successfully (despite error message)");
+                            $filesMoved++;
+                        }
                     }
                 }
             }
@@ -1296,9 +1824,9 @@ class ImportBooksFromDownloads extends Command
         // Display comparison
         $this->displayDirectoryComparison($comparison);
         
-        // If directories are identical, just clean up source
+        // If directories are identical, automatically clean up source
         if ($comparison['identical']) {
-            $this->info("✅ Directories are identical - no need to move files");
+            $this->info("🔍 Directories are identical - source will be automatically deleted");
             return 'skip';
         }
         
@@ -1602,7 +2130,7 @@ class ImportBooksFromDownloads extends Command
                 // Files already exist in target, safe to remove source
                 try {
                     File::deleteDirectory($audiobook['path']);
-                    $this->info("🗑️  Removed source directory (files already exist in target)");
+                    $this->info("✅ Removed duplicate source directory (identical files already exist in library)");
                 } catch (\Exception $e) {
                     $this->warn("⚠️  Could not remove source directory: " . $e->getMessage());
                 }
@@ -1726,6 +2254,122 @@ class ImportBooksFromDownloads extends Command
             }
         }
         
+        return null;
+    }
+
+    /**
+     * Normalize author names for directory use
+     */
+    protected function normalizeAuthorName(string $authorName): string
+    {
+        $name = trim($authorName);
+        
+        // Add periods after single letters (initials) if not already present
+        $name = preg_replace('/\b([A-Z])\s+/', '$1. ', $name);
+        
+        // Handle initials at the end of names
+        $name = preg_replace('/\s+([A-Z])$/', ' $1.', $name);
+        
+        // Combine consecutive initials (remove spaces between them)
+        // "J. N. Chaney" -> "J.N. Chaney"
+        // Handle multiple consecutive initials
+        $name = preg_replace('/\b([A-Z]\.)\s+([A-Z]\.)/', '$1$2', $name);
+        // Repeat to catch cases with 3+ initials
+        $name = preg_replace('/\b([A-Z]\.)\s+([A-Z]\.)/', '$1$2', $name);
+        
+        return trim($name);
+    }
+
+    /**
+     * Format multiple authors for directory paths
+     */
+    protected function formatAuthorsForDirectory(array $authors): string
+    {
+        // Normalize each author name
+        $normalizedAuthors = array_map([$this, 'normalizeAuthorName'], $authors);
+        
+        // Join with & for directory paths
+        return implode(' & ', $normalizedAuthors);
+    }
+
+    /**
+     * Find existing directory for authors (checking different orders and subsets)
+     */
+    protected function findExistingAuthorDirectory(array $authors, string $seriesName = null): ?string
+    {
+        if (empty($authors)) {
+            return null;
+        }
+
+        $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
+        if (!$bookStoragePath || !File::isDirectory($bookStoragePath)) {
+            return null;
+        }
+
+        $normalizedAuthors = array_map([$this, 'normalizeAuthorName'], $authors);
+        
+        // Generate all possible author combinations to check
+        $authorCombinations = [];
+        
+        // Single authors
+        foreach ($normalizedAuthors as $author) {
+            $authorCombinations[] = [$author];
+        }
+        
+        // All permutations of the full author list
+        if (count($normalizedAuthors) > 1) {
+            $authorCombinations[] = $normalizedAuthors;
+            $authorCombinations[] = array_reverse($normalizedAuthors);
+            
+            // For 3+ authors, also try pairs of the most common combinations
+            if (count($normalizedAuthors) >= 3) {
+                $authorCombinations[] = [$normalizedAuthors[0], $normalizedAuthors[1]];
+                $authorCombinations[] = [$normalizedAuthors[1], $normalizedAuthors[0]];
+            }
+        }
+
+        // Search through existing directories
+        try {
+            $iterator = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($bookStoragePath, \RecursiveDirectoryIterator::SKIP_DOTS),
+                \RecursiveIteratorIterator::SELF_FIRST
+            );
+
+            foreach ($iterator as $dir) {
+                if (!$dir->isDir()) {
+                    continue;
+                }
+
+                $dirPath = $dir->getPathname();
+                $pathParts = explode('/', str_replace($bookStoragePath . '/', '', $dirPath));
+                
+                // Look for author directories (typically 2nd level: Genre/Author/Series)
+                if (count($pathParts) >= 2) {
+                    $authorDirName = $pathParts[1];
+                    
+                    // Check if this directory matches any of our author combinations
+                    foreach ($authorCombinations as $combination) {
+                        $expectedDirName = $this->formatAuthorsForDirectory($combination);
+                        
+                        if ($authorDirName === $expectedDirName) {
+                            // If series name is provided, check if this author has that series
+                            if ($seriesName && count($pathParts) >= 3) {
+                                $seriesDirName = $pathParts[2];
+                                if (stripos($seriesDirName, $seriesName) !== false) {
+                                    return $authorDirName;
+                                }
+                            } else {
+                                // Return the found author directory name
+                                return $authorDirName;
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            Log::warning("Error searching for existing author directories: " . $e->getMessage());
+        }
+
         return null;
     }
 
