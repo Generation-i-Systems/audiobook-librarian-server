@@ -27,7 +27,8 @@ class ImportBooksFromDownloads extends Command
      * The name and signature of the console command.
      */
     protected $signature = 'books:import-downloads 
-                            {--directory=* : Custom directories to scan (defaults to /media/download and /media/download/audiobooks)}
+                            {path?* : Specific files or folders to process (if none provided, scans default directories)}
+                            {--directory=* : Custom directories to scan (ignored if paths are provided)}
                             {--model=gemini-2.5-flash-lite : AI model to use for processing}
                             {--min-confidence=80 : Minimum AI confidence for auto-import}
                             {--auto : Fully automated mode - no manual review}
@@ -104,17 +105,24 @@ class ImportBooksFromDownloads extends Command
             return Command::FAILURE;
         }
 
-        // Get directories to scan
-        $directories = $this->getDirectoriesToScan();
-        if (empty($directories)) {
-            $this->error("❌ No valid directories found to scan");
-            return Command::FAILURE;
+        // Check for specific paths first (files or folders)
+        $specificPaths = $this->argument('path');
+        if (!empty($specificPaths)) {
+            $this->info("📁 Processing specific paths: " . implode(', ', $specificPaths));
+            $audiobooks = $this->processSpecificPaths($specificPaths);
+        } else {
+            // Get directories to scan
+            $directories = $this->getDirectoriesToScan();
+            if (empty($directories)) {
+                $this->error("❌ No valid directories found to scan");
+                return Command::FAILURE;
+            }
+
+            $this->info("📁 Scanning directories: " . implode(', ', $directories));
+
+            // Scan for audiobooks
+            $audiobooks = $this->scanForAudiobooks($directories);
         }
-
-        $this->info("📁 Scanning directories: " . implode(', ', $directories));
-
-        // Scan for audiobooks
-        $audiobooks = $this->scanForAudiobooks($directories);
         $this->totalFound = count($audiobooks);
 
         if (empty($audiobooks)) {
@@ -213,6 +221,83 @@ class ImportBooksFromDownloads extends Command
         }
 
         return $directories;
+    }
+
+    /**
+     * Process specific files or folders provided as arguments
+     */
+    protected function processSpecificPaths(array $paths): array
+    {
+        $audiobooks = [];
+        $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
+
+        foreach ($paths as $path) {
+            if (!file_exists($path)) {
+                $this->warn("⚠️  Path does not exist: {$path}");
+                continue;
+            }
+
+            if (is_file($path)) {
+                // Single file - check if it's an audio file
+                $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+                if (in_array($extension, $audioExtensions)) {
+                    $directory = dirname($path);
+                    $this->info("🔍 Processing audio file: {$path}");
+                    $audiobook = $this->processAudiobookDirectory($directory);
+                    if ($audiobook) {
+                        $audiobooks[] = $audiobook;
+                    }
+                } else {
+                    $this->warn("⚠️  Not an audio file: {$path}");
+                }
+            } elseif (is_dir($path)) {
+                // Directory - scan it for audiobooks
+                $this->info("🔍 Processing directory: {$path}");
+                $audiobook = $this->processAudiobookDirectory($path);
+                if ($audiobook) {
+                    $audiobooks[] = $audiobook;
+                }
+            }
+        }
+
+        return $audiobooks;
+    }
+
+    /**
+     * Process a single directory as an audiobook
+     */
+    protected function processAudiobookDirectory(string $directory): ?array
+    {
+        $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
+        $files = [];
+        $totalSize = 0;
+
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($directory, \RecursiveDirectoryIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::LEAVES_ONLY
+        );
+
+        foreach ($iterator as $file) {
+            if ($file->isFile()) {
+                $extension = strtolower($file->getExtension());
+                if (in_array($extension, $audioExtensions)) {
+                    $files[] = $file->getPathname();
+                    $totalSize += $file->getSize();
+                }
+            }
+        }
+
+        // Require at least 1 audio file and 10MB total size
+        if (count($files) >= 1 && $totalSize > 10 * 1024 * 1024) {
+            return [
+                'path' => $directory,
+                'name' => basename($directory),
+                'files' => $files,
+                'total_size' => $totalSize
+            ];
+        }
+
+        return null;
     }
 
     /**
