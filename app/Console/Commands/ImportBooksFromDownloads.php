@@ -126,7 +126,13 @@ class ImportBooksFromDownloads extends Command
         $this->totalFound = count($audiobooks);
 
         if (empty($audiobooks)) {
-            $this->info("ℹ️  No audiobooks found in specified directories");
+            if (!empty($specificPaths)) {
+                $this->info("ℹ️  No audiobooks found in specified paths");
+                $this->info("💡 Tip: Use quotes around paths with spaces: \"path with spaces\"");
+                $this->info("💡 Or use full paths: /media/download/audiobooks/\"Michael Simon - First Command\"");
+            } else {
+                $this->info("ℹ️  No audiobooks found in specified directories");
+            }
             return Command::SUCCESS;
         }
 
@@ -232,10 +238,24 @@ class ImportBooksFromDownloads extends Command
         $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
 
         foreach ($paths as $path) {
-            if (!file_exists($path)) {
+            // Handle escaped spaces and normalize path
+            $normalizedPath = str_replace('\ ', ' ', $path);
+            
+            // Try original path first, then normalized path
+            $actualPath = null;
+            if (file_exists($path)) {
+                $actualPath = $path;
+            } elseif (file_exists($normalizedPath)) {
+                $actualPath = $normalizedPath;
+            } else {
                 $this->warn("⚠️  Path does not exist: {$path}");
+                if ($path !== $normalizedPath) {
+                    $this->warn("⚠️  Also tried: {$normalizedPath}");
+                }
                 continue;
             }
+            
+            $path = $actualPath;
 
             if (is_file($path)) {
                 // Single file - check if it's an audio file
