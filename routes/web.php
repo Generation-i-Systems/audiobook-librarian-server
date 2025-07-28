@@ -144,6 +144,9 @@ if (app()->environment('local')) {
 
 Route::get('/', function () {
     if (Auth::check()) {
+        if (Auth::user()->is_admin) {
+            return redirect()->route('admin.books.index')->with('status', 'Welcome to Audiobook Librarian!');
+        }
         return redirect()->route('books.index')->with('status', 'Welcome to Audiobook Librarian!');
     }
 
