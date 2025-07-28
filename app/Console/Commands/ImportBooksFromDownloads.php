@@ -1536,18 +1536,24 @@ class ImportBooksFromDownloads extends Command
             if ($existingBook) {
                 // Double-check that titles are truly identical (case-insensitive)
                 if (strtolower(trim($existingBook->title)) === strtolower(trim($title))) {
-                    // Additional check: if both have series info, make sure series numbers are the same
-                    // This prevents matching different books in the same series
-                    if (!empty($metadata['series']) && !empty($metadata['series_number'])) {
-                        $existingSeries = $existingBook->series ?? '';
-                        $existingSeriesNumber = $existingBook->series_number ?? 0;
-                        $newSeries = $metadata['series'] ?? '';
-                        $newSeriesNumber = $metadata['series_number'] ?? 0;
-                        
-                        if ($existingSeries && $newSeries && $existingSeries === $newSeries) {
-                            if ($existingSeriesNumber != $newSeriesNumber) {
-                                return false; // Different books in same series
-                            }
+                    // Critical check: if either book has series info, compare series numbers
+                    // Books with different series numbers should NEVER match, even with same title
+                    $existingSeries = $existingBook->series ?? '';
+                    $existingSeriesNumber = $existingBook->series_number ?? 0;
+                    $newSeries = $metadata['series'] ?? '';
+                    $newSeriesNumber = $metadata['series_number'] ?? 0;
+                    
+                    // If either book has series number info, they must match exactly
+                    if ($existingSeriesNumber > 0 || $newSeriesNumber > 0) {
+                        if ($existingSeriesNumber != $newSeriesNumber) {
+                            return false; // Different series numbers = different books
+                        }
+                    }
+                    
+                    // If both have series names, they must match
+                    if (!empty($existingSeries) && !empty($newSeries)) {
+                        if ($existingSeries !== $newSeries) {
+                            return false; // Different series = different books
                         }
                     }
                     
@@ -1600,19 +1606,26 @@ class ImportBooksFromDownloads extends Command
                 
                 // Double-check that titles are truly identical (case-insensitive)
                 if (strtolower(trim($existingBook->title)) === strtolower(trim($title))) {
-                    // Additional check: if both have series info, make sure series numbers are the same
-                    // This prevents matching different books in the same series
-                    if (!empty($metadata['series']) && !empty($metadata['series_number'])) {
-                        $existingSeries = $existingBook->series ?? '';
-                        $existingSeriesNumber = $existingBook->series_number ?? 0;
-                        $newSeries = $metadata['series'] ?? '';
-                        $newSeriesNumber = $metadata['series_number'] ?? 0;
-                        
-                        if ($existingSeries && $newSeries && $existingSeries === $newSeries) {
-                            if ($existingSeriesNumber != $newSeriesNumber) {
-                                $this->line("  ⚠️  Same series but different numbers (existing: #{$existingSeriesNumber}, new: #{$newSeriesNumber}) - not a duplicate");
-                                return null;
-                            }
+                    // Critical check: if either book has series info, compare series numbers
+                    // Books with different series numbers should NEVER match, even with same title
+                    $existingSeries = $existingBook->series ?? '';
+                    $existingSeriesNumber = $existingBook->series_number ?? 0;
+                    $newSeries = $metadata['series'] ?? '';
+                    $newSeriesNumber = $metadata['series_number'] ?? 0;
+                    
+                    // If either book has series number info, they must match exactly
+                    if ($existingSeriesNumber > 0 || $newSeriesNumber > 0) {
+                        if ($existingSeriesNumber != $newSeriesNumber) {
+                            $this->line("  ⚠️  Different series numbers (existing: #{$existingSeriesNumber}, new: #{$newSeriesNumber}) - not a duplicate");
+                            return null;
+                        }
+                    }
+                    
+                    // If both have series names, they must match
+                    if (!empty($existingSeries) && !empty($newSeries)) {
+                        if ($existingSeries !== $newSeries) {
+                            $this->line("  ⚠️  Different series (existing: '{$existingSeries}', new: '{$newSeries}') - not a duplicate");
+                            return null;
                         }
                     }
                     
@@ -3655,7 +3668,7 @@ class ImportBooksFromDownloads extends Command
                             }
                         } else {
                             // File was moved successfully despite the exception (common with inter-device moves)
-                            $this->info("📁 File {$relativePath} moved successfully (despite error message)");
+                            $this->info("📁 File {$relativePath} moved successfully");
                             $filesMoved++;
                         }
                     }

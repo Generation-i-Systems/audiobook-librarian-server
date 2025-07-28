@@ -6,6 +6,7 @@ use App\Contracts\DocumentStoreServiceInterface;
 use App\Services\FirestoreService;
 use App\Services\MongoService;
 use App\Services\MySqlService;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 use Tests\Mocks\MockDocumentStoreService;
 
@@ -33,7 +34,7 @@ class DocumentStoreServiceProvider extends ServiceProvider
                 }
             }
             
-            \Log::info("DocumentStoreService requested: driver='{$driver}' by {$caller}");
+            Log::info("DocumentStoreService requested: driver='{$driver}' by {$caller}");
             
             // Debug: Report when MongoDB is being used outside of migration commands
             if ($driver === 'mongodb') {
@@ -59,8 +60,8 @@ class DocumentStoreServiceProvider extends ServiceProvider
                 }
                 
                 if (!$isAcceptableMongoUsage) {
-                    \Log::error("MongoDB being used inappropriately by: {$caller}");
-                    \Log::error("Stack trace: " . json_encode(array_slice($backtrace, 0, 5)));
+                    Log::error("MongoDB being used inappropriately by: {$caller}");
+                    Log::error("Stack trace: " . json_encode(array_slice($backtrace, 0, 5)));
                 }
             }
 
