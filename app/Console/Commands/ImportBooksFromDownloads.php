@@ -943,7 +943,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function saveCache(): void
     {
-        if (!$this->cacheEnabled) {
+        if (!$this->cacheEnabled || !isset($this->cacheFilePath)) {
             return;
         }
         
