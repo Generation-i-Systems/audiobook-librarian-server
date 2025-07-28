@@ -7,12 +7,13 @@
       "Bash(./vendor/bin/phpunit:*)",
       "Bash(rg:*)",
       "Bash(php:*)",
-	"Bash(npm run build:*)",
+      "Bash(npm run build:*)",
       "Bash(curl:*)",
       "Bash(ls:*)",
       "Bash(composer:*)",
       "WebFetch(domain:docs.anthropic.com)",
-      "WebFetch(domain:ai.google.dev)"
+      "WebFetch(domain:ai.google.dev)",
+      "Bash(git add:*)"
     ],
     "deny": []
   }
