@@ -1536,15 +1536,30 @@ class ImportBooksFromDownloads extends Command
             if ($existingBook) {
                 // Double-check that titles are truly identical (case-insensitive)
                 if (strtolower(trim($existingBook->title)) === strtolower(trim($title))) {
+                    // Additional check: if both have series info, make sure series numbers are the same
+                    // This prevents matching different books in the same series
+                    if (!empty($metadata['series']) && !empty($metadata['series_number'])) {
+                        $existingSeries = $existingBook->series ?? '';
+                        $existingSeriesNumber = $existingBook->series_number ?? 0;
+                        $newSeries = $metadata['series'] ?? '';
+                        $newSeriesNumber = $metadata['series_number'] ?? 0;
+                        
+                        if ($existingSeries && $newSeries && $existingSeries === $newSeries) {
+                            if ($existingSeriesNumber != $newSeriesNumber) {
+                                return false; // Different books in same series
+                            }
+                        }
+                    }
+                    
                     return true;
                 }
             }
         }
         
-        // Fallback to exact directory basename match only (much more restrictive)
+        // Fallback to exact directory basename match only (much more restrictive) 
         // Only match if the final directory name is exactly the same
-        $existingBook = Book::where('directory_path', 'like', '%/' . $baseName)
-            ->orWhere('directory_path', '=', $baseName)
+        // REMOVED: LIKE pattern matching to prevent false positives between series books
+        $existingBook = Book::where('directory_path', '=', $baseName)
             ->first();
             
         return $existingBook !== null;
@@ -1585,6 +1600,22 @@ class ImportBooksFromDownloads extends Command
                 
                 // Double-check that titles are truly identical (case-insensitive)
                 if (strtolower(trim($existingBook->title)) === strtolower(trim($title))) {
+                    // Additional check: if both have series info, make sure series numbers are the same
+                    // This prevents matching different books in the same series
+                    if (!empty($metadata['series']) && !empty($metadata['series_number'])) {
+                        $existingSeries = $existingBook->series ?? '';
+                        $existingSeriesNumber = $existingBook->series_number ?? 0;
+                        $newSeries = $metadata['series'] ?? '';
+                        $newSeriesNumber = $metadata['series_number'] ?? 0;
+                        
+                        if ($existingSeries && $newSeries && $existingSeries === $newSeries) {
+                            if ($existingSeriesNumber != $newSeriesNumber) {
+                                $this->line("  ⚠️  Same series but different numbers (existing: #{$existingSeriesNumber}, new: #{$newSeriesNumber}) - not a duplicate");
+                                return null;
+                            }
+                        }
+                    }
+                    
                     return $existingBook;
                 } else {
                     $this->line("  ⚠️  Titles don't match exactly after normalization - not a duplicate");
@@ -1593,8 +1624,8 @@ class ImportBooksFromDownloads extends Command
         }
         
         // Fallback to exact directory basename match only (much more restrictive)
-        $existingBook = Book::where('directory_path', 'like', '%/' . $baseName)
-            ->orWhere('directory_path', '=', $baseName)
+        // REMOVED: LIKE pattern matching to prevent false positives between series books  
+        $existingBook = Book::where('directory_path', '=', $baseName)
             ->first();
             
         return $existingBook;
