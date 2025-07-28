@@ -236,34 +236,49 @@ class ImportBooksFromDownloads extends Command
     {
         $audiobooks = [];
         $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
+        $processedDirectories = []; // Track directories we've already processed
 
         foreach ($paths as $path) {
             // Handle escaped spaces and normalize path
             $normalizedPath = str_replace('\ ', ' ', $path);
             
-            // Try original path first, then normalized path
-            $actualPath = null;
-            if (file_exists($path)) {
-                $actualPath = $path;
-            } elseif (file_exists($normalizedPath)) {
-                $actualPath = $normalizedPath;
-            } else {
-                $this->warn("⚠️  Path does not exist: {$path}");
-                if ($path !== $normalizedPath) {
-                    $this->warn("⚠️  Also tried: {$normalizedPath}");
+            // Try multiple path variations
+            $pathsToTry = [
+                $path,
+                $normalizedPath,
+            ];
+            
+            // If not absolute path, also try common audiobook directories
+            if (!str_starts_with($path, '/')) {
+                $commonDirs = ['/media/download/audiobooks', '/media/download'];
+                foreach ($commonDirs as $baseDir) {
+                    $pathsToTry[] = $baseDir . '/' . $path;
+                    $pathsToTry[] = $baseDir . '/' . $normalizedPath;
                 }
+            }
+            
+            $actualPath = null;
+            foreach ($pathsToTry as $tryPath) {
+                if (file_exists($tryPath)) {
+                    $actualPath = $tryPath;
+                    break;
+                }
+            }
+            
+            if (!$actualPath) {
+                $this->warn("⚠️  Path does not exist: {$path}");
+                $this->warn("⚠️  Tried paths: " . implode(', ', array_unique($pathsToTry)));
                 continue;
             }
             
             $path = $actualPath;
 
             if (is_file($path)) {
-                // Single file - check if it's an audio file
+                // Single file - treat as individual audiobook
                 $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
                 if (in_array($extension, $audioExtensions)) {
-                    $directory = dirname($path);
-                    $this->info("🔍 Processing audio file: {$path}");
-                    $audiobook = $this->processAudiobookDirectory($directory);
+                    $this->info("🔍 Processing individual audio file: {$path}");
+                    $audiobook = $this->processSingleAudioFile($path);
                     if ($audiobook) {
                         $audiobooks[] = $audiobook;
                     }
@@ -271,16 +286,54 @@ class ImportBooksFromDownloads extends Command
                     $this->warn("⚠️  Not an audio file: {$path}");
                 }
             } elseif (is_dir($path)) {
+                // Skip if we've already processed this directory
+                if (in_array($path, $processedDirectories)) {
+                    $this->info("🔍 Directory already processed: {$path}");
+                    continue;
+                }
+                
                 // Directory - scan it for audiobooks
                 $this->info("🔍 Processing directory: {$path}");
                 $audiobook = $this->processAudiobookDirectory($path);
                 if ($audiobook) {
                     $audiobooks[] = $audiobook;
+                    $processedDirectories[] = $path;
                 }
             }
         }
 
         return $audiobooks;
+    }
+
+    /**
+     * Process a single audio file as an individual audiobook
+     */
+    protected function processSingleAudioFile(string $filePath): ?array
+    {
+        if (!file_exists($filePath) || !is_file($filePath)) {
+            return null;
+        }
+
+        $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
+        $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+        
+        if (!in_array($extension, $audioExtensions)) {
+            return null;
+        }
+
+        $fileSize = filesize($filePath);
+        
+        // Require at least 10MB for audiobook files
+        if ($fileSize < 10 * 1024 * 1024) {
+            return null;
+        }
+
+        return [
+            'path' => $filePath,
+            'name' => pathinfo($filePath, PATHINFO_FILENAME),
+            'files' => [$filePath],
+            'total_size' => $fileSize
+        ];
     }
 
     /**
