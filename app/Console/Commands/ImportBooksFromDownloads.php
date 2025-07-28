@@ -32,7 +32,7 @@ class ImportBooksFromDownloads extends Command
                             {--min-confidence=80 : Minimum AI confidence for auto-import}
                             {--auto : Fully automated mode - no manual review}
                             {--dry-run : Show what would be imported without making changes}
-                            {--limit=10 : Maximum number of books to process per run}
+                            {--limit=0 : Maximum number of books to process per run (0 = no limit)}
                             {--force : Skip confirmation prompts}
                             {--skip-enrichment : Skip external data enrichment (Audible, Google Books)}
                             {--copy-files : Copy files after successful import instead of moving (default is move)}
@@ -122,13 +122,16 @@ class ImportBooksFromDownloads extends Command
             return Command::SUCCESS;
         }
 
-        $this->info("📚 Found {$this->totalFound} potential audiobooks");
+        $totalFound = count($audiobooks);
+        $this->info("📚 Found {$totalFound} potential audiobooks to import");
 
         // Apply limit
         $limit = $this->option('limit');
-        if ($limit && count($audiobooks) > $limit) {
+        if ($limit && $limit > 0 && $totalFound > $limit) {
             $audiobooks = array_slice($audiobooks, 0, $limit);
-            $this->warn("⚠️  Processing limited to {$limit} books (use --limit=0 for no limit)");
+            $this->warn("⚠️  Processing limited to {$limit} of {$totalFound} books (use --limit=0 for no limit)");
+        } else {
+            $this->info("📋 Will process all {$totalFound} books");
         }
 
         // Show cost estimate for AI processing
