@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Author;
 use App\Models\Book;
 use App\Models\Genre;
+use App\Models\Narrator;
 use App\Models\Publisher;
 use App\Models\Series;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +16,7 @@ use Illuminate\Support\Facades\Storage;
 class BookImportService
 {
     /**
-     * Create book from metadata
+     * Create book from metadata with comprehensive handling
      */
     public function createBookFromMetadata(array $metadata, array $audiobook, array $options = []): ?Book
     {
@@ -48,11 +49,17 @@ class BookImportService
                 }
             }
             
-            // Handle cover image
+            // Handle cover image with download support
             if (!empty($metadata['cover_path'])) {
                 $book->cover_image = $metadata['cover_path'];
             } elseif (!empty($metadata['cover_url'])) {
-                $book->cover_image = $metadata['cover_url'];
+                $source = isset($metadata['audible_raw']) ? 'audible' : 'googlebooks';
+                $coverPath = $this->downloadCoverImage($metadata['cover_url'], $book->directory_path, $source);
+                if ($coverPath) {
+                    $book->cover_image = $coverPath;
+                } else {
+                    $book->cover_image = $metadata['cover_url'];
+                }
             }
 
             // Handle publisher
@@ -69,25 +76,70 @@ class BookImportService
             if (!empty($metadata['google_books_raw'])) {
                 $book->google_books_info = $metadata['google_books_raw'];
             }
+            
+            if (!empty($metadata['audiobook_bay_raw'])) {
+                $book->audiobook_bay_info = $metadata['audiobook_bay_raw'];
+            }
+            
+            // Calculate and store audio file information if available
+            if (!empty($audiobook['files'])) {
+                $audioInfo = $this->calculateAudioInfo($audiobook['files']);
+                $book->audio_file_count = $audioInfo['count'];
+                if ($audioInfo['duration'] > 0) {
+                    $book->duration = $audioInfo['duration'];
+                }
+                $book->file_tags = $audioInfo['tags'];
+            }
+            
+            // Set data source
+            $book->source = $options['data_source'] ?? 'import';
 
             $book->save();
 
             // Handle authors
             if (!empty($metadata['author'])) {
                 $authors = is_array($metadata['author']) ? $metadata['author'] : [$metadata['author']];
+                $authorIds = [];
                 foreach ($authors as $authorName) {
                     $author = Author::firstOrCreate(['name' => trim($authorName)]);
-                    $book->authors()->attach($author->id);
+                    $authorIds[] = $author->id;
                 }
+                $book->authors()->sync($authorIds);
+            }
+
+            // Handle narrators
+            if (!empty($metadata['narrator'])) {
+                $narrators = is_array($metadata['narrator']) ? $metadata['narrator'] : [$metadata['narrator']];
+                $narratorIds = [];
+                foreach ($narrators as $narratorName) {
+                    $narrator = Narrator::firstOrCreate(['name' => trim($narratorName)]);
+                    $narratorIds[] = $narrator->id;
+                }
+                $book->narrators()->sync($narratorIds);
             }
 
 
-            // Handle series
+            // Handle series with multi-book support
             if (!empty($metadata['series'])) {
                 $series = Series::firstOrCreate(['name' => trim($metadata['series'])]);
-                // Use pivot table for series relationship with series number
-                $seriesNumber = $metadata['series_number'] ?? null;
-                $book->series()->attach($series->id, ['series_number' => $seriesNumber]);
+                
+                // Handle multi-book entries (e.g., books 2-3 combined)
+                if (!empty($metadata['multi_book_numbers'])) {
+                    $firstNumber = $metadata['multi_book_numbers'][0];
+                    $lastNumber = end($metadata['multi_book_numbers']);
+                    
+                    $book->series()->sync([
+                        $series->id => [
+                            'series_number' => $firstNumber,
+                            // Note: series_end_number field may need to be added to pivot table
+                        ]
+                    ]);
+                } else {
+                    $seriesNumber = $metadata['series_number'] ?? 1;
+                    $book->series()->sync([
+                        $series->id => ['series_number' => $seriesNumber]
+                    ]);
+                }
             }
 
             // Handle genres
@@ -114,7 +166,7 @@ class BookImportService
     }
 
     /**
-     * Generate directory path for book
+     * Generate directory path for book with advanced features
      */
     public function generateDirectoryPath(array $metadata, array $options = []): string
     {
@@ -126,6 +178,11 @@ class BookImportService
         $structure = $options['directory_structure'] ?? 'genre/author/series';
         $authors = is_array($metadata['author']) ? $metadata['author'] : [$metadata['author']];
         
+        // Handle comma-separated authors
+        if (count($authors) === 1 && strpos($authors[0], ',') !== false) {
+            $authors = array_map('trim', explode(',', $authors[0]));
+        }
+        
         // Handle genre - convert array to string
         $genreData = $metadata['genre'] ?? 'Unknown';
         $genre = is_array($genreData) ? $genreData[0] : $genreData;
@@ -133,19 +190,49 @@ class BookImportService
             $genre = 'Unknown';
         }
         
-        // Check for Graphic Audio in narrator field
-        $authorDir = $this->formatAuthorsForDirectory($authors);
-        if ($this->isGraphicAudio($metadata)) {
-            $authorDir = 'Graphic Audio';
+        // Check for existing author directory first
+        $cleanedSeries = null;
+        if (!empty($metadata['series'])) {
+            $cleanedSeries = $this->cleanSeriesName($metadata['series'], $authors);
         }
         
-        return match ($structure) {
+        $existingAuthorDir = $this->findExistingAuthorDirectory($authors, $cleanedSeries);
+        
+        if ($existingAuthorDir) {
+            $authorDir = $existingAuthorDir;
+        } else {
+            // Check for Graphic Audio in narrator field
+            $authorDir = $this->formatAuthorsForDirectory($authors);
+            if ($this->isGraphicAudio($metadata)) {
+                $authorDir = 'Graphic Audio';
+            }
+        }
+        
+        $path = match ($structure) {
             'author/series' => $this->buildAuthorSeriesPath($authorDir, $metadata),
             'genre/author' => "{$genre}/{$authorDir}",
             'series/author' => $this->buildSeriesAuthorPath($metadata, $authorDir),
             'flat' => $authorDir,
             default => $this->buildGenreAuthorSeriesPath($genre, $authorDir, $metadata)
         };
+        
+        // Add title if requested
+        if (!empty($metadata['title']) && ($options['include_title'] ?? false)) {
+            $title = $metadata['title'];
+            
+            // If we have a series number, prefix it to the title
+            if (!empty($metadata['series_number'])) {
+                $seriesNumber = str_pad($metadata['series_number'], 2, '0', STR_PAD_LEFT);
+                $title = $seriesNumber . ' ' . $title;
+            }
+            
+            // Add GraphicAudio marker if detected
+            $title = $this->addGraphicAudioMarker($title, $metadata);
+            
+            $path .= '/' . $title;
+        }
+        
+        return $path;
     }
 
     /**
@@ -607,5 +694,194 @@ class BookImportService
                 'path' => $sourcePath
             ]);
         }
+    }
+
+    /**
+     * Calculate audio information from files with advanced tag extraction
+     */
+    protected function calculateAudioInfo(array $audioFiles): array
+    {
+        $totalDuration = 0;
+        $allTags = [];
+        $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
+        $audioFileCount = 0;
+        
+        foreach ($audioFiles as $filePath) {
+            $extension = strtolower(pathinfo(is_string($filePath) ? $filePath : $filePath['path'], PATHINFO_EXTENSION));
+            
+            if (in_array($extension, $audioExtensions)) {
+                $audioFileCount++;
+                
+                try {
+                    // Handle both string paths and file arrays
+                    $file = is_string($filePath) ? $filePath : $filePath['path'];
+                    $fileName = basename($file);
+                    
+                    // If we have pre-calculated data, use it
+                    if (is_array($filePath) && isset($filePath['duration'])) {
+                        $totalDuration += (int)$filePath['duration'];
+                        if (isset($filePath['tags'])) {
+                            $allTags[$fileName] = $filePath['tags'];
+                        }
+                    } else {
+                        // Try to get duration from file directly
+                        $fileDuration = $this->getAudioFileDuration($file);
+                        if ($fileDuration > 0) {
+                            $totalDuration += $fileDuration;
+                            $allTags[$fileName] = ['calculated_duration' => $fileDuration];
+                        }
+                    }
+                } catch (\Exception $e) {
+                    Log::warning("Failed to calculate audio info for {$file}: " . $e->getMessage());
+                }
+            }
+        }
+        
+        return [
+            'count' => $audioFileCount,
+            'duration' => $totalDuration, // in seconds
+            'tags' => $allTags
+        ];
+    }
+    
+    /**
+     * Get duration of audio file in seconds
+     */
+    protected function getAudioFileDuration(string $filePath): int
+    {
+        try {
+            // Try ffprobe first (most reliable)
+            $output = shell_exec("ffprobe -i " . escapeshellarg($filePath) . " -show_entries format=duration -v quiet -of csv=\"p=0\"");
+            if ($output && is_numeric(trim($output))) {
+                return (int)round(floatval(trim($output)));
+            }
+            
+            // Fallback to file modification patterns
+            return 0;
+        } catch (\Exception $e) {
+            Log::warning("Failed to get audio file duration: " . $e->getMessage());
+            return 0;
+        }
+    }
+    
+    /**
+     * Get author's preferred genre based on existing books
+     */
+    public function getAuthorPreferredGenre($authorData): ?string
+    {
+        if (empty($authorData)) {
+            return null;
+        }
+        
+        // Handle both string and array author data
+        $authorNames = is_array($authorData) ? $authorData : [$authorData];
+        
+        foreach ($authorNames as $authorName) {
+            $authorName = trim($authorName);
+            if (empty($authorName)) {
+                continue;
+            }
+            
+            // Find the author in the database
+            $author = Author::where('name', $authorName)->first();
+            if (!$author) {
+                continue;
+            }
+            
+            // Get genre distribution for this author's books
+            $genreStats = DB::table('books')
+                ->join('author_book', 'books.id', '=', 'author_book.book_id')
+                ->join('book_genre', 'books.id', '=', 'book_genre.book_id')
+                ->join('genres', 'book_genre.genre_id', '=', 'genres.id')
+                ->where('author_book.author_id', $author->id)
+                ->select('genres.name', DB::raw('COUNT(*) as count'))
+                ->groupBy('genres.name')
+                ->orderByDesc('count')
+                ->first();
+            
+            if ($genreStats && $genreStats->count >= 2) {
+                // If author has 2+ books in the same genre, use that genre
+                return $genreStats->name;
+            }
+        }
+        
+        return null;
+    }
+
+    /**
+     * Clean series name by removing author names
+     */
+    protected function cleanSeriesName(string $seriesName, array $authors): string
+    {
+        $cleanedSeries = $seriesName;
+        
+        foreach ($authors as $author) {
+            $authorWords = explode(' ', trim($author));
+            foreach ($authorWords as $word) {
+                if (strlen($word) > 2) { // Only remove meaningful words, not initials
+                    $cleanedSeries = preg_replace('/\b' . preg_quote($word, '/') . '\b/i', '', $cleanedSeries);
+                }
+            }
+        }
+        
+        // Clean up extra spaces and common series words
+        $cleanedSeries = preg_replace('/\b(series|saga|chronicles|collection)\b/i', '', $cleanedSeries);
+        $cleanedSeries = preg_replace('/\s+/', ' ', $cleanedSeries);
+        $cleanedSeries = trim($cleanedSeries, ' -,');
+        
+        return $cleanedSeries ?: $seriesName; // Return original if cleaning resulted in empty string
+    }
+
+    /**
+     * Add GraphicAudio marker if detected from source or metadata
+     */
+    public function addGraphicAudioMarker(string $title, array $metadata): string
+    {
+        // Check if GraphicAudio marker is already present
+        if (preg_match('/\(Graphic\s*Audio\)/i', $title)) {
+            return preg_replace('/\(Graphic\s*Audio\)/i', '(GraphicAudio)', $title);
+        }
+        
+        // Check various fields for GraphicAudio indicators
+        $sourcePath = $metadata['source_path'] ?? '';
+        $narrator = $metadata['narrator'] ?? '';
+        $publisher = $metadata['publisher'] ?? '';
+        
+        $isGraphicAudio = false;
+        
+        // Check source path
+        if (stripos($sourcePath, 'graphic') !== false && stripos($sourcePath, 'audio') !== false) {
+            $isGraphicAudio = true;
+        }
+        
+        // Check narrator field
+        if (is_array($narrator)) {
+            foreach ($narrator as $n) {
+                if (stripos($n, 'graphic') !== false && stripos($n, 'audio') !== false) {
+                    $isGraphicAudio = true;
+                    break;
+                }
+            }
+        } elseif (is_string($narrator) && stripos($narrator, 'graphic') !== false && stripos($narrator, 'audio') !== false) {
+            $isGraphicAudio = true;
+        }
+        
+        // Check publisher field
+        if (is_array($publisher)) {
+            foreach ($publisher as $p) {
+                if (stripos($p, 'graphic') !== false && stripos($p, 'audio') !== false) {
+                    $isGraphicAudio = true;
+                    break;
+                }
+            }
+        } elseif (is_string($publisher) && stripos($publisher, 'graphic') !== false && stripos($publisher, 'audio') !== false) {
+            $isGraphicAudio = true;
+        }
+        
+        if ($isGraphicAudio && !preg_match('/\(GraphicAudio\)/i', $title)) {
+            return $title . ' (GraphicAudio)';
+        }
+        
+        return $title;
     }
 }

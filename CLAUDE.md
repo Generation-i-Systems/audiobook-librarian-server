@@ -89,6 +89,7 @@ These rules ensure maintainability, safety, and developer velocity.
 - **C-17 (MUST)** use as little code in blade templates a possible. prefer code being in controllers or services or separate javascript files.
 - **C-18 (MUST)** use a database abstraction layer for database access from laravel.
 - **C-19 (MUST)** Laravel projects use Laravel 11+ (no Console Kernel.php, use bootstrap/app.php for scheduling).
+- **C-20 (SHOULD)** Classes with over 1000 lines should be split into smaller, focused pieces to improve maintainability and testability.
 
 ---
 
