@@ -257,6 +257,11 @@ class AIBookProcessor
             $this->paidTier = true;
         }
         
+        // Initialize OpenAI API key only for fallback audio transcription
+        if (!isset($this->openaiApiKey)) {
+            $this->openaiApiKey = config('services.openai.api_key');
+        }
+        
         // Set limits and pricing based on tier
         $tier = $this->paidTier ? 'paid' : 'free';
         
@@ -669,6 +674,10 @@ class AIBookProcessor
     protected function normalizeStringOrArray($value): array
     {
         if (is_string($value)) {
+            // If it's a comma-separated string, split it into an array
+            if (strpos($value, ',') !== false) {
+                return array_filter(array_map('trim', explode(',', $value)));
+            }
             return [$value];
         }
         
@@ -857,5 +866,332 @@ class AIBookProcessor
     public function resetCostTracking(): void
     {
         $this->estimatedCost = 0.0;
+    }
+
+    /**
+     * Process audio sample for transcription and metadata extraction
+     */
+    public function processAudioSample(string $audioFilePath, string $directoryHint = ''): ?array
+    {
+        try {
+            if (!file_exists($audioFilePath)) {
+                Log::error("Audio file not found", ['file' => $audioFilePath]);
+                return null;
+            }
+
+            Log::info("Starting audio transcription", [
+                'file' => $audioFilePath,
+                'hint' => $directoryHint,
+                'file_size' => filesize($audioFilePath)
+            ]);
+
+            // Check rate limits before making request
+            $this->respectRateLimit();
+
+            // Use OpenAI Whisper for transcription
+            $transcription = $this->transcribeAudio($audioFilePath);
+            
+            if (empty($transcription)) {
+                Log::warning("No transcription received from audio file");
+                return null;
+            }
+
+            Log::info("Audio transcription completed", [
+                'transcription_length' => strlen($transcription),
+                'preview' => substr($transcription, 0, 100) . '...'
+            ]);
+
+            // Analyze the transcription to extract metadata
+            $metadata = $this->extractMetadataFromTranscription($transcription, $directoryHint);
+            
+            // Add transcription source info
+            $metadata['transcription'] = $transcription;
+            $metadata['source'] = 'audio_analysis';
+            $metadata['ai_processed'] = true;
+            $metadata['processed_at'] = now()->toISOString();
+
+            return $metadata;
+            
+        } catch (\Exception $e) {
+            Log::error("Audio analysis failed", [
+                'file' => $audioFilePath,
+                'error' => $e->getMessage()
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Transcribe audio using the configured AI provider
+     */
+    protected function transcribeAudio(string $audioFilePath): ?string
+    {
+        try {
+            Log::info("Starting audio transcription", [
+                'file' => $audioFilePath,
+                'file_exists' => file_exists($audioFilePath),
+                'file_size' => file_exists($audioFilePath) ? filesize($audioFilePath) : 'N/A',
+                'provider' => $this->provider,
+                'model' => $this->model
+            ]);
+
+            if (!file_exists($audioFilePath)) {
+                Log::error("Audio file does not exist", ['file' => $audioFilePath]);
+                return null;
+            }
+
+            $fileSize = filesize($audioFilePath);
+            if ($fileSize === 0) {
+                Log::error("Audio file is empty", ['file' => $audioFilePath]);
+                return null;
+            }
+
+            // Check file size limits based on provider
+            $maxSize = $this->getAudioFileSizeLimit();
+            if ($fileSize > $maxSize) {
+                Log::error("Audio file too large for {$this->provider} API", [
+                    'file' => $audioFilePath,
+                    'size_mb' => round($fileSize / (1024 * 1024), 2),
+                    'max_size_mb' => round($maxSize / (1024 * 1024), 2)
+                ]);
+                return null;
+            }
+
+            // Track this request for rate limiting
+            $this->trackRequest();
+
+            Log::info("Sending audio file to {$this->provider} API", [
+                'file' => basename($audioFilePath),
+                'size_mb' => round($fileSize / (1024 * 1024), 2)
+            ]);
+
+            // Use the configured AI provider for audio transcription
+            if ($this->provider === 'gemini') {
+                return $this->transcribeWithGemini($audioFilePath);
+            } elseif ($this->provider === 'openai') {
+                return $this->transcribeWithOpenAI($audioFilePath);
+            } elseif ($this->provider === 'claude') {
+                // Claude doesn't support direct audio transcription, fallback to OpenAI
+                Log::info("Claude doesn't support audio transcription, falling back to OpenAI Whisper");
+                return $this->transcribeWithOpenAI($audioFilePath);
+            }
+
+            Log::error("Unsupported provider for audio transcription", ['provider' => $this->provider]);
+            return null;
+            
+        } catch (\Exception $e) {
+            Log::error("Audio transcription failed with exception", [
+                'file' => $audioFilePath,
+                'provider' => $this->provider,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Get audio file size limit based on provider
+     */
+    protected function getAudioFileSizeLimit(): int
+    {
+        return match($this->provider) {
+            'gemini' => 2 * 1024 * 1024,  // 2MB for Gemini
+            'openai' => 25 * 1024 * 1024, // 25MB for OpenAI Whisper
+            'claude' => 25 * 1024 * 1024, // Fallback to OpenAI limits
+            default => 2 * 1024 * 1024
+        };
+    }
+
+    /**
+     * Transcribe audio using Gemini
+     */
+    protected function transcribeWithGemini(string $audioFilePath): ?string
+    {
+        try {
+            if (!$this->apiKey) {
+                Log::error("Gemini API key not configured for audio transcription");
+                return null;
+            }
+
+            // Read the audio file and encode it as base64
+            $audioData = file_get_contents($audioFilePath);
+            if ($audioData === false) {
+                Log::error("Could not read audio file", ['file' => $audioFilePath]);
+                return null;
+            }
+
+            $mimeType = $this->getAudioMimeType($audioFilePath);
+            $base64Audio = base64_encode($audioData);
+
+            $response = $this->client->post($this->getApiUrl(), [
+                'query' => ['key' => $this->apiKey],
+                'json' => [
+                    'contents' => [
+                        [
+                            'parts' => [
+                                [
+                                    'text' => 'Please transcribe this audio file. This is the beginning of an audiobook where the title, author, and narrator are typically announced. Return only the transcribed text, no additional formatting or commentary.'
+                                ],
+                                [
+                                    'inline_data' => [
+                                        'mime_type' => $mimeType,
+                                        'data' => $base64Audio
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ],
+                    'generationConfig' => [
+                        'temperature' => 0.1,
+                        'topK' => 1,
+                        'topP' => 0.8,
+                        'maxOutputTokens' => $this->modelLimits['max_output_tokens'],
+                    ]
+                ]
+            ]);
+
+            $body = json_decode($response->getBody(), true);
+            
+            if (isset($body['candidates'][0]['content']['parts'][0]['text'])) {
+                $transcription = trim($body['candidates'][0]['content']['parts'][0]['text']);
+                
+                Log::info("Gemini audio transcription completed", [
+                    'transcription_length' => strlen($transcription),
+                    'preview' => substr($transcription, 0, 100)
+                ]);
+                
+                return $transcription;
+            }
+            
+            Log::error("No valid transcription content from Gemini", ['response' => $body]);
+            return null;
+            
+        } catch (\Exception $e) {
+            Log::error("Gemini audio transcription failed", [
+                'error' => $e->getMessage(),
+                'file' => $audioFilePath
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Transcribe audio using OpenAI Whisper (fallback)
+     */
+    protected function transcribeWithOpenAI(string $audioFilePath): ?string
+    {
+        try {
+            if (!$this->openaiApiKey) {
+                Log::error("OpenAI API key not configured for audio transcription fallback");
+                return null;
+            }
+
+            $client = OpenAI::client($this->openaiApiKey);
+            
+            $fileHandle = fopen($audioFilePath, 'r');
+            if (!$fileHandle) {
+                Log::error("Could not open audio file for reading", ['file' => $audioFilePath]);
+                return null;
+            }
+
+            $response = $client->audio()->transcribe([
+                'model' => 'whisper-1',
+                'file' => $fileHandle,
+                'response_format' => 'text',
+                'language' => 'en',
+            ]);
+
+            fclose($fileHandle);
+
+            Log::info("OpenAI Whisper transcription completed", [
+                'transcription_length' => strlen($response),
+                'preview' => substr($response, 0, 100)
+            ]);
+
+            return trim($response);
+            
+        } catch (\Exception $e) {
+            Log::error("OpenAI Whisper transcription failed", [
+                'error' => $e->getMessage(),
+                'file' => $audioFilePath
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Get MIME type for audio file
+     */
+    protected function getAudioMimeType(string $filePath): string
+    {
+        $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+        
+        return match($extension) {
+            'mp3' => 'audio/mpeg',
+            'm4a', 'm4b' => 'audio/mp4',
+            'flac' => 'audio/flac',
+            'ogg' => 'audio/ogg',
+            'wav' => 'audio/wav',
+            'aac' => 'audio/aac',
+            'wma' => 'audio/x-ms-wma',
+            default => 'audio/mpeg' // Default to MP3
+        };
+    }
+
+    /**
+     * Extract metadata from audio transcription using AI
+     */
+    protected function extractMetadataFromTranscription(string $transcription, string $directoryHint = ''): array
+    {
+        try {
+            // Build a prompt to analyze the transcription
+            $prompt = "Analyze this audiobook introduction transcription and extract metadata. Return JSON only:\n\n";
+            $prompt .= "TRANSCRIPTION:\n{$transcription}\n\n";
+            
+            if (!empty($directoryHint)) {
+                $prompt .= "DIRECTORY HINT: {$directoryHint}\n\n";
+            }
+            
+            $prompt .= "Extract: title, author, narrator, series{name,number}, genre, year, publisher, language, confidence (0-100).\n";
+            $prompt .= "This is the beginning of an audiobook where title, author, and narrator are typically announced.\n";
+            $prompt .= "Focus on the main book title, not chapter titles. Look for phrases like:\n";
+            $prompt .= "- 'This is [Title] by [Author]'\n";
+            $prompt .= "- 'Narrated by [Narrator]'\n"; 
+            $prompt .= "- '[Title], Book [Number] in the [Series] series'\n";
+            $prompt .= "- 'Written by [Author]', 'Read by [Narrator]'\n\n";
+            
+            $prompt .= "IMPORTANT: For genre, choose the MOST SPECIFIC literary genre. Valid genres:\n";
+            $prompt .= "Kids, Religion, General Fiction, Church, Science, Historical Fiction, Computer, Classic, History, Non Fiction, Action, LitRPG, Romance, Science Fiction, Other, Fantasy\n";
+            $prompt .= "Analyze the content/story type, not just that it's an audiobook.\n";
+
+            // Use the current AI model to analyze the transcription
+            $response = $this->callAIAPI($prompt);
+            $metadata = $this->parseAIResponse($response);
+            
+            // Boost confidence if we successfully extracted from audio
+            if ($metadata['confidence'] > 0) {
+                $metadata['confidence'] = min(95, $metadata['confidence'] + 20);
+            }
+            
+            return $metadata;
+            
+        } catch (\Exception $e) {
+            Log::error("Failed to extract metadata from transcription", ['error' => $e->getMessage()]);
+            
+            // Return basic fallback metadata
+            return [
+                'title' => 'Unknown Title (from audio)',
+                'author' => [],
+                'narrator' => [],
+                'series' => null,
+                'series_number' => null,
+                'genre' => [],
+                'year' => null,
+                'publisher' => null,
+                'language' => 'en',
+                'confidence' => 10 // Very low confidence for fallback
+            ];
+        }
     }
 }

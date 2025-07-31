@@ -23,54 +23,31 @@ class DocumentStoreServiceProvider extends ServiceProvider
             }
 
             $driver = config('documentstore.driver', 'mysql');
-            
-            // Debug: Always log what driver is being requested and by whom
-            $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 10);
-            $caller = '';
-            foreach ($backtrace as $trace) {
-                if (isset($trace['class']) && !str_contains($trace['class'], 'ServiceProvider')) {
-                    $caller = ($trace['class'] ?? 'Unknown') . '::' . ($trace['function'] ?? 'unknown');
-                    break;
-                }
-            }
-            
-            Log::info("DocumentStoreService requested: driver='{$driver}' by {$caller}");
-            
-            // Debug: Report when MongoDB is being used outside of migration commands
-            if ($driver === 'mongodb') {
-                
-                // Check if this is an acceptable MongoDB usage (migration/mongo commands)
-                $isAcceptableMongoUsage = false;
-                $allowedMongoCommands = [
-                    'MigrateMongoToMysql',
-                    'CompareMongoMysqlBooks', 
-                    'MongoTestCommand',
-                    'MigrateSeriesFormat'
-                ];
-                
-                foreach ($backtrace as $trace) {
-                    if (isset($trace['class'])) {
-                        foreach ($allowedMongoCommands as $allowedCommand) {
-                            if (str_contains($trace['class'], $allowedCommand)) {
-                                $isAcceptableMongoUsage = true;
-                                break 2;
-                            }
-                        }
-                    }
-                }
-                
-                if (!$isAcceptableMongoUsage) {
-                    Log::error("MongoDB being used inappropriately by: {$caller}");
-                    Log::error("Stack trace: " . json_encode(array_slice($backtrace, 0, 5)));
-                }
-            }
 
             return match ($driver) {
-                'mongodb' => new MongoService(),
+                'mongodb' => $this->createMongoService(),
                 'firestore' => new FirestoreService(),
                 default => new MySqlService(),
             };
         });
+    }
+
+    /**
+     * Create MongoService with proper configuration validation
+     */
+    protected function createMongoService(): MongoService
+    {
+        $uri = config('mongodb.uri');
+        $database = config('mongodb.database');
+        
+        if (!$uri || !$database) {
+            throw new \RuntimeException(
+                "MongoDB service requested but configuration is missing. " .
+                "Set MONGODB_URI and MONGODB_DB environment variables or change DOCUMENT_STORE_DRIVER to 'mysql'."
+            );
+        }
+        
+        return new MongoService();
     }
 
     /**

@@ -10,8 +10,12 @@ use App\Models\Series;
 use App\Services\AIBookProcessor;
 use App\Services\AudioFileAnalyzer;
 use App\Services\AudibleService;
+use App\Services\BackgroundProcessingService;
+use App\Services\BookEnrichmentService;
+use App\Services\BookImportService;
 use App\Services\ExternalCoverService;
 use App\Services\GoogleBooksApiService;
+use App\Services\ImportCacheService;
 use App\Traits\GenreMapping;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -39,7 +43,8 @@ class ImportBooksFromDownloads extends Command
                             {--copy-files : Copy files after successful import instead of moving (default is move)}
                             {--no-backup : Skip automatic database backup}
                             {--no-cache : Disable background processing cache}
-                            {--clear-cache : Clear background processing cache before starting}';
+                            {--clear-cache : Clear background processing cache before starting}
+                            {--force-audio : Force audio transcription even when AI confidence is high}';
 
     /**
      * The console command description.
@@ -51,6 +56,12 @@ class ImportBooksFromDownloads extends Command
     protected ?AudibleService $audibleService = null;
     protected ?ExternalCoverService $coverService = null;
     protected ?GoogleBooksApiService $googleBooksService = null;
+    
+    // New services
+    protected ?BookEnrichmentService $enrichmentService = null;
+    protected ?BookImportService $importService = null;
+    protected ?BackgroundProcessingService $backgroundService = null;
+    protected ?ImportCacheService $cacheService = null;
     
     // Background processing
     protected array $backgroundTasks = [];
@@ -94,6 +105,11 @@ class ImportBooksFromDownloads extends Command
         }
 
         $this->info("🚀 Starting automated audiobook import from download directories...");
+
+        // Check for readline extension and warn if not available (unless in auto mode)
+        if (!$this->option('auto') && !extension_loaded('readline')) {
+            $this->error("❌ PHP readline extension is not enabled. Advanced line editing features (arrow keys, etc.) will not be available. Consider enabling it for a better interactive experience.");
+        }
         
         // Initialize AI processor
         $model = $this->option('model');
@@ -161,6 +177,7 @@ class ImportBooksFromDownloads extends Command
                 // Start background processing for upcoming books
                 $this->startBackgroundProcessing($audiobooks, $index);
                 
+                $this->info("Debug: Calling processAudiobook for: " . $audiobook['name']);
                 $this->processAudiobook($audiobook);
             } catch (\Exception $e) {
                 $errorMessage = $e->getMessage();
@@ -173,12 +190,20 @@ class ImportBooksFromDownloads extends Command
                     ];
                     $this->info("⏭️  Skipped due to user interruption: " . basename($audiobook['path']));
                 } else {
-                    // Regular error handling
+                    // Regular error handling with detailed stack trace for debugging
+                    $stackTrace = $e->getTraceAsString();
+                    $fullError = $errorMessage . "\n\nStack trace:\n" . $stackTrace;
+                    
                     $this->failedBooks[] = [
                         'path' => $audiobook['path'],
                         'error' => $errorMessage
                     ];
-                    Log::error("Import failed for {$audiobook['path']}: " . $errorMessage);
+                    Log::error("Import failed for {$audiobook['path']}: " . $fullError);
+                    
+                    // Also output to console for debugging
+                    if ($this->output->isVerbose()) {
+                        $this->error("Full error trace: " . $fullError);
+                    }
                 }
             }
             $progressBar->advance();
@@ -248,8 +273,14 @@ class ImportBooksFromDownloads extends Command
                 $normalizedPath,
             ];
             
-            // If not absolute path, also try common audiobook directories
+            // If not absolute path, try current directory first, then common audiobook directories
             if (!str_starts_with($path, '/')) {
+                // Try current working directory first
+                $currentDir = getcwd();
+                $pathsToTry[] = $currentDir . '/' . $path;
+                $pathsToTry[] = $currentDir . '/' . $normalizedPath;
+                
+                // Then try common audiobook directories
                 $commonDirs = ['/media/download/audiobooks', '/media/download'];
                 foreach ($commonDirs as $baseDir) {
                     $pathsToTry[] = $baseDir . '/' . $path;
@@ -267,7 +298,11 @@ class ImportBooksFromDownloads extends Command
             
             if (!$actualPath) {
                 $this->warn("⚠️  Path does not exist: {$path}");
-                $this->warn("⚠️  Tried paths: " . implode(', ', array_unique($pathsToTry)));
+                $this->warn("⚠️  Tried paths:");
+                foreach (array_unique($pathsToTry) as $tryPath) {
+                    $exists = file_exists($tryPath) ? '✅' : '❌';
+                    $this->warn("    {$exists} {$tryPath}");
+                }
                 continue;
             }
             
@@ -292,13 +327,30 @@ class ImportBooksFromDownloads extends Command
                     continue;
                 }
                 
-                // Directory - scan it for audiobooks
+                // Directory - check if it contains subdirectories that are audiobooks
                 $this->info("🔍 Processing directory: {$path}");
-                $audiobook = $this->processAudiobookDirectory($path);
-                if ($audiobook) {
-                    $audiobooks[] = $audiobook;
-                    $processedDirectories[] = $path;
+                
+                // Scan recursively for individual audiobook directories
+                $foundAudiobookDirs = $this->findAudiobookDirectories($path);
+                
+                if (count($foundAudiobookDirs) > 1) {
+                    // Multiple individual audiobook directories found
+                    $this->info("📚 Found " . count($foundAudiobookDirs) . " individual audiobook directories");
+                    foreach ($foundAudiobookDirs as $audiobookDir) {
+                        $audiobook = $this->processAudiobookDirectory($audiobookDir);
+                        if ($audiobook) {
+                            $audiobooks[] = $audiobook;
+                        }
+                    }
+                } else {
+                    // Single audiobook directory or treat whole directory as one audiobook
+                    $audiobook = $this->processAudiobookDirectory($path);
+                    if ($audiobook) {
+                        $audiobooks[] = $audiobook;
+                    }
                 }
+                
+                $processedDirectories[] = $path;
             }
         }
 
@@ -742,7 +794,11 @@ class ImportBooksFromDownloads extends Command
         });
         
         if (!empty($audioFiles)) {
-            $firstAudioFile = array_values($audioFiles)[0];
+            $audioFileValues = array_values($audioFiles);
+            if (empty($audioFileValues)) {
+                return ['confidence' => 0];
+            }
+            $firstAudioFile = $audioFileValues[0];
             
             // Extract basic file metadata
             if (function_exists('getid3_analyze')) {
@@ -1022,6 +1078,94 @@ class ImportBooksFromDownloads extends Command
         
         return false;
     }
+
+    /**
+     * Check if directory contains audio files (recursively)
+     */
+    protected function hasAudioFiles(string $path): bool
+    {
+        $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
+        
+        try {
+            $iterator = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($path, \RecursiveDirectoryIterator::SKIP_DOTS),
+                \RecursiveIteratorIterator::LEAVES_ONLY
+            );
+
+            foreach ($iterator as $file) {
+                if ($file->isFile()) {
+                    $extension = strtolower($file->getExtension());
+                    if (in_array($extension, $audioExtensions)) {
+                        return true;
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            return false;
+        }
+        
+        return false;
+    }
+
+    /**
+     * Find individual audiobook directories within a parent directory
+     */
+    protected function findAudiobookDirectories(string $parentPath): array
+    {
+        $audiobookDirs = [];
+        $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
+        
+        try {
+            $iterator = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($parentPath, \RecursiveDirectoryIterator::SKIP_DOTS),
+                \RecursiveIteratorIterator::SELF_FIRST
+            );
+            
+            $checkedDirs = [];
+            
+            foreach ($iterator as $dir) {
+                if (!$dir->isDir()) {
+                    continue;
+                }
+                
+                $dirPath = $dir->getPathname();
+                
+                // Skip if we've already checked this directory or a parent
+                $skip = false;
+                foreach ($checkedDirs as $checkedDir) {
+                    if (str_starts_with($dirPath, $checkedDir)) {
+                        $skip = true;
+                        break;
+                    }
+                }
+                if ($skip) {
+                    continue;
+                }
+                
+                // Check if this directory directly contains audio files (not in subdirectories)
+                $directFiles = File::files($dirPath);
+                $hasDirectAudioFiles = false;
+                
+                foreach ($directFiles as $file) {
+                    $extension = strtolower($file->getExtension());
+                    if (in_array($extension, $audioExtensions)) {
+                        $hasDirectAudioFiles = true;
+                        break;
+                    }
+                }
+                
+                if ($hasDirectAudioFiles) {
+                    $audiobookDirs[] = $dirPath;
+                    $checkedDirs[] = $dirPath . '/';
+                }
+            }
+        } catch (\Exception $e) {
+            // If scanning fails, fall back to the original directory
+            return [$parentPath];
+        }
+        
+        return $audiobookDirs;
+    }
     
     /**
      * Initialize persistent cache system
@@ -1041,7 +1185,7 @@ class ImportBooksFromDownloads extends Command
         
         // Create cache directory if it doesn't exist
         if (!File::isDirectory($this->cacheDirectory)) {
-            File::makeDirectory($this->cacheDirectory, 0755, true);
+            File::makeDirectory($this->cacheDirectory, 0775, true);
         }
         
         // Clear cache if requested
@@ -1319,10 +1463,7 @@ class ImportBooksFromDownloads extends Command
         // Continuously process background tasks while waiting for user input
         $this->startContinuousBackgroundProcessing();
         
-        // Add quit option to question
-        $questionWithQuit = $question . " (or 'q' to quit)";
-        
-        $response = $this->askWithImmediateInterrupt($questionWithQuit, $default);
+        $response = $this->askWithImmediateInterrupt($question, $default);
         
         // Handle quit request or interruption
         if (strtolower(trim($response)) === 'q' || $this->inputInterrupted) {
@@ -1359,7 +1500,7 @@ class ImportBooksFromDownloads extends Command
             $question = $question . " (or 'q' to quit)";
         }
         
-        $response = parent::ask($question, $default);
+        $response = $this->askWithImmediateInterrupt($question, $default);
         
         // Handle quit request
         if (strtolower(trim($response)) === 'q') {
@@ -1458,72 +1599,29 @@ class ImportBooksFromDownloads extends Command
      */
     protected function askWithImmediateInterrupt(string $question, string $default = null): string
     {
-        $this->output->write($question . ($default ? " [{$default}]" : '') . ': ');
-        
-        // Set terminal to raw mode for immediate input
-        if (function_exists('system')) {
-            system('stty -echo -icanon min 0 time 0 2>/dev/null');
-        }
-        
-        $input = '';
-        $stdin = fopen('php://stdin', 'r');
-        stream_set_blocking($stdin, false);
-        
-        while (true) {
-            // Check for signal interruption
-            if ($this->inputInterrupted) {
-                // Restore terminal
-                if (function_exists('system')) {
-                    system('stty echo icanon 2>/dev/null');
-                }
-                fclose($stdin);
+        if (extension_loaded('readline')) {
+            // Use readline for advanced line editing
+            $prompt = $question . ($default ? " [{$default}]" : '') . ': ';
+            $input = readline($prompt);
+            if ($input === false) { // Readline returns false on Ctrl+D (EOF)
+                $this->inputInterrupted = true;
                 return '';
             }
-            
-            // Process pending signals
-            if (extension_loaded('pcntl')) {
-                pcntl_signal_dispatch();
+            return trim($input) ?: ($default ?? '');
+        } else {
+            // Fallback to basic input if readline extension is not available
+            static $warned = false;
+            if (!$warned) {
+                $this->error("❌ PHP readline extension is not enabled. Advanced line editing features (arrow keys, etc.) will not be available. Consider enabling it for a better interactive experience.");
+                $warned = true;
             }
+
+            $this->output->write($question . ($default ? " [{$default}]" : '') . ': ');
+            $input = trim(fgets(STDIN));
             
-            // Check for input
-            $read = [$stdin];
-            $write = [];
-            $except = [];
-            
-            if (stream_select($read, $write, $except, 0, 100000) > 0) {
-                $char = fread($stdin, 1);
-                
-                if ($char === false || feof($stdin)) {
-                    break;
-                }
-                
-                // Handle different characters
-                if ($char === "\n" || $char === "\r") {
-                    $this->output->writeln('');
-                    break;
-                } elseif ($char === "\x7f" || $char === "\x08") { // Backspace
-                    if (strlen($input) > 0) {
-                        $input = substr($input, 0, -1);
-                        $this->output->write("\x08 \x08");
-                    }
-                } elseif (ord($char) >= 32) { // Printable characters
-                    $input .= $char;
-                    $this->output->write($char);
-                }
-            }
-            
-            // Small delay to prevent excessive CPU usage
-            usleep(10000);
+            // Return default if empty
+            return $input ?: ($default ?? '');
         }
-        
-        // Restore terminal
-        if (function_exists('system')) {
-            system('stty echo icanon 2>/dev/null');
-        }
-        fclose($stdin);
-        
-        // Return default if empty
-        return trim($input) ?: ($default ?? '');
     }
 
     /**
@@ -1807,6 +1905,34 @@ class ImportBooksFromDownloads extends Command
      */
     protected function processAudiobook(array $audiobook): void
     {
+        // Check if source still exists before processing
+        if (!file_exists($audiobook['path'])) {
+            $this->warn("⚠️  Skipping {$audiobook['name']} - source path no longer exists");
+            $this->skippedBooks[] = [
+                'path' => $audiobook['path'],
+                'reason' => 'Source path no longer exists'
+            ];
+            return;
+        }
+        
+        // Verify some key audio files still exist
+        $missingFiles = 0;
+        $sampleSize = min(3, count($audiobook['files'])); // Check up to 3 files
+        for ($i = 0; $i < $sampleSize; $i++) {
+            if (!file_exists($audiobook['files'][$i])) {
+                $missingFiles++;
+            }
+        }
+        
+        if ($missingFiles > 0) {
+            $this->warn("⚠️  Skipping {$audiobook['name']} - {$missingFiles} of {$sampleSize} sample files missing");
+            $this->skippedBooks[] = [
+                'path' => $audiobook['path'],
+                'reason' => 'Some audio files no longer exist'
+            ];
+            return;
+        }
+        
         // Skip directories with no audio files
         if (empty($audiobook['files']) || count($audiobook['files']) === 0) {
             $this->warn("⚠️  Skipping {$audiobook['name']} - no audio files found");
@@ -1833,13 +1959,43 @@ class ImportBooksFromDownloads extends Command
         $spinner->finish();
         $this->output->write("\r\033[K");
         
-        if (!$aiMetadata || $aiMetadata['confidence'] < $this->option('min-confidence')) {
-            $this->warn("⚠️  AI confidence too low (" . ($aiMetadata['confidence'] ?? 0) . "%) - skipping");
-            $this->skippedBooks[] = [
-                'path' => $audiobook['path'],
-                'reason' => 'Low AI confidence'
-            ];
-            return;
+        // Check if we should try audio analysis (low confidence OR forced)
+        $shouldTryAudio = !$aiMetadata || 
+                         $aiMetadata['confidence'] < $this->option('min-confidence') || 
+                         $this->option('force-audio');
+                         
+        if ($shouldTryAudio) {
+            if ($this->option('force-audio')) {
+                $this->info("🎵 Forcing audio analysis (--force-audio flag used)");
+            } else {
+                $this->warn("⚠️  AI confidence too low (" . ($aiMetadata['confidence'] ?? 0) . "%) - trying audio analysis fallback");
+            }
+            
+            // Try audio analysis fallback
+            $audioMetadata = $this->processWithAudioAnalysis($audiobook);
+            if ($audioMetadata && $audioMetadata['confidence'] >= $this->option('min-confidence')) {
+                $this->info("✅ Audio analysis successful with " . $audioMetadata['confidence'] . "% confidence");
+                $aiMetadata = $audioMetadata;
+            } else {
+                // Only skip if we tried due to low confidence, not if forced
+                if (!$this->option('force-audio')) {
+                    $this->warn("⚠️  Audio analysis also failed - skipping");
+                    $currentProvider = config('services.ai.default_provider', 'gemini');
+                    if ($currentProvider === 'gemini' && empty(config('services.gemini.api_key'))) {
+                        $this->warn("   💡 Tip: Add GEMINI_API_KEY to your .env file to enable audio transcription");
+                    } elseif ($currentProvider === 'claude' && empty(config('services.openai.api_key'))) {
+                        $this->warn("   💡 Tip: Claude doesn't support audio transcription. Add OPENAI_API_KEY for fallback");
+                    }
+                    $this->skippedBooks[] = [
+                        'path' => $audiobook['path'],
+                        'reason' => 'Low AI confidence (tried audio analysis)'
+                    ];
+                    return;
+                } else {
+                    $this->warn("⚠️  Audio analysis failed but continuing due to --force-audio flag");
+                    // Continue with original metadata if forced
+                }
+            }
         }
 
         $this->info("✅ AI processing successful (confidence: {$aiMetadata['confidence']}%)");
@@ -1963,20 +2119,30 @@ class ImportBooksFromDownloads extends Command
         
         // Step 2: External data enrichment (before manual review)
         if (!$this->option('skip-enrichment')) {
-            $this->info("🔍 Enriching with external data...");
+            $this->info("🔍 Attempting to enrich with external data...");
             $enrichedData = $this->enrichWithExternalData($aiMetadata);
             if ($enrichedData) {
-                $aiMetadata = array_merge($aiMetadata, $enrichedData);
-                $this->info("✅ External data enrichment completed");
+                if ($this->getEnrichmentService()->isValidEnrichment($aiMetadata, $enrichedData)) {
+                    $aiMetadata = array_merge($aiMetadata, $enrichedData);
+                    $this->info("✅ Found enrichment data!");
+                } else {
+                    $this->warn("⚠️  Invalid enrichment data - skipping merge.");
+                }
+            } else {
+                $this->warn("⚠️  No enrichment data found");
             }
         }
         
-        // Show expected directory path
-        $aiMetadata['source_path'] = $audiobook['path']; // Add source path for GraphicAudio detection
-        $expectedPath = $this->generateDirectoryPath($aiMetadata);
-        $this->info("📁 Expected directory path: {$expectedPath}");
+        $this->newLine();
         
+        // Add source path for display and processing
+        $aiMetadata['source_path'] = $audiobook['path'];
         $this->displayEnrichedMetadata($aiMetadata);
+        $this->newLine();
+        
+        // Show expected directory path
+        $expectedPath = $this->getImportService()->generateDirectoryPath($aiMetadata);
+        $this->info("📁 Expected directory path: {$expectedPath}");
 
         // Step 3: Manual review (unless in auto mode)
         if (!$this->option('auto') && !$this->option('dry-run')) {
@@ -2005,7 +2171,7 @@ class ImportBooksFromDownloads extends Command
             $spinner->setMessage("💾 Creating database record...");
             $spinner->start();
             
-            $book = $this->createBookFromMetadata($aiMetadata, $audiobook);
+            $book = $this->getImportService()->createBookFromMetadata($aiMetadata, $audiobook);
             
             $spinner->finish();
             $this->output->write("\r\033[K");
@@ -2014,13 +2180,35 @@ class ImportBooksFromDownloads extends Command
                 $this->info("✅ Book imported successfully: {$book->title} (ID: {$book->id})");
                 
                 // Step 5: Move/copy files
-                $this->moveFilesToLibrary($audiobook, $book);
-                
-                $this->processedBooks[] = [
-                    'path' => $audiobook['path'],
-                    'book_id' => $book->id,
-                    'title' => $book->title
+                $options = [
+                    'operation' => $this->option('copy-files') ? 'copy' : 'move'
                 ];
+                $success = $this->getImportService()->moveFilesToLibrary($audiobook, $book, $options);
+                
+                if ($success) {
+                    $this->info("📁 Files " . ($this->option('copy-files') ? 'copied' : 'moved') . " to library successfully");
+                    
+                    $this->processedBooks[] = [
+                        'path' => $audiobook['path'],
+                        'book_id' => $book->id,
+                        'title' => $book->title
+                    ];
+                } else {
+                    $this->error("❌ Failed to " . ($this->option('copy-files') ? 'copy' : 'move') . " files to library");
+                    
+                    // Get the last error from logs for more details
+                    $this->displayFileOperationError($audiobook, $book);
+                    
+                    // Clean up the book record since file operation failed
+                    $this->cleanupFailedBookImport($book);
+                    
+                    // Move to failed books array instead of processed
+                    $this->failedBooks[] = [
+                        'path' => $audiobook['path'],
+                        'error' => 'File operation failed - book record cleaned up'
+                    ];
+                    return;
+                }
             }
         } else {
             $this->info("🔍 [DRY RUN] Would import: {$aiMetadata['title']}");
@@ -2050,6 +2238,13 @@ class ImportBooksFromDownloads extends Command
                 }
             }
 
+            // Debug: Show what we're passing to the AI
+            $this->line("🔍 AI Input Debug:");
+            $this->line("  Directory: " . $audiobook['path']);
+            $this->line("  Files (" . count($fileNames) . "): " . implode(', ', array_slice($fileNames, 0, 5)) . (count($fileNames) > 5 ? '...' : ''));
+            $this->line("  Has NFO: " . (empty($nfoData) ? 'No' : 'Yes'));
+            $this->line("  Has Tags: " . (empty($fileTags) ? 'No' : count($fileTags) . ' files'));
+
             // Process with AI, passing NFO data as priority information
             $aiResult = $this->aiProcessor->processBookDirectory(
                 $audiobook['path'],
@@ -2076,6 +2271,76 @@ class ImportBooksFromDownloads extends Command
             return null;
         }
     }
+
+    /**
+     * Process audiobook using audio analysis fallback when metadata extraction fails
+     */
+    protected function processWithAudioAnalysis(array $audiobook): ?array
+    {
+        try {
+            $this->line("🎵 Attempting audio analysis of first 30 seconds...");
+            
+            // Get the first audio file (alphanumerically sorted)
+            if (empty($audiobook['files'])) {
+                return null;
+            }
+            
+            // Sort files alphanumerically to ensure we get the intro file first
+            $sortedFiles = $audiobook['files'];
+            sort($sortedFiles, SORT_STRING);
+            
+            if (empty($sortedFiles)) {
+                $this->warn("⚠️  No audio files found for transcription");
+                return null;
+            }
+            
+            $firstAudioFile = $sortedFiles[0];
+            
+            $this->line("📁 Using first audio file: " . basename($firstAudioFile));
+            if (!file_exists($firstAudioFile)) {
+                return null;
+            }
+            
+            // Extract first 30 seconds using ffmpeg
+            $tempAudioFile = tempnam(sys_get_temp_dir(), 'audio_sample_') . '.mp3';
+            $ffmpegCommand = sprintf(
+                'ffmpeg -i %s -t 30 -acodec libmp3lame -ab 64k %s -y 2>/dev/null',
+                escapeshellarg($firstAudioFile),
+                escapeshellarg($tempAudioFile)
+            );
+            
+            exec($ffmpegCommand, $output, $returnCode);
+            
+            if ($returnCode !== 0 || !file_exists($tempAudioFile)) {
+                $this->warn("⚠️  Failed to extract audio sample");
+                return null;
+            }
+            
+            $this->line("🎵 Audio sample extracted, sending to AI for transcription...");
+            
+            // Send audio to AI for transcription and analysis
+            $audioAnalysis = $this->aiProcessor->processAudioSample(
+                $tempAudioFile,
+                basename($audiobook['path'])
+            );
+            
+            // Clean up temp file
+            @unlink($tempAudioFile);
+            
+            if ($audioAnalysis) {
+                $this->line("🎵 Audio transcription successful");
+                $this->line("  Transcribed: " . substr($audioAnalysis['transcription'] ?? '', 0, 100) . "...");
+                return $audioAnalysis;
+            }
+            
+            return null;
+            
+        } catch (\Exception $e) {
+            $this->error("❌ Audio analysis failed: " . $e->getMessage());
+            return null;
+        }
+    }
+
 
     /**
      * Post-process AI result to fix common issues with numbered series books
@@ -2196,6 +2461,17 @@ class ImportBooksFromDownloads extends Command
             ['Confidence', $metadata['confidence'] . '%'],
         ];
         
+        // Add source and directory paths
+        if (!empty($metadata['source_path'])) {
+            $displayPath = $this->formatSourcePathForDisplay($metadata['source_path']);
+            $tableData[] = ['Source Path', $displayPath];
+        }
+        
+        // Calculate and add expected directory path (including book title)
+        $basePath = $this->getImportService()->generateDirectoryPath($metadata);
+        $expectedPath = $basePath . '/' . ($metadata['title'] ?? 'Unknown Title');
+        $tableData[] = ['Directory Path', $expectedPath];
+        
         // Add description if available (truncated for display)
         if (!empty($metadata['description'])) {
             $description = strlen($metadata['description']) > 80 
@@ -2216,13 +2492,31 @@ class ImportBooksFromDownloads extends Command
         }
 
         $this->table(['Field', 'Value'], $tableData);
-        
         // Display cover image if terminal supports it and cover is available
         if (!empty($metadata['cover_url'])) {
             $this->displayCoverImage($metadata['cover_url']);
         }
     }
     
+    /**
+     * Ask for input with prompt on the same line
+     */
+     protected function askInline(string $question, string $default = ''): string
+     {
+         // Format the question with default value if provided
+         $prompt = $question;
+         if (!empty($default)) {
+             $prompt .= " [<comment>{$default}</comment>]";
+         }
+         
+         $this->output->write($prompt . " ");
+         
+         // Read input
+         $input = trim(fgets(STDIN));
+         
+         return empty($input) ? $default : $input;
+     }
+     
     /**
      * Display cover image if terminal supports it (like Ghostty with Kitty protocol)
      */
@@ -2244,8 +2538,7 @@ class ImportBooksFromDownloads extends Command
                 $imageData = @file_get_contents($imageUrl);
                 
                 if ($imageData) {
-                    $this->line("\n📸 Cover Preview:");
-                    $this->line("  URL: {$imageUrl}");
+                    $this->line("\n📸 Cover Preview: {$imageUrl}");
                     
                     if ($kittySupport) {
                         // Use Kitty graphics protocol (supported by Ghostty)
@@ -2282,6 +2575,10 @@ class ImportBooksFromDownloads extends Command
             file_put_contents($tempOriginal, $imageData);
             
             $imageInfo = getimagesize($tempOriginal);
+            if ($imageInfo === false) {
+                $this->line("  (Could not read image dimensions)");
+                return;
+            }
             $width = $imageInfo[0] ?? 200;
             $height = $imageInfo[1] ?? 300;
             
@@ -2300,7 +2597,6 @@ class ImportBooksFromDownloads extends Command
                 
                 // Use kitten icat directly since it works
                 if (file_exists('/usr/bin/kitten') && is_executable('/usr/bin/kitten')) {
-                    $this->line("  📏 Dimensions: {$thumbWidth}x{$thumbHeight}");
                     system("kitten icat --align=left '$tempFile' 2>/dev/null");
                 } else {
                     // Fallback to protocol if kitten not available
@@ -2380,7 +2676,6 @@ class ImportBooksFromDownloads extends Command
      */
     protected function reviewAndApprove(array &$metadata, array $audiobook = []): bool
     {
-        $this->warn("🔍 Manual Review Required");
         
         // If no enrichment data found, assume detected fields are wrong and skip auto-approval
         if (!$this->hasEnrichmentData($metadata)) {
@@ -2389,9 +2684,10 @@ class ImportBooksFromDownloads extends Command
         } else {
             // Ask if user wants to accept all fields as shown
             $this->line("\nOptions:");
-            $this->line("1. Accept all metadata as shown");
-            $this->line("2. Edit individual fields");
-            $this->line("3. Skip this book");
+            $this->line("1. (A)ccept all metadata as shown");
+            $this->line("2. (E)dit individual fields");
+            $this->line("3. (P)ath - edit directory path only");
+            $this->line("4. (S)kip this book");
             
             // Default to accept all if confidence is over 80%, otherwise default to edit
             $confidence = $metadata['confidence'] ?? 0;
@@ -2404,7 +2700,14 @@ class ImportBooksFromDownloads extends Command
                 ['type' => 'duplicate_check', 'data' => $audiobook]
             ];
             
-            $choice = $this->askWithBackground("Choose an option (1-3){$confidenceNote}", $defaultChoice, $backgroundTasks);
+            $choice = $this->askWithBackground("Choose an option (1-4)", $defaultChoice, $backgroundTasks);
+            
+            // Normalize choice to handle letters
+            $choice = strtolower(trim($choice));
+            if (in_array($choice, ['a', 'accept'])) $choice = '1';
+            if (in_array($choice, ['e', 'edit'])) $choice = '2';
+            if (in_array($choice, ['p', 'path'])) $choice = '3';
+            if (in_array($choice, ['s', 'skip'])) $choice = '4';
             
             switch ($choice) {
                 case '1':
@@ -2413,6 +2716,11 @@ class ImportBooksFromDownloads extends Command
                     // Continue to field editing below
                     break;
                 case '3':
+                    // Edit directory path only
+                    $metadata = $this->editDirectoryPathOnly($metadata, $audiobook);
+                    if ($this->inputInterrupted) return false;
+                    return true;
+                case '4':
                     return false;
                 default:
                     // Use the determined default behavior
@@ -2425,18 +2733,118 @@ class ImportBooksFromDownloads extends Command
         
         // Offer individual field editing
         $this->info("📝 Edit individual fields (press Enter to keep current value):");
+        $metadata = $this->editMetadataFields($metadata, $audiobook);
+        if ($this->inputInterrupted) return $metadata;
         
+        // Show updated metadata with new directory path
+        $metadata['source_path'] = $audiobook['path'] ?? '';
+        $expectedPath = $this->getImportService()->generateDirectoryPath($metadata);
+        $this->newLine();
+        $this->info("📁 Updated directory path: {$expectedPath}");
+        $this->displayEnrichedMetadata($metadata);
+        $this->newLine();
+        
+        // If we started with no enrichment data, automatically try to enrich with the edited metadata
+        if (!$this->hasEnrichmentData($metadata) && !$this->option('skip-enrichment')) {
+            $this->info("🔍 Attempting to enrich with edited metadata...");
+            $enrichedData = $this->enrichWithExternalData($metadata);
+            if ($enrichedData) {
+                if ($this->getEnrichmentService()->isValidEnrichment($metadata, $enrichedData)) {
+                    $metadata = array_merge($metadata, $enrichedData);
+                    $this->info("✅ Found enrichment data with edited metadata!");
+                    $this->newLine();
+                    $this->displayEnrichedMetadata($metadata);
+                    $this->newLine();
+                } else {
+                    $this->warn("⚠️  Invalid enrichment data - skipping merge.");
+                }
+            } else {
+                $this->warn("⚠️  Still no enrichment data found");
+            }
+        }
+
+        // Ask for final confirmation with option to re-edit
+        while (true) {
+            $this->line("\nOptions:");
+            $this->line("1. (A)ccept all metadata as shown");
+            $this->line("2. (E)dit individual fields");
+            $this->line("3. (P)ath - edit directory path only");
+            $this->line("4. (S)kip this book");
+            
+            $choice = $this->askWithImmediateInterrupt("Choose an option (1-4):", '1');
+            
+            // Handle quit request or interruption
+            if (strtolower(trim($choice)) === 'q' || $this->inputInterrupted) {
+                $this->handleUserQuit();
+                return false;
+            }
+            
+            // Normalize choice to handle first letters
+            $choice = strtolower(trim($choice));
+            if ($choice === 'a' || $choice === 'accept') $choice = '1';
+            if ($choice === 'e' || $choice === 'edit') $choice = '2';
+            if ($choice === 'p' || $choice === 'path') $choice = '3';
+            if ($choice === 's' || $choice === 'skip') $choice = '4';
+            
+            switch ($choice) {
+                case '1':
+                    return true;
+                case '2':
+                    // Re-edit metadata - call the editing section again
+                    $this->info("📝 Edit individual fields again (press Enter to keep current value):");
+                    $metadata = $this->editMetadataFields($metadata, $audiobook);
+                    
+                    // Show updated metadata with new directory path
+                    $metadata['source_path'] = $audiobook['path'] ?? '';
+                    $expectedPath = $this->getImportService()->generateDirectoryPath($metadata);
+                    $this->newLine();
+                    $this->info("📁 Updated directory path: {$expectedPath}");
+                    $this->displayEnrichedMetadata($metadata);
+                    $this->newLine();
+                    
+                    // Re-enrich after editing
+                    if (!$this->option('skip-enrichment')) {
+                        $this->info("🔍 Attempting to enrich with re-edited metadata...");
+                        $enrichedData = $this->enrichWithExternalData($metadata);
+                        if ($enrichedData) {
+                            if ($this->getEnrichmentService()->isValidEnrichment($metadata, $enrichedData)) {
+                                $metadata = array_merge($metadata, $enrichedData);
+                                $this->info("✅ Found enrichment data with re-edited metadata!");
+                                $this->displayEnrichedMetadata($metadata);
+                            } else {
+                                $this->warn("⚠️  Invalid enrichment data - skipping merge.");
+                            }
+                        } else {
+                            $this->warn("⚠️  Still no enrichment data found");
+                        }
+                    }
+                    // Continue the loop to ask again
+                    break;
+                case '3':
+                    // Edit directory path only
+                    $metadata = $this->editDirectoryPathOnly($metadata, $audiobook);
+                    if ($this->inputInterrupted) return false;
+                    return true;
+                case '4':
+                    return false;
+                default:
+                    $this->warn("Please choose 1-4, or use first letters (A/E/P/S)");
+                    // No break here, so it will re-prompt
+            }
+        }
+    }
+
+    /**
+     * Edit metadata fields interactively
+     */
+    protected function editMetadataFields(array $metadata, array $audiobook): array
+    {
         // Edit title
         $newTitle = $this->askWithImmediateInterrupt("Title", $metadata['title'] ?? '');
         if ($this->inputInterrupted) return $metadata;
         if ($newTitle !== ($metadata['title'] ?? '')) {
-            // Apply series name cleaning to user-entered title
-            $cleanedTitle = $this->removeSeriesFromTitle($newTitle);
-            if ($cleanedTitle !== $newTitle) {
-                $this->line("🧹 Cleaned series from title: '{$newTitle}' → '{$cleanedTitle}'");
-                $newTitle = $cleanedTitle;
-            }
-            $metadata['title'] = $newTitle;
+            // Only trim whitespace for user-entered titles
+            $metadata['title'] = trim($newTitle);
         }
 
         // Edit author
@@ -2487,25 +2895,18 @@ class ImportBooksFromDownloads extends Command
             $metadata['year'] = $newYear;
         }
 
+        // Edit directory path
+        $currentPath = $this->getImportService()->generateDirectoryPath($metadata);
+        $newPath = $this->askWithImmediateInterrupt("Directory Path (relative to library root)", $currentPath);
+        if ($this->inputInterrupted) return $metadata;
+        if ($newPath !== $currentPath) {
+            $metadata['custom_directory_path'] = trim($newPath);
+        }
+
         // Extract series number from edited title if present
         $this->extractSeriesNumberFromTitle($metadata);
         
-        // If we started with no enrichment data, automatically try to enrich with the edited metadata
-        if (!$this->hasEnrichmentData($metadata) && !$this->option('skip-enrichment')) {
-            $this->info("🔍 Attempting to enrich with edited metadata...");
-            $enrichedData = $this->enrichWithExternalData($metadata);
-            if ($enrichedData) {
-                $metadata = array_merge($metadata, $enrichedData);
-                $this->info("✅ Found enrichment data with edited metadata!");
-                $this->newLine();
-                $this->displayEnrichedMetadata($metadata);
-                $this->newLine();
-            } else {
-                $this->warn("⚠️  Still no enrichment data found");
-            }
-        }
-
-        return $this->confirm("Import this book with the edited metadata?", true);
+        return $metadata;
     }
 
     /**
@@ -2726,6 +3127,11 @@ class ImportBooksFromDownloads extends Command
             $this->info("📖 Processing Book {$bookNumber} with " . count($fileInfos) . " files");
             
             // Extract files and get the title from the first file info
+            if (empty($fileInfos)) {
+                $this->warn("⚠️  No file info found for book {$bookNumber}, skipping");
+                continue;
+            }
+            
             $files = array_map(function($fileInfo) { return $fileInfo['file']; }, $fileInfos);
             $bookTitle = $fileInfos[0]['title']; // Use title from first file
             
@@ -2765,14 +3171,18 @@ class ImportBooksFromDownloads extends Command
             $this->info("🔍 Enriching with external data...");
             $enrichedData = $this->enrichWithExternalData($metadata);
             if ($enrichedData) {
-                $metadata = array_merge($metadata, $enrichedData);
-                $this->info("✅ External data enrichment completed");
+                if ($this->getEnrichmentService()->isValidEnrichment($metadata, $enrichedData)) {
+                    $metadata = array_merge($metadata, $enrichedData);
+                    $this->info("✅ External data enrichment completed");
+                } else {
+                    $this->warn("⚠️  Invalid enrichment data - skipping merge.");
+                }
             }
         }
         
         // Show expected directory path
         $metadata['source_path'] = $audiobook['path']; // Add source path for GraphicAudio detection
-        $expectedPath = $this->generateDirectoryPath($metadata);
+        $expectedPath = $this->getImportService()->generateDirectoryPath($metadata);
         $this->info("📁 Expected directory path: {$expectedPath}");
         
         $this->displayEnrichedMetadata($metadata);
@@ -2804,7 +3214,7 @@ class ImportBooksFromDownloads extends Command
             $spinner->setMessage("💾 Creating database record...");
             $spinner->start();
             
-            $book = $this->createBookFromMetadata($metadata, $audiobook);
+            $book = $this->getImportService()->createBookFromMetadata($metadata, $audiobook);
             
             $spinner->finish();
             $this->output->write("\r\033[K");
@@ -2813,13 +3223,35 @@ class ImportBooksFromDownloads extends Command
                 $this->info("✅ Book imported successfully: {$book->title} (ID: {$book->id})");
                 
                 // Move/copy files
-                $this->moveFilesToLibrary($audiobook, $book);
-                
-                $this->processedBooks[] = [
-                    'path' => $audiobook['path'],
-                    'book_id' => $book->id,
-                    'title' => $book->title
+                $options = [
+                    'operation' => $this->option('copy-files') ? 'copy' : 'move'
                 ];
+                $success = $this->getImportService()->moveFilesToLibrary($audiobook, $book, $options);
+                
+                if ($success) {
+                    $this->info("📁 Files " . ($this->option('copy-files') ? 'copied' : 'moved') . " to library successfully");
+                    
+                    $this->processedBooks[] = [
+                        'path' => $audiobook['path'],
+                        'book_id' => $book->id,
+                        'title' => $book->title
+                    ];
+                } else {
+                    $this->error("❌ Failed to " . ($this->option('copy-files') ? 'copy' : 'move') . " files to library");
+                    
+                    // Get the last error from logs for more details
+                    $this->displayFileOperationError($audiobook, $book);
+                    
+                    // Clean up the book record since file operation failed
+                    $this->cleanupFailedBookImport($book);
+                    
+                    // Move to failed books array instead of processed
+                    $this->failedBooks[] = [
+                        'path' => $audiobook['path'],
+                        'error' => 'File operation failed - book record cleaned up'
+                    ];
+                    return;
+                }
             }
         } else {
             $this->info("🔍 [DRY RUN] Would import: {$metadata['title']}");
@@ -2894,10 +3326,15 @@ class ImportBooksFromDownloads extends Command
         // Try Google Books if we still need description or cover
         if ((empty($enrichedData['description']) || empty($enrichedData['cover_url'])) && !empty($metadata['title'])) {
             $title = $metadata['title'];
-            $author = is_array($metadata['author']) ? $metadata['author'][0] : $metadata['author'];
-            $googleData = $this->retryApiCall(function() use ($title, $author) {
-                return $this->searchGoogleBooks($title, $author);
-            }, 'Google Books', "Searching Google Books for '{$title}' by {$author}");
+            $author = is_array($metadata['author']) && !empty($metadata['author']) ? $metadata['author'][0] : $metadata['author'];
+            $authorString = is_array($author) ? implode(', ', $author) : ($author ?: 'Unknown');
+            
+            // Ensure author is a string for the API call
+            $authorForApi = is_array($author) ? implode(', ', $author) : ($author ?: '');
+            
+            $googleData = $this->retryApiCall(function() use ($title, $authorForApi) {
+                return $this->searchGoogleBooks($title, $authorForApi);
+            }, 'Google Books', "Searching Google Books for '{$title}' by {$authorString}");
             
             if ($googleData) {
                 // Only merge data we don't already have (prioritize Audible)
@@ -3117,7 +3554,8 @@ class ImportBooksFromDownloads extends Command
                 $book->title = $metadata['title'] ?? basename($audiobook['path']);
                 $book->description = $metadata['description'] ?? null;
                 $metadata['source_path'] = $audiobook['path']; // Add source path for GraphicAudio detection
-                $book->directory_path = $this->generateDirectoryPath($metadata);
+                $basePath = $this->getImportService()->generateDirectoryPath($metadata);
+                $book->directory_path = $basePath . '/' . $metadata['title'];
                 $book->language = $metadata['language'] ?? 'en';
                 $book->isbn = $metadata['isbn'] ?? null;
                 
@@ -3690,173 +4128,6 @@ class ImportBooksFromDownloads extends Command
         return true;
     }
 
-    /**
-     * Move files to library after successful import
-     */
-    protected function moveFilesToLibrary(array $audiobook, Book $book): bool
-    {
-        try {
-            $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
-            if (!$bookStoragePath) {
-                $this->warn("⚠️  Book storage path not configured - files not moved");
-                return false;
-            }
-
-            $targetDir = $bookStoragePath . '/' . $book->directory_path;
-            
-            // Handle target directory existence and conflicts
-            $needToCreateDirectory = true;
-            
-            if (File::isDirectory($targetDir)) {
-                // Check if the existing directory has any relevant files (same logic as comparison)
-                $targetInfo = $this->getDirectoryInfo($targetDir);
-                
-                if ($targetInfo['count'] === 0) {
-                    // Directory exists but has no audio files - no conflict, just proceed
-                    $this->info("📁 Target directory exists but has no audio files - proceeding with import");
-                    $needToCreateDirectory = false; // Directory already exists
-                } else {
-                    // Directory has audio files - handle the conflict
-                    $conflictAction = $this->handleDirectoryConflict($audiobook, $targetDir);
-                    
-                    switch ($conflictAction) {
-                        case 'skip':
-                            $this->info("🗑️  Cleaning up duplicate source directory");
-                            $this->cleanupSourceDirectory($audiobook, true); // Clean up since files already exist
-                            return true;
-                            
-                        case 'replace':
-                            $this->info("🗑️  Removing existing directory to replace with new files");
-                            File::deleteDirectory($targetDir);
-                            // Directory will be recreated below
-                            break;
-                            
-                        case 'rename_existing':
-                            $newExistingPath = $targetDir . '_backup_' . date('Y-m-d_H-i-s');
-                            File::move($targetDir, $newExistingPath);
-                            $this->info("📁 Renamed existing directory to: " . basename($newExistingPath));
-                            // Directory will be recreated below
-                            break;
-                            
-                        case 'rename_new':
-                            $targetDir = $targetDir . '_imported_' . date('Y-m-d_H-i-s');
-                            $this->info("📁 Importing to renamed directory: " . basename($targetDir));
-                            // New directory name will be created below
-                            break;
-                            
-                        case 'rename_both_narrator':
-                            // Rename both directories with narrator format
-                            $this->renameBothDirectoriesByNarrator($audiobook, $targetDir, $book);
-                            return true;
-                            
-                        case 'cancel':
-                            $this->warn("❌ Import cancelled by user");
-                            return false;
-                    }
-                }
-            }
-            
-            // Create target directory only if needed
-            if ($needToCreateDirectory) {
-                File::makeDirectory($targetDir, 0755, true);
-            }
-
-            // Flatten CD subdirectories before moving files
-            $this->flattenCdDirectories($audiobook['path']);
-
-            // Move or copy all files in the directory (not just audio files)
-            $copyFiles = $this->option('copy-files');
-            $filesMoved = 0;
-            $filesCopied = 0;
-            
-            // Get files to move - either all files in directory or specific files for multi-book
-            if (isset($audiobook['is_multi_book_part']) && $audiobook['is_multi_book_part']) {
-                // For multi-book parts, only move the specific files for this book
-                $filesToMove = $audiobook['multi_book_files_only'];
-            } else {
-                // For regular books, move all files in the directory
-                $allFiles = File::allFiles($audiobook['path']);
-                $filesToMove = array_map(function($file) { return $file->getPathname(); }, $allFiles);
-            }
-            
-            // Start spinner for file operations
-            $operationType = $copyFiles ? 'Copying' : 'Moving';
-            $fileCount = count($filesToMove);
-            $spinner = $this->output->createProgressBar();
-            $spinner->setFormat(" %message%");
-            $spinner->setMessage("📁 {$operationType} {$fileCount} files to library...");
-            $spinner->start();
-            
-            foreach ($filesToMove as $sourceFilePath) {
-                $filename = basename($sourceFilePath);
-                
-                // Skip torrent/piracy tracking files
-                if ($this->isTorrentTrackingFile($filename)) {
-                    File::delete($sourceFilePath);
-                    continue;
-                }
-                
-                $relativePath = str_replace($audiobook['path'] . '/', '', $sourceFilePath);
-                $targetFile = $targetDir . '/' . $relativePath;
-                
-                // Create subdirectories if needed
-                $targetSubDir = dirname($targetFile);
-                if (!File::isDirectory($targetSubDir)) {
-                    File::makeDirectory($targetSubDir, 0755, true);
-                }
-                
-                if ($copyFiles) {
-                    File::copy($sourceFilePath, $targetFile);
-                    $filesCopied++;
-                } else {
-                    // Try to move first, fallback to copy if move fails
-                    try {
-                        File::move($sourceFilePath, $targetFile);
-                        $filesMoved++;
-                    } catch (\Exception $e) {
-                        // Check if source file still exists before trying to copy
-                        if (File::exists($sourceFilePath)) {
-                            $this->warn("⚠️  Failed to move {$relativePath}, copying instead: " . $e->getMessage());
-                            try {
-                                File::copy($sourceFilePath, $targetFile);
-                                $filesCopied++;
-                            } catch (\Exception $copyException) {
-                                $this->error("❌ Failed to copy {$relativePath}: " . $copyException->getMessage());
-                                throw $copyException;
-                            }
-                        } else {
-                            // File was moved successfully despite the exception (common with inter-device moves)
-                            $this->info("📁 File {$relativePath} moved successfully");
-                            $filesMoved++;
-                        }
-                    }
-                }
-            }
-            
-            // Stop spinner and clear line
-            $spinner->finish();
-            $this->output->write("\r\033[K");
-            
-            // Log the actual operation performed
-            if ($filesMoved > 0 && $filesCopied > 0) {
-                $this->info("✅ {$filesMoved} files moved, {$filesCopied} files copied to library");
-            } elseif ($filesMoved > 0) {
-                $this->info("✅ {$filesMoved} files moved to library");
-            } elseif ($filesCopied > 0) {
-                $this->info("✅ {$filesCopied} files copied to library");
-            }
-
-            // Clean up source directory if files were moved successfully
-            if ($filesMoved > 0 && $filesCopied == 0) {
-                $this->cleanupSourceDirectory($audiobook);
-            }
-
-            return true;
-        } catch (\Exception $e) {
-            $this->error("❌ Failed to move files: " . $e->getMessage());
-            return false;
-        }
-    }
 
     /**
      * Show cost estimate for AI processing
@@ -4288,7 +4559,7 @@ class ImportBooksFromDownloads extends Command
     protected function moveFilesToNarratorDirectory(array $audiobook, string $targetDir, Book $book): void
     {
         // Create the target directory
-        File::makeDirectory($targetDir, 0755, true);
+        File::makeDirectory($targetDir, 0775, true);
         
         // Flatten CD subdirectories before moving files
         $this->flattenCdDirectories($audiobook['path']);
@@ -4313,7 +4584,7 @@ class ImportBooksFromDownloads extends Command
             // Create subdirectories if needed
             $targetFileDir = dirname($targetFile);
             if (!File::isDirectory($targetFileDir)) {
-                File::makeDirectory($targetFileDir, 0755, true);
+                File::makeDirectory($targetFileDir, 0775, true);
             }
             
             // Move or copy the file with error handling
@@ -4371,6 +4642,34 @@ class ImportBooksFromDownloads extends Command
         $totalSize = 0;
         $fileTypes = [];
         
+        // Handle individual files
+        if (File::isFile($path)) {
+            $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+            if (in_array($extension, $audioExtensions)) {
+                $size = filesize($path);
+                $filename = basename($path);
+                return [
+                    'files' => [[
+                        'name' => $filename,
+                        'size' => $size,
+                        'extension' => $extension,
+                        'hash' => md5($filename . $size)
+                    ]],
+                    'total_size' => $size,
+                    'file_types' => [$extension => 1],
+                    'count' => 1
+                ];
+            } else {
+                return [
+                    'files' => [],
+                    'total_size' => 0,
+                    'file_types' => [],
+                    'count' => 0
+                ];
+            }
+        }
+        
+        // Handle directories
         if (!File::isDirectory($path)) {
             return [
                 'files' => [],
@@ -4486,9 +4785,9 @@ class ImportBooksFromDownloads extends Command
         $this->line("  Database path: " . ($existingBook->directory_path ?? 'N/A'));
         
         $this->line("\nOptions:");
-        $this->line("1. Skip import (keep both)");
-        $this->line("2. Delete source directory");
-        $this->line("3. Continue with import anyway");
+        $this->line("1. (S)kip import (keep both)");
+        $this->line("2. (D)elete source directory");
+        $this->line("3. (C)ontinue with import anyway");
         
         // Prepare background tasks for potential analysis
         $backgroundTasks = [
@@ -4497,6 +4796,12 @@ class ImportBooksFromDownloads extends Command
         ];
         
         $choice = $this->askWithBackground("Choose an option (1-3)", '1', $backgroundTasks);
+        
+        // Normalize choice to handle letters
+        $choice = strtolower(trim($choice));
+        if (in_array($choice, ['s', 'skip'])) $choice = '1';
+        if (in_array($choice, ['d', 'delete'])) $choice = '2';
+        if (in_array($choice, ['c', 'continue'])) $choice = '3';
         
         switch ($choice) {
             case '2':
@@ -4556,6 +4861,58 @@ class ImportBooksFromDownloads extends Command
         }
         
         return 'ai'; // Generic fallback
+    }
+
+    /**
+     * Format source path for display - show relative to command line input or configured directories
+     */
+    protected function formatSourcePathForDisplay(string $fullPath): string
+    {
+        // Get the paths provided on command line
+        $providedPaths = $this->argument('path');
+        
+        if (!empty($providedPaths)) {
+            // Check if this path is under any of the provided paths
+            foreach ($providedPaths as $providedPath) {
+                $normalizedProvided = str_replace('\ ', ' ', $providedPath);
+                if (str_starts_with($fullPath, $normalizedProvided)) {
+                    $relativePath = str_replace($normalizedProvided, '', $fullPath);
+                    $relativePath = ltrim($relativePath, '/');
+                    // If we have a relative path, show it relative to the provided path
+                    if (!empty($relativePath)) {
+                        return basename($normalizedProvided) . '/' . $relativePath;
+                    } else {
+                        return basename($normalizedProvided);
+                    }
+                }
+            }
+        }
+        
+        // Check against configured default directories
+        $defaultDirs = [
+            '/media/lyra_data1/audiobooks/unsorted',
+            env('AUDIOBOOK_DOWNLOAD_PATH', '/tmp/audiobooks')
+        ];
+        
+        foreach ($defaultDirs as $defaultDir) {
+            if (str_starts_with($fullPath, $defaultDir)) {
+                return str_replace($defaultDir . '/', '', $fullPath);
+            }
+        }
+        
+        // Check against current working directory
+        $currentDir = getcwd();
+        if (str_starts_with($fullPath, $currentDir)) {
+            return str_replace($currentDir . '/', './', $fullPath);
+        }
+        
+        // If no match, show just the last 2-3 directory levels
+        $pathParts = explode('/', $fullPath);
+        if (count($pathParts) > 3) {
+            return '.../' . implode('/', array_slice($pathParts, -3));
+        }
+        
+        return $fullPath;
     }
     
     /**
@@ -4860,6 +5217,7 @@ class ImportBooksFromDownloads extends Command
         return implode(' & ', $normalizedAuthors);
     }
 
+
     /**
      * Find existing directory for authors (checking different orders and subsets)
      */
@@ -4941,6 +5299,180 @@ class ImportBooksFromDownloads extends Command
         }
 
         return null;
+    }
+
+    /**
+     * Get enrichment service instance
+     */
+    protected function getEnrichmentService(): BookEnrichmentService
+    {
+        if (!$this->enrichmentService) {
+            $this->enrichmentService = app(BookEnrichmentService::class);
+        }
+        return $this->enrichmentService;
+    }
+
+    /**
+     * Get import service instance
+     */
+    protected function getImportService(): BookImportService
+    {
+        if (!$this->importService) {
+            $this->importService = app(BookImportService::class);
+        }
+        return $this->importService;
+    }
+
+    /**
+     * Get background processing service instance
+     */
+    protected function getBackgroundService(): BackgroundProcessingService
+    {
+        if (!$this->backgroundService) {
+            $this->backgroundService = new BackgroundProcessingService();
+        }
+        return $this->backgroundService;
+    }
+
+    /**
+     * Get cache service instance
+     */
+    protected function getCacheService(): ImportCacheService
+    {
+        if (!$this->cacheService) {
+            $options = [
+                'enabled' => $this->cacheEnabled,
+                'cache_file' => $this->cacheFilePath ?? storage_path('app/import_cache.json')
+            ];
+            $this->cacheService = new ImportCacheService($options);
+        }
+        return $this->cacheService;
+    }
+
+    /**
+     * Edit directory path only
+     */
+    protected function editDirectoryPathOnly(array $metadata, array $audiobook): array
+    {
+        $this->newLine();
+        $this->info("📁 Edit Directory Path");
+        
+        // Generate current path
+        $currentPath = $this->getImportService()->generateDirectoryPath($metadata);
+        $this->line("Current path: {$currentPath}");
+        
+        // Allow user to edit the path
+        $newPath = $this->ask("Enter new directory path (relative to library root)", $currentPath);
+        
+        if ($this->inputInterrupted) {
+            return $metadata;
+        }
+        
+        // Store the custom path in metadata
+        $metadata['custom_directory_path'] = trim($newPath);
+        
+        $this->newLine();
+        $this->info("📁 Updated directory path: {$newPath}");
+        $this->displayEnrichedMetadata($metadata);
+        $this->newLine();
+        
+        return $metadata;
+    }
+
+    /**
+     * Display detailed file operation error information
+     */
+    protected function displayFileOperationError(array $audiobook, Book $book): void
+    {
+        $this->line("📋 File Operation Details:");
+        $this->line("   Source: {$audiobook['path']}");
+        
+        // Try to determine the target path
+        try {
+            $metadata = [
+                'author' => $book->authors->pluck('name')->toArray(),
+                'genre' => $book->genres->first()?->name ?? 'Unknown',
+                'series' => $book->series->first()?->name,
+                'title' => $book->title
+            ];
+            $targetPath = $this->getImportService()->generateDirectoryPath($metadata);
+            $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
+            $fullTargetPath = "{$bookStoragePath}/{$targetPath}/{$book->title}";
+            $this->line("   Target: {$fullTargetPath}");
+        } catch (\Exception $e) {
+            $this->line("   Target: [Could not determine target path]");
+        }
+        
+        // Check recent logs for specific error
+        $this->checkRecentFileOperationLogs($audiobook['path']);
+    }
+
+    /**
+     * Check recent logs for file operation errors
+     */
+    protected function checkRecentFileOperationLogs(string $sourcePath): void
+    {
+        $logFile = storage_path('logs/laravel-' . date('Y-m-d') . '.log');
+        if (!file_exists($logFile)) {
+            $this->line("   Error: Could not access log file for detailed error information");
+            return;
+        }
+
+        try {
+            $logs = file_get_contents($logFile);
+            $lines = explode("\n", $logs);
+            $recentLines = array_slice($lines, -50); // Get last 50 lines
+            
+            foreach (array_reverse($recentLines) as $line) {
+                if (strpos($line, 'Failed to move files to library') !== false && 
+                    strpos($line, basename($sourcePath)) !== false) {
+                    // Extract the error message
+                    if (preg_match('/Failed to move files to library: (.+?) \{/', $line, $matches)) {
+                        $errorMsg = trim($matches[1]);
+                        $this->line("   Error: {$errorMsg}");
+                        
+                        // Provide specific help based on error type
+                        if (strpos($errorMsg, 'Operation not permitted') !== false) {
+                            $this->line("   💡 This is likely a permissions issue. Check:");
+                            $this->line("      - File/directory ownership");
+                            $this->line("      - Write permissions on target directory");
+                            $this->line("      - SELinux or AppArmor restrictions");
+                        } elseif (strpos($errorMsg, 'No such file or directory') !== false) {
+                            $this->line("   💡 The source file may have been moved or deleted");
+                        } elseif (strpos($errorMsg, 'File exists') !== false) {
+                            $this->line("   💡 Target file already exists - conflict resolution may be needed");
+                        }
+                        return;
+                    }
+                }
+            }
+            
+            $this->line("   Error: Specific error details not found in recent logs");
+        } catch (\Exception $e) {
+            $this->line("   Error: Could not read log file for detailed error information");
+        }
+    }
+
+    /**
+     * Clean up book record and related data after failed file operation
+     */
+    protected function cleanupFailedBookImport(Book $book): void
+    {
+        try {
+            $bookTitle = $book->title;
+            $bookId = $book->id;
+            
+            $this->line("🧹 Cleaning up book record: {$bookTitle} (ID: {$bookId})");
+            
+            // Delete the book (this should cascade to related pivot tables)
+            $book->delete();
+            
+            $this->line("   ✅ Book record and relationships cleaned up");
+            
+        } catch (\Exception $e) {
+            $this->error("   ❌ Failed to clean up book record: " . $e->getMessage());
+            $this->line("   ⚠️  Manual cleanup may be required for book ID: {$book->id}");
+        }
     }
 
 }

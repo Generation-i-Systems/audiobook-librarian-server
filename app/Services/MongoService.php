@@ -24,9 +24,20 @@ class MongoService implements DocumentStoreServiceInterface
 
     public function __construct()
     {
+        // Only connect if we're actually configured to use MongoDB
+        if (config('documentstore.driver') !== 'mongodb') {
+            Log::warning("MongoService instantiated but documentstore.driver is set to: " . config('documentstore.driver'));
+            return; // Don't connect
+        }
+        
         try {
-            $uri = env('MONGODB_URI', 'mongodb://localhost:27017');
-            $dbName = env('MONGODB_DB', 'ab_librarian');
+            $uri = config('mongodb.uri');
+            $dbName = config('mongodb.database');
+            
+            if (!$uri || !$dbName) {
+                throw new \RuntimeException("MongoDB configuration missing. Set MONGODB_URI and MONGODB_DB environment variables.");
+            }
+            
             $this->client = new Client($uri);
             $this->db = $this->client->$dbName;
             // Attempt a simple operation to verify connection

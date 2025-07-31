@@ -13,7 +13,10 @@
       "Bash(composer:*)",
       "WebFetch(domain:docs.anthropic.com)",
       "WebFetch(domain:ai.google.dev)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(cat:*)",
+      "Bash(PHP_ERROR_REPORTING=E_ALL php artisan books:import-downloads:*)",
+      "Bash(timeout:*)"
     ],
     "deny": []
   }

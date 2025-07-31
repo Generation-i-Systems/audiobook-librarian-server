@@ -1,6 +1,6 @@
 <?php
 
 return [
-    'uri' => env('MONGODB_URI', 'mongodb://localhost:27017'),
-    'database' => env('MONGODB_DB', 'ab_librarian'),
+    'uri' => env('MONGODB_URI'),
+    'database' => env('MONGODB_DB'),
 ];
