@@ -129,130 +129,117 @@ A Laravel-based audiobook library and management system for personal and family 
 
 ## API Specification
 
-**Base URL:** `/api/v1/`
+**Base URL:** `/api/`
+
+**OpenAPI Specification:** [`/api-docs/openapi.json`](/api-docs/openapi.json)
 
 ### Authentication & Headers
-- Most endpoints require authentication via Laravel Sanctum (`Authorization: Bearer <token>`).
+- Most endpoints require authentication via Firebase JWT (`Authorization: Bearer <firebase-jwt-token>`).
 - Responses are JSON. Errors use standard HTTP codes with a JSON error message.
 
 ### Authentication
-- `POST /register`
-  - **Body:** `{ "name": "...", "email": "...", "password": "..." }`
-  - **Response:** `{ "token": "...", "user": { ... } }`
-- `POST /login`
-  - **Body:** `{ "email": "...", "password": "..." }`
-  - **Response:** `{ "token": "...", "user": { ... } }`
-- `POST /logout` — Requires auth, invalidates the token.
+Authentication is handled by Firebase. Obtain a Firebase JWT token from your Firebase client and include it in the `Authorization: Bearer <token>` header for protected endpoints.
 
 ### User
 - `GET /user` — Get current user (requires auth)
-- `GET /me` — Alias for `/user`
 
 ### Books
-- `GET /books`
+- `GET /books` — List all books with pagination
   - **Query Parameters:**
-    - `query`: Search string (matches title, author, or series)
-    - `author_id` or `author`: Filter by author ID or name
-    - `series_id` or `series`: Filter by series ID or name
-    - `genre_id` or `genre`: Filter by genre ID or name
-    - `published_year`: Filter by publication year
-    - `date_added`: Filter by date the book was added
-    - `with_cover` (bool, default: true): Include cover info
-    - `inlineCovers` (bool, default: false): Return base64-encoded cover images instead of URLs
-    - `per_page` (default: 100): Results per page
+    - `per_page` (default: 15): Results per page
     - `page` (default: 1): Page number
-  - **Response:**
-    ```json
-    {
-      "data": [ { "id": 1, "title": "...", ... } ],
-      "meta": { "current_page": 1, ... }
-    }
-    ```
+  - **Response:** Paginated list of books
 
 - `GET /books/{book}` — Get book details
-  - **Query Parameters:**
-    - `with_cover` (bool, default: true)
-    - `inlineCovers` (bool, default: false)
-  - **Response:**
-    ```json
-    {
-      "id": 1,
-      "title": "...",
-      "author": { ... },
-      "series": [
-        {
-          "seriesName": "Buryoku",
-          "number": "9"
-        }
-      ],
-      "cover_url": "/api/v1/books/1/cover",
-      "download_url": "/api/v1/books/1/download",
-      ...
-    }
-    ```
+  - **Response:** Full book details with authors, series, genres, etc.
 
-- `GET /books/{book}/cover` — Returns image or 404
+- `GET /books/{book}/cover` — Returns book cover image or 404
 - `GET /books/{book}/download` — Returns audio file (requires permission)
 
-- `GET /books/browse`
+- `GET /books/browse` — Browse books by categories
   - **Query Parameters:**
     - `type` (required): One of `genre`, `author`, `series`
     - `search`: Filter by name
-    - `per_page` (default: 100)
+    - `per_page` (default: 15)
     - `page` (default: 1)
-  - **Response:** Paginated list of genres, authors, or series
+  - **Response:** Paginated list of categories
 
-- `GET /books/search`
+- `GET /books/search` — Search books with advanced filters
   - **Query Parameters:**
     - `title`: Filter by book title
     - `author`: Filter by author name
     - `series`: Filter by series name
     - `genre`: Filter by genre name
-    - `published_year`: Filter by publication year
-    - `date_added`: Filter by date added
-    - `with_cover` (bool, default: true)
-    - `inlineCovers` (bool, default: false)
-    - `per_page` (default: 100)
+    - `per_page` (default: 15)
     - `page` (default: 1)
   - **Response:** Paginated list of books matching criteria
 
-- `GET /books/browse` — Browse books by genre/author
-- `GET /books/search` — Advanced search (see `/books`)
-- `POST /books/queue/download` — Queue books for zipped download
-  - **Body:** `{ "book_ids": [1,2,3] }`
-  - **Response:** `{ "zip_id": "..." }`
-- `GET /books/queue/download/{zipId}` — Download zipped books
-- `POST /books/queue/download/{zipId}/mark-downloaded` — Mark zip as downloaded
+### Autocomplete Endpoints
+- `GET /authors/autocomplete` — Autocomplete for author names
+  - **Query Parameters:**
+    - `query` (required): Search string
+  - **Response:** Array of matching author names
 
-### Series
-- `GET /series/{seriesId}/books` — List books in a series
-  - **Response:** Array of book objects
+- `GET /narrators/autocomplete` — Autocomplete for narrator names  
+  - **Query Parameters:**
+    - `query` (required): Search string
+  - **Response:** Array of matching narrator names
+
+- `GET /genres/autocomplete` — Autocomplete for genre names
+  - **Query Parameters:**
+    - `query` (required): Search string
+  - **Response:** Array of matching genre names
+
+### Series  
+- `GET /series/{series}/books` — List books in a series
+  - **Query Parameters:**
+    - `per_page` (default: 15): Results per page
+    - `page` (default: 1): Page number
+  - **Response:** Paginated list of books in the series
 
 ### Authors
-- `GET /authors/{authorId}/books` — List books by author
-- `GET /authors/{authorId}/series` — List series by author
-- `GET /authors/{authorId}/genres/{genreId}/books` — List books by author & genre
+- `GET /authors` — List all authors
+  - **Query Parameters:**
+    - `per_page` (default: 15): Results per page
+    - `page` (default: 1): Page number
+  - **Response:** Paginated list of authors
+
+- `GET /authors/{author}` — Get author details
+  - **Response:** Author details with statistics
+
+- `GET /authors/{author}/books` — List books by author
+  - **Query Parameters:**
+    - `per_page` (default: 15): Results per page
+    - `page` (default: 1): Page number
+  - **Response:** Paginated list of books by the author
+
+- `GET /authors/{author}/series` — List series by author
+  - **Query Parameters:**
+    - `per_page` (default: 15): Results per page
+    - `page` (default: 1): Page number
+  - **Response:** Paginated list of series by the author
 
 ### Genres
-- `GET /genres` — List genres
+- `GET /genres` — List all genres
+  - **Query Parameters:**
+    - `per_page` (default: 15): Results per page
+    - `page` (default: 1): Page number
+  - **Response:** Paginated list of genres
+
+- `GET /genres/{genre}` — Get genre details
+  - **Response:** Genre details with statistics
+
 - `GET /genres/{genre}/authors` — List authors by genre
-- `GET /genres/{genreId}/authors` — List authors by genre (simple)
+  - **Query Parameters:**
+    - `per_page` (default: 15): Results per page
+    - `page` (default: 1): Page number
+  - **Response:** Paginated list of authors in the genre
 
-### Book Requests
-- `POST /book-requests`
-  - **Body:** `{ "title": "...", "author": "...", ... }`
-  - **Response:** `{ "status": "ok", ... }`
-
-### Follow/Unfollow
-- `POST /follow/{followableType}/{followableId}` — Follow an author/series
-- `DELETE /unfollow/{followableType}/{followableId}` — Unfollow
-
-### Reading Progress
-- `POST /reading-progress/{book}`
-  - **Body:** `{ "progress": 0.5 }`
-  - **Response:** `{ "status": "ok" }`
-- `GET /reading-progress/{book}`
-  - **Response:** `{ "progress": 0.5 }`
+- `GET /genres/{genre}/books` — List books by genre
+  - **Query Parameters:**
+    - `per_page` (default: 15): Results per page
+    - `page` (default: 1): Page number
+  - **Response:** Paginated list of books in the genre
 
 ### Messages
 - `POST /messages`
@@ -264,21 +251,41 @@ A Laravel-based audiobook library and management system for personal and family 
 {
   "id": 123,
   "title": "Book Title",
-  "author": {
-    "id": 1,
-    "name": "Author Name"
-  },
-  "series": {
-    "id": 2,
-    "name": "Series Name",
-    "number": 1
-  },
-  "cover_url": "/api/v1/books/123/cover",
-  "download_url": "/api/v1/books/123/download",
-  "genres": ["Sci-Fi", "Adventure"],
-  "description": "...",
+  "description": "Book description...",
+  "directory_path": "Authors/Author Name/Book Title",
+  "release_date": "2024-01-01",
+  "cover_image": "covers/book-123.jpg",
+  "language": "en",
+  "source": "local",
   "duration": 36000,
-  ...
+  "publisher": "Publisher Name",
+  "authors": [
+    {
+      "id": 1,
+      "name": "Author Name"
+    }
+  ],
+  "series": [
+    {
+      "id": 2,
+      "name": "Series Name",
+      "pivot": {
+        "series_number": "1"
+      }
+    }
+  ],
+  "genres": [
+    {
+      "id": 1,
+      "name": "Sci-Fi"
+    }
+  ],
+  "narrators": [
+    {
+      "id": 1,
+      "name": "Narrator Name"
+    }
+  ]
 }
 ```
 
@@ -295,36 +302,36 @@ Most list endpoints return paginated responses. The structure is:
 ```json
 {
   "data": [ /* array of resource objects, e.g. books */ ],
+  "links": {
+    "first": "/api/books?page=1",
+    "last": "/api/books?page=10",
+    "prev": null,
+    "next": "/api/books?page=2"
+  },
   "meta": {
     "current_page": 1,
     "last_page": 10,
-    "per_page": 20,
-    "total": 200,
+    "per_page": 15,
+    "total": 150,
     "from": 1,
-    "to": 20,
-    "path": "/api/v1/books",
-    "links": {
-      "first": "/api/v1/books?page=1",
-      "last": "/api/v1/books?page=10",
-      "prev": null,
-      "next": "/api/v1/books?page=2"
-    }
+    "to": 15,
+    "path": "/api/books"
   }
 }
 ```
 - `data`: Array of items for this page.
 - `meta.current_page`: Current page number.
 - `meta.last_page`: Last available page.
-- `meta.per_page`: Items per page.
+- `meta.per_page`: Items per page (default: 15).
 - `meta.total`: Total number of items matching the query.
 - `meta.from`/`meta.to`: Range of items in this page.
 - `meta.path`: Base API endpoint.
-- `meta.links`: URLs for navigation (null if not available).
+- `links`: URLs for navigation (null if not available).
 - Use `?page=N&per_page=M` to control pagination.
 
 #### Example: Requesting Page 2
 ```
-GET /api/v1/books?page=2&per_page=10
+GET /api/books?page=2&per_page=10
 ```
 
 #### Example: Error Response (Validation)

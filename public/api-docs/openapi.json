@@ -3,516 +3,323 @@
   "info": {
     "title": "Audiobook Librarian API",
     "version": "1.0.0",
-    "description": "API documentation for the Audiobook Librarian application.\n\nThis specification covers all endpoints available in the Audiobook Librarian API."
+    "description": "API documentation for the Audiobook Librarian application.\n\nThis specification covers all endpoints available in the Audiobook Librarian API v1. Authentication uses Laravel Sanctum with MySQL backend.",
+    "contact": {
+      "name": "API Support",
+      "email": "support@librarian.local"
+    }
   },
   "servers": [
     {
-      "url": "/api/v1",
-      "description": "API v1"
+      "url": "http://localhost:8000/api/v1",
+      "description": "Local development server"
     },
     {
-      "url": "/admin",
-      "description": "Admin API"
+      "url": "https://books.thelin.org/api/v1",
+      "description": "Production server"
     }
   ],
-  "paths": {
-    "/register": {
-      "post": {
-        "tags": [
-          "Authentication"
-        ],
-        "summary": "Register new user",
-        "description": "Registers a new user account",
-        "operationId": "register"
-      }
-    },
-    "/login": {
-      "post": {
-        "tags": [
-          "Authentication"
-        ],
-        "summary": "Login",
-        "description": "Authenticates a user and returns a JWT token",
-        "operationId": "login"
-      }
-    },
-    "/logout": {
-      "post": {
-        "tags": [
-          "Authentication"
-        ],
-        "summary": "Logout",
-        "description": "Logs out the current user by invalidating their token",
-        "operationId": "logout"
-      }
-    },
-    "/user": {
-      "get": {
-        "tags": [
-          "User"
-        ],
-        "summary": "Get current user profile",
-        "description": "Returns the profile of the currently authenticated user",
-        "operationId": "getCurrentUser"
-      }
-    },
-    "/me": {
-      "get": {
-        "tags": [
-          "User"
-        ],
-        "summary": "Get current user profile (alias)",
-        "description": "Alias for /user endpoint - returns the profile of the currently authenticated user",
-        "operationId": "getMe"
-      }
-    },
-    "/series/autocomplete": {
-      "get": {
-        "tags": [
-          "Series"
-        ],
-        "summary": "Series name autocomplete",
-        "description": "|",
-        "operationId": "seriesAutocomplete"
-      }
-    },
-    "/books": {
-      "get": {
-        "tags": [
-          "Books"
-        ],
-        "summary": "List books",
-        "description": "Returns a paginated list of books with optional filtering",
-        "operationId": "listBooks"
-      }
-    },
-    "/books/{book}": {
-      "get": {
-        "tags": [
-          "Books"
-        ],
-        "summary": "Get book details",
-        "description": "Returns detailed information about a specific book",
-        "operationId": "getBook"
-      }
-    },
-    "/books/{book}/cover": {
-      "get": {
-        "tags": [
-          "Books"
-        ],
-        "summary": "Get book cover image",
-        "description": "Returns the cover image for a specific book",
-        "operationId": "getBookCover"
-      }
-    },
-    "/books/{book}/download": {
-      "get": {
-        "tags": [
-          "Books"
-        ],
-        "summary": "Download book audio file",
-        "description": "Returns the audio file for a specific book (requires permission)",
-        "operationId": "downloadBook"
-      }
-    },
-    "/books/browse": {
-      "get": {
-        "tags": [
-          "Books"
-        ],
-        "summary": "Browse books by genre/author/series",
-        "description": "Returns a paginated list of genres, authors, or series for browsing",
-        "operationId": "browseBooks"
-      }
-    },
-    "/books/search": {
-      "get": {
-        "tags": [
-          "Books"
-        ],
-        "summary": "Advanced search for books",
-        "description": "Returns a paginated list of books matching the search criteria",
-        "operationId": "searchBooks"
-      }
-    },
-    "/authors": {
-      "get": {
-        "tags": [
-          "Authors"
-        ],
-        "summary": "List authors",
-        "description": "Returns a paginated list of authors",
-        "operationId": "listAuthors"
-      }
-    },
-    "/authors/{author}": {
-      "get": {
-        "tags": [
-          "Authors"
-        ],
-        "summary": "Get author details",
-        "description": "Returns detailed information about a specific author and their books",
-        "operationId": "getAuthor"
-      }
-    },
-    "/genres": {
-      "get": {
-        "tags": [
-          "Genres"
-        ],
-        "summary": "List genres",
-        "description": "Returns a paginated list of genres",
-        "operationId": "listGenres"
-      }
-    },
-    "/genres/{genre}": {
-      "get": {
-        "tags": [
-          "Genres"
-        ],
-        "summary": "Get genre details",
-        "description": "Returns detailed information about a specific genre and books in that genre",
-        "operationId": "getGenre"
-      }
-    },
-    "/series": {
-      "get": {
-        "tags": [
-          "Series"
-        ],
-        "summary": "List series",
-        "description": "Returns a paginated list of series",
-        "operationId": "listSeries"
-      }
-    },
-    "/series/{series}": {
-      "get": {
-        "tags": [
-          "Series"
-        ],
-        "summary": "Get series details",
-        "description": "Returns detailed information about a specific series and books in that series",
-        "operationId": "getSeries"
-      }
-    },
-    "/admin/books/autocomplete/series": {
-      "get": {
-        "tags": [
-          "Admin",
-          "Series"
-        ],
-        "summary": "Autocomplete series names (admin)",
-        "description": "Returns series names matching the search term for admin autocomplete",
-        "operationId": "adminAutocompleteSeriesNames"
-      }
-    },
-    "/user/profile": {
-      "get": {
-        "tags": [
-          "User"
-        ],
-        "summary": "Get user profile",
-        "description": "Returns the current user's profile information",
-        "operationId": "getUserProfile"
-      },
-      "put": {
-        "tags": [
-          "User"
-        ],
-        "summary": "Update user profile",
-        "description": "Updates the current user's profile information",
-        "operationId": "updateUserProfile"
-      }
-    },
-    "/user/library": {
-      "get": {
-        "tags": [
-          "User",
-          "Books"
-        ],
-        "summary": "Get user library",
-        "description": "Returns the current user's library of books",
-        "operationId": "getUserLibrary"
-      }
-    },
-    "/books/{book}/progress": {
-      "get": {
-        "tags": [
-          "Books",
-          "User"
-        ],
-        "summary": "Get reading progress",
-        "description": "Returns the user's reading progress for a specific book",
-        "operationId": "getBookProgress"
-      },
-      "put": {
-        "tags": [
-          "Books",
-          "User"
-        ],
-        "summary": "Update reading progress",
-        "description": "Updates the user's reading progress for a specific book",
-        "operationId": "updateBookProgress"
-      }
-    },
-    "/book-requests": {
-      "get": {
-        "tags": [
-          "Book Requests"
-        ],
-        "summary": "List book requests",
-        "description": "Returns a paginated list of book requests",
-        "operationId": "listBookRequests"
-      },
-      "post": {
-        "tags": [
-          "Book Requests"
-        ],
-        "summary": "Create book request",
-        "description": "Creates a new book request",
-        "operationId": "createBookRequest"
-      }
-    },
-    "/book-requests/{request}": {
-      "get": {
-        "tags": [
-          "Book Requests"
-        ],
-        "summary": "Get book request",
-        "description": "Returns details of a specific book request",
-        "operationId": "getBookRequest"
-      },
-      "put": {
-        "tags": [
-          "Book Requests",
-          "Admin"
-        ],
-        "summary": "Update book request status (admin)",
-        "description": "Updates the status of a book request (admin only)",
-        "operationId": "updateBookRequestStatus"
-      },
-      "delete": {
-        "tags": [
-          "Book Requests"
-        ],
-        "summary": "Delete book request",
-        "description": "Deletes a book request (only allowed for the user who created it or admins)",
-        "operationId": "deleteBookRequest"
-      }
-    },
-    "/authors/{author}/follow": {
-      "post": {
-        "tags": [
-          "Authors",
-          "User"
-        ],
-        "summary": "Follow author",
-        "description": "Follow an author to receive notifications about new books",
-        "operationId": "followAuthor"
-      },
-      "delete": {
-        "tags": [
-          "Authors",
-          "User"
-        ],
-        "summary": "Unfollow author",
-        "description": "Unfollow an author to stop receiving notifications about new books",
-        "operationId": "unfollowAuthor"
-      }
-    },
-    "/series/{series}/follow": {
-      "post": {
-        "tags": [
-          "Series",
-          "User"
-        ],
-        "summary": "Follow series",
-        "description": "Follow a series to receive notifications about new books",
-        "operationId": "followSeries"
-      },
-      "delete": {
-        "tags": [
-          "Series",
-          "User"
-        ],
-        "summary": "Unfollow series",
-        "description": "Unfollow a series to stop receiving notifications about new books",
-        "operationId": "unfollowSeries"
-      }
-    },
-    "/messages": {
-      "get": {
-        "tags": [
-          "Messages"
-        ],
-        "summary": "List messages",
-        "description": "Returns a paginated list of messages for the current user",
-        "operationId": "listMessages"
-      },
-      "post": {
-        "tags": [
-          "Messages",
-          "Admin"
-        ],
-        "summary": "Create message (admin)",
-        "description": "Creates a new message for a user or all users (admin only)",
-        "operationId": "createMessage"
-      }
-    },
-    "/messages/{message}": {
-      "get": {
-        "tags": [
-          "Messages"
-        ],
-        "summary": "Get message",
-        "description": "Returns details of a specific message and marks it as read",
-        "operationId": "getMessage"
-      },
-      "delete": {
-        "tags": [
-          "Messages"
-        ],
-        "summary": "Delete message",
-        "description": "Deletes a message",
-        "operationId": "deleteMessage"
-      }
-    },
-    "/admin/users": {
-      "get": {
-        "tags": [
-          "Admin",
-          "User"
-        ],
-        "summary": "List all users (admin)",
-        "description": "Returns a paginated list of all users (admin only)",
-        "operationId": "adminListUsers"
-      }
-    },
-    "/admin/users/{user}": {
-      "get": {
-        "tags": [
-          "Admin",
-          "User"
-        ],
-        "summary": "Get user details (admin)",
-        "description": "Returns detailed information about a specific user (admin only)",
-        "operationId": "adminGetUser"
-      },
-      "put": {
-        "tags": [
-          "Admin",
-          "User"
-        ],
-        "summary": "Update user (admin)",
-        "description": "Updates a user's information (admin only)",
-        "operationId": "adminUpdateUser"
-      },
-      "delete": {
-        "tags": [
-          "Admin",
-          "User"
-        ],
-        "summary": "Delete user (admin)",
-        "description": "Deletes a user (admin only)",
-        "operationId": "adminDeleteUser"
-      }
-    },
-    "/admin/stats": {
-      "get": {
-        "tags": [
-          "Admin"
-        ],
-        "summary": "Get system statistics (admin)",
-        "description": "Returns system statistics (admin only)",
-        "operationId": "adminGetStats"
-      }
-    },
-    "/admin/books/import": {
-      "post": {
-        "tags": [
-          "Admin",
-          "Books"
-        ],
-        "summary": "Import books (admin)",
-        "description": "Imports books from a file or external source (admin only)",
-        "operationId": "adminImportBooks"
-      }
-    },
-    "/admin/books/import/{import_id}": {
-      "get": {
-        "tags": [
-          "Admin",
-          "Books"
-        ],
-        "summary": "Get import status (admin)",
-        "description": "Returns the status of a book import job (admin only)",
-        "operationId": "adminGetImportStatus"
-      }
-    },
-    "/books/queue/download": {
-      "post": {
-        "tags": [
-          "Books"
-        ],
-        "summary": "Queue multiple books for download",
-        "description": "Creates a zip file containing multiple books for download",
-        "operationId": "queueDownload"
-      }
-    },
-    "/books/queue/download/{zipId}": {
-      "get": {
-        "tags": [
-          "Books"
-        ],
-        "summary": "Download queued zip file",
-        "description": "Downloads a previously queued zip file containing multiple books",
-        "operationId": "downloadQueuedZip"
-      }
-    },
-    "/books/queue/download/{zipId}/mark-downloaded": {
-      "post": {
-        "tags": [
-          "Books"
-        ],
-        "summary": "Mark zip as downloaded",
-        "description": "Marks a queued zip file as downloaded by the user",
-        "operationId": "markZipDownloaded"
-      }
-    },
-    "/narrators/autocomplete": {
-      "get": {
-        "tags": [
-          "Narrators"
-        ],
-        "summary": "Autocomplete narrators",
-        "description": "Returns a list of narrators matching the search term",
-        "operationId": "autocompleteNarrators"
-      }
-    },
-    "/reading-progress/reset": {
-      "post": {
-        "tags": [
-          "Reading Progress"
-        ],
-        "summary": "Reset reading progress",
-        "description": "Resets reading progress for all books or a specific book",
-        "operationId": "resetReadingProgress"
-      }
-    }
-  },
   "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "Token",
+        "description": "Authentication using Bearer tokens. After logging in, include the token in the Authorization header: `Authorization: Bearer {token}`"
+      }
+    },
     "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "User ID",
+            "example": 1
+          },
+          "name": {
+            "type": "string",
+            "description": "Full name of the user",
+            "example": "John Doe"
+          },
+          "username": {
+            "type": "string",
+            "description": "Unique username",
+            "example": "johndoe"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "User's email address",
+            "example": "john@example.com"
+          },
+          "photo_url": {
+            "type": "string",
+            "nullable": true,
+            "description": "User's profile photo URL. If not set, defaults to cover of last completed book",
+            "example": "https://books.thelin.org/api/v1/books/1/cover"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["admin", "user", "unverified"],
+            "description": "User role",
+            "example": "user"
+          },
+          "email_verified_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Email verification timestamp",
+            "example": "2024-01-01T12:00:00Z"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Account creation timestamp",
+            "example": "2024-01-01T12:00:00Z"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last update timestamp",
+            "example": "2024-01-01T12:00:00Z"
+          }
+        }
+      },
+      "AuthResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "User ID",
+            "example": 1
+          },
+          "name": {
+            "type": "string",
+            "description": "Full name",
+            "example": "John Doe"
+          },
+          "username": {
+            "type": "string",
+            "description": "Username",
+            "example": "johndoe"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Email address",
+            "example": "john@example.com"
+          },
+          "photo_url": {
+            "type": "string",
+            "nullable": true,
+            "description": "Profile photo URL",
+            "example": "https://books.thelin.org/api/v1/books/1/cover"
+          },
+          "role": {
+            "type": "string",
+            "description": "User role",
+            "example": "user"
+          },
+          "authToken": {
+            "type": "string",
+            "description": "Authentication token for API requests",
+            "example": "1|abc123def456ghi789jkl012mno345pqr678stu901vwx234yz"
+          },
+          "refreshToken": {
+            "type": "string",
+            "description": "Refresh token (same as authToken in this implementation)",
+            "example": "1|abc123def456ghi789jkl012mno345pqr678stu901vwx234yz"
+          },
+          "token": {
+            "type": "string",
+            "description": "Legacy token field (same as authToken)",
+            "example": "1|abc123def456ghi789jkl012mno345pqr678stu901vwx234yz"
+          }
+        }
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "required": ["name", "username", "email", "password"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Full name of the user",
+            "example": "John Doe",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "username": {
+            "type": "string",
+            "description": "Unique username",
+            "example": "johndoe",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Valid email address",
+            "example": "john@example.com",
+            "maxLength": 255
+          },
+          "password": {
+            "type": "string",
+            "description": "Password (minimum 8 characters)",
+            "example": "securepassword123",
+            "minLength": 8
+          }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": ["password"],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "User's email address (required if username not provided)",
+            "example": "john@example.com"
+          },
+          "username": {
+            "type": "string",
+            "description": "User's username (required if email not provided)",
+            "example": "johndoe"
+          },
+          "password": {
+            "type": "string",
+            "description": "User's password",
+            "example": "securepassword123"
+          }
+        }
+      },
       "Error": {
         "type": "object",
         "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error type",
+            "example": "Unauthorized"
+          },
           "message": {
             "type": "string",
-            "description": "Error message"
+            "description": "Detailed error message",
+            "example": "Invalid credentials"
+          }
+        }
+      },
+      "ValidationError": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Email validation errors",
+            "example": ["The email field is required."]
           },
-          "errors": {
-            "type": "object",
-            "description": "Validation errors"
+          "password": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Password validation errors",
+            "example": ["The password must be at least 8 characters."]
+          }
+        }
+      },
+      "Book": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Unique book identifier",
+            "example": 1
+          },
+          "title": {
+            "type": "string",
+            "description": "Book title",
+            "example": "The Fellowship of the Ring"
+          },
+          "author": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of authors",
+            "example": ["J.R.R. Tolkien"]
+          },
+          "narrator": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of narrators",
+            "example": ["Rob Inglis"]
+          },
+          "series": {
+            "type": "string",
+            "nullable": true,
+            "description": "Series name",
+            "example": "The Lord of the Rings"
+          },
+          "series_number": {
+            "type": "string",
+            "nullable": true,
+            "description": "Book number in series",
+            "example": "1"
+          },
+          "genre": {
+            "type": "string",
+            "description": "Book genre",
+            "example": "Fantasy"
+          },
+          "year": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Publication/release year",
+            "example": 2001
+          },
+          "duration": {
+            "type": "string",
+            "nullable": true,
+            "description": "Total audiobook duration (HH:MM:SS)",
+            "example": "19:39:00"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "description": "Book description/summary",
+            "example": "The first volume of The Lord of the Rings..."
+          },
+          "cover_url": {
+            "type": "string",
+            "nullable": true,
+            "description": "URL to cover image",
+            "example": "https://books.thelin.org/api/v1/books/1/cover"
+          },
+          "file_count": {
+            "type": "integer",
+            "description": "Number of audio files",
+            "example": 12
+          },
+          "total_size": {
+            "type": "integer",
+            "description": "Total size in bytes",
+            "example": 687194112
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Creation timestamp",
+            "example": "2024-01-01T12:00:00Z"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last update timestamp",
+            "example": "2024-01-01T12:00:00Z"
           }
         }
       },
@@ -521,36 +328,763 @@
         "properties": {
           "current_page": {
             "type": "integer",
-            "description": "Current page number"
+            "description": "Current page number",
+            "example": 1
+          },
+          "from": {
+            "type": "integer",
+            "nullable": true,
+            "description": "First item number on current page",
+            "example": 1
           },
           "last_page": {
             "type": "integer",
-            "description": "Last page number"
+            "description": "Last available page number",
+            "example": 5
           },
           "per_page": {
             "type": "integer",
-            "description": "Items per page"
+            "description": "Items per page",
+            "example": 15
+          },
+          "to": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Last item number on current page",
+            "example": 15
           },
           "total": {
             "type": "integer",
-            "description": "Total number of items"
+            "description": "Total number of items",
+            "example": 67
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/register": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Register a new user account",
+        "description": "Creates a new user account. The account will be created with 'unverified' status and requires admin approval before the user can log in.",
+        "operationId": "register",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              },
+              "examples": {
+                "valid_registration": {
+                  "summary": "Valid registration request",
+                  "value": {
+                    "name": "John Doe",
+                    "username": "johndoe",
+                    "email": "john@example.com",
+                    "password": "securepassword123"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Account created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Account created. Waiting for admin approval."
+                    }
+                  }
+                },
+                "examples": {
+                  "successful_registration": {
+                    "summary": "Account created successfully",
+                    "value": {
+                      "message": "Account created. Waiting for admin approval."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error or duplicate user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                },
+                "examples": {
+                  "validation_error": {
+                    "summary": "Validation errors",
+                    "value": {
+                      "name": ["The name field is required."],
+                      "email": ["The email must be a valid email address."],
+                      "password": ["The password must be at least 8 characters."]
+                    }
+                  },
+                  "duplicate_email": {
+                    "summary": "Email already exists",
+                    "value": {
+                      "email": ["The email has already been taken."]
+                    }
+                  },
+                  "duplicate_username": {
+                    "summary": "Username already exists",
+                    "value": {
+                      "username": ["The username has already been taken."]
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
     },
-    "securitySchemes": {
-      "bearerAuth": {
-        "type": "http",
-        "scheme": "bearer",
-        "bearerFormat": "JWT",
-        "description": "JWT token authentication."
-      },
-      "adminAuth": {
-        "type": "http",
-        "scheme": "bearer",
-        "bearerFormat": "JWT",
-        "description": "Admin authentication required."
+    "/login": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Authenticate user and get access token",
+        "description": "Authenticates a user with email/username and password. Returns an access token that must be included in subsequent API requests.",
+        "operationId": "login",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              },
+              "examples": {
+                "login_with_email": {
+                  "summary": "Login with email",
+                  "value": {
+                    "email": "john@example.com",
+                    "password": "securepassword123"
+                  }
+                },
+                "login_with_username": {
+                  "summary": "Login with username",
+                  "value": {
+                    "username": "johndoe",
+                    "password": "securepassword123"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                },
+                "examples": {
+                  "successful_login": {
+                    "summary": "Successful login response",
+                    "value": {
+                      "id": 1,
+                      "name": "John Doe",
+                      "username": "johndoe",
+                      "email": "john@example.com",
+                      "photo_url": "https://books.thelin.org/api/v1/books/1/cover",
+                      "role": "user",
+                      "authToken": "1|abc123def456ghi789jkl012mno345pqr678stu901vwx234yz",
+                      "refreshToken": "1|abc123def456ghi789jkl012mno345pqr678stu901vwx234yz",
+                      "token": "1|abc123def456ghi789jkl012mno345pqr678stu901vwx234yz"
+                    }
+                  },
+                  "admin_login": {
+                    "summary": "Admin user login response",
+                    "value": {
+                      "id": 2,
+                      "name": "Eric Thelin",
+                      "username": "eric.thelin",
+                      "email": "eric.thelin@gmail.com",
+                      "photo_url": "https://books.thelin.org/api/v1/books/2/cover",
+                      "role": "admin",
+                      "authToken": "2|xyz789abc123def456ghi789jkl012mno345pqr678stu901vwx",
+                      "refreshToken": "2|xyz789abc123def456ghi789jkl012mno345pqr678stu901vwx",
+                      "token": "2|xyz789abc123def456ghi789jkl012mno345pqr678stu901vwx"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                },
+                "examples": {
+                  "missing_password": {
+                    "summary": "Missing password field",
+                    "value": {
+                      "password": ["The password field is required."]
+                    }
+                  },
+                  "invalid_email_format": {
+                    "summary": "Invalid email format",
+                    "value": {
+                      "email": ["The email must be a valid email address."]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "invalid_credentials": {
+                    "summary": "Wrong email/username or password",
+                    "value": {
+                      "message": "Invalid credentials"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Account pending approval",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "pending_approval": {
+                    "summary": "Account waiting for admin approval",
+                    "value": {
+                      "message": "Account pending admin approval"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/logout": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Logout and invalidate access token",
+        "description": "Logs out the current user by invalidating their access token. The token will no longer be valid for API requests.",
+        "operationId": "logout",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Logout successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Successfully logged out"
+                    }
+                  }
+                },
+                "examples": {
+                  "successful_logout": {
+                    "summary": "User successfully logged out",
+                    "value": {
+                      "message": "Successfully logged out"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "missing_token": {
+                    "summary": "No Authorization header provided",
+                    "value": {
+                      "error": "Unauthorized"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Invalid or expired token",
+                    "value": {
+                      "error": "Invalid or expired token"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user": {
+      "get": {
+        "tags": ["Authentication"],
+        "summary": "Get current user information",
+        "description": "Returns the authenticated user's profile information",
+        "operationId": "getUser",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User information retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                },
+                "examples": {
+                  "regular_user": {
+                    "summary": "Regular user profile",
+                    "value": {
+                      "id": 1,
+                      "name": "John Doe",
+                      "username": "johndoe",
+                      "email": "john@example.com",
+                      "photo_url": "https://books.thelin.org/api/v1/books/1/cover",
+                      "role": "user",
+                      "email_verified_at": null,
+                      "created_at": "2024-01-01T12:00:00Z",
+                      "updated_at": "2024-01-01T12:00:00Z"
+                    }
+                  },
+                  "admin_user": {
+                    "summary": "Admin user profile",
+                    "value": {
+                      "id": 2,
+                      "name": "Eric Thelin",
+                      "username": "eric.thelin",
+                      "email": "eric.thelin@gmail.com",
+                      "photo_url": "https://books.thelin.org/api/v1/books/2/cover",
+                      "role": "admin",
+                      "email_verified_at": "2024-01-01T10:00:00Z",
+                      "created_at": "2023-12-15T08:30:00Z",
+                      "updated_at": "2024-01-01T12:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "missing_token": {
+                    "summary": "No Authorization header provided",
+                    "value": {
+                      "error": "Unauthorized"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Invalid or expired token",
+                    "value": {
+                      "error": "Invalid or expired token"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Account pending approval",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "pending_approval": {
+                    "summary": "Account awaiting admin approval",
+                    "value": {
+                      "error": "Account pending admin approval"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me": {
+      "get": {
+        "tags": ["Authentication"],
+        "summary": "Get current user information (alias for /user)",
+        "description": "Returns the authenticated user's profile information (same as /user endpoint)",
+        "operationId": "getMe",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User information retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                },
+                "examples": {
+                  "regular_user": {
+                    "summary": "Regular user profile",
+                    "value": {
+                      "id": 1,
+                      "name": "John Doe",
+                      "username": "johndoe",
+                      "email": "john@example.com",
+                      "photo_url": "https://books.thelin.org/api/v1/books/1/cover",
+                      "role": "user",
+                      "email_verified_at": null,
+                      "created_at": "2024-01-01T12:00:00Z",
+                      "updated_at": "2024-01-01T12:00:00Z"
+                    }
+                  },
+                  "admin_user": {
+                    "summary": "Admin user profile",
+                    "value": {
+                      "id": 2,
+                      "name": "Eric Thelin",
+                      "username": "eric.thelin",
+                      "email": "eric.thelin@gmail.com",
+                      "photo_url": "https://books.thelin.org/api/v1/books/2/cover",
+                      "role": "admin",
+                      "email_verified_at": "2024-01-01T10:00:00Z",
+                      "created_at": "2023-12-15T08:30:00Z",
+                      "updated_at": "2024-01-01T12:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "missing_token": {
+                    "summary": "No Authorization header provided",
+                    "value": {
+                      "error": "Unauthorized"
+                    }
+                  },
+                  "invalid_token": {
+                    "summary": "Invalid or expired token",
+                    "value": {
+                      "error": "Invalid or expired token"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/books": {
+      "get": {
+        "tags": ["Books"],
+        "summary": "Get list of books",
+        "description": "Returns a paginated list of audiobooks available to the authenticated user",
+        "operationId": "getBooks",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number for pagination",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "example": 1
+            }
+          },
+          {
+            "name": "per_page",
+            "in": "query",
+            "description": "Number of books per page",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 15,
+              "example": 15
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Search term to filter books",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "harry potter"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Books retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Book"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/PaginationMeta"
+                    }
+                  }
+                },
+                "examples": {
+                  "books_list": {
+                    "summary": "Successful books list response",
+                    "value": {
+                      "data": [
+                        {
+                          "id": 1,
+                          "title": "The Fellowship of the Ring",
+                          "author": ["J.R.R. Tolkien"],
+                          "narrator": ["Rob Inglis"],
+                          "series": "The Lord of the Rings",
+                          "series_number": "1",
+                          "genre": "Fantasy",
+                          "year": 2001,
+                          "duration": "19:39:00",
+                          "description": "The first volume of The Lord of the Rings...",
+                          "cover_url": "https://books.thelin.org/api/v1/books/1/cover",
+                          "file_count": 12,
+                          "total_size": 687194112,
+                          "created_at": "2024-01-01T12:00:00Z",
+                          "updated_at": "2024-01-01T12:00:00Z"
+                        },
+                        {
+                          "id": 2,
+                          "title": "Dune",
+                          "author": ["Frank Herbert"],
+                          "narrator": ["Scott Brick", "Orlagh Cassidy"],
+                          "series": "Dune",
+                          "series_number": "1",
+                          "genre": "Science Fiction",
+                          "year": 2007,
+                          "duration": "21:02:00",
+                          "description": "Set on the desert planet Arrakis...",
+                          "cover_url": "https://books.thelin.org/api/v1/books/2/cover",
+                          "file_count": 15,
+                          "total_size": 912457728,
+                          "created_at": "2024-01-02T10:30:00Z",
+                          "updated_at": "2024-01-02T10:30:00Z"
+                        }
+                      ],
+                      "meta": {
+                        "current_page": 1,
+                        "from": 1,
+                        "last_page": 5,
+                        "per_page": 15,
+                        "to": 15,
+                        "total": 67
+                      }
+                    }
+                  },
+                  "empty_list": {
+                    "summary": "No books found",
+                    "value": {
+                      "data": [],
+                      "meta": {
+                        "current_page": 1,
+                        "from": null,
+                        "last_page": 1,
+                        "per_page": 15,
+                        "to": null,
+                        "total": 0
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "unauthorized": {
+                    "summary": "Invalid or missing token",
+                    "value": {
+                      "error": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/books/{book}": {
+      "get": {
+        "tags": ["Books"],
+        "summary": "Get specific book details",
+        "description": "Returns detailed information about a specific audiobook",
+        "operationId": "getBook",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "book",
+            "in": "path",
+            "description": "Book ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Book details retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Book"
+                },
+                "examples": {
+                  "book_details": {
+                    "summary": "Complete book details",
+                    "value": {
+                      "id": 1,
+                      "title": "The Fellowship of the Ring",
+                      "author": ["J.R.R. Tolkien"],
+                      "narrator": ["Rob Inglis"],
+                      "series": "The Lord of the Rings",
+                      "series_number": "1",
+                      "genre": "Fantasy",
+                      "year": 2001,
+                      "duration": "19:39:00",
+                      "description": "The first volume of The Lord of the Rings, The Fellowship of the Ring tells of the fateful power of the One Ring. It begins a magnificent tale of adventure that will plunge the members of the Fellowship of the Ring into a perilous quest and set the stage for the ultimate clash between the powers of good and evil.",
+                      "cover_url": "https://books.thelin.org/api/v1/books/1/cover",
+                      "file_count": 12,
+                      "total_size": 687194112,
+                      "created_at": "2024-01-01T12:00:00Z",
+                      "updated_at": "2024-01-01T12:00:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Book not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "not_found": {
+                    "summary": "Book does not exist",
+                    "value": {
+                      "error": "Book not found"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "unauthorized": {
+                    "summary": "Invalid or missing token",
+                    "value": {
+                      "error": "Unauthorized"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     }
-  }
+  },
+  "tags": [
+    {
+      "name": "Authentication",
+      "description": "User authentication and authorization endpoints"
+    },
+    {
+      "name": "Books",
+      "description": "Audiobook management and browsing endpoints"
+    }
+  ]
 }

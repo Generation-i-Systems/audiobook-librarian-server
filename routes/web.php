@@ -169,6 +169,18 @@ Route::get('/home', function () {
     return redirect()->route('books.index')->with('status', 'Welcome to Audiobook Librarian!');
 })->name('home');
 
+// Documentation routes (public access)
+Route::prefix('docs')->group(function () {
+    Route::get('/', [App\Http\Controllers\DocsController::class, 'index'])->name('docs.index');
+    Route::get('/openapi.json', [App\Http\Controllers\DocsController::class, 'openapi'])->name('docs.openapi');
+    Route::get('/{path?}', [App\Http\Controllers\DocsController::class, 'show'])->where('path', '.*')->name('docs.show');
+});
+
+// API docs routes (aliases)
+Route::prefix('api-docs')->group(function () {
+    Route::get('/openapi.json', [App\Http\Controllers\DocsController::class, 'openapi'])->name('api-docs.openapi');
+});
+
 Route::middleware(['auth'])->group(function () {
     Route::resource('books', BookController::class)->only(['index', 'show']);
     Route::get('/books/create', [
