@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Contracts\DocumentStoreServiceInterface;
+use App\Models\User;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -11,13 +11,6 @@ use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
 {
-    protected $documentStore;
-
-
-    public function __construct(DocumentStoreServiceInterface $documentStore)
-    {
-        $this->documentStore = $documentStore;
-    }
 
 
     public function register(Request $request)
@@ -46,41 +39,29 @@ class AuthController extends Controller
         }
 
         // Check if email already exists
-        $existingUser = $this->documentStore->getUserByEmail($request->email);
+        $existingUser = User::where('email', $request->email)->first();
 
         if ($existingUser) {
             return response()->json(['email' => ['The email has already been taken.']], 400);
         }
 
         // Check if username already exists
-        if ($this->documentStore->userExistsByUsername($request->username)) {
+        $existingUsername = User::where('username', $request->username)->first();
+        if ($existingUsername) {
             return response()->json(['username' => ['The username has already been taken.']], 400);
         }
 
         // Create the user
-        $userData = [
+        $user = User::create([
             'name' => $request->name,
             'username' => $request->username,
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'role' => 'unverified',
-            // Let the service handle timestamps
-        ];
+        ]);
 
-        $userId = $this->documentStore->createUser($userData);
-
-        // Notify all admins about the new user
-        $adminUsers = $this->documentStore->getAdminUsers();
-
-        foreach ($adminUsers as $admin) {
-            $this->documentStore->createMessage([
-                'user_id' => $admin['id'],
-                'content' => 'New user registered: ' . $request->name . ' (' . $request->email . ')',
-                'is_from_admin' => false,
-                'created_at' => new \DateTime(),
-                'updated_at' => new \DateTime(),
-            ]);
-        }
+        // TODO: Notify all admins about the new user
+        // This would require a Message model and notification system
 
         return response()->json([
             'message' => 'Account created. Waiting for admin approval.',
@@ -102,65 +83,43 @@ class AuthController extends Controller
 
         $loginField = $request->input('email') ?? $request->input('username');
 
-        // Try to find user by email
-        $user = null;
-        if (filter_var($loginField, FILTER_VALIDATE_EMAIL)) {
-            $user = $this->documentStore->getUserByEmail($loginField);
-        }
+        // Try to find user by email or username
+        $user = User::where('email', $loginField)
+            ->orWhere('username', $loginField)
+            ->first();
 
-        // If not found by email, try to find by username
-        if (!$user) {
-            $users = $this->documentStore->getUsersForMessaging();
-            foreach ($users as $potentialUser) {
-                if (isset($potentialUser['username']) && $potentialUser['username'] === $loginField) {
-                    $user = $potentialUser;
-                    break;
-                }
-            }
-        }
-
-        if (!$user || !Hash::check($request->password, $user['password'])) {
+        if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
 
-        $userId = $user['id'];
-
         // Check if user is approved
-        if ($user['role'] === 'unverified') {
+        if ($user->role === 'unverified') {
             return response()->json(['message' => 'Account pending admin approval'], 403);
         }
 
-        // Create a simple token (in a real app, use Laravel Sanctum/Passport)
-        $token = hash('sha256', $userId . now()->timestamp . uniqid());
+        // Create a Sanctum token
+        $token = $user->createToken('api-token', ['*'], now()->addDays(30))->plainTextToken;
 
-        // Store the token using the interface method
-        $tokenData = [
-            'user_id' => $userId,
-            'token' => $token,
-            'created_at' => new \DateTime(),
-            'expires_at' => now()->addDays(30)->toDateTime(),
-        ];
-
-        // Use the createApiToken interface method
-        $this->documentStore->createApiToken($tokenData);
-
-        unset($user['password']);
-        $user['id'] = $userId;
-
-        return response()->json(array_merge($user, [
+        return response()->json([
+            'id' => $user->id,
+            'name' => $user->name,
+            'username' => $user->username,
+            'email' => $user->email,
+            'photo_url' => $user->photo_url,
+            'role' => $user->role,
             'authToken' => $token,
             'refreshToken' => $token,
             'token' => $token,
-        ]));
+        ]);
     }
 
 
     public function logout(Request $request)
     {
-        $token = $request->bearerToken();
-        if ($token) {
-            // Use the deleteApiTokenByValue interface method
-            $this->documentStore->deleteApiTokenByValue($token);
+        // Delete the current access token
+        $user = $request->user();
+        if ($user) {
+            $user->currentAccessToken()->delete();
         }
 
         return response()->json(['message' => 'Successfully logged out']);

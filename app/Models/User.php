@@ -23,6 +23,7 @@ class User extends Authenticatable
         'name',
         'username',
         'email',
+        'photo_url',
         'password',
         'role',
         'email_verified_at',
@@ -56,5 +57,23 @@ class User extends Authenticatable
     public function queuedBooks(): BelongsToMany
     {
         return $this->belongsToMany(Book::class, 'user_book_queues')->withPivot('order')->orderBy('order');
+    }
+
+    public function getPhotoUrlAttribute($value)
+    {
+        if ($value) {
+            return $value;
+        }
+
+        $lastCompletedBook = $this->books()
+            ->wherePivot('progress', '>=', 100)
+            ->orderByPivot('last_listened', 'desc')
+            ->first();
+
+        if ($lastCompletedBook && $lastCompletedBook->cover_url) {
+            return $lastCompletedBook->cover_url;
+        }
+
+        return null;
     }
 }

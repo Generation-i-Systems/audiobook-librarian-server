@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->group(function () {
     Route::get('/books/{book}/cover', [BookApiController::class, 'cover']);
 
-    Route::middleware(['firebase.auth', 'standard'])->group(function () {
+    Route::middleware(['api.auth', 'standard'])->group(function () {
         Route::get('/user', function (Request $request) {
             return $request->user();
         });

@@ -18,17 +18,17 @@ class DocumentStoreServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(DocumentStoreServiceInterface::class, function ($app) {
-            if ($app->environment('testing')) {
-                return new MockDocumentStoreService();
+            $driver = config('documentstore.driver');
+
+            switch ($driver) {
+                case 'firestore':
+                    return $this->createFirestoreService();
+                case 'mongodb':
+                    return $this->createMongoService();
+                case 'mysql':
+                default:
+                    return $this->createMysqlService();
             }
-
-            $driver = config('documentstore.driver', 'mysql');
-
-            return match ($driver) {
-                'mongodb' => $this->createMongoService(),
-                'firestore' => new FirestoreService(),
-                default => new MySqlService(),
-            };
         });
     }
 
@@ -48,6 +48,14 @@ class DocumentStoreServiceProvider extends ServiceProvider
         }
         
         return new MongoService();
+    }
+
+    /**
+     * Create MySqlService
+     */
+    protected function createMysqlService(): MySqlService
+    {
+        return new MySqlService();
     }
 
     /**

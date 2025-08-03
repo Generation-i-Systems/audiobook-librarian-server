@@ -19,12 +19,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(AudibleApiService::class, function ($app) {
             return new AudibleApiService(config('services.audible', []));
         });
-        // Bind DocumentStoreServiceInterface based on the default database connection
-        if (config('database.default') === 'mysql') {
-            $this->app->bind(\App\Contracts\DocumentStoreServiceInterface::class, \App\Services\MySqlService::class);
-        } else {
-            $this->app->bind(\App\Contracts\DocumentStoreServiceInterface::class, \App\Services\MongoService::class);
-        }
+        // DocumentStoreServiceInterface binding is now handled by DocumentStoreServiceProvider
+        // to avoid conflicts and ensure proper driver selection based on documentstore.driver config
 
         $this->app->singleton(FirestoreClient::class, function ($app) {
             return new FirestoreClient([
