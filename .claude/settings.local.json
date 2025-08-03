@@ -16,7 +16,9 @@
       "Bash(git add:*)",
       "Bash(cat:*)",
       "Bash(PHP_ERROR_REPORTING=E_ALL php artisan books:import-downloads:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(sudo chmod:*)",
+      "Bash(sed:*)"
     ],
     "deny": []
   }

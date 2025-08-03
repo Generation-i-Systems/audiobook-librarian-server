@@ -1,0 +1,4 @@
+Add all changes to staging, and create a commit.
+
+Follow this checklist for writing your commit message:
+- SHOULD NOT refer to Claude or Anthropic in the commit message or description.

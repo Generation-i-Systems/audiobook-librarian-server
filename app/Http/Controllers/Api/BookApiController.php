@@ -74,57 +74,26 @@ class BookApiController extends Controller
 
     public function index(Request $request)
     {
-        $books = $this->documentStoreService->listBooks();
+        $perPage = $request->input('per_page', 20);
+        $page = (int) $request->input('page', 1);
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
-        $perPage = $request->input('per_page', 100);
-        $query = $request->input('query');
-        $genre = $request->input('genre');
-        $author = $request->input('author');
-        $series = $request->input('series');
-        $title = $request->input('title');
-        $publication_date = $request->input('publication_date');
-        $date_added = $request->input('date_added');
-        // Filter
-        $books = array_filter(
-            $books,
-            function ($book) use ($query, $genre, $author, $series, $title, $publication_date, $date_added) {
-                $match = true;
-                if ($query) {
-                    $match = $match && (
-                        stripos($book['title'] ?? '', $query) !== false ||
-                        stripos($book['author_name'] ?? '', $query) !== false ||
-                        stripos($book['series_name'] ?? '', $query) !== false
-                    );
-                }
-                if ($genre) {
-                    $match = $match && (strcasecmp($book['genre'] ?? '', $genre) === 0);
-                }
-                if ($author) {
-                    $match = $match && (stripos($book['author_name'] ?? '', $author) !== false);
-                }
-                if ($series) {
-                    $match = $match && (stripos($book['series_name'] ?? '', $series) !== false);
-                }
-                if ($title) {
-                    $match = $match && (stripos($book['title'] ?? '', $title) !== false);
-                }
-                if ($publication_date) {
-                    $match = $match && (($book['published_year'] ?? null) == $publication_date);
-                }
-                if ($date_added) {
-                    $match = $match && (isset($book['date_added']) && strpos($book['date_added'], $date_added) === 0);
-                }
 
-                return $match;
-            }
-        );
-        // Pagination
-        $books = array_values($books);
-        $total = count($books);
-        $page = (int) $request->input('page', 1);
-        $books = array_slice($books, ($page - 1) * $perPage, $perPage);
-        // Transform
+        $filters = [
+            'search' => $request->input('search'),
+            'genre' => $request->input('genre'),
+            'author' => $request->input('author'),
+            'series' => $request->input('series'),
+            'title' => $request->input('title'),
+            'publication_date' => $request->input('publication_date'),
+            'date_added' => $request->input('date_added'),
+        ];
+
+        $booksData = $this->documentStoreService->listBooks($page, $perPage, $filters);
+        $books = $booksData['data'];
+        $total = $booksData['total'];
+
+        // Transform books to include cover URLs and other necessary fields
         $books = array_map(function ($book) use ($withCover, $inlineCovers) {
             return $this->getBookWithCover($book, $withCover, $inlineCovers);
         }, $books);
@@ -214,44 +183,24 @@ class BookApiController extends Controller
 
     public function search(Request $request)
     {
-        $books = $this->documentStoreService->listBooks();
+        $perPage = $request->input('per_page', 20);
+        $page = (int) $request->input('page', 1);
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
-        $perPage = $request->input('per_page', 100);
-        $title = $request->input('title');
-        $author = $request->input('author');
-        $series = $request->input('series');
-        $publication_date = $request->input('publication_date');
-        $date_added = $request->input('date_added');
-        // Filter
-        $books = array_filter(
-            $books,
-            function ($book) use ($title, $author, $series, $publication_date, $date_added) {
-                $match = true;
-                if ($title) {
-                    $match = $match && (stripos($book['title'] ?? '', $title) !== false);
-                }
-                if ($author) {
-                    $match = $match && (stripos($book['author_name'] ?? '', $author) !== false);
-                }
-                if ($series) {
-                    $match = $match && (stripos($book['series_name'] ?? '', $series) !== false);
-                }
-                if ($publication_date) {
-                    $match = $match && (($book['published_year'] ?? null) == $publication_date);
-                }
-                if ($date_added) {
-                    $match = $match && (isset($book['date_added']) && strpos($book['date_added'], $date_added) === 0);
-                }
 
-                return $match;
-            }
-        );
-        // Pagination
-        $books = array_values($books);
-        $total = count($books);
-        $page = (int) $request->input('page', 1);
-        $books = array_slice($books, ($page - 1) * $perPage, $perPage);
+        $filters = [
+            'search' => $request->input('search'),
+            'title' => $request->input('title'),
+            'author' => $request->input('author'),
+            'series' => $request->input('series'),
+            'publication_date' => $request->input('publication_date'),
+            'date_added' => $request->input('date_added'),
+        ];
+
+        $booksData = $this->documentStoreService->listBooks($page, $perPage, $filters);
+        $books = $booksData['data'];
+        $total = $booksData['total'];
+
         // Transform
         $books = array_map(function ($book) use ($withCover, $inlineCovers) {
             return $this->getBookWithCover($book, $withCover, $inlineCovers);
@@ -448,6 +397,8 @@ class BookApiController extends Controller
         }
         $books = array_filter($documentStore->listBooks(), fn($book) => ($book['series_id'] ?? null) == $seriesId);
         $books = array_values($books);
+        // Filter out any non-array entries that may have gotten into the books array
+        $books = array_filter($books, 'is_array');
         $total = count($books);
         $page = (int) $request->input('page', 1);
         $books = array_slice($books, ($page - 1) * $perPage, $perPage);
@@ -479,6 +430,8 @@ class BookApiController extends Controller
         }
         $books = array_filter($documentStore->listBooks(), fn($book) => ($book['author_id'] ?? null) == $authorId);
         $books = array_values($books);
+        // Filter out any non-array entries that may have gotten into the books array
+        $books = array_filter($books, 'is_array');
         $total = count($books);
         $page = (int) $request->input('page', 1);
         $books = array_slice($books, ($page - 1) * $perPage, $perPage);
@@ -555,6 +508,8 @@ class BookApiController extends Controller
             return strcmp($a['title'] ?? '', $b['title'] ?? '');
         });
         // Paginate manually
+        // Filter out any non-array entries that may have gotten into the books array
+        $books = array_filter($books, 'is_array');
         $total = count($books);
         $page = max(1, (int) $request->input('page', 1));
         $offset = ($page - 1) * $perPage;
@@ -571,6 +526,16 @@ class BookApiController extends Controller
 
     private function getBookWithCover($book, $withCover = false, $inlineCovers = false)
     {
+        // Ensure $book is an array
+        if (!is_array($book)) {
+            \Log::error('getBookWithCover received non-array book data', [
+                'book_type' => gettype($book),
+                'book_value' => $book,
+                'backtrace' => debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 5)
+            ]);
+            return ['error' => 'Invalid book data'];
+        }
+
         $arr = $book;
         if ($withCover && !empty($book['coverImage']) && Storage::disk('books')->exists($book['coverImage'])) {
             if ($inlineCovers) {

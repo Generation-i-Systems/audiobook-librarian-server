@@ -41,7 +41,7 @@ class BenchmarkDatabasePerformance extends Command
         $driver = $this->argument('driver');
 
         if ($driver === 'all' || $driver === 'mongo') {
-            $this->mongoService = new MongoService(new Client(config('database.connections.mongodb.dsn')));
+            // $this->mongoService = new MongoService(new Client(config('database.connections.mongodb.dsn')));
         }
         if ($driver === 'all' || $driver === 'mysql') {
             $this->mySqlService = new MySqlService();

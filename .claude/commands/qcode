@@ -1,0 +1,6 @@
+Implement your plan and make sure your new tests pass.
+Always run tests to make sure you didn't break anything else.
+Always run `./gradlew ktlintCheck` on the newly created files to ensure standard formatting.
+Always run `./gradlew testDebugUnitTest` and `./gradlew build` to make sure tests and build passes.
+When applicable, run gradle commands on individual modules that have been updated rather than the entire project.
+If more than one module has been updated, run gradle commands for entire project.

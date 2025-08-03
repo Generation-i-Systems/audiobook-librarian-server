@@ -282,7 +282,7 @@ class BookController extends Controller
 
         // Get related books (same author or series)
         $result = $this->documentStoreService->listBooks(1, 100);
-        $allBooks = $result['data']->all();
+        $allBooks = $result['data'];
 
         $relatedBooks = array_filter($allBooks, function ($relatedBook) use ($book, $id) {
             // Skip the current book
