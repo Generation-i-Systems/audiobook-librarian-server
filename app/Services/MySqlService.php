@@ -622,9 +622,20 @@ class MySqlService implements DocumentStoreServiceInterface
 
     public function createUser(array $data)
     {
+        // Generate username from email if not provided (for Google auth, etc.)
+        $username = $data['username'] ?? explode('@', $data['email'])[0];
+        
+        // Ensure username is unique
+        $originalUsername = $username;
+        $counter = 1;
+        while (User::where('username', $username)->exists()) {
+            $username = $originalUsername . $counter;
+            $counter++;
+        }
+        
         return User::create([
             'name' => $data['name'],
-            'username' => $data['username'],
+            'username' => $username,
             'email' => $data['email'],
             'password' => $data['password'], // Hashed automatically by model cast
             'role' => $data['role'] ?? 'user',

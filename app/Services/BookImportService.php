@@ -281,7 +281,29 @@ class BookImportService
 
             $sourcePath = $audiobook['path'];
             $targetDir = $options['target_directory'] ?? $this->generateTargetDirectory($book, $bookStoragePath, $options);
-            $operation = $options['operation'] ?? 'copy'; // 'copy' or 'move'
+            $operation = $options['operation'] ?? 'copy'; // 'copy', 'move', or 'in_place'
+
+            // Check if source is already within book storage path (in-place import)
+            $realBookStoragePath = realpath($bookStoragePath);
+            $realSourcePath = realpath($sourcePath);
+            
+            if ($realBookStoragePath && $realSourcePath && 
+                strpos($realSourcePath, $realBookStoragePath) === 0) {
+                
+                // Files are already in the book storage path - use in-place import
+                $book->directory_path = $sourcePath;
+                $book->save();
+                
+                // Just flatten CD directories if needed, but don't move files
+                $this->flattenCdDirectories($sourcePath);
+                
+                Log::info("In-place import: Files already in book storage", [
+                    'source' => $sourcePath,
+                    'book_id' => $book->id
+                ]);
+                
+                return true;
+            }
 
             // Handle directory conflicts
             if (File::isDirectory($targetDir)) {
@@ -302,6 +324,10 @@ class BookImportService
             } else {
                 $this->copyDirectoryContents($sourcePath, $targetDir);
             }
+            
+            // Update book directory path to target location (only for move/copy operations)
+            $book->directory_path = $targetDir;
+            $book->save();
             
             return true;
 

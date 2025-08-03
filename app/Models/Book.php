@@ -80,6 +80,7 @@ class Book extends Model
     public function series()
     {
         return $this->belongsToMany(Series::class, 'book_series')
+            ->withPivot('series_number')
             ->withTimestamps();
     }
 

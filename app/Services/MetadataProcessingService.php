@@ -30,7 +30,38 @@ class MetadataProcessingService
         }
 
         try {
-            $result = $this->aiProcessor->extractMetadata($audiobook);
+            // Extract necessary data from audiobook array
+            $directoryPath = $audiobook['path'] ?? '';
+            $fileNames = array_map(function($file) {
+                return basename($file);
+            }, $audiobook['files'] ?? []);
+            
+            // Extract file tags if available
+            $fileTags = [];
+            if (!empty($audiobook['files'])) {
+                foreach ($audiobook['files'] as $file) {
+                    if (pathinfo($file, PATHINFO_EXTENSION) === 'm4b' || 
+                        pathinfo($file, PATHINFO_EXTENSION) === 'mp3') {
+                        $tags = $this->aiProcessor->extractFileTags($file);
+                        if (!empty($tags)) {
+                            $fileTags = array_merge($fileTags, $tags);
+                        }
+                    }
+                }
+            }
+            
+            // Check for NFO data
+            $nfoData = null;
+            if (!empty($audiobook['nfo_data'])) {
+                $nfoData = $audiobook['nfo_data'];
+            }
+            
+            $result = $this->aiProcessor->processBookDirectory(
+                $directoryPath,
+                $fileNames,
+                $fileTags,
+                $nfoData
+            );
             
             if ($result && isset($result['confidence']) && $result['confidence'] >= 70) {
                 return $this->postProcessAIResult($result, $audiobook);

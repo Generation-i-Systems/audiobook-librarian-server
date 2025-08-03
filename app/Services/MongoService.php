@@ -3,8 +3,8 @@
 namespace App\Services;
 
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Services\SafeLoggingService;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Log;
 use MongoDB\Client;
 use MongoDB\BSON\ObjectId;
 use MongoDB\BSON\UTCDateTime;
@@ -14,6 +14,7 @@ use MongoDB\BSON\Binary;
 use MongoDB\Model\BSONDocument;
 use MongoDB\Operation\FindOneAndUpdate;
 use RuntimeException;
+use Illuminate\Support\Facades\Log;
 
 class MongoService implements DocumentStoreServiceInterface
 {
@@ -24,51 +25,67 @@ class MongoService implements DocumentStoreServiceInterface
 
     public function __construct()
     {
-        // Only connect if we're actually configured to use MongoDB
-        if (config('documentstore.driver') !== 'mongodb') {
-            Log::warning("MongoService instantiated but documentstore.driver is set to: " . config('documentstore.driver'));
-            return; // Don't connect
-        }
-        
-        try {
-            $uri = config('mongodb.uri');
-            $dbName = config('mongodb.database');
-            
-            if (!$uri || !$dbName) {
-                throw new \RuntimeException("MongoDB configuration missing. Set MONGODB_URI and MONGODB_DB environment variables.");
-            }
-            
-            $this->client = new Client($uri);
-            $this->db = $this->client->$dbName;
-            // Attempt a simple operation to verify connection
-            $this->db->command(['ping' => 1]);
-            Log::info("Successfully connected to MongoDB: {$uri} / {$dbName}");
-        } catch (\Exception $e) {
-            Log::error("Failed to connect to MongoDB: " . $e->getMessage());
-            throw new \RuntimeException("Could not connect to MongoDB: " . $e->getMessage(), 0, $e);
-        }
+        // Constructor no longer connects directly. Connection is now on-demand in getCollection.
     }
 
     public function getCollection($name)
     {
-        Log::debug("MongoService: Attempting to get collection: {$name}");
+        // Only connect if we're actually configured to use MongoDB
+        if (config('documentstore.driver') !== 'mongodb') {
+            // This should ideally not be reached if DocumentStoreServiceProvider is correctly configured
+            // but as a fallback, throw an exception or log a critical error.
+            $caller = '';
+            $stackTrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 10);
+            foreach ($stackTrace as $trace) {
+                if (isset($trace['file']) && !str_contains($trace['file'], 'MongoService.php')) {
+                    $caller = ($trace['file'] ?? 'unknown') . ':' . ($trace['line'] ?? 'unknown');
+                    break;
+                }
+            }
+            SafeLoggingService::safeLog('warning', "MongoService: Attempted to get collection '{$name}' but documentstore.driver is not 'mongodb'. Called from: " . $caller);
+            // throw new \RuntimeException("MongoDB service not configured.");
+        }
+
+        // Connect on demand if not already connected
+        if (!$this->client || !$this->db) {
+            try {
+                $uri = config('mongodb.uri');
+                $dbName = config('mongodb.database');
+
+                if (!$uri || !$dbName) {
+                    throw new \RuntimeException("MongoDB configuration missing. Set MONGODB_URI and MONGODB_DB environment variables.");
+                }
+
+                $this->client = new Client($uri);
+                $this->db = $this->client->$dbName;
+                // Attempt a simple operation to verify connection
+                $this->db->command(['ping' => 1]);
+                SafeLoggingService::safeLog('info', "Successfully connected to MongoDB: {$uri} / {$dbName}");
+            } catch (\Exception $e) {
+                SafeLoggingService::safeLog('error', "Failed to connect to MongoDB: " . $e->getMessage());
+                throw new \RuntimeException("Could not connect to MongoDB: " . $e->getMessage(), 0, $e);
+            }
+        }
+
+        SafeLoggingService::safeLog('debug', "MongoService: Attempting to get collection: {$name}");
         if (!$this->db) {
-            Log::error("MongoService: $this->db is null or invalid when trying to get collection {$name}");
+            SafeLoggingService::safeLog('error', "MongoService: \$this->db is null or invalid when trying to get collection {$name}");
             throw new \RuntimeException("MongoDB database object is not initialized.");
         }
         try {
             $collection = $this->db->$name;
-            Log::debug("MongoService: Successfully retrieved collection: {$name}");
+            SafeLoggingService::safeLog('debug', "MongoService: Successfully retrieved collection: {$name}");
             return $collection;
         } catch (\Exception $e) {
-            Log::error("MongoService: Error getting collection {$name}: " . $e->getMessage() . "\n" . $e->getTraceAsString());
+            SafeLoggingService::safeLog('error', "MongoService: Error getting collection {$name}: " . $e->getMessage() . "\n" . $e->getTraceAsString());
             throw new \RuntimeException("Could not retrieve MongoDB collection {$name}: " . $e->getMessage(), 0, $e);
         }
     }
 
+
     /**
      * Get unique values for a specific field across all books
-     * 
+     *
      * @param string $field The field to get unique values for (e.g., 'genre', 'author')
      * @param string|null $subField Optional subfield for nested data (e.g., 'seriesName' when field is 'series')
      * @return array Array of unique values
@@ -78,26 +95,26 @@ class MongoService implements DocumentStoreServiceInterface
         try {
             $collection = $this->getCollection('books');
             $pipeline = [];
-            
+
             switch ($field) {
                 case 'author':
                     $pipeline = [
                         ['$unwind' => '$authors'],
                         ['$group' => ['_id' => '$authors.name']],
                         ['$sort' => ['_id' => 1]],
-                        ['$project' => ['_id' => 0, 'name' => '$_id']]
+                        ['$project' => ['_id' => 0, 'name' => '$_id']],
                     ];
                     break;
-                    
+
                 case 'genre':
                     $pipeline = [
                         ['$unwind' => '$genres'],
                         ['$group' => ['_id' => '$genres.name']],
                         ['$sort' => ['_id' => 1]],
-                        ['$project' => ['_id' => 0, 'name' => '$_id']]
+                        ['$project' => ['_id' => 0, 'name' => '$_id']],
                     ];
                     break;
-                    
+
                 case 'series':
                     if ($subField === 'seriesName') {
                         $pipeline = [
@@ -105,22 +122,22 @@ class MongoService implements DocumentStoreServiceInterface
                             ['$unwind' => '$series'],
                             ['$group' => ['_id' => '$series.seriesName']],
                             ['$sort' => ['_id' => 1]],
-                            ['$project' => ['_id' => 0, 'seriesName' => '$_id']]
+                            ['$project' => ['_id' => 0, 'seriesName' => '$_id']],
                         ];
                     } else {
                         return [];
                     }
                     break;
-                    
+
                 default:
                     return [];
             }
-            
+
             $cursor = $collection->aggregate($pipeline);
             $results = [];
-            
+
             foreach ($cursor as $doc) {
-                $doc = (array)$doc;
+                $doc = (array) $doc;
                 if ($field === 'series' && $subField === 'seriesName') {
                     if (isset($doc['seriesName'])) {
                         $results[] = $doc['seriesName'];
@@ -129,18 +146,18 @@ class MongoService implements DocumentStoreServiceInterface
                     $results[] = $doc['name'];
                 }
             }
-            
+
             return $results;
-            
+
         } catch (\Exception $e) {
             Log::error("Error getting unique values for field {$field}", [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
             return [];
         }
     }
-    
+
     // BOOKS
     /**
      * Autocomplete author names using MongoDB Atlas Search with fuzzy matching.
@@ -321,43 +338,43 @@ class MongoService implements DocumentStoreServiceInterface
     {
         $collection = $this->getCollection('books');
         Log::debug("MongoService: Querying collection: 'books'");
-        
+
         // Build query filters
         $query = [];
-        
+
         // Apply filters
         if (!empty($filters['author'])) {
             $query['author'] = new \MongoDB\BSON\Regex(preg_quote($filters['author']), 'i');
         }
-        
+
         if (!empty($filters['genre'])) {
             $query['genre'] = $filters['genre'];
         }
-        
+
         if (!empty($filters['series'])) {
             $query['series.seriesName'] = new \MongoDB\BSON\Regex(preg_quote($filters['series']), 'i');
         }
-        
+
         Log::debug("MongoService: Query filters: " . json_encode($query));
 
         // Count total matching documents
         $total = $collection->countDocuments($query);
         Log::debug("MongoService: Total documents found for query: {$total}");
-        
+
         // Calculate pagination
         $skip = ($page - 1) * $perPage;
         $lastPage = max(1, ceil($total / $perPage));
-        
+
         // Set up options for the query
         $options = [
             'sort' => ['title' => 1],
             'skip' => $skip,
             'limit' => $perPage,
         ];
-        
+
         // Execute query with pagination
         $cursor = $collection->find($query, $options);
-        
+
         // Convert documents to array
         $books = [];
         foreach ($cursor as $doc) {
@@ -365,23 +382,23 @@ class MongoService implements DocumentStoreServiceInterface
                 $doc = (array) $doc;
             }
             $doc['id'] = (string) $doc['_id'];
-            
+
             // Recursively normalize fields
             foreach (['author', 'series', 'genre'] as $field) {
                 if (isset($doc[$field])) {
                     $doc[$field] = $this->normalizeMongoValue($doc[$field]);
                 }
             }
-            
+
             // Load related data if requested
             if ($withRelated) {
                 $doc = $this->loadRelatedData($doc);
             }
-            
+
             $books[] = $doc;
         }
         Log::debug("MongoService: Number of books processed in loop: " . count($books));
-        
+
         return [
             'data' => $books,
             'total' => $total,
@@ -390,7 +407,7 @@ class MongoService implements DocumentStoreServiceInterface
             'last_page' => $lastPage,
         ];
     }
-    
+
     /**
      * Get recently added books
      *
@@ -403,42 +420,42 @@ class MongoService implements DocumentStoreServiceInterface
         try {
             $collection = $this->getCollection('books');
             $dateThreshold = new UTCDateTime((time() - ($days * 24 * 60 * 60)) * 1000);
-            
+
             $pipeline = [
                 [
                     '$match' => [
                         'created_at' => [
-                            '$gte' => $dateThreshold
-                        ]
-                    ]
+                            '$gte' => $dateThreshold,
+                        ],
+                    ],
                 ],
                 [
-                    '$sort' => ['created_at' => -1]
+                    '$sort' => ['created_at' => -1],
                 ],
                 [
-                    '$limit' => $limit
-                ]
+                    '$limit' => $limit,
+                ],
             ];
-            
+
             $cursor = $collection->aggregate($pipeline);
             $recentBooks = [];
-            
+
             foreach ($cursor as $doc) {
                 $book = $this->normalizeMongoValue($doc);
                 $book = $this->loadRelatedData($book);
                 $recentBooks[] = $book;
             }
-            
+
             return $recentBooks;
         } catch (\Exception $e) {
             Log::error('Error fetching recent books: ' . $e->getMessage());
             return [];
         }
     }
-    
+
     /**
      * Load related data for a book (authors, series, etc.)
-     * 
+     *
      * @param array $book
      * @return array
      */
@@ -446,21 +463,21 @@ class MongoService implements DocumentStoreServiceInterface
     {
         // Load full author objects if we only have author IDs
         if (isset($book['author_ids']) && is_array($book['author_ids'])) {
-            $authorIds = array_map(function($id) {
+            $authorIds = array_map(function ($id) {
                 return new \MongoDB\BSON\ObjectId($id);
             }, $book['author_ids']);
-            
+
             $authors = $this->getCollection('authors')->find([
-                '_id' => ['$in' => $authorIds]
+                '_id' => ['$in' => $authorIds],
             ]);
-            
+
             $book['authors'] = [];
             foreach ($authors as $author) {
                 $author = $this->normalizeMongoValue($author);
                 $book['authors'][] = $author;
             }
         }
-        
+
         // Ensure series is always an array of objects with seriesName
         if (isset($book['series'])) {
             if (is_string($book['series'])) {
@@ -468,11 +485,11 @@ class MongoService implements DocumentStoreServiceInterface
             } elseif (is_array($book['series']) && !empty($book['series'])) {
                 // Convert simple array of series names to array of objects
                 if (!isset($book['series'][0]) || !is_array($book['series'][0])) {
-                    $book['series'] = array_map(function($series) {
+                    $book['series'] = array_map(function ($series) {
                         return is_string($series) ? ['seriesName' => $series] : $series;
                     }, $book['series']);
                 }
-                
+
                 // Ensure seriesName is used instead of name
                 foreach ($book['series'] as &$series) {
                     if (is_array($series) && isset($series['name']) && !isset($series['seriesName'])) {
@@ -482,7 +499,7 @@ class MongoService implements DocumentStoreServiceInterface
                 }
             }
         }
-        
+
         return $book;
     }
     /** @inheritDoc */
@@ -1803,23 +1820,23 @@ class MongoService implements DocumentStoreServiceInterface
 
         try {
             $collection = $this->getCollection('books');
-            
+
             // Use aggregation to find genres that match the search term
             $pipeline = [
                 ['$unwind' => '$genre'],
                 [
                     '$match' => [
-                        'genre' => new \MongoDB\BSON\Regex($term, 'i')
-                    ]
+                        'genre' => new \MongoDB\BSON\Regex($term, 'i'),
+                    ],
                 ],
                 ['$group' => ['_id' => '$genre']],
                 ['$sort' => ['_id' => 1]],
-                ['$limit' => 20]
+                ['$limit' => 20],
             ];
 
             $cursor = $collection->aggregate($pipeline);
             $genres = [];
-            
+
             foreach ($cursor as $doc) {
                 $genres[] = $doc['_id'];
             }
