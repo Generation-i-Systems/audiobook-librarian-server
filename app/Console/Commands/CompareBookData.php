@@ -6,32 +6,57 @@ use App\Contracts\DocumentStoreServiceInterface;
 use App\Models\Book;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class CompareBookData extends Command
 {
-    protected $signature = 'app:compare-book-data {title?} 
-        {--id=} 
-        {--list : List all books in MySQL} 
+    protected $signature = 'app:compare-book-data {title?}
+        {--id=}
+        {--list : List all books in MySQL}
         {--all : Compare all fields including JSON data}';
     protected $description = 'Compare book data between MongoDB and MySQL';
 
     /** @var array */
     protected $fieldsToCompare = [
-        'title', 'subtitle', 'description', 'published_date', 'publisher',
-        'language', 'book_number', 'duration', 'runtime', 'audio_file_count',
-        'needs_review', 'needs_review_reasons', 'source', 'path', 'directory_path',
+        'title',
+        'subtitle',
+        'description',
+        'published_date',
+        'publisher',
+        'language',
+        'book_number',
+        'duration',
+        'runtime',
+        'audio_file_count',
+        'needs_review',
+        'needs_review_reasons',
+        'source',
+        'path',
+        'directory_path',
     ];
 
     /** @var array */
     protected $jsonFields = [
-        'mongo_record', 'file_tags', 'audible_info', 'google_books_info', 'hardcover_info', 'audiobook_bay_info',
+        'mongo_record',
+        'file_tags',
+        'audible_info',
+        'google_books_info',
+        'hardcover_info',
+        'audiobook_bay_info',
     ];
 
     public function __construct(
-        private DocumentStoreServiceInterface $mongoService
+        private DocumentStoreServiceInterface $documentStoreService
     ) {
         parent::__construct();
+        // Conditionally resolve MongoService only if MongoDB is the configured driver
+        if (config('documentstore.driver') === 'mongodb') {
+            Log::debug('CompareBookData: Instantiating MongoService in constructor (MongoDB driver is active)');
+            $this->documentStoreService = app(\App\Services\MongoService::class);
+        } else {
+            $this->documentStoreService = $documentStoreService;
+        }
     }
 
     public function handle()
@@ -69,7 +94,8 @@ class CompareBookData extends Command
         }
 
         // Get the corresponding MongoDB record
-        $mongoBook = $this->mongoService->getBook($mysqlBook->mongo_id);
+        // Use the resolved documentStoreService, which will be MongoService if configured
+        $mongoBook = $this->documentStoreService->getBook($mysqlBook->mongo_id);
 
         if (!$mongoBook) {
             $this->error("No MongoDB record found with ID: {$mysqlBook->mongo_id}");
@@ -139,49 +165,49 @@ class CompareBookData extends Command
         $this->info(sprintf("Genres: %d", $mysqlBook->genres()->count()));
         $this->info(sprintf("Series: %d", $mysqlBook->series()->count()));
     }
-    
+
     protected function formatValue($value)
     {
         if (is_null($value)) {
             return 'NULL';
         }
-        
+
         if (is_bool($value)) {
             return $value ? 'true' : 'false';
         }
-        
+
         if (is_array($value) || is_object($value)) {
             $json = json_encode($value, JSON_PRETTY_PRINT);
             return strlen($json) > 100 ? substr($json, 0, 100) . '...' : $json;
         }
-        
-        $stringValue = (string)$value;
+
+        $stringValue = (string) $value;
         return strlen($stringValue) > 100 ? substr($stringValue, 0, 100) . '...' : $stringValue;
     }
-    
+
     protected function valuesMatch($value1, $value2)
     {
         // Handle null cases
         if (is_null($value1) && is_null($value2)) {
             return true;
         }
-        
+
         if (is_null($value1) || is_null($value2)) {
             return false;
         }
-        
+
         // Compare JSON strings
         $json1 = $this->tryJsonDecode($value1);
         $json2 = $this->tryJsonDecode($value2);
-        
+
         if ($json1 !== null || $json2 !== null) {
             return $json1 == $json2;
         }
-        
+
         // Simple string comparison
-        return (string)$value1 === (string)$value2;
+        return (string) $value1 === (string) $value2;
     }
-    
+
     protected function tryJsonDecode($value)
     {
         if (is_string($value)) {

@@ -139,6 +139,13 @@ return [
             'level' => 'info',
             'days' => 365, // Keep audit logs for a year
         ],
+        
+        // Safe fallback channel that won't cause infinite loops
+        'safe_fallback' => [
+            'driver' => 'stack',
+            'channels' => ['stderr', 'null'],
+            'ignore_exceptions' => true,
+        ],
 
     ],
 

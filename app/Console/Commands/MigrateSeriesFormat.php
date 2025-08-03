@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 
 class MigrateSeriesFormat extends Command
 {
@@ -71,6 +72,11 @@ class MigrateSeriesFormat extends Command
 
     protected function updateMongoDB()
     {
+        if (config('documentstore.driver') !== 'mongodb') {
+            Log::info('Skipping MongoDB migration: documentstore.driver is not set to mongodb.');
+            return;
+        }
+        Log::debug('MigrateSeriesFormat: Instantiating MongoService');
         $mongoService = app(\App\Services\MongoService::class);
         $books = $mongoService->listBooks(); // Get all books
         $count = 0;

@@ -4,6 +4,8 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Services\MongoService;
+use App\Contracts\DocumentStoreServiceInterface;
+use Illuminate\Support\Facades\Log;
 
 class MongoTestCommand extends Command
 {
@@ -13,18 +15,21 @@ class MongoTestCommand extends Command
      * @var string
      */
     protected $signature = 'mongo:test';
+    protected DocumentStoreServiceInterface $mongoService;
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
-    protected $description = 'Test MongoDB integration: insert a record into books and count records.';
+    public function __construct(DocumentStoreServiceInterface $mongoService)
+    {
+        parent::__construct();
+        $this->mongoService = $mongoService;
+    }
 
     public function handle()
     {
-        $mongo = new MongoService();
-        $collection = $mongo->getCollection('books');
+        Log::debug('MongoTestCommand: handle() method started.');
+        $this->error('MongoTestCommand is currently disabled.');
+        $this->info('This command can be re-enabled when MongoDB testing is needed.');
+        return 1;
+        $collection = $this->mongoService->getCollection('books');
 
         $testBook = [
             '_id' => uniqid('test_', true),

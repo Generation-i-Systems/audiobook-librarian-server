@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Services\MongoService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 
 class FirestoreBooksDump extends Command
 {
@@ -34,12 +35,15 @@ class FirestoreBooksDump extends Command
     public function __construct(DocumentStoreServiceInterface $documentStoreService, MongoService $mongoService)
     {
         parent::__construct();
+
         $this->documentStoreService = $documentStoreService;
-        $this->mongoService = $mongoService;
     }
 
     public function handle()
     {
+        Log::debug('FirestoreBooksDump: Instantiating MongoService in constructor');
+        $this->mongoService = app(MongoService::class);
+
         $collectionName = $this->option('collection') ?: 'books';
         $oneByOne = $this->option('one-by-one') ? true : false;
         $output = $this->option('output');
@@ -56,6 +60,10 @@ class FirestoreBooksDump extends Command
                 return $doc;
             }, $docs);
             if ($this->option('import-to-mongo')) {
+                if (!$this->mongoService) {
+                    $this->error('MongoDB service is not configured. Cannot import to MongoDB.');
+                    return 1;
+                }
                 $collection = $this->mongoService->getCollection($collectionName);
                 $inserted = 0;
                 $errors = 0;
@@ -96,6 +104,10 @@ class FirestoreBooksDump extends Command
                 }
             }
         } elseif ($direction === 'mongo-to-firestore') {
+            if (!$this->mongoService) {
+                $this->error('MongoDB service is not configured. Cannot migrate from MongoDB.');
+                return 1;
+            }
             $collection = $this->mongoService->getCollection($collectionName);
             $docs = $collection->find()->toArray();
             $docs = array_map(function ($doc) {

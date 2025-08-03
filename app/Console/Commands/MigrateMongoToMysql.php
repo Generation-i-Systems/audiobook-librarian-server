@@ -10,6 +10,7 @@ use App\Models\Genre;
 use App\Models\Narrator;
 use App\Models\Series;
 use App\Services\MySqlService;
+use App\Services\MongoService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -32,6 +33,7 @@ class MigrateMongoToMysql extends Command
     protected $description = 'Migrate data from MongoDB to MySQL (creates a database backup by default, with optional data fixing)';
 
     protected MySqlService $mysqlService;
+    protected MongoService $mongoService;
     protected $processedBooks = 0;
     protected $bookLimit = 0;
     protected int $mergedAuthorCount = 0;
@@ -57,13 +59,38 @@ class MigrateMongoToMysql extends Command
         }
 
         // Explicitly resolve MongoService here to ensure we always use it for MongoDB operations
+        Log::debug('MigrateMongoToMysql: Instantiating MongoService');
         $this->mongoService = app(\App\Services\MongoService::class);
 
         $this->info('Starting data migration from MongoDB to MySQL...');
 
-        Log::debug("MigrateMongoToMysql: Before truncateTables()");
-        $this->truncateTables();
-        Log::debug("MigrateMongoToMysql: After truncateTables()");
+        // Get book counts before any truncation
+        $mongoBookCount = $this->mongoService->dumpAllBooks()['total'];
+        $mysqlBookCount = Book::count();
+
+        Log::debug("MigrateMongoToMysql: MongoDB book count: {$mongoBookCount}");
+        Log::debug("MigrateMongoToMysql: MySQL book count: {$mysqlBookCount}");
+
+        $shouldTruncate = false;
+        if ($mongoBookCount === $mysqlBookCount) {
+            $this->info("MongoDB and MySQL book counts match ({$mongoBookCount} records). Proceeding with truncation.");
+            $shouldTruncate = true;
+        } else {
+            $this->warn("MongoDB has {$mongoBookCount} books, while MySQL has {$mysqlBookCount} books.");
+            if ($this->confirm('Do you want to wipe the MySQL database before migrating? (Default: No, will add records without deleting old ones)')) {
+                $shouldTruncate = true;
+            } else {
+                $this->info('Skipping database wipe. Existing MySQL records will be kept and new records will be added/updated.');
+            }
+        }
+
+        if ($shouldTruncate) {
+            Log::debug("MigrateMongoToMysql: Before truncateTables()");
+            $this->truncateTables();
+            Log::debug("MigrateMongoToMysql: After truncateTables()");
+        } else {
+            Log::debug("MigrateMongoToMysql: Skipping truncateTables() as per user confirmation.");
+        }
 
         try {
             $this->info("Migrating users...");
@@ -355,7 +382,8 @@ class MigrateMongoToMysql extends Command
         // Remove duplicates while preserving original case in the map
         $uniqueAuthors = [];
         foreach (array_unique($authorNames) as $name) {
-            if (empty($name)) continue;
+            if (empty($name))
+                continue;
             $uniqueAuthors[$name] = $name; // Use normalized name as key, original as value
         }
 
@@ -633,27 +661,27 @@ class MigrateMongoToMysql extends Command
             'file_tags' => !empty($mongoBook['fileTags'])
                 ? (is_string($mongoBook['fileTags'])
                     ? $mongoBook['fileTags']
-                    : json_encode((array)$mongoBook['fileTags']))
+                    : json_encode((array) $mongoBook['fileTags']))
                 : null,
             'audible_info' => !empty($mongoBook['audible'])
                 ? (is_string($mongoBook['audible'])
                     ? $mongoBook['audible']
-                    : json_encode((array)$mongoBook['audible']))
+                    : json_encode((array) $mongoBook['audible']))
                 : null,
             'google_books_info' => !empty($mongoBook['googleBooks'])
                 ? (is_string($mongoBook['googleBooks'])
                     ? $mongoBook['googleBooks']
-                    : json_encode((array)$mongoBook['googleBooks']))
+                    : json_encode((array) $mongoBook['googleBooks']))
                 : null,
             'hardcover_info' => !empty($mongoBook['hardcover'])
                 ? (is_string($mongoBook['hardcover'])
                     ? $mongoBook['hardcover']
-                    : json_encode((array)$mongoBook['hardcover']))
+                    : json_encode((array) $mongoBook['hardcover']))
                 : null,
             'audiobook_bay_info' => !empty($mongoBook['audiobookBay'])
                 ? (is_string($mongoBook['audiobookBay'])
                     ? $mongoBook['audiobookBay']
-                    : json_encode((array)$mongoBook['audiobookBay']))
+                    : json_encode((array) $mongoBook['audiobookBay']))
                 : null,
 
             // Timestamps - handle both string and Carbon instances
@@ -805,7 +833,7 @@ class MigrateMongoToMysql extends Command
         $cleanedTitle = $title;
 
         if (preg_match('/^(\d+)[\s\-]* (.*)$/', $title, $matches)) {
-            $extractedNumber = (int)$matches[1];
+            $extractedNumber = (int) $matches[1];
             $remainingTitle = $matches[2];
 
             // Simple heuristic: if it's a small number and not a year
@@ -889,7 +917,7 @@ class MigrateMongoToMysql extends Command
         // If the coverImagePath is just a filename, check if it needs directoryPath prefix
         $baseFileName = basename($coverImagePath);
         $coverWithoutDir = rtrim($directoryPath, '/') . '/' . $baseFileName;
-        
+
         // Check if file exists with directoryPath prefix
         if (Storage::disk('books')->exists($coverWithoutDir)) {
             return $coverWithoutDir;
@@ -1071,8 +1099,7 @@ class MigrateMongoToMysql extends Command
                         foreach ($extraAuthors as $narrator) {
                             $this->info("  + " . $narrator);
                         }
-                    }
-                    else {
+                    } else {
                         $this->info("  (Too many extra narrators to list: " . count($extraAuthors) . ")");
                     }
                 }

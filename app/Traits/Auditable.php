@@ -3,9 +3,9 @@
 namespace App\Traits;
 
 use App\Models\Audit;
+use App\Services\SafeLoggingService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 
 trait Auditable
 {
@@ -56,8 +56,9 @@ trait Auditable
             'tags' => null, // You can add custom tags here if needed
         ]);
 
-        // Record to redundant changelog file
-        Log::channel('audit_trail')->info(
+        // Record to redundant changelog file using safe logging to prevent infinite loops
+        SafeLoggingService::safeLog(
+            'info',
             "Audit Trail: User [{$userId}] {$event} {$auditableType} [{$auditableId}]",
             [
                 'old_values' => $filteredOldValues,
@@ -65,7 +66,8 @@ trait Auditable
                 'url' => request()->fullUrl(),
                 'ip_address' => request()->ip(),
                 'user_agent' => request()->header('User-Agent'),
-            ]
+            ],
+            'audit_trail'
         );
     }
 
