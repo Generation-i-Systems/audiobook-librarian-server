@@ -4,11 +4,10 @@ namespace App\Console\Commands;
 
 use App\Auth\DocumentstoreUser;
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Route;
-use Symfony\Component\Console\Helper\Table;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class ApiServiceClient extends Command
 {
@@ -169,11 +168,15 @@ class ApiServiceClient extends Command
      */
     protected function makeApiCall(string $uri, string $method, ?string $data, DocumentstoreUser $user): array
     {
-        // Set up authentication
-        Auth::setUser($user);
+        // Generate a temporary Sanctum token for API authentication
+        $userData = $user->getRawUser();
+        $tempToken = $this->generateTempToken($userData);
 
         // Create a request object
         $request = Request::create($uri, $method);
+
+        // Set the Authorization header with Bearer token
+        $request->headers->set('Authorization', 'Bearer ' . $tempToken);
 
         // Add JSON data if provided
         if ($data && in_array($method, ['POST', 'PUT', 'PATCH'])) {
@@ -185,11 +188,6 @@ class ApiServiceClient extends Command
             $request->headers->set('Content-Type', 'application/json');
         }
 
-        // Set the authenticated user in the request
-        $request->setUserResolver(function () use ($user) {
-            return $user;
-        });
-
         // Dispatch the request through Laravel's router
         $response = app()->handle($request);
 
@@ -199,6 +197,9 @@ class ApiServiceClient extends Command
 
         // Try to decode JSON response
         $jsonResponse = json_decode($content, true);
+
+        // Clean up the temporary token after the request
+        $this->cleanupTempToken($tempToken);
 
         return [
             'status_code' => $statusCode,
@@ -293,5 +294,44 @@ class ApiServiceClient extends Command
         $line = preg_replace('/([{}\[\]])/', '<fg=white>$1</>', $line);
 
         return $line;
+    }
+
+    /**
+     * Generate a temporary Sanctum token for API authentication
+     *
+     * @param array $userData
+     * @return string
+     */
+    protected function generateTempToken(array $userData): string
+    {
+        // Create or find a User model instance to generate the token
+        $user = User::firstOrCreate(
+            ['id' => $userData['id']],
+            [
+                'name' => $userData['name'] ?? 'API User',
+                'email' => $userData['email'] ?? 'api@example.com',
+                'role' => $userData['role'] ?? 'user',
+                'password' => bcrypt('temp-password'), // Temporary password
+            ]
+        );
+
+        // Generate a temporary token
+        $token = $user->createToken('api-service-client-temp', ['*'], now()->addMinutes(5));
+
+        return $token->plainTextToken;
+    }
+
+    /**
+     * Clean up the temporary token after use
+     *
+     * @param string $plainTextToken
+     * @return void
+     */
+    protected function cleanupTempToken(string $plainTextToken): void
+    {
+        $hashedToken = hash('sha256', $plainTextToken);
+        PersonalAccessToken::where('token', $hashedToken)
+            ->where('name', 'api-service-client-temp')
+            ->delete();
     }
 }
