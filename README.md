@@ -493,6 +493,32 @@ php artisan api:client "/api/v1/books" --no-color
 - `--data=JSON`: JSON data for POST/PUT/PATCH requests
 - `--no-color`: Disable colored JSON output
 
+### Database Backup and Restore
+
+The project includes automated MySQL backup and restore scripts:
+
+```bash
+# Create a database backup
+./scripts/backup-mysql.sh
+
+# Restore from a backup file
+./scripts/restore-mysql-backup.sh /path/to/backup_file.sql.gz
+```
+
+**Backup Features:**
+- Includes field names in SQL dumps (`--complete-insert`) for schema compatibility
+- Single-row inserts (`--extended-insert=FALSE`) for better readability
+- Automatic compression with gzip
+- Integrity verification after backup
+- Automatic cleanup of backups older than 30 days
+- Comprehensive logging
+
+**Restore Features:**
+- Automatic confirmation skip if both `users` and `books` tables are empty
+- Validation of backup file format (.sql.gz)
+- Database credential extraction from .env file
+- Error handling for missing tables or connection issues
+
 ## Documentation
 
 - [Book Parser Documentation](./docs/book-parser.md) - Detailed guide on using the book parser

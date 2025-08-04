@@ -56,12 +56,29 @@ echo "User: $DB_USERNAME"
 echo "Host: $DB_HOST"
 echo "Port: ${DB_PORT:-3306} (defaulting to 3306 if not set)"
 
-# --- Confirm with User ---
-read -p "This will overwrite the '$DB_DATABASE' database. Are you sure you want to continue? (y/N): " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Restore cancelled by user."
-    exit 0
+# --- Check if tables are empty to skip confirmation ---
+echo "Checking if database tables are empty..."
+
+# Check if users table exists and is empty
+USERS_COUNT=$(mysql -h "$DB_HOST" -P "${DB_PORT:-3306}" -u "$DB_USERNAME" -p"$DB_PASSWORD" "$DB_DATABASE" -se "SELECT COUNT(*) FROM users" 2>/dev/null || echo "0")
+
+# Check if books table exists and is empty
+BOOKS_COUNT=$(mysql -h "$DB_HOST" -P "${DB_PORT:-3306}" -u "$DB_USERNAME" -p"$DB_PASSWORD" "$DB_DATABASE" -se "SELECT COUNT(*) FROM books" 2>/dev/null || echo "0")
+
+echo "Users table count: $USERS_COUNT"
+echo "Books table count: $BOOKS_COUNT"
+
+# Skip confirmation if both tables are empty
+if [ "$USERS_COUNT" -eq 0 ] && [ "$BOOKS_COUNT" -eq 0 ]; then
+    echo "Both users and books tables are empty. Proceeding with restore without confirmation."
+else
+    # --- Confirm with User ---
+    read -p "This will overwrite the '$DB_DATABASE' database. Are you sure you want to continue? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Restore cancelled by user."
+        exit 0
+    fi
 fi
 
 # --- Perform Restore ---

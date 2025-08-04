@@ -8,6 +8,12 @@
   - Colored JSON output with syntax highlighting
   - Comprehensive error handling and validation
   - Full test coverage with 11 test cases
+- Enhanced database backup and restore scripts
+  - Backup script now includes field names (`--complete-insert`) for schema compatibility
+  - Backup script uses single-row inserts (`--extended-insert=FALSE`) for better readability
+  - Restore script automatically skips confirmation if both `users` and `books` tables are empty
+  - Improved error handling for missing tables during restore checks
+  - Full test coverage with 14 test cases for script validation
 - MongoDB to MySQL migration for series data with pivot table support
   - Added `series_number` field to `book_series` pivot table
   - Updated `Book` and `Series` models to use `BelongsToMany` relationship

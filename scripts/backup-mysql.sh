@@ -47,6 +47,8 @@ mysqldump -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USERNAME" -p"$DB_PASSWORD" \
     --triggers \
     --events \
     --add-drop-database \
+    --complete-insert \
+    --extended-insert=FALSE \
     --databases "$DB_DATABASE" > "$BACKUP_FILE"
 
 # Check if backup was successful
