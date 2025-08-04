@@ -191,35 +191,37 @@ class MySqlService implements DocumentStoreServiceInterface
         string $sort = 'title',
         string $order = 'asc'
     ): array {
-        // Aggressive memory protection - limit to 50 max
-        $perPage = min($perPage, 50);
-        // Start building the query
+        // Limit perPage to a reasonable maximum to prevent memory issues
+        $perPage = min($perPage, 100);
+        
+        // Validate order direction
+        $order = in_array(strtolower($order), ['asc', 'desc']) ? strtolower($order) : 'asc';
+
         $query = Book::query();
 
-        // Minimal eager loading to prevent memory exhaustion
-        if ($withRelated) {
-            // Only load absolutely essential data - no pivot tables
-            $query->with([
-                'authors' => function($q) { $q->select('id', 'name')->limit(2); },
-                'genres' => function($q) { $q->select('id', 'name')->limit(1); }
-            ]);
-            // Skip series and narrators entirely for memory conservation
-        }
+        // Eager load all relationships required by the OpenAPI spec
+        $query->with([
+            'authors' => function ($q) {
+                $q->select('authors.id', 'authors.name');
+            },
+            'narrators' => function ($q) {
+                $q->select('narrators.id', 'narrators.name');
+            },
+            'genres' => function ($q) {
+                $q->select('genres.id', 'genres.name');
+            },
+            'series' => function ($q) {
+                $q->select('series.id', 'series.name')->withPivot('series_number');
+            },
+        ]);
 
-        // Apply filters if provided
+        // Apply filters
         if (!empty($filters['search'])) {
             $searchTerm = $filters['search'];
-            
-            // Optimize search by prioritizing direct book fields first
             $query->where(function ($q) use ($searchTerm) {
-                // Search in book title first (most common and fastest)
                 $q->where('title', 'like', '%' . $searchTerm . '%')
-                  // Search in book description
-                  ->orWhere('description', 'like', '%' . $searchTerm . '%');
-                  
-                // Only search relationships if the search term looks like a name (has spaces or is longer)
-                if (strlen($searchTerm) > 2) {
-                    $q->orWhereHas('authors', function ($authorQuery) use ($searchTerm) {
+                    ->orWhere('description', 'like', '%' . $searchTerm . '%')
+                    ->orWhereHas('authors', function ($authorQuery) use ($searchTerm) {
                         $authorQuery->where('name', 'like', '%' . $searchTerm . '%');
                     })
                     ->orWhereHas('narrators', function ($narratorQuery) use ($searchTerm) {
@@ -228,8 +230,11 @@ class MySqlService implements DocumentStoreServiceInterface
                     ->orWhereHas('series', function ($seriesQuery) use ($searchTerm) {
                         $seriesQuery->where('name', 'like', '%' . $searchTerm . '%');
                     });
-                }
             });
+        }
+
+        if (!empty($filters['title'])) {
+            $query->where('title', 'like', '%' . $filters['title'] . '%');
         }
 
         if (!empty($filters['author'])) {
@@ -250,10 +255,17 @@ class MySqlService implements DocumentStoreServiceInterface
             });
         }
 
+        if (!empty($filters['publication_date'])) {
+            $query->whereYear('release_date', $filters['publication_date']);
+        }
+
+        if (!empty($filters['date_added'])) {
+            $query->whereDate('created_at', $filters['date_added']);
+        }
+
         // Apply sorting
         switch ($sort) {
             case 'author':
-                // Simplified author sorting to avoid memory issues with large datasets
                 $query->leftJoin('author_book', 'books.id', '=', 'author_book.book_id')
                     ->leftJoin('authors', 'author_book.author_id', '=', 'authors.id')
                     ->orderBy('authors.name', $order)
@@ -273,64 +285,62 @@ class MySqlService implements DocumentStoreServiceInterface
                 break;
         }
 
-        // Get the total count before pagination (without eager loading to save memory)
-        $countQuery = clone $query;
-        // Remove eager loading from count query to save memory
-        $countQuery->setEagerLoads([]);
-        $total = $countQuery->count('books.id'); // Count only the books table
+        // Get total count before pagination
+        $total = $query->count();
 
         // Apply pagination
-        $query->skip(($page - 1) * $perPage)
-            ->take($perPage);
+        $books = $query->skip(($page - 1) * $perPage)
+            ->take($perPage)
+            ->get();
 
-        // Execute the query with limited results
-        $books = $query->get();
-
-        // Minimal data transformation to reduce memory usage
-        $transformedData = [];
-        foreach ($books as $book) {
-            // Only include essential fields for the index view
-            $camelCasedBook = [
-                'id' => $book->id,
-                'title' => $book->title ?? 'Untitled',
-                'coverImage' => $book->cover_image,
-                'directoryPath' => $book->directory_path,
-            ];
-
-            // Handle only essential relationships with minimal processing
-            if ($book->relationLoaded('authors') && $book->authors->isNotEmpty()) {
-                $camelCasedBook['author'] = $book->authors->pluck('name')->take(3)->toArray(); // Limit to 3 authors
-            } else {
-                $camelCasedBook['author'] = ['Unknown'];
+        // Transform data to match OpenAPI Book schema
+        $transformedData = $books->map(function ($book) {
+            $coverUrl = null;
+            if ($book->cover_image) {
+                // Assuming cover_image is a path relative to storage/app/public/covers
+                // and we want an API endpoint like /api/v1/books/{id}/cover
+                $coverUrl = url('/api/v1/books/' . $book->id . '/cover');
             }
 
-            if ($book->relationLoaded('genres') && $book->genres->isNotEmpty()) {
-                $camelCasedBook['genre'] = $book->genres->pluck('name')->take(2)->toArray(); // Limit to 2 genres
-            } else {
-                $camelCasedBook['genre'] = ['Unknown'];
+            $durationFormatted = null;
+            if ($book->duration) {
+                // Assuming duration is stored in seconds
+                $durationFormatted = gmdate("H:i:s", $book->duration);
             }
 
-            // Simplified series handling
-            if ($book->relationLoaded('series') && $book->series->isNotEmpty()) {
+            $seriesName = null;
+            $seriesNumber = null;
+            if ($book->series->isNotEmpty()) {
                 $firstSeries = $book->series->first();
-                $camelCasedBook['series'] = [[
-                    'seriesName' => $firstSeries->name ?? '',
-                    'number' => $firstSeries->pivot->number ?? ''
-                ]];
-            } else {
-                $camelCasedBook['series'] = [];
+                $seriesName = $firstSeries->name;
+                $seriesNumber = $firstSeries->pivot->series_number;
             }
 
-            $transformedData[] = $camelCasedBook;
-        }
+            return [
+                'id' => $book->id,
+                'title' => $book->title,
+                'author' => $book->authors->pluck('name')->toArray(),
+                'narrator' => $book->narrators->pluck('name')->toArray(),
+                'series' => $seriesName,
+                'series_number' => $seriesNumber,
+                'genre' => $book->genres->pluck('name')->toArray(), // OpenAPI spec shows string, but array is more flexible
+                'year' => $book->release_date ? (int) date('Y', strtotime($book->release_date)) : null,
+                'duration' => $durationFormatted,
+                'description' => $book->description,
+                'cover_url' => $coverUrl,
+                'file_count' => $book->audio_file_count,
+                'total_size' => $book->total_size,
+                'created_at' => $book->created_at ? $book->created_at->toIso8601String() : null,
+                'updated_at' => $book->updated_at ? $book->updated_at->toIso8601String() : null,
+            ];
+        })->toArray();
 
-        // Return paginated results in the expected format
         return [
             'data' => $transformedData,
             'total' => $total,
-            'perPage' => $perPage,
-            'currentPage' => $page,
-            'lastPage' => max(1, ceil($total / $perPage)),
+            'per_page' => $perPage,
+            'current_page' => $page,
+            'last_page' => max(1, ceil($total / $perPage)),
         ];
     }
 
@@ -354,16 +364,62 @@ class MySqlService implements DocumentStoreServiceInterface
 
             // Minimal query with only essential fields and limited relationships
             return Book::query()
-                ->select('id', 'title', 'cover_image', 'directory_path', 'created_at')
+                ->select('id', 'title', 'cover_image', 'directory_path', 'created_at', 'description', 'duration', 'release_date', 'audio_file_count', 'total_size')
                 ->with([
-                    'authors' => function($q) { $q->select('id', 'name')->limit(1); },
-                    'genres' => function($q) { $q->select('id', 'name')->limit(1); }
+                    'authors' => function ($q) {
+                        $q->select('id', 'name');
+                    },
+                    'genres' => function ($q) {
+                        $q->select('id', 'name');
+                    },
+                    'narrators' => function ($q) {
+                        $q->select('id', 'name');
+                    },
+                    'series' => function ($q) {
+                        $q->select('id', 'name')->withPivot('series_number');
+                    },
                 ])
                 ->where('created_at', '>=', $dateThreshold)
                 ->orderBy('created_at', 'desc')
                 ->limit($limit)
                 ->get()
-                ->toArray();
+                ->map(function ($book) {
+                    $coverUrl = null;
+                    if ($book->cover_image) {
+                        $coverUrl = url('/api/v1/books/' . $book->id . '/cover');
+                    }
+
+                    $durationFormatted = null;
+                    if ($book->duration) {
+                        $durationFormatted = gmdate("H:i:s", $book->duration);
+                    }
+
+                    $seriesName = null;
+                    $seriesNumber = null;
+                    if ($book->series->isNotEmpty()) {
+                        $firstSeries = $book->series->first();
+                        $seriesName = $firstSeries->name;
+                        $seriesNumber = $firstSeries->pivot->series_number;
+                    }
+
+                    return [
+                        'id' => $book->id,
+                        'title' => $book->title,
+                        'author' => $book->authors->pluck('name')->toArray(),
+                        'narrator' => $book->narrators->pluck('name')->toArray(),
+                        'series' => $seriesName,
+                        'series_number' => $seriesNumber,
+                        'genre' => $book->genres->pluck('name')->toArray(),
+                        'year' => $book->release_date ? (int) date('Y', strtotime($book->release_date)) : null,
+                        'duration' => $durationFormatted,
+                        'description' => $book->description,
+                        'cover_url' => $coverUrl,
+                        'file_count' => $book->audio_file_count,
+                        'total_size' => $book->total_size,
+                        'created_at' => $book->created_at ? $book->created_at->toIso8601String() : null,
+                        'updated_at' => $book->updated_at ? $book->updated_at->toIso8601String() : null,
+                    ];
+                })->toArray();
         } catch (\Exception $e) {
             // Log the error and return an empty array as fallback
             Log::error('Error fetching recent books: ' . $e->getMessage());
@@ -420,6 +476,9 @@ class MySqlService implements DocumentStoreServiceInterface
         int $limit = 20,
         ?string $startAfter = null
     ): array {
+        // Validate order direction
+        $direction = in_array(strtolower($direction), ['asc', 'desc']) ? strtolower($direction) : 'asc';
+        
         $query = Book::where('series_id', $seriesId)
             ->with(['authors', 'narrators', 'genres', 'series'])
             ->orderBy($orderBy, $direction);
@@ -579,6 +638,8 @@ class MySqlService implements DocumentStoreServiceInterface
         int $limit = 20,
         ?string $startAfter = null
     ): array {
+        // Validate order direction
+        $direction = in_array(strtolower($direction), ['asc', 'desc']) ? strtolower($direction) : 'asc';
         $query = Book::whereHas('authors', function ($q) use ($author) {
             $q->where('name', $author);
         })->whereHas('genres', function ($q) use ($genre) {

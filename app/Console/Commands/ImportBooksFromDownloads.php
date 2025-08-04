@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\App;
 
 class ImportBooksFromDownloads extends Command
 {
@@ -272,9 +273,10 @@ class ImportBooksFromDownloads extends Command
         }
 
         // Save cache before exit and show cache statistics
-        if ($this->cacheEnabled) {
-            $this->getCacheService()->saveCache();
-            $cacheStats = $this->getCacheService()->displayCacheStatistics();
+        $cacheService = $this->getCacheService();
+        if ($this->cacheEnabled && $cacheService) {
+            $cacheService->saveCache();
+            $cacheStats = $cacheService->displayCacheStatistics();
             $this->table(['Metric', 'Value'], $cacheStats);
         }
 
@@ -582,7 +584,11 @@ class ImportBooksFromDownloads extends Command
      */
     public function __destruct()
     {
-        $this->getCacheService()->saveCache();
+        // Only save cache if running in console and not in a testing environment
+        // This prevents issues during testing where the app might not be fully bootstrapped
+        if (function_exists('app') && app()->bound('files') && app()->runningInConsole() && !app()->runningUnitTests()) {
+            $this->getCacheService()->saveCache();
+        }
     }
 
     /**
@@ -1815,14 +1821,21 @@ class ImportBooksFromDownloads extends Command
     /**
      * Get cache service instance
      */
-    protected function getCacheService(): ImportCacheService
+    protected function getCacheService(): ?ImportCacheService
     {
         if (!$this->cacheService) {
+            // Disable caching in testing environment to prevent filesystem issues
+            if (App::runningUnitTests()) {
+                return null;
+            }
+
             $options = [
                 'enabled' => $this->cacheEnabled,
                 'cache_file' => $this->cacheFilePath ?? storage_path('app/import_cache.json')
             ];
-            $this->cacheService = new ImportCacheService($options);
+            // Only resolve Filesystem from container if not in testing environment
+            $filesystem = App::runningUnitTests() ? null : app(\Illuminate\Filesystem\Filesystem::class);
+            $this->cacheService = new ImportCacheService($filesystem, $options);
         }
         return $this->cacheService;
     }

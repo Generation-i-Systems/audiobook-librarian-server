@@ -74,7 +74,7 @@ class BookApiController extends Controller
 
     public function index(Request $request)
     {
-        $perPage = $request->input('per_page', 20);
+        $perPage = $request->input('per_page', 15);
         $page = (int) $request->input('page', 1);
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
@@ -90,37 +90,87 @@ class BookApiController extends Controller
         ];
 
         $booksData = $this->documentStoreService->listBooks($page, $perPage, $filters);
-        $books = $booksData['data'];
-        $total = $booksData['total'];
 
-        // Transform books to include cover URLs and other necessary fields
-        $books = array_map(function ($book) use ($withCover, $inlineCovers) {
-            return $this->getBookWithCover($book, $withCover, $inlineCovers);
-        }, $books);
+        // Transform books to match OpenAPI spec
+        $transformedBooks = [];
+        if (isset($booksData['data']) && is_array($booksData['data'])) {
+            $transformedBooks = array_map(function ($book) use ($withCover, $inlineCovers) {
+                return $this->getBookWithCover($book, $withCover, $inlineCovers);
+            }, array_filter($booksData['data'], 'is_array'));
+        }
 
         return response()->json([
-            'data' => $books,
-            'total' => $total,
-            'per_page' => $perPage,
-            'current_page' => $page,
+            'data' => $transformedBooks,
+            'meta' => [
+                'current_page' => $booksData['currentPage'] ?? $page,
+                'from' => ($booksData['total'] > 0) ? (($page - 1) * $perPage) + 1 : null,
+                'last_page' => $booksData['lastPage'] ?? max(1, ceil(($booksData['total'] ?? 0) / $perPage)),
+                'per_page' => $perPage,
+                'to' => ($booksData['total'] > 0) ? min($page * $perPage, $booksData['total']) : null,
+                'total' => $booksData['total'] ?? 0,
+            ]
         ]);
     }
+
 
     public function show($id, Request $request)
     {
         $book = $this->documentStoreService->getBook($id);
+
         if (!$book) {
             return response()->json([
-                'error' => 'Book not found or not authorized.',
+                'error' => 'Book not found',
+                'message' => 'The specified book could not be found'
             ], 404);
         }
+
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
 
-        return response()->json(
-            $this->getBookWithCover($book, $withCover, $inlineCovers)
-        );
+        // Transform book to match OpenAPI spec format
+        return response()->json($this->getBookWithCover($book, $withCover, $inlineCovers));
     }
+
+    public function cover($id)
+    {
+        $book = $this->documentStoreService->getBook($id);
+
+        if (!$book) {
+            return response()->json([
+                'error' => 'Book not found',
+                'message' => 'The specified book could not be found'
+            ], 404);
+        }
+
+        if (empty($book['coverImage'])) {
+            return response()->json([
+                'error' => 'Cover not found',
+                'message' => 'No cover image available for this book'
+            ], 404);
+        }
+
+        $coverPath = $book['coverImage'];
+        Log::info('Cover image requested for book: ' . ($book['title'] ?? '[unknown]') . ' (' . $coverPath . ')');
+
+        // Ensure the path is relative to the storage disk
+        if (Storage::disk('books')->exists($coverPath)) {
+            $mime = Storage::disk('books')->mimeType($coverPath);
+            return response(
+                Storage::disk('books')->get($coverPath),
+                200
+            )->header('Content-Type', $mime);
+        }
+
+        return response()->json([
+            'error' => 'Cover not found',
+            'message' => 'Cover image file could not be found'
+        ], 404);
+    }
+
+
+
+
+
 
     public function browse(Request $request)
     {
@@ -133,7 +183,10 @@ class BookApiController extends Controller
             'series' => $this->documentStoreService->listSeries(),
         ];
         if (!isset($dataMap[$type])) {
-            return response()->json(['error' => 'Invalid browse type'], 400);
+            return response()->json([
+                'error' => 'Invalid browse type',
+                'message' => 'The browse type must be one of: genre, author, series'
+            ], 400);
         }
         $items = $dataMap[$type];
         if ($search) {
@@ -144,42 +197,21 @@ class BookApiController extends Controller
         $items = array_values($items);
         $total = count($items);
         $page = (int) $request->input('page', 1);
-        $items = array_slice($items, ($page - 1) * $perPage, $perPage);
+        $paginatedItems = array_slice($items, ($page - 1) * $perPage, $perPage);
 
         return response()->json([
-            'data' => $items,
-            'total' => $total,
-            'per_page' => $perPage,
-            'current_page' => $page,
+            'data' => $paginatedItems,
+            'meta' => [
+                'current_page' => $page,
+                'from' => ($total > 0) ? (($page - 1) * $perPage) + 1 : null,
+                'last_page' => max(1, ceil($total / $perPage)),
+                'per_page' => $perPage,
+                'to' => ($total > 0) ? min($page * $perPage, $total) : null,
+                'total' => $total,
+            ]
         ]);
     }
 
-    public function cover($id)
-    {
-        $book = $this->documentStoreService->getBook($id);
-        if (!$book) {
-            return response()->json([
-                'error' => 'Book not found or not authorized.',
-            ], 404);
-        }
-        Log::info(
-            'Cover image requested for book: ' . ($book['title'] ?? '[unknown]') . ' (' .
-            ($book['coverImage'] ?? '[none]') . ')'
-        );
-        if (
-            !empty($book['coverImage']) &&
-            Storage::disk('books')->exists($book['coverImage'])
-        ) {
-            $mime = Storage::disk('books')->mimeType($book['coverImage']);
-
-            return response(
-                Storage::disk('books')->get($book['coverImage']),
-                200
-            )->header('Content-Type', $mime);
-        }
-
-        return response()->json(['error' => 'Cover image not found.'], 404);
-    }
 
     public function search(Request $request)
     {
@@ -201,16 +233,22 @@ class BookApiController extends Controller
         $books = $booksData['data'];
         $total = $booksData['total'];
 
-        // Transform
+        // Transform books to match OpenAPI spec
+        $books = array_filter($books, 'is_array');
         $books = array_map(function ($book) use ($withCover, $inlineCovers) {
             return $this->getBookWithCover($book, $withCover, $inlineCovers);
         }, $books);
 
         return response()->json([
             'data' => $books,
-            'total' => $total,
-            'per_page' => $perPage,
-            'current_page' => $page,
+            'meta' => [
+                'current_page' => $page,
+                'from' => ($total > 0) ? (($page - 1) * $perPage) + 1 : null,
+                'last_page' => max(1, ceil($total / $perPage)),
+                'per_page' => $perPage,
+                'to' => ($total > 0) ? min($page * $perPage, $total) : null,
+                'total' => $total,
+            ]
         ]);
     }
 
@@ -249,7 +287,10 @@ class BookApiController extends Controller
         if (empty($queue)) {
             $queue = $this->documentStoreService->getBookQueue($user->id);
             if ($queue->isEmpty()) {
-                return response()->json(['error' => 'No books queued for download.'], 404);
+                return response()->json([
+                    'error' => 'No books queued for download',
+                    'message' => 'No books have been added to your download queue'
+                ], 404);
             }
             $zipName = 'bookqueue_' . $user->id . '_' . Str::random(8) . '.zip';
             $zipPath = storage_path('app/public/' . $zipName);
@@ -270,7 +311,10 @@ class BookApiController extends Controller
                 }
                 $zip->close();
             } else {
-                return response()->json(['error' => 'Could not create zip file.'], 500);
+                return response()->json([
+                    'error' => 'Could not create zip file',
+                    'message' => 'Failed to create download archive'
+                ], 500);
             }
 
             // Optionally, store a record of the zip for later deletion/marking
@@ -283,7 +327,10 @@ class BookApiController extends Controller
     {
         $zipPath = storage_path('app/public/' . $zipId);
         if (!file_exists($zipPath)) {
-            return response()->json(['error' => 'Zip file not found.'], 404);
+            return response()->json([
+                'error' => 'Zip file not found',
+                'message' => 'The requested download file could not be found'
+            ], 404);
         }
 
         return response()->download($zipPath);
@@ -295,10 +342,13 @@ class BookApiController extends Controller
         if (file_exists($zipPath)) {
             unlink($zipPath);
 
-            return response()->json(['message' => 'Zip file deleted.']);
+            return response()->json(['message' => 'Zip file deleted successfully']);
         }
 
-        return response()->json(['error' => 'Zip file not found.'], 404);
+        return response()->json([
+            'error' => 'Zip file not found',
+            'message' => 'The requested download file could not be found'
+        ], 404);
     }
 
     /**
@@ -326,7 +376,10 @@ class BookApiController extends Controller
         $search = $request->input('search');
         $genre = $this->documentStoreService->getGenre($genreId);
         if (!$genre) {
-            return response()->json(['error' => 'Genre not found'], 404);
+            return response()->json([
+                'error' => 'Genre not found',
+                'message' => 'The specified genre could not be found'
+            ], 404);
         }
         $books = array_filter($this->documentStoreService->listBooks(), function ($book) use ($genreId) {
             return ($book['genre_id'] ?? null) == $genreId;
@@ -347,13 +400,19 @@ class BookApiController extends Controller
 
         $total = count($authors);
         $page = (int) $request->input('page', 1);
-        $authors = array_slice($authors, ($page - 1) * $perPage, $perPage);
+        $offset = ($page - 1) * $perPage;
+        $paginatedAuthors = array_slice($authors, $offset, $perPage);
 
         return response()->json([
-            'data' => $authors,
-            'total' => $total,
-            'per_page' => $perPage,
-            'current_page' => $page,
+            'data' => $paginatedAuthors,
+            'meta' => [
+                'current_page' => $page,
+                'from' => ($total > 0) ? $offset + 1 : null,
+                'last_page' => max(1, ceil($total / $perPage)),
+                'per_page' => $perPage,
+                'to' => ($total > 0) ? min($offset + $perPage, $total) : null,
+                'total' => $total,
+            ]
         ]);
     }
 
@@ -365,7 +424,10 @@ class BookApiController extends Controller
         $documentStore = $this->documentStoreService;
         $genre = $documentStore->getGenre($genreId);
         if (!$genre) {
-            return response()->json(['error' => 'Genre not found'], 404);
+            return response()->json([
+                'error' => 'Genre not found',
+                'message' => 'The specified genre could not be found'
+            ], 404);
         }
         $books = array_filter($documentStore->listBooks(), function ($book) use ($genreId) {
             return ($book['genre_id'] ?? null) == $genreId;
@@ -393,7 +455,10 @@ class BookApiController extends Controller
         $inlineCovers = $request->boolean('inlineCovers', false);
         $series = $documentStore->getSeries($seriesId);
         if (!$series) {
-            return response()->json(['error' => 'Series not found'], 404);
+            return response()->json([
+                'error' => 'Series not found',
+                'message' => 'The specified series could not be found'
+            ], 404);
         }
         $books = array_filter($documentStore->listBooks(), fn($book) => ($book['series_id'] ?? null) == $seriesId);
         $books = array_values($books);
@@ -401,17 +466,21 @@ class BookApiController extends Controller
         $books = array_filter($books, 'is_array');
         $total = count($books);
         $page = (int) $request->input('page', 1);
-        $books = array_slice($books, ($page - 1) * $perPage, $perPage);
-        $books = array_map(fn($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $books);
+        $offset = ($page - 1) * $perPage;
+        $paginatedBooks = array_slice($books, $offset, $perPage);
+        $paginatedBooks = array_map(fn($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $paginatedBooks);
 
         return response()->json([
             'series' => ['id' => $series['id'], 'name' => $series['name']],
-            'books' => [
-                'data' => $books,
-                'total' => $total,
-                'per_page' => $perPage,
+            'data' => $paginatedBooks,
+            'meta' => [
                 'current_page' => $page,
-            ],
+                'from' => ($total > 0) ? $offset + 1 : null,
+                'last_page' => max(1, ceil($total / $perPage)),
+                'per_page' => $perPage,
+                'to' => ($total > 0) ? min($offset + $perPage, $total) : null,
+                'total' => $total,
+            ]
         ]);
     }
 
@@ -426,7 +495,10 @@ class BookApiController extends Controller
         $inlineCovers = $request->boolean('inlineCovers', false);
         $author = $documentStore->getAuthor($authorId);
         if (!$author) {
-            return response()->json(['error' => 'Author not found'], 404);
+            return response()->json([
+                'error' => 'Author not found',
+                'message' => 'The specified author could not be found'
+            ], 404);
         }
         $books = array_filter($documentStore->listBooks(), fn($book) => ($book['author_id'] ?? null) == $authorId);
         $books = array_values($books);
@@ -434,17 +506,21 @@ class BookApiController extends Controller
         $books = array_filter($books, 'is_array');
         $total = count($books);
         $page = (int) $request->input('page', 1);
-        $books = array_slice($books, ($page - 1) * $perPage, $perPage);
-        $books = array_map(fn($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $books);
+        $offset = ($page - 1) * $perPage;
+        $paginatedBooks = array_slice($books, $offset, $perPage);
+        $paginatedBooks = array_map(fn($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $paginatedBooks);
 
         return response()->json([
             'author' => ['id' => $author['id'], 'name' => $author['name']],
-            'books' => [
-                'data' => $books,
-                'total' => $total,
-                'per_page' => $perPage,
+            'data' => $paginatedBooks,
+            'meta' => [
                 'current_page' => $page,
-            ],
+                'from' => ($total > 0) ? $offset + 1 : null,
+                'last_page' => max(1, ceil($total / $perPage)),
+                'per_page' => $perPage,
+                'to' => ($total > 0) ? min($offset + $perPage, $total) : null,
+                'total' => $total,
+            ]
         ]);
     }
 
@@ -489,7 +565,8 @@ class BookApiController extends Controller
         $books = $documentStore->getBooksByAuthorAndGenre($authorId, $genreId);
         if (!$author || !$genre) {
             return response()->json([
-                'error' => 'Author or Genre not found.',
+                'error' => 'Author or Genre not found',
+                'message' => 'The specified author or genre could not be found'
             ], 404);
         }
         // Sort books by series name, series number, and title
@@ -518,9 +595,14 @@ class BookApiController extends Controller
 
         return response()->json([
             'data' => $paginatedBooks,
-            'total' => $total,
-            'per_page' => $perPage,
-            'current_page' => $page,
+            'meta' => [
+                'current_page' => $page,
+                'from' => ($total > 0) ? $offset + 1 : null,
+                'last_page' => max(1, ceil($total / $perPage)),
+                'per_page' => $perPage,
+                'to' => ($total > 0) ? min($offset + $perPage, $total) : null,
+                'total' => $total,
+            ]
         ]);
     }
 
@@ -536,24 +618,73 @@ class BookApiController extends Controller
             return ['error' => 'Invalid book data'];
         }
 
-        $arr = $book;
-        if ($withCover && !empty($book['coverImage']) && Storage::disk('books')->exists($book['coverImage'])) {
-            if ($inlineCovers) {
+        // Transform book data to match OpenAPI specification
+        $transformedBook = [
+            'id' => $book['id'] ?? null,
+            'title' => $book['title'] ?? '',
+            'author' => $this->normalizeArray($book['author'] ?? $book['author_name'] ?? []),
+            'narrator' => $this->normalizeArray($book['narrator'] ?? $book['narrator_name'] ?? []),
+            'series' => $book['series_name'] ?? $book['series']['name'] ?? null,
+            'series_number' => $book['series_number'] ?? null,
+            'genre' => $this->normalizeString($book['genre'] ?? []),
+            'year' => isset($book['published_year']) ? (int)$book['published_year'] : (isset($book['year']) ? (int)$book['year'] : null),
+            'duration' => $book['duration'] ?? null,
+            'description' => $book['description'] ?? null,
+            'file_count' => isset($book['audio_file_count']) ? (int)$book['audio_file_count'] : (isset($book['file_count']) ? (int)$book['file_count'] : null),
+            'total_size' => isset($book['total_size']) ? (int)$book['total_size'] : null,
+            'created_at' => $book['created_at'] ?? $book['date_added'] ?? null,
+            'updated_at' => $book['updated_at'] ?? null,
+        ];
+
+        // Handle cover image - always set cover_url if coverImage exists
+        if (!empty($book['coverImage'])) {
+            if ($inlineCovers && Storage::disk('books')->exists($book['coverImage'])) {
                 $coverPath = Storage::disk('books')->path($book['coverImage']);
-                $arr['cover'] = [
+                $transformedBook['cover'] = [
                     'type' => 'base64',
                     'path' => $coverPath,
                     'data' => base64_encode(Storage::disk('books')->get($book['coverImage'])),
                 ];
-            } else {
-                $arr['cover_url'] = url('/api/v1/books/' . ($book['id'] ?? '') . '/cover');
             }
+            // Always provide cover_url for consistency with OpenAPI spec
+            $transformedBook['cover_url'] = url('/api/v1/books/' . ($book['id'] ?? '') . '/cover');
         } else {
-            $arr['cover_url'] = null;
+            $transformedBook['cover_url'] = null;
         }
-        unset($arr['coverImageContent']);
 
-        return $arr;
+        return $transformedBook;
+    }
+
+    /**
+     * Normalize array data - ensure it's always an array of strings
+     */
+    private function normalizeArray($data)
+    {
+        if (is_string($data)) {
+            return [$data];
+        }
+        
+        if (is_array($data)) {
+            return array_values(array_filter(array_map('trim', $data)));
+        }
+        
+        return [];
+    }
+
+    /**
+     * Normalize genre data - convert array to single string if needed
+     */
+    private function normalizeString($data)
+    {
+        if (is_string($data)) {
+            return $data;
+        }
+        
+        if (is_array($data) && !empty($data)) {
+            return trim($data[0]);
+        }
+        
+        return null;
     }
 
     /**

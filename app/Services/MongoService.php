@@ -334,32 +334,68 @@ class MongoService implements DocumentStoreServiceInterface
     /**
      * @inheritdoc
      */
-    public function listBooks(int $page = 1, int $perPage = 24, array $filters = [], bool $withRelated = true)
+    public function listBooks(int $page = 1, int $perPage = 24, array $filters = [], bool $withRelated = true, string $sort = 'title', string $order = 'asc'): array
     {
+        // Validate order direction
+        $order = in_array(strtolower($order), ['asc', 'desc']) ? strtolower($order) : 'asc';
+        
         $collection = $this->getCollection('books');
-        Log::debug("MongoService: Querying collection: 'books'");
+        SafeLoggingService::safeLog('debug', "MongoService: Querying collection: 'books'");
 
         // Build query filters
         $query = [];
 
         // Apply filters
+        if (!empty($filters['search'])) {
+            $searchTerm = $filters['search'];
+            $query['$or'] = [
+                ['title' => new \MongoDB\BSON\Regex(preg_quote($searchTerm), 'i')],
+                ['description' => new \MongoDB\BSON\Regex(preg_quote($searchTerm), 'i')],
+                ['authors.name' => new \MongoDB\BSON\Regex(preg_quote($searchTerm), 'i')],
+                ['narrators.name' => new \MongoDB\BSON\Regex(preg_quote($searchTerm), 'i')],
+                ['series.name' => new \MongoDB\BSON\Regex(preg_quote($searchTerm), 'i')],
+            ];
+        }
+
+        if (!empty($filters['title'])) {
+            $query['title'] = new \MongoDB\BSON\Regex(preg_quote($filters['title']), 'i');
+        }
+
         if (!empty($filters['author'])) {
-            $query['author'] = new \MongoDB\BSON\Regex(preg_quote($filters['author']), 'i');
+            $query['authors.name'] = new \MongoDB\BSON\Regex(preg_quote($filters['author']), 'i');
         }
 
         if (!empty($filters['genre'])) {
-            $query['genre'] = $filters['genre'];
+            $query['genres.name'] = $filters['genre'];
         }
 
         if (!empty($filters['series'])) {
-            $query['series.seriesName'] = new \MongoDB\BSON\Regex(preg_quote($filters['series']), 'i');
+            $query['series.name'] = new \MongoDB\BSON\Regex(preg_quote($filters['series']), 'i');
         }
 
-        Log::debug("MongoService: Query filters: " . json_encode($query));
+        if (!empty($filters['publication_date'])) {
+            // Assuming release_date is stored as a string or date object
+            $year = (int) $filters['publication_date'];
+            $query['release_date'] = [
+                '$gte' => new \MongoDB\BSON\UTCDateTime(strtotime("{$year}-01-01") * 1000),
+                '$lt' => new \MongoDB\BSON\UTCDateTime(strtotime("{$year}+1-01-01") * 1000),
+            ];
+        }
+
+        if (!empty($filters['date_added'])) {
+            // Assuming created_at is stored as a date object
+            $date = new \DateTime($filters['date_added']);
+            $query['created_at'] = [
+                '$gte' => new \MongoDB\BSON\UTCDateTime($date->getTimestamp() * 1000),
+                '$lt' => new \MongoDB\BSON\UTCDateTime(($date->getTimestamp() + 86400) * 1000), // Add 1 day
+            ];
+        }
+
+        SafeLoggingService::safeLog('debug', "MongoService: Query filters: " . json_encode($query));
 
         // Count total matching documents
         $total = $collection->countDocuments($query);
-        Log::debug("MongoService: Total documents found for query: {$total}");
+        SafeLoggingService::safeLog('debug', "MongoService: Total documents found for query: {$total}");
 
         // Calculate pagination
         $skip = ($page - 1) * $perPage;
@@ -367,7 +403,7 @@ class MongoService implements DocumentStoreServiceInterface
 
         // Set up options for the query
         $options = [
-            'sort' => ['title' => 1],
+            'sort' => [$sort => ($order === 'asc' ? 1 : -1)],
             'skip' => $skip,
             'limit' => $perPage,
         ];
@@ -375,29 +411,50 @@ class MongoService implements DocumentStoreServiceInterface
         // Execute query with pagination
         $cursor = $collection->find($query, $options);
 
-        // Convert documents to array
+        // Convert documents to array and transform to match OpenAPI spec
         $books = [];
         foreach ($cursor as $doc) {
-            if ($doc instanceof \MongoDB\Model\BSONDocument) {
-                $doc = (array) $doc;
-            }
-            $doc['id'] = (string) $doc['_id'];
+            $book = $this->normalizeMongoValue($doc);
+            $book['id'] = (string) $book['_id'];
 
-            // Recursively normalize fields
-            foreach (['author', 'series', 'genre'] as $field) {
-                if (isset($doc[$field])) {
-                    $doc[$field] = $this->normalizeMongoValue($doc[$field]);
+            // Transform authors, narrators, genres to arrays of names
+            $book['author'] = collect($book['authors'] ?? [])->pluck('name')->toArray();
+            $book['narrator'] = collect($book['narrators'] ?? [])->pluck('name')->toArray();
+            $book['genre'] = collect($book['genres'] ?? [])->pluck('name')->toArray();
+
+            // Transform series
+            $seriesName = null;
+            $seriesNumber = null;
+            if (!empty($book['series'])) {
+                // Assuming series is an array of objects, take the first one
+                $firstSeries = collect($book['series'])->first();
+                if ($firstSeries) {
+                    $seriesName = $firstSeries['name'] ?? $firstSeries['seriesName'] ?? null;
+                    $seriesNumber = $firstSeries['seriesNumber'] ?? $firstSeries['pivot']['series_number'] ?? null;
                 }
             }
+            $book['series'] = $seriesName;
+            $book['series_number'] = (string) $seriesNumber; // Ensure string type
 
-            // Load related data if requested
-            if ($withRelated) {
-                $doc = $this->loadRelatedData($doc);
-            }
+            // Format duration to HH:MM:SS
+            $book['duration'] = isset($book['duration']) ? gmdate("H:i:s", $book['duration']) : null;
 
-            $books[] = $doc;
+            // Extract year from release_date
+            $book['year'] = isset($book['release_date']) ? (int) date('Y', strtotime($book['release_date'])) : null;
+
+            // Format cover_url to API endpoint
+            $book['cover_url'] = isset($book['id']) ? url('/api/v1/books/' . $book['id'] . '/cover') : null;
+
+            // Ensure timestamps are ISO 8601
+            $book['created_at'] = isset($book['created_at']) ? (new \DateTime($book['created_at']))->format('Y-m-d\TH:i:s\Z') : null;
+            $book['updated_at'] = isset($book['updated_at']) ? (new \DateTime($book['updated_at']))->format('Y-m-d\TH:i:s\Z') : null;
+
+            // Remove internal MongoDB fields and original relationship arrays
+            unset($book['_id'], $book['authors'], $book['narrators'], $book['genres'], $book['chapters'], $book['coverImage']);
+
+            $books[] = $book;
         }
-        Log::debug("MongoService: Number of books processed in loop: " . count($books));
+        SafeLoggingService::safeLog('debug', "MongoService: Number of books processed in loop: " . count($books));
 
         return [
             'data' => $books,

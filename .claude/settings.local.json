@@ -18,7 +18,8 @@
       "Bash(PHP_ERROR_REPORTING=E_ALL php artisan books:import-downloads:*)",
       "Bash(timeout:*)",
       "Bash(sudo chmod:*)",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "WebFetch(domain:books.thelin.org)"
     ],
     "deny": []
   }

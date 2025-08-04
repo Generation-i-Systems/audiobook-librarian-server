@@ -28,9 +28,9 @@ return Application::configure(basePath: dirname(__DIR__))
                  ->appendOutputTo(storage_path('logs/log-compression.log'));
                  
         // Fix storage permissions every hour to ensure proper access
-        $schedule->command('storage:fix-permissions')
-                 ->hourly()
-                 ->appendOutputTo(storage_path('logs/permissions-fix.log'));
+        //$schedule->command('storage:fix-permissions')
+        //         ->hourly()
+        //         ->appendOutputTo(storage_path('logs/permissions-fix.log'));
     })
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->api([

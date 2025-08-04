@@ -3,24 +3,28 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\File;
+use Illuminate\Contracts\Logging\Logger;
+use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Filesystem\FilesystemAdapter;
 
 class ImportCacheService
 {
+    protected Filesystem $files;
     protected string $cacheFile;
     protected array $cache = [];
     protected bool $cacheEnabled = true;
     protected int $maxCacheAge = 86400; // 24 hours
     protected int $maxCacheSize = 100; // MB
 
-    public function __construct(array $options = [])
+    public function __construct(Filesystem $files, array $options = [])
     {
+        $this->files = $files;
         $this->cacheFile = $options['cache_file'] ?? storage_path('app/import_cache.json');
         $this->cacheEnabled = $options['enabled'] ?? true;
         $this->maxCacheAge = $options['max_age'] ?? 86400;
         $this->maxCacheSize = $options['max_size_mb'] ?? 100;
-        
+
         if ($this->cacheEnabled) {
             $this->loadCache();
         }
@@ -44,33 +48,33 @@ class ImportCacheService
      */
     protected function loadCache(): void
     {
-        if (!File::exists($this->cacheFile)) {
+        if (!$this->files->exists($this->cacheFile)) {
             $this->cache = [
                 'version' => '1.0',
                 'created_at' => time(),
                 'tasks' => [],
-                'metadata' => []
+                'metadata' => [],
             ];
             return;
         }
 
         try {
-            $content = File::get($this->cacheFile);
+            $content = $this->files->get($this->cacheFile);
             $data = json_decode($content, true);
-            
+
             if (!$data || !isset($data['version'])) {
                 throw new \Exception('Invalid cache format');
             }
-            
+
             $this->cache = $data;
-            
+
         } catch (\Exception $e) {
             Log::warning("Failed to load cache, starting fresh: " . $e->getMessage());
             $this->cache = [
                 'version' => '1.0',
                 'created_at' => time(),
                 'tasks' => [],
-                'metadata' => []
+                'metadata' => [],
             ];
         }
     }
@@ -87,14 +91,14 @@ class ImportCacheService
         try {
             $this->cache['updated_at'] = time();
             $content = json_encode($this->cache, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-            
+
             $directory = dirname($this->cacheFile);
-            if (!File::isDirectory($directory)) {
-                File::makeDirectory($directory, 0755, true);
+            if (!$this->files->isDirectory($directory)) {
+                $this->files->makeDirectory($directory, 0755, true);
             }
-            
-            File::put($this->cacheFile, $content);
-            
+
+            $this->files->put($this->cacheFile, $content);
+
         } catch (\Exception $e) {
             Log::error("Failed to save cache: " . $e->getMessage());
         }
@@ -114,8 +118,10 @@ class ImportCacheService
 
         // Clean up old task results
         foreach ($this->cache['tasks'] as $key => $result) {
-            if (isset($result['timestamp']) && 
-                ($currentTime - $result['timestamp']) > $this->maxCacheAge) {
+            if (
+                isset($result['timestamp']) &&
+                ($currentTime - $result['timestamp']) > $this->maxCacheAge
+            ) {
                 unset($this->cache['tasks'][$key]);
                 $removedCount++;
             }
@@ -123,8 +129,10 @@ class ImportCacheService
 
         // Clean up old metadata
         foreach ($this->cache['metadata'] as $key => $metadata) {
-            if (isset($metadata['timestamp']) && 
-                ($currentTime - $metadata['timestamp']) > $this->maxCacheAge) {
+            if (
+                isset($metadata['timestamp']) &&
+                ($currentTime - $metadata['timestamp']) > $this->maxCacheAge
+            ) {
                 unset($this->cache['metadata'][$key]);
                 $removedCount++;
             }
@@ -135,8 +143,8 @@ class ImportCacheService
         }
 
         // Check cache file size
-        if (File::exists($this->cacheFile)) {
-            $sizeMB = File::size($this->cacheFile) / 1024 / 1024;
+        if ($this->files->exists($this->cacheFile)) {
+            $sizeMB = $this->files->size($this->cacheFile) / 1024 / 1024;
             if ($sizeMB > $this->maxCacheSize) {
                 $this->truncateCache();
             }
@@ -151,13 +159,13 @@ class ImportCacheService
         // Remove oldest 25% of entries
         $taskCount = count($this->cache['tasks']);
         $metadataCount = count($this->cache['metadata']);
-        
+
         if ($taskCount > 0) {
             $tasks = $this->cache['tasks'];
             uasort($tasks, fn($a, $b) => ($a['timestamp'] ?? 0) <=> ($b['timestamp'] ?? 0));
             $this->cache['tasks'] = array_slice($tasks, intval($taskCount * 0.25), null, true);
         }
-        
+
         if ($metadataCount > 0) {
             $metadata = $this->cache['metadata'];
             uasort($metadata, fn($a, $b) => ($a['timestamp'] ?? 0) <=> ($b['timestamp'] ?? 0));
@@ -187,16 +195,18 @@ class ImportCacheService
         }
 
         $cacheKey = $this->getCacheKey($audiobook, $taskType);
-        
+
         if (!isset($this->cache['tasks'][$cacheKey])) {
             return null;
         }
 
         $cached = $this->cache['tasks'][$cacheKey];
-        
+
         // Check if cache is still valid
-        if (isset($cached['timestamp']) && 
-            (time() - $cached['timestamp']) > $this->maxCacheAge) {
+        if (
+            isset($cached['timestamp']) &&
+            (time() - $cached['timestamp']) > $this->maxCacheAge
+        ) {
             unset($this->cache['tasks'][$cacheKey]);
             return null;
         }
@@ -214,7 +224,7 @@ class ImportCacheService
         }
 
         $cacheKey = $this->getCacheKey($audiobook, $taskType);
-        
+
         $this->cache['tasks'][$cacheKey] = [
             'result' => $result,
             'timestamp' => time(),
@@ -234,7 +244,7 @@ class ImportCacheService
 
         $this->cache['metadata'][$key] = [
             'data' => $metadata,
-            'timestamp' => time()
+            'timestamp' => time(),
         ];
     }
 
@@ -248,9 +258,11 @@ class ImportCacheService
         }
 
         $cached = $this->cache['metadata'][$key];
-        
-        if (isset($cached['timestamp']) && 
-            (time() - $cached['timestamp']) > $this->maxCacheAge) {
+
+        if (
+            isset($cached['timestamp']) &&
+            (time() - $cached['timestamp']) > $this->maxCacheAge
+        ) {
             unset($this->cache['metadata'][$key]);
             return null;
         }
@@ -263,13 +275,13 @@ class ImportCacheService
      */
     protected function getDirectoryModificationTime(string $path): int
     {
-        if (!File::isDirectory($path)) {
+        if (!$this->files->isDirectory($path)) {
             return 0;
         }
 
         try {
             $latestTime = filemtime($path);
-            
+
             $iterator = new \RecursiveIteratorIterator(
                 new \RecursiveDirectoryIterator($path, \RecursiveDirectoryIterator::SKIP_DOTS),
                 \RecursiveIteratorIterator::LEAVES_ONLY
@@ -283,9 +295,9 @@ class ImportCacheService
             }
 
             return $latestTime;
-            
+
         } catch (\Exception $e) {
-            return filemtime($path) ?: 0;
+            return $this->files->lastModified($path) ?: 0;
         }
     }
 
@@ -304,11 +316,11 @@ class ImportCacheService
             'metadata_count' => count($this->cache['metadata']),
             'cache_file' => $this->cacheFile,
             'file_size' => 0,
-            'file_size_formatted' => '0 B'
+            'file_size_formatted' => '0 B',
         ];
 
-        if (File::exists($this->cacheFile)) {
-            $stats['file_size'] = File::size($this->cacheFile);
+        if ($this->files->exists($this->cacheFile)) {
+            $stats['file_size'] = $this->files->size($this->cacheFile);
             $stats['file_size_formatted'] = $this->formatBytes($stats['file_size']);
         }
 
@@ -322,12 +334,12 @@ class ImportCacheService
     {
         $units = ['B', 'KB', 'MB', 'GB'];
         $unitIndex = 0;
-        
+
         while ($bytes >= 1024 && $unitIndex < count($units) - 1) {
             $bytes /= 1024;
             $unitIndex++;
         }
-        
+
         return round($bytes, 1) . ' ' . $units[$unitIndex];
     }
 
@@ -340,11 +352,11 @@ class ImportCacheService
             'version' => '1.0',
             'created_at' => time(),
             'tasks' => [],
-            'metadata' => []
+            'metadata' => [],
         ];
 
-        if (File::exists($this->cacheFile)) {
-            File::delete($this->cacheFile);
+        if ($this->files->exists($this->cacheFile)) {
+            $this->files->delete($this->cacheFile);
         }
     }
 

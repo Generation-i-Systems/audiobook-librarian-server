@@ -37,7 +37,7 @@ interface DocumentStoreServiceInterface
      *     'last_page' => int,    // Last available page number
      * ]
      */
-    public function listBooks(int $page = 1, int $perPage = 24, array $filters = [], bool $withRelated = true);
+    public function listBooks(int $page = 1, int $perPage = 24, array $filters = [], bool $withRelated = true, string $sort = 'title', string $order = 'asc'): array;
 
     /**
      * Get recently added books
