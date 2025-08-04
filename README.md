@@ -466,6 +466,33 @@ php artisan queue:retry all
 php artisan queue:flush
 ```
 
+### API Service Client
+
+The API service client allows you to make API calls as a specific user or admin user from the command line:
+
+```bash
+# Make API call with default admin user
+php artisan api:client "/api/v1/books?page=1&per_page=10"
+
+# Make API call with full URL
+php artisan api:client "https://books.thelin.org/api/v1/books?date_added=recent&page=1&per_page=10"
+
+# Make API call as specific user
+php artisan api:client "/api/v1/books" --user=user-123
+
+# Make POST request with JSON data
+php artisan api:client "/api/v1/books" --method=POST --data='{"title":"New Book","author":"Author Name"}'
+
+# Disable colored output
+php artisan api:client "/api/v1/books" --no-color
+```
+
+**Options:**
+- `--user=USER_ID`: Impersonate a specific user (defaults to first admin user)
+- `--method=METHOD`: HTTP method (GET, POST, PUT, PATCH, DELETE)
+- `--data=JSON`: JSON data for POST/PUT/PATCH requests
+- `--no-color`: Disable colored JSON output
+
 ## Documentation
 
 - [Book Parser Documentation](./docs/book-parser.md) - Detailed guide on using the book parser

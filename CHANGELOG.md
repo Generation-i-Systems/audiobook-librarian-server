@@ -1,5 +1,13 @@
 ## [Unreleased]
 ### Added
+- API Service Client command (`php artisan api:client`) for making authenticated API calls
+  - Support for both full URLs and relative URIs
+  - User impersonation with fallback to first admin user
+  - Support for all HTTP methods (GET, POST, PUT, PATCH, DELETE)
+  - JSON data support for POST/PUT/PATCH requests
+  - Colored JSON output with syntax highlighting
+  - Comprehensive error handling and validation
+  - Full test coverage with 11 test cases
 - MongoDB to MySQL migration for series data with pivot table support
   - Added `series_number` field to `book_series` pivot table
   - Updated `Book` and `Series` models to use `BelongsToMany` relationship
