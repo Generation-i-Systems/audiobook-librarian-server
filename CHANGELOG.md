@@ -1,7 +1,16 @@
 ## [Unreleased]
+### Changed
+- Archived FirestoreService (moved to app/Services/Legacy) as it's no longer used
+- Updated service providers to remove FirestoreService registration
+- Added database safety check in TestCase to prevent tests from wiping production MySQL database
+- Created PersistentDatabaseTestCase for tests that need persistent data
+
 ### Added
 - API Service Client command (`php artisan api:client`) for making authenticated API calls
   - Support for both full URLs and relative URIs
+- Fix Remote Images command (`php artisan books:fix-remote-images`) for downloading remote cover images
+  - Downloads remote cover images to book directories and updates database URLs
+  - Supports dry-run mode and limiting number of books to process
   - User impersonation with fallback to first admin user
   - Support for all HTTP methods (GET, POST, PUT, PATCH, DELETE)
   - JSON data support for POST/PUT/PATCH requests
@@ -36,6 +45,19 @@
   - Ensured a cover image radio button is always selected if any image is available
 
 ### Fixed
+- Fixed API 'recent' books query to correctly return books ordered by creation date
+  - Updated MySqlService to handle 'recent' keyword properly in date_added filter
+  - Ensured consistent ordering by created_at in descending order
+  - Verified alignment between API results and direct database queries
+- Fixed cover image URLs in API responses to use the request's hostname and protocol
+  - Updated BookApiController to use request's scheme and host for cover URLs
+  - Enhanced ApiServiceClient command to preserve hostname information in internal requests
+  - Added proper server parameter handling for request forwarding
+  - Ensured cover URLs match the original request's domain (e.g., example.com vs localhost)
+- Updated API to return series data as an array of objects with name and series number
+  - Modified BookApiController to format series data consistently
+  - Added formatSeriesData method to handle both direct and relationship-based series data
+  - Improved handling of many-to-many series relationships with pivot data
 - Fixed 401 Unauthorized error for series autocomplete in admin book form
   - Added admin-accessible endpoint `/admin/series-autocomplete` in BookController
   - Updated JS to use the correct endpoint for series autocomplete

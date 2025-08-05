@@ -1,5 +1,17 @@
 # Audiobook Librarian
 
+## Service Architecture
+
+### Document Storage Services
+- **MySqlService**: Primary storage service for all book data and user information
+- **MongoService**: Legacy service used only for migration purposes
+- **FirestoreService**: Archived service (moved to `app/Services/Legacy`)
+
+### Testing Safety
+- Tests use SQLite in-memory database by default to prevent data loss
+- Safety checks prevent tests from accidentally using production MySQL database
+- `PersistentDatabaseTestCase` available for tests that need persistent data
+
 ## MongoDB to MySQL Migration
 
 ### Features

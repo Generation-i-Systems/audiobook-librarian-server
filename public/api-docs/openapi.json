@@ -259,21 +259,33 @@
             "example": ["Rob Inglis"]
           },
           "series": {
-            "type": "string",
-            "nullable": true,
-            "description": "Series name",
-            "example": "The Lord of the Rings"
-          },
-          "series_number": {
-            "type": "string",
-            "nullable": true,
-            "description": "Book number in series",
-            "example": "1"
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Series name",
+                  "example": "The Lord of the Rings"
+                },
+                "series_number": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "Book number in series",
+                  "example": "1"
+                }
+              }
+            },
+            "description": "List of series this book belongs to with their position numbers",
+            "example": [{"name": "The Lord of the Rings", "series_number": "1"}]
           },
           "genre": {
-            "type": "string",
-            "description": "Book genre",
-            "example": "Fantasy"
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of book genres",
+            "example": ["Fantasy", "Adventure"]
           },
           "year": {
             "type": "integer",
