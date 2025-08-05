@@ -3,7 +3,7 @@
 namespace App\Providers;
 
 use App\Contracts\DocumentStoreServiceInterface;
-use App\Services\FirestoreService;
+// FirestoreService has been archived
 use App\Services\MongoService;
 use App\Services\MySqlService;
 use Illuminate\Support\Facades\Log;
@@ -22,7 +22,9 @@ class DocumentStoreServiceProvider extends ServiceProvider
 
             switch ($driver) {
                 case 'firestore':
-                    return $this->createFirestoreService();
+                    // FirestoreService has been archived - fallback to MySQL
+                    Log::warning('FirestoreService has been archived. Using MySqlService instead.');
+                    return $this->createMysqlService();
                 case 'mongodb':
                     return $this->createMongoService();
                 case 'mysql':

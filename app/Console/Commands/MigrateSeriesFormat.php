@@ -100,23 +100,8 @@ class MigrateSeriesFormat extends Command
 
     protected function updateFirestore()
     {
-        $firestoreService = app(\App\Services\FirestoreService::class);
-        $books = $firestoreService->listBooks(); // Get all books
-        $count = 0;
-        foreach ($books as $doc) {
-            $id = $doc['id'] ?? $doc['documentId'] ?? null;
-            $series = $doc['series'] ?? null;
-            $seriesName = $doc['seriesName'] ?? null;
-            $seriesNumber = $doc['seriesNumber'] ?? null;
-            $canonical = $this->canonicalizeSeries($series, $seriesName, $seriesNumber);
-            if ($series !== $canonical || (empty($series) && ($seriesName || $seriesNumber))) {
-                $update = ['series' => $canonical];
-                unset($doc['seriesName'], $doc['seriesNumber']);
-                $firestoreService->updateBook($id, $update);
-                $count++;
-                $this->line("[Firestore] Updated book {$id}");
-            }
-        }
-        $this->info("[Firestore] Migration complete. Updated {$count} records.");
+        $this->warn('FirestoreService has been archived and is no longer available.');
+        $this->info('Skipping Firestore migration.');
+        return;
     }
 }

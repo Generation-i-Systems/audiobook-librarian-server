@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Contracts\DocumentStoreServiceInterface;
-use App\Services\FirestoreService;
+// FirestoreService has been archived
 use App\Services\MongoService;
 use App\Services\MySqlService;
 use Illuminate\Console\Command;
@@ -47,7 +47,7 @@ class BenchmarkDatabasePerformance extends Command
             $this->mySqlService = new MySqlService();
         }
         if ($driver === 'all' || $driver === 'firestore') {
-            $this->firestoreService = new FirestoreService();
+            $this->info('FirestoreService has been archived and is no longer available.');
         }
 
         $this->info('Starting database performance benchmark...');

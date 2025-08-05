@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Admin;
 
 use App\Auth\DocumentstoreUser;
-use App\Services\FirestoreService;
+use App\Services\MySqlService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Tests\TestCase;
@@ -20,7 +20,7 @@ class BookControllerImportFileTest extends TestCase
     {
         $admin = new DocumentstoreUser(['id' => 'admin-user', 'role' => 'admin']);
 
-        $this->mock(FirestoreService::class, function ($mock) {
+        $this->mock(MySqlService::class, function ($mock) {
             $mock->shouldReceive('isAdmin')->with('admin-user')->andReturn(true);
         });
 
@@ -35,7 +35,7 @@ class BookControllerImportFileTest extends TestCase
     {
         $user = new DocumentstoreUser(['id' => 'non-admin-user', 'role' => 'user']);
 
-        $this->mock(FirestoreService::class, function ($mock) {
+        $this->mock(MySqlService::class, function ($mock) {
             $mock->shouldReceive('isAdmin')->with('non-admin-user')->andReturn(false);
         });
 

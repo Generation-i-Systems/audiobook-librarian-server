@@ -3,7 +3,7 @@
 namespace App\Providers;
 
 use App\Services\AudibleApiService;
-use App\Services\FirestoreService;
+// FirestoreService has been archived
 use Google\Cloud\Firestore\FirestoreClient;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Queue;
@@ -29,9 +29,10 @@ class AppServiceProvider extends ServiceProvider
             ]);
         });
 
-        $this->app->singleton(FirestoreService::class, function ($app) {
-            return new FirestoreService($app->make(FirestoreClient::class));
-        });
+        // FirestoreService has been archived
+        // $this->app->singleton(FirestoreService::class, function ($app) {
+        //     return new FirestoreService($app->make(FirestoreClient::class));
+        // });
     }
 
     /**
