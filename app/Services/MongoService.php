@@ -383,12 +383,27 @@ class MongoService implements DocumentStoreServiceInterface
         }
 
         if (!empty($filters['date_added'])) {
-            // Assuming created_at is stored as a date object
-            $date = new \DateTime($filters['date_added']);
-            $query['created_at'] = [
-                '$gte' => new \MongoDB\BSON\UTCDateTime($date->getTimestamp() * 1000),
-                '$lt' => new \MongoDB\BSON\UTCDateTime(($date->getTimestamp() + 86400) * 1000), // Add 1 day
-            ];
+            // Handle 'recent' as a special keyword
+            if ($filters['date_added'] === 'recent') {
+                // Use the same logic as getRecentBooks - default to 30 days
+                $days = 30;
+                $dateThreshold = time() - ($days * 24 * 60 * 60);
+                $query['created_at'] = [
+                    '$gte' => new \MongoDB\BSON\UTCDateTime($dateThreshold * 1000)
+                ];
+            } else {
+                // Handle as a specific date
+                try {
+                    $date = new \DateTime($filters['date_added']);
+                    $query['created_at'] = [
+                        '$gte' => new \MongoDB\BSON\UTCDateTime($date->getTimestamp() * 1000),
+                        '$lt' => new \MongoDB\BSON\UTCDateTime(($date->getTimestamp() + 86400) * 1000), // Add 1 day
+                    ];
+                } catch (\Exception $e) {
+                    // Log invalid date format
+                    \Illuminate\Support\Facades\Log::warning("Invalid date format for date_added filter: {$filters['date_added']}");
+                }
+            }
         }
 
         SafeLoggingService::safeLog('debug', "MongoService: Query filters: " . json_encode($query));

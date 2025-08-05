@@ -53,8 +53,8 @@ class MySqlService implements DocumentStoreServiceInterface
         if (!empty($bookArray['series'])) {
             $camelCasedBook['series'] = collect($bookArray['series'])->map(function ($series) {
                 return [
-                    'number' => $series['pivot']['number'] ?? null,
-                    'seriesName' => $series['name'] ?? null,
+                    'name' => $series['name'] ?? null,
+                    'series_number' => $series['pivot']['series_number'] ?? null,
                 ];
             })->all();
         }
@@ -124,33 +124,32 @@ class MySqlService implements DocumentStoreServiceInterface
      * Ultra minimal books listing to prevent memory exhaustion
      */
     public function listBooksMinimal(
-        int $page = 1, 
+        int $page = 1,
         int $perPage = 10,
         array $filters = []
     ): array {
         $perPage = min($perPage, 10); // Hard limit to 10 items
-        
         try {
             // Raw SQL to avoid Eloquent overhead
             $offset = ($page - 1) * $perPage;
             $whereClause = '';
             $params = [];
-            
+
             if (!empty($filters['search'])) {
                 $whereClause = 'WHERE title LIKE ?';
                 $params[] = '%' . $filters['search'] . '%';
             }
-            
+
             $books = DB::select("
                 SELECT id, title, cover_image, directory_path
-                FROM books 
+                FROM books
                 {$whereClause}
                 ORDER BY title ASC
                 LIMIT {$perPage} OFFSET {$offset}
             ", $params);
-            
+
             $total = DB::scalar("SELECT COUNT(*) FROM books {$whereClause}", $params);
-            
+
             // Minimal transformation
             $data = [];
             foreach ($books as $book) {
@@ -161,24 +160,25 @@ class MySqlService implements DocumentStoreServiceInterface
                     'directoryPath' => $book->directory_path,
                     'author' => ['Loading...'],
                     'genre' => ['Loading...'],
-                    'series' => []
+                    'series' => [],
                 ];
             }
-            
+
             return ['data' => $data, 'total' => $total];
-            
         } catch (\Exception $e) {
             return [
-                'data' => [[
-                    'id' => '1',
-                    'title' => 'Database Error - Contact Admin',
-                    'author' => ['System'],
-                    'genre' => ['Error'],
-                    'series' => [],
-                    'coverImage' => null,
-                    'directoryPath' => null
-                ]],
-                'total' => 1
+                'data' => [
+                    [
+                        'id' => '1',
+                        'title' => 'Database Error - Contact Admin',
+                        'author' => ['System'],
+                        'genre' => ['Error'],
+                        'series' => [],
+                        'coverImage' => null,
+                        'directoryPath' => null,
+                    ],
+                ],
+                'total' => 1,
             ];
         }
     }
@@ -193,7 +193,7 @@ class MySqlService implements DocumentStoreServiceInterface
     ): array {
         // Limit perPage to a reasonable maximum to prevent memory issues
         $perPage = min($perPage, 100);
-        
+
         // Validate order direction
         $order = in_array(strtolower($order), ['asc', 'desc']) ? strtolower($order) : 'asc';
 
@@ -260,7 +260,26 @@ class MySqlService implements DocumentStoreServiceInterface
         }
 
         if (!empty($filters['date_added'])) {
-            $query->whereDate('created_at', $filters['date_added']);
+            // Handle 'recent' as a special keyword
+            if ($filters['date_added'] === 'recent') {
+                // Use the same logic as getRecentBooks - default to 30 days
+                $days = 30;
+                $dateThreshold = now()->subDays($days);
+                $query->where('created_at', '>=', $dateThreshold);
+
+                // Force sorting by created_at desc for recent books to ensure most recent first
+                // This will override any other sort parameters
+                $sort = 'created_at';
+                $order = 'desc';
+            } else {
+                // Handle as a specific date
+                try {
+                    $query->whereDate('created_at', $filters['date_added']);
+                } catch (\Exception $e) {
+                    // Log invalid date format
+                    \Illuminate\Support\Facades\Log::warning("Invalid date format for date_added filter: {$filters['date_added']}");
+                }
+            }
         }
 
         // Apply sorting
@@ -297,9 +316,10 @@ class MySqlService implements DocumentStoreServiceInterface
         $transformedData = $books->map(function ($book) {
             $coverUrl = null;
             if ($book->cover_image) {
-                // Assuming cover_image is a path relative to storage/app/public/covers
-                // and we want an API endpoint like /api/v1/books/{id}/cover
-                $coverUrl = url('/api/v1/books/' . $book->id . '/cover');
+                // Use the current request's hostname and protocol for the cover URL
+                // This ensures URLs match the original request (e.g., https://books.thelin.org)
+                $request = request();
+                $coverUrl = $request->getSchemeAndHttpHost() . '/api/v1/books/' . $book->id . '/cover';
             }
 
             $durationFormatted = null;
@@ -308,12 +328,15 @@ class MySqlService implements DocumentStoreServiceInterface
                 $durationFormatted = gmdate("H:i:s", $book->duration);
             }
 
-            $seriesName = null;
-            $seriesNumber = null;
+            // Format series data as an array of objects with name and series_number
+            $seriesData = [];
             if ($book->series->isNotEmpty()) {
-                $firstSeries = $book->series->first();
-                $seriesName = $firstSeries->name;
-                $seriesNumber = $firstSeries->pivot->series_number;
+                foreach ($book->series as $series) {
+                    $seriesData[] = [
+                        'name' => $series->name,
+                        'series_number' => $series->pivot->series_number,
+                    ];
+                }
             }
 
             return [
@@ -321,12 +344,12 @@ class MySqlService implements DocumentStoreServiceInterface
                 'title' => $book->title,
                 'author' => $book->authors->pluck('name')->toArray(),
                 'narrator' => $book->narrators->pluck('name')->toArray(),
-                'series' => $seriesName,
-                'series_number' => $seriesNumber,
+                'series' => $seriesData,
                 'genre' => $book->genres->pluck('name')->toArray(), // OpenAPI spec shows string, but array is more flexible
-                'year' => $book->release_date ? (int) date('Y', strtotime($book->release_date)) : null,
+                'year' => $book->release_date ? (int) $book->release_date->format('Y') : null,
                 'duration' => $durationFormatted,
                 'description' => $book->description,
+                'coverImage' => $book->cover_image, // Add coverImage field for BookApiController::getBookWithCover
                 'cover_url' => $coverUrl,
                 'file_count' => $book->audio_file_count,
                 'total_size' => $book->total_size,
@@ -394,12 +417,15 @@ class MySqlService implements DocumentStoreServiceInterface
                         $durationFormatted = gmdate("H:i:s", $book->duration);
                     }
 
-                    $seriesName = null;
-                    $seriesNumber = null;
+                    // Format series data as an array of objects with name and series_number
+                    $seriesData = [];
                     if ($book->series->isNotEmpty()) {
-                        $firstSeries = $book->series->first();
-                        $seriesName = $firstSeries->name;
-                        $seriesNumber = $firstSeries->pivot->series_number;
+                        foreach ($book->series as $series) {
+                            $seriesData[] = [
+                                'name' => $series->name,
+                                'series_number' => $series->pivot->series_number,
+                            ];
+                        }
                     }
 
                     return [
@@ -407,10 +433,9 @@ class MySqlService implements DocumentStoreServiceInterface
                         'title' => $book->title,
                         'author' => $book->authors->pluck('name')->toArray(),
                         'narrator' => $book->narrators->pluck('name')->toArray(),
-                        'series' => $seriesName,
-                        'series_number' => $seriesNumber,
+                        'series' => $seriesData,
                         'genre' => $book->genres->pluck('name')->toArray(),
-                        'year' => $book->release_date ? (int) date('Y', strtotime($book->release_date)) : null,
+                        'year' => $book->release_date ? (int) (is_object($book->release_date) && method_exists($book->release_date, 'format') ? $book->release_date->format('Y') : date('Y', strtotime((string) $book->release_date))) : null,
                         'duration' => $durationFormatted,
                         'description' => $book->description,
                         'cover_url' => $coverUrl,
@@ -478,7 +503,7 @@ class MySqlService implements DocumentStoreServiceInterface
     ): array {
         // Validate order direction
         $direction = in_array(strtolower($direction), ['asc', 'desc']) ? strtolower($direction) : 'asc';
-        
+
         $query = Book::where('series_id', $seriesId)
             ->with(['authors', 'narrators', 'genres', 'series'])
             ->orderBy($orderBy, $direction);
@@ -685,7 +710,7 @@ class MySqlService implements DocumentStoreServiceInterface
     {
         // Generate username from email if not provided (for Google auth, etc.)
         $username = $data['username'] ?? explode('@', $data['email'])[0];
-        
+
         // Ensure username is unique
         $originalUsername = $username;
         $counter = 1;
@@ -693,7 +718,7 @@ class MySqlService implements DocumentStoreServiceInterface
             $username = $originalUsername . $counter;
             $counter++;
         }
-        
+
         return User::create([
             'name' => $data['name'],
             'username' => $username,
