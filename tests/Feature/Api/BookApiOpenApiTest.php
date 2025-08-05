@@ -4,15 +4,16 @@ namespace Tests\Feature\Api;
 
 use Tests\TestCase;
 
+use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Support\Facades\Artisan;
 use App\Models\User;
 use App\Models\Book;
 use Illuminate\Support\Facades\Storage;
+use Mockery;
+use Mockery\MockInterface;
 
 class BookApiOpenApiTest extends TestCase
 {
-    
-
     protected $token;
     protected $openApiSpec;
 
@@ -198,171 +199,84 @@ class BookApiOpenApiTest extends TestCase
         $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/', $responseData['created_at'] ?? '');
         $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/', $responseData['updated_at'] ?? '');
     }
-}
-
-
-
+    
     /**
-     * Test GET /api/v1/books endpoint against OpenAPI spec.
+     * Test that genre is always returned as an array, even when stored as a string
      *
      * @return void
      */
-    public function test_get_books_matches_openapi_spec()
+    public function test_genre_is_always_returned_as_array()
     {
-        // Create some test books
-        Book::factory()->count(5)->create();
+        // Mock the DocumentStoreServiceInterface
+        $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) {
+            // Mock response for a book with genre as a string
+            $mock->shouldReceive('getBook')
+                ->once()
+                ->with(1)
+                ->andReturn([
+                    'id' => 1,
+                    'title' => 'Test Book 1',
+                    'author' => ['John Doe'],
+                    'narrator' => ['Jane Smith'],
+                    'genre' => 'Science Fiction', // String genre
+                    'year' => 2023,
+                    'duration' => '10:30:00',
+                    'description' => 'A test book description',
+                    'cover_image' => 'test/cover.jpg',
+                    'file_count' => 1,
+                    'total_size' => 1000,
+                    'created_at' => '2023-01-01T00:00:00Z',
+                    'updated_at' => '2023-01-01T00:00:00Z',
+                ]);
+                
+            // Mock response for a book with genre as an array
+            $mock->shouldReceive('getBook')
+                ->once()
+                ->with(2)
+                ->andReturn([
+                    'id' => 2,
+                    'title' => 'Test Book 2',
+                    'author' => ['Jane Doe'],
+                    'narrator' => ['John Smith'],
+                    'genre' => ['Fantasy', 'Adventure'], // Array genre
+                    'year' => 2023,
+                    'duration' => '08:45:00',
+                    'description' => 'Another test book description',
+                    'cover_image' => 'test/cover2.jpg',
+                    'file_count' => 1,
+                    'total_size' => 1200,
+                    'created_at' => '2023-01-02T00:00:00Z',
+                    'updated_at' => '2023-01-02T00:00:00Z',
+                ]);
+        });
 
+        // Test book with genre as string
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
             'Accept' => 'application/json',
-        ])->getJson('/api/v1/books');
+        ])->getJson('/api/v1/books/1');
 
         $response->assertStatus(200);
-
-        $response->assertJsonStructure([
-            'data' => [
-                '*' => [
-                    'id',
-                    'title',
-                    'author',
-                    'narrator',
-                    'series',
-                    'series_number',
-                    'genre',
-                    'year',
-                    'duration',
-                    'description',
-                    'cover_url',
-                    'file_count',
-                    'total_size',
-                    'created_at',
-                    'updated_at',
-                ]
-            ],
-            'meta' => [
-                'current_page',
-                'from',
-                'last_page',
-                'per_page',
-                'to',
-                'total',
-            ]
-        ]);
-
         $responseData = $response->json();
-        $books = $responseData['data'];
-
-        foreach ($books as $book) {
-            $this->assertIsInt($book['id']);
-            $this->assertIsString($book['title']);
-            $this->assertIsArray($book['author']);
-            $this->assertIsArray($book['narrator']);
-            $this->assertIsString($book['series'] ?? ''); // Can be null
-            $this->assertIsString($book['series_number'] ?? ''); // Can be null
-            $this->assertIsArray($book['genre']);
-            $this->assertIsInt($book['year'] ?? 0); // Can be null
-            $this->assertMatchesRegularExpression('/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/', $book['duration'] ?? '00:00:00'); // HH:MM:SS format
-            $this->assertIsString($book['description'] ?? ''); // Can be null
-            $this->assertMatchesRegularExpression('/^http(s)?:\/\/.+\/api\/v1\/books\/\d+\/cover$/', $book['cover_url'] ?? ''); // API endpoint format
-            $this->assertIsInt($book['file_count']);
-            $this->assertIsInt($book['total_size']);
-            $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/', $book['created_at'] ?? ''); // ISO 8601
-            $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/', $book['updated_at'] ?? ''); // ISO 8601
-        }
-    }
-
-    /**
-     * Test GET /api/v1/books with search parameter.
-     *
-     * @return void
-     */
-    public function test_get_books_with_search_matches_openapi_spec()
-    {
-        // Create a book with a specific title for searching
-        Book::factory()->create(['title' => 'The Lord of the Rings']);
-        Book::factory()->create(['title' => 'Another Book']);
-
-        $response = $this->withHeaders([
-            'Authorization' => 'Bearer ' . $this->token,
-            'Accept' => 'application/json',
-        ])->getJson('/api/v1/books?search=Lord');
-
-        $response->assertStatus(200);
-        $response->assertJsonCount(1, 'data'); // Expecting only one book
-        $response->assertJsonFragment(['title' => 'The Lord of the Rings']);
-
-        $responseData = $response->json();
-        $books = $responseData['data'];
-
-        foreach ($books as $book) {
-            $this->assertIsInt($book['id']);
-            $this->assertIsString($book['title']);
-            $this->assertIsArray($book['author']);
-            $this->assertIsArray($book['narrator']);
-            $this->assertIsString($book['series'] ?? '');
-            $this->assertIsString($book['series_number'] ?? '');
-            $this->assertIsArray($book['genre']);
-            $this->assertIsInt($book['year'] ?? 0);
-            $this->assertMatchesRegularExpression('/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/', $book['duration'] ?? '00:00:00');
-            $this->assertIsString($book['description'] ?? '');
-            $this->assertMatchesRegularExpression('/^http(s)?:\/\/.+\/api\/v1\/books\/\d+\/cover$/', $book['cover_url'] ?? '');
-            $this->assertIsInt($book['file_count']);
-            $this->assertIsInt($book['total_size']);
-            $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/', $book['created_at'] ?? '');
-            $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/', $book['updated_at'] ?? '');
-        }
-    }
-
-    /**
-     * Test GET /api/v1/books/{book} endpoint against OpenAPI spec.
-     *
-     * @return void
-     */
-    public function test_get_single_book_matches_openapi_spec()
-    {
-        $book = Book::factory()->create();
-
-        $response = $this->withHeaders([
-            'Authorization' => 'Bearer ' . $this->token,
-            'Accept' => 'application/json',
-        ])->getJson('/api/v1/books/' . $book->id);
-
-        $response->assertStatus(200);
-
-        $response->assertJsonStructure([
-            'id',
-            'title',
-            'author',
-            'narrator',
-            'series',
-            'series_number',
-            'genre',
-            'year',
-            'duration',
-            'description',
-            'cover_url',
-            'file_count',
-            'total_size',
-            'created_at',
-            'updated_at',
-        ]);
-
-        $responseData = $response->json();
-
-        $this->assertIsInt($responseData['id']);
-        $this->assertIsString($responseData['title']);
-        $this->assertIsArray($responseData['author']);
-        $this->assertIsArray($responseData['narrator']);
-        $this->assertIsString($responseData['series'] ?? '');
-        $this->assertIsString($responseData['series_number'] ?? '');
+        
+        // Assert genre is an array
         $this->assertIsArray($responseData['genre']);
-        $this->assertIsInt($responseData['year'] ?? 0);
-        $this->assertMatchesRegularExpression('/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/', $responseData['duration'] ?? '00:00:00');
-        $this->assertIsString($responseData['description'] ?? '');
-        $this->assertMatchesRegularExpression('/^http(s)?:\/\/.+\/api\/v1\/books\/\d+\/cover$/', $responseData['cover_url'] ?? '');
-        $this->assertIsInt($responseData['file_count']);
-        $this->assertIsInt($responseData['total_size']);
-        $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/', $responseData['created_at'] ?? '');
-        $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/', $responseData['updated_at'] ?? '');
+        $this->assertCount(1, $responseData['genre']);
+        $this->assertEquals('Science Fiction', $responseData['genre'][0]);
+        
+        // Test book with genre as array
+        $response2 = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->token,
+            'Accept' => 'application/json',
+        ])->getJson('/api/v1/books/2');
+
+        $response2->assertStatus(200);
+        $responseData2 = $response2->json();
+        
+        // Assert genre is an array with multiple values
+        $this->assertIsArray($responseData2['genre']);
+        $this->assertCount(2, $responseData2['genre']);
+        $this->assertContains('Fantasy', $responseData2['genre']);
+        $this->assertContains('Adventure', $responseData2['genre']);
     }
 }

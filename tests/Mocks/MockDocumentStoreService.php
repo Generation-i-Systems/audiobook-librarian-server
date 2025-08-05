@@ -265,7 +265,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     /**
      * @inheritdoc
      */
-    public function listBooks(int $page = 1, int $perPage = 24, array $filters = [], bool $withRelated = true, string $sort = 'title', string $order = 'asc')
+    public function listBooks(int $page = 1, int $perPage = 24, array $filters = [], bool $withRelated = true, string $sort = 'title', string $order = 'asc'): array
     {
         // Validate order direction
         $order = in_array(strtolower($order), ['asc', 'desc']) ? strtolower($order) : 'asc';

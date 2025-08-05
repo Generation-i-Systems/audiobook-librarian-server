@@ -91,7 +91,7 @@ class ImportFileControllerTest extends TestCase
     /**
      * Create application with mocked services to avoid permission issues.
      */
-    public function createApplication()
+    public function createApplication(): \Illuminate\Foundation\Application
     {
         // First create the application
         $app = parent::createApplication();

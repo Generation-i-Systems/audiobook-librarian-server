@@ -1,0 +1,106 @@
+<?php
+
+namespace Tests\Feature\Api;
+
+use App\Contracts\DocumentStoreServiceInterface;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
+use Mockery\MockInterface;
+use Tests\TestCase;
+
+class BookApiGenreArrayTest extends TestCase
+{
+    protected string $token;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Force SQLite in-memory database to avoid safety check issues
+        config(['database.default' => 'sqlite']);
+        config(['database.connections.sqlite.database' => ':memory:']);
+        
+        // Create a user and token for API authentication
+        $user = User::factory()->create(['is_admin' => true]);
+        $this->token = $user->createToken('test-token')->plainTextToken;
+    }
+
+    /**
+     * Test that genre is always returned as an array, even when stored as a string
+     */
+    public function test_genre_is_always_returned_as_array()
+    {
+        // Mock the DocumentStoreServiceInterface
+        $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) {
+            // Mock response for a book with genre as a string
+            $mock->shouldReceive('getBook')
+                ->once()
+                ->with(1)
+                ->andReturn([
+                    'id' => 1,
+                    'title' => 'Test Book 1',
+                    'author' => ['John Doe'],
+                    'narrator' => ['Jane Smith'],
+                    'genre' => 'Science Fiction', // String genre
+                    'year' => 2023,
+                    'duration' => '10:30:00',
+                    'description' => 'A test book description',
+                    'cover_image' => 'test/cover.jpg',
+                    'file_count' => 1,
+                    'total_size' => 1000,
+                    'created_at' => '2023-01-01T00:00:00Z',
+                    'updated_at' => '2023-01-01T00:00:00Z',
+                ]);
+                
+            // Mock response for a book with genre as an array
+            $mock->shouldReceive('getBook')
+                ->once()
+                ->with(2)
+                ->andReturn([
+                    'id' => 2,
+                    'title' => 'Test Book 2',
+                    'author' => ['Jane Doe'],
+                    'narrator' => ['John Smith'],
+                    'genre' => ['Fantasy', 'Adventure'], // Array genre
+                    'year' => 2023,
+                    'duration' => '08:45:00',
+                    'description' => 'Another test book description',
+                    'cover_image' => 'test/cover2.jpg',
+                    'file_count' => 1,
+                    'total_size' => 1200,
+                    'created_at' => '2023-01-02T00:00:00Z',
+                    'updated_at' => '2023-01-02T00:00:00Z',
+                ]);
+        });
+
+        // Test book with genre as string
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->token,
+            'Accept' => 'application/json',
+        ])->getJson('/api/v1/books/1');
+
+        $response->assertStatus(200);
+        $responseData = $response->json();
+        
+        // Assert genre is an array
+        $this->assertIsArray($responseData['genre']);
+        $this->assertCount(1, $responseData['genre']);
+        $this->assertEquals('Science Fiction', $responseData['genre'][0]);
+        
+        // Test book with genre as array
+        $response2 = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $this->token,
+            'Accept' => 'application/json',
+        ])->getJson('/api/v1/books/2');
+
+        $response2->assertStatus(200);
+        $responseData2 = $response2->json();
+        
+        // Assert genre is an array with multiple values
+        $this->assertIsArray($responseData2['genre']);
+        $this->assertCount(2, $responseData2['genre']);
+        $this->assertContains('Fantasy', $responseData2['genre']);
+        $this->assertContains('Adventure', $responseData2['genre']);
+    }
+}

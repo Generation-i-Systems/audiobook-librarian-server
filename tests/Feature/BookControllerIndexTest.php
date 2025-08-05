@@ -7,14 +7,14 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Illuminate\Support\Facades\Storage;
-use Tests\TestCase;
+use Tests\PersistentDatabaseTestCase as TestCase;
 use Mockery;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Facade;
 
 class BookControllerIndexTest extends TestCase
 {
-    use RefreshDatabase;
+    // Removed RefreshDatabase to prevent database wipes
     use WithFaker;
 
     protected $user;
@@ -24,9 +24,8 @@ class BookControllerIndexTest extends TestCase
     {
         parent::setUp();
 
-        // Configure in-memory SQLite database
-        config(['database.default' => 'sqlite']);
-        config(['database.connections.sqlite.database' => ':memory:']);
+        // Using persistent database instead of in-memory SQLite
+        // Database configuration is handled in PersistentDatabaseTestCase
 
         // Run migrations
         $this->artisan('migrate');
