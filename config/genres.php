@@ -17,5 +17,6 @@ return [
         'Romance',
         'Science',
         'Science Fiction',
+        'Other',
     ],
 ];

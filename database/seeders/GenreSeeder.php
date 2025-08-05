@@ -28,6 +28,7 @@ class GenreSeeder extends Seeder
             'Romance',
             'Science',
             'Science Fiction',
+            'Other',
         ];
 
         foreach ($genres as $genreName) {
