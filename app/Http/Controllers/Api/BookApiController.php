@@ -149,17 +149,53 @@ class BookApiController extends Controller
             ], 404);
         }
 
-        $coverPath = $book['coverImage'];
-        Log::info('Cover image requested for book: ' . ($book['title'] ?? '[unknown]') . ' (' . $coverPath . ')');
+        $coverImage = $book['coverImage'];
+        $directoryPath = $book['directoryPath'] ?? null;
+
+        Log::info('Cover image requested for book: ' . ($book['title'] ?? '[unknown]') . ' (' . $coverImage . ')');
+
+        // Handle both filename-only and full path formats
+        $coverPath = $this->resolveCoverImagePath($coverImage, $directoryPath);
+
+        if (!$coverPath) {
+            Log::warning('Could not resolve cover image path', [
+                'book_id' => $id,
+                'coverImage' => $coverImage,
+                'directoryPath' => $directoryPath,
+            ]);
+
+            return response()->json([
+                'error' => 'Cover not found',
+                'message' => 'Cover image file could not be found',
+            ], 404);
+        }
 
         // Check if the resolved path exists
         if (Storage::disk('books')->exists($coverPath)) {
-            $mime = Storage::disk('books')->mimeType($coverPath);
+            $content = Storage::disk('books')->get($coverPath);
+            $mime = mime_content_type(Storage::disk('books')->path($coverPath));
             return response(
-                Storage::disk('books')->get($coverPath),
+                $content,
                 200
             )->header('Content-Type', $mime);
         }
+
+        //split out context into multiple log entries
+        Log::warning('Cover image file does not exist', [
+            'book_id' => $id,
+        ]);
+        Log::warning('Cover image file does not exist', [
+            'resolved_path' => $coverPath,
+        ]);
+        Log::warning('Cover image file does not exist', [
+            'original_coverImage' => $coverImage,
+        ]);
+        Log::warning('Cover image file does not exist', [
+            'directoryPath' => $directoryPath,
+        ]);
+        Log::warning('Cover image file does not exist', [
+            'storage_path' => Storage::disk('books')->path($coverPath),
+        ]);
 
         return response()->json([
             'error' => 'Cover not found',
@@ -167,9 +203,70 @@ class BookApiController extends Controller
         ], 404);
     }
 
+    /**
+     * Resolve cover image path, handling both filename-only and full path formats
+     * Also handles filesystem corruption where directory names have stray quotes
+     *
+     * @param string $coverImage The cover image value from database
+     * @param string|null $directoryPath The directory path for the book
+     * @return string|null The resolved cover image path
+     */
+    private function resolveCoverImagePath(string $coverImage, ?string $directoryPath): ?string
+    {
+        // Clean up any corrupted paths (remove quotes, etc.)
+        $coverImage = trim($coverImage, "'\"");
+        $coverImage = str_replace("'/", "/", $coverImage);
+        $coverImage = ltrim($coverImage, '/');
 
+        // If it's a full path (contains slashes), use as-is
+        if (str_contains($coverImage, '/')) {
+            return $coverImage;
+        }
 
+        // It's just a filename - combine with directory path
+        if ($directoryPath) {
+            $cleanDirectoryPath = rtrim($directoryPath, '/');
+            $primaryPath = $cleanDirectoryPath . '/' . $coverImage;
 
+            // Check if the clean path exists first
+            if (Storage::disk('books')->exists($primaryPath)) {
+                return $primaryPath;
+            }
+
+            // Fallback: check if filesystem has corrupted directory names with trailing quotes
+            // This handles cases where DB was cleaned but filesystem still has corruption
+            $corruptedPath = $cleanDirectoryPath . "'/" . $coverImage;
+            if (Storage::disk('books')->exists($corruptedPath)) {
+                Log::info('Found cover image at corrupted filesystem path', [
+                    'clean_path' => $primaryPath,
+                    'corrupted_path' => $corruptedPath,
+                ]);
+                return $corruptedPath;
+            }
+
+            // // Try other common corruption patterns
+            $patterns = [
+                $cleanDirectoryPath . '"/' . $coverImage,  // Double quote
+                $cleanDirectoryPath . ' /' . $coverImage,  // Space
+                $cleanDirectoryPath . '\\' . $coverImage,  // Backslash
+            ];
+
+            foreach ($patterns as $pattern) {
+                if (Storage::disk('books')->exists($pattern)) {
+                    Log::info('Found cover image at alternative corrupted path', [
+                        'clean_path' => $primaryPath,
+                        'found_path' => $pattern,
+                    ]);
+                    return $pattern;
+                }
+            }
+
+            return $primaryPath; // Return clean path even if not found (for error logging)
+        }
+
+        // No directory path available, try as-is (might be in root)
+        return $coverImage;
+    }
 
 
     public function browse(Request $request)
@@ -286,7 +383,7 @@ class BookApiController extends Controller
         $queue = $this->documentStoreService->getBookQueue($user->id);
         if (empty($queue)) {
             $queue = $this->documentStoreService->getBookQueue($user->id);
-            if ($queue->isEmpty()) {
+            if (empty($queue) || (is_array($queue) && count($queue) === 0)) {
                 return response()->json([
                     'error' => 'No books queued for download',
                     'message' => 'No books have been added to your download queue',
@@ -624,30 +721,34 @@ class BookApiController extends Controller
             'title' => $book['title'] ?? '',
             'author' => $this->normalizeArray($book['author'] ?? $book['author_name'] ?? []),
             'narrator' => $this->normalizeArray($book['narrator'] ?? $book['narrator_name'] ?? []),
-            'series' => $book['series_name'] ?? $book['series']['name'] ?? null,
-            'series_number' => $book['series_number'] ?? null,
-            'genre' => $this->normalizeString($book['genre'] ?? []),
-            'year' => isset($book['published_year']) ? (int)$book['published_year'] : (isset($book['year']) ? (int)$book['year'] : null),
+            'series' => $this->formatSeriesData($book),
+            'genre' => $this->normalizeGenre($book['genre'] ?? []),
+            'year' => isset($book['published_year']) ? (int) $book['published_year'] : (isset($book['year']) ? (int) $book['year'] : null),
             'duration' => $book['duration'] ?? null,
             'description' => $book['description'] ?? null,
-            'file_count' => isset($book['audio_file_count']) ? (int)$book['audio_file_count'] : (isset($book['file_count']) ? (int)$book['file_count'] : null),
-            'total_size' => isset($book['total_size']) ? (int)$book['total_size'] : null,
+            'file_count' => isset($book['audio_file_count']) ? (int) $book['audio_file_count'] : (isset($book['file_count']) ? (int) $book['file_count'] : null),
+            'total_size' => isset($book['total_size']) ? (int) $book['total_size'] : null,
             'created_at' => $book['created_at'] ?? $book['date_added'] ?? null,
             'updated_at' => $book['updated_at'] ?? null,
         ];
 
         // Handle cover image - always set cover_url if coverImage exists
         if (!empty($book['coverImage'])) {
-            if ($inlineCovers && Storage::disk('books')->exists($book['coverImage'])) {
-                $coverPath = Storage::disk('books')->path($book['coverImage']);
+            // Resolve the cover image path (handles both filename-only and full path formats)
+            $coverPath = $this->resolveCoverImagePath($book['coverImage'], $book['directoryPath'] ?? null);
+
+            if ($inlineCovers && $coverPath && Storage::disk('books')->exists($coverPath)) {
+                $fullPath = Storage::disk('books')->path($coverPath);
                 $transformedBook['cover'] = [
                     'type' => 'base64',
-                    'path' => $coverPath,
-                    'data' => base64_encode(Storage::disk('books')->get($book['coverImage'])),
+                    'path' => $fullPath,
+                    'data' => base64_encode(Storage::disk('books')->get($coverPath)),
                 ];
             }
             // Always provide cover_url for consistency with OpenAPI spec
-            $transformedBook['cover_url'] = url('/api/v1/books/' . ($book['id'] ?? '') . '/cover');
+            // Use the current request's hostname and protocol for the cover URL
+            $request = request();
+            $transformedBook['cover_url'] = $request->getSchemeAndHttpHost() . '/api/v1/books/' . ($book['id'] ?? '') . '/cover';
         } else {
             $transformedBook['cover_url'] = null;
         }
@@ -663,28 +764,68 @@ class BookApiController extends Controller
         if (is_string($data)) {
             return [$data];
         }
-        
+
         if (is_array($data)) {
             return array_values(array_filter(array_map('trim', $data)));
         }
-        
+
         return [];
     }
 
     /**
      * Format series data as an array with name and series number
      */
-    private function normalizeString($data)
+    private function formatSeriesData($book): array
+    {
+        // Handle case where series is already loaded as a relationship
+        if (isset($book['series']) && is_array($book['series']) && !empty($book['series'])) {
+            $result = [];
+            foreach ($book['series'] as $series) {
+                if (is_array($series)) {
+                    $result[] = [
+                        'name' => $series['name'] ?? null,
+                        'series_number' => $series['pivot']['series_number'] ?? null,
+                    ];
+                } elseif (is_object($series)) {
+                    $result[] = [
+                        'name' => $series->name ?? null,
+                        'series_number' => $series->pivot->series_number ?? null,
+                    ];
+                }
+            }
+            return $result;
+        }
+
+        // Handle case where series info is directly in the book array
+        $seriesName = $book['series_name'] ?? ($book['series']['name'] ?? null);
+        $seriesNumber = $book['series_number'] ?? null;
+
+        if (empty($seriesName)) {
+            return [];
+        }
+
+        return [
+            [
+                'name' => $seriesName,
+                'series_number' => $seriesNumber,
+            ],
+        ];
+    }
+
+    /**
+     * Normalize genre data - ensure it's always an array of strings
+     */
+    private function normalizeGenre($data)
     {
         if (is_string($data)) {
-            return $data;
+            return [$data];
         }
-        
-        if (is_array($data) && !empty($data)) {
-            return trim($data[0]);
+
+        if (is_array($data)) {
+            return array_values(array_filter(array_map('trim', $data)));
         }
-        
-        return null;
+
+        return [];
     }
 
     /**
