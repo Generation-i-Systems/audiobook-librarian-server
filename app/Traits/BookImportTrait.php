@@ -432,72 +432,130 @@ trait BookImportTrait
      */
     private function importCoverImageFromUrl($url, $directoryPath = null): ?string
     {
+        // For direct console output in the command
+        $output = method_exists($this, 'line') ? $this : null;
+        
         if (!$url) {
-            Log::error("Invalid URL: {$url}");
-
+            if ($output) $output->error("Invalid URL: {$url}");
             return null;
         }
 
         try {
+            if ($output) $output->line("Downloading image from <comment>{$url}</comment>");
+            
             $storagePath = env('BOOK_STORAGE_PATH'); // absolute path
             if (!$storagePath) {
-                Log::error('BOOK_STORAGE_PATH is not defined.');
-
-                return null;
-            }
-
-            $fullDir = rtrim($storagePath, '/') . '/' . ltrim($directoryPath, '/');
-            if (!is_dir($fullDir)) {
-                if (!mkdir($fullDir, 0775, true) && !is_dir($fullDir)) {
-                    Log::error("importCoverImageFromUrl error: Unable to create directory at $fullDir");
-
-                    return null;
+                $storagePath = storage_path('app/books');
+                
+                // Create the default directory if it doesn't exist
+                if (!is_dir($storagePath)) {
+                    if (!mkdir($storagePath, 0775, true) && !is_dir($storagePath)) {
+                        if ($output) $output->error("Unable to create default storage directory: {$storagePath}");
+                        return null;
+                    }
                 }
             }
 
-            // Use cURL with a browser User-Agent
+            $fullDir = rtrim($storagePath, '/') . '/' . ltrim($directoryPath, '/');
+            
+            if (!is_dir($fullDir)) {
+                if (!mkdir($fullDir, 0775, true) && !is_dir($fullDir)) {
+                    if ($output) $output->error("Unable to create directory at {$fullDir}");
+                    // Check directory permissions
+                    $parentDir = dirname($fullDir);
+                    if (is_dir($parentDir)) {
+                        $perms = substr(sprintf('%o', fileperms($parentDir)), -4);
+                        if ($output) $output->error("Parent directory permissions: {$perms}");
+                    }
+                    return null;
+                }
+                if ($output) $output->line("Created directory: <info>{$directoryPath}</info>");
+            }
+
+            // Use cURL with a browser User-Agent and more options for better compatibility
             $ch = curl_init($url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 30); // 30 seconds timeout
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // Disable SSL verification for testing
+            curl_setopt($ch, CURLOPT_HEADER, true); // Include headers in output
             curl_setopt(
                 $ch,
                 CURLOPT_USERAGENT,
                 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) ' .
-                'Chrome/58.0.3029.110 Safari/537.3'
+                'Chrome/91.0.4472.124 Safari/537.36'
             );
-            $contents = curl_exec($ch);
+            
+            $response = curl_exec($ch);
+            
+            // Get response info
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+            $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+            $errorMsg = curl_error($ch);
+            $errorNo = curl_errno($ch);
+            
+            // Split header and body
+            $header = substr($response, 0, $headerSize);
+            $contents = substr($response, $headerSize);
+            
             curl_close($ch);
 
-            if ($contents === false || !$contents) {
-                Log::error("importCoverImageFromUrl error: Unable to fetch image from {$url}");
-
+            if ($errorNo !== 0) {
+                if ($output) $output->error("cURL error ({$errorNo}): {$errorMsg}");
+                return null;
+            }
+            
+            if ($httpCode !== 200) {
+                if ($output) $output->error("HTTP error: Received code {$httpCode} from {$url}");
+                if ($output) $output->line("<info>Response headers: {$header}</info>");
                 return null;
             }
 
-            // Determine extension
-            $ext = 'jpg';
-            if (strpos($contentType, 'png') !== false) {
-                $ext = 'png';
-            } elseif (strpos($contentType, 'gif') !== false) {
-                $ext = 'gif';
-            } elseif (strpos($contentType, 'jpeg') !== false) {
-                $ext = 'jpg';
+            if (empty($contents)) {
+                if ($output) $output->error("Empty content received from {$url}");
+                return null;
+            }
+
+            // Determine extension from content type
+            $ext = 'jpg'; // Default
+            if (!empty($contentType)) {
+                if (strpos($contentType, 'png') !== false) {
+                    $ext = 'png';
+                } elseif (strpos($contentType, 'gif') !== false) {
+                    $ext = 'gif';
+                } elseif (strpos($contentType, 'jpeg') !== false || strpos($contentType, 'jpg') !== false) {
+                    $ext = 'jpg';
+                } elseif (strpos($contentType, 'webp') !== false) {
+                    $ext = 'webp';
+                }
             }
 
             $filename = 'cover.' . $ext;
             $fullPath = $fullDir . '/' . $filename;
-            if (file_put_contents($fullPath, $contents) === false) {
-                Log::error("importCoverImageFromUrl error: Unable to write file $fullPath");
-
+            
+            $bytesWritten = file_put_contents($fullPath, $contents);
+            
+            if ($bytesWritten === false) {
+                if ($output) $output->error("Unable to write file {$fullPath}");
+                // Check file permissions
+                if (is_dir($fullDir)) {
+                    $perms = substr(sprintf('%o', fileperms($fullDir)), -4);
+                    if ($output) $output->error("Directory permissions: {$perms}");
+                }
                 return null;
             }
+            
+            if ($output) $output->line("Saved <info>{$bytesWritten}</info> bytes to <info>{$directoryPath}/{$filename}</info>");
 
             // Return only the path relative to BOOK_STORAGE_PATH
-            return ltrim($directoryPath, '/') . '/' . $filename;
+            $relativePath = ltrim($directoryPath, '/') . '/' . $filename;
+            return $relativePath;
         } catch (\Exception $e) {
-            Log::error('importCoverImageFromUrl error: ' . $e->getMessage());
-
+            if ($output) {
+                $output->error('Error downloading image: ' . $e->getMessage());
+                $output->error($e->getTraceAsString());
+            }
             return null;
         }
     }
