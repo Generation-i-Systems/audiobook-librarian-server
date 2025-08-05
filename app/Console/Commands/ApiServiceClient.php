@@ -64,12 +64,15 @@ class ApiServiceClient extends Command
 
             $this->info("Making {$method} request as user: {$user->name} ({$user->getAuthIdentifier()})");
 
-            // Parse the URL
-            $uri = $this->parseUrl($url);
+            // Parse the URL to get the URI and host
+            [$uri, $host] = $this->parseUrl($url);
             $this->info("Request URI: {$uri}");
+            if ($host) {
+                $this->info("Request Host: {$host}");
+            }
 
             // Make the API call
-            $response = $this->makeApiCall($uri, $method, $data, $user);
+            $response = $this->makeApiCall($uri, $method, $data, $user, $host);
 
             // Display the response
             $this->displayResponse($response, $noColor);
@@ -120,16 +123,16 @@ class ApiServiceClient extends Command
     }
 
     /**
-     * Parse URL to extract URI
+     * Parse URL to extract URI and host
      *
      * @param string $url
-     * @return string
+     * @return array [uri, host]
      */
-    protected function parseUrl(string $url): string
+    protected function parseUrl(string $url): array
     {
-        // If it's already a URI (starts with /), return as is
+        // If it's already a URI (starts with /), return as is with no host
         if (str_starts_with($url, '/')) {
-            return $url;
+            return [$url, null];
         }
 
         // If it's a full URL, extract the path and query
@@ -153,8 +156,17 @@ class ApiServiceClient extends Command
         if (isset($parsed['query'])) {
             $uri .= '?' . $parsed['query'];
         }
+        
+        // Extract host and scheme for constructing full URLs
+        $host = null;
+        if (isset($parsed['scheme']) && isset($parsed['host'])) {
+            $host = $parsed['scheme'] . '://' . $parsed['host'];
+            if (isset($parsed['port'])) {
+                $host .= ':' . $parsed['port'];
+            }
+        }
 
-        return $uri;
+        return [$uri, $host];
     }
 
     /**
@@ -164,9 +176,10 @@ class ApiServiceClient extends Command
      * @param string $method
      * @param string|null $data
      * @param DocumentstoreUser $user
+     * @param string|null $host
      * @return array
      */
-    protected function makeApiCall(string $uri, string $method, ?string $data, DocumentstoreUser $user): array
+    protected function makeApiCall(string $uri, string $method, ?string $data, DocumentstoreUser $user, ?string $host = null): array
     {
         // Generate a temporary Sanctum token for API authentication
         $userData = $user->getRawUser();
@@ -174,6 +187,36 @@ class ApiServiceClient extends Command
 
         // Create a request object
         $request = Request::create($uri, $method);
+        
+        // Set the host in the server parameters if provided
+        if ($host) {
+            $parsedHost = parse_url($host);
+            if (isset($parsedHost['host'])) {
+                // Set HTTP_HOST and SERVER_NAME
+                $request->server->set('HTTP_HOST', $parsedHost['host']);
+                $request->server->set('SERVER_NAME', $parsedHost['host']);
+                
+                // Set the scheme (http/https)
+                if (isset($parsedHost['scheme'])) {
+                    $request->server->set('HTTPS', $parsedHost['scheme'] === 'https' ? 'on' : 'off');
+                    // Also set REQUEST_SCHEME
+                    $request->server->set('REQUEST_SCHEME', $parsedHost['scheme']);
+                }
+                
+                // Set the port if specified
+                if (isset($parsedHost['port'])) {
+                    $request->server->set('SERVER_PORT', $parsedHost['port']);
+                }
+                
+                // Override the request's getSchemeAndHttpHost method by setting the trusted host
+                $request->setTrustedHosts([$parsedHost['host']]);
+                
+                // Set the full URL in the request
+                $fullUrl = $host . $uri;
+                $request->headers->set('HOST', $parsedHost['host']);
+                $request->server->set('HTTP_REFERER', $fullUrl);
+            }
+        }
 
         // Set the Authorization header with Bearer token
         $request->headers->set('Authorization', 'Bearer ' . $tempToken);
