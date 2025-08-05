@@ -108,7 +108,7 @@ class BookApiController extends Controller
                 'per_page' => $perPage,
                 'to' => ($booksData['total'] > 0) ? min($page * $perPage, $booksData['total']) : null,
                 'total' => $booksData['total'] ?? 0,
-            ]
+            ],
         ]);
     }
 
@@ -120,7 +120,7 @@ class BookApiController extends Controller
         if (!$book) {
             return response()->json([
                 'error' => 'Book not found',
-                'message' => 'The specified book could not be found'
+                'message' => 'The specified book could not be found',
             ], 404);
         }
 
@@ -138,21 +138,21 @@ class BookApiController extends Controller
         if (!$book) {
             return response()->json([
                 'error' => 'Book not found',
-                'message' => 'The specified book could not be found'
+                'message' => 'The specified book could not be found',
             ], 404);
         }
 
         if (empty($book['coverImage'])) {
             return response()->json([
                 'error' => 'Cover not found',
-                'message' => 'No cover image available for this book'
+                'message' => 'No cover image available for this book',
             ], 404);
         }
 
         $coverPath = $book['coverImage'];
         Log::info('Cover image requested for book: ' . ($book['title'] ?? '[unknown]') . ' (' . $coverPath . ')');
 
-        // Ensure the path is relative to the storage disk
+        // Check if the resolved path exists
         if (Storage::disk('books')->exists($coverPath)) {
             $mime = Storage::disk('books')->mimeType($coverPath);
             return response(
@@ -163,7 +163,7 @@ class BookApiController extends Controller
 
         return response()->json([
             'error' => 'Cover not found',
-            'message' => 'Cover image file could not be found'
+            'message' => 'Cover image file could not be found',
         ], 404);
     }
 
@@ -185,7 +185,7 @@ class BookApiController extends Controller
         if (!isset($dataMap[$type])) {
             return response()->json([
                 'error' => 'Invalid browse type',
-                'message' => 'The browse type must be one of: genre, author, series'
+                'message' => 'The browse type must be one of: genre, author, series',
             ], 400);
         }
         $items = $dataMap[$type];
@@ -208,7 +208,7 @@ class BookApiController extends Controller
                 'per_page' => $perPage,
                 'to' => ($total > 0) ? min($page * $perPage, $total) : null,
                 'total' => $total,
-            ]
+            ],
         ]);
     }
 
@@ -248,7 +248,7 @@ class BookApiController extends Controller
                 'per_page' => $perPage,
                 'to' => ($total > 0) ? min($page * $perPage, $total) : null,
                 'total' => $total,
-            ]
+            ],
         ]);
     }
 
@@ -289,7 +289,7 @@ class BookApiController extends Controller
             if ($queue->isEmpty()) {
                 return response()->json([
                     'error' => 'No books queued for download',
-                    'message' => 'No books have been added to your download queue'
+                    'message' => 'No books have been added to your download queue',
                 ], 404);
             }
             $zipName = 'bookqueue_' . $user->id . '_' . Str::random(8) . '.zip';
@@ -313,7 +313,7 @@ class BookApiController extends Controller
             } else {
                 return response()->json([
                     'error' => 'Could not create zip file',
-                    'message' => 'Failed to create download archive'
+                    'message' => 'Failed to create download archive',
                 ], 500);
             }
 
@@ -329,7 +329,7 @@ class BookApiController extends Controller
         if (!file_exists($zipPath)) {
             return response()->json([
                 'error' => 'Zip file not found',
-                'message' => 'The requested download file could not be found'
+                'message' => 'The requested download file could not be found',
             ], 404);
         }
 
@@ -347,7 +347,7 @@ class BookApiController extends Controller
 
         return response()->json([
             'error' => 'Zip file not found',
-            'message' => 'The requested download file could not be found'
+            'message' => 'The requested download file could not be found',
         ], 404);
     }
 
@@ -378,7 +378,7 @@ class BookApiController extends Controller
         if (!$genre) {
             return response()->json([
                 'error' => 'Genre not found',
-                'message' => 'The specified genre could not be found'
+                'message' => 'The specified genre could not be found',
             ], 404);
         }
         $books = array_filter($this->documentStoreService->listBooks(), function ($book) use ($genreId) {
@@ -412,7 +412,7 @@ class BookApiController extends Controller
                 'per_page' => $perPage,
                 'to' => ($total > 0) ? min($offset + $perPage, $total) : null,
                 'total' => $total,
-            ]
+            ],
         ]);
     }
 
@@ -426,7 +426,7 @@ class BookApiController extends Controller
         if (!$genre) {
             return response()->json([
                 'error' => 'Genre not found',
-                'message' => 'The specified genre could not be found'
+                'message' => 'The specified genre could not be found',
             ], 404);
         }
         $books = array_filter($documentStore->listBooks(), function ($book) use ($genreId) {
@@ -457,7 +457,7 @@ class BookApiController extends Controller
         if (!$series) {
             return response()->json([
                 'error' => 'Series not found',
-                'message' => 'The specified series could not be found'
+                'message' => 'The specified series could not be found',
             ], 404);
         }
         $books = array_filter($documentStore->listBooks(), fn($book) => ($book['series_id'] ?? null) == $seriesId);
@@ -480,7 +480,7 @@ class BookApiController extends Controller
                 'per_page' => $perPage,
                 'to' => ($total > 0) ? min($offset + $perPage, $total) : null,
                 'total' => $total,
-            ]
+            ],
         ]);
     }
 
@@ -497,7 +497,7 @@ class BookApiController extends Controller
         if (!$author) {
             return response()->json([
                 'error' => 'Author not found',
-                'message' => 'The specified author could not be found'
+                'message' => 'The specified author could not be found',
             ], 404);
         }
         $books = array_filter($documentStore->listBooks(), fn($book) => ($book['author_id'] ?? null) == $authorId);
@@ -520,7 +520,7 @@ class BookApiController extends Controller
                 'per_page' => $perPage,
                 'to' => ($total > 0) ? min($offset + $perPage, $total) : null,
                 'total' => $total,
-            ]
+            ],
         ]);
     }
 
@@ -566,7 +566,7 @@ class BookApiController extends Controller
         if (!$author || !$genre) {
             return response()->json([
                 'error' => 'Author or Genre not found',
-                'message' => 'The specified author or genre could not be found'
+                'message' => 'The specified author or genre could not be found',
             ], 404);
         }
         // Sort books by series name, series number, and title
@@ -602,7 +602,7 @@ class BookApiController extends Controller
                 'per_page' => $perPage,
                 'to' => ($total > 0) ? min($offset + $perPage, $total) : null,
                 'total' => $total,
-            ]
+            ],
         ]);
     }
 
@@ -610,10 +610,10 @@ class BookApiController extends Controller
     {
         // Ensure $book is an array
         if (!is_array($book)) {
-            \Log::error('getBookWithCover received non-array book data', [
+            Log::error('getBookWithCover received non-array book data', [
                 'book_type' => gettype($book),
                 'book_value' => $book,
-                'backtrace' => debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 5)
+                'backtrace' => debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 5),
             ]);
             return ['error' => 'Invalid book data'];
         }
@@ -672,7 +672,7 @@ class BookApiController extends Controller
     }
 
     /**
-     * Normalize genre data - convert array to single string if needed
+     * Format series data as an array with name and series number
      */
     private function normalizeString($data)
     {
