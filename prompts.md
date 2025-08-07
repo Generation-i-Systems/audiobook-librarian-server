@@ -5,3 +5,11 @@
 - Implemented autocompleteSeries in MongoService, controller, interface.
 - New endpoint: /api/v1/series/autocomplete
 - Tests, docs, and changelog updated.
+
+2025-08-07: Fix Series Names Starting with a Number
+- Created command to identify and fix series entries whose names start with a number.
+- Command reparses directory_path to determine the correct series name.
+- Supports interactive mode for user confirmation when needed.
+- Supports dry-run mode for safe testing.
+- Handles renaming series or moving books to existing series with correct name.
+- Comprehensive test coverage with mocking approach.

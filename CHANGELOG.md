@@ -6,6 +6,13 @@
 - Created PersistentDatabaseTestCase for tests that need persistent data
 
 ### Added
+- Fix Series Starting With Number command (`php artisan series:fix-number-prefix`) for correcting series names
+  - Identifies series entries whose names start with a number
+  - Reparses directory paths to determine the correct series name
+  - Supports interactive mode for user confirmation when needed
+  - Supports dry-run mode for safe testing
+  - Handles renaming series or moving books to existing series with correct name
+  - Includes comprehensive test coverage
 - API Service Client command (`php artisan api:client`) for making authenticated API calls
   - Support for both full URLs and relative URIs
 - Fix Remote Images command (`php artisan books:fix-remote-images`) for downloading remote cover images
