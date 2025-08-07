@@ -1461,8 +1461,8 @@ class BookApiController extends Controller
             $query->where('books.title', 'LIKE', '%' . $search . '%');
         }
 
-        // Group by book to avoid duplicates from joins
-        $query->groupBy('books.id');
+        // Use distinct to avoid duplicates from joins instead of GROUP BY
+        $query->distinct();
 
         // Add sorting
         switch ($sort) {
