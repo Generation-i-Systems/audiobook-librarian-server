@@ -23,6 +23,7 @@ Route::prefix('v1')->group(function () {
 
         // Book Routes
         Route::get('/books', [BookApiController::class, 'index']);
+        Route::get('/books/enhanced', [BookApiController::class, 'booksEnhanced']);
         Route::get('/books/{book}', [BookApiController::class, 'show']);
         Route::get('/books/{book}/download', [BookApiController::class, 'download']);
         Route::get('/books/browse', [BookApiController::class, 'browse']);
@@ -34,8 +35,12 @@ Route::prefix('v1')->group(function () {
         // Series Books Route
         Route::get('/series/{seriesId}/books', [BookApiController::class, 'booksBySeries']);
 
+        // Series Routes - with author filtering and pagination  
+        Route::get('/series', [BookApiController::class, 'series']);
         // Series Autocomplete
         Route::get('/series/autocomplete', [BookApiController::class, 'autocompleteSeries']);
+        // Authors Route - with genre filtering and pagination
+        Route::get('/authors', [BookApiController::class, 'authors']);
         // Author Autocomplete
         Route::get('/authors/autocomplete', [BookApiController::class, 'autocompleteAuthors']);
         // Narrator Autocomplete

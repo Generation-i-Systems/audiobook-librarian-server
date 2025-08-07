@@ -154,7 +154,12 @@ class BookApiController extends Controller
 
         Log::info('Cover image requested for book: ' . ($book['title'] ?? '[unknown]') . ' (' . $coverImage . ')');
 
-        // Handle both filename-only and full path formats
+        // Check if coverImage is a remote URL (starts with http:// or https://)
+        if ($this->isRemoteUrl($coverImage)) {
+            return $this->proxyRemoteCoverImage($coverImage);
+        }
+
+        // Handle local files (both filename-only and full path formats)
         $coverPath = $this->resolveCoverImagePath($coverImage, $directoryPath);
 
         if (!$coverPath) {
@@ -177,7 +182,11 @@ class BookApiController extends Controller
             return response(
                 $content,
                 200
-            )->header('Content-Type', $mime);
+            )->header('Content-Type', $mime)
+             ->header('Access-Control-Allow-Origin', '*')
+             ->header('Access-Control-Allow-Methods', 'GET, OPTIONS')
+             ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+             ->header('Cache-Control', 'public, max-age=3600');
         }
 
         //split out context into multiple log entries
@@ -197,10 +206,7 @@ class BookApiController extends Controller
             'storage_path' => Storage::disk('books')->path($coverPath),
         ]);
 
-        return response()->json([
-            'error' => 'Cover not found',
-            'message' => 'Cover image file could not be found',
-        ], 404);
+        return $this->coverNotFoundResponse();
     }
 
     /**
@@ -266,6 +272,98 @@ class BookApiController extends Controller
 
         // No directory path available, try as-is (might be in root)
         return $coverImage;
+    }
+
+    /**
+     * Check if a URL is remote (starts with http:// or https://)
+     *
+     * @param string $url
+     * @return bool
+     */
+    private function isRemoteUrl(string $url): bool
+    {
+        return (strpos($url, 'http://') === 0 || strpos($url, 'https://') === 0);
+    }
+
+    /**
+     * Proxy a remote cover image URL with caching and error handling
+     *
+     * @param string $url The remote URL to proxy
+     * @return \Illuminate\Http\Response
+     */
+    private function proxyRemoteCoverImage(string $url): \Illuminate\Http\Response
+    {
+        try {
+            Log::info('Proxying remote cover image', ['url' => $url]);
+
+            // Use Laravel's HTTP client with a reasonable timeout
+            $response = \Illuminate\Support\Facades\Http::timeout(10)
+                ->withHeaders([
+                    'User-Agent' => 'Mozilla/5.0 (compatible; BooksCoverProxy/1.0)',
+                    'Accept' => 'image/*,*/*;q=0.8',
+                ])
+                ->get($url);
+
+            if ($response->successful()) {
+                $content = $response->body();
+                $contentType = $response->header('Content-Type');
+
+                // Default to image/jpeg if no content type or invalid content type
+                if (!$contentType || !str_starts_with($contentType, 'image/')) {
+                    $contentType = 'image/jpeg';
+                }
+
+                // Validate that we actually got image content
+                if (empty($content)) {
+                    Log::warning('Remote cover image returned empty content', ['url' => $url]);
+                    return $this->coverNotFoundResponse();
+                }
+
+                // Optional: Validate image content using finfo
+                if (function_exists('finfo_buffer')) {
+                    $finfo = new \finfo(FILEINFO_MIME_TYPE);
+                    $detectedMime = $finfo->buffer($content);
+                    if ($detectedMime && str_starts_with($detectedMime, 'image/')) {
+                        $contentType = $detectedMime;
+                    }
+                }
+
+                return response($content, 200)
+                    ->header('Content-Type', $contentType)
+                    ->header('Access-Control-Allow-Origin', '*')
+                    ->header('Access-Control-Allow-Methods', 'GET, OPTIONS')
+                    ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+                    ->header('Cache-Control', 'public, max-age=3600')
+                    ->header('X-Proxied-From', parse_url($url, PHP_URL_HOST));
+            } else {
+                Log::warning('Remote cover image request failed', [
+                    'url' => $url,
+                    'status' => $response->status(),
+                    'response' => \Illuminate\Support\Str::limit($response->body(), 200)
+                ]);
+                return $this->coverNotFoundResponse();
+            }
+        } catch (\Exception $e) {
+            Log::error('Exception while proxying remote cover image', [
+                'url' => $url,
+                'message' => $e->getMessage(),
+                'trace' => \Illuminate\Support\Str::limit($e->getTraceAsString(), 500)
+            ]);
+            return $this->coverNotFoundResponse();
+        }
+    }
+
+    /**
+     * Return a standardized "cover not found" response
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    private function coverNotFoundResponse(): \Illuminate\Http\JsonResponse
+    {
+        return response()->json([
+            'error' => 'Cover not found',
+            'message' => 'Cover image file could not be found'
+        ], 404);
     }
 
 
@@ -364,17 +462,124 @@ class BookApiController extends Controller
             abort(404, 'No files found for this book.');
         }
         $zipFileName = str_replace(' ', '_', $book['title']) . '.zip';
-        $zipPath = storage_path('app/public/temp/' . $zipFileName);
+        
+        // Ensure temp directory exists
+        $tempDir = storage_path('app/public/temp');
+        if (!file_exists($tempDir)) {
+            if (!mkdir($tempDir, 0755, true)) {
+                Log::error('Failed to create temp directory', ['path' => $tempDir]);
+                abort(500, 'Failed to create temporary directory for zip archive.');
+            }
+        }
+        
+        $zipPath = $tempDir . '/' . $zipFileName;
         $zip = new ZipArchive();
-        if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
-            abort(500, 'Failed to create zip archive.');
+        
+        $result = $zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+        if ($result !== true) {
+            Log::error('Failed to open zip archive', [
+                'zipPath' => $zipPath,
+                'result' => $result,
+                'tempDir' => $tempDir,
+                'tempDirExists' => file_exists($tempDir),
+                'tempDirWritable' => is_writable($tempDir),
+            ]);
+            abort(500, 'Failed to create zip archive: ' . $result);
         }
+        
         foreach ($files as $file) {
-            $zip->addFile(Storage::disk('books')->path($file), basename($file));
+            $filePath = Storage::disk('books')->path($file);
+            if (!$zip->addFile($filePath, basename($file))) {
+                Log::warning('Failed to add file to zip', [
+                    'file' => $file,
+                    'filePath' => $filePath,
+                    'fileExists' => file_exists($filePath),
+                ]);
+            }
         }
-        $zip->close();
+        
+        if (!$zip->close()) {
+            Log::error('Failed to close zip archive', [
+                'zipPath' => $zipPath,
+                'numFiles' => $zip->numFiles,
+            ]);
+            abort(500, 'Failed to finalize zip archive.');
+        }
 
-        return response()->download($zipPath, $zipFileName)->deleteFileAfterSend(true);
+        // Verify the zip file exists and is readable before starting the stream
+        if (!file_exists($zipPath) || !is_readable($zipPath)) {
+            Log::error('Zip file not found or not readable for streaming', [
+                'zipPath' => $zipPath,
+                'exists' => file_exists($zipPath),
+                'readable' => is_readable($zipPath)
+            ]);
+            abort(500, 'Zip file is not accessible for download.');
+        }
+
+        // Get file size for Content-Length header
+        $fileSize = filesize($zipPath);
+        
+        // Use chunked transfer encoding for streaming large zip files
+        return response()->stream(
+            function () use ($zipPath) {
+                $handle = fopen($zipPath, 'rb');
+                if ($handle === false) {
+                    Log::error('Failed to open zip file for streaming', ['zipPath' => $zipPath]);
+                    // Don't abort here as headers are already sent
+                    return;
+                }
+                
+                try {
+                    while (!feof($handle)) {
+                        $chunk = fread($handle, 8192); // Read in 8KB chunks
+                        if ($chunk === false) {
+                            Log::error('Failed to read chunk from zip file', ['zipPath' => $zipPath]);
+                            break;
+                        }
+                        
+                        if (strlen($chunk) > 0) {
+                            echo $chunk;
+                            if (ob_get_level()) {
+                                ob_flush();
+                            }
+                            flush(); // Force output of current buffer
+                        }
+                        
+                        // Check if client disconnected
+                        if (connection_aborted()) {
+                            Log::info('Client disconnected during zip download', ['zipPath' => $zipPath]);
+                            break;
+                        }
+                    }
+                } catch (\Exception $e) {
+                    Log::error('Exception during zip file streaming', [
+                        'zipPath' => $zipPath,
+                        'message' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString()
+                    ]);
+                } finally {
+                    if (is_resource($handle)) {
+                        fclose($handle);
+                    }
+                    // Clean up the temporary file after streaming
+                    if (file_exists($zipPath)) {
+                        unlink($zipPath);
+                    }
+                }
+            },
+            200,
+            [
+                'Content-Type' => 'application/zip',
+                'Content-Disposition' => 'attachment; filename="' . $zipFileName . '"',
+                'Content-Length' => $fileSize,
+                'Cache-Control' => 'no-store, no-cache, must-revalidate',
+                'Pragma' => 'no-cache',
+                'Access-Control-Allow-Origin' => '*',
+                'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+                'Access-Control-Allow-Headers' => 'Content-Type, Authorization',
+                'Accept-Ranges' => 'bytes',
+            ]
+        );
     }
 
     public function queueDownload(Request $request)
@@ -898,5 +1103,475 @@ class BookApiController extends Controller
         ];
 
         return response()->json($manifest);
+    }
+
+    /**
+     * Get all authors with optional genre filtering, pagination, and sorting
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function authors(Request $request)
+    {
+        $genreId = $request->input('genre_id');
+        $genreName = $request->input('genre_name');
+        $page = max(1, (int) $request->input('page', 1));
+        $perPage = min(100, max(1, (int) $request->input('per_page', 50)));
+        $sort = $request->input('sort', 'name_asc');
+        $search = $request->input('search');
+
+        // Validate sort parameter
+        $allowedSorts = ['name_asc', 'name_desc', 'book_count_asc', 'book_count_desc'];
+        if (!in_array($sort, $allowedSorts)) {
+            $sort = 'name_asc';
+        }
+
+        // Build the base query
+        $query = \App\Models\Author::query()
+            ->select([
+                'authors.id',
+                'authors.name'
+            ])
+            ->withCount('books as book_count')
+            ->join('author_book', 'authors.id', '=', 'author_book.author_id')
+            ->join('books', 'author_book.book_id', '=', 'books.id');
+
+        // Add genre filtering if specified
+        if ($genreId || $genreName) {
+            $query->join('book_genre', 'books.id', '=', 'book_genre.book_id')
+                  ->join('genres', 'book_genre.genre_id', '=', 'genres.id');
+            
+            if ($genreId) {
+                $query->where('genres.id', $genreId);
+            } elseif ($genreName) {
+                $query->where('genres.name', $genreName);
+            }
+
+            // Add book count in specific genre
+            $query->selectRaw('COUNT(DISTINCT CASE WHEN genres.id = ? OR genres.name = ? THEN books.id END) as book_count_in_genre', 
+                             [$genreId, $genreName]);
+        } else {
+            // No genre filter, so book_count_in_genre equals total book_count
+            $query->selectRaw('COUNT(DISTINCT books.id) as book_count_in_genre');
+        }
+
+        // Add search functionality
+        if ($search) {
+            $query->where('authors.name', 'LIKE', '%' . $search . '%');
+        }
+
+        // Group by author to avoid duplicates
+        $query->groupBy('authors.id', 'authors.name');
+
+        // Add sorting
+        switch ($sort) {
+            case 'name_desc':
+                $query->orderBy('authors.name', 'desc');
+                break;
+            case 'book_count_asc':
+                $query->orderByRaw('COUNT(DISTINCT books.id) ASC');
+                break;
+            case 'book_count_desc':
+                $query->orderByRaw('COUNT(DISTINCT books.id) DESC');
+                break;
+            case 'name_asc':
+            default:
+                $query->orderBy('authors.name', 'asc');
+                break;
+        }
+
+        // Get total count before pagination - need to remove GROUP BY for accurate count
+        $countQuery = \App\Models\Author::query()
+            ->join('author_book', 'authors.id', '=', 'author_book.author_id')
+            ->join('books', 'author_book.book_id', '=', 'books.id');
+            
+        // Add same genre filtering as main query if present
+        if ($genreId || $genreName) {
+            $countQuery->join('book_genre', 'books.id', '=', 'book_genre.book_id')
+                      ->join('genres', 'book_genre.genre_id', '=', 'genres.id');
+            if ($genreId) {
+                $countQuery->where('genres.id', $genreId);
+            } elseif ($genreName) {
+                $countQuery->where('genres.name', $genreName);
+            }
+        }
+        
+        // Add search functionality if present
+        if ($search) {
+            $countQuery->where('authors.name', 'LIKE', '%' . $search . '%');
+        }
+        
+        $total = $countQuery->distinct()->count('authors.id');
+        
+        // Execute query with pagination
+        $offset = ($page - 1) * $perPage;
+        $authors = $query->offset($offset)->limit($perPage)->get();
+
+        // Get genres for each author if needed for response
+        $authorsWithGenres = $authors->map(function ($author) {
+            $author->genres = $author->books()
+                ->join('book_genre', 'books.id', '=', 'book_genre.book_id')
+                ->join('genres', 'book_genre.genre_id', '=', 'genres.id')
+                ->select('genres.name')
+                ->distinct()
+                ->pluck('name')
+                ->toArray();
+            
+            return [
+                'id' => $author->id,
+                'name' => $author->name,
+                'biography' => null, // Column doesn't exist in database
+                'book_count' => $author->book_count,
+                'book_count_in_genre' => $author->book_count_in_genre ?? $author->book_count,
+                'image_url' => null, // Column doesn't exist in database
+                'genres' => $author->genres
+            ];
+        });
+
+        // Calculate pagination info
+        $totalPages = ceil($total / $perPage);
+        $hasNext = $page < $totalPages;
+        $hasPrev = $page > 1;
+
+        return response()->json([
+            'authors' => $authorsWithGenres,
+            'pagination' => [
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'total_pages' => $totalPages,
+                'has_next' => $hasNext,
+                'has_prev' => $hasPrev
+            ]
+        ]);
+    }
+
+    /**
+     * Get all series with optional author filtering, pagination, and sorting
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function series(Request $request)
+    {
+        $authorId = $request->input('author_id');
+        $authorName = $request->input('author_name');
+        $page = max(1, (int) $request->input('page', 1));
+        $perPage = min(100, max(1, (int) $request->input('per_page', 50)));
+        $sort = $request->input('sort', 'name_asc');
+        $search = $request->input('search');
+
+        // Validate sort parameter
+        $allowedSorts = ['name_asc', 'name_desc', 'book_count_asc', 'book_count_desc'];
+        if (!in_array($sort, $allowedSorts)) {
+            $sort = 'name_asc';
+        }
+
+        // Build the base query
+        $query = \App\Models\Series::query()
+            ->select([
+                'series.id',
+                'series.name'
+            ])
+            ->withCount('books as book_count')
+            ->join('book_series', 'series.id', '=', 'book_series.series_id')
+            ->join('books', 'book_series.book_id', '=', 'books.id');
+
+        // Add author filtering if specified
+        if ($authorId || $authorName) {
+            $query->join('author_book', 'books.id', '=', 'author_book.book_id')
+                  ->join('authors', 'author_book.author_id', '=', 'authors.id');
+            
+            if ($authorId) {
+                $query->where('authors.id', $authorId);
+            } elseif ($authorName) {
+                $query->where('authors.name', $authorName);
+            }
+
+            // Add book count by specific author
+            $query->selectRaw('COUNT(DISTINCT CASE WHEN authors.id = ? OR authors.name = ? THEN books.id END) as book_count_by_author', 
+                             [$authorId, $authorName]);
+        } else {
+            // No author filter, so book_count_by_author equals total book_count
+            $query->selectRaw('COUNT(DISTINCT books.id) as book_count_by_author');
+        }
+
+        // Add search functionality
+        if ($search) {
+            $query->where('series.name', 'LIKE', '%' . $search . '%');
+        }
+
+        // Group by series to avoid duplicates
+        $query->groupBy('series.id', 'series.name');
+
+        // Add sorting
+        switch ($sort) {
+            case 'name_desc':
+                $query->orderBy('series.name', 'desc');
+                break;
+            case 'book_count_asc':
+                $query->orderByRaw('COUNT(DISTINCT books.id) ASC');
+                break;
+            case 'book_count_desc':
+                $query->orderByRaw('COUNT(DISTINCT books.id) DESC');
+                break;
+            case 'name_asc':
+            default:
+                $query->orderBy('series.name', 'asc');
+                break;
+        }
+
+        // Get total count before pagination - need to remove GROUP BY for accurate count
+        $countQuery = \App\Models\Series::query()
+            ->join('book_series', 'series.id', '=', 'book_series.series_id')
+            ->join('books', 'book_series.book_id', '=', 'books.id');
+            
+        // Add same author filtering as main query if present
+        if ($authorId || $authorName) {
+            $countQuery->join('author_book', 'books.id', '=', 'author_book.book_id')
+                      ->join('authors', 'author_book.author_id', '=', 'authors.id');
+            if ($authorId) {
+                $countQuery->where('authors.id', $authorId);
+            } elseif ($authorName) {
+                $countQuery->where('authors.name', $authorName);
+            }
+        }
+        
+        // Add search functionality if present
+        if ($search) {
+            $countQuery->where('series.name', 'LIKE', '%' . $search . '%');
+        }
+        
+        $total = $countQuery->distinct()->count('series.id');
+        
+        // Execute query with pagination
+        $offset = ($page - 1) * $perPage;
+        $series = $query->offset($offset)->limit($perPage)->get();
+
+        // Get authors for each series if needed for response
+        $seriesWithAuthors = $series->map(function ($series) {
+            $series->authors = $series->books()
+                ->join('author_book', 'books.id', '=', 'author_book.book_id')
+                ->join('authors', 'author_book.author_id', '=', 'authors.id')
+                ->select('authors.name')
+                ->distinct()
+                ->pluck('name')
+                ->toArray();
+            
+            return [
+                'id' => $series->id,
+                'name' => $series->name,
+                'description' => null, // Column doesn't exist in database
+                'book_count' => $series->book_count,
+                'book_count_by_author' => $series->book_count_by_author ?? $series->book_count,
+                'authors' => $series->authors
+            ];
+        });
+
+        // Calculate pagination info
+        $totalPages = ceil($total / $perPage);
+        $hasNext = $page < $totalPages;
+        $hasPrev = $page > 1;
+
+        return response()->json([
+            'series' => $seriesWithAuthors,
+            'pagination' => [
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'total_pages' => $totalPages,
+                'has_next' => $hasNext,
+                'has_prev' => $hasPrev
+            ]
+        ]);
+    }
+
+    /**
+     * Enhanced books endpoint with proper SQL-based filtering
+     * 
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function booksEnhanced(Request $request)
+    {
+        $page = max(1, (int) $request->input('page', 1));
+        $perPage = min(100, max(1, (int) $request->input('per_page', 15)));
+        $withCover = $request->boolean('with_cover', true);
+        $inlineCovers = $request->boolean('inlineCovers', false);
+        
+        // Filtering parameters
+        $genreId = $request->input('genre_id');
+        $genreName = $request->input('genre_name');
+        $authorId = $request->input('author_id');
+        $authorName = $request->input('author_name');
+        $seriesId = $request->input('series_id');
+        $seriesName = $request->input('series_name');
+        $search = $request->input('search');
+        $sort = $request->input('sort', 'title_asc');
+
+        // Validate sort parameter
+        $allowedSorts = ['title_asc', 'title_desc', 'created_at_asc', 'created_at_desc', 'author_asc', 'author_desc'];
+        if (!in_array($sort, $allowedSorts)) {
+            $sort = 'title_asc';
+        }
+
+        // Build the base query
+        $query = \App\Models\Book::query()
+            ->with(['authors', 'narrators', 'genres', 'series'])
+            ->select('books.*');
+
+        // Add genre filtering
+        if ($genreId || $genreName) {
+            $query->join('book_genre', 'books.id', '=', 'book_genre.book_id')
+                  ->join('genres', 'book_genre.genre_id', '=', 'genres.id');
+            
+            if ($genreId) {
+                $query->where('genres.id', $genreId);
+            } elseif ($genreName) {
+                $query->where('genres.name', $genreName);
+            }
+        }
+
+        // Add author filtering
+        if ($authorId || $authorName) {
+            $query->join('author_book', 'books.id', '=', 'author_book.book_id')
+                  ->join('authors', 'author_book.author_id', '=', 'authors.id');
+            
+            if ($authorId) {
+                $query->where('authors.id', $authorId);
+            } elseif ($authorName) {
+                $query->where('authors.name', 'LIKE', '%' . $authorName . '%');
+            }
+        }
+
+        // Add series filtering
+        if ($seriesId || $seriesName) {
+            $query->join('book_series', 'books.id', '=', 'book_series.book_id')
+                  ->join('series', 'book_series.series_id', '=', 'series.id');
+            
+            if ($seriesId) {
+                $query->where('series.id', $seriesId);
+            } elseif ($seriesName) {
+                $query->where('series.name', 'LIKE', '%' . $seriesName . '%');
+            }
+        }
+
+        // Add search functionality (title search)
+        if ($search) {
+            $query->where('books.title', 'LIKE', '%' . $search . '%');
+        }
+
+        // Group by book to avoid duplicates from joins
+        $query->groupBy('books.id');
+
+        // Add sorting
+        switch ($sort) {
+            case 'title_desc':
+                $query->orderBy('books.title', 'desc');
+                break;
+            case 'created_at_asc':
+                $query->orderBy('books.created_at', 'asc');
+                break;
+            case 'created_at_desc':
+                $query->orderBy('books.created_at', 'desc');
+                break;
+            case 'author_asc':
+                if (!($authorId || $authorName)) {
+                    // Only join authors if not already joined for filtering
+                    $query->leftJoin('author_book as ab_sort', 'books.id', '=', 'ab_sort.book_id')
+                          ->leftJoin('authors as a_sort', 'ab_sort.author_id', '=', 'a_sort.id')
+                          ->orderBy('a_sort.name', 'asc');
+                } else {
+                    $query->orderBy('authors.name', 'asc');
+                }
+                break;
+            case 'author_desc':
+                if (!($authorId || $authorName)) {
+                    $query->leftJoin('author_book as ab_sort', 'books.id', '=', 'ab_sort.book_id')
+                          ->leftJoin('authors as a_sort', 'ab_sort.author_id', '=', 'a_sort.id')
+                          ->orderBy('a_sort.name', 'desc');
+                } else {
+                    $query->orderBy('authors.name', 'desc');
+                }
+                break;
+            case 'title_asc':
+            default:
+                $query->orderBy('books.title', 'asc');
+                break;
+        }
+
+        // Get total count before pagination - create clean count query without GROUP BY
+        $countQuery = \App\Models\Book::query();
+        
+        // Add same filtering as main query
+        if ($genreId || $genreName) {
+            $countQuery->join('book_genre', 'books.id', '=', 'book_genre.book_id')
+                      ->join('genres', 'book_genre.genre_id', '=', 'genres.id');
+            if ($genreId) {
+                $countQuery->where('genres.id', $genreId);
+            } elseif ($genreName) {
+                $countQuery->where('genres.name', $genreName);
+            }
+        }
+        
+        if ($authorId || $authorName) {
+            $countQuery->join('author_book', 'books.id', '=', 'author_book.book_id')
+                      ->join('authors', 'author_book.author_id', '=', 'authors.id');
+            if ($authorId) {
+                $countQuery->where('authors.id', $authorId);
+            } elseif ($authorName) {
+                $countQuery->where('authors.name', $authorName);
+            }
+        }
+        
+        if ($seriesId || $seriesName) {
+            $countQuery->join('book_series', 'books.id', '=', 'book_series.book_id')
+                      ->join('series', 'book_series.series_id', '=', 'series.id');
+            if ($seriesId) {
+                $countQuery->where('series.id', $seriesId);
+            } elseif ($seriesName) {
+                $countQuery->where('series.name', $seriesName);
+            }
+        }
+        
+        if ($search) {
+            $countQuery->where('books.title', 'LIKE', '%' . $search . '%');
+        }
+        
+        $total = $countQuery->distinct()->count('books.id');
+        
+        // Execute query with pagination
+        $offset = ($page - 1) * $perPage;
+        $books = $query->offset($offset)->limit($perPage)->get();
+
+        // Transform books to match API spec
+        $transformedBooks = $books->map(function ($book) use ($withCover, $inlineCovers) {
+            return $this->getBookWithCover($book->toArray(), $withCover, $inlineCovers);
+        });
+
+        // Calculate pagination info
+        $totalPages = ceil($total / $perPage);
+        $hasNext = $page < $totalPages;
+        $hasPrev = $page > 1;
+
+        return response()->json([
+            'data' => $transformedBooks,
+            'meta' => [
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => $totalPages,
+                'from' => $total > 0 ? $offset + 1 : null,
+                'to' => $total > 0 ? min($offset + $perPage, $total) : null,
+            ],
+            'pagination' => [
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'total_pages' => $totalPages,
+                'has_next' => $hasNext,
+                'has_prev' => $hasPrev
+            ]
+        ]);
     }
 }
