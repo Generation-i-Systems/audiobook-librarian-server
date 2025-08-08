@@ -29,19 +29,36 @@ class RotateLogs extends Command
     public function handle()
     {
         $logPath = storage_path('logs');
-
-        // Close all log handlers to release file handles
-        $logger = app('log');
-        foreach ($logger->getHandlers() as $handler) {
-            if (method_exists($handler, 'close')) {
-                $handler->close();
+        $today = now()->format('Y-m-d');
+        
+        try {
+            // Get all log files that aren't from today
+            $logFiles = glob($logPath . '/laravel-*.log*');
+            
+            foreach ($logFiles as $file) {
+                // Skip today's log file
+                if (str_contains($file, 'laravel-' . $today)) {
+                    continue;
+                }
+                
+                // If the file doesn't have a date in the name, rename it
+                if (!preg_match('/laravel-\d{4}-\d{2}-\d{2}/', $file)) {
+                    $newName = preg_replace('/(laravel)(\.log)?$/', '$1-' . $today . '$2', $file);
+                    if ($newName !== $file) {
+                        rename($file, $newName);
+                    }
+                }
             }
+            
+            // Clear the current log file
+            file_put_contents($logPath . '/laravel.log', '');
+            
+            $this->info('Logs have been rotated successfully.');
+            return 0;
+            
+        } catch (\Exception $e) {
+            $this->error('Error rotating logs: ' . $e->getMessage());
+            return 1;
         }
-
-        // Reopen log handlers to create new log file
-        $logger->info('Log file rotated at ' . now());
-
-        $this->info('Logs have been rotated successfully.');
-        return 0;
     }
 }
