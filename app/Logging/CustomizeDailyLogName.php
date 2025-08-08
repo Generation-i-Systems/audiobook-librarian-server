@@ -16,14 +16,10 @@ class CustomizeDailyLogName
     {
         foreach ($logger->getHandlers() as $handler) {
             if ($handler instanceof RotatingFileHandler) {
-                // Set the filename format to ensure rotation happens daily
-                $handler->setFilenameFormat('{filename}-{date}', 'Y-m-d');
-                
-                // Set the date format for the filename to ensure daily rotation
-                $handler->setFilenameFormat('{filename}-{date}', 'Y-m-d');
-                
-                // Set the maximum number of log files to keep (14 days)
-                $handler->setMaxFiles(14);
+                // Use reflection to set the filename format if the method exists
+                if (method_exists($handler, 'setFilenameFormat')) {
+                    $handler->setFilenameFormat('{filename}-{date}', 'Y-m-d');
+                }
             }
         }
     }
