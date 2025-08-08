@@ -174,16 +174,16 @@ class ImportBookFromDirectoryJob implements ShouldQueue
                 }
             }
             $meta = $this->extractMetadataAbs($fullPath);
-            
+
             // Map ID3 tags to book fields: artist = author, composer = narrator, date = published_date
             if (!empty($tags['artist']) && empty($bookData['author'])) {
                 $bookData['author'] = [$tags['artist']];
             }
-            
+
             if (!empty($tags['composer'])) {
                 $bookData['narrator'] = $tags['composer'];
             }
-            
+
             if (!empty($tags['date'])) {
                 // Extract year from date (e.g., "2025-06-17" -> "2025")
                 $year = substr($tags['date'], 0, 4);
@@ -191,7 +191,7 @@ class ImportBookFromDirectoryJob implements ShouldQueue
                     $bookData['publishedYear'] = (int)$year;
                 }
             }
-            
+
             if (!empty($tags['description'])) {
                 $bookData['description'] = $tags['description'];
             } elseif (!empty($meta['description'])) {

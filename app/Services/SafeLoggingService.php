@@ -44,15 +44,15 @@ class SafeLoggingService
     protected static function checkLogsDirectory(): void
     {
         self::$logsDirectoryChecked = true;
-        
+
         $logsPath = storage_path('logs');
-        
+
         try {
             // Create logs directory if it doesn't exist
             if (!File::exists($logsPath)) {
                 File::makeDirectory($logsPath, 0755, true);
             }
-            
+
             // Check if directory is writable
             self::$logsDirectoryWritable = is_writable($logsPath);
         } catch (\Exception $e) {
@@ -70,7 +70,7 @@ class SafeLoggingService
         }
 
         $logsPath = storage_path('logs');
-        
+
         return [
             'exists' => File::exists($logsPath),
             'writable' => self::$logsDirectoryWritable,

@@ -18,19 +18,19 @@ class OptimizedBookService
         try {
             $perPage = min($perPage, 10); // Hard limit
             $offset = ($page - 1) * $perPage;
-            
+
             // Base query
             $whereConditions = [];
             $params = [];
-            
+
             // Apply search filter
             if (!empty($filters['search'])) {
                 $whereConditions[] = '(books.title LIKE ? OR books.description LIKE ?)';
                 $params[] = '%' . $filters['search'] . '%';
                 $params[] = '%' . $filters['search'] . '%';
             }
-            
-            // Apply author filter  
+
+            // Apply author filter
             if (!empty($filters['author'])) {
                 $whereConditions[] = 'EXISTS (
                     SELECT 1 FROM author_book ab 
@@ -39,7 +39,7 @@ class OptimizedBookService
                 )';
                 $params[] = '%' . $filters['author'] . '%';
             }
-            
+
             // Apply genre filter
             if (!empty($filters['genre'])) {
                 $whereConditions[] = 'EXISTS (
@@ -49,9 +49,9 @@ class OptimizedBookService
                 )';
                 $params[] = $filters['genre'];
             }
-            
+
             $whereClause = !empty($whereConditions) ? 'WHERE ' . implode(' AND ', $whereConditions) : '';
-            
+
             // Get books with minimal fields
             $books = DB::select("
                 SELECT books.id, books.title, books.cover_image, books.directory_path, books.description,
@@ -67,7 +67,7 @@ class OptimizedBookService
                 ORDER BY books.title ASC
                 LIMIT {$perPage} OFFSET {$offset}
             ", $params);
-            
+
             // Get total count
             $totalQuery = "
                 SELECT COUNT(DISTINCT books.id) as total
@@ -79,7 +79,7 @@ class OptimizedBookService
                 {$whereClause}
             ";
             $total = DB::scalar($totalQuery, $params) ?? 0;
-            
+
             // Process results efficiently
             $processedBooks = [];
             foreach ($books as $book) {
@@ -87,13 +87,13 @@ class OptimizedBookService
                     'id' => $book->id,
                     'title' => $book->title ?? 'Untitled',
                     'author' => !empty($book->authors) ? explode('|', $book->authors) : ['Unknown'],
-                    'genre' => !empty($book->genres) ? explode('|', $book->genres) : ['Unknown'], 
+                    'genre' => !empty($book->genres) ? explode('|', $book->genres) : ['Unknown'],
                     'coverImage' => $this->processCoverImage($book->cover_image),
                     'description' => substr($book->description ?? 'No description available.', 0, 200),
                     'series' => [], // Skip series for now to save memory
                 ];
             }
-            
+
             return [
                 'data' => $processedBooks,
                 'total' => $total,
@@ -101,10 +101,9 @@ class OptimizedBookService
                 'currentPage' => $page,
                 'lastPage' => max(1, ceil($total / $perPage)),
             ];
-            
         } catch (\Exception $e) {
             Log::error('OptimizedBookService failed: ' . $e->getMessage());
-            
+
             return [
                 'data' => [[
                     'id' => '1',
@@ -122,7 +121,7 @@ class OptimizedBookService
             ];
         }
     }
-    
+
     /**
      * Get unique values for filters without model overhead
      */
@@ -138,7 +137,7 @@ class OptimizedBookService
                         ->limit(100) // Limit to prevent memory issues
                         ->pluck('name')
                         ->toArray();
-                        
+
                 case 'genre':
                     return DB::table('genres')
                         ->select('name')
@@ -147,7 +146,7 @@ class OptimizedBookService
                         ->limit(50) // Limit to prevent memory issues
                         ->pluck('name')
                         ->toArray();
-                        
+
                 case 'series':
                     return DB::table('series')
                         ->select('name')
@@ -156,7 +155,7 @@ class OptimizedBookService
                         ->limit(100) // Limit to prevent memory issues
                         ->pluck('name')
                         ->toArray();
-                        
+
                 default:
                     return [];
             }
@@ -165,7 +164,7 @@ class OptimizedBookService
             return [];
         }
     }
-    
+
     /**
      * Get recent books efficiently
      */
@@ -183,7 +182,7 @@ class OptimizedBookService
                 ORDER BY books.created_at DESC
                 LIMIT {$limit}
             ");
-            
+
             $processedBooks = [];
             foreach ($books as $book) {
                 $processedBooks[] = [
@@ -194,15 +193,14 @@ class OptimizedBookService
                     'createdAt' => $book->created_at,
                 ];
             }
-            
+
             return $processedBooks;
-            
         } catch (\Exception $e) {
             Log::error('Error getting recent books: ' . $e->getMessage());
             return [];
         }
     }
-    
+
     /**
      * Process cover image URL efficiently
      */
@@ -211,11 +209,11 @@ class OptimizedBookService
         if (empty($coverImage)) {
             return asset('images/placeholder.png');
         }
-        
+
         if (str_starts_with($coverImage, ['http://', 'https://', '/'])) {
             return $coverImage;
         }
-        
+
         return route('cover.proxy', ['path' => rawurlencode($coverImage)]);
     }
 }

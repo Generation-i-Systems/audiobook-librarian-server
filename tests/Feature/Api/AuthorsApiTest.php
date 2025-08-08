@@ -14,7 +14,7 @@ class AuthorsApiTest extends ApiTestCase
     {
         // Create test data
         $authors = Author::factory()->count(3)->create();
-        
+
         // Make each author have at least one book
         foreach ($authors as $author) {
             $book = Book::factory()->create();
@@ -55,25 +55,25 @@ class AuthorsApiTest extends ApiTestCase
         // Create genres
         $fantasyGenre = Genre::factory()->create(['name' => 'Fantasy']);
         $scifiGenre = Genre::factory()->create(['name' => 'Science Fiction']);
-        
+
         // Create authors
         $fantasyAuthor = Author::factory()->create(['name' => 'Fantasy Author']);
         $scifiAuthor = Author::factory()->create(['name' => 'SciFi Author']);
         $bothAuthor = Author::factory()->create(['name' => 'Both Genres Author']);
-        
+
         // Create books and attach genres/authors
         $fantasyBook = Book::factory()->create();
         $fantasyBook->authors()->attach($fantasyAuthor);
         $fantasyBook->genres()->attach($fantasyGenre);
-        
+
         $scifiBook = Book::factory()->create();
         $scifiBook->authors()->attach($scifiAuthor);
         $scifiBook->genres()->attach($scifiGenre);
-        
+
         $bothBook1 = Book::factory()->create();
         $bothBook1->authors()->attach($bothAuthor);
         $bothBook1->genres()->attach($fantasyGenre);
-        
+
         $bothBook2 = Book::factory()->create();
         $bothBook2->authors()->attach($bothAuthor);
         $bothBook2->genres()->attach($scifiGenre);
@@ -83,7 +83,7 @@ class AuthorsApiTest extends ApiTestCase
 
         $response->assertStatus(200);
         $data = $response->json();
-        
+
         $authorNames = array_column($data['authors'], 'name');
         $this->assertContains('Fantasy Author', $authorNames);
         $this->assertContains('Both Genres Author', $authorNames);
@@ -94,13 +94,13 @@ class AuthorsApiTest extends ApiTestCase
     {
         // Create genre
         $genre = Genre::factory()->create(['name' => 'Mystery']);
-        
+
         // Create author with book in mystery genre
         $author = Author::factory()->create(['name' => 'Mystery Author']);
         $book = Book::factory()->create();
         $book->authors()->attach($author);
         $book->genres()->attach($genre);
-        
+
         // Create author without mystery books
         $otherAuthor = Author::factory()->create(['name' => 'Romance Author']);
         $otherBook = Book::factory()->create();
@@ -110,7 +110,7 @@ class AuthorsApiTest extends ApiTestCase
 
         $response->assertStatus(200);
         $data = $response->json();
-        
+
         $authorNames = array_column($data['authors'], 'name');
         $this->assertContains('Mystery Author', $authorNames);
         $this->assertNotContains('Romance Author', $authorNames);
@@ -128,7 +128,7 @@ class AuthorsApiTest extends ApiTestCase
         // Test first page
         $response = $this->getJson('/api/v1/authors?page=1&per_page=10');
         $response->assertStatus(200);
-        
+
         $data = $response->json();
         $this->assertEquals(1, $data['pagination']['current_page']);
         $this->assertEquals(10, $data['pagination']['per_page']);
@@ -140,7 +140,7 @@ class AuthorsApiTest extends ApiTestCase
         // Test second page
         $response = $this->getJson('/api/v1/authors?page=2&per_page=10');
         $response->assertStatus(200);
-        
+
         $data = $response->json();
         $this->assertEquals(2, $data['pagination']['current_page']);
         $this->assertTrue($data['pagination']['has_prev']);
@@ -153,7 +153,7 @@ class AuthorsApiTest extends ApiTestCase
             $book = Book::factory()->create();
             $book->authors()->attach($author);
         });
-        
+
         Author::factory()->create(['name' => 'Stephen King'])->each(function ($author) {
             $book = Book::factory()->create();
             $book->authors()->attach($author);
@@ -163,10 +163,10 @@ class AuthorsApiTest extends ApiTestCase
 
         $response->assertStatus(200);
         $data = $response->json();
-        
+
         $this->assertGreaterThanOrEqual(1, $data['pagination']['total']);
         $authorNames = array_column($data['authors'], 'name');
-        
+
         foreach ($authorNames as $name) {
             $this->assertStringContainsStringIgnoringCase('Brandon', $name);
         }
@@ -177,13 +177,13 @@ class AuthorsApiTest extends ApiTestCase
         // Create authors with different names and book counts
         $authorA = Author::factory()->create(['name' => 'Alpha Author']);
         $authorZ = Author::factory()->create(['name' => 'Zeta Author']);
-        
+
         // Give Alpha Author more books
         for ($i = 0; $i < 5; $i++) {
             $book = Book::factory()->create();
             $book->authors()->attach($authorA);
         }
-        
+
         // Give Zeta Author fewer books
         for ($i = 0; $i < 2; $i++) {
             $book = Book::factory()->create();
@@ -194,10 +194,10 @@ class AuthorsApiTest extends ApiTestCase
         $response = $this->getJson('/api/v1/authors?sort=name_asc');
         $response->assertStatus(200);
         $data = $response->json();
-        
+
         $firstAuthor = $data['authors'][0] ?? null;
         $lastAuthor = $data['authors'][count($data['authors']) - 1] ?? null;
-        
+
         if ($firstAuthor && $lastAuthor && count($data['authors']) > 1) {
             $this->assertLessThanOrEqual($lastAuthor['name'], $firstAuthor['name']);
         }
@@ -206,11 +206,11 @@ class AuthorsApiTest extends ApiTestCase
         $response = $this->getJson('/api/v1/authors?sort=book_count_desc');
         $response->assertStatus(200);
         $data = $response->json();
-        
+
         // Find our test authors in the results
         $alphaAuthor = collect($data['authors'])->firstWhere('name', 'Alpha Author');
         $zetaAuthor = collect($data['authors'])->firstWhere('name', 'Zeta Author');
-        
+
         if ($alphaAuthor && $zetaAuthor) {
             $this->assertGreaterThan($zetaAuthor['book_count'], $alphaAuthor['book_count']);
         }
@@ -245,18 +245,18 @@ class AuthorsApiTest extends ApiTestCase
     {
         // Create genre
         $genre = Genre::factory()->create(['name' => 'Fantasy']);
-        
+
         // Create author with multiple books, some in fantasy
         $author = Author::factory()->create();
-        
+
         // Create 3 fantasy books
         for ($i = 0; $i < 3; $i++) {
             $book = Book::factory()->create();
             $book->authors()->attach($author);
             $book->genres()->attach($genre);
         }
-        
-        // Create 2 non-fantasy books  
+
+        // Create 2 non-fantasy books
         for ($i = 0; $i < 2; $i++) {
             $book = Book::factory()->create();
             $book->authors()->attach($author);
@@ -266,9 +266,9 @@ class AuthorsApiTest extends ApiTestCase
 
         $response->assertStatus(200);
         $data = $response->json();
-        
+
         $testAuthor = collect($data['authors'])->firstWhere('id', $author->id);
-        
+
         $this->assertNotNull($testAuthor);
         $this->assertEquals(5, $testAuthor['book_count']); // Total books
         $this->assertEquals(3, $testAuthor['book_count_in_genre']); // Books in fantasy genre

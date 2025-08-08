@@ -12,20 +12,21 @@ use Laravel\Sanctum\Sanctum;
 
 abstract class ApiTestCase extends TestCase
 {
-    use RefreshDatabase, WithFaker;
+    use RefreshDatabase;
+    use WithFaker;
 
     protected User $user;
 
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Create a test user and authenticate
         $this->user = User::factory()->create([
             'role' => 'user',
             'email_verified_at' => now(),
         ]);
-        
+
         // Authenticate the user
         Sanctum::actingAs($this->user);
     }

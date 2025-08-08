@@ -8,7 +8,6 @@ use App\Services\MongoService;
 use App\Services\MySqlService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
-use Tests\Mocks\MockDocumentStoreService;
 
 class DocumentStoreServiceProvider extends ServiceProvider
 {
@@ -41,14 +40,14 @@ class DocumentStoreServiceProvider extends ServiceProvider
     {
         $uri = config('mongodb.uri');
         $database = config('mongodb.database');
-        
+
         if (!$uri || !$database) {
             throw new \RuntimeException(
                 "MongoDB service requested but configuration is missing. " .
                 "Set MONGODB_URI and MONGODB_DB environment variables or change DOCUMENT_STORE_DRIVER to 'mysql'."
             );
         }
-        
+
         return new MongoService();
     }
 

@@ -22,7 +22,7 @@ class BookControllerDebugTest extends TestCase
         parent::setUp();
 
         // Create a mock document store service
-        $this->documentStore = new MockDocumentStoreService;
+        $this->documentStore = new MockDocumentStoreService();
 
         // Mock the required services
         $mockGoogleBooksService = $this->createMock(\App\Services\GoogleBooksApiService::class);
@@ -75,7 +75,7 @@ class BookControllerDebugTest extends TestCase
             'driver' => 'local',
             'root' => storage_path('app/books'),
         ]);
-        putenv('BOOK_STORAGE_PATH='.storage_path('app/books'));
+        putenv('BOOK_STORAGE_PATH=' . storage_path('app/books'));
 
         // Add logging to trace execution
         Log::spy();
@@ -103,13 +103,13 @@ class BookControllerDebugTest extends TestCase
         $response = $this->controller->store($request);
 
         // Output debug info
-        echo 'Response: '.json_encode($response)."\n";
+        echo 'Response: ' . json_encode($response) . "\n";
 
         // Output logs
         $logs = Log::logged();
-        echo 'Logs: '.json_encode($logs)."\n";
-        echo 'Books after controller store: '.json_encode($this->documentStore->getAllBooks())."\n";
-        echo 'Raw books array: '.json_encode($this->documentStore->dumpAllBooks())."\n";
+        echo 'Logs: ' . json_encode($logs) . "\n";
+        echo 'Books after controller store: ' . json_encode($this->documentStore->getAllBooks()) . "\n";
+        echo 'Raw books array: ' . json_encode($this->documentStore->dumpAllBooks()) . "\n";
 
         // Get all books from the mock store
         $books = $this->documentStore->getAllBooks();

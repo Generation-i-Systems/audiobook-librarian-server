@@ -9,7 +9,8 @@ use App\Traits\CamelCaseAttributeAccess;
 
 class Bookmark extends Model
 {
-    use HasFactory, CamelCaseAttributeAccess;
+    use HasFactory;
+    use CamelCaseAttributeAccess;
 
     protected $fillable = [
         'user_id',

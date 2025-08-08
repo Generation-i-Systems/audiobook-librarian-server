@@ -37,7 +37,7 @@ class BookController extends Controller
         // Memory monitoring
         $memoryStart = memory_get_usage();
         Log::debug('BookController index start', ['memory_mb' => round($memoryStart / 1024 / 1024, 2)]);
-        
+
         // Get pagination and filter parameters from request
         $page = max(1, (int) $request->get('page', 1));
         $perPage = min((int) session('main_per_page', 12), 12); // Reduce from 24 to 12 max
@@ -132,11 +132,11 @@ class BookController extends Controller
 
                 if ($subField && is_array($item) && isset($item[$subField])) {
                     $value = $item[$subField];
-                } else if (is_array($item) && isset($item['name'])) {
+                } elseif (is_array($item) && isset($item['name'])) {
                     $value = $item['name'];
-                } else if (is_string($item)) {
+                } elseif (is_string($item)) {
                     $value = $item;
-                } else if (is_array($item) && count($item) === 1) {
+                } elseif (is_array($item) && count($item) === 1) {
                     $value = reset($item);
                 }
 
@@ -162,13 +162,13 @@ class BookController extends Controller
         try {
             // Use the document store service to get recent books with minimal processing
             $recentBooks = $this->documentStoreService->getRecentBooks($limit, 7); // Only 7 days back
-            
+
             // Minimal processing to reduce memory usage
             $processedBooks = [];
             foreach ($recentBooks as $book) {
                 $processedBooks[] = $this->ensureBookFieldsMinimal($book);
             }
-            
+
             return $processedBooks;
         } catch (\Exception $e) {
             // Log the error and return an empty array as fallback
@@ -505,34 +505,33 @@ class BookController extends Controller
         if (empty($coverImage)) {
             return asset('images/placeholder.png');
         }
-        
+
         // If it's already a full URL, return as-is (avoid double processing)
         if (Str::startsWith($coverImage, ['http://', 'https://'])) {
             return $coverImage;
         }
-        
+
         // If it's an absolute path (like /images/placeholder.png), convert to asset URL
         if (Str::startsWith($coverImage, '/')) {
             return url($coverImage);
         }
-        
+
         // Handle relative paths that might need directory path prefix
         $finalCoverPath = $coverImage;
         $bookStoragePath = env('BOOK_STORAGE_PATH', '/media/audiobooks/books');
-        
+
         // If we have a directory path and the cover image doesn't contain it
         if (!empty($directoryPath) && !Str::contains($coverImage, $directoryPath)) {
             // Check if the file exists without directory path
             $coverWithoutDir = rtrim($bookStoragePath, '/') . '/' . ltrim($coverImage, '/');
             $coverWithDir = rtrim($bookStoragePath, '/') . '/' . ltrim($directoryPath, '/') . '/' . ltrim($coverImage, '/');
-            
+
             // If file doesn't exist without directory but does exist with directory, use directory version
             if (!file_exists($coverWithoutDir) && file_exists($coverWithDir)) {
                 $finalCoverPath = $directoryPath . '/' . $coverImage;
             }
         }
-        
+
         return route('cover.proxy', ['path' => rawurlencode($finalCoverPath)]);
     }
-
 }

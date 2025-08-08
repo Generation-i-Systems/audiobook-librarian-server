@@ -48,7 +48,7 @@ class AIReviewController extends Controller
         }
 
         $aiSuggestions = json_decode($book->ai_suggestions, true);
-        
+
         return view('admin.ai-review.show', compact('book', 'aiSuggestions'));
     }
 
@@ -125,7 +125,7 @@ class AIReviewController extends Controller
                 if (in_array('series', $selectedFields) && $aiSuggestions['series']) {
                     $series = Series::firstOrCreate(['name' => trim($aiSuggestions['series'])]);
                     $seriesNumber = $aiSuggestions['series_number'] ?? 1;
-                    
+
                     $book->series()->sync([
                         $series->id => ['series_number' => $seriesNumber]
                     ]);
@@ -138,12 +138,11 @@ class AIReviewController extends Controller
                 $book->ai_suggestions = null; // Clear suggestions after applying
                 $book->needs_review = false;
                 $book->needs_review_reasons = null;
-                
+
                 $book->save();
             });
 
             return response()->json(['success' => true, 'message' => 'AI suggestions applied successfully']);
-
         } catch (\Exception $e) {
             return response()->json(['error' => 'Failed to apply suggestions: ' . $e->getMessage()], 500);
         }
@@ -194,7 +193,7 @@ class AIReviewController extends Controller
         }
 
         return response()->json([
-            'success' => true, 
+            'success' => true,
             'message' => "Applied AI suggestions to {$appliedCount} books"
         ]);
     }
@@ -207,23 +206,23 @@ class AIReviewController extends Controller
         DB::transaction(function () use ($book, $aiSuggestions) {
             // Apply basic fields
             $book->title = $aiSuggestions['title'];
-            
+
             if ($aiSuggestions['year']) {
                 $book->release_date = $aiSuggestions['year'] . '-01-01';
             }
-            
+
             if ($aiSuggestions['description']) {
                 $book->description = $aiSuggestions['description'];
             }
-            
+
             if ($aiSuggestions['publisher']) {
                 $book->publisher = $aiSuggestions['publisher'];
             }
-            
+
             if ($aiSuggestions['isbn']) {
                 $book->isbn = $aiSuggestions['isbn'];
             }
-            
+
             if ($aiSuggestions['language']) {
                 $book->language = $aiSuggestions['language'];
             }
@@ -259,7 +258,7 @@ class AIReviewController extends Controller
             if ($aiSuggestions['series']) {
                 $series = Series::firstOrCreate(['name' => trim($aiSuggestions['series'])]);
                 $seriesNumber = $aiSuggestions['series_number'] ?? 1;
-                
+
                 $book->series()->sync([
                     $series->id => ['series_number' => $seriesNumber]
                 ]);
@@ -272,7 +271,7 @@ class AIReviewController extends Controller
             $book->ai_suggestions = null;
             $book->needs_review = false;
             $book->needs_review_reasons = null;
-            
+
             $book->save();
         });
     }

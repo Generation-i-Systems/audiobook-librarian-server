@@ -26,19 +26,19 @@ class BookImportService
             $book = new Book();
             $book->title = $metadata['title'] ?? 'Unknown Title';
             $book->description = $metadata['description'] ?? null;
-            
+
             // Handle year/release_date
             if (isset($metadata['year']) && $metadata['year']) {
                 $book->release_date = $metadata['year'] . '-01-01'; // Convert year to date
             }
-            
+
             $book->isbn = $metadata['isbn'] ?? null;
             $book->language = $metadata['language'] ?? 'en';
             $book->source = 'import';
-            
+
             // Store directory path for the audiobook files
             $book->directory_path = $this->generateDirectoryPath($metadata);
-            
+
             // Handle duration (should be in seconds as integer)
             if (isset($metadata['duration'])) {
                 if (is_string($metadata['duration']) && preg_match('/(\d{2}):(\d{2}):(\d{2})/', $metadata['duration'], $matches)) {
@@ -48,7 +48,7 @@ class BookImportService
                     $book->duration = (int)$metadata['duration'];
                 }
             }
-            
+
             // Handle cover image with download support
             if (!empty($metadata['cover_path'])) {
                 $book->cover_image = $metadata['cover_path'];
@@ -76,11 +76,11 @@ class BookImportService
             if (!empty($metadata['google_books_raw'])) {
                 $book->google_books_info = $metadata['google_books_raw'];
             }
-            
+
             if (!empty($metadata['audiobook_bay_raw'])) {
                 $book->audiobook_bay_info = $metadata['audiobook_bay_raw'];
             }
-            
+
             // Calculate and store audio file information if available
             if (!empty($audiobook['files'])) {
                 $audioInfo = $this->calculateAudioInfo($audiobook['files']);
@@ -90,7 +90,7 @@ class BookImportService
                 }
                 $book->file_tags = $audioInfo['tags'];
             }
-            
+
             // Set data source
             $book->source = $options['data_source'] ?? 'import';
 
@@ -122,12 +122,12 @@ class BookImportService
             // Handle series with multi-book support
             if (!empty($metadata['series'])) {
                 $series = Series::firstOrCreate(['name' => trim($metadata['series'])]);
-                
+
                 // Handle multi-book entries (e.g., books 2-3 combined)
                 if (!empty($metadata['multi_book_numbers'])) {
                     $firstNumber = $metadata['multi_book_numbers'][0];
                     $lastNumber = end($metadata['multi_book_numbers']);
-                    
+
                     $book->series()->sync([
                         $series->id => [
                             'series_number' => $firstNumber,
@@ -153,7 +153,6 @@ class BookImportService
 
             DB::commit();
             return $book;
-
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Failed to create book from metadata: " . $e->getMessage(), [
@@ -174,30 +173,30 @@ class BookImportService
         if (!empty($metadata['custom_directory_path'])) {
             return trim($metadata['custom_directory_path']);
         }
-        
+
         $structure = $options['directory_structure'] ?? 'genre/author/series';
         $authors = is_array($metadata['author']) ? $metadata['author'] : [$metadata['author']];
-        
+
         // Handle comma-separated authors
         if (count($authors) === 1 && strpos($authors[0], ',') !== false) {
             $authors = array_map('trim', explode(',', $authors[0]));
         }
-        
+
         // Handle genre - convert array to string
         $genreData = $metadata['genre'] ?? 'Unknown';
         $genre = is_array($genreData) ? $genreData[0] : $genreData;
         if (empty($genre)) {
             $genre = 'Unknown';
         }
-        
+
         // Check for existing author directory first
         $cleanedSeries = null;
         if (!empty($metadata['series'])) {
             $cleanedSeries = $this->cleanSeriesName($metadata['series'], $authors);
         }
-        
+
         $existingAuthorDir = $this->findExistingAuthorDirectory($authors, $cleanedSeries);
-        
+
         if ($existingAuthorDir) {
             $authorDir = $existingAuthorDir;
         } else {
@@ -207,7 +206,7 @@ class BookImportService
                 $authorDir = 'Graphic Audio';
             }
         }
-        
+
         $path = match ($structure) {
             'author/series' => $this->buildAuthorSeriesPath($authorDir, $metadata),
             'genre/author' => "{$genre}/{$authorDir}",
@@ -215,23 +214,23 @@ class BookImportService
             'flat' => $authorDir,
             default => $this->buildGenreAuthorSeriesPath($genre, $authorDir, $metadata)
         };
-        
+
         // Add title if requested
         if (!empty($metadata['title']) && ($options['include_title'] ?? false)) {
             $title = $metadata['title'];
-            
+
             // If we have a series number, prefix it to the title
             if (!empty($metadata['series_number'])) {
                 $seriesNumber = str_pad($metadata['series_number'], 2, '0', STR_PAD_LEFT);
                 $title = $seriesNumber . ' ' . $title;
             }
-            
+
             // Add GraphicAudio marker if detected
             $title = $this->addGraphicAudioMarker($title, $metadata);
-            
+
             $path .= '/' . $title;
         }
-        
+
         return $path;
     }
 
@@ -286,22 +285,21 @@ class BookImportService
             // Check if source is already within book storage path (in-place import)
             $realBookStoragePath = realpath($bookStoragePath);
             $realSourcePath = realpath($sourcePath);
-            
-            if ($realBookStoragePath && $realSourcePath && 
+
+            if ($realBookStoragePath && $realSourcePath &&
                 strpos($realSourcePath, $realBookStoragePath) === 0) {
-                
                 // Files are already in the book storage path - use in-place import
                 $book->directory_path = $sourcePath;
                 $book->save();
-                
+
                 // Just flatten CD directories if needed, but don't move files
                 $this->flattenCdDirectories($sourcePath);
-                
+
                 Log::info("In-place import: Files already in book storage", [
                     'source' => $sourcePath,
                     'book_id' => $book->id
                 ]);
-                
+
                 return true;
             }
 
@@ -309,7 +307,7 @@ class BookImportService
             if (File::isDirectory($targetDir)) {
                 $targetDir = $this->handleDirectoryConflict($audiobook, $targetDir);
             }
-            
+
             if (!File::isDirectory($targetDir)) {
                 File::makeDirectory($targetDir, 0775, true);
             }
@@ -324,13 +322,12 @@ class BookImportService
             } else {
                 $this->copyDirectoryContents($sourcePath, $targetDir);
             }
-            
+
             // Update book directory path to target location (only for move/copy operations)
             $book->directory_path = $targetDir;
             $book->save();
-            
-            return true;
 
+            return true;
         } catch (\Exception $e) {
             Log::error("Failed to move files to library: " . $e->getMessage(), [
                 'audiobook' => $audiobook,
@@ -349,22 +346,22 @@ class BookImportService
         $authors = $book->authors->pluck('name')->toArray();
         $genre = $book->genres->first()?->name ?? 'Unknown';
         $authorDir = $this->formatAuthorsForDirectory($authors);
-        
+
         $metadata = [
             'author' => $authors,
             'genre' => $genre,
             'series' => $book->series->first()?->name,
             'title' => $book->title
         ];
-        
+
         $relativePath = $this->generateDirectoryPath($metadata, $options);
         $path = "{$basePath}/{$relativePath}";
-        
+
         // Always include title in path unless explicitly disabled
         if (!isset($options['include_title_in_path']) || $options['include_title_in_path'] !== false) {
             $path .= "/{$book->title}";
         }
-        
+
         return $path;
     }
 
@@ -378,18 +375,18 @@ class BookImportService
         }
 
         $files = File::allFiles($source);
-        
+
         foreach ($files as $file) {
             $relativePath = $file->getRelativePathname();
             $targetFile = "{$target}/{$relativePath}";
-            
+
             $targetSubDir = dirname($targetFile);
             if (!File::isDirectory($targetSubDir)) {
                 File::makeDirectory($targetSubDir, 0775, true);
             }
-            
+
             File::copy($file->getPathname(), $targetFile);
-            
+
             // Set file permissions after copying
             chmod($targetFile, 0664);
         }
@@ -405,18 +402,18 @@ class BookImportService
         }
 
         $files = File::allFiles($source);
-        
+
         foreach ($files as $file) {
             $relativePath = $file->getRelativePathname();
             $targetFile = "{$target}/{$relativePath}";
-            
+
             $targetSubDir = dirname($targetFile);
             if (!File::isDirectory($targetSubDir)) {
                 File::makeDirectory($targetSubDir, 0775, true);
             }
-            
+
             File::move($file->getPathname(), $targetFile);
-            
+
             // Set file permissions after moving
             chmod($targetFile, 0664);
         }
@@ -435,7 +432,7 @@ class BookImportService
         }
 
         $directories = File::directories($path);
-        
+
         foreach ($directories as $dir) {
             $this->removeEmptyDirectories($dir);
         }
@@ -454,26 +451,26 @@ class BookImportService
         if (!empty($metadata['narrator'])) {
             $narrators = is_array($metadata['narrator']) ? $metadata['narrator'] : [$metadata['narrator']];
             foreach ($narrators as $narrator) {
-                if (is_string($narrator) && 
-                    (stripos($narrator, 'Graphic Audio') !== false || 
+                if (is_string($narrator) &&
+                    (stripos($narrator, 'Graphic Audio') !== false ||
                      stripos($narrator, 'GraphicAudio') !== false)) {
                     return true;
                 }
             }
         }
-        
+
         // Also check publisher field as fallback
         if (!empty($metadata['publisher'])) {
             $publishers = is_array($metadata['publisher']) ? $metadata['publisher'] : [$metadata['publisher']];
             foreach ($publishers as $publisher) {
-                if (is_string($publisher) && 
-                    (stripos($publisher, 'Graphic Audio') !== false || 
+                if (is_string($publisher) &&
+                    (stripos($publisher, 'Graphic Audio') !== false ||
                      stripos($publisher, 'GraphicAudio') !== false)) {
                     return true;
                 }
             }
         }
-        
+
         return false;
     }
 
@@ -492,12 +489,12 @@ class BookImportService
     protected function normalizeAuthorName(string $authorName): string
     {
         $name = trim($authorName);
-        
+
         $name = preg_replace('/\b([A-Z])\s+/', '$1. ', $name);
         $name = preg_replace('/\s+([A-Z])$/', ' $1.', $name);
         $name = preg_replace('/\b([A-Z]\.)\s+([A-Z]\.)/', '$1$2', $name);
         $name = preg_replace('/\b([A-Z]\.)\s+([A-Z]\.)/', '$1$2', $name);
-        
+
         return trim($name);
     }
 
@@ -521,7 +518,6 @@ class BookImportService
                 chmod($filePath, 0664);
                 return $filename;
             }
-
         } catch (\Exception $e) {
             Log::warning("Failed to download cover image: " . $e->getMessage(), [
                 'url' => $imageUrl,
@@ -538,11 +534,11 @@ class BookImportService
     protected function getImageExtensionFromUrl(string $url): string
     {
         $extension = pathinfo(parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION);
-        
+
         if (in_array(strtolower($extension), ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
             return strtolower($extension);
         }
-        
+
         return 'jpg';
     }
 
@@ -561,19 +557,19 @@ class BookImportService
         }
 
         $normalizedAuthors = array_map([$this, 'normalizeAuthorName'], $authors);
-        
+
         $authorCombinations = [];
-        
+
         if (count($normalizedAuthors) > 1) {
             $authorCombinations[] = $normalizedAuthors;
             $authorCombinations[] = array_reverse($normalizedAuthors);
-            
+
             if (count($normalizedAuthors) >= 3) {
                 $authorCombinations[] = [$normalizedAuthors[0], $normalizedAuthors[1]];
                 $authorCombinations[] = [$normalizedAuthors[1], $normalizedAuthors[0]];
             }
         }
-        
+
         if (count($normalizedAuthors) === 1) {
             $authorCombinations[] = $normalizedAuthors;
         }
@@ -591,13 +587,13 @@ class BookImportService
 
                 $dirPath = $dir->getPathname();
                 $pathParts = explode('/', str_replace($bookStoragePath . '/', '', $dirPath));
-                
+
                 if (count($pathParts) >= 2) {
                     $authorDirName = $pathParts[1];
-                    
+
                     foreach ($authorCombinations as $combination) {
                         $expectedDirName = $this->formatAuthorsForDirectory($combination);
-                        
+
                         if ($authorDirName === $expectedDirName) {
                             if ($seriesName && count($pathParts) >= 3) {
                                 $seriesDirName = $pathParts[2];
@@ -625,16 +621,16 @@ class BookImportService
     {
         $originalTargetDir = $targetDir;
         $counter = 1;
-        
+
         while (File::isDirectory($targetDir)) {
             $targetDir = "{$originalTargetDir}_" . str_pad($counter, 2, '0', STR_PAD_LEFT);
             $counter++;
-            
+
             if ($counter > 99) {
                 break;
             }
         }
-        
+
         return $targetDir;
     }
 
@@ -649,7 +645,7 @@ class BookImportService
 
         $directories = File::directories($sourcePath);
         $hasCdDirectories = false;
-        
+
         foreach ($directories as $dir) {
             $dirName = basename($dir);
             if (preg_match('/^(cd|disc|disk)\s*\d+$/i', $dirName)) {
@@ -657,7 +653,7 @@ class BookImportService
                 break;
             }
         }
-        
+
         if (!$hasCdDirectories) {
             return;
         }
@@ -667,18 +663,18 @@ class BookImportService
             if (preg_match('/^(cd|disc|disk)\s*(\d+)$/i', $dirName, $matches)) {
                 $cdNumber = str_pad($matches[2], 2, '0', STR_PAD_LEFT);
                 $files = File::files($dir);
-                
+
                 foreach ($files as $file) {
                     $filename = $file->getFilename();
                     $extension = $file->getExtension();
                     $baseName = pathinfo($filename, PATHINFO_FILENAME);
-                    
+
                     $newFilename = "{$cdNumber}-{$baseName}.{$extension}";
                     $newPath = "{$sourcePath}/{$newFilename}";
-                    
+
                     File::move($file->getPathname(), $newPath);
                 }
-                
+
                 File::deleteDirectory($dir);
             }
         }
@@ -692,10 +688,10 @@ class BookImportService
         if (!File::isDirectory($path)) {
             return true;
         }
-        
+
         $files = File::allFiles($path);
         $directories = File::directories($path);
-        
+
         return empty($files) && empty($directories);
     }
 
@@ -705,7 +701,7 @@ class BookImportService
     public function cleanupSourceDirectory(array $audiobook, bool $filesAlreadyExist = false): void
     {
         $sourcePath = $audiobook['path'];
-        
+
         if (!File::isDirectory($sourcePath)) {
             return;
         }
@@ -731,18 +727,18 @@ class BookImportService
         $allTags = [];
         $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
         $audioFileCount = 0;
-        
+
         foreach ($audioFiles as $filePath) {
             $extension = strtolower(pathinfo(is_string($filePath) ? $filePath : $filePath['path'], PATHINFO_EXTENSION));
-            
+
             if (in_array($extension, $audioExtensions)) {
                 $audioFileCount++;
-                
+
                 try {
                     // Handle both string paths and file arrays
                     $file = is_string($filePath) ? $filePath : $filePath['path'];
                     $fileName = basename($file);
-                    
+
                     // If we have pre-calculated data, use it
                     if (is_array($filePath) && isset($filePath['duration'])) {
                         $totalDuration += (int)$filePath['duration'];
@@ -762,14 +758,14 @@ class BookImportService
                 }
             }
         }
-        
+
         return [
             'count' => $audioFileCount,
             'duration' => $totalDuration, // in seconds
             'tags' => $allTags
         ];
     }
-    
+
     /**
      * Get duration of audio file in seconds
      */
@@ -781,7 +777,7 @@ class BookImportService
             if ($output && is_numeric(trim($output))) {
                 return (int)round(floatval(trim($output)));
             }
-            
+
             // Fallback to file modification patterns
             return 0;
         } catch (\Exception $e) {
@@ -789,7 +785,7 @@ class BookImportService
             return 0;
         }
     }
-    
+
     /**
      * Get author's preferred genre based on existing books
      */
@@ -798,22 +794,22 @@ class BookImportService
         if (empty($authorData)) {
             return null;
         }
-        
+
         // Handle both string and array author data
         $authorNames = is_array($authorData) ? $authorData : [$authorData];
-        
+
         foreach ($authorNames as $authorName) {
             $authorName = trim($authorName);
             if (empty($authorName)) {
                 continue;
             }
-            
+
             // Find the author in the database
             $author = Author::where('name', $authorName)->first();
             if (!$author) {
                 continue;
             }
-            
+
             // Get genre distribution for this author's books
             $genreStats = DB::table('books')
                 ->join('author_book', 'books.id', '=', 'author_book.book_id')
@@ -824,13 +820,13 @@ class BookImportService
                 ->groupBy('genres.name')
                 ->orderByDesc('count')
                 ->first();
-            
+
             if ($genreStats && $genreStats->count >= 2) {
                 // If author has 2+ books in the same genre, use that genre
                 return $genreStats->name;
             }
         }
-        
+
         return null;
     }
 
@@ -840,7 +836,7 @@ class BookImportService
     protected function cleanSeriesName(string $seriesName, array $authors): string
     {
         $cleanedSeries = $seriesName;
-        
+
         foreach ($authors as $author) {
             $authorWords = explode(' ', trim($author));
             foreach ($authorWords as $word) {
@@ -849,12 +845,12 @@ class BookImportService
                 }
             }
         }
-        
+
         // Clean up extra spaces and common series words
         $cleanedSeries = preg_replace('/\b(series|saga|chronicles|collection)\b/i', '', $cleanedSeries);
         $cleanedSeries = preg_replace('/\s+/', ' ', $cleanedSeries);
         $cleanedSeries = trim($cleanedSeries, ' -,');
-        
+
         return $cleanedSeries ?: $seriesName; // Return original if cleaning resulted in empty string
     }
 
@@ -867,19 +863,19 @@ class BookImportService
         if (preg_match('/\(Graphic\s*Audio\)/i', $title)) {
             return preg_replace('/\(Graphic\s*Audio\)/i', '(GraphicAudio)', $title);
         }
-        
+
         // Check various fields for GraphicAudio indicators
         $sourcePath = $metadata['source_path'] ?? '';
         $narrator = $metadata['narrator'] ?? '';
         $publisher = $metadata['publisher'] ?? '';
-        
+
         $isGraphicAudio = false;
-        
+
         // Check source path
         if (stripos($sourcePath, 'graphic') !== false && stripos($sourcePath, 'audio') !== false) {
             $isGraphicAudio = true;
         }
-        
+
         // Check narrator field
         if (is_array($narrator)) {
             foreach ($narrator as $n) {
@@ -891,7 +887,7 @@ class BookImportService
         } elseif (is_string($narrator) && stripos($narrator, 'graphic') !== false && stripos($narrator, 'audio') !== false) {
             $isGraphicAudio = true;
         }
-        
+
         // Check publisher field
         if (is_array($publisher)) {
             foreach ($publisher as $p) {
@@ -903,11 +899,11 @@ class BookImportService
         } elseif (is_string($publisher) && stripos($publisher, 'graphic') !== false && stripos($publisher, 'audio') !== false) {
             $isGraphicAudio = true;
         }
-        
+
         if ($isGraphicAudio && !preg_match('/\(GraphicAudio\)/i', $title)) {
             return $title . ' (GraphicAudio)';
         }
-        
+
         return $title;
     }
 }

@@ -320,7 +320,7 @@ class MySqlService implements DocumentStoreServiceInterface
                 // Use the current request's hostname and protocol for the cover URL
                 // This ensures URLs match the original request (e.g., https://books.thelin.org)
                 $request = request();
-                $coverUrl = $request->getSchemeAndHttpHost().'/api/v1/books/'.$book->id.'/cover';
+                $coverUrl = $request->getSchemeAndHttpHost() . '/api/v1/books/' . $book->id . '/cover';
             }
 
             $durationFormatted = null;
@@ -1334,7 +1334,7 @@ class MySqlService implements DocumentStoreServiceInterface
             $method = 'findOrCreate' . ucfirst($type);
             if (is_array($item) && isset($item['name'])) {
                 $model = $this->$method(['name' => $item['name']]);
-            } else if (is_string($item)) {
+            } elseif (is_string($item)) {
                 $model = $this->$method(['name' => $item]);
             } else {
                 // Log a warning or throw an exception if this case should not happen

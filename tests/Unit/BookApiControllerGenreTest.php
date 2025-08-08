@@ -16,14 +16,14 @@ class BookApiControllerGenreTest extends TestCase
     {
         $controller = $this->getControllerInstance();
         $method = $this->getPrivateMethod($controller, 'normalizeGenre');
-        
+
         $result = $method->invoke($controller, 'Science Fiction');
-        
+
         $this->assertIsArray($result);
         $this->assertCount(1, $result);
         $this->assertEquals('Science Fiction', $result[0]);
     }
-    
+
     /**
      * Test that normalizeGenre correctly handles array input
      */
@@ -31,15 +31,15 @@ class BookApiControllerGenreTest extends TestCase
     {
         $controller = $this->getControllerInstance();
         $method = $this->getPrivateMethod($controller, 'normalizeGenre');
-        
+
         $result = $method->invoke($controller, ['Fantasy', 'Adventure']);
-        
+
         $this->assertIsArray($result);
         $this->assertCount(2, $result);
         $this->assertContains('Fantasy', $result);
         $this->assertContains('Adventure', $result);
     }
-    
+
     /**
      * Test that normalizeGenre correctly handles array with empty values
      */
@@ -47,15 +47,15 @@ class BookApiControllerGenreTest extends TestCase
     {
         $controller = $this->getControllerInstance();
         $method = $this->getPrivateMethod($controller, 'normalizeGenre');
-        
+
         $result = $method->invoke($controller, ['Fantasy', '', '  ', 'Adventure']);
-        
+
         $this->assertIsArray($result);
         $this->assertCount(2, $result);
         $this->assertContains('Fantasy', $result);
         $this->assertContains('Adventure', $result);
     }
-    
+
     /**
      * Test that normalizeGenre correctly handles null input
      */
@@ -63,13 +63,13 @@ class BookApiControllerGenreTest extends TestCase
     {
         $controller = $this->getControllerInstance();
         $method = $this->getPrivateMethod($controller, 'normalizeGenre');
-        
+
         $result = $method->invoke($controller, null);
-        
+
         $this->assertIsArray($result);
         $this->assertEmpty($result);
     }
-    
+
     /**
      * Helper method to create a controller instance with a mock DocumentStoreService
      */
@@ -78,7 +78,7 @@ class BookApiControllerGenreTest extends TestCase
         $documentStoreMock = $this->createMock(DocumentStoreServiceInterface::class);
         return new BookApiController($documentStoreMock);
     }
-    
+
     /**
      * Helper method to access private methods for testing
      */

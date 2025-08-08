@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use Illuminate\Support\Facades\Log;
-
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Book;
@@ -554,7 +553,8 @@ class VerifyBookDirectories extends Command
         $this->line("   Title: {$book->title}");
         $this->line("   Author: " . ($book->authors->isNotEmpty() ? $book->authors->pluck('name')->implode(', ') : 'N/A'));
         $this->line("   Series: " . ($book->series->isNotEmpty() ? $book->series->map(function ($s) {
-            return $s->name . ($s->pivot && $s->pivot->series_number ? ' #' . $s->pivot->series_number : ''); })->implode(', ') : 'N/A'));
+            return $s->name . ($s->pivot && $s->pivot->series_number ? ' #' . $s->pivot->series_number : '');
+        })->implode(', ') : 'N/A'));
         $this->line("   Current Path: {$book->directory_path}");
         $this->line("   Description: " . substr($book->description, 0, 100) . (strlen($book->description) > 100 ? '...' : ''));
         // Add more relevant fields as needed

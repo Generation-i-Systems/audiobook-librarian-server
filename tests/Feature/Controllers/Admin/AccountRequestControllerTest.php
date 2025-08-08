@@ -3,8 +3,6 @@
 namespace Tests\Feature\Controllers\Admin;
 
 use App\Contracts\DocumentStoreServiceInterface;
-use App\Http\Controllers\Admin\AccountRequestController;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use Tests\TestCase;
 

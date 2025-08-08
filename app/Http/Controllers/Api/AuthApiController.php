@@ -120,6 +120,4 @@ class AuthApiController extends Controller
             return response()->json(['error' => 'Authentication failed: ' . $e->getMessage()], 400);
         }
     }
-
-
 }

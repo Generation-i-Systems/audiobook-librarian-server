@@ -75,7 +75,7 @@ class FixRemoteImageUrlsCommand extends Command
         if ($dryRun) {
             $this->warn('DRY RUN MODE: No changes will be made');
         }
-        
+
         if ($cleanPaths) {
             $this->info('CLEAN PATHS MODE: Focusing on cleaning corrupted cover image paths');
         }
@@ -113,11 +113,11 @@ class FixRemoteImageUrlsCommand extends Command
             }
 
             $id = $book['id'];
-            
+
             // Raw Eloquent data uses camelCase field names (with accessors)
             $coverUrl = $book['coverImage'] ?? null;
             $directoryPath = $book['directoryPath'] ?? null;
-            
+
             // Handle cover URL normalization - but only for local paths, not remote URLs
             $fullCoverPath = null;
             if ($coverUrl) {
@@ -125,12 +125,12 @@ class FixRemoteImageUrlsCommand extends Command
                 if (!$this->isRemoteUrl($coverUrl)) {
                     $originalCoverUrl = $coverUrl;
                     $normalizedCoverUrl = $this->cleanupCoverUrl($coverUrl); // This now returns just filename
-                    
+
                     if ($normalizedCoverUrl !== $originalCoverUrl) {
                         $this->warn("Book {$id}: Normalizing local cover URL to filename only");
                         $this->warn("  From: {$originalCoverUrl}");
                         $this->warn("  To: {$normalizedCoverUrl}");
-                        
+
                         // Update the database with just the filename
                         if (!$dryRun) {
                             $result = $this->documentStore->updateBook($id, ['coverImage' => $normalizedCoverUrl]);
@@ -145,17 +145,17 @@ class FixRemoteImageUrlsCommand extends Command
                             $this->info("Would update book {$id} with normalized cover URL");
                             $fixed++;
                         }
-                        
+
                         // Update our working variable to the normalized version
                         $coverUrl = $normalizedCoverUrl;
-                        
+
                         // If we're only cleaning paths, skip the rest of the processing
                         if ($cleanPaths) {
                             $progressBar->advance();
                             continue;
                         }
                     }
-                    
+
                     // Get the full path for file operations (combines filename with directory)
                     $fullCoverPath = $this->getFullCoverPath($coverUrl, $directoryPath);
                 } else {
@@ -177,10 +177,10 @@ class FixRemoteImageUrlsCommand extends Command
                     // Check if the file exists using direct filesystem check (handles symlinks)
                     $booksRoot = config('filesystems.disks.books.root') ?? storage_path('app/books');
                     $coverFileSystemPath = rtrim($booksRoot, '/') . '/' . ltrim($fullCoverPath, '/');
-                    
+
                     if (file_exists($coverFileSystemPath)) {
                         $this->info("Book {$id} has valid local cover image: {$fullCoverPath}");
-                        
+
                         // Ensure we have a directory path (extract from full path if needed)
                         if (!$directoryPath && str_contains($fullCoverPath, '/')) {
                             $extractedDirectoryPath = dirname($fullCoverPath);
@@ -191,7 +191,7 @@ class FixRemoteImageUrlsCommand extends Command
                                 $this->info("Would update book {$id} with directory path: {$extractedDirectoryPath}");
                             }
                         }
-                        
+
                         $skipped++;
                         $progressBar->advance();
                         continue;
@@ -256,14 +256,14 @@ class FixRemoteImageUrlsCommand extends Command
             if ($this->isRemoteUrl($coverUrl)) {
                 // Download the image from remote URL using ExternalCoverService
                 $this->info("Downloading image from remote URL: {$coverUrl}");
-                
+
                 if (!$directoryPath) {
                     $this->warn("Book {$id} has remote URL but no directory path - cannot download");
                     $errors++;
                     $progressBar->advance();
                     continue;
                 }
-                
+
                 if ($dryRun) {
                     $this->warn("Would download image from {$coverUrl} to {$directoryPath}");
                     $this->warn("Would update book {$id} with normalized filename");
@@ -306,7 +306,7 @@ class FixRemoteImageUrlsCommand extends Command
                 // Check if the file exists using direct filesystem check (handles symlinks)
                 $booksRoot = config('filesystems.disks.books.root') ?? storage_path('app/books');
                 $coverFullPath = rtrim($booksRoot, '/') . '/' . ltrim($fullCoverPath, '/');
-                
+
                 if (file_exists($coverFullPath)) {
                     $this->info("File already exists at {$fullCoverPath}");
                     // File exists, ensure database has just the filename (normalized)
@@ -416,16 +416,16 @@ class FixRemoteImageUrlsCommand extends Command
         try {
             $booksRoot = config('filesystems.disks.books.root') ?? storage_path('app/books');
             $fullPath = rtrim($booksRoot, '/') . '/' . ltrim($directoryPath, '/');
-            
+
             if (is_dir($fullPath)) {
                 // Use glob to find audiobook files, which handles symlinks properly
                 $audioExtensions = '{m4b,mp3,mp4,aac,flac,wav}';
                 $audioFiles = glob($fullPath . '/*.{' . str_replace(['{', '}'], '', $audioExtensions) . '}', GLOB_BRACE);
-                
+
                 if (!empty($audioFiles)) {
                     return true; // Directory exists and has audiobooks
                 }
-                
+
                 $this->warn("Directory {$directoryPath} exists but contains no audiobook files");
             } else {
                 $this->warn("Directory {$directoryPath} does not exist");
@@ -438,7 +438,7 @@ class FixRemoteImageUrlsCommand extends Command
 
         // Search for similar paths
         $similarPaths = $this->findSimilarPaths($directoryPath, $book);
-        
+
         if (empty($similarPaths)) {
             $this->error("No similar paths found for book {$bookId}");
             return false;
@@ -447,36 +447,36 @@ class FixRemoteImageUrlsCommand extends Command
         // Display options to user
         $this->line("");
         $this->warn("Found similar paths for book {$bookId} ({$book['title']}):");
-        
+
         foreach ($similarPaths as $index => $path) {
             $this->line(($index + 1) . ". {$path}");
         }
-        
+
         $this->line("0. Skip this book");
-        
+
         if ($dryRun) {
             $this->info("DRY RUN: Would prompt user to select a path");
             return false;
         }
 
         $choice = $this->ask("Select a path (0-" . count($similarPaths) . "):");
-        
+
         if ($choice === '0' || $choice === null) {
             $this->info("Skipping book {$bookId}");
             return false;
         }
-        
+
         $selectedIndex = (int)$choice - 1;
         if ($selectedIndex < 0 || $selectedIndex >= count($similarPaths)) {
             $this->error("Invalid selection");
             return false;
         }
-        
+
         $selectedPath = $similarPaths[$selectedIndex];
-        
+
         // Update the book with the new directory path
         $result = $this->documentStore->updateBook($bookId, ['directoryPath' => $selectedPath]);
-        
+
         if ($result) {
             $this->info("Updated book {$bookId} with new directory path: {$selectedPath}");
             return true;
@@ -498,65 +498,65 @@ class FixRemoteImageUrlsCommand extends Command
         $title = $book['title'] ?? '';
         $authors = $book['author'] ?? [];
         $authorName = is_array($authors) && !empty($authors) ? $authors[0] : '';
-        
+
         if (empty($title) && empty($authorName)) {
             return [];
         }
 
         $similarPaths = [];
         $allDirectories = $this->getAllBookDirectories();
-        
+
         // Search for paths containing the title
         if (!empty($title)) {
             $titleWords = explode(' ', strtolower($title));
-            $titleWords = array_filter($titleWords, function($word) {
+            $titleWords = array_filter($titleWords, function ($word) {
                 return strlen($word) > 2; // Filter out small words
             });
-            
+
             foreach ($allDirectories as $dir) {
                 $dirLower = strtolower($dir);
                 $matchCount = 0;
-                
+
                 foreach ($titleWords as $word) {
                     if (strpos($dirLower, $word) !== false) {
                         $matchCount++;
                     }
                 }
-                
+
                 // If more than half the significant words match, consider it similar
                 if ($matchCount > 0 && $matchCount >= count($titleWords) / 2) {
                     $similarPaths[] = $dir;
                 }
             }
         }
-        
+
         // Search for paths containing the author name
         if (!empty($authorName)) {
             $authorWords = explode(' ', strtolower($authorName));
-            $authorWords = array_filter($authorWords, function($word) {
+            $authorWords = array_filter($authorWords, function ($word) {
                 return strlen($word) > 2;
             });
-            
+
             foreach ($allDirectories as $dir) {
                 if (in_array($dir, $similarPaths)) {
                     continue; // Already found
                 }
-                
+
                 $dirLower = strtolower($dir);
                 $matchCount = 0;
-                
+
                 foreach ($authorWords as $word) {
                     if (strpos($dirLower, $word) !== false) {
                         $matchCount++;
                     }
                 }
-                
+
                 if ($matchCount > 0) {
                     $similarPaths[] = $dir;
                 }
             }
         }
-        
+
         // Remove duplicates and limit results
         $similarPaths = array_unique($similarPaths);
         return array_slice($similarPaths, 0, 10); // Limit to 10 results
@@ -571,16 +571,16 @@ class FixRemoteImageUrlsCommand extends Command
     private function getAllBookDirectories(): array
     {
         $directories = [];
-        
+
         try {
             // Get the root path for books storage
             $booksRoot = config('filesystems.disks.books.root') ?? storage_path('app/books');
-            
+
             if (!is_dir($booksRoot)) {
                 $this->warn("Books root directory does not exist: {$booksRoot}");
                 return $this->getDirectoriesFromDatabase();
             }
-            
+
             // Use RecursiveDirectoryIterator with FOLLOW_SYMLINKS to handle symbolic links
             $iterator = new \RecursiveIteratorIterator(
                 new \RecursiveDirectoryIterator(
@@ -589,7 +589,7 @@ class FixRemoteImageUrlsCommand extends Command
                 ),
                 \RecursiveIteratorIterator::LEAVES_ONLY
             );
-            
+
             foreach ($iterator as $file) {
                 if ($file->isFile()) {
                     $extension = strtolower($file->getExtension());
@@ -598,22 +598,21 @@ class FixRemoteImageUrlsCommand extends Command
                         $fullPath = $file->getPath();
                         $relativePath = str_replace($booksRoot . '/', '', $fullPath);
                         $relativePath = ltrim($relativePath, '/');
-                        
+
                         if ($relativePath && !in_array($relativePath, $directories)) {
                             $directories[] = $relativePath;
                         }
                     }
                 }
             }
-            
+
             $this->info("Found " . count($directories) . " directories with audiobook files (including through symlinks)");
-            
         } catch (\Exception $e) {
             $this->error("Error scanning directories: " . $e->getMessage());
             $this->warn("Falling back to database-only directory listing");
             $directories = $this->getDirectoriesFromDatabase();
         }
-        
+
         return $directories;
     }
 
@@ -627,7 +626,7 @@ class FixRemoteImageUrlsCommand extends Command
         try {
             $booksResult = $this->documentStore->listBooks();
             $books = $booksResult['data'] ?? [];
-            
+
             $directories = [];
             foreach ($books as $book) {
                 $directoryPath = $book['directoryPath'] ?? null;
@@ -636,7 +635,7 @@ class FixRemoteImageUrlsCommand extends Command
                     try {
                         $booksRoot = config('filesystems.disks.books.root') ?? storage_path('app/books');
                         $fullPath = rtrim($booksRoot, '/') . '/' . ltrim($directoryPath, '/');
-                        
+
                         if (is_dir($fullPath)) {
                             $directories[] = $directoryPath;
                         }
@@ -646,10 +645,9 @@ class FixRemoteImageUrlsCommand extends Command
                     }
                 }
             }
-            
+
             $this->info("Fallback: Found " . count($directories) . " directories from database");
             return $directories;
-            
         } catch (\Exception $e) {
             $this->error("Failed to get directories from database: " . $e->getMessage());
             return [];
@@ -667,24 +665,24 @@ class FixRemoteImageUrlsCommand extends Command
     {
         // Remove any leading/trailing whitespace
         $cleaned = trim($coverUrl);
-        
+
         // Remove any stray quotes that might be embedded in the path
         $cleaned = str_replace("'/", "/", $cleaned);
         $cleaned = str_replace("'/", "/", $cleaned); // Run twice in case of multiple occurrences
         $cleaned = trim($cleaned, "'\""); // Remove quotes from start/end
-        
+
         // Fix double slashes
         $cleaned = preg_replace('#/+#', '/', $cleaned);
-        
+
         // Remove leading slash if present (paths should be relative)
         $cleaned = ltrim($cleaned, '/');
-        
+
         // Fix any other common path corruptions
         $cleaned = str_replace('\\', '/', $cleaned); // Fix backslashes
-        
+
         // Extract just the filename - this normalizes both full paths and filenames
         $filename = basename($cleaned);
-        
+
         return $filename;
     }
 
@@ -701,30 +699,30 @@ class FixRemoteImageUrlsCommand extends Command
         if (!$coverImage) {
             return null;
         }
-        
+
         // Clean the cover image value
         $cleaned = $this->cleanupCoverUrl($coverImage);
-        
+
         // If it's just a filename and we have a directory path, combine them
         if (!str_contains($cleaned, '/') && $directoryPath) {
             return rtrim($directoryPath, '/') . '/' . $cleaned;
         }
-        
+
         // If it's already a full path (legacy), extract directory and filename
         if (str_contains($cleaned, '/')) {
             $parts = explode('/', $cleaned);
             $filename = array_pop($parts);
             $pathFromCover = implode('/', $parts);
-            
+
             // Use the directory from the cover path if no directoryPath is set
             if (!$directoryPath) {
                 return $cleaned; // Return the full path as-is
             }
-            
+
             // Prefer the directoryPath from the database
             return rtrim($directoryPath, '/') . '/' . $filename;
         }
-        
+
         // Just a filename with no directory path
         return $cleaned;
     }

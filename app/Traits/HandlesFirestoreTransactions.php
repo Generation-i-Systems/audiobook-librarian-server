@@ -2,8 +2,6 @@
 
 namespace App\Traits;
 
-use Google\Cloud\Core\Exception\GoogleException;
-use Google\Cloud\Firestore\FirestoreClient;
 use Google\Cloud\Firestore\Transaction;
 use Illuminate\Support\Facades\Log;
 

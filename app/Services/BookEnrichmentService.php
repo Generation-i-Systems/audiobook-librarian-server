@@ -23,7 +23,7 @@ class BookEnrichmentService
         }
 
         $title = trim($metadata['title']);
-        
+
         $patterns = [
             '/^(.+?),\s*Book\s+(\d+)$/i',            // "Title, Book 1"
             '/^(.+?)\s+Book\s+(\d+)$/i',             // "Title Book 1"
@@ -31,7 +31,7 @@ class BookEnrichmentService
             '/^(.+?)\s+Volume\s+(\d+)$/i',           // "Title Volume 1"
             '/^(.+?),\s*#(\d+)$/i',                  // "Title, #1"
             '/^(.+?)\s+#(\d+)$/i',                   // "Title #1"
-            '/^(.+?),\s*Part\s+(\d+)$/i',            // "Title, Part 1"  
+            '/^(.+?),\s*Part\s+(\d+)$/i',            // "Title, Part 1"
             '/^(.+?)\s+Part\s+(\d+)$/i',             // "Title Part 1"
             '/^(.+?)\s+(\d+)$/',                     // "Title 1" (last resort)
         ];
@@ -43,7 +43,7 @@ class BookEnrichmentService
 
                 $metadata['title'] = $cleanTitle;
                 $metadata['series_number'] = $bookNumber;
-                
+
                 return;
             }
         }
@@ -89,8 +89,8 @@ class BookEnrichmentService
     protected function searchFromSource(string $source, string $title, string $author, int $maxRetries = 3): ?array
     {
         return match ($source) {
-            'audible' => $this->retryApiCall(fn() => $this->searchAudible($title, $author), 'Audible', '', $maxRetries),
-            'google_books' => $this->retryApiCall(fn() => $this->searchGoogleBooks($title, $author), 'Google Books', '', $maxRetries),
+            'audible' => $this->retryApiCall(fn () => $this->searchAudible($title, $author), 'Audible', '', $maxRetries),
+            'google_books' => $this->retryApiCall(fn () => $this->searchGoogleBooks($title, $author), 'Google Books', '', $maxRetries),
             default => null
         };
     }
@@ -101,7 +101,7 @@ class BookEnrichmentService
     protected function retryApiCall(callable $apiCall, string $serviceName, string $description = '', int $maxRetries = 3): mixed
     {
         $attempt = 1;
-        
+
         while ($attempt <= $maxRetries) {
             try {
                 return $apiCall();
@@ -110,13 +110,13 @@ class BookEnrichmentService
                     Log::error("{$serviceName}: All {$maxRetries} attempts failed - " . $e->getMessage());
                     return null;
                 }
-                
+
                 $delay = pow(2, $attempt - 1);
                 sleep($delay);
                 $attempt++;
             }
         }
-        
+
         return null;
     }
 
@@ -126,15 +126,15 @@ class BookEnrichmentService
     protected function getMissingDataFields(array $enrichedData): array
     {
         $missing = [];
-        
+
         if (empty($enrichedData['cover_url'])) {
             $missing[] = 'cover image';
         }
-        
+
         if (empty($enrichedData['description'])) {
             $missing[] = 'description';
         }
-        
+
         return $missing;
     }
 
@@ -149,37 +149,37 @@ class BookEnrichmentService
             }
 
             $results = $this->audibleService->searchBooksWithFiltering($title, $author, ['limit' => 1]);
-            
+
             if (!empty($results) && isset($results[0])) {
                 $bookData = $results[0];
-                
+
                 $enrichedData = [];
-                
+
                 $enrichedData['audible_raw'] = $bookData;
-                
+
                 if (!empty($bookData['description'])) {
                     $enrichedData['description'] = $this->cleanDescription($bookData['description']);
                 }
-                
+
                 if (!empty($bookData['coverImageUrl'])) {
                     $enrichedData['cover_url'] = $bookData['coverImageUrl'];
                 }
-                
+
                 if (!empty($bookData['publishDate'])) {
                     $year = date('Y', strtotime($bookData['publishDate']));
                     if ($year && $year > 1800) {
                         $enrichedData['year'] = (int)$year;
                     }
                 }
-                
+
                 if (!empty($bookData['publisher'])) {
                     $enrichedData['publisher'] = $bookData['publisher'];
                 }
-                
+
                 if (!empty($bookData['series'])) {
                     $enrichedData['series'] = $bookData['series'];
                 }
-                
+
                 return $enrichedData;
             }
         } catch (\Exception $e) {
@@ -197,27 +197,27 @@ class BookEnrichmentService
         try {
             $query = urlencode($title . ' ' . $author);
             $url = "https://www.googleapis.com/books/v1/volumes?q={$query}&maxResults=1";
-            
+
             $response = file_get_contents($url);
             if (!$response) {
                 return null;
             }
-            
+
             $data = json_decode($response, true);
             if (empty($data['items'][0])) {
                 return null;
             }
-            
+
             $book = $data['items'][0];
             $volumeInfo = $book['volumeInfo'] ?? [];
-            
+
             $enrichedData = [];
             $enrichedData['google_books_raw'] = $book;
-            
+
             if (!empty($volumeInfo['description'])) {
                 $enrichedData['description'] = $this->cleanDescription($volumeInfo['description']);
             }
-            
+
             if (!empty($volumeInfo['imageLinks']['large'])) {
                 $enrichedData['cover_url'] = $volumeInfo['imageLinks']['large'];
             } elseif (!empty($volumeInfo['imageLinks']['medium'])) {
@@ -225,20 +225,19 @@ class BookEnrichmentService
             } elseif (!empty($volumeInfo['imageLinks']['thumbnail'])) {
                 $enrichedData['cover_url'] = str_replace('zoom=1', 'zoom=2', $volumeInfo['imageLinks']['thumbnail']);
             }
-            
+
             if (!empty($volumeInfo['publishedDate'])) {
                 $year = date('Y', strtotime($volumeInfo['publishedDate']));
                 if ($year && $year > 1800) {
                     $enrichedData['year'] = (int)$year;
                 }
             }
-            
+
             if (!empty($volumeInfo['publisher'])) {
                 $enrichedData['publisher'] = $volumeInfo['publisher'];
             }
-            
+
             return $enrichedData;
-            
         } catch (\Exception $e) {
             Log::warning("Google Books search failed: " . $e->getMessage());
         }
@@ -265,48 +264,48 @@ class BookEnrichmentService
         if (empty($enrichedData)) {
             return false;
         }
-        
+
         // Validate title consistency if both exist
         if (!empty($originalMetadata['title']) && !empty($enrichedData['title'])) {
             $originalTitle = strtolower(trim($originalMetadata['title']));
             $enrichedTitle = strtolower(trim($enrichedData['title']));
-            
+
             if (strlen($originalTitle) > 3 && strlen($enrichedTitle) > 3) {
                 $similarity = similar_text($originalTitle, $enrichedTitle);
                 $maxLength = max(strlen($originalTitle), strlen($enrichedTitle));
                 $similarityPercentage = ($similarity / $maxLength) * 100;
-                
+
                 if ($similarityPercentage < 50) {
                     return false;
                 }
             }
         }
-        
+
         // Validate author consistency if both exist
         if (!empty($originalMetadata['author']) && !empty($enrichedData['author'])) {
-            $originalAuthors = is_array($originalMetadata['author']) 
-                ? $originalMetadata['author'] 
+            $originalAuthors = is_array($originalMetadata['author'])
+                ? $originalMetadata['author']
                 : [$originalMetadata['author']];
-            $enrichedAuthors = is_array($enrichedData['author']) 
-                ? $enrichedData['author'] 
+            $enrichedAuthors = is_array($enrichedData['author'])
+                ? $enrichedData['author']
                 : [$enrichedData['author']];
-                
+
             $hasMatchingAuthor = false;
             foreach ($originalAuthors as $originalAuthor) {
                 foreach ($enrichedAuthors as $enrichedAuthor) {
-                    if (stripos($originalAuthor, $enrichedAuthor) !== false || 
+                    if (stripos($originalAuthor, $enrichedAuthor) !== false ||
                         stripos($enrichedAuthor, $originalAuthor) !== false) {
                         $hasMatchingAuthor = true;
                         break 2;
                     }
                 }
             }
-            
+
             if (!$hasMatchingAuthor) {
                 return false;
             }
         }
-        
+
         // Check for reasonable data values
         if (isset($enrichedData['year']) && is_numeric($enrichedData['year'])) {
             $year = (int)$enrichedData['year'];
@@ -314,14 +313,14 @@ class BookEnrichmentService
                 return false;
             }
         }
-        
+
         // Validate cover URL format if present
         if (!empty($enrichedData['cover_url'])) {
             if (!filter_var($enrichedData['cover_url'], FILTER_VALIDATE_URL)) {
                 return false;
             }
         }
-        
+
         return true;
     }
 
@@ -336,17 +335,17 @@ class BookEnrichmentService
             'audiobook_bay_raw',
             'cover_url'
         ];
-        
+
         foreach ($enrichmentFields as $field) {
             if (!empty($metadata[$field])) {
                 return true;
             }
         }
-        
+
         if (!empty($metadata['description']) && strlen($metadata['description']) > 100) {
             return true;
         }
-        
+
         return false;
     }
 
@@ -383,20 +382,20 @@ class BookEnrichmentService
     public function extractBookTitleFromFilename(string $filename, string $seriesName, int $bookNumber): string
     {
         $baseName = pathinfo($filename, PATHINFO_FILENAME);
-        
+
         $patterns = [
             "/^{$seriesName}\s*[-–]\s*book\s*{$bookNumber}\s*[-–]\s*(.+)$/i",
             "/^{$seriesName}\s*{$bookNumber}\s*[-–]\s*(.+)$/i",
             "/^(.+?)\s*[-–]\s*{$seriesName}\s*{$bookNumber}$/i",
             "/^(.+?)\s*[-–]\s*book\s*{$bookNumber}$/i",
         ];
-        
+
         foreach ($patterns as $pattern) {
             if (preg_match($pattern, $baseName, $matches)) {
                 return trim($matches[1]);
             }
         }
-        
+
         return "{$seriesName} {$bookNumber}";
     }
 
@@ -406,21 +405,21 @@ class BookEnrichmentService
     public function cleanSeriesName(string $seriesName, array $authors): string
     {
         $cleanName = trim($seriesName);
-        
+
         foreach ($authors as $author) {
             $authorLastName = explode(' ', trim($author));
             $authorLastName = end($authorLastName);
-            
+
             if (stripos($cleanName, $authorLastName) !== false) {
                 $cleanName = trim(str_ireplace($authorLastName, '', $cleanName));
                 $cleanName = preg_replace('/^[-–\s]+|[-–\s]+$/', '', $cleanName);
                 break;
             }
         }
-        
+
         $cleanName = preg_replace('/\s*[-–]\s*books?\s*\d+\s*[-–]\s*\d+\s*$/i', '', $cleanName);
         $cleanName = preg_replace('/\s*[-–]\s*(books?|parts?|volumes?)\s*$/i', '', $cleanName);
-        
+
         return trim($cleanName);
     }
 
@@ -430,15 +429,14 @@ class BookEnrichmentService
     public function addGraphicAudioMarker(string $title, array $metadata): string
     {
         $sourcePath = $metadata['source_path'] ?? '';
-        
-        if (stripos($sourcePath, 'graphicaudio') !== false || 
+
+        if (stripos($sourcePath, 'graphicaudio') !== false ||
             (isset($metadata['narrator']) && stripos($metadata['narrator'], 'full cast') !== false)) {
-            
             if (stripos($title, 'GraphicAudio') === false) {
                 return $title . ' (GraphicAudio)';
             }
         }
-        
+
         return $title;
     }
 }

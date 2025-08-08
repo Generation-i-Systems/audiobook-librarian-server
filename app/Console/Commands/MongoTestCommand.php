@@ -3,7 +3,6 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
-use App\Services\MongoService;
 use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Support\Facades\Log;
 

@@ -22,7 +22,7 @@ class BookControllerNarratorAutocompleteTest extends TestCase
         parent::setUp();
 
         // Set a valid app key for encryption
-        config(['app.key' => 'base64:'.base64_encode(random_bytes(32))]);
+        config(['app.key' => 'base64:' . base64_encode(random_bytes(32))]);
         $this->withoutMiddleware(CheckAdminRole::class);
     }
 

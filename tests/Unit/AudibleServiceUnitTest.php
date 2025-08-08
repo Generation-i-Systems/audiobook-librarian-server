@@ -60,7 +60,7 @@ class AudibleServiceUnitTest extends TestCase
         $this->app->instance('log', $logManagerMock);
         Log::swap($logManagerMock);
 
-        $this->audibleService = new AudibleService;
+        $this->audibleService = new AudibleService();
     }
 
     protected function tearDown(): void
@@ -83,9 +83,9 @@ class AudibleServiceUnitTest extends TestCase
         $filePath = $this->audibleService->downloadCoverImage($imageUrl, $asin);
 
         $this->assertNotNull($filePath);
-        $this->assertEquals('covers/'.$asin.'.jpg', $filePath);
+        $this->assertEquals('covers/' . $asin . '.jpg', $filePath);
         Storage::disk('public')->assertExists($filePath);
-        Storage::disk('public')->assertMissing('covers/'.$asin.'.png');
+        Storage::disk('public')->assertMissing('covers/' . $asin . '.png');
         $this->assertEquals($imageContent, Storage::disk('public')->get($filePath));
     }
 
@@ -103,7 +103,7 @@ class AudibleServiceUnitTest extends TestCase
         $filePath = $this->audibleService->downloadCoverImage($imageUrl, $asin);
 
         $this->assertNotNull($filePath);
-        $this->assertEquals('covers/'.$asin.'.png', $filePath);
+        $this->assertEquals('covers/' . $asin . '.png', $filePath);
         Storage::disk('public')->assertExists($filePath);
     }
 
@@ -123,7 +123,7 @@ class AudibleServiceUnitTest extends TestCase
         $filePath = $this->audibleService->downloadCoverImage($imageUrl, $asin, $subDirectory);
 
         $this->assertNotNull($filePath);
-        $this->assertEquals($subDirectory.'/'.$asin.'.jpg', $filePath);
+        $this->assertEquals($subDirectory . '/' . $asin . '.jpg', $filePath);
         Storage::disk('public')->assertExists($subDirectory);
         Storage::disk('public')->assertExists($filePath);
     }
@@ -141,7 +141,7 @@ class AudibleServiceUnitTest extends TestCase
         $filePath = $this->audibleService->downloadCoverImage($imageUrl, $asin);
 
         $this->assertNull($filePath);
-        Storage::disk('public')->assertMissing('covers/'.$asin.'.jpg');
+        Storage::disk('public')->assertMissing('covers/' . $asin . '.jpg');
     }
 
     #[Test]
@@ -149,7 +149,7 @@ class AudibleServiceUnitTest extends TestCase
     {
         $imageUrl = 'https://m.media-amazon.com/images/I/51Q42D63G5L.jpg';
         $asin = 'B002V1O1QK';
-        $expectedPath = 'covers/'.$asin.'.jpg';
+        $expectedPath = 'covers/' . $asin . '.jpg';
 
         Http::fake([$imageUrl => Http::response('fake-data', 200, ['Content-Type' => 'image/jpeg'])]);
 
@@ -177,7 +177,7 @@ class AudibleServiceUnitTest extends TestCase
 
         $filePath = $this->audibleService->downloadCoverImage($imageUrl, $asin);
 
-        $this->assertEquals('covers/'.$asin.'.jpg', $filePath);
+        $this->assertEquals('covers/' . $asin . '.jpg', $filePath);
         Storage::disk('public')->assertExists($filePath);
     }
 

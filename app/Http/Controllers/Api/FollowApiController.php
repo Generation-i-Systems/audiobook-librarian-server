@@ -67,6 +67,4 @@ class FollowApiController extends Controller
 
         return response()->json(['message' => 'Successfully unfollowed!'], 200);
     }
-
-
 }

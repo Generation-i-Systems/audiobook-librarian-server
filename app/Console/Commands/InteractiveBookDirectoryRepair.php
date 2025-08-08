@@ -50,7 +50,7 @@ class InteractiveBookDirectoryRepair extends Command
         $this->newLine();
 
         $books = $this->getBooksToProcess();
-        
+
         if ($books->isEmpty()) {
             $this->info('✅ No books with missing directories found!');
             return 0;
@@ -98,9 +98,9 @@ class InteractiveBookDirectoryRepair extends Command
     protected function processBook(Book $book): string
     {
         $this->displayBookInfo($book);
-        
+
         $suggestions = $this->findSimilarDirectories($book);
-        
+
         if (!empty($suggestions)) {
             $this->displaySuggestions($suggestions);
         } else {
@@ -135,13 +135,13 @@ class InteractiveBookDirectoryRepair extends Command
     {
         while (true) {
             $options = [];
-            
+
             if (!empty($suggestions)) {
                 for ($i = 1; $i <= count($suggestions); $i++) {
                     $options[] = $i;
                 }
             }
-            
+
             $this->line("Available options:");
             if (!empty($suggestions)) {
                 $this->line("   1-" . count($suggestions) . ". Select a suggested directory");
@@ -157,25 +157,25 @@ class InteractiveBookDirectoryRepair extends Command
             switch (strtolower($choice)) {
                 case 'm':
                     return $this->handleManualPath($book);
-                    
+
                 case 'b':
                     $this->browseDirectories();
                     continue 2;
-                    
+
                 case 's':
                     $this->warn("⏭️  Skipping: {$book->title}");
                     return 'skipped';
-                    
+
                 case 'q':
                     $this->info("👋 Goodbye!");
                     exit(0);
-                    
+
                 default:
                     if (is_numeric($choice) && $choice >= 1 && $choice <= count($suggestions)) {
                         $selectedPath = $suggestions[$choice - 1]['path'];
                         return $this->confirmAndUpdate($book, $selectedPath);
                     }
-                    
+
                     $this->error("Invalid choice. Please try again.");
                     continue 2;
             }
@@ -185,7 +185,7 @@ class InteractiveBookDirectoryRepair extends Command
     protected function handleManualPath(Book $book): string
     {
         $currentPath = $book->directory_path;
-        
+
         $this->line("📝 Current path: {$currentPath}");
         $this->line("💡 You can edit the path below. Use tab completion if available.");
         $this->line("💡 Leave empty to skip, or type '?' for help");
@@ -212,15 +212,15 @@ class InteractiveBookDirectoryRepair extends Command
 
             // Validate path
             $validation = $this->validatePath($newPath, $book);
-            
+
             if ($validation === 'valid') {
                 return $this->confirmAndUpdate($book, $newPath);
             } elseif ($validation === 'not_exists') {
                 $this->error("❌ Directory does not exist: {$newPath}");
-                
+
                 // Try to suggest similar paths
                 $this->suggestSimilarPaths($newPath);
-                
+
                 if (!$this->confirm('Try again?')) {
                     return 'skipped';
                 }
@@ -228,9 +228,9 @@ class InteractiveBookDirectoryRepair extends Command
                 $usedBy = Book::where('directory_path', $newPath)
                     ->where('id', '!=', $book->id)
                     ->first();
-                
+
                 $this->error("❌ Path already used by: {$usedBy->title}");
-                
+
                 if (!$this->confirm('Try again?')) {
                     return 'skipped';
                 }
@@ -242,15 +242,15 @@ class InteractiveBookDirectoryRepair extends Command
     {
         if (function_exists('readline')) {
             $input = readline("{$prompt}" . ($default ? " [{$default}]" : '') . ": ");
-            
+
             if (empty($input) && !empty($default)) {
                 return $default;
             }
-            
+
             if (!empty($input)) {
                 readline_add_history($input);
             }
-            
+
             return $input;
         }
 
@@ -286,7 +286,7 @@ class InteractiveBookDirectoryRepair extends Command
             }
 
             $similarity = $this->calculateStringSimilarity($normalizedInput, $this->normalizeForComparison($dir));
-            
+
             if ($similarity > 0.5) {
                 $suggestions[] = [
                     'path' => $dir,
@@ -296,8 +296,8 @@ class InteractiveBookDirectoryRepair extends Command
         }
 
         if (!empty($suggestions)) {
-            usort($suggestions, fn($a, $b) => $b['score'] <=> $a['score']);
-            
+            usort($suggestions, fn ($a, $b) => $b['score'] <=> $a['score']);
+
             $this->line("💡 Did you mean one of these?");
             foreach (array_slice($suggestions, 0, 5) as $suggestion) {
                 $score = number_format($suggestion['score'] * 100, 1);
@@ -328,7 +328,7 @@ class InteractiveBookDirectoryRepair extends Command
         $this->newLine();
 
         $unused = array_diff($this->allDirectories, $this->usedPaths);
-        
+
         if (empty($unused)) {
             $this->warn("No unused directories found!");
             return;
@@ -344,19 +344,21 @@ class InteractiveBookDirectoryRepair extends Command
         ksort($byDepth);
 
         foreach ($byDepth as $depth => $dirs) {
-            if ($depth > 3) break; // Don't show too deep
-            
+            if ($depth > 3) {
+                break;
+            } // Don't show too deep
+
             $this->line("Level " . ($depth + 1) . ":");
             sort($dirs);
-            
+
             foreach (array_slice($dirs, 0, 20) as $dir) {
                 $this->line("   {$dir}");
             }
-            
+
             if (count($dirs) > 20) {
                 $this->line("   ... and " . (count($dirs) - 20) . " more at this level");
             }
-            
+
             $this->newLine();
         }
 
@@ -378,35 +380,34 @@ class InteractiveBookDirectoryRepair extends Command
 
         try {
             $book->update(['directory_path' => $newPath]);
-            
+
             // Update our cache
             $oldPath = $book->directory_path;
             if (($key = array_search($oldPath, $this->usedPaths)) !== false) {
                 unset($this->usedPaths[$key]);
             }
             $this->usedPaths[] = $newPath;
-            
+
             $this->info("✅ Successfully updated: {$book->title}");
-            
+
             SafeLoggingService::safeLog('info', "Book directory path updated via interactive repair", [
                 'book_id' => $book->id,
                 'book_title' => $book->title,
                 'old_path' => $oldPath,
                 'new_path' => $newPath
             ]);
-            
+
             return 'fixed';
-            
         } catch (\Exception $e) {
             $this->error("❌ Failed to update book: " . $e->getMessage());
-            
+
             SafeLoggingService::safeLog('error', "Failed to update book directory path via interactive repair", [
                 'book_id' => $book->id,
                 'book_title' => $book->title,
                 'new_path' => $newPath,
                 'error' => $e->getMessage()
             ]);
-            
+
             return 'errors';
         }
     }
@@ -422,7 +423,7 @@ class InteractiveBookDirectoryRepair extends Command
             }
 
             $similarity = $this->calculateDirectorySimilarity($directory, $searchTerms);
-            
+
             if ($similarity >= $this->similarityThreshold) {
                 $suggestions[] = [
                     'path' => $directory,
@@ -431,18 +432,24 @@ class InteractiveBookDirectoryRepair extends Command
             }
         }
 
-        usort($suggestions, fn($a, $b) => $b['score'] <=> $a['score']);
+        usort($suggestions, fn ($a, $b) => $b['score'] <=> $a['score']);
         return array_slice($suggestions, 0, 8);
     }
 
     protected function buildSearchTerms(Book $book): array
     {
         $terms = [];
-        
-        if ($book->author) $terms[] = $this->normalizeForComparison($book->author);
-        if ($book->title) $terms[] = $this->normalizeForComparison($book->title);
-        if ($book->series) $terms[] = $this->normalizeForComparison($book->series);
-        
+
+        if ($book->author) {
+            $terms[] = $this->normalizeForComparison($book->author);
+        }
+        if ($book->title) {
+            $terms[] = $this->normalizeForComparison($book->title);
+        }
+        if ($book->series) {
+            $terms[] = $this->normalizeForComparison($book->series);
+        }
+
         if ($book->narrator) {
             if (is_array($book->narrator)) {
                 foreach ($book->narrator as $narrator) {
@@ -482,8 +489,10 @@ class InteractiveBookDirectoryRepair extends Command
 
         // Levenshtein distance
         $maxLen = max(strlen($str1), strlen($str2));
-        if ($maxLen === 0) return 1.0;
-        
+        if ($maxLen === 0) {
+            return 1.0;
+        }
+
         $levenshteinScore = 1 - (levenshtein($str1, $str2) / $maxLen);
 
         // Return the best score
@@ -506,10 +515,10 @@ class InteractiveBookDirectoryRepair extends Command
     {
         try {
             $contents = $this->disk->directories($path);
-            
+
             foreach ($contents as $directory) {
                 $directories[] = $directory;
-                
+
                 if (substr_count($directory, '/') < 4) {
                     $this->collectDirectoriesRecursively($directory, $directories);
                 }
@@ -535,7 +544,7 @@ class InteractiveBookDirectoryRepair extends Command
         $this->line("   ✅ Successfully fixed: {$stats['fixed']}");
         $this->line("   ⏭️  Skipped: {$stats['skipped']}");
         $this->line("   ❌ Errors: {$stats['errors']}");
-        
+
         if ($stats['fixed'] > 0) {
             $this->info("🔧 Great job! You've repaired {$stats['fixed']} book directories.");
         }

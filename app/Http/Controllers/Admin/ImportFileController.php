@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\Admin;
 
 use App\Contracts\DocumentStoreServiceInterface;
@@ -214,8 +215,8 @@ class ImportFileController extends Controller
                     // Check if the directory contains any files with allowed extensions
                     $hasMatchingFiles = collect(File::files($d))
                         ->filter(function ($f) use ($allowedExtensions) {
-                        return in_array(strtolower($f->getExtension()), $allowedExtensions);
-                    })
+                            return in_array(strtolower($f->getExtension()), $allowedExtensions);
+                        })
                         ->isNotEmpty();
 
                     return $hasMatchingFiles;
@@ -515,7 +516,6 @@ class ImportFileController extends Controller
                         'confidence' => $aiMetadata['confidence']
                     ]);
                 }
-
             } catch (\Exception $e) {
                 Log::error("[ImportFile] AI processing failed: " . $e->getMessage());
                 $regularData['aiWarning'] = "AI processing failed: " . $e->getMessage() . ". Using basic extraction.";
@@ -528,7 +528,6 @@ class ImportFileController extends Controller
             }
 
             return response()->json($regularData);
-
         } catch (\Exception $e) {
             Log::error('[ImportFile] AI-enhanced extraction failed: ' . $e->getMessage());
             return response()->json([
@@ -1848,6 +1847,4 @@ class ImportFileController extends Controller
 
         return $formData;
     }
-
-
 }

@@ -4,15 +4,15 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use App\Models\Series;
 use App\Traits\CamelCaseAttributeAccess;
 use App\Traits\Auditable;
 
 class Book extends Model
 {
-    use HasFactory, CamelCaseAttributeAccess, Auditable;
+    use HasFactory;
+    use CamelCaseAttributeAccess;
+    use Auditable;
 
     protected $fillable = [
         'title',

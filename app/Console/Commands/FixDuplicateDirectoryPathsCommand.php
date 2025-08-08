@@ -5,8 +5,6 @@ namespace App\Console\Commands;
 use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 
 class FixDuplicateDirectoryPathsCommand extends Command
 {
@@ -53,78 +51,77 @@ class FixDuplicateDirectoryPathsCommand extends Command
         // Find directory paths with multiple books
         $this->info('Finding directory paths with multiple books...');
         $duplicatePaths = DB::select("SELECT directory_path, COUNT(*) as cnt FROM books WHERE directory_path IS NOT NULL GROUP BY directory_path HAVING cnt >= ?", [$minCount]);
-        
+
         if (empty($duplicatePaths)) {
             $this->info('No directory paths with multiple books found.');
             return 0;
         }
-        
+
         $this->info(sprintf('Found %d directory paths with %d or more books', count($duplicatePaths), $minCount));
-        
+
         $fixed = 0;
         $errors = 0;
         $skipped = 0;
-        
+
         foreach ($duplicatePaths as $pathInfo) {
             $directoryPath = $pathInfo->directory_path;
             $count = $pathInfo->cnt;
-            
+
             $this->info(sprintf('Processing directory path: %s (used by %d books)', $directoryPath, $count));
-            
+
             // Get all books with this directory path
             $books = DB::table('books')
                 ->where('directory_path', $directoryPath)
                 ->select('id', 'title', 'directory_path')
                 ->get();
-                
+
             $this->info(sprintf('Found %d books with this directory path', count($books)));
-            
+
             // For each book, check if there's a more specific directory that includes the title
             foreach ($books as $book) {
                 $this->info(sprintf('Processing book: %s (ID: %s)', $book->title, $book->id));
-                
+
                 // Skip if no title
                 if (empty($book->title)) {
                     $this->warn('Book has no title, skipping');
                     $skipped++;
                     continue;
                 }
-                
+
                 // Generate a sanitized title for directory name
                 $sanitizedTitle = $this->sanitizeForPath($book->title);
-                
+
                 // Check for potential better directory paths
                 $potentialPaths = [
                     $directoryPath . '/' . $sanitizedTitle,
                     $directoryPath . '_' . $sanitizedTitle,
                     $directoryPath . '/' . $book->id,
                 ];
-                
+
                 // Look for directories with pattern 'title (narrator)'
                 $basePath = $this->option('path');
                 $fullPath = $basePath . '/' . $directoryPath;
-                
+
                 if (is_dir($fullPath)) {
                     $subdirs = array_map('basename', glob($fullPath . '/*', GLOB_ONLYDIR));
-                    
+
                     foreach ($subdirs as $subdirName) {
-                        
                         // Check if the subdirectory follows the 'title (narrator)' pattern
                         if (preg_match('/^(.+)\s+\((.+)\)$/', $subdirName, $matches)) {
                             $titlePart = $matches[1];
-                            
+
                             // Check if the title part matches the book title
-                            if (stripos($book->title, $titlePart) !== false || 
+                            if (stripos($book->title, $titlePart) !== false ||
                                 stripos($titlePart, $book->title) !== false) {
                                 $potentialPaths[] = $directoryPath . '/' . $subdirName;
                             }
                         }
                     }
                 }
-                
+
                 $betterPath = null;
                 $basePath = $this->option('path');
-                
+
                 // Check if any of these directories exist
                 foreach ($potentialPaths as $path) {
                     $fullPath = $basePath . '/' . $path;
@@ -134,27 +131,27 @@ class FixDuplicateDirectoryPathsCommand extends Command
                         break;
                     }
                 }
-                
+
                 // If no better path found, check if there are subdirectories that contain the title
                 if (!$betterPath) {
                     try {
                         $fullDirectoryPath = $basePath . '/' . $directoryPath;
                         if (is_dir($fullDirectoryPath)) {
                             $subdirs = glob($fullDirectoryPath . '/*', GLOB_ONLYDIR);
-                            
+
                             foreach ($subdirs as $subdir) {
                                 $subdirName = basename($subdir);
                                 $sanitizedBookTitle = $this->sanitizeForPath($book->title);
-                                
+
                                 // Check for 'title (narrator)' pattern
                                 if (preg_match('/^(.+?)\s+\((.+?)\)$/', $subdirName, $matches)) {
                                     $title = $matches[1];
                                     $narrator = $matches[2];
-                                    
+
                                     // Check if the subdirectory title part matches the book title
                                     // Use more flexible matching to catch variations
                                     $sanitizedTitle = $this->sanitizeForPath($title);
-                                    if (stripos($sanitizedBookTitle, $sanitizedTitle) !== false || 
+                                    if (stripos($sanitizedBookTitle, $sanitizedTitle) !== false ||
                                         stripos($sanitizedTitle, $sanitizedBookTitle) !== false ||
                                         similar_text($sanitizedBookTitle, $sanitizedTitle) > min(strlen($sanitizedBookTitle), strlen($sanitizedTitle)) * 0.7) {
                                         $this->info(sprintf('Found matching subdirectory with narrator: %s', $subdirName));
@@ -164,7 +161,7 @@ class FixDuplicateDirectoryPathsCommand extends Command
                                 } else {
                                     // Also check for direct title match without narrator pattern
                                     $sanitizedSubdirName = $this->sanitizeForPath($subdirName);
-                                    if (stripos($sanitizedBookTitle, $sanitizedSubdirName) !== false || 
+                                    if (stripos($sanitizedBookTitle, $sanitizedSubdirName) !== false ||
                                         stripos($sanitizedSubdirName, $sanitizedBookTitle) !== false ||
                                         similar_text($sanitizedBookTitle, $sanitizedSubdirName) > min(strlen($sanitizedBookTitle), strlen($sanitizedSubdirName)) * 0.7) {
                                         $this->info(sprintf('Found matching subdirectory: %s', $subdirName));
@@ -178,16 +175,20 @@ class FixDuplicateDirectoryPathsCommand extends Command
                         $this->error('Error checking subdirectories: ' . $e->getMessage());
                     }
                 }
-                
+
                 // Update the book if a better path was found
                 if ($betterPath) {
-                    $this->info(sprintf('Updating book %s directory path from %s to %s', 
-                        $book->id, $directoryPath, $betterPath));
-                    
+                    $this->info(sprintf(
+                        'Updating book %s directory path from %s to %s',
+                        $book->id,
+                        $directoryPath,
+                        $betterPath
+                    ));
+
                     if (!$dryRun) {
                         try {
                             $result = $this->documentStore->updateBook($book->id, ['directory_path' => $betterPath]);
-                            
+
                             if ($result) {
                                 $this->info('Successfully updated book directory path');
                                 $fixed++;
@@ -209,16 +210,16 @@ class FixDuplicateDirectoryPathsCommand extends Command
                 }
             }
         }
-        
+
         $this->info('');
         $this->info('Summary:');
         $this->info(sprintf('Books fixed: %d', $fixed));
         $this->info(sprintf('Books skipped: %d', $skipped));
         $this->info(sprintf('Errors: %d', $errors));
-        
+
         return 0;
     }
-    
+
     /**
      * Sanitize a string to be used as a directory name
      *
@@ -237,7 +238,7 @@ class FixDuplicateDirectoryPathsCommand extends Command
         $name = str_replace(' ', '_', $name);
         // Convert to lowercase
         $name = strtolower($name);
-        
+
         return $name;
     }
 }

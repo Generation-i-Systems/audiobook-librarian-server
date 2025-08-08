@@ -8,7 +8,8 @@ use App\Traits\CamelCaseAttributeAccess;
 
 class Message extends Model
 {
-    use HasFactory, CamelCaseAttributeAccess;
+    use HasFactory;
+    use CamelCaseAttributeAccess;
 
     protected $fillable = [
         'sender_id',

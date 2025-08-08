@@ -10,7 +10,9 @@ use App\Traits\Auditable;
 
 class Series extends Model
 {
-    use HasFactory, CamelCaseAttributeAccess, Auditable;
+    use HasFactory;
+    use CamelCaseAttributeAccess;
+    use Auditable;
 
     protected $fillable = ['name'];
 

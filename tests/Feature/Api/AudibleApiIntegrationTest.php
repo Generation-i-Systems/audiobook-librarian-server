@@ -188,7 +188,7 @@ XML;
             $queryString = $urlParts['query'] ?? '';
             parse_str($queryString, $queryParams);
 
-            $urlWithoutQuery = ($urlParts['scheme'] ?? 'http').'://'.($urlParts['host'] ?? '').
+            $urlWithoutQuery = ($urlParts['scheme'] ?? 'http') . '://' . ($urlParts['host'] ?? '') .
                 ($urlParts['path'] ?? '');
             $rtrimmedUrlWithoutQuery = rtrim($urlWithoutQuery, '/');
             $rtrimmedApiBaseUrl = rtrim($apiBaseUrl, '/');
@@ -209,7 +209,7 @@ XML;
                 'base_url_expected' => $apiBaseUrl,
             ]);
 
-            return Http::response('Mock not found for integration search: '.$request->url(), 404, [
+            return Http::response('Mock not found for integration search: ' . $request->url(), 404, [
                 'Content-Type' => 'text/plain',
             ]);
         });
@@ -234,7 +234,7 @@ XML;
             $queryString = $urlParts['query'] ?? '';
             parse_str($queryString, $queryParams);
 
-            $urlWithoutQuery = ($urlParts['scheme'] ?? 'http').'://'.($urlParts['host'] ?? '').
+            $urlWithoutQuery = ($urlParts['scheme'] ?? 'http') . '://' . ($urlParts['host'] ?? '') .
                 ($urlParts['path'] ?? '');
             $rtrimmedUrlWithoutQuery = rtrim($urlWithoutQuery, '/');
             $rtrimmedApiBaseUrl = rtrim($apiBaseUrl, '/');
@@ -256,7 +256,7 @@ XML;
                 'base_url_expected' => $apiBaseUrl,
             ]);
 
-            return Http::response('Mock not found for integration details: '.$request->url(), 404, [
+            return Http::response('Mock not found for integration details: ' . $request->url(), 404, [
                 'Content-Type' => 'text/plain',
             ]);
         });

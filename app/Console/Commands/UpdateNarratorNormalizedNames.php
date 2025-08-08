@@ -21,7 +21,7 @@ class UpdateNarratorNormalizedNames extends Command
 
         $this->info('Starting to normalize narrator names...');
         $count = 0;
-        
+
         Narrator::chunk(100, function ($narrators) use (&$count) {
             foreach ($narrators as $narrator) {
                 $normalizedName = Narrator::normalizeName($narrator->name);
@@ -31,7 +31,7 @@ class UpdateNarratorNormalizedNames extends Command
                 }
             }
         });
-        
+
         $this->info("Updated normalized names for {$count} narrators.");
         return Command::SUCCESS;
     }

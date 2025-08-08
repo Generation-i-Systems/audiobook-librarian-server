@@ -5,7 +5,7 @@ namespace App\Traits;
 use Illuminate\Support\Str;
 
 /**
- * Optimized version of CamelCaseAttributeAccess that caches conversions 
+ * Optimized version of CamelCaseAttributeAccess that caches conversions
  * and avoids expensive string operations on every toArray() call
  */
 trait OptimizedCamelCaseAccess
@@ -14,9 +14,9 @@ trait OptimizedCamelCaseAccess
      * Static cache for snake_case to camelCase conversions
      */
     protected static array $camelCaseCache = [];
-    
+
     /**
-     * Static cache for camelCase to snake_case conversions  
+     * Static cache for camelCase to snake_case conversions
      */
     protected static array $snakeCaseCache = [];
 
@@ -77,7 +77,7 @@ trait OptimizedCamelCaseAccess
     public function toArray()
     {
         $attributes = parent::toArray();
-        
+
         // Build conversion map once for this model's attributes
         static $conversionMap = null;
         if ($conversionMap === null) {
@@ -96,7 +96,7 @@ trait OptimizedCamelCaseAccess
 
         return $camelCaseAttributes;
     }
-    
+
     /**
      * Get cached snake_case conversion
      */
@@ -104,16 +104,16 @@ trait OptimizedCamelCaseAccess
     {
         if (!isset(static::$snakeCaseCache[$key])) {
             static::$snakeCaseCache[$key] = Str::snake($key);
-            
+
             // Prevent cache from growing too large
             if (count(static::$snakeCaseCache) > 1000) {
                 static::$snakeCaseCache = array_slice(static::$snakeCaseCache, -500, null, true);
             }
         }
-        
+
         return static::$snakeCaseCache[$key];
     }
-    
+
     /**
      * Get cached camelCase conversion
      */
@@ -121,13 +121,13 @@ trait OptimizedCamelCaseAccess
     {
         if (!isset(static::$camelCaseCache[$key])) {
             static::$camelCaseCache[$key] = Str::camel($key);
-            
+
             // Prevent cache from growing too large
             if (count(static::$camelCaseCache) > 1000) {
                 static::$camelCaseCache = array_slice(static::$camelCaseCache, -500, null, true);
             }
         }
-        
+
         return static::$camelCaseCache[$key];
     }
 }

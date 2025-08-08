@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Auth;
 use App\Auth\DocumentstoreUser;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
-use Google\Cloud\Core\Timestamp as GoogleTimestamp;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -222,6 +221,4 @@ class LoginController extends Controller
 
         return $this->loggedOut($request) ?: redirect('/');
     }
-
-
 }

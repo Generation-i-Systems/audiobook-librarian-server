@@ -12,7 +12,11 @@ use App\Traits\Auditable;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable, CamelCaseAttributeAccess, Auditable;
+    use HasApiTokens;
+    use HasFactory;
+    use Notifiable;
+    use CamelCaseAttributeAccess;
+    use Auditable;
 
     /**
      * The attributes that are mass assignable.

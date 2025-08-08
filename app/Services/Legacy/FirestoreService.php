@@ -107,28 +107,28 @@ class FirestoreService implements DocumentStoreServiceInterface
                 }
                 $books = $filteredBooks;
             }
-            
+
             // Sort books
-            usort($books, function($a, $b) use ($sort, $order) {
+            usort($books, function ($a, $b) use ($sort, $order) {
                 $valueA = $a[$sort] ?? '';
                 $valueB = $b[$sort] ?? '';
-                
+
                 if ($order === 'asc') {
                     return $valueA <=> $valueB;
                 } else {
                     return $valueB <=> $valueA;
                 }
             });
-            
+
             // Calculate pagination
             $total = count($books);
             $lastPage = max(1, ceil($total / $perPage));
             $currentPage = min(max(1, $page), $lastPage);
             $offset = ($currentPage - 1) * $perPage;
-            
+
             // Get paginated data
             $paginatedBooks = array_slice($books, $offset, $perPage);
-            
+
             return [
                 'data' => $paginatedBooks,
                 'total' => $total,
@@ -347,13 +347,13 @@ class FirestoreService implements DocumentStoreServiceInterface
             $data['updated_at'] = $now;
 
             Log::debug('Creating user in Firestore', $data);
-            
+
             $docRef = $this->db->collection('users')->newDocument();
             $docRef->set($data);
             $userId = $docRef->id();
-            
+
             Log::debug('User created successfully', ['user_id' => $userId]);
-            
+
             return $userId;
         } catch (\Exception $e) {
             Log::error('Error creating user: ' . $e->getMessage(), [
@@ -2570,7 +2570,7 @@ class FirestoreService implements DocumentStoreServiceInterface
             return [];
         }
     }
-    
+
     /**
      * Get recently added books
      *
@@ -2584,25 +2584,25 @@ class FirestoreService implements DocumentStoreServiceInterface
             if (!$this->db) {
                 return [];
             }
-            
+
             // Calculate the date $days ago
             $daysAgo = new \DateTime();
             $daysAgo->modify("-{$days} days");
-            
+
             $books = [];
             $query = $this->db->collection('books');
             $documents = $query->documents();
-            
+
             foreach ($documents as $document) {
                 if ($document->exists()) {
                     $data = $document->data();
                     $createdAt = isset($data['created_at']) ? $data['created_at'] : null;
-                    
+
                     // Skip if no created_at or if it's older than $days
                     if (!$createdAt) {
                         continue;
                     }
-                    
+
                     // Convert Firestore timestamp to DateTime for comparison
                     if ($createdAt instanceof Timestamp) {
                         $createdDateTime = $createdAt->get()->format('Y-m-d H:i:s');
@@ -2612,16 +2612,16 @@ class FirestoreService implements DocumentStoreServiceInterface
                     } else {
                         continue; // Skip if we can't parse the date
                     }
-                    
+
                     // Check if the book was created within the last $days days
                     if ($createdDateTime >= $daysAgo) {
                         $bookData = array_merge(['id' => $document->id()], $data);
-                        
+
                         // Format series data as array of objects with name and series_number
                         if (isset($bookData['series']) && !empty($bookData['series'])) {
                             $seriesName = $bookData['series'];
                             $seriesNumber = $bookData['series_number'] ?? null;
-                            
+
                             $bookData['series'] = [
                                 [
                                     'name' => $seriesName,
@@ -2631,7 +2631,7 @@ class FirestoreService implements DocumentStoreServiceInterface
                         } else {
                             $bookData['series'] = [];
                         }
-                        
+
                         // Extract year from release_date if available
                         if (isset($bookData['release_date'])) {
                             if ($bookData['release_date'] instanceof Timestamp) {
@@ -2641,36 +2641,35 @@ class FirestoreService implements DocumentStoreServiceInterface
                                 $bookData['year'] = (int)substr($bookData['release_date'], 0, 4);
                             }
                         }
-                        
+
                         $books[] = $bookData;
                     }
                 }
             }
-            
+
             // Sort by created_at desc
-            usort($books, function($a, $b) {
+            usort($books, function ($a, $b) {
                 $dateA = $a['created_at'] ?? null;
                 $dateB = $b['created_at'] ?? null;
-                
+
                 if ($dateA instanceof Timestamp && $dateB instanceof Timestamp) {
                     return $dateB->get()->getTimestamp() - $dateA->get()->getTimestamp();
                 }
-                
+
                 return 0; // Default to no change in order if dates can't be compared
             });
-            
+
             // Limit results
             return array_slice($books, 0, $limit);
-            
         } catch (\Exception $e) {
             Log::error('Error getting recent books: ' . $e->getMessage());
             return [];
         }
     }
-    
+
     /**
      * Get unique values for a specific field across all books
-     * 
+     *
      * @param string $field The field to get unique values for (e.g., 'genre', 'author')
      * @param string $subField Optional subfield for nested data (e.g., 'seriesName' when field is 'series')
      * @return array Array of unique values
@@ -2681,18 +2680,18 @@ class FirestoreService implements DocumentStoreServiceInterface
             if (!$this->db) {
                 return [];
             }
-            
+
             $uniqueValues = [];
             $query = $this->db->collection('books');
             $documents = $query->documents();
-            
+
             foreach ($documents as $document) {
                 if ($document->exists()) {
                     $data = $document->data();
-                    
+
                     if (isset($data[$field])) {
                         $value = $data[$field];
-                        
+
                         // Handle array fields like authors, genres
                         if (is_array($value) && !$subField) {
                             foreach ($value as $item) {
@@ -2702,7 +2701,7 @@ class FirestoreService implements DocumentStoreServiceInterface
                                     $uniqueValues[$item['name']] = true;
                                 }
                             }
-                        } 
+                        }
                         // Handle nested fields with subField
                         elseif (is_array($value) && $subField && isset($value[$subField])) {
                             $uniqueValues[$value[$subField]] = true;
@@ -2714,15 +2713,14 @@ class FirestoreService implements DocumentStoreServiceInterface
                     }
                 }
             }
-            
+
             return array_keys($uniqueValues);
-            
         } catch (\Exception $e) {
             Log::error('Error getting unique values: ' . $e->getMessage());
             return [];
         }
     }
-    
+
     /**
      * Validate a user's credentials.
      *
@@ -2735,22 +2733,22 @@ class FirestoreService implements DocumentStoreServiceInterface
         if (!$user || !isset($credentials['password'])) {
             return false;
         }
-        
+
         // If user is an array (from Firestore), get the password hash
         if (is_array($user) && isset($user['password'])) {
             $passwordHash = $user['password'];
-        } 
+        }
         // If user is an object, get the password attribute
         elseif (is_object($user) && isset($user->password)) {
             $passwordHash = $user->password;
         } else {
             return false;
         }
-        
+
         // Verify the password using Laravel's Hash facade
         return Hash::check($credentials['password'], $passwordHash);
     }
-    
+
     /**
      * Update the "remember me" token for the given user.
      *
@@ -2764,17 +2762,16 @@ class FirestoreService implements DocumentStoreServiceInterface
             if (!$this->db) {
                 return;
             }
-            
+
             $userRef = $this->db->collection('users')->document($identifier);
             $userRef->update([
                 ['path' => 'remember_token', 'value' => $token]
             ]);
-            
         } catch (\Exception $e) {
             Log::error('Error updating remember token: ' . $e->getMessage());
         }
     }
-    
+
     /**
      * Search for genres by name
      *
@@ -2787,32 +2784,29 @@ class FirestoreService implements DocumentStoreServiceInterface
             if (!$this->db) {
                 return [];
             }
-            
+
             $results = [];
             $query = $this->db->collection('genres');
             $documents = $query->documents();
-            
+
             $term = strtolower($term);
-            
+
             foreach ($documents as $document) {
                 if ($document->exists()) {
                     $data = $document->data();
                     $name = $data['name'] ?? '';
-                    
+
                     // Simple case-insensitive contains search
                     if ($name && stripos($name, $term) !== false) {
                         $results[] = array_merge(['id' => $document->id()], $data);
                     }
                 }
             }
-            
+
             return $results;
-            
         } catch (\Exception $e) {
             Log::error('Error searching genres: ' . $e->getMessage());
             return [];
         }
     }
-
-
 }

@@ -21,7 +21,7 @@ class AIBookProcessor
     protected array $modelLimits;
     protected array $modelPricing;
     protected float $estimatedCost = 0.0;
-    
+
     // Model configurations with rate limits and pricing (based on official documentation)
     protected array $modelConfigs = [
         // Gemini Models (Google)
@@ -115,7 +115,7 @@ class AIBookProcessor
                 'output_tokens_per_million' => 10.00, // Official: $10.00 per 1M (≤200K tokens), $15.00 (>200K tokens)
             ]
         ],
-        
+
         // Claude Models (Anthropic)
         'claude-3-5-haiku' => [
             'free' => null, // No free tier for Claude API
@@ -169,7 +169,7 @@ class AIBookProcessor
                 'output_tokens_per_million' => 75.00, // Official: $75.00 per 1M output tokens
             ]
         ],
-        
+
         // OpenAI Models (ChatGPT)
         'gpt-4o-mini' => [
             'free' => null, // No free tier for OpenAI API
@@ -233,17 +233,17 @@ class AIBookProcessor
                 'Content-Type' => 'application/json',
             ],
         ]);
-        
+
         // Set default model and determine provider
         $this->model = $model ?: config('services.ai.default_model', 'gemini-2.5-flash-lite');
         $this->provider = $this->determineProvider($this->model);
         $this->paidTier = $paidTier;
-        
+
         // Validate model exists
         if (!isset($this->modelConfigs[$this->model])) {
             throw new \InvalidArgumentException("Unsupported model: {$this->model}");
         }
-        
+
         // Set API keys based on provider
         if ($this->provider === 'gemini') {
             $this->apiKey = config('services.gemini.api_key');
@@ -256,24 +256,24 @@ class AIBookProcessor
             // For OpenAI, we always use paid tier (no free tier available)
             $this->paidTier = true;
         }
-        
+
         // Initialize OpenAI API key only for fallback audio transcription
         if (!isset($this->openaiApiKey)) {
             $this->openaiApiKey = config('services.openai.api_key');
         }
-        
+
         // Set limits and pricing based on tier
         $tier = $this->paidTier ? 'paid' : 'free';
-        
+
         // Claude and OpenAI models don't have free tier
         if (($this->provider === 'claude' || $this->provider === 'openai') && !$this->modelConfigs[$this->model]['paid']) {
             throw new \InvalidArgumentException("{$this->provider} models require paid tier access");
         }
-        
+
         $this->modelLimits = $this->modelConfigs[$this->model][$tier];
         $this->modelPricing = $this->modelConfigs[$this->model]['pricing'];
     }
-    
+
     /**
      * Determine AI provider based on model name
      */
@@ -286,7 +286,7 @@ class AIBookProcessor
         } elseif (str_starts_with($model, 'gpt-')) {
             return 'openai';
         }
-        
+
         throw new \InvalidArgumentException("Cannot determine provider for model: {$model}");
     }
 
@@ -302,7 +302,7 @@ class AIBookProcessor
         } elseif ($this->provider === 'openai') {
             return "https://api.openai.com/v1/chat/completions";
         }
-        
+
         throw new \InvalidArgumentException("Unsupported provider: {$this->provider}");
     }
 
@@ -313,14 +313,14 @@ class AIBookProcessor
     {
         $cacheKey = "{$this->provider}_api_requests_{$this->model}_" . date('Y-m-d-H-i');
         $dailyCacheKey = "{$this->provider}_api_requests_{$this->model}_" . date('Y-m-d');
-        
+
         $minuteRequests = cache()->get($cacheKey, 0);
         $dailyRequests = cache()->get($dailyCacheKey, 0);
-        
+
         $withinMinuteLimit = $minuteRequests < $this->modelLimits['requests_per_minute'];
-        $withinDailyLimit = $this->modelLimits['requests_per_day'] === null || 
+        $withinDailyLimit = $this->modelLimits['requests_per_day'] === null ||
                            $dailyRequests < $this->modelLimits['requests_per_day'];
-        
+
         return $withinMinuteLimit && $withinDailyLimit;
     }
 
@@ -331,10 +331,10 @@ class AIBookProcessor
     {
         $cacheKey = "{$this->provider}_api_requests_{$this->model}_" . date('Y-m-d-H-i');
         $dailyCacheKey = "{$this->provider}_api_requests_{$this->model}_" . date('Y-m-d');
-        
+
         cache()->increment($cacheKey, 1);
         cache()->put($cacheKey, cache()->get($cacheKey, 1), 60); // 1 minute
-        
+
         cache()->increment($dailyCacheKey, 1);
         cache()->put($dailyCacheKey, cache()->get($dailyCacheKey, 1), 24 * 60 * 60); // 24 hours
     }
@@ -367,17 +367,17 @@ class AIBookProcessor
         try {
             // Check rate limits before making request
             $this->respectRateLimit();
-            
+
             $prompt = $this->buildPrompt($directoryPath, $fileNames, $fileTags, $nfoData);
             $response = $this->callAIAPI($prompt);
-            
+
             return $this->parseAIResponse($response);
         } catch (\Exception $e) {
             Log::error("{$this->provider} book processing failed", [
                 'directory' => $directoryPath,
                 'error' => $e->getMessage()
             ]);
-            
+
             return $this->getFallbackMetadata($directoryPath, $fileNames, $fileTags);
         }
     }
@@ -388,9 +388,9 @@ class AIBookProcessor
     protected function buildPrompt(string $directoryPath, array $fileNames, array $fileTags, array $nfoData = null): string
     {
         $prompt = "Extract audiobook metadata from this data and return JSON only:\n\n";
-        
+
         $prompt .= "Directory: {$directoryPath}\n";
-        
+
         // Prioritize NFO data if available
         if (!empty($nfoData)) {
             $prompt .= "\nNFO FILE DATA (PRIORITY - USE THIS FIRST):\n";
@@ -401,7 +401,7 @@ class AIBookProcessor
             }
             $prompt .= "\n";
         }
-        
+
         // Limit file names to first 3 to save tokens
         if (!empty($fileNames)) {
             $limitedFiles = array_slice($fileNames, 0, 3);
@@ -411,7 +411,7 @@ class AIBookProcessor
             }
             $prompt .= "\n";
         }
-        
+
         // Include most important tags only
         if (!empty($fileTags)) {
             $firstFileTags = reset($fileTags);
@@ -425,25 +425,25 @@ class AIBookProcessor
             }
             $prompt .= implode(', ', $tagParts) . "\n";
         }
-        
+
         $prompt .= "\nReturn JSON with these fields: title, author, narrator, series{name,number}, genre, year, publisher, language, isbn, confidence (0-100).\n";
         $prompt .= "Clean titles (remove file artifacts, bitrates, sizes). Separate authors from narrators. Extract series info from patterns.\n";
-        
+
         if (!empty($nfoData)) {
             $prompt .= "CRITICAL: The NFO file data above is AUTHORITATIVE - use it as the primary source. Only supplement with other data if NFO fields are missing.\n";
         }
-        
+
         $prompt .= "CRITICAL INSTRUCTION: You are analyzing ONE COMPLETE AUDIOBOOK, not individual chapters. \n";
         $prompt .= "- The directory represents ONE BOOK, even if it contains multiple audio files\n";
         $prompt .= "- Do NOT extract chapter titles (like 'The Pool of Tears', 'Chapter 1', etc.) as the main book title\n";
         $prompt .= "- Use the overall book title (like 'Alice's Adventures in Wonderland'), not chapter names\n";
         $prompt .= "- Only use series information if this is genuinely part of a multi-book series (Book 1, Book 2, etc.)\n";
         $prompt .= "- Individual chapters/parts within one book are NOT separate series entries\n\n";
-        
+
         $prompt .= "IMPORTANT: For genre, choose the MOST SPECIFIC literary genre that fits the content. Valid genres are:\n";
         $prompt .= "Kids, Religion, General Fiction, Church, Science, Historical Fiction, Computer, Classic, History, Non Fiction, Action, LitRPG, Romance, Science Fiction, Other, Fantasy\n";
         $prompt .= "Do NOT use generic terms like 'Audiobook', 'Book', 'Audio' - analyze the actual story content and choose the appropriate literary genre.\n";
-        
+
         return $prompt;
     }
 
@@ -455,11 +455,11 @@ class AIBookProcessor
         try {
             // Track this request for rate limiting
             $this->trackRequest();
-            
+
             // Estimate token usage for cost calculation
             $estimatedInputTokens = $this->estimateTokens($prompt);
             $estimatedOutputTokens = $this->modelLimits['max_output_tokens'] / 2; // Conservative estimate
-            
+
             if ($this->provider === 'gemini') {
                 return $this->callGeminiAPI($prompt, $estimatedInputTokens, $estimatedOutputTokens);
             } elseif ($this->provider === 'claude') {
@@ -467,15 +467,14 @@ class AIBookProcessor
             } elseif ($this->provider === 'openai') {
                 return $this->callOpenAIAPI($prompt, $estimatedInputTokens, $estimatedOutputTokens);
             }
-            
+
             throw new \InvalidArgumentException("Unsupported provider: {$this->provider}");
-            
         } catch (GuzzleException $e) {
             Log::error("{$this->provider} API call failed", [
                 'error' => $e->getMessage(),
                 'code' => $e->getCode()
             ]);
-            
+
             return ['success' => false, 'error' => $e->getMessage()];
         }
     }
@@ -522,21 +521,21 @@ class AIBookProcessor
                 ]
             ]);
 
-            $body = json_decode($response->getBody(), true);
-            
-            if (isset($body['candidates'][0]['content']['parts'][0]['text'])) {
-                // Calculate actual cost if paid tier
-                if ($this->paidTier) {
-                    $actualInputTokens = $body['usageMetadata']['promptTokenCount'] ?? $estimatedInputTokens;
-                    $actualOutputTokens = $body['usageMetadata']['candidatesTokenCount'] ?? $estimatedOutputTokens;
-                    $requestCost = $this->calculateCost($actualInputTokens, $actualOutputTokens);
-                    $this->estimatedCost += $requestCost;
-                }
-                
-                return ['success' => true, 'data' => $body['candidates'][0]['content']['parts'][0]['text']];
+        $body = json_decode($response->getBody(), true);
+
+        if (isset($body['candidates'][0]['content']['parts'][0]['text'])) {
+            // Calculate actual cost if paid tier
+            if ($this->paidTier) {
+                $actualInputTokens = $body['usageMetadata']['promptTokenCount'] ?? $estimatedInputTokens;
+                $actualOutputTokens = $body['usageMetadata']['candidatesTokenCount'] ?? $estimatedOutputTokens;
+                $requestCost = $this->calculateCost($actualInputTokens, $actualOutputTokens);
+                $this->estimatedCost += $requestCost;
             }
-            
-            return ['success' => false, 'error' => 'No valid response content'];
+
+            return ['success' => true, 'data' => $body['candidates'][0]['content']['parts'][0]['text']];
+        }
+
+        return ['success' => false, 'error' => 'No valid response content'];
     }
 
     /**
@@ -564,10 +563,10 @@ class AIBookProcessor
                 $requestCost = $this->calculateCost($actualInputTokens, $actualOutputTokens);
                 $this->estimatedCost += $requestCost;
             }
-            
+
             return ['success' => true, 'data' => $response['content'][0]['text']];
         }
-        
+
         return ['success' => false, 'error' => 'No valid response content from Claude'];
     }
 
@@ -578,7 +577,7 @@ class AIBookProcessor
     {
         // Use the OpenAI SDK
         $client = OpenAI::client($this->openaiApiKey);
-        
+
         $response = $client->chat()->create([
             'model' => $this->model,
             'messages' => [
@@ -600,10 +599,10 @@ class AIBookProcessor
                 $requestCost = $this->calculateCost($actualInputTokens, $actualOutputTokens);
                 $this->estimatedCost += $requestCost;
             }
-            
+
             return ['success' => true, 'data' => $response['choices'][0]['message']['content']];
         }
-        
+
         return ['success' => false, 'error' => 'No valid response content from OpenAI'];
     }
 
@@ -617,14 +616,14 @@ class AIBookProcessor
         }
 
         $jsonText = $response['data'];
-        
+
         // Clean up the response to extract JSON
         $jsonText = preg_replace('/```json\s*/', '', $jsonText);
         $jsonText = preg_replace('/```\s*$/', '', $jsonText);
         $jsonText = trim($jsonText);
-        
+
         $metadata = json_decode($jsonText, true);
-        
+
         if (json_last_error() !== JSON_ERROR_NONE) {
             Log::warning("Failed to parse {$this->provider} JSON response", [
                 'response' => $jsonText,
@@ -632,7 +631,7 @@ class AIBookProcessor
             ]);
             throw new \Exception('Failed to parse AI response as JSON');
         }
-        
+
         return $this->normalizeMetadata($metadata);
     }
 
@@ -680,11 +679,11 @@ class AIBookProcessor
             }
             return [$value];
         }
-        
+
         if (is_array($value)) {
             return array_filter(array_map('trim', $value));
         }
-        
+
         return [];
     }
 
@@ -695,16 +694,16 @@ class AIBookProcessor
     {
         // Basic extraction from directory path and file names
         $dirName = basename($directoryPath);
-        
+
         // Try to extract title from directory name
         $title = $dirName;
         $title = preg_replace('/^\d+[\.\-\s]*/', '', $title); // Remove leading numbers
         $title = preg_replace('/\([^)]*\)/', '', $title); // Remove parentheses content
         $title = trim($title);
-        
+
         // Try to get metadata from first audio file tags if available
         $firstFileTags = !empty($fileTags) ? reset($fileTags) : [];
-        
+
         return [
             'title' => !empty($firstFileTags['title']) ? $firstFileTags['title'] : $title,
             'author' => !empty($firstFileTags['artist']) ? [$firstFileTags['artist']] : [],
@@ -737,10 +736,10 @@ class AIBookProcessor
         try {
             $getID3 = new \getID3();
             $fileInfo = $getID3->analyze($filePath);
-            
+
             if (isset($fileInfo['tags'])) {
                 $tags = [];
-                
+
                 // Merge all tag formats (ID3v2, ID3v1, etc.)
                 foreach ($fileInfo['tags'] as $tagFormat => $tagData) {
                     foreach ($tagData as $key => $values) {
@@ -749,17 +748,16 @@ class AIBookProcessor
                         }
                     }
                 }
-                
+
                 return $tags;
             }
-            
         } catch (\Exception $e) {
             Log::warning('Failed to extract audio file tags', [
                 'file' => $filePath,
                 'error' => $e->getMessage()
             ]);
         }
-        
+
         return [];
     }
 
@@ -770,17 +768,17 @@ class AIBookProcessor
     {
         $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
         $audioFiles = [];
-        
+
         $diskName = 'books';
         $files = Storage::disk($diskName)->files($directoryPath);
-        
+
         foreach ($files as $file) {
             $extension = strtolower(pathinfo($file, PATHINFO_EXTENSION));
             if (in_array($extension, $audioExtensions)) {
                 $audioFiles[] = $file;
             }
         }
-        
+
         return $audioFiles;
     }
 
@@ -804,7 +802,7 @@ class AIBookProcessor
 
         $inputCost = ($inputTokens / 1000000) * $this->modelPricing['input_tokens_per_million'];
         $outputCost = ($outputTokens / 1000000) * $this->modelPricing['output_tokens_per_million'];
-        
+
         return $inputCost + $outputCost;
     }
 
@@ -824,7 +822,7 @@ class AIBookProcessor
         // Average estimates based on typical book metadata
         $avgInputTokens = 150;  // Concise prompt
         $avgOutputTokens = 200; // JSON response
-        
+
         $costPerBook = $this->calculateCost($avgInputTokens, $avgOutputTokens);
         $totalCost = $costPerBook * $bookCount;
 
@@ -890,7 +888,7 @@ class AIBookProcessor
 
             // Use OpenAI Whisper for transcription
             $transcription = $this->transcribeAudio($audioFilePath);
-            
+
             if (empty($transcription)) {
                 Log::warning("No transcription received from audio file");
                 return null;
@@ -903,7 +901,7 @@ class AIBookProcessor
 
             // Analyze the transcription to extract metadata
             $metadata = $this->extractMetadataFromTranscription($transcription, $directoryHint);
-            
+
             // Add transcription source info
             $metadata['transcription'] = $transcription;
             $metadata['source'] = 'audio_analysis';
@@ -911,7 +909,6 @@ class AIBookProcessor
             $metadata['processed_at'] = now()->toISOString();
 
             return $metadata;
-            
         } catch (\Exception $e) {
             Log::error("Audio analysis failed", [
                 'file' => $audioFilePath,
@@ -978,7 +975,6 @@ class AIBookProcessor
 
             Log::error("Unsupported provider for audio transcription", ['provider' => $this->provider]);
             return null;
-            
         } catch (\Exception $e) {
             Log::error("Audio transcription failed with exception", [
                 'file' => $audioFilePath,
@@ -995,7 +991,7 @@ class AIBookProcessor
      */
     protected function getAudioFileSizeLimit(): int
     {
-        return match($this->provider) {
+        return match ($this->provider) {
             'gemini' => 2 * 1024 * 1024,  // 2MB for Gemini
             'openai' => 25 * 1024 * 1024, // 25MB for OpenAI Whisper
             'claude' => 25 * 1024 * 1024, // Fallback to OpenAI limits
@@ -1052,21 +1048,20 @@ class AIBookProcessor
             ]);
 
             $body = json_decode($response->getBody(), true);
-            
+
             if (isset($body['candidates'][0]['content']['parts'][0]['text'])) {
                 $transcription = trim($body['candidates'][0]['content']['parts'][0]['text']);
-                
+
                 Log::info("Gemini audio transcription completed", [
                     'transcription_length' => strlen($transcription),
                     'preview' => substr($transcription, 0, 100)
                 ]);
-                
+
                 return $transcription;
             }
-            
+
             Log::error("No valid transcription content from Gemini", ['response' => $body]);
             return null;
-            
         } catch (\Exception $e) {
             Log::error("Gemini audio transcription failed", [
                 'error' => $e->getMessage(),
@@ -1088,7 +1083,7 @@ class AIBookProcessor
             }
 
             $client = OpenAI::client($this->openaiApiKey);
-            
+
             $fileHandle = fopen($audioFilePath, 'r');
             if (!$fileHandle) {
                 Log::error("Could not open audio file for reading", ['file' => $audioFilePath]);
@@ -1110,7 +1105,6 @@ class AIBookProcessor
             ]);
 
             return trim($response);
-            
         } catch (\Exception $e) {
             Log::error("OpenAI Whisper transcription failed", [
                 'error' => $e->getMessage(),
@@ -1126,8 +1120,8 @@ class AIBookProcessor
     protected function getAudioMimeType(string $filePath): string
     {
         $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
-        
-        return match($extension) {
+
+        return match ($extension) {
             'mp3' => 'audio/mpeg',
             'm4a', 'm4b' => 'audio/mp4',
             'flac' => 'audio/flac',
@@ -1148,19 +1142,19 @@ class AIBookProcessor
             // Build a prompt to analyze the transcription
             $prompt = "Analyze this audiobook introduction transcription and extract metadata. Return JSON only:\n\n";
             $prompt .= "TRANSCRIPTION:\n{$transcription}\n\n";
-            
+
             if (!empty($directoryHint)) {
                 $prompt .= "DIRECTORY HINT: {$directoryHint}\n\n";
             }
-            
+
             $prompt .= "Extract: title, author, narrator, series{name,number}, genre, year, publisher, language, confidence (0-100).\n";
             $prompt .= "This is the beginning of an audiobook where title, author, and narrator are typically announced.\n";
             $prompt .= "Focus on the main book title, not chapter titles. Look for phrases like:\n";
             $prompt .= "- 'This is [Title] by [Author]'\n";
-            $prompt .= "- 'Narrated by [Narrator]'\n"; 
+            $prompt .= "- 'Narrated by [Narrator]'\n";
             $prompt .= "- '[Title], Book [Number] in the [Series] series'\n";
             $prompt .= "- 'Written by [Author]', 'Read by [Narrator]'\n\n";
-            
+
             $prompt .= "IMPORTANT: For genre, choose the MOST SPECIFIC literary genre. Valid genres:\n";
             $prompt .= "Kids, Religion, General Fiction, Church, Science, Historical Fiction, Computer, Classic, History, Non Fiction, Action, LitRPG, Romance, Science Fiction, Other, Fantasy\n";
             $prompt .= "Analyze the content/story type, not just that it's an audiobook.\n";
@@ -1168,17 +1162,16 @@ class AIBookProcessor
             // Use the current AI model to analyze the transcription
             $response = $this->callAIAPI($prompt);
             $metadata = $this->parseAIResponse($response);
-            
+
             // Boost confidence if we successfully extracted from audio
             if ($metadata['confidence'] > 0) {
                 $metadata['confidence'] = min(95, $metadata['confidence'] + 20);
             }
-            
+
             return $metadata;
-            
         } catch (\Exception $e) {
             Log::error("Failed to extract metadata from transcription", ['error' => $e->getMessage()]);
-            
+
             // Return basic fallback metadata
             return [
                 'title' => 'Unknown Title (from audio)',

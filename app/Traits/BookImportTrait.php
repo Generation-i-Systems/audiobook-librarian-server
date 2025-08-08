@@ -343,7 +343,7 @@ trait BookImportTrait
             if (str_contains($author, ',') || stripos($author, ' and ') !== false || str_contains($author, '&')) {
                 $author = str_replace([' and ', ' & '], ',', $author);
                 $authors = array_map('trim', explode(',', $author));
-                $book['author'] = array_values(array_filter($authors, fn($a) => strlen(trim($a)) > 0));
+                $book['author'] = array_values(array_filter($authors, fn ($a) => strlen(trim($a)) > 0));
             } else {
                 $book['author'] = [trim($author)];
             }
@@ -440,42 +440,54 @@ trait BookImportTrait
     {
         // For direct console output in the command
         $output = method_exists($this, 'line') ? $this : null;
-        
+
         if (!$url) {
-            if ($output) $output->error("Invalid URL: {$url}");
+            if ($output) {
+                $output->error("Invalid URL: {$url}");
+            }
             return null;
         }
 
         try {
-            if ($output) $output->line("Downloading image from <comment>{$url}</comment>");
-            
+            if ($output) {
+                $output->line("Downloading image from <comment>{$url}</comment>");
+            }
+
             $storagePath = env('BOOK_STORAGE_PATH'); // absolute path
             if (!$storagePath) {
                 $storagePath = storage_path('app/books');
-                
+
                 // Create the default directory if it doesn't exist
                 if (!is_dir($storagePath)) {
                     if (!mkdir($storagePath, 0775, true) && !is_dir($storagePath)) {
-                        if ($output) $output->error("Unable to create default storage directory: {$storagePath}");
+                        if ($output) {
+                            $output->error("Unable to create default storage directory: {$storagePath}");
+                        }
                         return null;
                     }
                 }
             }
 
             $fullDir = rtrim($storagePath, '/') . '/' . ltrim($directoryPath, '/');
-            
+
             if (!is_dir($fullDir)) {
                 if (!mkdir($fullDir, 0775, true) && !is_dir($fullDir)) {
-                    if ($output) $output->error("Unable to create directory at {$fullDir}");
+                    if ($output) {
+                        $output->error("Unable to create directory at {$fullDir}");
+                    }
                     // Check directory permissions
                     $parentDir = dirname($fullDir);
                     if (is_dir($parentDir)) {
                         $perms = substr(sprintf('%o', fileperms($parentDir)), -4);
-                        if ($output) $output->error("Parent directory permissions: {$perms}");
+                        if ($output) {
+                            $output->error("Parent directory permissions: {$perms}");
+                        }
                     }
                     return null;
                 }
-                if ($output) $output->line("Created directory: <info>{$directoryPath}</info>");
+                if ($output) {
+                    $output->line("Created directory: <info>{$directoryPath}</info>");
+                }
             }
 
             // Use cURL with a browser User-Agent and more options for better compatibility
@@ -491,35 +503,43 @@ trait BookImportTrait
                 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) ' .
                 'Chrome/91.0.4472.124 Safari/537.36'
             );
-            
+
             $response = curl_exec($ch);
-            
+
             // Get response info
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
             $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
             $errorMsg = curl_error($ch);
             $errorNo = curl_errno($ch);
-            
+
             // Split header and body
             $header = substr($response, 0, $headerSize);
             $contents = substr($response, $headerSize);
-            
+
             curl_close($ch);
 
             if ($errorNo !== 0) {
-                if ($output) $output->error("cURL error ({$errorNo}): {$errorMsg}");
+                if ($output) {
+                    $output->error("cURL error ({$errorNo}): {$errorMsg}");
+                }
                 return null;
             }
-            
+
             if ($httpCode !== 200) {
-                if ($output) $output->error("HTTP error: Received code {$httpCode} from {$url}");
-                if ($output) $output->line("<info>Response headers: {$header}</info>");
+                if ($output) {
+                    $output->error("HTTP error: Received code {$httpCode} from {$url}");
+                }
+                if ($output) {
+                    $output->line("<info>Response headers: {$header}</info>");
+                }
                 return null;
             }
 
             if (empty($contents)) {
-                if ($output) $output->error("Empty content received from {$url}");
+                if ($output) {
+                    $output->error("Empty content received from {$url}");
+                }
                 return null;
             }
 
@@ -539,20 +559,26 @@ trait BookImportTrait
 
             $filename = 'cover.' . $ext;
             $fullPath = $fullDir . '/' . $filename;
-            
+
             $bytesWritten = file_put_contents($fullPath, $contents);
-            
+
             if ($bytesWritten === false) {
-                if ($output) $output->error("Unable to write file {$fullPath}");
+                if ($output) {
+                    $output->error("Unable to write file {$fullPath}");
+                }
                 // Check file permissions
                 if (is_dir($fullDir)) {
                     $perms = substr(sprintf('%o', fileperms($fullDir)), -4);
-                    if ($output) $output->error("Directory permissions: {$perms}");
+                    if ($output) {
+                        $output->error("Directory permissions: {$perms}");
+                    }
                 }
                 return null;
             }
-            
-            if ($output) $output->line("Saved <info>{$bytesWritten}</info> bytes to <info>{$directoryPath}/{$filename}</info>");
+
+            if ($output) {
+                $output->line("Saved <info>{$bytesWritten}</info> bytes to <info>{$directoryPath}/{$filename}</info>");
+            }
 
             // Return only the path relative to BOOK_STORAGE_PATH
             $relativePath = ltrim($directoryPath, '/') . '/' . $filename;

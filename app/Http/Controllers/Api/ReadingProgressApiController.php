@@ -57,6 +57,4 @@ class ReadingProgressApiController extends Controller
 
         return response()->json(['progress' => $progress]);
     }
-
-
 }

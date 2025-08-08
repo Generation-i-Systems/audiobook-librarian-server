@@ -14,8 +14,6 @@ use Tests\TestCase;
  */
 class BookControllerSearchTest extends TestCase
 {
-
-
     protected function setUp(): void
     {
         parent::setUp();

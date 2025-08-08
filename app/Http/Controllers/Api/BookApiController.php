@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
-use App\Models\BookQueue;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -462,7 +461,7 @@ class BookApiController extends Controller
             abort(404, 'No files found for this book.');
         }
         $zipFileName = str_replace(' ', '_', $book['title']) . '.zip';
-        
+
         // Ensure temp directory exists
         $tempDir = storage_path('app/public/temp');
         if (!file_exists($tempDir)) {
@@ -471,10 +470,10 @@ class BookApiController extends Controller
                 abort(500, 'Failed to create temporary directory for zip archive.');
             }
         }
-        
+
         $zipPath = $tempDir . '/' . $zipFileName;
         $zip = new ZipArchive();
-        
+
         $result = $zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
         if ($result !== true) {
             Log::error('Failed to open zip archive', [
@@ -486,7 +485,7 @@ class BookApiController extends Controller
             ]);
             abort(500, 'Failed to create zip archive: ' . $result);
         }
-        
+
         foreach ($files as $file) {
             $filePath = Storage::disk('books')->path($file);
             if (!$zip->addFile($filePath, basename($file))) {
@@ -497,7 +496,7 @@ class BookApiController extends Controller
                 ]);
             }
         }
-        
+
         if (!$zip->close()) {
             Log::error('Failed to close zip archive', [
                 'zipPath' => $zipPath,
@@ -518,7 +517,7 @@ class BookApiController extends Controller
 
         // Get file size for Content-Length header
         $fileSize = filesize($zipPath);
-        
+
         // Use chunked transfer encoding for streaming large zip files
         return response()->stream(
             function () use ($zipPath) {
@@ -528,7 +527,7 @@ class BookApiController extends Controller
                     // Don't abort here as headers are already sent
                     return;
                 }
-                
+
                 try {
                     while (!feof($handle)) {
                         $chunk = fread($handle, 8192); // Read in 8KB chunks
@@ -536,7 +535,7 @@ class BookApiController extends Controller
                             Log::error('Failed to read chunk from zip file', ['zipPath' => $zipPath]);
                             break;
                         }
-                        
+
                         if (strlen($chunk) > 0) {
                             echo $chunk;
                             if (ob_get_level()) {
@@ -544,7 +543,7 @@ class BookApiController extends Controller
                             }
                             flush(); // Force output of current buffer
                         }
-                        
+
                         // Check if client disconnected
                         if (connection_aborted()) {
                             Log::info('Client disconnected during zip download', ['zipPath' => $zipPath]);
@@ -735,10 +734,10 @@ class BookApiController extends Controller
             return ($book['genre_id'] ?? null) == $genreId;
         });
         $authorIds = array_unique(array_column($books, 'author_id'));
-        $authors = array_filter($documentStore->listAuthors(), fn($author) => in_array($author['id'], $authorIds));
+        $authors = array_filter($documentStore->listAuthors(), fn ($author) => in_array($author['id'], $authorIds));
         $authors = array_values($authors);
-        usort($authors, fn($a, $b) => strcmp($a['name'], $b['name']));
-        $authors = array_map(fn($a) => ['id' => $a['id'], 'name' => $a['name']], $authors);
+        usort($authors, fn ($a, $b) => strcmp($a['name'], $b['name']));
+        $authors = array_map(fn ($a) => ['id' => $a['id'], 'name' => $a['name']], $authors);
 
         return response()->json([
             'genre' => ['id' => $genre['id'], 'name' => $genre['name']],
@@ -762,7 +761,7 @@ class BookApiController extends Controller
                 'message' => 'The specified series could not be found',
             ], 404);
         }
-        $books = array_filter($documentStore->listBooks(), fn($book) => ($book['series_id'] ?? null) == $seriesId);
+        $books = array_filter($documentStore->listBooks(), fn ($book) => ($book['series_id'] ?? null) == $seriesId);
         $books = array_values($books);
         // Filter out any non-array entries that may have gotten into the books array
         $books = array_filter($books, 'is_array');
@@ -770,7 +769,7 @@ class BookApiController extends Controller
         $page = (int) $request->input('page', 1);
         $offset = ($page - 1) * $perPage;
         $paginatedBooks = array_slice($books, $offset, $perPage);
-        $paginatedBooks = array_map(fn($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $paginatedBooks);
+        $paginatedBooks = array_map(fn ($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $paginatedBooks);
 
         return response()->json([
             'series' => ['id' => $series['id'], 'name' => $series['name']],
@@ -802,7 +801,7 @@ class BookApiController extends Controller
                 'message' => 'The specified author could not be found',
             ], 404);
         }
-        $books = array_filter($documentStore->listBooks(), fn($book) => ($book['author_id'] ?? null) == $authorId);
+        $books = array_filter($documentStore->listBooks(), fn ($book) => ($book['author_id'] ?? null) == $authorId);
         $books = array_values($books);
         // Filter out any non-array entries that may have gotten into the books array
         $books = array_filter($books, 'is_array');
@@ -810,7 +809,7 @@ class BookApiController extends Controller
         $page = (int) $request->input('page', 1);
         $offset = ($page - 1) * $perPage;
         $paginatedBooks = array_slice($books, $offset, $perPage);
-        $paginatedBooks = array_map(fn($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $paginatedBooks);
+        $paginatedBooks = array_map(fn ($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $paginatedBooks);
 
         return response()->json([
             'author' => ['id' => $author['id'], 'name' => $author['name']],
@@ -836,12 +835,12 @@ class BookApiController extends Controller
         if (!$author) {
             return response()->json(['error' => 'Author not found'], 404);
         }
-        $books = array_filter($documentStore->listBooks(), fn($book) => ($book['author_id'] ?? null) == $authorId);
+        $books = array_filter($documentStore->listBooks(), fn ($book) => ($book['author_id'] ?? null) == $authorId);
         $seriesIds = array_unique(array_column($books, 'series_id'));
-        $series = array_filter($documentStore->listSeries(), fn($ser) => in_array($ser['id'], $seriesIds));
+        $series = array_filter($documentStore->listSeries(), fn ($ser) => in_array($ser['id'], $seriesIds));
         $series = array_values($series);
-        usort($series, fn($a, $b) => strcmp($a['name'], $b['name']));
-        $series = array_map(fn($s) => ['id' => $s['id'], 'name' => $s['name']], $series);
+        usort($series, fn ($a, $b) => strcmp($a['name'], $b['name']));
+        $series = array_map(fn ($s) => ['id' => $s['id'], 'name' => $s['name']], $series);
 
         return response()->json([
             'author' => ['id' => $author['id'], 'name' => $author['name']],
@@ -893,7 +892,7 @@ class BookApiController extends Controller
         $page = max(1, (int) $request->input('page', 1));
         $offset = ($page - 1) * $perPage;
         $paginatedBooks = array_slice($books, $offset, $perPage);
-        $paginatedBooks = array_map(fn($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $paginatedBooks);
+        $paginatedBooks = array_map(fn ($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $paginatedBooks);
 
         return response()->json([
             'data' => $paginatedBooks,
@@ -1107,7 +1106,7 @@ class BookApiController extends Controller
 
     /**
      * Get all authors with optional genre filtering, pagination, and sorting
-     * 
+     *
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
@@ -1140,7 +1139,7 @@ class BookApiController extends Controller
         if ($genreId || $genreName) {
             $query->join('book_genre', 'books.id', '=', 'book_genre.book_id')
                   ->join('genres', 'book_genre.genre_id', '=', 'genres.id');
-            
+
             if ($genreId) {
                 $query->where('genres.id', $genreId);
             } elseif ($genreName) {
@@ -1148,8 +1147,10 @@ class BookApiController extends Controller
             }
 
             // Add book count in specific genre
-            $query->selectRaw('COUNT(DISTINCT CASE WHEN genres.id = ? OR genres.name = ? THEN books.id END) as book_count_in_genre', 
-                             [$genreId, $genreName]);
+            $query->selectRaw(
+                'COUNT(DISTINCT CASE WHEN genres.id = ? OR genres.name = ? THEN books.id END) as book_count_in_genre',
+                [$genreId, $genreName]
+            );
         } else {
             // No genre filter, so book_count_in_genre equals total book_count
             $query->selectRaw('COUNT(DISTINCT books.id) as book_count_in_genre');
@@ -1184,7 +1185,7 @@ class BookApiController extends Controller
         $countQuery = \App\Models\Author::query()
             ->join('author_book', 'authors.id', '=', 'author_book.author_id')
             ->join('books', 'author_book.book_id', '=', 'books.id');
-            
+
         // Add same genre filtering as main query if present
         if ($genreId || $genreName) {
             $countQuery->join('book_genre', 'books.id', '=', 'book_genre.book_id')
@@ -1195,14 +1196,14 @@ class BookApiController extends Controller
                 $countQuery->where('genres.name', $genreName);
             }
         }
-        
+
         // Add search functionality if present
         if ($search) {
             $countQuery->where('authors.name', 'LIKE', '%' . $search . '%');
         }
-        
+
         $total = $countQuery->distinct()->count('authors.id');
-        
+
         // Execute query with pagination
         $offset = ($page - 1) * $perPage;
         $authors = $query->offset($offset)->limit($perPage)->get();
@@ -1216,7 +1217,7 @@ class BookApiController extends Controller
                 ->distinct()
                 ->pluck('name')
                 ->toArray();
-            
+
             return [
                 'id' => $author->id,
                 'name' => $author->name,
@@ -1248,7 +1249,7 @@ class BookApiController extends Controller
 
     /**
      * Get all series with optional author filtering, pagination, and sorting
-     * 
+     *
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
@@ -1281,7 +1282,7 @@ class BookApiController extends Controller
         if ($authorId || $authorName) {
             $query->join('author_book', 'books.id', '=', 'author_book.book_id')
                   ->join('authors', 'author_book.author_id', '=', 'authors.id');
-            
+
             if ($authorId) {
                 $query->where('authors.id', $authorId);
             } elseif ($authorName) {
@@ -1289,8 +1290,10 @@ class BookApiController extends Controller
             }
 
             // Add book count by specific author
-            $query->selectRaw('COUNT(DISTINCT CASE WHEN authors.id = ? OR authors.name = ? THEN books.id END) as book_count_by_author', 
-                             [$authorId, $authorName]);
+            $query->selectRaw(
+                'COUNT(DISTINCT CASE WHEN authors.id = ? OR authors.name = ? THEN books.id END) as book_count_by_author',
+                [$authorId, $authorName]
+            );
         } else {
             // No author filter, so book_count_by_author equals total book_count
             $query->selectRaw('COUNT(DISTINCT books.id) as book_count_by_author');
@@ -1325,7 +1328,7 @@ class BookApiController extends Controller
         $countQuery = \App\Models\Series::query()
             ->join('book_series', 'series.id', '=', 'book_series.series_id')
             ->join('books', 'book_series.book_id', '=', 'books.id');
-            
+
         // Add same author filtering as main query if present
         if ($authorId || $authorName) {
             $countQuery->join('author_book', 'books.id', '=', 'author_book.book_id')
@@ -1336,14 +1339,14 @@ class BookApiController extends Controller
                 $countQuery->where('authors.name', $authorName);
             }
         }
-        
+
         // Add search functionality if present
         if ($search) {
             $countQuery->where('series.name', 'LIKE', '%' . $search . '%');
         }
-        
+
         $total = $countQuery->distinct()->count('series.id');
-        
+
         // Execute query with pagination
         $offset = ($page - 1) * $perPage;
         $series = $query->offset($offset)->limit($perPage)->get();
@@ -1357,7 +1360,7 @@ class BookApiController extends Controller
                 ->distinct()
                 ->pluck('name')
                 ->toArray();
-            
+
             return [
                 'id' => $series->id,
                 'name' => $series->name,
@@ -1388,7 +1391,7 @@ class BookApiController extends Controller
 
     /**
      * Enhanced books endpoint with proper SQL-based filtering
-     * 
+     *
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
@@ -1398,7 +1401,7 @@ class BookApiController extends Controller
         $perPage = min(100, max(1, (int) $request->input('per_page', 15)));
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
-        
+
         // Filtering parameters
         $genreId = $request->input('genre_id');
         $genreName = $request->input('genre_name');
@@ -1424,7 +1427,7 @@ class BookApiController extends Controller
         if ($genreId || $genreName) {
             $query->join('book_genre', 'books.id', '=', 'book_genre.book_id')
                   ->join('genres', 'book_genre.genre_id', '=', 'genres.id');
-            
+
             if ($genreId) {
                 $query->where('genres.id', $genreId);
             } elseif ($genreName) {
@@ -1436,7 +1439,7 @@ class BookApiController extends Controller
         if ($authorId || $authorName) {
             $query->join('author_book', 'books.id', '=', 'author_book.book_id')
                   ->join('authors', 'author_book.author_id', '=', 'authors.id');
-            
+
             if ($authorId) {
                 $query->where('authors.id', $authorId);
             } elseif ($authorName) {
@@ -1448,7 +1451,7 @@ class BookApiController extends Controller
         if ($seriesId || $seriesName) {
             $query->join('book_series', 'books.id', '=', 'book_series.book_id')
                   ->join('series', 'book_series.series_id', '=', 'series.id');
-            
+
             if ($seriesId) {
                 $query->where('series.id', $seriesId);
             } elseif ($seriesName) {
@@ -1502,7 +1505,7 @@ class BookApiController extends Controller
 
         // Get total count before pagination - create clean count query without GROUP BY
         $countQuery = \App\Models\Book::query();
-        
+
         // Add same filtering as main query
         if ($genreId || $genreName) {
             $countQuery->join('book_genre', 'books.id', '=', 'book_genre.book_id')
@@ -1513,7 +1516,7 @@ class BookApiController extends Controller
                 $countQuery->where('genres.name', $genreName);
             }
         }
-        
+
         if ($authorId || $authorName) {
             $countQuery->join('author_book', 'books.id', '=', 'author_book.book_id')
                       ->join('authors', 'author_book.author_id', '=', 'authors.id');
@@ -1523,7 +1526,7 @@ class BookApiController extends Controller
                 $countQuery->where('authors.name', $authorName);
             }
         }
-        
+
         if ($seriesId || $seriesName) {
             $countQuery->join('book_series', 'books.id', '=', 'book_series.book_id')
                       ->join('series', 'book_series.series_id', '=', 'series.id');
@@ -1533,13 +1536,13 @@ class BookApiController extends Controller
                 $countQuery->where('series.name', $seriesName);
             }
         }
-        
+
         if ($search) {
             $countQuery->where('books.title', 'LIKE', '%' . $search . '%');
         }
-        
+
         $total = $countQuery->distinct()->count('books.id');
-        
+
         // Execute query with pagination
         $offset = ($page - 1) * $perPage;
         $books = $query->offset($offset)->limit($perPage)->get();

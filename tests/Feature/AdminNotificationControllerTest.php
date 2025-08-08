@@ -26,8 +26,7 @@ class AdminNotificationControllerTest extends TestCase
         $mock->shouldReceive('getClient')->andReturnSelf();
         $mock->shouldReceive('collection')->with('users')->andReturnSelf();
         $mock->shouldReceive('document')->andReturnSelf();
-        $mock->shouldReceive('snapshot')->andReturn(new class
-        {
+        $mock->shouldReceive('snapshot')->andReturn(new class () {
             public function exists()
             {
                 return true;
@@ -44,8 +43,7 @@ class AdminNotificationControllerTest extends TestCase
             }
         });
         $mock->shouldReceive('documents')->andReturn([
-            new class
-            {
+            new class () {
                 public function exists()
                 {
                     return true;
@@ -99,8 +97,7 @@ class AdminNotificationControllerTest extends TestCase
         $mock->shouldReceive('getClient')->andReturnSelf();
         $mock->shouldReceive('collection')->with('users')->andReturnSelf();
         $mock->shouldReceive('document')->andReturnSelf();
-        $mock->shouldReceive('snapshot')->andReturn(new class
-        {
+        $mock->shouldReceive('snapshot')->andReturn(new class () {
             public function exists()
             {
                 return false;

@@ -4,13 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Str;
 use App\Traits\CamelCaseAttributeAccess;
 use App\Traits\Auditable;
 
 class Narrator extends Model
 {
-    use HasFactory, CamelCaseAttributeAccess, Auditable;
+    use HasFactory;
+    use CamelCaseAttributeAccess;
+    use Auditable;
 
     protected $fillable = ['name', 'normalized_name'];
 
@@ -44,7 +45,7 @@ class Narrator extends Model
         $name = mb_convert_encoding($name, 'UTF-8', 'UTF-8');
 
         // Remove BOM if present
-        $bom = pack('H*','EFBBBF');
+        $bom = pack('H*', 'EFBBBF');
         $name = preg_replace("/^$bom/", '', $name);
 
         // Normalize line endings and whitespace

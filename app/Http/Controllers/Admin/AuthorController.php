@@ -22,10 +22,10 @@ class AuthorController extends Controller
         $search = $request->input('search');
         $authors = $this->documentStoreService->listAuthors();
         if ($search) {
-            $authors = array_filter($authors, fn($author) => stripos($author['name'], $search) !== false);
+            $authors = array_filter($authors, fn ($author) => stripos($author['name'], $search) !== false);
         }
         // Optionally sort authors by name
-        usort($authors, fn($a, $b) => strcmp($a['name'], $b['name']));
+        usort($authors, fn ($a, $b) => strcmp($a['name'], $b['name']));
 
         return view('admin.authors.index', ['authors' => $authors, 'search' => $search]);
     }
@@ -98,14 +98,12 @@ class AuthorController extends Controller
         $q = $request->input('q', '');
         $authors = $this->documentStoreService->listAuthors();
         if ($q) {
-            $authors = array_filter($authors, fn($author) => stripos($author['name'], $q) !== false);
+            $authors = array_filter($authors, fn ($author) => stripos($author['name'], $q) !== false);
         }
         // Limit and sort
         $authors = array_slice($authors, 0, 20);
-        usort($authors, fn($a, $b) => strcmp($a['name'], $b['name']));
+        usort($authors, fn ($a, $b) => strcmp($a['name'], $b['name']));
 
         return response()->json(['data' => array_values($authors)]);
     }
-
-
 }

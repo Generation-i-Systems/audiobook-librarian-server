@@ -18,17 +18,17 @@ class ApiAuth
         }
 
         $token = $matches[1];
-        
+
         // Try to find the token in the personal_access_tokens table
         $accessToken = PersonalAccessToken::findToken($token);
-        
+
         if (!$accessToken || $accessToken->expires_at && $accessToken->expires_at->isPast()) {
             return response()->json(['error' => 'Invalid or expired token'], 401);
         }
 
         // Get the user associated with the token
         $user = $accessToken->tokenable;
-        
+
         if (!$user) {
             return response()->json(['error' => 'User not found'], 401);
         }

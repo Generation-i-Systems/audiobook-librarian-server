@@ -241,6 +241,4 @@ class JobController extends Controller
             ->route('admin.jobs.index')
             ->with('status', "Successfully cleaned up $deleted old jobs.");
     }
-
-
 }

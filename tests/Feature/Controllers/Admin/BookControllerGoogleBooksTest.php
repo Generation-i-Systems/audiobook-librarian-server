@@ -63,8 +63,7 @@ class BookControllerGoogleBooksTest extends TestCase
             ->andReturn($rawGoogleBooksResults);
 
         // Create a test class that uses the BookImportTrait
-        $testClass = new class
-        {
+        $testClass = new class () {
             use BookImportTrait;
         };
 

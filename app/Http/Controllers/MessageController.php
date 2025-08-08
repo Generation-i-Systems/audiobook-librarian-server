@@ -87,6 +87,4 @@ class MessageController extends Controller
             return back()->with('error', 'An error occurred while sending the message.');
         }
     }
-
-
 }

@@ -270,7 +270,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         // Validate order direction
         $order = in_array(strtolower($order), ['asc', 'desc']) ? strtolower($order) : 'asc';
         // Apply filters
-        $filteredBooks = array_filter($this->books, function($book) use ($filters) {
+        $filteredBooks = array_filter($this->books, function ($book) use ($filters) {
             // Filter by author
             if (!empty($filters['author'])) {
                 $authorMatch = false;
@@ -306,7 +306,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
                     $seriesName = '';
                     if (is_array($series)) {
                         $seriesName = $series['seriesName'] ?? $series['name'] ?? '';
-                    } else if (is_string($series)) {
+                    } elseif (is_string($series)) {
                         $seriesName = $series;
                     }
 
@@ -360,7 +360,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     {
         // Sort books by created_at in descending order
         $sortedBooks = $this->books;
-        usort($sortedBooks, function($a, $b) {
+        usort($sortedBooks, function ($a, $b) {
             $aTime = strtotime($a['created_at'] ?? 'now');
             $bTime = strtotime($b['created_at'] ?? 'now');
             return $bTime - $aTime;
@@ -368,7 +368,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
 
         // Filter books from the last $days days
         $cutoffDate = strtotime("-$days days");
-        $recentBooks = array_filter($sortedBooks, function($book) use ($cutoffDate) {
+        $recentBooks = array_filter($sortedBooks, function ($book) use ($cutoffDate) {
             $bookTime = strtotime($book['created_at'] ?? 'now');
             return $bookTime >= $cutoffDate;
         });
@@ -412,7 +412,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         // Ensure author is an array of arrays with name
         if (!empty($book['author'])) {
             $authors = is_array($book['author']) ? $book['author'] : [$book['author']];
-            $book['author'] = array_map(function($author) {
+            $book['author'] = array_map(function ($author) {
                 if (is_array($author) && isset($author['name'])) {
                     return $author;
                 }
@@ -423,7 +423,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         // Ensure series is an array of arrays with seriesName
         if (!empty($book['series'])) {
             $seriesList = is_array($book['series']) ? $book['series'] : [$book['series']];
-            $book['series'] = array_map(function($series) {
+            $book['series'] = array_map(function ($series) {
                 if (is_array($series)) {
                     // Convert 'name' to 'seriesName' if needed
                     if (isset($series['name']) && !isset($series['seriesName'])) {
@@ -463,7 +463,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
 
         // Ensure series have all required fields
         if (!empty($book['series'])) {
-            $book['series'] = array_map(function($series) {
+            $book['series'] = array_map(function ($series) {
                 if (is_array($series)) {
                     return [
                         'seriesName' => $series['seriesName'] ?? $series['name'] ?? 'Unknown Series',
@@ -981,7 +981,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     public function getClient()
     {
         // Return a mock client object
-        return new class {
+        return new class () {
             public function collection($name)
             {
                 return $this;
@@ -1181,7 +1181,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         if (!isset($this->follows[$userId])) {
             return false;
         }
-        
+
         return in_array(
             ['type' => $followableType, 'id' => $followableId],
             $this->follows[$userId],
@@ -1197,14 +1197,14 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         if (!isset($this->follows[$userId])) {
             $this->follows[$userId] = [];
         }
-        
+
         $follow = ['type' => $followableType, 'id' => $followableId];
-        
+
         if (!in_array($follow, $this->follows[$userId], true)) {
             $this->follows[$userId][] = $follow;
             return true;
         }
-        
+
         return false;
     }
 
@@ -1216,9 +1216,9 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         if (!isset($this->follows[$userId])) {
             return false;
         }
-        
+
         $follow = ['type' => $followableType, 'id' => $followableId];
-        
+
         foreach ($this->follows[$userId] as $key => $existingFollow) {
             if ($existingFollow === $follow) {
                 unset($this->follows[$userId][$key]);
@@ -1226,7 +1226,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
                 return true;
             }
         }
-        
+
         return false;
     }
 
@@ -1237,13 +1237,13 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     {
         $followers = [];
         $target = ['type' => $followableType, 'id' => $followableId];
-        
+
         foreach ($this->follows as $followerId => $follows) {
             if (in_array($target, $follows, true)) {
                 $followers[] = $followerId;
             }
         }
-        
+
         return $followers;
     }
 
@@ -1255,14 +1255,14 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         if (!isset($this->follows[$userId])) {
             return [];
         }
-        
+
         if ($followableType === null) {
             return $this->follows[$userId];
         }
-        
+
         return array_filter(
             $this->follows[$userId],
-            fn($follow) => $follow['type'] === $followableType
+            fn ($follow) => $follow['type'] === $followableType
         );
     }
 
@@ -1273,14 +1273,14 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     {
         $cutoff = time() - ($daysOld * 24 * 60 * 60);
         $deleted = 0;
-        
+
         foreach ($this->jobs as $id => $job) {
             if (isset($job['created_at']) && $job['created_at'] < $cutoff) {
                 unset($this->jobs[$id]);
                 $deleted++;
             }
         }
-        
+
         return $deleted;
     }
 
@@ -1300,15 +1300,15 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     public function updateDocument(string $collection, string $id, array $data): bool
     {
         $collection = strtolower($collection);
-        
+
         if (!property_exists($this, $collection) || !is_array($this->$collection)) {
             return false;
         }
-        
+
         if (!isset($this->{$collection}[$id])) {
             return false;
         }
-        
+
         $this->{$collection}[$id] = array_merge($this->{$collection}[$id], $data);
         return true;
     }

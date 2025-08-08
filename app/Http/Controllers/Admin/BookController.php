@@ -10,8 +10,6 @@ use App\Services\ExternalCoverService;
 use App\Services\GoogleBooksApiService;
 use App\Traits\BookImportTrait;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
-use App\Http\Controllers\Admin\ImportFileController;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -137,7 +135,6 @@ class BookController extends Controller
     {
         // Emergency: Increase memory limit aggressively
         try {
-
             // Get pagination and filter parameters from request
             $page = max(1, (int) $request->input('page', 1));
             $perPage = 20;
@@ -217,7 +214,6 @@ class BookController extends Controller
                 'books' => $paginator,
                 'sort' => $request->input('sort', 'recent_desc'),
             ]);
-
         } catch (\Throwable $e) {
             // Log the error using Laravel's logging system
             Log::error('Admin BookController error', [
@@ -326,16 +322,16 @@ class BookController extends Controller
                         $coverAuto = $coverFile;
                     }
                     $tags = $this->extractTagData($firstM4b);
-                    
+
                     // Map ID3 tags to book fields: artist = author, composer = narrator, date = published_date
                     if (!empty($tags['artist']) && empty($initial['author'])) {
                         $initial['author'] = [$tags['artist']];
                     }
-                    
+
                     if (!empty($tags['composer']) && empty($initial['narrator'])) {
                         $initial['narrator'] = $tags['composer'];
                     }
-                    
+
                     if (!empty($tags['date']) && empty($initial['publishedYear'])) {
                         // Extract year from date (e.g., "2025-06-17" -> "2025")
                         $year = substr($tags['date'], 0, 4);
@@ -343,7 +339,7 @@ class BookController extends Controller
                             $initial['publishedYear'] = (int)$year;
                         }
                     }
-                    
+
                     if (!empty($tags['description'])) {
                         $initial['description'] = $tags['description'];
                     }
@@ -992,7 +988,6 @@ class BookController extends Controller
 
                 // Dispatch the NewBookAdded event
                 event(new NewBookAdded($book));
-
             } catch (\Exception $e) {
                 Log::error('BookController@store: Error creating book', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
                 throw $e;

@@ -41,6 +41,4 @@ class HardcoverTokenExpiring extends Mailable
 
         return $this->subject($subject)->view('emails.hardcover.token-expiring');
     }
-
-
 }

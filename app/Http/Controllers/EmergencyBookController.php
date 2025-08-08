@@ -26,12 +26,12 @@ class EmergencyBookController extends Controller
         // Memory monitoring
         $memoryStart = memory_get_usage();
         Log::info('Emergency book controller start', ['memory_mb' => round($memoryStart / 1024 / 1024, 2)]);
-        
+
         try {
             // Get pagination parameters
             $page = max(1, (int) $request->get('page', 1));
             $perPage = 10; // Fixed small limit
-            
+
             // Get filters
             $filters = [];
             if ($request->filled('search')) {
@@ -43,19 +43,19 @@ class EmergencyBookController extends Controller
             if ($request->filled('genre_id')) {
                 $filters['genre'] = $request->get('genre_id');
             }
-            
+
             // Get books using optimized service
             $result = $this->optimizedBookService->getBooks($page, $perPage, $filters);
             $books = collect($result['data']);
-            
+
             // Get filter options
             $genres = $this->optimizedBookService->getUniqueValues('genre');
             $authors = $this->optimizedBookService->getUniqueValues('author');
             $series = []; // Skip series for now
-            
+
             // Get recent books
             $recentBooks = $this->optimizedBookService->getRecentBooks(3);
-            
+
             // Create pagination object
             $pagination = new \Illuminate\Pagination\LengthAwarePaginator(
                 $books,
@@ -64,7 +64,7 @@ class EmergencyBookController extends Controller
                 $page,
                 ['path' => $request->url(), 'query' => $request->query()]
             );
-            
+
             // Memory monitoring
             $memoryEnd = memory_get_usage();
             Log::info('Emergency book controller complete', [
@@ -72,7 +72,7 @@ class EmergencyBookController extends Controller
                 'memory_used_mb' => round(($memoryEnd - $memoryStart) / 1024 / 1024, 2),
                 'books_loaded' => count($books)
             ]);
-            
+
             return view('books.emergency_index', [
                 'books' => $pagination,
                 'genres' => $genres,
@@ -83,12 +83,11 @@ class EmergencyBookController extends Controller
                 'mainPerPage' => $perPage,
                 'currentFilters' => $filters,
             ]);
-            
         } catch (\Exception $e) {
             Log::error('Emergency controller failed: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString()
             ]);
-            
+
             return response()->view('books.emergency_error', [
                 'error' => $e->getMessage()
             ], 500);

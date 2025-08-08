@@ -5,7 +5,6 @@ namespace App\Console\Commands;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Models\Book;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 

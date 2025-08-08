@@ -138,13 +138,12 @@ class MongoService implements DocumentStoreServiceInterface
                     if (isset($doc['seriesName'])) {
                         $results[] = $doc['seriesName'];
                     }
-                } else if (isset($doc['name'])) {
+                } elseif (isset($doc['name'])) {
                     $results[] = $doc['name'];
                 }
             }
 
             return $results;
-
         } catch (\Exception $e) {
             Log::error("Error getting unique values for field {$field}", [
                 'error' => $e->getMessage(),
@@ -334,7 +333,7 @@ class MongoService implements DocumentStoreServiceInterface
     {
         // Validate order direction
         $order = in_array(strtolower($order), ['asc', 'desc']) ? strtolower($order) : 'asc';
-        
+
         $collection = $this->getCollection('books');
         SafeLoggingService::safeLog('debug', "MongoService: Querying collection: 'books'");
 

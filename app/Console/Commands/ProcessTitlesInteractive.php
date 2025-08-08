@@ -7,7 +7,6 @@ use App\Models\Series;
 use App\Models\Narrator;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 class ProcessTitlesInteractive extends Command
 {
@@ -38,7 +37,7 @@ class ProcessTitlesInteractive extends Command
         }
 
         $this->info('Starting interactive title processing...');
-        
+
         $books = Book::all();
         $processedCount = 0;
         $changesCount = 0;
@@ -46,13 +45,13 @@ class ProcessTitlesInteractive extends Command
         foreach ($books as $book) {
             $originalTitle = $book->title;
             $directoryPath = $book->directoryPath ?? '';
-            
+
             // Process the title through various cleanup steps
             $titleInfo = $this->processTitleAndDirectory($originalTitle, $directoryPath);
-            
+
             if ($this->hasChanges($originalTitle, $book, $titleInfo)) {
                 $this->displayProposedChanges($book, $titleInfo, $originalTitle);
-                
+
                 if ($this->option('force') || $this->confirm('Apply these changes?', true)) {
                     $this->applyChanges($book, $titleInfo);
                     $changesCount++;
@@ -60,19 +59,19 @@ class ProcessTitlesInteractive extends Command
                 } else {
                     $this->info('✗ Changes skipped');
                 }
-                
+
                 $this->newLine();
             }
-            
+
             $processedCount++;
-            
+
             if ($processedCount % 10 == 0) {
                 $this->info("Processed {$processedCount}/{$books->count()} books...");
             }
         }
 
         $this->info("Processing complete! Processed {$processedCount} books, applied changes to {$changesCount} books.");
-        
+
         return Command::SUCCESS;
     }
 
@@ -175,7 +174,7 @@ class ProcessTitlesInteractive extends Command
     protected function extractReadByNarrator(string $title): array
     {
         $pattern = '/\s*\(read by ([^)]+)\)\s*/i';
-        
+
         if (preg_match($pattern, $title, $matches)) {
             return [
                 'narrator' => trim($matches[1]),
@@ -193,10 +192,10 @@ class ProcessTitlesInteractive extends Command
     {
         // Look for patterns like "(Jackson)" that might be narrators
         $pattern = '/\s*\(([A-Za-z\s]+)\)\s*/';
-        
+
         if (preg_match($pattern, $title, $matches)) {
             $possibleNarrator = trim($matches[1]);
-            
+
             // Simple heuristic: if it's a single word or two words, might be a narrator
             if (str_word_count($possibleNarrator) <= 2 && ctype_alpha(str_replace(' ', '', $possibleNarrator))) {
                 return [
@@ -218,7 +217,7 @@ class ProcessTitlesInteractive extends Command
 
         // Pattern for "- ECA-04 - Title" or similar
         $pattern = '/^-\s*([A-Z]+)-(\d+)\s*-\s*(.*?)(?:\s+\d+k\s+[\d:.]+\s+\{[^}]+\}\s+by\s+\w+)?$/';
-        
+
         if (preg_match($pattern, $title, $matches)) {
             $result['seriesName'] = $matches[1];
             $result['seriesNumber'] = (int)$matches[2];
@@ -242,7 +241,7 @@ class ProcessTitlesInteractive extends Command
             $result['year'] = (int)$matches[1];
         }
 
-        // Extract multiple book numbers like "09,10" 
+        // Extract multiple book numbers like "09,10"
         if (preg_match('/(\d+),(\d+)/', $dirName, $matches)) {
             $result['multipleBooks'] = [(int)$matches[1], (int)$matches[2]];
         }
@@ -251,7 +250,7 @@ class ProcessTitlesInteractive extends Command
         $cleanDirName = preg_replace('/\d+[,\d]*\s*/', '', $dirName); // Remove numbers
         $cleanDirName = preg_replace('/\(\d{4}\)/', '', $cleanDirName); // Remove year
         $cleanDirName = trim($cleanDirName);
-        
+
         if (!empty($cleanDirName) && strlen($cleanDirName) > 3) {
             $result['seriesName'] = $cleanDirName;
         }
@@ -264,10 +263,10 @@ class ProcessTitlesInteractive extends Command
      */
     protected function hasChanges(string $originalTitle, Book $book, array $titleInfo): bool
     {
-        return !empty($titleInfo['changes']) || 
-               $titleInfo['narrator'] || 
-               $titleInfo['year'] || 
-               $titleInfo['seriesNumber'] || 
+        return !empty($titleInfo['changes']) ||
+               $titleInfo['narrator'] ||
+               $titleInfo['year'] ||
+               $titleInfo['seriesNumber'] ||
                !empty($titleInfo['multipleBooks']);
     }
 
@@ -280,7 +279,7 @@ class ProcessTitlesInteractive extends Command
         $this->info("Directory: {$book->directoryPath}");
         $this->line("Original Title: <fg=red>{$originalTitle}</>");
         $this->line("New Title: <fg=green>{$titleInfo['title']}</>");
-        
+
         if (!empty($titleInfo['changes'])) {
             $this->info("Changes:");
             foreach ($titleInfo['changes'] as $change) {
@@ -336,7 +335,7 @@ class ProcessTitlesInteractive extends Command
             if ($titleInfo['seriesName']) {
                 $series = Series::firstOrCreate(['name' => $titleInfo['seriesName']]);
                 $seriesNumber = $titleInfo['seriesNumber'] ?? 1;
-                
+
                 // Handle multiple books in the same series
                 if (!empty($titleInfo['multipleBooks'])) {
                     foreach ($titleInfo['multipleBooks'] as $bookNumber) {

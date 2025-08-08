@@ -14,7 +14,7 @@ class SeriesApiTest extends ApiTestCase
     {
         // Create test series with books and authors
         $series = Series::factory()->count(3)->create();
-        
+
         foreach ($series as $s) {
             $author = Author::factory()->create();
             $book = Book::factory()->create();
@@ -61,22 +61,22 @@ class SeriesApiTest extends ApiTestCase
         // Create authors
         $author1 = Author::factory()->create(['name' => 'Brandon Sanderson']);
         $author2 = Author::factory()->create(['name' => 'Stephen King']);
-        
+
         // Create series
         $series1 = Series::factory()->create(['name' => 'The Stormlight Archive']);
         $series2 = Series::factory()->create(['name' => 'The Dark Tower']);
         $series3 = Series::factory()->create(['name' => 'Mistborn']); // Also by Sanderson
-        
+
         // Create books and relationships
         // Author 1 has books in series 1 and 3
         $book1 = Book::factory()->create();
         $book1->authors()->attach($author1);
         $book1->series()->attach($series1, ['series_number' => '1']);
-        
+
         $book3 = Book::factory()->create();
         $book3->authors()->attach($author1);
         $book3->series()->attach($series3, ['series_number' => '1']);
-        
+
         // Author 2 has books in series 2
         $book2 = Book::factory()->create();
         $book2->authors()->attach($author2);
@@ -87,7 +87,7 @@ class SeriesApiTest extends ApiTestCase
 
         $response->assertStatus(200);
         $data = $response->json();
-        
+
         $seriesNames = array_column($data['series'], 'name');
         $this->assertContains('The Stormlight Archive', $seriesNames);
         $this->assertContains('Mistborn', $seriesNames);
@@ -98,13 +98,13 @@ class SeriesApiTest extends ApiTestCase
     {
         // Create author
         $author = Author::factory()->create(['name' => 'Isaac Asimov']);
-        
+
         // Create series with books by this author
         $series = Series::factory()->create(['name' => 'Foundation']);
         $book = Book::factory()->create();
         $book->authors()->attach($author);
         $book->series()->attach($series, ['series_number' => '1']);
-        
+
         // Create series without books by this author
         $otherSeries = Series::factory()->create(['name' => 'Other Series']);
         $otherBook = Book::factory()->create();
@@ -114,7 +114,7 @@ class SeriesApiTest extends ApiTestCase
 
         $response->assertStatus(200);
         $data = $response->json();
-        
+
         $seriesNames = array_column($data['series'], 'name');
         $this->assertContains('Foundation', $seriesNames);
         $this->assertNotContains('Other Series', $seriesNames);
@@ -134,7 +134,7 @@ class SeriesApiTest extends ApiTestCase
         // Test first page
         $response = $this->getJson('/api/v1/series?page=1&per_page=10');
         $response->assertStatus(200);
-        
+
         $data = $response->json();
         $this->assertEquals(1, $data['pagination']['current_page']);
         $this->assertEquals(10, $data['pagination']['per_page']);
@@ -146,7 +146,7 @@ class SeriesApiTest extends ApiTestCase
         // Test second page
         $response = $this->getJson('/api/v1/series?page=2&per_page=10');
         $response->assertStatus(200);
-        
+
         $data = $response->json();
         $this->assertEquals(2, $data['pagination']['current_page']);
         $this->assertTrue($data['pagination']['has_prev']);
@@ -157,7 +157,7 @@ class SeriesApiTest extends ApiTestCase
         // Create series with specific names
         $series1 = Series::factory()->create(['name' => 'Harry Potter']);
         $series2 = Series::factory()->create(['name' => 'Lord of the Rings']);
-        
+
         // Add books to make them appear in results
         foreach ([$series1, $series2] as $series) {
             $author = Author::factory()->create();
@@ -170,10 +170,10 @@ class SeriesApiTest extends ApiTestCase
 
         $response->assertStatus(200);
         $data = $response->json();
-        
+
         $this->assertGreaterThanOrEqual(1, $data['pagination']['total']);
         $seriesNames = array_column($data['series'], 'name');
-        
+
         foreach ($seriesNames as $name) {
             $this->assertStringContainsStringIgnoringCase('Harry', $name);
         }
@@ -184,16 +184,16 @@ class SeriesApiTest extends ApiTestCase
         // Create series with different names and book counts
         $seriesA = Series::factory()->create(['name' => 'Alpha Series']);
         $seriesZ = Series::factory()->create(['name' => 'Zeta Series']);
-        
+
         $author = Author::factory()->create();
-        
+
         // Give Alpha Series more books
         for ($i = 1; $i <= 5; $i++) {
             $book = Book::factory()->create();
             $book->authors()->attach($author);
             $book->series()->attach($seriesA, ['series_number' => (string)$i]);
         }
-        
+
         // Give Zeta Series fewer books
         for ($i = 1; $i <= 2; $i++) {
             $book = Book::factory()->create();
@@ -205,7 +205,7 @@ class SeriesApiTest extends ApiTestCase
         $response = $this->getJson('/api/v1/series?sort=name_asc');
         $response->assertStatus(200);
         $data = $response->json();
-        
+
         if (count($data['series']) > 1) {
             $firstSeries = $data['series'][0];
             $lastSeries = $data['series'][count($data['series']) - 1];
@@ -216,11 +216,11 @@ class SeriesApiTest extends ApiTestCase
         $response = $this->getJson('/api/v1/series?sort=book_count_desc');
         $response->assertStatus(200);
         $data = $response->json();
-        
+
         // Find our test series in the results
         $alphaSeries = collect($data['series'])->firstWhere('name', 'Alpha Series');
         $zetaSeries = collect($data['series'])->firstWhere('name', 'Zeta Series');
-        
+
         if ($alphaSeries && $zetaSeries) {
             $this->assertGreaterThan($zetaSeries['book_count'], $alphaSeries['book_count']);
         }
@@ -256,19 +256,19 @@ class SeriesApiTest extends ApiTestCase
         // Create authors
         $author1 = Author::factory()->create(['name' => 'Author One']);
         $author2 = Author::factory()->create(['name' => 'Author Two']);
-        
+
         // Create series
         $series = Series::factory()->create(['name' => 'Multi-Author Series']);
-        
+
         // Create books by both authors in the same series
         $book1 = Book::factory()->create();
         $book1->authors()->attach($author1);
         $book1->series()->attach($series, ['series_number' => '1']);
-        
+
         $book2 = Book::factory()->create();
         $book2->authors()->attach($author1);
         $book2->series()->attach($series, ['series_number' => '2']);
-        
+
         $book3 = Book::factory()->create();
         $book3->authors()->attach($author2);
         $book3->series()->attach($series, ['series_number' => '3']);
@@ -277,22 +277,22 @@ class SeriesApiTest extends ApiTestCase
 
         $response->assertStatus(200);
         $data = $response->json();
-        
+
         $testSeries = collect($data['series'])->firstWhere('name', 'Multi-Author Series');
-        
+
         $this->assertNotNull($testSeries);
         $this->assertEquals(3, $testSeries['book_count']);
         $this->assertCount(2, $testSeries['authors']); // Two different authors
-        
+
         // Check author information
         $authorNames = array_column($testSeries['authors'], 'name');
         $this->assertContains('Author One', $authorNames);
         $this->assertContains('Author Two', $authorNames);
-        
+
         // Check book counts for each author
         $authorOne = collect($testSeries['authors'])->firstWhere('name', 'Author One');
         $authorTwo = collect($testSeries['authors'])->firstWhere('name', 'Author Two');
-        
+
         $this->assertEquals(2, $authorOne['book_count_in_series']);
         $this->assertEquals(1, $authorTwo['book_count_in_series']);
     }
@@ -302,17 +302,17 @@ class SeriesApiTest extends ApiTestCase
         // Create authors
         $targetAuthor = Author::factory()->create(['name' => 'Target Author']);
         $otherAuthor = Author::factory()->create(['name' => 'Other Author']);
-        
+
         // Create series
         $series = Series::factory()->create(['name' => 'Mixed Series']);
-        
+
         // Target author has 2 books in the series
         for ($i = 1; $i <= 2; $i++) {
             $book = Book::factory()->create();
             $book->authors()->attach($targetAuthor);
             $book->series()->attach($series, ['series_number' => (string)$i]);
         }
-        
+
         // Other author has 3 books in the series
         for ($i = 3; $i <= 5; $i++) {
             $book = Book::factory()->create();
@@ -325,9 +325,9 @@ class SeriesApiTest extends ApiTestCase
 
         $response->assertStatus(200);
         $data = $response->json();
-        
+
         $testSeries = collect($data['series'])->firstWhere('name', 'Mixed Series');
-        
+
         $this->assertNotNull($testSeries);
         $this->assertEquals(5, $testSeries['book_count']); // Total books in series
         $this->assertEquals(2, $testSeries['book_count_by_author']); // Books by filtered author

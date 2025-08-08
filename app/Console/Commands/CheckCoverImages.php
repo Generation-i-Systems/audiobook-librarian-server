@@ -303,12 +303,12 @@ class CheckCoverImages extends Command
         // Check if file exists without directoryPath prefix
         $diskName = 'books';
         $bookStoragePath = env('BOOK_STORAGE_PATH', '/media/audiobooks/books');
-        
+
         // If the coverImagePath is just a filename, check if it needs directoryPath prefix
         $baseFileName = basename($coverImagePath);
         $coverWithoutDir = rtrim($directoryPath, '/') . '/' . $baseFileName;
         $coverWithDir = $coverImagePath;
-        
+
         // Check if file exists with directoryPath prefix
         if (Storage::disk($diskName)->exists($coverWithoutDir)) {
             $this->info("    -> Adding directoryPath prefix to cover: {$coverWithoutDir}");

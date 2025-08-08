@@ -61,17 +61,17 @@ class DocumentstoreUser implements Authenticatable
             if (is_callable([$object, $key])) {
                 return $object->$key();
             }
-            
+
             // Try direct property access
             if (property_exists($object, $key)) {
                 return $object->$key;
             }
-            
+
             // Try getAttribute for Eloquent models
             if (method_exists($object, 'getAttribute')) {
                 return $object->getAttribute($key);
             }
-            
+
             // Try array access if object implements ArrayAccess
             if ($object instanceof ArrayAccess && $object->offsetExists($key)) {
                 return $object[$key];
@@ -80,7 +80,7 @@ class DocumentstoreUser implements Authenticatable
             // Silently fail to prevent memory leaks from error handling
             return null;
         }
-        
+
         return null;
     }
 
@@ -142,12 +142,12 @@ class DocumentstoreUser implements Authenticatable
         if ($key === 'is_admin') {
             return $this->isAdmin();
         }
-        
+
         // Only allow access to whitelisted properties
         if (array_key_exists($key, $this->userData)) {
             return $this->userData[$key];
         }
-        
+
         return null;
     }
 

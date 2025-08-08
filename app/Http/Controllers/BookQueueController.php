@@ -76,6 +76,4 @@ class BookQueueController extends Controller
         // Optionally implement reordering in document store if needed
         // For now, this is a stub
     }
-
-
 }

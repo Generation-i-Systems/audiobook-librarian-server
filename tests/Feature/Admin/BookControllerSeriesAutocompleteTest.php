@@ -10,8 +10,6 @@ use Tests\TestCase;
 
 class BookControllerSeriesAutocompleteTest extends TestCase
 {
-
-
     /**
      * Test the autocompleteSeries method directly.
      */
@@ -60,6 +58,4 @@ class BookControllerSeriesAutocompleteTest extends TestCase
             ],
         ], $response->getData(true));
     }
-
-
 }

@@ -6,7 +6,6 @@ use App\Auth\DocumentstoreUser;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Services\ExternalCoverService;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Http\UploadedFile;
 use Mockery;
 use Mockery\LegacyMockInterface;
@@ -145,19 +144,19 @@ class BookControllerTest extends TestCase
 
 
 
-                $bookData['cover'] = UploadedFile::fake()->image('cover.jpg');
+        $bookData['cover'] = UploadedFile::fake()->image('cover.jpg');
 
         $response = $this->post(route('admin.books.store'), $bookData);
-    
-    // Debug information to see what's causing the 500 error
-    if ($response->status() === 500) {
-        dump('Response Status: ' . $response->status());
-        dump('Response Content: ' . $response->content());
-        dump('Exception: ' . $response->exception?->getMessage());
-        dump('Exception Trace: ' . $response->exception?->getTraceAsString());
-    }
 
-    $response->assertRedirect(route('admin.books.edit', 'new-book-id'));
+        // Debug information to see what's causing the 500 error
+        if ($response->status() === 500) {
+            dump('Response Status: ' . $response->status());
+            dump('Response Content: ' . $response->content());
+            dump('Exception: ' . $response->exception?->getMessage());
+            dump('Exception Trace: ' . $response->exception?->getTraceAsString());
+        }
+
+        $response->assertRedirect(route('admin.books.edit', 'new-book-id'));
     }
 
     #[Test]

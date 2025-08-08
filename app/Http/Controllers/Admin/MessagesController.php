@@ -78,6 +78,4 @@ class MessagesController extends Controller
 
         return redirect()->route('admin.messages.index')->with('success', 'Message sent.');
     }
-
-
 }

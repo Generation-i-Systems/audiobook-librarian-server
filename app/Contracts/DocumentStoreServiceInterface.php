@@ -47,10 +47,10 @@ interface DocumentStoreServiceInterface
      * @return array Array of recent books with related data
      */
     public function getRecentBooks(int $limit = 10, int $days = 30);
-    
+
     /**
      * Get unique values for a specific field across all books
-     * 
+     *
      * @param string $field The field to get unique values for (e.g., 'genre', 'author')
      * @param string $subField Optional subfield for nested data (e.g., 'seriesName' when field is 'series')
      * @return array Array of unique values
@@ -73,7 +73,7 @@ interface DocumentStoreServiceInterface
     public function getUserByCredentials($credentials);
 
     public function getUserByRememberToken($identifier, $token);
-    
+
     /**
      * Validate a user's credentials.
      *

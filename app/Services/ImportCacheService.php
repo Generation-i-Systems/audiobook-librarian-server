@@ -3,10 +3,8 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Contracts\Logging\Logger;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Filesystem\FilesystemAdapter;
 
 class ImportCacheService
 {
@@ -67,7 +65,6 @@ class ImportCacheService
             }
 
             $this->cache = $data;
-
         } catch (\Exception $e) {
             Log::warning("Failed to load cache, starting fresh: " . $e->getMessage());
             $this->cache = [
@@ -98,7 +95,6 @@ class ImportCacheService
             }
 
             $this->files->put($this->cacheFile, $content);
-
         } catch (\Exception $e) {
             Log::error("Failed to save cache: " . $e->getMessage());
         }
@@ -162,13 +158,13 @@ class ImportCacheService
 
         if ($taskCount > 0) {
             $tasks = $this->cache['tasks'];
-            uasort($tasks, fn($a, $b) => ($a['timestamp'] ?? 0) <=> ($b['timestamp'] ?? 0));
+            uasort($tasks, fn ($a, $b) => ($a['timestamp'] ?? 0) <=> ($b['timestamp'] ?? 0));
             $this->cache['tasks'] = array_slice($tasks, intval($taskCount * 0.25), null, true);
         }
 
         if ($metadataCount > 0) {
             $metadata = $this->cache['metadata'];
-            uasort($metadata, fn($a, $b) => ($a['timestamp'] ?? 0) <=> ($b['timestamp'] ?? 0));
+            uasort($metadata, fn ($a, $b) => ($a['timestamp'] ?? 0) <=> ($b['timestamp'] ?? 0));
             $this->cache['metadata'] = array_slice($metadata, intval($metadataCount * 0.25), null, true);
         }
 
@@ -295,7 +291,6 @@ class ImportCacheService
             }
 
             return $latestTime;
-
         } catch (\Exception $e) {
             return $this->files->lastModified($path) ?: 0;
         }

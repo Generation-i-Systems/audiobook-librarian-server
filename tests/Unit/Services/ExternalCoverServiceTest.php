@@ -20,7 +20,7 @@ class ExternalCoverServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->externalCoverService = new ExternalCoverService;
+        $this->externalCoverService = new ExternalCoverService();
 
         // Create a fake storage disk
         Storage::fake('books');

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Feature\Api;
 
 use App\Models\Book;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
 class BookDownloadTest extends ApiTestCase
@@ -13,7 +12,7 @@ class BookDownloadTest extends ApiTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Set up fake storage for testing
         Storage::fake('books');
     }
@@ -22,7 +21,7 @@ class BookDownloadTest extends ApiTestCase
     {
         // Create a book
         $book = Book::factory()->create();
-        
+
         // Create a fake cover image
         $coverPath = "covers/{$book->id}/cover.jpg";
         Storage::disk('books')->put($coverPath, 'fake-image-content');
@@ -50,7 +49,7 @@ class BookDownloadTest extends ApiTestCase
 
         // Should handle missing cover gracefully (either 404 or fallback)
         $this->assertTrue(in_array($response->status(), [200, 404]));
-        
+
         // If it returns 200, it should be using a fallback or placeholder
         if ($response->status() === 200) {
             $this->assertNotEmpty($response->getContent());
@@ -60,7 +59,7 @@ class BookDownloadTest extends ApiTestCase
     public function test_download_endpoint_requires_authentication()
     {
         $book = Book::factory()->create();
-        
+
         // Clear authentication
         auth()->logout();
 
@@ -143,7 +142,7 @@ class BookDownloadTest extends ApiTestCase
 
         // Even if the file doesn't exist, we can test the endpoint exists
         $this->assertTrue(in_array($response->status(), [200, 404, 500]));
-        
+
         // If download is successful, it should handle large files properly
         if ($response->status() === 200) {
             // Check for appropriate headers that would be set for chunked transfer
@@ -176,7 +175,7 @@ class BookDownloadTest extends ApiTestCase
         }
 
         // Each request should have a unique zipId
-        $zipIds = array_map(fn($r) => $r->json('zipId'), $responses);
+        $zipIds = array_map(fn ($r) => $r->json('zipId'), $responses);
         $this->assertEquals(count($zipIds), count(array_unique($zipIds)));
     }
 
@@ -187,19 +186,19 @@ class BookDownloadTest extends ApiTestCase
         $queueResponse = $this->postJson('/api/v1/books/queue/download', [
             'book_ids' => $books->pluck('id')->toArray()
         ]);
-        
+
         $queueResponse->assertStatus(200);
         $zipId = $queueResponse->json('zipId');
 
         // Check download status before marking as downloaded
         $statusResponse = $this->getJson('/api/v1/books/queue/download/' . $zipId);
-        
+
         // Should either be processing or ready
         $this->assertTrue(in_array($statusResponse->status(), [200, 202, 404]));
 
         // Mark as downloaded
         $markResponse = $this->postJson('/api/v1/books/queue/download/' . $zipId . '/mark-downloaded');
-        
+
         // Should either succeed or indicate already processed
         $this->assertTrue(in_array($markResponse->status(), [200, 404, 409]));
     }
@@ -215,7 +214,7 @@ class BookDownloadTest extends ApiTestCase
 
         // Should handle file system errors gracefully
         $this->assertTrue(in_array($response->status(), [200, 404, 500]));
-        
+
         // If error status, should include meaningful error message
         if ($response->status() >= 400) {
             $this->assertIsString($response->getContent());
@@ -233,7 +232,7 @@ class BookDownloadTest extends ApiTestCase
 
         // Should not allow access to system files
         $this->assertNotEquals(200, $response->status());
-        
+
         // Response should not contain system file content
         $content = $response->getContent();
         $this->assertStringNotContainsString('root:', $content);
@@ -244,11 +243,11 @@ class BookDownloadTest extends ApiTestCase
     {
         // Create books for download queue
         $books = Book::factory()->count(2)->create();
-        
+
         $response = $this->postJson('/api/v1/books/queue/download', [
             'book_ids' => $books->pluck('id')->toArray()
         ]);
-        
+
         $response->assertStatus(200);
         $zipId = $response->json('zipId');
 
@@ -256,10 +255,10 @@ class BookDownloadTest extends ApiTestCase
         // and clean them up appropriately (this is more of a system test)
         $this->assertIsString($zipId);
         $this->assertNotEmpty($zipId);
-        
+
         // Verify the system can handle the cleanup process
         $markResponse = $this->postJson('/api/v1/books/queue/download/' . $zipId . '/mark-downloaded');
-        
+
         // Should handle cleanup without errors
         $this->assertTrue(in_array($markResponse->status(), [200, 404]));
     }

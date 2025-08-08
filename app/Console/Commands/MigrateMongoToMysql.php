@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Contracts\DocumentStoreServiceInterface;
 use App\Models\Author;
 use App\Models\Book;
 use App\Models\Chapter;
@@ -72,7 +71,7 @@ class MigrateMongoToMysql extends Command
         Log::debug("MigrateMongoToMysql: MySQL book count: {$mysqlBookCount}");
 
         $shouldTruncate = false;
-        
+
         // Check if --no-wipe option is set
         if ($this->option('no-wipe')) {
             $this->info('--no-wipe option set. Skipping database wipe. Existing MySQL records will be kept and new records will be added/updated.');
@@ -201,7 +200,9 @@ class MigrateMongoToMysql extends Command
             }
 
             $normalize = function ($name) {
-                if (!is_string($name)) return null;
+                if (!is_string($name)) {
+                    return null;
+                }
                 // Normalize to UTF-8 and remove BOM
                 $name = mb_convert_encoding($name, 'UTF-8', 'UTF-8');
                 $bom = pack('H*', 'EFBBBF');
@@ -307,7 +308,6 @@ class MigrateMongoToMysql extends Command
             $this->info("Running cover image fixes and title processing...");
             $this->call('cover:check');
             $this->call('books:process-titles-interactive');
-
         } catch (\Exception $e) {
             $this->error("An error occurred during migration: " . $e->getMessage());
             return 1;
@@ -387,8 +387,9 @@ class MigrateMongoToMysql extends Command
         // Remove duplicates while preserving original case in the map
         $uniqueAuthors = [];
         foreach (array_unique($authorNames) as $name) {
-            if (empty($name))
+            if (empty($name)) {
                 continue;
+            }
             $uniqueAuthors[$name] = $name; // Use normalized name as key, original as value
         }
 
@@ -444,8 +445,9 @@ class MigrateMongoToMysql extends Command
 
         // Helper function to normalize names
         $normalizeName = function ($name) {
-            if (!is_string($name))
+            if (!is_string($name)) {
                 return null;
+            }
 
             // Normalize to UTF-8
             $name = mb_convert_encoding($name, 'UTF-8', 'UTF-8');
@@ -501,8 +503,9 @@ class MigrateMongoToMysql extends Command
         // Remove duplicates while preserving original case in the map
         $uniqueNarrators = [];
         foreach (array_unique($narratorNames) as $name) {
-            if (empty($name))
+            if (empty($name)) {
                 continue;
+            }
 
             $lowerName = mb_strtolower($name, 'UTF-8');
             if (!isset($uniqueNarrators[$lowerName])) {
@@ -716,7 +719,7 @@ class MigrateMongoToMysql extends Command
         }
 
         // Clean up any empty strings that should be null
-        $bookData = array_map(fn($value) => $value === '' ? null : $value, $bookData);
+        $bookData = array_map(fn ($value) => $value === '' ? null : $value, $bookData);
 
         try {
             $book = null;
@@ -1069,7 +1072,8 @@ class MigrateMongoToMysql extends Command
                     foreach ($mysqlNarrators as $narrator) {
                         $name = is_array($narrator)
                             ? ($narrator['name'] ?? null)
-                            : (is_object($narrator)
+                            : (
+                                is_object($narrator)
                                 ? ($narrator->name ?? null)
                                 : $narrator
                             );

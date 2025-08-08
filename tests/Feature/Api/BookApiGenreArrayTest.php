@@ -4,8 +4,6 @@ namespace Tests\Feature\Api;
 
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use Mockery;
 use Mockery\MockInterface;
 use Tests\TestCase;
 
@@ -20,7 +18,7 @@ class BookApiGenreArrayTest extends TestCase
         // Force SQLite in-memory database to avoid safety check issues
         config(['database.default' => 'sqlite']);
         config(['database.connections.sqlite.database' => ':memory:']);
-        
+
         // Create a user and token for API authentication
         $user = User::factory()->create(['is_admin' => true]);
         $this->token = $user->createToken('test-token')->plainTextToken;
@@ -52,7 +50,7 @@ class BookApiGenreArrayTest extends TestCase
                     'created_at' => '2023-01-01T00:00:00Z',
                     'updated_at' => '2023-01-01T00:00:00Z',
                 ]);
-                
+
             // Mock response for a book with genre as an array
             $mock->shouldReceive('getBook')
                 ->once()
@@ -82,12 +80,12 @@ class BookApiGenreArrayTest extends TestCase
 
         $response->assertStatus(200);
         $responseData = $response->json();
-        
+
         // Assert genre is an array
         $this->assertIsArray($responseData['genre']);
         $this->assertCount(1, $responseData['genre']);
         $this->assertEquals('Science Fiction', $responseData['genre'][0]);
-        
+
         // Test book with genre as array
         $response2 = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
@@ -96,7 +94,7 @@ class BookApiGenreArrayTest extends TestCase
 
         $response2->assertStatus(200);
         $responseData2 = $response2->json();
-        
+
         // Assert genre is an array with multiple values
         $this->assertIsArray($responseData2['genre']);
         $this->assertCount(2, $responseData2['genre']);

@@ -5,12 +5,10 @@ namespace App\Http\Controllers\Auth;
 use App\Auth\DocumentstoreUser;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
-use Google\Cloud\Core\Timestamp;
 use Illuminate\Foundation\Auth\RegistersUsers;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 
 class RegisterController extends Controller
 {
@@ -151,6 +149,4 @@ class RegisterController extends Controller
             Log::error('Error notifying admins about new user: ' . $e->getMessage());
         }
     }
-
-
 }

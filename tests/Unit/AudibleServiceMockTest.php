@@ -17,12 +17,12 @@ class AudibleServiceMockTest extends TestCase
 
         // Mock the cache facade
         $cache = new \Illuminate\Cache\Repository(
-            new \Illuminate\Cache\ArrayStore
+            new \Illuminate\Cache\ArrayStore()
         );
         $this->app->instance('cache', $cache);
 
         // Create the service instance
-        $this->service = new AudibleService;
+        $this->service = new AudibleService();
     }
 
     #[Test]

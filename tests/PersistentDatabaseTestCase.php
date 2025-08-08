@@ -4,7 +4,6 @@ namespace Tests;
 
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
-use PHPUnit\Framework\SkippedTestError;
 
 /**
  * Base test case for tests that need a persistent database
@@ -12,7 +11,6 @@ use PHPUnit\Framework\SkippedTestError;
  */
 abstract class PersistentDatabaseTestCase extends TestCase
 {
-
     /**
      * Indicates whether the default database has been configured.
      *
@@ -34,22 +32,22 @@ abstract class PersistentDatabaseTestCase extends TestCase
 
         // Use a persistent test database instead of in-memory
         config(['database.default' => 'mysql']);
-        
+
         // Make sure we're using a test database, not production
         $database = config('database.connections.mysql.database');
         if (!str_contains($database, 'test') && !str_contains($database, 'testing')) {
             config(['database.connections.mysql.database' => 'testing']);
         }
-        
+
         // Only run migrations once for the entire test suite
         if (!static::$databaseConfigured) {
             // Refresh the database connection to use the test database
             DB::purge();
             DB::reconnect();
-            
+
             // Uncomment to run migrations only once per test suite
             // Artisan::call('migrate:fresh');
-            
+
             static::$databaseConfigured = true;
         }
     }

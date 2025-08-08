@@ -21,11 +21,8 @@ use App\Services\GoogleBooksApiService;
 use App\Services\ImportCacheService;
 use App\Traits\GenreMapping;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\App;
 
 class ImportBooksFromDownloads extends Command
@@ -1699,7 +1696,6 @@ class ImportBooksFromDownloads extends Command
                     return false;
                 default:
                     $this->warn("Please choose 1-4, or use first letters (A/E/P/S)");
-                // No break here, so it will re-prompt
             }
         }
     }

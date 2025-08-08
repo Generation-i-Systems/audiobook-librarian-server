@@ -135,6 +135,4 @@ class ProfileController extends Controller
 
         return (array) $document;
     }
-
-
 }

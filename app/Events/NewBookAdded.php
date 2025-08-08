@@ -30,6 +30,4 @@ class NewBookAdded
     {
         $this->book = $book;
     }
-
-
 }

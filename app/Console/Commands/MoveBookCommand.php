@@ -67,17 +67,17 @@ class MoveBookCommand extends Command
 
         // Check if this is a multi-book operation
         $booksToMove = $this->findBooksToMove($sourcePath);
-        
+
         if (count($booksToMove) > 1) {
             return $this->handleMultiBookMove($booksToMove, $sourcePath, $destinationPath, $dryRun, $force);
         }
-        
+
         // Single book operation (existing logic)
         $book = $this->findBookByPath($sourcePath);
 
         if ($book) {
             $this->info("Found existing book: {$book->title} (ID: {$book->id})");
-            
+
             if (!$force && !$dryRun) {
                 if (!$this->confirm('Update this book and move its files?')) {
                     $this->info('Operation cancelled.');
@@ -88,7 +88,7 @@ class MoveBookCommand extends Command
             return $this->moveExistingBook($book, $sourcePath, $destinationPath, $dryRun);
         } else {
             $this->warn("No existing book found for path: {$sourcePath}");
-            
+
             if ($forceImport || (!$force && $this->confirm('Import this directory as a new book?'))) {
                 return $this->importNewBook($sourcePath, $destinationPath, $dryRun);
             } else {
@@ -104,14 +104,14 @@ class MoveBookCommand extends Command
         if (!Str::startsWith($destination, '/')) {
             $destination = getcwd() . '/' . $destination;
         }
-        
+
         // If destination is an existing directory, append the source basename
         if (File::exists($destination) && File::isDirectory($destination)) {
             $sourcePath = $this->argument('source');
             $sourceBasename = basename(realpath($sourcePath) ?: $sourcePath);
             $destination = rtrim($destination, '/') . '/' . $sourceBasename;
         }
-        
+
         return $destination;
     }
 
@@ -123,16 +123,16 @@ class MoveBookCommand extends Command
         }
 
         $relativePath = $this->convertToRelativePath($sourcePath);
-        
+
         // Find all books whose directory_path starts with the relative source path
         $books = Book::where('directory_path', 'LIKE', $relativePath . '%')->get();
-        
+
         // Also find by absolute path match in case of mixed data
         $absoluteBooks = Book::where('directory_path', 'LIKE', $sourcePath . '%')->get();
-        
+
         // Merge and deduplicate
         $allBooks = $books->merge($absoluteBooks)->unique('id');
-        
+
         return $allBooks->all();
     }
 
@@ -140,59 +140,59 @@ class MoveBookCommand extends Command
     {
         $count = count($books);
         $this->info("Found {$count} books to move:");
-        
+
         $sourceRelative = $this->convertToRelativePath($sourcePath);
         $destinationRelative = $this->convertToRelativePath(
             $this->resolveDestinationPath($destinationPath)
         );
-        
+
         // Show what will be moved
         foreach ($books as $book) {
             $currentPath = $book->directory_path;
             // Calculate new path by replacing the source prefix with destination
             $newPath = $destinationRelative . '/' . ltrim(substr($currentPath, strlen($sourceRelative)), '/');
             $newPath = trim($newPath, '/');
-            
+
             $this->line("  • {$book->title} (ID: {$book->id})");
             $this->line("    From: {$currentPath}");
             $this->line("    To:   {$newPath}");
         }
-        
+
         if ($dryRun) {
             $this->warn("DRY RUN - No changes will be made");
             return 0;
         }
-        
+
         if (!$force && !$this->confirm("Move all {$count} books?")) {
             $this->info('Operation cancelled.');
             return 0;
         }
-        
+
         $errors = 0;
         $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
-        
+
         foreach ($books as $book) {
             if (!$book) {
                 $this->error("Book not found, skipping");
                 $errors++;
                 continue;
             }
-            
+
             $currentPath = $book->directory_path;
             $currentAbsolutePath = $bookStoragePath . '/' . ltrim($currentPath, '/');
-            
+
             // Calculate new relative path
             $newRelativePath = $destinationRelative . '/' . ltrim(substr($currentPath, strlen($sourceRelative)), '/');
             $newRelativePath = trim($newRelativePath, '/');
             $newAbsolutePath = $bookStoragePath . '/' . $newRelativePath;
-            
+
             try {
                 // Ensure destination directory exists
                 $newParentDir = dirname($newAbsolutePath);
                 if (!File::exists($newParentDir)) {
                     File::makeDirectory($newParentDir, 0755, true);
                 }
-                
+
                 // Move the directory
                 if (File::exists($currentAbsolutePath)) {
                     if (!File::move($currentAbsolutePath, $newAbsolutePath)) {
@@ -201,42 +201,41 @@ class MoveBookCommand extends Command
                         continue;
                     }
                 }
-                
+
                 // Update database record
                 $book->directory_path = $newRelativePath;
                 $book->save();
-                
+
                 $this->info("✅ Moved: {$book->title}");
-                
             } catch (\Exception $e) {
                 $this->error("Error moving {$book->title}: {$e->getMessage()}");
                 $errors++;
             }
         }
-        
+
         $successful = $count - $errors;
         $this->info("Completed: {$successful}/{$count} books moved successfully");
-        
+
         return $errors > 0 ? 1 : 0;
     }
 
     protected function convertToRelativePath(string $absolutePath): string
     {
         $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
-        
+
         if (!$bookStoragePath) {
             return $absolutePath;
         }
-        
+
         $realBookPath = realpath($bookStoragePath);
         $realAbsolutePath = realpath($absolutePath) ?: $absolutePath;
-        
+
         if ($realBookPath && strpos($realAbsolutePath, $realBookPath) === 0) {
             // Remove the book storage path prefix and leading slash
             $relativePath = ltrim(substr($realAbsolutePath, strlen($realBookPath)), '/');
             return $relativePath;
         }
-        
+
         return $absolutePath;
     }
 
@@ -251,10 +250,10 @@ class MoveBookCommand extends Command
         // Try to find by basename match within book storage
         $basename = basename($path);
         $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
-        
+
         if ($bookStoragePath) {
             $books = Book::where('directory_path', 'like', "%{$basename}%")->get();
-            
+
             foreach ($books as $book) {
                 if (basename($book->directory_path) === $basename) {
                     return $book;
@@ -305,8 +304,8 @@ class MoveBookCommand extends Command
         $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
         $realBookPath = $bookStoragePath ? realpath($bookStoragePath) : null;
         $realDestPath = realpath(dirname($destinationPath));
-        
-        $isDestinationWithinBookStorage = $realBookPath && $realDestPath && 
+
+        $isDestinationWithinBookStorage = $realBookPath && $realDestPath &&
             strpos($realDestPath, $realBookPath) === 0;
 
         if ($isDestinationWithinBookStorage) {
@@ -315,14 +314,14 @@ class MoveBookCommand extends Command
                 $this->error("Failed to move directory for import");
                 return 1;
             }
-            
+
             // Import in-place - files are already in the correct location
             $this->call('books:import-downloads', [
                 'path' => [$destinationPath],
                 '--force' => true,
                 '--no-backup' => true,
             ]);
-            
+
             $this->info("✅ Book imported in-place at destination");
         } else {
             // Import from source, then move to final destination

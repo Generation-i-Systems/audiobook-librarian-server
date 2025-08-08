@@ -59,7 +59,7 @@ class BookControllerUpdateTest extends TestCase
 
         // Set up request binding to ensure controller receives the request
         $this->app->bind('request', function () {
-            return new Request;
+            return new Request();
         });
     }
 

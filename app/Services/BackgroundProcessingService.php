@@ -23,7 +23,7 @@ class BackgroundProcessingService
     public function scheduleBackgroundTask(string $type, array $data): void
     {
         $taskId = $this->generateTaskId($type, $data);
-        
+
         $this->taskQueue[] = [
             'id' => $taskId,
             'type' => $type,
@@ -31,7 +31,7 @@ class BackgroundProcessingService
             'priority' => $data['priority'] ?? 'normal',
             'scheduled_at' => microtime(true)
         ];
-        
+
         $this->maintainConcurrentTasks();
     }
 
@@ -59,31 +59,30 @@ class BackgroundProcessingService
     public function executeBackgroundTask(array $task): array
     {
         $startTime = microtime(true);
-        
+
         try {
             $result = $this->executeBackgroundTaskInternal($task['type'], $task['data']);
-            
+
             $endTime = microtime(true);
             $duration = round($endTime - $startTime, 2);
-            
+
             return [
                 'success' => true,
                 'result' => $result,
                 'duration' => $duration,
                 'task_id' => $task['id'] ?? null
             ];
-            
         } catch (\Exception $e) {
             $endTime = microtime(true);
             $duration = round($endTime - $startTime, 2);
-            
+
             Log::error("Background task failed: " . $e->getMessage(), [
                 'task_type' => $task['type'],
                 'task_data' => $task['data'],
                 'duration' => $duration,
                 'trace' => $e->getTraceAsString()
             ]);
-            
+
             return [
                 'success' => false,
                 'error' => $e->getMessage(),
@@ -115,16 +114,16 @@ class BackgroundProcessingService
     protected function maintainConcurrentTasks(): void
     {
         $activeTaskIds = array_keys($this->backgroundTasks);
-        
+
         foreach ($activeTaskIds as $taskId) {
             $taskInfo = $this->backgroundTasks[$taskId];
             $process = $taskInfo['process'];
-            
+
             if (!$process->running()) {
                 $output = $process->output();
                 $errorOutput = $process->errorOutput();
                 $exitCode = $process->exitCode();
-                
+
                 $result = [
                     'success' => $exitCode === 0,
                     'output' => $output,
@@ -132,7 +131,7 @@ class BackgroundProcessingService
                     'exit_code' => $exitCode,
                     'completed_at' => microtime(true)
                 ];
-                
+
                 $this->completedTasks[$taskId] = array_merge($taskInfo, $result);
                 unset($this->backgroundTasks[$taskId]);
             }
@@ -149,14 +148,14 @@ class BackgroundProcessingService
                 $priorityOrder = ['high' => 1, 'normal' => 2, 'low' => 3];
                 $aPriority = $priorityOrder[$a['priority']] ?? 2;
                 $bPriority = $priorityOrder[$b['priority']] ?? 2;
-                
+
                 if ($aPriority === $bPriority) {
                     return $a['scheduled_at'] <=> $b['scheduled_at'];
                 }
-                
+
                 return $aPriority <=> $bPriority;
             });
-            
+
             $task = array_shift($this->taskQueue);
             $this->startBackgroundTask($task);
         }
@@ -168,9 +167,9 @@ class BackgroundProcessingService
     protected function startBackgroundTask(array $taskInfo): void
     {
         $command = $this->buildTaskCommand($taskInfo);
-        
+
         $process = Process::start($command);
-        
+
         $this->backgroundTasks[$taskInfo['id']] = array_merge($taskInfo, [
             'process' => $process,
             'started_at' => microtime(true)
@@ -194,11 +193,11 @@ class BackgroundProcessingService
         if (isset($this->completedTasks[$taskId])) {
             return $this->completedTasks[$taskId];
         }
-        
+
         if (isset($this->backgroundTasks[$taskId])) {
             return ['status' => 'running', 'task' => $this->backgroundTasks[$taskId]];
         }
-        
+
         return null;
     }
 
@@ -228,7 +227,7 @@ class BackgroundProcessingService
                 $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
                 return in_array($ext, ['mp3', 'm4a', 'm4b', 'flac', 'wav', 'ogg']);
             });
-            
+
             $metadata['audio_file_count'] = count($audioFiles);
             $metadata['has_audio_files'] = count($audioFiles) > 0;
         }
@@ -242,7 +241,7 @@ class BackgroundProcessingService
     protected function scanDirectoryInBackground(array $data): array
     {
         $path = $data['path'];
-        
+
         if (!is_dir($path)) {
             throw new \InvalidArgumentException("Path is not a directory: {$path}");
         }
@@ -267,7 +266,7 @@ class BackgroundProcessingService
         }
 
         $result['file_count'] = count($result['files']);
-        
+
         return $result;
     }
 
@@ -291,7 +290,7 @@ class BackgroundProcessingService
     {
         $path = $audiobook['path'];
         $baseName = basename($path);
-        
+
         $metadata = [
             'title' => $baseName,
             'path' => $path,
@@ -352,7 +351,7 @@ class BackgroundProcessingService
     {
         $path = $audiobook['path'];
         $coverFiles = ['cover.jpg', 'cover.png', 'folder.jpg', 'folder.png'];
-        
+
         foreach ($coverFiles as $coverFile) {
             $fullPath = $path . '/' . $coverFile;
             if (file_exists($fullPath)) {

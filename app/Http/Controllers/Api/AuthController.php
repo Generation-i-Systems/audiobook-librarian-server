@@ -11,8 +11,6 @@ use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
 {
-
-
     public function register(Request $request)
     {
         // Log incoming request data
@@ -124,6 +122,4 @@ class AuthController extends Controller
 
         return response()->json(['message' => 'Successfully logged out']);
     }
-
-
 }

@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Console\Commands\ApiServiceClient;
 use App\Contracts\DocumentStoreServiceInterface;
-use App\Auth\DocumentstoreUser;
 use App\Models\User;
 use Illuminate\Http\Response;
 use Laravel\Sanctum\PersonalAccessToken;

@@ -46,7 +46,7 @@ class FixStoragePermissions extends Command
             $storagePath . '/framework/cache' => 0755,
             $storagePath . '/framework/sessions' => 0755,
             $storagePath . '/framework/views' => 0755,
-            
+
             // Logs directory - 777 (rwxrwxrwx) for world-writable access
             $storagePath . '/logs' => 0777,
         ];
@@ -55,7 +55,7 @@ class FixStoragePermissions extends Command
         foreach ($permissions as $path => $permission) {
             if (is_dir($path)) {
                 $currentPerms = fileperms($path) & 0777;
-                
+
                 if ($currentPerms !== $permission) {
                     $changes[] = [
                         'path' => $path,
@@ -63,14 +63,14 @@ class FixStoragePermissions extends Command
                         'new' => sprintf('%o', $permission),
                         'type' => 'directory'
                     ];
-                    
+
                     if (!$dryRun) {
                         if (!chmod($path, $permission)) {
                             $errors[] = "Failed to set permissions on directory: {$path}";
                         }
                     }
                 }
-                
+
                 if ($verbose) {
                     $this->line("📁 {$path}: " . sprintf('%o', $permission));
                 }
@@ -83,7 +83,7 @@ class FixStoragePermissions extends Command
 
         // Fix log files permissions (world writable)
         $this->fixLogFilePermissions($storagePath . '/logs', $dryRun, $verbose, $changes, $errors);
-        
+
         // Recursively fix permissions for cache and other subdirectories
         $this->fixRecursivePermissions($storagePath . '/framework/cache', 0755, 0644, $dryRun, $verbose, $changes, $errors);
         $this->fixRecursivePermissions($storagePath . '/framework/sessions', 0755, 0666, $dryRun, $verbose, $changes, $errors); // Session files need to be writable
@@ -117,7 +117,7 @@ class FixStoragePermissions extends Command
         ]);
 
         $this->info("\n🎉 Storage permissions fix completed!");
-        
+
         if ($dryRun && !empty($changes)) {
             $this->warn("💡 Run without --dry-run to apply these changes.");
         }

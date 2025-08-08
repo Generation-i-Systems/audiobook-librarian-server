@@ -8,7 +8,8 @@ use App\Traits\CamelCaseAttributeAccess;
 
 class Chapter extends Model
 {
-    use HasFactory, CamelCaseAttributeAccess;
+    use HasFactory;
+    use CamelCaseAttributeAccess;
 
     protected $fillable = [
         'book_id',

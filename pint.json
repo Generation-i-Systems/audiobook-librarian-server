@@ -2,7 +2,7 @@
     "preset": "psr12",
     "rules": {
         "new_with_braces": true,
-        "not_operator_with_successor_space": true,
+        "not_operator_with_successor_space": false,
         "no_spaces_after_function_name": true,
         "concat_space": {"spacing": "one"},
         "braces": {

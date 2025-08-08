@@ -174,7 +174,7 @@ class BookControllerIndexTest extends TestCase
                     'updated_at' => now()->subDays(5),
                 ]
             ];
-            
+
             $this->mockDocumentStoreService->shouldReceive('getRecentBooks')
                 ->with(10, 30)
                 ->andReturn($recentBooks);
@@ -198,22 +198,22 @@ class BookControllerIndexTest extends TestCase
 
             // Get the response content before making assertions
             $content = $response->getContent();
-            
+
             // If we get a 500 error, dump the full response content for debugging
             if ($response->status() === 500) {
                 dump('Response status: 500');
                 dump('Response content:');
                 dump($content);
-                
+
                 // Get the actual exception if available
                 $exception = $response->exception ?? null;
-                
+
                 if ($exception) {
                     dump('Exception class: ' . get_class($exception));
                     dump('Exception message: ' . $exception->getMessage());
                     dump('Exception file: ' . $exception->getFile() . ':' . $exception->getLine());
                     dump('Exception trace: ' . $exception->getTraceAsString());
-                    
+
                     // If there's a previous exception, show that too
                     $previous = $exception->getPrevious();
                     while ($previous) {
@@ -238,15 +238,15 @@ class BookControllerIndexTest extends TestCase
                         dump('Could not get exception from handler: ' . $e->getMessage());
                     }
                 }
-                
+
                 // Also check the session for errors
                 if (session()->has('errors')) {
                     dump('Validation errors:', session('errors')->all());
                 }
-                
+
                 // Dump the full response headers
                 dump('Response headers:', $response->headers->all());
-                
+
                 // If we have a JSON response, try to decode it
                 if (str_contains($response->headers->get('Content-Type'), 'application/json')) {
                     $json = json_decode($content, true);
@@ -254,7 +254,7 @@ class BookControllerIndexTest extends TestCase
                         dump('JSON response:', $json);
                     }
                 }
-                
+
                 // Dump the last few lines of the Laravel log
                 try {
                     $logPath = storage_path('logs/laravel.log');
@@ -268,7 +268,7 @@ class BookControllerIndexTest extends TestCase
                     dump('Could not read log file: ' . $e->getMessage());
                 }
             }
-            
+
             // Now assert the response status
             $response->assertStatus(200);
 

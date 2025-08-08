@@ -21,7 +21,7 @@ class BookControllerTestDebug extends TestCase
         parent::setUp();
 
         // Create a mock document store service
-        $this->documentStore = new MockDocumentStoreService;
+        $this->documentStore = new MockDocumentStoreService();
 
         // Mock the required services
         $mockGoogleBooksService = $this->createMock(\App\Services\GoogleBooksApiService::class);

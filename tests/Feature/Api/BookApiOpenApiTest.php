@@ -3,13 +3,10 @@
 namespace Tests\Feature\Api;
 
 use Tests\TestCase;
-
 use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Support\Facades\Artisan;
 use App\Models\User;
 use App\Models\Book;
-use Illuminate\Support\Facades\Storage;
-use Mockery;
 use Mockery\MockInterface;
 
 class BookApiOpenApiTest extends TestCase
@@ -199,7 +196,7 @@ class BookApiOpenApiTest extends TestCase
         $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/', $responseData['created_at'] ?? '');
         $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/', $responseData['updated_at'] ?? '');
     }
-    
+
     /**
      * Test that genre is always returned as an array, even when stored as a string
      *
@@ -228,7 +225,7 @@ class BookApiOpenApiTest extends TestCase
                     'created_at' => '2023-01-01T00:00:00Z',
                     'updated_at' => '2023-01-01T00:00:00Z',
                 ]);
-                
+
             // Mock response for a book with genre as an array
             $mock->shouldReceive('getBook')
                 ->once()
@@ -258,12 +255,12 @@ class BookApiOpenApiTest extends TestCase
 
         $response->assertStatus(200);
         $responseData = $response->json();
-        
+
         // Assert genre is an array
         $this->assertIsArray($responseData['genre']);
         $this->assertCount(1, $responseData['genre']);
         $this->assertEquals('Science Fiction', $responseData['genre'][0]);
-        
+
         // Test book with genre as array
         $response2 = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
@@ -272,7 +269,7 @@ class BookApiOpenApiTest extends TestCase
 
         $response2->assertStatus(200);
         $responseData2 = $response2->json();
-        
+
         // Assert genre is an array with multiple values
         $this->assertIsArray($responseData2['genre']);
         $this->assertCount(2, $responseData2['genre']);

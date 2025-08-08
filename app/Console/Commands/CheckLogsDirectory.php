@@ -14,9 +14,9 @@ class CheckLogsDirectory extends Command
     public function handle(): int
     {
         $this->info('Checking logs directory status...');
-        
+
         $status = SafeLoggingService::getLogsDirectoryStatus();
-        
+
         $this->table(
             ['Property', 'Value'],
             [
@@ -26,10 +26,10 @@ class CheckLogsDirectory extends Command
                 ['Permissions', $status['permissions'] ?? 'N/A'],
             ]
         );
-        
+
         if (!$status['exists']) {
             $this->error('Logs directory does not exist!');
-            
+
             if ($this->option('fix')) {
                 $this->info('Attempting to create logs directory...');
                 try {
@@ -41,10 +41,10 @@ class CheckLogsDirectory extends Command
                 }
             }
         }
-        
+
         if (!$status['writable']) {
             $this->error('Logs directory is not writable!');
-            
+
             if ($this->option('fix')) {
                 $this->info('Attempting to fix permissions...');
                 try {
@@ -58,16 +58,16 @@ class CheckLogsDirectory extends Command
                 $this->warn('Run with --fix to attempt to fix permissions.');
             }
         }
-        
+
         if ($status['exists'] && $status['writable']) {
             $this->info('Logs directory is properly configured.');
-            
+
             // Test logging
             $this->info('Testing logging functionality...');
             SafeLoggingService::safeLog('info', 'Test log message from logs:check command');
             $this->info('Test log written successfully.');
         }
-        
+
         return 0;
     }
 }

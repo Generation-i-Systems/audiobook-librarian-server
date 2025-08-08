@@ -121,6 +121,4 @@ class GenreController extends Controller
             return redirect()->route('admin.genres.index')->with('error', 'Failed to delete genre. Please try again.');
         }
     }
-
-
 }

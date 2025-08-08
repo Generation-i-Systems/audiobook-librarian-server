@@ -156,7 +156,7 @@ class ApiServiceClient extends Command
         if (isset($parsed['query'])) {
             $uri .= '?' . $parsed['query'];
         }
-        
+
         // Extract host and scheme for constructing full URLs
         $host = null;
         if (isset($parsed['scheme']) && isset($parsed['host'])) {
@@ -187,7 +187,7 @@ class ApiServiceClient extends Command
 
         // Create a request object
         $request = Request::create($uri, $method);
-        
+
         // Set the host in the server parameters if provided
         if ($host) {
             $parsedHost = parse_url($host);
@@ -195,22 +195,22 @@ class ApiServiceClient extends Command
                 // Set HTTP_HOST and SERVER_NAME
                 $request->server->set('HTTP_HOST', $parsedHost['host']);
                 $request->server->set('SERVER_NAME', $parsedHost['host']);
-                
+
                 // Set the scheme (http/https)
                 if (isset($parsedHost['scheme'])) {
                     $request->server->set('HTTPS', $parsedHost['scheme'] === 'https' ? 'on' : 'off');
                     // Also set REQUEST_SCHEME
                     $request->server->set('REQUEST_SCHEME', $parsedHost['scheme']);
                 }
-                
+
                 // Set the port if specified
                 if (isset($parsedHost['port'])) {
                     $request->server->set('SERVER_PORT', $parsedHost['port']);
                 }
-                
+
                 // Override the request's getSchemeAndHttpHost method by setting the trusted host
                 $request->setTrustedHosts([$parsedHost['host']]);
-                
+
                 // Set the full URL in the request
                 $fullUrl = $host . $uri;
                 $request->headers->set('HOST', $parsedHost['host']);

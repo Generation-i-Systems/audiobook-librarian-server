@@ -15,7 +15,7 @@ class BooksEnhancedApiTest extends ApiTestCase
     {
         // Create test data
         $books = Book::factory()->count(3)->create();
-        
+
         foreach ($books as $book) {
             $author = Author::factory()->create();
             $genre = Genre::factory()->create();
@@ -74,11 +74,11 @@ class BooksEnhancedApiTest extends ApiTestCase
         // Create genres
         $fantasyGenre = Genre::factory()->create(['name' => 'Fantasy']);
         $scifiGenre = Genre::factory()->create(['name' => 'Science Fiction']);
-        
+
         // Create books with different genres
         $fantasyBook = Book::factory()->create(['title' => 'Fantasy Book']);
         $fantasyBook->genres()->attach($fantasyGenre);
-        
+
         $scifiBook = Book::factory()->create(['title' => 'SciFi Book']);
         $scifiBook->genres()->attach($scifiGenre);
 
@@ -86,7 +86,7 @@ class BooksEnhancedApiTest extends ApiTestCase
 
         $response->assertStatus(200);
         $data = $response->json();
-        
+
         $bookTitles = array_column($data['books'], 'title');
         $this->assertContains('Fantasy Book', $bookTitles);
         $this->assertNotContains('SciFi Book', $bookTitles);
@@ -96,11 +96,11 @@ class BooksEnhancedApiTest extends ApiTestCase
     {
         // Create genre
         $genre = Genre::factory()->create(['name' => 'Horror']);
-        
+
         // Create book with horror genre
         $horrorBook = Book::factory()->create(['title' => 'Horror Story']);
         $horrorBook->genres()->attach($genre);
-        
+
         // Create book without horror genre
         $romanceBook = Book::factory()->create(['title' => 'Love Story']);
 
@@ -108,7 +108,7 @@ class BooksEnhancedApiTest extends ApiTestCase
 
         $response->assertStatus(200);
         $data = $response->json();
-        
+
         $bookTitles = array_column($data['books'], 'title');
         $this->assertContains('Horror Story', $bookTitles);
         $this->assertNotContains('Love Story', $bookTitles);
@@ -119,11 +119,11 @@ class BooksEnhancedApiTest extends ApiTestCase
         // Create authors
         $author1 = Author::factory()->create(['name' => 'Author One']);
         $author2 = Author::factory()->create(['name' => 'Author Two']);
-        
+
         // Create books with different authors
         $book1 = Book::factory()->create(['title' => 'Book by Author One']);
         $book1->authors()->attach($author1);
-        
+
         $book2 = Book::factory()->create(['title' => 'Book by Author Two']);
         $book2->authors()->attach($author2);
 
@@ -131,7 +131,7 @@ class BooksEnhancedApiTest extends ApiTestCase
 
         $response->assertStatus(200);
         $data = $response->json();
-        
+
         $bookTitles = array_column($data['books'], 'title');
         $this->assertContains('Book by Author One', $bookTitles);
         $this->assertNotContains('Book by Author Two', $bookTitles);
@@ -141,11 +141,11 @@ class BooksEnhancedApiTest extends ApiTestCase
     {
         // Create author
         $author = Author::factory()->create(['name' => 'J.K. Rowling']);
-        
+
         // Create book by this author
         $book = Book::factory()->create(['title' => 'Harry Potter Book']);
         $book->authors()->attach($author);
-        
+
         // Create book by different author
         $otherBook = Book::factory()->create(['title' => 'Other Book']);
 
@@ -153,7 +153,7 @@ class BooksEnhancedApiTest extends ApiTestCase
 
         $response->assertStatus(200);
         $data = $response->json();
-        
+
         $bookTitles = array_column($data['books'], 'title');
         $this->assertContains('Harry Potter Book', $bookTitles);
         $this->assertNotContains('Other Book', $bookTitles);
@@ -164,11 +164,11 @@ class BooksEnhancedApiTest extends ApiTestCase
         // Create series
         $series1 = Series::factory()->create(['name' => 'Series One']);
         $series2 = Series::factory()->create(['name' => 'Series Two']);
-        
+
         // Create books in different series
         $book1 = Book::factory()->create(['title' => 'Book in Series One']);
         $book1->series()->attach($series1, ['series_number' => '1']);
-        
+
         $book2 = Book::factory()->create(['title' => 'Book in Series Two']);
         $book2->series()->attach($series2, ['series_number' => '1']);
 
@@ -176,7 +176,7 @@ class BooksEnhancedApiTest extends ApiTestCase
 
         $response->assertStatus(200);
         $data = $response->json();
-        
+
         $bookTitles = array_column($data['books'], 'title');
         $this->assertContains('Book in Series One', $bookTitles);
         $this->assertNotContains('Book in Series Two', $bookTitles);
@@ -186,11 +186,11 @@ class BooksEnhancedApiTest extends ApiTestCase
     {
         // Create series
         $series = Series::factory()->create(['name' => 'The Witcher']);
-        
+
         // Create book in this series
         $book = Book::factory()->create(['title' => 'The Last Wish']);
         $book->series()->attach($series, ['series_number' => '1']);
-        
+
         // Create standalone book
         $standaloneBook = Book::factory()->create(['title' => 'Standalone Novel']);
 
@@ -198,7 +198,7 @@ class BooksEnhancedApiTest extends ApiTestCase
 
         $response->assertStatus(200);
         $data = $response->json();
-        
+
         $bookTitles = array_column($data['books'], 'title');
         $this->assertContains('The Last Wish', $bookTitles);
         $this->assertNotContains('Standalone Novel', $bookTitles);
@@ -215,10 +215,10 @@ class BooksEnhancedApiTest extends ApiTestCase
 
         $response->assertStatus(200);
         $data = $response->json();
-        
+
         $this->assertGreaterThanOrEqual(1, $data['pagination']['total']);
         $bookTitles = array_column($data['books'], 'title');
-        
+
         foreach ($bookTitles as $title) {
             $this->assertStringContainsStringIgnoringCase('Ring', $title);
         }
@@ -232,7 +232,7 @@ class BooksEnhancedApiTest extends ApiTestCase
         // Test first page
         $response = $this->getJson('/api/v1/books/enhanced?page=1&per_page=10');
         $response->assertStatus(200);
-        
+
         $data = $response->json();
         $this->assertEquals(1, $data['pagination']['current_page']);
         $this->assertEquals(10, $data['pagination']['per_page']);
@@ -244,7 +244,7 @@ class BooksEnhancedApiTest extends ApiTestCase
         // Test second page
         $response = $this->getJson('/api/v1/books/enhanced?page=2&per_page=10');
         $response->assertStatus(200);
-        
+
         $data = $response->json();
         $this->assertEquals(2, $data['pagination']['current_page']);
         $this->assertTrue($data['pagination']['has_prev']);
@@ -260,7 +260,7 @@ class BooksEnhancedApiTest extends ApiTestCase
         $response = $this->getJson('/api/v1/books/enhanced?sort=title_asc');
         $response->assertStatus(200);
         $data = $response->json();
-        
+
         if (count($data['books']) > 1) {
             $firstBook = $data['books'][0];
             $lastBook = $data['books'][count($data['books']) - 1];
@@ -280,17 +280,17 @@ class BooksEnhancedApiTest extends ApiTestCase
         $fantasyGenre = Genre::factory()->create(['name' => 'Fantasy']);
         $author = Author::factory()->create(['name' => 'Fantasy Author']);
         $series = Series::factory()->create(['name' => 'Fantasy Series']);
-        
+
         // Create book that matches all criteria
         $matchingBook = Book::factory()->create(['title' => 'Fantasy Epic']);
         $matchingBook->genres()->attach($fantasyGenre);
         $matchingBook->authors()->attach($author);
         $matchingBook->series()->attach($series, ['series_number' => '1']);
-        
+
         // Create book that only matches some criteria
         $partialBook = Book::factory()->create(['title' => 'Different Epic']);
         $partialBook->genres()->attach($fantasyGenre); // Only matches genre
-        
+
         // Create book that matches none
         $nonMatchingBook = Book::factory()->create(['title' => 'SciFi Story']);
 
@@ -298,7 +298,7 @@ class BooksEnhancedApiTest extends ApiTestCase
 
         $response->assertStatus(200);
         $data = $response->json();
-        
+
         $bookTitles = array_column($data['books'], 'title');
         $this->assertContains('Fantasy Epic', $bookTitles);
         $this->assertNotContains('Different Epic', $bookTitles);
@@ -336,13 +336,13 @@ class BooksEnhancedApiTest extends ApiTestCase
         $author = Author::factory()->create(['name' => 'Test Author']);
         $genre = Genre::factory()->create(['name' => 'Test Genre']);
         $series = Series::factory()->create(['name' => 'Test Series']);
-        
+
         $book = Book::factory()->create([
             'title' => 'Complete Test Book',
             'description' => 'A book with all relationships',
             'year' => 2023
         ]);
-        
+
         $book->authors()->attach($author);
         $book->genres()->attach($genre);
         $book->series()->attach($series, ['series_number' => '1']);
@@ -351,21 +351,21 @@ class BooksEnhancedApiTest extends ApiTestCase
 
         $response->assertStatus(200);
         $data = $response->json();
-        
+
         $testBook = collect($data['books'])->firstWhere('title', 'Complete Test Book');
-        
+
         $this->assertNotNull($testBook);
-        
+
         // Verify authors are included
         $this->assertArrayHasKey('authors', $testBook);
         $this->assertCount(1, $testBook['authors']);
         $this->assertEquals('Test Author', $testBook['authors'][0]['name']);
-        
+
         // Verify genres are included
         $this->assertArrayHasKey('genres', $testBook);
         $this->assertCount(1, $testBook['genres']);
         $this->assertEquals('Test Genre', $testBook['genres'][0]['name']);
-        
+
         // Verify series are included
         $this->assertArrayHasKey('series', $testBook);
         $this->assertCount(1, $testBook['series']);
@@ -380,7 +380,7 @@ class BooksEnhancedApiTest extends ApiTestCase
 
         $response->assertStatus(200);
         $data = $response->json();
-        
+
         $this->assertEquals(0, $data['pagination']['total']);
         $this->assertEmpty($data['books']);
         $this->assertFalse($data['pagination']['has_next']);

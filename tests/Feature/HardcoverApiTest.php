@@ -102,7 +102,6 @@ class HardcoverApiTest extends TestCase
     #[Test]
     public function test_search_books_by_title()
     {
-
         $results = $this->hardcoverApiService->searchBooksByTitle('Test');
 
         $this->assertIsArray($results);

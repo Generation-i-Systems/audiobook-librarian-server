@@ -64,7 +64,7 @@ class ProcessBooksWithAI extends Command
         $model = $this->option('model');
         $isClaudeModel = str_starts_with($model, 'claude-');
         $isOpenAIModel = str_starts_with($model, 'gpt-');
-        
+
         if ($isClaudeModel && empty(config('services.claude.api_key'))) {
             $this->error('Claude API key not configured. Please set CLAUDE_API_KEY in your .env file.');
             return Command::FAILURE;
@@ -79,7 +79,7 @@ class ProcessBooksWithAI extends Command
         // Initialize processor with selected model and tier
         $model = $this->option('model');
         $paidTier = $this->option('paid-tier');
-        
+
         try {
             $this->aiProcessor = new AIBookProcessor($model, $paidTier);
         } catch (\InvalidArgumentException $e) {
@@ -92,7 +92,7 @@ class ProcessBooksWithAI extends Command
         $this->info("Using model: {$modelInfo['model']} ({$modelInfo['tier']} tier)");
 
         $books = $this->getBooks();
-        
+
         if ($books->isEmpty()) {
             $this->info('No books found to process.');
             return Command::SUCCESS;
@@ -100,7 +100,7 @@ class ProcessBooksWithAI extends Command
 
         $totalBooks = $books->count();
         $this->info("Found {$totalBooks} books to process.");
-        
+
         // Show limits and cost estimates
         $this->displayLimitsAndCosts($totalBooks);
 
@@ -136,13 +136,13 @@ class ProcessBooksWithAI extends Command
                     'book_id' => $book->id,
                     'error' => $e->getMessage()
                 ]);
-                
+
                 if ($this->option('verbose')) {
                     $this->newLine();
                     $this->error("Failed to process book {$book->id}: {$e->getMessage()}");
                 }
             }
-            
+
             $progressBar->advance();
         }
 
@@ -198,7 +198,7 @@ class ProcessBooksWithAI extends Command
 
         // Get audio files from the directory
         $audioFiles = $this->aiProcessor->getAudioFiles($book->directoryPath);
-        
+
         if (empty($audioFiles)) {
             if ($this->option('verbose')) {
                 $this->warn("No audio files found in directory: {$book->directoryPath}");
@@ -208,7 +208,7 @@ class ProcessBooksWithAI extends Command
 
         // Extract file tags from a sample of files (first 3 files to avoid rate limits)
         $fileTags = $this->extractFileTags($audioFiles, $book->directoryPath, 3);
-        
+
         // Get just filenames for the AI
         $fileNames = array_map('basename', $audioFiles);
 
@@ -226,11 +226,11 @@ class ProcessBooksWithAI extends Command
 
         // Apply changes based on confidence level
         $minConfidence = $this->option('min-confidence');
-        
+
         if ($aiMetadata['confidence'] >= $minConfidence || $this->option('force')) {
             $this->applyAIMetadata($book, $aiMetadata);
             $this->updatedCount++;
-            
+
             if ($this->option('verbose')) {
                 $this->info("✓ Updated book with AI metadata (confidence: {$aiMetadata['confidence']}%)");
             }
@@ -238,7 +238,7 @@ class ProcessBooksWithAI extends Command
             if ($this->option('verbose')) {
                 $this->warn("⚠ Skipped book due to low confidence ({$aiMetadata['confidence']}% < {$minConfidence}%)");
             }
-            
+
             // Still save the AI metadata for manual review
             $this->saveAIMetadataForReview($book, $aiMetadata);
         }
@@ -259,7 +259,7 @@ class ProcessBooksWithAI extends Command
             }
 
             $fullPath = Storage::disk($diskName)->path($audioFile);
-            
+
             if (file_exists($fullPath)) {
                 $tags = $this->aiProcessor->extractFileTags($fullPath);
                 if (!empty($tags)) {
@@ -281,14 +281,14 @@ class ProcessBooksWithAI extends Command
         $this->info("Book ID: {$book->id}");
         $this->line("Current Title: <fg=red>{$book->title}</>");
         $this->line("AI Title: <fg=green>{$aiMetadata['title']}</>");
-        
+
         $this->line("Current Authors: " . implode(', ', $book->authors->pluck('name')->toArray()));
         $this->line("AI Authors: " . implode(', ', $aiMetadata['author']));
-        
+
         if (!empty($aiMetadata['narrator'])) {
             $this->line("AI Narrators: " . implode(', ', $aiMetadata['narrator']));
         }
-        
+
         if ($aiMetadata['series']) {
             $seriesText = $aiMetadata['series'];
             if ($aiMetadata['series_number']) {
@@ -296,11 +296,11 @@ class ProcessBooksWithAI extends Command
             }
             $this->line("AI Series: {$seriesText}");
         }
-        
+
         if (!empty($aiMetadata['genre'])) {
             $this->line("AI Genres: " . implode(', ', $aiMetadata['genre']));
         }
-        
+
         $this->line("AI Confidence: {$aiMetadata['confidence']}%");
         $this->line(str_repeat('-', 50));
     }
@@ -313,32 +313,32 @@ class ProcessBooksWithAI extends Command
         DB::transaction(function () use ($book, $aiMetadata) {
             // Update basic book information
             $book->title = $aiMetadata['title'];
-            
+
             if ($aiMetadata['year']) {
                 $book->release_date = $aiMetadata['year'] . '-01-01';
             }
-            
+
             if ($aiMetadata['description']) {
                 $book->description = $aiMetadata['description'];
             }
-            
+
             if ($aiMetadata['publisher']) {
                 $book->publisher = $aiMetadata['publisher'];
             }
-            
+
             if ($aiMetadata['isbn']) {
                 $book->isbn = $aiMetadata['isbn'];
             }
-            
+
             if ($aiMetadata['language']) {
                 $book->language = $aiMetadata['language'];
             }
-            
+
             // Mark as AI processed
             $book->ai_processed = true;
             $book->ai_confidence = $aiMetadata['confidence'];
             $book->ai_processed_at = now();
-            
+
             $book->save();
 
             // Handle authors
@@ -375,7 +375,7 @@ class ProcessBooksWithAI extends Command
             if ($aiMetadata['series']) {
                 $series = Series::firstOrCreate(['name' => trim($aiMetadata['series'])]);
                 $seriesNumber = $aiMetadata['series_number'] ?? 1;
-                
+
                 // Sync series relationship
                 $book->series()->sync([
                     $series->id => ['series_number' => $seriesNumber]
@@ -417,10 +417,10 @@ class ProcessBooksWithAI extends Command
             $this->info("Paid tier limits:");
             $this->line("  • {$limits['requests_per_minute']} requests/minute");
             $this->line("  • No daily limit");
-            
+
             $costEstimate = $this->aiProcessor->estimateBatchCost($totalBooks);
             $this->info("💰 Estimated cost: \${$costEstimate['total_cost']} (\${$costEstimate['cost_per_book']} per book)");
-            
+
             if ($costEstimate['total_cost'] > 0.10) {
                 $this->warn("💡 Consider using free tier for small batches to save costs");
             }
@@ -436,15 +436,15 @@ class ProcessBooksWithAI extends Command
         $this->info('AI Book Processing Summary:');
         $this->line("Total processed: {$this->processedCount}");
         $this->line("Books updated: {$this->updatedCount}");
-        
+
         if ($this->errorCount > 0) {
             $this->line("Errors: {$this->errorCount}");
         }
-        
+
         if ($this->option('dry-run')) {
             $this->info('This was a dry run - no changes were made.');
         }
-        
+
         $lowConfidenceCount = $this->processedCount - $this->updatedCount - $this->errorCount;
         if ($lowConfidenceCount > 0) {
             $this->info("{$lowConfidenceCount} books saved for manual review due to low confidence.");
@@ -456,7 +456,7 @@ class ProcessBooksWithAI extends Command
             if ($totalCost > 0) {
                 $this->newLine();
                 $this->info("💰 Total cost: \${$totalCost}");
-                
+
                 if ($totalCost > 0.50) {
                     $this->warn("💡 Significant cost incurred. Consider using free tier for development.");
                 }

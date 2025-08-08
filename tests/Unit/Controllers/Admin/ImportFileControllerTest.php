@@ -220,7 +220,7 @@ class ImportFileControllerTest extends TestCase
         file_put_contents($tempFilePath, str_repeat('0', $fileSize));
 
         // Create a test controller with overridden methods
-        $controller = new class extends ImportFileController {
+        $controller = new class () extends ImportFileController {
             public function __construct()
             {
                 // Empty constructor to avoid dependency injection issues
@@ -299,7 +299,7 @@ class ImportFileControllerTest extends TestCase
         file_put_contents($tempFilePath, str_repeat('0', 1024));
 
         // Create a test controller with overridden methods
-        $controller = new class extends ImportFileController {
+        $controller = new class () extends ImportFileController {
             public function __construct()
             {
                 // Empty constructor to avoid dependency injection issues
@@ -371,7 +371,7 @@ class ImportFileControllerTest extends TestCase
         file_put_contents($tempFilePath, str_repeat('0', 1024));
 
         // Create a test controller with overridden methods
-        $controller = new class extends ImportFileController {
+        $controller = new class () extends ImportFileController {
             public function __construct()
             {
                 // Empty constructor to avoid dependency injection issues
@@ -445,7 +445,7 @@ class ImportFileControllerTest extends TestCase
         file_put_contents($tempFilePath, str_repeat('0', 1024));
 
         // Create a test controller with overridden methods
-        $controller = new class extends ImportFileController {
+        $controller = new class () extends ImportFileController {
             public function __construct()
             {
                 // Empty constructor to avoid dependency injection issues

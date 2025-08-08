@@ -16,7 +16,7 @@ class BookDirectoryParserTest extends TestCase
     #[Test]
     public function test_extract_author_from_path_with_genre_and_subgenre()
     {
-        $parser = new BookDirectoryParser;
+        $parser = new BookDirectoryParser();
         // Patch: set genres so 'Fantasy' is recognized and skipped
         $reflection = new \ReflectionClass($parser);
         $genresProp = $reflection->getProperty('genres');

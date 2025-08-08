@@ -8,7 +8,8 @@ use App\Traits\CamelCaseAttributeAccess;
 
 class Job extends Model
 {
-    use HasFactory, CamelCaseAttributeAccess;
+    use HasFactory;
+    use CamelCaseAttributeAccess;
 
     protected $fillable = [
         'type',

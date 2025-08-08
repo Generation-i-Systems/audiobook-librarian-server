@@ -147,6 +147,4 @@ class DebugController extends Controller
 
         return response()->json($result);
     }
-
-
 }

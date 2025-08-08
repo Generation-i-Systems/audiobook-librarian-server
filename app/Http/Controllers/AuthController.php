@@ -63,6 +63,4 @@ class AuthController extends Controller
 
         return response()->json(['message' => 'Account request submitted. Please wait for approval.'], 201); // Created
     }
-
-
 }

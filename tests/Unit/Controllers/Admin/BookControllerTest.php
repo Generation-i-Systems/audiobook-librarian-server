@@ -14,10 +14,8 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\ValidationException;
 use Mockery;
 use Tests\TestCase;
-use Tests\Mocks\MockDocumentStoreService;
 
 class BookControllerTest extends TestCase
 {
@@ -664,7 +662,7 @@ class BookControllerTest extends TestCase
         $request->shouldReceive('input')->with('import_root')->andReturn('/import/root');
         $request->shouldReceive('input')->with('import_type')->andReturn('dir');
         $request->shouldReceive('ajax')->andReturn(false);
-        $request->shouldReceive('validate')->andReturnUsing(function($rules) use ($bookData) {
+        $request->shouldReceive('validate')->andReturnUsing(function ($rules) use ($bookData) {
             return $bookData;
         });
 
