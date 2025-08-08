@@ -2,10 +2,13 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BookApiController;
+use App\Http\Controllers\Api\BookmarkApiController;
 use App\Http\Controllers\Api\BookRequestApiController;
+use App\Http\Controllers\Api\ExternalReadApiController;
 use App\Http\Controllers\Api\FollowApiController;
 use App\Http\Controllers\Api\MessageApiController;
 use App\Http\Controllers\Api\ReadingProgressApiController;
+use App\Http\Controllers\Api\ReadingStatsApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -35,7 +38,7 @@ Route::prefix('v1')->group(function () {
         // Series Books Route
         Route::get('/series/{seriesId}/books', [BookApiController::class, 'booksBySeries']);
 
-        // Series Routes - with author filtering and pagination  
+        // Series Routes - with author filtering and pagination
         Route::get('/series', [BookApiController::class, 'series']);
         // Series Autocomplete
         Route::get('/series/autocomplete', [BookApiController::class, 'autocompleteSeries']);
@@ -70,6 +73,29 @@ Route::prefix('v1')->group(function () {
         Route::post('/reading-progress/reset', [ReadingProgressApiController::class, 'reset']);
         Route::post('/reading-progress/{book}', [ReadingProgressApiController::class, 'update']);
         Route::get('/reading-progress/{book}', [ReadingProgressApiController::class, 'get']);
+
+        // Bookmark Routes
+        Route::get('/books/{book}/bookmarks', [BookmarkApiController::class, 'getBookmarks']);
+        Route::post('/books/{book}/bookmarks', [BookmarkApiController::class, 'createBookmark']);
+        Route::get('/books/{book}/bookmarks/{bookmark}', [BookmarkApiController::class, 'getBookmark']);
+        Route::put('/books/{book}/bookmarks/{bookmark}', [BookmarkApiController::class, 'updateBookmark']);
+        Route::patch('/books/{book}/bookmarks/{bookmark}', [BookmarkApiController::class, 'updateBookmark']);
+        Route::delete('/books/{book}/bookmarks/{bookmark}', [BookmarkApiController::class, 'deleteBookmark']);
+
+        // External/Previously Read Routes
+        Route::get('/books/{book}/external-reads', [ExternalReadApiController::class, 'getExternalReads']);
+        Route::post('/books/{book}/external-reads', [ExternalReadApiController::class, 'createExternalRead']);
+        Route::get('/books/{book}/external-reads/{externalRead}', [ExternalReadApiController::class, 'getExternalRead']);
+        Route::put('/books/{book}/external-reads/{externalRead}', [ExternalReadApiController::class, 'updateExternalRead']);
+        Route::patch('/books/{book}/external-reads/{externalRead}', [ExternalReadApiController::class, 'updateExternalRead']);
+        Route::delete('/books/{book}/external-reads/{externalRead}', [ExternalReadApiController::class, 'deleteExternalRead']);
+
+        // Reading Stats Routes
+        Route::post('/books/{book}/reading-stats/sessions', [ReadingStatsApiController::class, 'recordSession']);
+        Route::get('/reading-stats/daily', [ReadingStatsApiController::class, 'getDaily']);
+        Route::get('/books/{book}/reading-stats', [ReadingStatsApiController::class, 'getBookStats']);
+        Route::get('/reading-stats/user', [ReadingStatsApiController::class, 'getUserStats']);
+        Route::get('/reading-stats/streaks', [ReadingStatsApiController::class, 'getStreaks']);
 
         // Message Route
         Route::post('/messages', [MessageApiController::class, 'store']);
