@@ -23,14 +23,14 @@ class MigrateMongoToMysql extends Command
      *
      * @var string
      */
-    protected $signature = 'app:migrate-mongo-to-mysql {--force : Skip confirmation prompt} {--limit=0 : Limit the number of books to process (0 for no limit)} {--no-backup : Skip automatic database backup} {--fix-data : Apply data fixing logic during migration}';
+    protected $signature = 'app:migrate-mongo-to-mysql {--force : Skip confirmation prompt} {--limit=0 : Limit the number of books to process (0 for no limit)} {--no-backup : Skip automatic database backup} {--fix-data : Apply data fixing logic during migration} {--no-wipe : Do not wipe existing MySQL data before migration}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Migrate data from MongoDB to MySQL (creates a database backup by default, with optional data fixing)';
+    protected $description = 'Migrate data from MongoDB to MySQL (creates a database backup by default, with optional data fixing and wipe control)';
 
     protected MySqlService $mysqlService;
     protected MongoService $mongoService;
@@ -72,12 +72,17 @@ class MigrateMongoToMysql extends Command
         Log::debug("MigrateMongoToMysql: MySQL book count: {$mysqlBookCount}");
 
         $shouldTruncate = false;
-        if ($mongoBookCount === $mysqlBookCount) {
+        
+        // Check if --no-wipe option is set
+        if ($this->option('no-wipe')) {
+            $this->info('--no-wipe option set. Skipping database wipe. Existing MySQL records will be kept and new records will be added/updated.');
+            $shouldTruncate = false;
+        } elseif ($mongoBookCount === $mysqlBookCount) {
             $this->info("MongoDB and MySQL book counts match ({$mongoBookCount} records). Proceeding with truncation.");
             $shouldTruncate = true;
         } else {
             $this->warn("MongoDB has {$mongoBookCount} books, while MySQL has {$mysqlBookCount} books.");
-            if ($this->confirm('Do you want to wipe the MySQL database before migrating? (Default: No, will add records without deleting old ones)')) {
+            if ($this->option('force') || $this->confirm('Do you want to wipe the MySQL database before migrating? (Default: No, will add records without deleting old ones)')) {
                 $shouldTruncate = true;
             } else {
                 $this->info('Skipping database wipe. Existing MySQL records will be kept and new records will be added/updated.');

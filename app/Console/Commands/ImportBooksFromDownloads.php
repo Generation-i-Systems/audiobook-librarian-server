@@ -277,7 +277,14 @@ class ImportBooksFromDownloads extends Command
         if ($this->cacheEnabled && $cacheService) {
             $cacheService->saveCache();
             $cacheStats = $cacheService->displayCacheStatistics();
-            $this->table(['Metric', 'Value'], $cacheStats);
+            if (is_array($cacheStats) && !empty($cacheStats)) {
+                // Convert associative array to table rows
+                $tableRows = [];
+                foreach ($cacheStats as $key => $value) {
+                    $tableRows[] = [ucwords(str_replace('_', ' ', $key)), $value];
+                }
+                $this->table(['Metric', 'Value'], $tableRows);
+            }
         }
 
         return Command::SUCCESS;
@@ -599,7 +606,7 @@ class ImportBooksFromDownloads extends Command
         // Start background processing if data provided
         if (!empty($backgroundData)) {
             foreach ($backgroundData as $task) {
-                $this->queueBackgroundTask($task['type'], $task['data'], 'high');
+                $this->getBackgroundService()->scheduleBackgroundTask($task['type'], $task['data'], 'high');
             }
         }
 
@@ -629,8 +636,14 @@ class ImportBooksFromDownloads extends Command
             usleep(50000); // 50ms
         }
 
-        // Show final status
-        $this->showEnhancedBackgroundStatus();
+        // Show final background processing status
+        $stats = $this->getBackgroundService()->getTaskStatistics();
+        if (!empty($stats)) {
+            $this->info("📊 Background Processing Summary:");
+            foreach ($stats as $key => $value) {
+                $this->line("  • " . ucwords(str_replace('_', ' ', $key)) . ": $value");
+            }
+        }
     }
 
     /**

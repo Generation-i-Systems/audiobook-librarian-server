@@ -1555,15 +1555,7 @@ class BookApiController extends Controller
         $hasPrev = $page > 1;
 
         return response()->json([
-            'data' => $transformedBooks,
-            'meta' => [
-                'current_page' => $page,
-                'per_page' => $perPage,
-                'total' => $total,
-                'last_page' => $totalPages,
-                'from' => $total > 0 ? $offset + 1 : null,
-                'to' => $total > 0 ? min($offset + $perPage, $total) : null,
-            ],
+            'books' => $transformedBooks,
             'pagination' => [
                 'current_page' => $page,
                 'per_page' => $perPage,

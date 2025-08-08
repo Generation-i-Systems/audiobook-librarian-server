@@ -74,6 +74,9 @@ trait BookImportTrait
         $artist = $tags['artist'] ?? null;
         $album = $tags['album'] ?? null;
         $comment = $tags['comment'] ?? $tags['description'] ?? null;
+        $composer = $tags['composer'] ?? null;
+        $date = $tags['date'] ?? null;
+        $albumArtist = $tags['album_artist'] ?? null;
 
         // Check if tags match the directory structure
         $tagMatch = true;
@@ -91,6 +94,9 @@ trait BookImportTrait
             'artist' => $artist,
             'album' => $album,
             'description' => $comment,
+            'composer' => $composer,
+            'date' => $date,
+            'albumArtist' => $albumArtist,
             'tagMatch' => $tagMatch,
         ];
     }

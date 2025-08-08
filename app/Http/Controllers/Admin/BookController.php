@@ -326,6 +326,24 @@ class BookController extends Controller
                         $coverAuto = $coverFile;
                     }
                     $tags = $this->extractTagData($firstM4b);
+                    
+                    // Map ID3 tags to book fields: artist = author, composer = narrator, date = published_date
+                    if (!empty($tags['artist']) && empty($initial['author'])) {
+                        $initial['author'] = [$tags['artist']];
+                    }
+                    
+                    if (!empty($tags['composer']) && empty($initial['narrator'])) {
+                        $initial['narrator'] = $tags['composer'];
+                    }
+                    
+                    if (!empty($tags['date']) && empty($initial['publishedYear'])) {
+                        // Extract year from date (e.g., "2025-06-17" -> "2025")
+                        $year = substr($tags['date'], 0, 4);
+                        if (is_numeric($year) && $year >= 1000 && $year <= date('Y')) {
+                            $initial['publishedYear'] = (int)$year;
+                        }
+                    }
+                    
                     if (!empty($tags['description'])) {
                         $initial['description'] = $tags['description'];
                     }

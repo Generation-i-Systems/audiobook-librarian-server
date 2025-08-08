@@ -64,6 +64,8 @@ class MetadataProcessingService
             );
             
             if ($result && isset($result['confidence']) && $result['confidence'] >= 70) {
+                // Apply ID3 tag mappings if available: artist = author, composer = narrator, date = published_year
+                $this->applyId3TagMappings($result, $fileTags);
                 return $this->postProcessAIResult($result, $audiobook);
             }
             
@@ -125,6 +127,36 @@ class MetadataProcessingService
         }
         
         return $metadata;
+    }
+
+    /**
+     * Apply ID3 tag mappings to the result metadata
+     */
+    protected function applyId3TagMappings(array &$result, array $fileTags): void
+    {
+        // Map artist to author if author is missing or empty
+        if (!empty($fileTags['artist']) && (empty($result['author']) || (is_array($result['author']) && empty($result['author'])))) {
+            $result['author'] = [$fileTags['artist']];
+        }
+        
+        // Map composer to narrator if narrator is missing or empty
+        if (!empty($fileTags['composer']) && empty($result['narrator'])) {
+            $result['narrator'] = $fileTags['composer'];
+        }
+        
+        // Map date to published_year if published_year is missing or empty
+        if (!empty($fileTags['date']) && empty($result['published_year'])) {
+            // Extract year from date (e.g., "2025-06-17" -> "2025")
+            $year = substr($fileTags['date'], 0, 4);
+            if (is_numeric($year) && $year >= 1000 && $year <= date('Y')) {
+                $result['published_year'] = (int)$year;
+            }
+        }
+        
+        // Also check for album_artist as alternative to artist
+        if (!empty($fileTags['album_artist']) && (empty($result['author']) || (is_array($result['author']) && empty($result['author'])))) {
+            $result['author'] = [$fileTags['album_artist']];
+        }
     }
 
     /**

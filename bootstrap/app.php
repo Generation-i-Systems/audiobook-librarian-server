@@ -55,6 +55,17 @@ return Application::configure(basePath: dirname(__DIR__))
         \App\Providers\BookParserServiceProvider::class,
     ])
     ->withExceptions(function (Exceptions $exceptions) {
+        // Ensure API routes return JSON errors
+        $exceptions->render(function (\Throwable $e, $request) {
+            if ($request->is('api/*') || $request->wantsJson()) {
+                return response()->json([
+                    'error' => true,
+                    'message' => $e->getMessage(),
+                    'code' => $e->getCode() ?: 500
+                ], method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500);
+            }
+        });
+
         // Prevent infinite loops when logging fails due to permission issues
         $exceptions->report(function (\Throwable $e) {
             // Check for logging-related exceptions that could cause infinite loops

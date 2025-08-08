@@ -174,13 +174,31 @@ class ImportBookFromDirectoryJob implements ShouldQueue
                 }
             }
             $meta = $this->extractMetadataAbs($fullPath);
+            
+            // Map ID3 tags to book fields: artist = author, composer = narrator, date = published_date
+            if (!empty($tags['artist']) && empty($bookData['author'])) {
+                $bookData['author'] = [$tags['artist']];
+            }
+            
+            if (!empty($tags['composer'])) {
+                $bookData['narrator'] = $tags['composer'];
+            }
+            
+            if (!empty($tags['date'])) {
+                // Extract year from date (e.g., "2025-06-17" -> "2025")
+                $year = substr($tags['date'], 0, 4);
+                if (is_numeric($year) && $year >= 1000 && $year <= date('Y')) {
+                    $bookData['publishedYear'] = (int)$year;
+                }
+            }
+            
             if (!empty($tags['description'])) {
                 $bookData['description'] = $tags['description'];
             } elseif (!empty($meta['description'])) {
                 $bookData['description'] = $meta['description'];
             }
-            if (!empty($meta['year'])) {
-                $bookData['published_year'] = $meta['year'];
+            if (!empty($meta['year']) && empty($bookData['publishedYear'])) {
+                $bookData['publishedYear'] = $meta['year'];
             }
             if ($coverAuto) {
                 $bookData['coverImage'] = ltrim($this->directoryPath, '/') . '/' . $coverAuto;

@@ -312,8 +312,8 @@ class ImportCacheService
 
         $stats = [
             'enabled' => true,
-            'task_count' => count($this->cache['tasks']),
-            'metadata_count' => count($this->cache['metadata']),
+            'task_count' => isset($this->cache['tasks']) ? count($this->cache['tasks']) : 0,
+            'metadata_count' => isset($this->cache['metadata']) ? count($this->cache['metadata']) : 0,
             'cache_file' => $this->cacheFile,
             'file_size' => 0,
             'file_size_formatted' => '0 B',
