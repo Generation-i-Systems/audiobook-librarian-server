@@ -88,6 +88,8 @@ php artisan app:migrate-mongo-to-mysql
 
 See [CHANGELOG.md](CHANGELOG.md) for details.
 
+## Reading Progress & Statistics Requirements
+See `docs/requirements/reading-progress-and-stats.md`.
 
 A Laravel-based audiobook library and management system for personal and family use. Features a RESTful API, web interface (admin & user), and powerful console utilities for maintaining and repairing your audiobook collection.
 

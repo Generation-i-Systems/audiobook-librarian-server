@@ -13,3 +13,8 @@
 - Supports dry-run mode for safe testing.
 - Handles renaming series or moving books to existing series with correct name.
 - Comprehensive test coverage with mocking approach.
+
+2025-08-08: Reading Progress & Statistics Requirements
+- Created `docs/requirements/reading-progress-and-stats.md` capturing requirements for cross-device progress sync, stats ingestion, conflict resolution, batch/offline handling, and endpoints.
+- Linked from root `README.md`, `docs/README.md`, and `PROJECT-BLUEPRINT.md`; added CHANGELOG entry.
+- Expanded recommended metrics and insights to include engagement, content preferences, device/quality, velocity/forecasting, retention, and habits.

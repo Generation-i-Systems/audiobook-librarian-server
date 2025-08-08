@@ -13,6 +13,7 @@ This documentation is organized into the following sections:
 - [API Documentation](./API.md) - Details about the API, including endpoints, authentication, and usage
 - [Development Guidelines](./DEVELOPMENT.md) - Information for developers contributing to the API documentation
 - [Changelog](./CHANGELOG.md) - History of changes to the API and documentation
+- [Reading Progress & Statistics Requirements](./requirements/reading-progress-and-stats.md)
 
 ## Quick Links
 

@@ -3,6 +3,9 @@
 ## Overview
 Audiobook Librarian is a Laravel-based web app for managing audiobooks, supporting admin CRUD, user management, Google Books autofill, and Firestore-backed autocomplete for authors and series. The backend also provides a REST API that supports integration with an Android app client.
 
+## Reading Progress & Statistics Requirements
+See `docs/requirements/reading-progress-and-stats.md`.
+
 ## 1. Tech Stack
 - **Backend:** Laravel (PHP) — provides both web and REST API endpoints
 - **Frontend:** Blade, Bootstrap 5, jQuery, jQuery UI (Autocomplete)
