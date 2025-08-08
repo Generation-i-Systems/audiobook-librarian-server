@@ -18,7 +18,7 @@ class CustomizeDailyLogName
             if ($handler instanceof RotatingFileHandler) {
                 // Set the filename format to ensure rotation happens at midnight
                 $handler->setFilenameFormat('{filename}-{date}', 'Y-m-d');
-                
+
                 // Force the log to rotate at midnight by setting the next rotation time
                 $now = time();
                 $midnight = strtotime('tomorrow midnight');

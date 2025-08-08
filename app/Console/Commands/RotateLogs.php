@@ -29,7 +29,7 @@ class RotateLogs extends Command
     public function handle()
     {
         $logPath = storage_path('logs');
-        
+
         // Close all log handlers to release file handles
         $logger = app('log');
         foreach ($logger->getHandlers() as $handler) {
@@ -40,7 +40,7 @@ class RotateLogs extends Command
 
         // Reopen log handlers to create new log file
         $logger->info('Log file rotated at ' . now());
-        
+
         $this->info('Logs have been rotated successfully.');
         return 0;
     }
