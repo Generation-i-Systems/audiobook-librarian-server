@@ -18,7 +18,7 @@ return [
     |
     */
 
-    'default' => env('LOG_CHANNEL', 'daily'),
+    'default' => 'daily',
 
     /*
     |--------------------------------------------------------------------------
@@ -69,8 +69,11 @@ return [
             'driver' => 'daily',
             'path' => storage_path('logs/laravel.log'),
             'level' => env('LOG_LEVEL', 'debug'),
-            'days' => env('LOG_DAILY_DAYS', 14),
+            'days' => 14,
             'replace_placeholders' => true,
+            'permission' => 0664,
+            'locking' => false,
+            'tap' => [App\Logging\CustomizeDailyLogName::class],
         ],
 
         'slack' => [

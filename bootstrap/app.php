@@ -27,6 +27,19 @@ return Application::configure(basePath: dirname(__DIR__))
                  ->dailyAt('01:00')
                  ->appendOutputTo(storage_path('logs/log-compression.log'));
                  
+        // Rotate logs at midnight
+        $schedule->command('log:rotate')
+                 ->dailyAt('00:00')
+                 ->timezone(config('app.timezone'))
+                 ->onOneServer()
+                 ->runInBackground()
+                 ->appendOutputTo(storage_path('logs/log-rotation.log'));
+                 
+        // Clean up old log files (keep last 14 days)
+        $schedule->command('log:clear --keep-last=14')
+                 ->daily()
+                 ->appendOutputTo(storage_path('logs/log-cleanup.log'));
+                 
         // Fix storage permissions every hour to ensure proper access
         //$schedule->command('storage:fix-permissions')
         //         ->hourly()
