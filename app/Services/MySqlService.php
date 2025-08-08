@@ -6,6 +6,7 @@ use App\Contracts\DocumentStoreServiceInterface;
 use App\Models\Author;
 use App\Models\Book;
 use App\Models\Bookmark;
+use App\Models\ExternalRead;
 use App\Models\Genre;
 use App\Models\Job;
 use App\Models\Message;
@@ -14,8 +15,8 @@ use App\Models\Series;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class MySqlService implements DocumentStoreServiceInterface
 {
@@ -319,13 +320,13 @@ class MySqlService implements DocumentStoreServiceInterface
                 // Use the current request's hostname and protocol for the cover URL
                 // This ensures URLs match the original request (e.g., https://books.thelin.org)
                 $request = request();
-                $coverUrl = $request->getSchemeAndHttpHost() . '/api/v1/books/' . $book->id . '/cover';
+                $coverUrl = $request->getSchemeAndHttpHost().'/api/v1/books/'.$book->id.'/cover';
             }
 
             $durationFormatted = null;
             if ($book->duration) {
                 // Assuming duration is stored in seconds
-                $durationFormatted = gmdate("H:i:s", $book->duration);
+                $durationFormatted = gmdate('H:i:s', $book->duration);
             }
 
             // Format series data as an array of objects with name and series_number
@@ -414,7 +415,7 @@ class MySqlService implements DocumentStoreServiceInterface
 
                     $durationFormatted = null;
                     if ($book->duration) {
-                        $durationFormatted = gmdate("H:i:s", $book->duration);
+                        $durationFormatted = gmdate('H:i:s', $book->duration);
                     }
 
                     // Format series data as an array of objects with name and series_number
@@ -1194,6 +1195,50 @@ class MySqlService implements DocumentStoreServiceInterface
         return $bookmark->delete();
     }
 
+    // EXTERNAL READS / PREVIOUSLY READ
+    public function getExternalReads(string $userId, string $bookId): array
+    {
+        return ExternalRead::where('user_id', $userId)
+            ->where('book_id', $bookId)
+            ->orderBy('started_at')
+            ->get()
+            ->toArray();
+    }
+
+    public function getExternalRead(string $externalReadId, string $userId, string $bookId): ?array
+    {
+        $entry = ExternalRead::where('id', $externalReadId)
+            ->where('user_id', $userId)
+            ->where('book_id', $bookId)
+            ->first();
+
+        return $entry ? $entry->toArray() : null;
+    }
+
+    public function createExternalRead(array $data): string
+    {
+        $entry = ExternalRead::create($data);
+
+        return (string) $entry->id;
+    }
+
+    public function updateExternalRead(string $externalReadId, array $data): bool
+    {
+        $entry = ExternalRead::findOrFail($externalReadId);
+
+        return $entry->update($data);
+    }
+
+    public function deleteExternalRead(string $externalReadId, string $userId, string $bookId): bool
+    {
+        $entry = ExternalRead::where('id', $externalReadId)
+            ->where('user_id', $userId)
+            ->where('book_id', $bookId)
+            ->firstOrFail();
+
+        return $entry->delete();
+    }
+
     public function getDocument(string $collection, string $docId): ?array
     {
         $modelMap = [
@@ -1205,6 +1250,7 @@ class MySqlService implements DocumentStoreServiceInterface
             'books' => Book::class,
             'jobs' => Job::class,
             'bookmarks' => Bookmark::class,
+            'external_reads' => ExternalRead::class,
         ];
 
         if (!isset($modelMap[$collection])) {
@@ -1235,6 +1281,7 @@ class MySqlService implements DocumentStoreServiceInterface
             'books' => Book::class,
             'jobs' => Job::class,
             'bookmarks' => Bookmark::class,
+            'external_reads' => ExternalRead::class,
         ];
 
         if (!isset($modelMap[$collection])) {

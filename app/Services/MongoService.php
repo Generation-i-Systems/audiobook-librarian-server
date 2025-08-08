@@ -3,23 +3,19 @@
 namespace App\Services;
 
 use App\Contracts\DocumentStoreServiceInterface;
-use App\Services\SafeLoggingService;
 use Illuminate\Support\Facades\Hash;
-use MongoDB\Client;
+use Illuminate\Support\Facades\Log;
 use MongoDB\BSON\ObjectId;
 use MongoDB\BSON\UTCDateTime;
-use MongoDB\BSON\Regex;
-use MongoDB\BSON\Timestamp;
-use MongoDB\BSON\Binary;
+use MongoDB\Client;
 use MongoDB\Model\BSONDocument;
-use MongoDB\Operation\FindOneAndUpdate;
 use RuntimeException;
-use Illuminate\Support\Facades\Log;
 
 class MongoService implements DocumentStoreServiceInterface
 {
     /** @var Client */
     protected $client;
+
     /** @var \MongoDB\Database */
     protected $db;
 
@@ -1413,7 +1409,7 @@ class MongoService implements DocumentStoreServiceInterface
         $queue[] = [
             'book_id' => $bookId,
             'added_at' => time(),
-            'order' => count($queue) + 1
+            'order' => count($queue) + 1,
         ];
 
         // Update user document
@@ -1665,6 +1661,75 @@ class MongoService implements DocumentStoreServiceInterface
     {
         $result = $this->getCollection('bookmarks')->deleteOne([
             '_id' => $bookmarkId,
+            'user_id' => $userId,
+            'book_id' => $bookId,
+        ]);
+
+        return $result->getDeletedCount() > 0;
+    }
+
+    // EXTERNAL READS
+    /** {@inheritDoc} */
+    public function getExternalReads(string $userId, string $bookId): array
+    {
+        $cursor = $this->getCollection('external_reads')->find([
+            'user_id' => $userId,
+            'book_id' => $bookId,
+        ]);
+
+        $reads = [];
+        foreach ($cursor as $doc) {
+            $doc = $this->normalizeMongoValue($doc);
+            $doc['id'] = (string) $doc['_id'];
+            $reads[] = $doc;
+        }
+
+        return $reads;
+    }
+
+    /** {@inheritDoc} */
+    public function getExternalRead(string $externalReadId, string $userId, string $bookId): ?array
+    {
+        $doc = $this->getCollection('external_reads')->findOne([
+            '_id' => $externalReadId,
+            'user_id' => $userId,
+            'book_id' => $bookId,
+        ]);
+
+        if (! $doc) {
+            return null;
+        }
+
+        $doc = $this->normalizeMongoValue($doc);
+        $doc['id'] = (string) $doc['_id'];
+
+        return $doc;
+    }
+
+    /** {@inheritDoc} */
+    public function createExternalRead(array $data): string
+    {
+        $result = $this->getCollection('external_reads')->insertOne($data);
+
+        return (string) $result->getInsertedId();
+    }
+
+    /** {@inheritDoc} */
+    public function updateExternalRead(string $externalReadId, array $data): bool
+    {
+        $result = $this->getCollection('external_reads')->updateOne(
+            ['_id' => $externalReadId],
+            ['$set' => $data]
+        );
+
+        return $result->getModifiedCount() > 0;
+    }
+
+    /** {@inheritDoc} */
+    public function deleteExternalRead(string $externalReadId, string $userId, string $bookId): bool
+    {
+        $result = $this->getCollection('external_reads')->deleteOne([
+            '_id' => $externalReadId,
             'user_id' => $userId,
             'book_id' => $bookId,
         ]);
