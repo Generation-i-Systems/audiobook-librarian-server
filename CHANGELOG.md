@@ -1,5 +1,8 @@
 ## [Unreleased]
 ### Changed
+- Archived MongoService for application runtime; it is now migration-only
+  - `DocumentStoreServiceProvider` always binds `MySqlService` at runtime (even if `DOCUMENT_STORE_DRIVER=mongodb`)
+  - Added deprecation docblock to `App\\Services\\MongoService`
 - Archived FirestoreService (moved to app/Services/Legacy) as it's no longer used
 - Updated service providers to remove FirestoreService registration
 - Added database safety check in TestCase to prevent tests from wiping production MySQL database
@@ -56,6 +59,10 @@
   - Ensured a cover image radio button is always selected if any image is available
 
 ### Fixed
+- Book updates now persist narrator, series, and published year reliably
+  - `BookController@update` normalizes plural and snake_case input keys pre-validation
+  - `MongoService@updateBook` normalizes payload: plural→singular, snake_case→camelCase, trims/filters arrays, maps legacy series `name`→`seriesName`
+  - Added feature tests covering narrator array trimming, series normalization, and persistence
 - Fixed API 'recent' books query to correctly return books ordered by creation date
   - Updated MySqlService to handle 'recent' keyword properly in date_added filter
   - Ensured consistent ordering by created_at in descending order

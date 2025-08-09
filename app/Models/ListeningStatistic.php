@@ -90,7 +90,7 @@ class ListeningStatistic extends Model
     public static function getDailyStats(string $deviceId, ?string $date = null): array
     {
         $date = $date ?: now()->toDateString();
-        
+
         $stats = self::where('device_id', $deviceId)
             ->where('listening_date', $date)
             ->selectRaw('
@@ -119,7 +119,7 @@ class ListeningStatistic extends Model
     public static function getBookStats(int $bookId, ?string $deviceId = null): array
     {
         $query = self::where('book_id', $bookId);
-        
+
         if ($deviceId) {
             $query->where('device_id', $deviceId);
         }

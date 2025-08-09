@@ -13,7 +13,7 @@ return [
     // Maximum items per page for different contexts
     'pagination_limits' => [
         'admin_books' => 10,    // Admin book list
-        'public_books' => 12,   // Public book list  
+        'public_books' => 12,   // Public book list
         'recent_books' => 5,    // Recent books widget
         'related_books' => 3,   // Related books on book detail page
     ],

@@ -31,40 +31,39 @@ class RotateLogs extends Command
         $logPath = storage_path('logs');
         $today = now()->format('Y-m-d');
         $currentLog = $logPath . '/laravel.log';
-        
+
         try {
             // If the current log file exists and has content, rotate it
             if (file_exists($currentLog) && filesize($currentLog) > 0) {
                 $newLog = $logPath . '/laravel-' . $today . '.log';
-                
+
                 // If a log file for today already exists, append a timestamp
                 if (file_exists($newLog)) {
                     $newLog = $logPath . '/laravel-' . $today . '-' . time() . '.log';
                 }
-                
+
                 // Rename the current log file
                 rename($currentLog, $newLog);
-                
+
                 // Create a new empty log file
                 touch($currentLog);
                 chmod($currentLog, 0664);
-                
+
                 // Clean up old log files (keep last 14 days)
                 $this->cleanupOldLogs($logPath);
-                
+
                 $this->info('Logs have been rotated successfully.');
                 return 0;
             }
-            
+
             $this->info('No log rotation needed - log file is empty or does not exist.');
             return 0;
-            
         } catch (\Exception $e) {
             $this->error('Error rotating logs: ' . $e->getMessage());
             return 1;
         }
     }
-    
+
     /**
      * Clean up log files older than 14 days
      *
@@ -76,16 +75,16 @@ class RotateLogs extends Command
         $files = glob($logPath . '/laravel-*.log*');
         $now = time();
         $daysToKeep = 14;
-        
+
         foreach ($files as $file) {
             // Skip directories
             if (is_dir($file)) {
                 continue;
             }
-            
+
             // Get file modification time
             $fileTime = filemtime($file);
-            
+
             // Delete files older than $daysToKeep days
             if (($now - $fileTime) >= ($daysToKeep * 24 * 60 * 60)) {
                 @unlink($file);

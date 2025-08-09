@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class () extends Migration {
     /**
      * Run the migrations.
      */
@@ -25,7 +24,7 @@ return new class extends Migration
             $table->boolean('completed')->default(false); // If book is finished
             $table->timestamp('completed_at')->nullable(); // When completed
             $table->timestamps();
-            
+
             $table->foreign('book_id')->references('id')->on('books')->onDelete('cascade');
             $table->unique(['book_id', 'device_id']); // One progress record per book per device
             $table->index(['device_id', 'last_listened_at']);

@@ -25,7 +25,9 @@ class DocumentStoreServiceProvider extends ServiceProvider
                     Log::warning('FirestoreService has been archived. Using MySqlService instead.');
                     return $this->createMysqlService();
                 case 'mongodb':
-                    return $this->createMongoService();
+                    // Mongo driver is archived and should not be used at runtime
+                    Log::warning("MongoService is archived and only intended for migration commands. Using MySqlService instead.");
+                    return $this->createMysqlService();
                 case 'mysql':
                 default:
                     return $this->createMysqlService();

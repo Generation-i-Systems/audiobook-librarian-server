@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class () extends Migration {
     /**
      * Run the migrations.
      */
@@ -25,7 +24,7 @@ return new class extends Migration
             $table->string('session_type')->default('listening'); // listening, completed, resumed
             $table->json('metadata')->nullable(); // Additional session data (chapters, speed, etc.)
             $table->timestamps();
-            
+
             $table->foreign('book_id')->references('id')->on('books')->onDelete('cascade');
             $table->index(['device_id', 'listening_date']);
             $table->index(['book_id', 'listening_date']);

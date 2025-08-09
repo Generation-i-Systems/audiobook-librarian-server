@@ -11,6 +11,10 @@ use MongoDB\Client;
 use MongoDB\Model\BSONDocument;
 use RuntimeException;
 
+/**
+ * @deprecated Archived: MongoService is retained for migration utilities only (e.g., MigrateMongoToMysql).
+ *              Do not bind or use at runtime for the application. The active document store is MySqlService.
+ */
 class MongoService implements DocumentStoreServiceInterface
 {
     /** @var Client */

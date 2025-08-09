@@ -39,12 +39,12 @@ if ($leadingSlashCount > 0) {
         ->where('directory_path', 'NOT LIKE', $bookStoragePath . '%')
         ->limit(5)
         ->get();
-    
+
     foreach ($examples as $book) {
         $newPath = ltrim($book->directory_path, '/');
         echo "ID {$book->id}: '{$book->directory_path}' -> '{$newPath}'\n";
     }
-    
+
     echo "\nFixing leading slash paths...\n";
     $affected = DB::update("
         UPDATE books 

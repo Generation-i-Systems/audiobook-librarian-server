@@ -18,3 +18,8 @@
 - Created `docs/requirements/reading-progress-and-stats.md` capturing requirements for cross-device progress sync, stats ingestion, conflict resolution, batch/offline handling, and endpoints.
 - Linked from root `README.md`, `docs/README.md`, and `PROJECT-BLUEPRINT.md`; added CHANGELOG entry.
 - Expanded recommended metrics and insights to include engagement, content preferences, device/quality, velocity/forecasting, retention, and habits.
+
+2025-08-09: Archive MongoService (runtime) and persist book updates
+- DocumentStoreServiceProvider now always binds MySqlService at runtime; MongoService marked @deprecated for migration-only use
+- BookController@update and MongoService@updateBook normalized inputs to persist narrator, series, and publishedYear
+- Added/updated feature tests for narrator trimming and series normalization/persistence

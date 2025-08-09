@@ -42,7 +42,7 @@ class DocsController extends Controller
         }
 
         $content = File::get($openApiPath);
-        
+
         return response($content, 200, [
             'Content-Type' => 'application/json',
             'Access-Control-Allow-Origin' => '*',

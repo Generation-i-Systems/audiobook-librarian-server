@@ -7,7 +7,6 @@ use App\Models\ListeningStatistic;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
-use Carbon\Carbon;
 use Laravel\Sanctum\Sanctum;
 
 class StatisticsControllerTest extends TestCase
@@ -21,7 +20,7 @@ class StatisticsControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         if (!self::$migrationsRun) {
             try {
                 // Try to run migrations for the in-memory database
@@ -32,20 +31,20 @@ class StatisticsControllerTest extends TestCase
             }
             self::$migrationsRun = true;
         }
-        
+
         // Create a test user without running the problematic seeders
         $this->user = User::factory()->create([
             'role' => 'admin',
             'email_verified_at' => now(),
         ]);
-        
+
         // Create a Sanctum token for API authentication
         $this->token = $this->user->createToken('test-token')->plainTextToken;
-        
+
         // Use Sanctum::actingAs for API tests
         Sanctum::actingAs($this->user);
     }
-    
+
     protected function tearDown(): void
     {
         // Clean up created records but leave database structure
@@ -53,7 +52,7 @@ class StatisticsControllerTest extends TestCase
             $this->user->tokens()->delete();
             $this->user->delete();
         }
-        
+
         parent::tearDown();
     }
 
@@ -214,7 +213,7 @@ class StatisticsControllerTest extends TestCase
     public function test_get_book_stats_returns_book_specific_data()
     {
         $book = Book::factory()->create(['title' => 'Test Book']);
-        
+
         // Create multiple sessions for the same book
         ListeningStatistic::create([
             'book_id' => $book->id,
@@ -368,7 +367,7 @@ class StatisticsControllerTest extends TestCase
     {
         $book = Book::factory()->create();
         $today = now();
-        
+
         // Create statistics for today, this week, and this month
         ListeningStatistic::create([
             'book_id' => $book->id,

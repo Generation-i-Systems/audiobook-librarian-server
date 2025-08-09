@@ -1,4 +1,5 @@
 <?php
+
 // Temporary debug file - remove after debugging
 echo "<h1>PHP Configuration</h1>";
 echo "<p><strong>Memory Limit:</strong> " . ini_get('memory_limit') . "</p>";
@@ -9,4 +10,3 @@ echo "<p><strong>Memory Available:</strong> " . (ini_get('memory_limit') === '-1
 
 echo "<h2>Full PHP Info:</h2>";
 phpinfo();
-?>

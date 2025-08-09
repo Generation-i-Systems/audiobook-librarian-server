@@ -56,7 +56,7 @@ class BookProgress extends Model
         if ($this->total_duration_seconds > 0) {
             $percentage = ($positionSeconds / $this->total_duration_seconds) * 100;
             $this->progress_percentage = min(100, max(0, $percentage));
-            
+
             // Mark as completed if near the end (95% or more)
             if ($percentage >= 95 && !$this->completed) {
                 $this->completed = true;

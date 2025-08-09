@@ -12,7 +12,6 @@ use App\Http\Controllers\ReadingProgressController;
 use App\Http\Controllers\ReviewController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Session;
 
 // --- EMERGENCY ROUTES ---
 // Emergency book routes that bypass memory-intensive models
@@ -23,7 +22,7 @@ Route::get('/emergency/books', [App\Http\Controllers\EmergencyBookController::cl
 if (app()->environment('local')) {
     // Memory test route
     Route::get('/test-memory', [App\Http\Controllers\TestController::class, 'memoryTest']);
-    
+
     // Reset test user password to a known value
     Route::get('/reset-test-password', function () {
         $user = \App\Models\User::where('email', 'eric@thelin.org')->first();

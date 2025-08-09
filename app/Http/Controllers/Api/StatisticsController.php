@@ -45,7 +45,7 @@ class StatisticsController extends Controller
         }
 
         $query = ListeningStatistic::where('device_id', $userId);
-        
+
         if ($startDate) {
             $query->where('listening_date', '>=', $startDate->toDateString());
         }
@@ -92,7 +92,7 @@ class StatisticsController extends Controller
         ]);
 
         $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
-        
+
         $startDate = $validated['start_date'] ? Carbon::parse($validated['start_date']) : now()->subDays(29);
         $endDate = $validated['end_date'] ? Carbon::parse($validated['end_date']) : now();
         $limit = $validated['limit'] ?? 30;
@@ -337,7 +337,7 @@ class StatisticsController extends Controller
         ]);
 
         $period = $validated['period'] ?? 'month';
-        
+
         if (isset($validated['start_date']) && isset($validated['end_date'])) {
             $startDate = Carbon::parse($validated['start_date']);
             $endDate = Carbon::parse($validated['end_date']);
@@ -555,20 +555,20 @@ class StatisticsController extends Controller
     {
         $streak = 0;
         $currentDate = now();
-        
+
         while (true) {
             $hasActivity = ListeningStatistic::where('device_id', $userId)
                 ->where('listening_date', $currentDate->toDateString())
                 ->exists();
-            
+
             if (!$hasActivity) {
                 break;
             }
-            
+
             $streak++;
             $currentDate->subDay();
         }
-        
+
         return $streak;
     }
 
@@ -582,7 +582,7 @@ class StatisticsController extends Controller
             ->distinct()
             ->orderBy('listening_date')
             ->pluck('listening_date')
-            ->map(fn($date) => Carbon::parse($date))
+            ->map(fn ($date) => Carbon::parse($date))
             ->toArray();
 
         if (empty($dates)) {
@@ -632,7 +632,7 @@ class StatisticsController extends Controller
     private function getDailyStatsForPeriod(string $userId, ?Carbon $startDate): array
     {
         $query = ListeningStatistic::where('device_id', $userId);
-        
+
         if ($startDate) {
             $query->where('listening_date', '>=', $startDate->toDateString());
         }

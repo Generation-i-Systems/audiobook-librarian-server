@@ -26,7 +26,7 @@ class ProgressController extends Controller
 
         // Use authenticated user's device/session instead of requiring device_id
         $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
-        
+
         $progress = BookProgress::where('book_id', $bookId)
             ->where('device_id', $userId)
             ->first();
@@ -71,7 +71,7 @@ class ProgressController extends Controller
         }
 
         $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
-        
+
         $progress = BookProgress::updateOrCreate(
             [
                 'book_id' => $bookId,
@@ -113,7 +113,7 @@ class ProgressController extends Controller
         ]);
 
         $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
-        
+
         $query = BookProgress::with('book')
             ->where('device_id', $userId)
             ->orderBy('last_listened_at', 'desc');
