@@ -581,6 +581,11 @@ class MySqlService implements DocumentStoreServiceInterface
     {
         try {
             $book = Book::findOrFail($id);
+            
+            // Handle publishedYear -> release_date mapping
+            if (isset($data['publishedYear']) && !empty($data['publishedYear'])) {
+                $data['release_date'] = $data['publishedYear'] . '-01-01';
+            }
 
             $book->update([
                 'title' => $data['title'] ?? $book->title,
@@ -590,8 +595,8 @@ class MySqlService implements DocumentStoreServiceInterface
                 'series_id' => $data['series_id'] ?? $book->series_id,
                 'mongo_id' => $data['mongo_id'] ?? $book->mongo_id,
                 'release_date' => $data['release_date'] ?? $book->release_date,
-                'cover_image' => $data['cover_image'] ?? $book->cover_image,
-                'directory_path' => $data['directory_path'] ?? $book->directory_path,
+                'cover_image' => $data['cover_image'] ?? $data['coverImage'] ?? $book->cover_image,
+                'directory_path' => $data['directory_path'] ?? $data['directoryPath'] ?? $book->directory_path,
                 'duration' => $data['duration'] ?? $book->duration,
                 'publisher' => $data['publisher'] ?? $book->publisher,
                 'needs_review' => $data['needs_review'] ?? $book->needs_review,
@@ -605,33 +610,40 @@ class MySqlService implements DocumentStoreServiceInterface
                 'audiobook_bay_info' => $data['audiobook_bay_info'] ?? $book->audiobook_bay_info,
             ]);
 
-            if (isset($data['authors'])) {
+            // Handle authors (support both 'authors' and 'author' keys)
+            $authorData = $data['authors'] ?? $data['author'] ?? null;
+            if (isset($authorData)) {
                 $authorIds = [];
-                foreach ($data['authors'] as $authorName) {
+                foreach ($authorData as $authorName) {
                     $author = Author::firstOrCreate(['name' => $authorName]);
                     $authorIds[] = $author->id;
                 }
                 $book->authors()->sync($authorIds);
             }
 
-            if (isset($data['narrators'])) {
+            // Handle narrators (support both 'narrators' and 'narrator' keys)
+            $narratorData = $data['narrators'] ?? $data['narrator'] ?? null;
+            if (isset($narratorData)) {
                 $narratorIds = [];
-                foreach ($data['narrators'] as $narratorName) {
+                foreach ($narratorData as $narratorName) {
                     $narrator = Narrator::firstOrCreate(['name' => $narratorName]);
                     $narratorIds[] = $narrator->id;
                 }
                 $book->narrators()->sync($narratorIds);
             }
 
-            if (isset($data['genres'])) {
+            // Handle genres (support both 'genres' and 'genre' keys)
+            $genreData = $data['genres'] ?? $data['genre'] ?? null;
+            if (isset($genreData)) {
                 $genreIds = [];
-                foreach ($data['genres'] as $genreName) {
+                foreach ($genreData as $genreName) {
                     $genre = Genre::firstOrCreate(['name' => $genreName]);
                     $genreIds[] = $genre->id;
                 }
                 $book->genres()->sync($genreIds);
             }
 
+            // Handle series (support both legacy 'series_name' and new 'series' array structure)
             if (array_key_exists('series_name', $data)) {
                 if ($data['series_name']) {
                     $series = Series::firstOrCreate(['name' => $data['series_name']]);
@@ -640,6 +652,19 @@ class MySqlService implements DocumentStoreServiceInterface
                     $book->series()->dissociate();
                 }
                 $book->save();
+            } elseif (isset($data['series']) && is_array($data['series'])) {
+                // Handle new series array structure from BookController
+                $seriesSyncData = [];
+                foreach ($data['series'] as $seriesEntry) {
+                    $seriesName = $seriesEntry['seriesName'] ?? $seriesEntry['name'] ?? null;
+                    if ($seriesName) {
+                        $series = Series::firstOrCreate(['name' => $seriesName]);
+                        $seriesSyncData[$series->id] = [
+                            'series_number' => $seriesEntry['number'] ?? null
+                        ];
+                    }
+                }
+                $book->series()->sync($seriesSyncData);
             }
 
             if (isset($data['chapters'])) {
