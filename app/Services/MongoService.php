@@ -584,7 +584,90 @@ class MongoService implements DocumentStoreServiceInterface
     /** @inheritDoc */
     public function updateBook(string $id, array $data)
     {
-        return $this->getCollection('books')->updateOne(['_id' => $id], ['$set' => $data]);
+        // Normalize incoming payload keys to match our Mongo schema
+        // Accept both singular/plural and snake_case/camelCase variants
+        $normalized = $data;
+
+        // Authors/Genres/Narrators: prefer singular camelCase keys in storage
+        if (isset($normalized['authors']) && !isset($normalized['author'])) {
+            $normalized['author'] = $normalized['authors'];
+            unset($normalized['authors']);
+        }
+        if (isset($normalized['genres']) && !isset($normalized['genre'])) {
+            $normalized['genre'] = $normalized['genres'];
+            unset($normalized['genres']);
+        }
+        if (isset($normalized['narrators']) && !isset($normalized['narrator'])) {
+            $normalized['narrator'] = $normalized['narrators'];
+            unset($normalized['narrators']);
+        }
+
+        // Directory path and published year
+        if (isset($normalized['directory_path']) && !isset($normalized['directoryPath'])) {
+            $normalized['directoryPath'] = $normalized['directory_path'];
+            unset($normalized['directory_path']);
+        }
+        if (isset($normalized['published_year']) && !isset($normalized['publishedYear'])) {
+            $normalized['publishedYear'] = $normalized['published_year'];
+            unset($normalized['published_year']);
+        }
+
+        // Clean arrays: trim strings and drop empties for narrator/author/genre
+        foreach (['author', 'narrator', 'genre'] as $listKey) {
+            if (isset($normalized[$listKey]) && is_array($normalized[$listKey])) {
+                $normalized[$listKey] = array_values(array_filter(array_map(function ($v) {
+                    return is_string($v) ? trim($v) : $v;
+                }, $normalized[$listKey]), function ($v) {
+                    return $v !== null && $v !== '';
+                }));
+            }
+        }
+
+        // Series: map legacy 'name' to 'seriesName' and filter
+        if (isset($normalized['series']) && is_array($normalized['series'])) {
+            $seriesArr = [];
+            foreach ($normalized['series'] as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+                if (isset($item['name']) && !isset($item['seriesName'])) {
+                    $item['seriesName'] = $item['name'];
+                    unset($item['name']);
+                }
+                // Normalize keys we expect
+                $seriesName = isset($item['seriesName']) ? trim((string) $item['seriesName']) : null;
+                $number = $item['number'] ?? ($item['series_number'] ?? null);
+                if ($seriesName !== null && $seriesName !== '') {
+                    $seriesArr[] = [
+                        'seriesName' => $seriesName,
+                        'number' => is_string($number) || is_numeric($number) ? (string) $number : null,
+                    ];
+                }
+            }
+            $normalized['series'] = $seriesArr;
+        }
+
+        // Build update with $set and optionally $unset to remove legacy keys
+        $set = $normalized;
+        $unset = [];
+        // If we set singular keys, clear out plural/snake_case legacy ones
+        foreach ([
+            'authors', 'genres', 'narrators',
+            'directory_path', 'published_year',
+        ] as $legacyKey) {
+            if (array_key_exists($legacyKey, $set)) {
+                // already unset above, skip
+                continue;
+            }
+        }
+
+        // Execute update
+        $update = ['$set' => $set];
+        if (!empty($unset)) {
+            $update['$unset'] = array_fill_keys(array_keys($unset), '');
+        }
+
+        return $this->getCollection('books')->updateOne(['_id' => $id], $update);
     }
     /** @inheritDoc */
     public function deleteBook(string $id)

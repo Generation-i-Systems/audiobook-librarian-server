@@ -31,6 +31,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/books/enhanced', [BookApiController::class, 'booksEnhanced']);
         Route::get('/books/{book}', [BookApiController::class, 'show']);
         Route::get('/books/{book}/download', [BookApiController::class, 'download']);
+        Route::get('/books/{book}/download-url', [BookApiController::class, 'downloadUrl']);
         Route::get('/books/browse', [BookApiController::class, 'browse']);
         Route::get('/books/search', [BookApiController::class, 'search']);
         Route::post('/books/queue/download', [BookApiController::class, 'queueDownload']);
@@ -76,7 +77,11 @@ Route::prefix('v1')->group(function () {
         Route::post('/reading-progress/{book}', [ReadingProgressApiController::class, 'update']);
         Route::get('/reading-progress/{book}', [ReadingProgressApiController::class, 'get']);
 
-        // Bookmark Routes
+        // OpenAPI spec bookmark routes
+        Route::get('/bookmarks/{book}', [BookmarkApiController::class, 'getBookmarksOpenApi']);
+        Route::post('/bookmarks/{book}', [BookmarkApiController::class, 'createBookmarkOpenApi']);
+
+        // Legacy bookmark routes
         Route::get('/books/{book}/bookmarks', [BookmarkApiController::class, 'getBookmarks']);
         Route::post('/books/{book}/bookmarks', [BookmarkApiController::class, 'createBookmark']);
         Route::get('/books/{book}/bookmarks/{bookmark}', [BookmarkApiController::class, 'getBookmark']);
@@ -99,16 +104,26 @@ Route::prefix('v1')->group(function () {
         Route::get('/reading-stats/user', [ReadingStatsApiController::class, 'getUserStats']);
         Route::get('/reading-stats/streaks', [ReadingStatsApiController::class, 'getStreaks']);
 
-        // Book Progress Routes (cross-device listening continuity)
+        // OpenAPI spec progress routes
+        Route::get('/progress/{book}', [ProgressController::class, 'getBookProgress']);
+        Route::put('/progress/{book}', [ProgressController::class, 'updateBookProgress']);
+        Route::get('/progress', [ProgressController::class, 'getAllProgress']);
+
+        // Book Progress Routes (cross-device listening continuity) - legacy routes
         Route::get('/books/{book}/progress', [ProgressController::class, 'getProgress']);
         Route::put('/books/{book}/progress', [ProgressController::class, 'updateProgress']);
         Route::post('/books/{book}/progress/complete', [ProgressController::class, 'markCompleted']);
         Route::delete('/books/{book}/progress', [ProgressController::class, 'resetProgress']);
         Route::get('/progress/device', [ProgressController::class, 'getDeviceProgress']);
 
-        // Listening Statistics Routes (detailed analytics)
+        // OpenAPI spec statistics routes
+        Route::get('/statistics/overview', [StatisticsController::class, 'getOverview']);
+        Route::get('/statistics/daily', [StatisticsController::class, 'getDailyStatsOpenApi']);
+        Route::post('/statistics/report', [StatisticsController::class, 'reportSession']);
+
+        // Legacy statistics routes
         Route::post('/statistics/sessions', [StatisticsController::class, 'recordSession']);
-        Route::get('/statistics/daily', [StatisticsController::class, 'getDailyStats']);
+        Route::get('/statistics/legacy-daily', [StatisticsController::class, 'getDailyStats']);
         Route::get('/statistics/weekly', [StatisticsController::class, 'getWeeklyStats']);
         Route::get('/statistics/trends', [StatisticsController::class, 'getListeningTrends']);
         Route::get('/statistics/top-books', [StatisticsController::class, 'getTopBooks']);

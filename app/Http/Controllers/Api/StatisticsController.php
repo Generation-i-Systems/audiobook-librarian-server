@@ -13,7 +13,167 @@ use Carbon\Carbon;
 class StatisticsController extends Controller
 {
     /**
-     * Record a listening session
+     * Get listening statistics overview (OpenAPI spec)
+     */
+    public function getOverview(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'period' => 'nullable|string|in:week,month,quarter,year,all_time',
+        ]);
+
+        $period = $validated['period'] ?? 'month';
+        $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
+
+        // Calculate date ranges based on period
+        switch ($period) {
+            case 'week':
+                $startDate = now()->startOfWeek();
+                break;
+            case 'quarter':
+                $startDate = now()->startOfQuarter();
+                break;
+            case 'year':
+                $startDate = now()->startOfYear();
+                break;
+            case 'all_time':
+                $startDate = null;
+                break;
+            case 'month':
+            default:
+                $startDate = now()->startOfMonth();
+                break;
+        }
+
+        $query = ListeningStatistic::where('device_id', $userId);
+        
+        if ($startDate) {
+            $query->where('listening_date', '>=', $startDate->toDateString());
+        }
+
+        $stats = $query->selectRaw('
+            SUM(seconds_listened) as total_listening_time_ms,
+            COUNT(DISTINCT book_id) as books_started,
+            COUNT(DISTINCT CASE WHEN session_type = "completed" THEN book_id END) as books_finished,
+            AVG(seconds_listened) as average_session_duration_ms,
+            COUNT(DISTINCT listening_date) as days_with_activity
+        ')->first();
+
+        // Calculate streaks
+        $currentStreak = $this->calculateCurrentStreak($userId);
+        $longestStreak = $this->calculateLongestStreak($userId);
+
+        // Get favorite genres (top 5 most listened)
+        $favoriteGenres = $this->getFavoriteGenres($userId, $startDate);
+
+        // Get daily stats for the period
+        $dailyStats = $this->getDailyStatsForPeriod($userId, $startDate);
+
+        return response()->json([
+            'daily_stats' => $dailyStats,
+            'total_listening_time_ms' => ($stats->total_listening_time_ms ?? 0) * 1000,
+            'books_started' => $stats->books_started ?? 0,
+            'books_finished' => $stats->books_finished ?? 0,
+            'average_session_duration_ms' => ($stats->average_session_duration_ms ?? 0) * 1000,
+            'favorite_genres' => $favoriteGenres,
+            'current_streak' => $currentStreak,
+            'longest_streak' => $longestStreak,
+        ]);
+    }
+
+    /**
+     * Get daily listening statistics (OpenAPI spec)
+     */
+    public function getDailyStatsOpenApi(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'start_date' => 'nullable|date_format:Y-m-d',
+            'end_date' => 'nullable|date_format:Y-m-d',
+            'limit' => 'nullable|integer|min:1|max:365',
+        ]);
+
+        $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
+        
+        $startDate = $validated['start_date'] ? Carbon::parse($validated['start_date']) : now()->subDays(29);
+        $endDate = $validated['end_date'] ? Carbon::parse($validated['end_date']) : now();
+        $limit = $validated['limit'] ?? 30;
+
+        $stats = ListeningStatistic::where('device_id', $userId)
+            ->whereBetween('listening_date', [$startDate->toDateString(), $endDate->toDateString()])
+            ->selectRaw('
+                listening_date as date,
+                SUM(seconds_listened) * 1000 as listening_time_ms,
+                COUNT(*) as sessions_count,
+                JSON_ARRAYAGG(DISTINCT book_id) as books_listened
+            ')
+            ->groupBy('listening_date')
+            ->orderByDesc('listening_date')
+            ->limit($limit)
+            ->get();
+
+        $dailyStats = $stats->map(function ($stat) {
+            return [
+                'date' => $stat->date,
+                'listening_time_ms' => (int) $stat->listening_time_ms,
+                'sessions_count' => $stat->sessions_count,
+                'books_listened' => json_decode($stat->books_listened, true) ?? [],
+            ];
+        });
+
+        return response()->json([
+            'daily_stats' => $dailyStats
+        ]);
+    }
+
+    /**
+     * Report listening session (OpenAPI spec)
+     */
+    public function reportSession(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'book_id' => 'required|integer|exists:books,id',
+            'session_start' => 'required|date_format:Y-m-d\TH:i:s\Z',
+            'session_end' => 'required|date_format:Y-m-d\TH:i:s\Z|after:session_start',
+            'start_position_ms' => 'required|integer|min:0',
+            'end_position_ms' => 'required|integer|min:0',
+            'playback_speed' => 'nullable|numeric|min:0.1|max:5.0',
+            'pauses_count' => 'nullable|integer|min:0',
+        ]);
+
+        $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
+
+        $sessionStart = Carbon::parse($validated['session_start']);
+        $sessionEnd = Carbon::parse($validated['session_end']);
+        $sessionDuration = $sessionEnd->diffInSeconds($sessionStart);
+
+        // Calculate actual listening time based on position change and playback speed
+        $positionChange = ($validated['end_position_ms'] - $validated['start_position_ms']) / 1000;
+        $playbackSpeed = $validated['playback_speed'] ?? 1.0;
+        $actualListeningTime = min($sessionDuration, $positionChange / $playbackSpeed);
+
+        $statistic = ListeningStatistic::createSession(
+            $validated['book_id'],
+            $userId,
+            (int) $actualListeningTime,
+            (int) ($validated['start_position_ms'] / 1000),
+            (int) ($validated['end_position_ms'] / 1000),
+            'listening',
+            [
+                'session_start' => $validated['session_start'],
+                'session_end' => $validated['session_end'],
+                'playback_speed' => $playbackSpeed,
+                'pauses_count' => $validated['pauses_count'] ?? 0,
+            ],
+            auth('api')->id()
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Session reported successfully'
+        ], 201);
+    }
+
+    /**
+     * Record a listening session (existing method for backward compatibility)
      */
     public function recordSession(Request $request): JsonResponse
     {
@@ -386,6 +546,116 @@ class StatisticsController extends Controller
                 ],
             ]
         ]);
+    }
+
+    /**
+     * Calculate current listening streak
+     */
+    private function calculateCurrentStreak(string $userId): int
+    {
+        $streak = 0;
+        $currentDate = now();
+        
+        while (true) {
+            $hasActivity = ListeningStatistic::where('device_id', $userId)
+                ->where('listening_date', $currentDate->toDateString())
+                ->exists();
+            
+            if (!$hasActivity) {
+                break;
+            }
+            
+            $streak++;
+            $currentDate->subDay();
+        }
+        
+        return $streak;
+    }
+
+    /**
+     * Calculate longest listening streak
+     */
+    private function calculateLongestStreak(string $userId): int
+    {
+        $dates = ListeningStatistic::where('device_id', $userId)
+            ->select('listening_date')
+            ->distinct()
+            ->orderBy('listening_date')
+            ->pluck('listening_date')
+            ->map(fn($date) => Carbon::parse($date))
+            ->toArray();
+
+        if (empty($dates)) {
+            return 0;
+        }
+
+        $longestStreak = 1;
+        $currentStreak = 1;
+
+        for ($i = 1; $i < count($dates); $i++) {
+            if ($dates[$i]->diffInDays($dates[$i - 1]) === 1) {
+                $currentStreak++;
+                $longestStreak = max($longestStreak, $currentStreak);
+            } else {
+                $currentStreak = 1;
+            }
+        }
+
+        return $longestStreak;
+    }
+
+    /**
+     * Get favorite genres for a user
+     */
+    private function getFavoriteGenres(string $userId, ?Carbon $startDate): array
+    {
+        $query = ListeningStatistic::where('listening_statistics.device_id', $userId)
+            ->join('books', 'listening_statistics.book_id', '=', 'books.id')
+            ->join('book_genre', 'books.id', '=', 'book_genre.book_id')
+            ->join('genres', 'book_genre.genre_id', '=', 'genres.id');
+
+        if ($startDate) {
+            $query->where('listening_date', '>=', $startDate->toDateString());
+        }
+
+        return $query->selectRaw('genres.name, SUM(seconds_listened) as total_time')
+            ->groupBy('genres.name')
+            ->orderByDesc('total_time')
+            ->limit(5)
+            ->pluck('genres.name')
+            ->toArray();
+    }
+
+    /**
+     * Get daily stats for a period
+     */
+    private function getDailyStatsForPeriod(string $userId, ?Carbon $startDate): array
+    {
+        $query = ListeningStatistic::where('device_id', $userId);
+        
+        if ($startDate) {
+            $query->where('listening_date', '>=', $startDate->toDateString());
+        }
+
+        $stats = $query->selectRaw('
+            listening_date as date,
+            SUM(seconds_listened) * 1000 as listening_time_ms,
+            COUNT(*) as sessions_count,
+            JSON_ARRAYAGG(DISTINCT book_id) as books_listened
+        ')
+        ->groupBy('listening_date')
+        ->orderByDesc('listening_date')
+        ->limit(30)
+        ->get();
+
+        return $stats->map(function ($stat) {
+            return [
+                'date' => $stat->date,
+                'listening_time_ms' => (int) $stat->listening_time_ms,
+                'sessions_count' => $stat->sessions_count,
+                'books_listened' => json_decode($stat->books_listened, true) ?? [],
+            ];
+        })->toArray();
     }
 
     /**

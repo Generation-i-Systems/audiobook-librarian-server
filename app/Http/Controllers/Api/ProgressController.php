@@ -12,7 +12,135 @@ use Illuminate\Validation\ValidationException;
 class ProgressController extends Controller
 {
     /**
-     * Get progress for a specific book and device
+     * Get progress for a specific book (OpenAPI spec version)
+     */
+    public function getBookProgress(Request $request, int $bookId): JsonResponse
+    {
+        $book = Book::find($bookId);
+        if (!$book) {
+            return response()->json([
+                'error' => 'Book not found',
+                'message' => 'The specified book could not be found'
+            ], 404);
+        }
+
+        // Use authenticated user's device/session instead of requiring device_id
+        $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
+        
+        $progress = BookProgress::where('book_id', $bookId)
+            ->where('device_id', $userId)
+            ->first();
+
+        if (!$progress) {
+            return response()->json([
+                'book_id' => $bookId,
+                'position_ms' => 0,
+                'progress_percentage' => 0,
+                'last_updated' => now()->toISOString(),
+                'is_finished' => false,
+            ]);
+        }
+
+        return response()->json([
+            'book_id' => $progress->book_id,
+            'position_ms' => $progress->current_position_seconds * 1000,
+            'progress_percentage' => (int) round($progress->progress_percentage),
+            'last_updated' => $progress->updated_at->toISOString(),
+            'is_finished' => $progress->completed,
+        ]);
+    }
+
+    /**
+     * Update progress for a specific book (OpenAPI spec version)
+     */
+    public function updateBookProgress(Request $request, int $bookId): JsonResponse
+    {
+        $validated = $request->validate([
+            'position_ms' => 'required|integer|min:0',
+            'progress_percentage' => 'required|integer|min:0|max:100',
+            'session_duration_ms' => 'nullable|integer|min:0',
+            'playback_speed' => 'nullable|numeric|min:0.1|max:5.0',
+        ]);
+
+        $book = Book::find($bookId);
+        if (!$book) {
+            return response()->json([
+                'error' => 'Book not found',
+                'message' => 'The specified book could not be found'
+            ], 404);
+        }
+
+        $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
+        
+        $progress = BookProgress::updateOrCreate(
+            [
+                'book_id' => $bookId,
+                'device_id' => $userId,
+            ],
+            [
+                'user_id' => auth('api')->id(),
+            ]
+        );
+
+        $progress->updateProgress(
+            (int) ($validated['position_ms'] / 1000),
+            null
+        );
+
+        $progress->progress_percentage = $validated['progress_percentage'];
+        $progress->completed = $validated['progress_percentage'] >= 100;
+        if ($progress->completed && !$progress->completed_at) {
+            $progress->completed_at = now();
+        }
+        $progress->save();
+
+        return response()->json([
+            'book_id' => $progress->book_id,
+            'position_ms' => $progress->current_position_seconds * 1000,
+            'progress_percentage' => (int) round($progress->progress_percentage),
+            'last_updated' => $progress->updated_at->toISOString(),
+            'is_finished' => $progress->completed,
+        ]);
+    }
+
+    /**
+     * Get all progress (OpenAPI spec version)
+     */
+    public function getAllProgress(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'active_only' => 'nullable|boolean',
+        ]);
+
+        $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
+        
+        $query = BookProgress::with('book')
+            ->where('device_id', $userId)
+            ->orderBy('last_listened_at', 'desc');
+
+        if ($validated['active_only'] ?? false) {
+            $query->where('completed', false);
+        }
+
+        $progressList = $query->get();
+
+        $progress = $progressList->map(function ($progress) {
+            return [
+                'book_id' => $progress->book_id,
+                'position_ms' => $progress->current_position_seconds * 1000,
+                'progress_percentage' => (int) round($progress->progress_percentage),
+                'last_updated' => $progress->updated_at->toISOString(),
+                'is_finished' => $progress->completed,
+            ];
+        });
+
+        return response()->json([
+            'progress' => $progress
+        ]);
+    }
+
+    /**
+     * Get progress for a specific book and device (existing method for backward compatibility)
      */
     public function getProgress(Request $request, int $bookId): JsonResponse
     {

@@ -19,7 +19,91 @@ class BookmarkApiController extends Controller
 
 
     /**
-     * Get all bookmarks for a book
+     * Get all bookmarks for a book (OpenAPI spec version)
+     */
+    public function getBookmarksOpenApi(Request $request, string $bookId)
+    {
+        // Verify the book exists
+        $book = $this->documentStoreService->getBook($bookId);
+        if (!$book) {
+            return response()->json(['error' => 'Book not found'], 404);
+        }
+
+        // Get user ID from authenticated user
+        $userId = auth('api')->id();
+
+        // Get bookmarks from the document store
+        $bookmarks = $this->documentStoreService->getBookmarks($userId, $bookId);
+
+        // Format response to match OpenAPI spec
+        $formattedBookmarks = [];
+        foreach ($bookmarks as $bookmark) {
+            $formattedBookmarks[] = [
+                'id' => (int) ($bookmark['_id'] ?? $bookmark['id']),
+                'book_id' => (int) $bookmark['book_id'],
+                'position_ms' => ((int) ($bookmark['position'] ?? 0)) * 1000, // Convert to milliseconds
+                'title' => $bookmark['title'] ?? null,
+                'note' => $bookmark['note'] ?? null,
+                'is_auto' => (bool) ($bookmark['is_auto'] ?? false),
+                'created_at' => $bookmark['created_at'] ?? now()->toISOString(),
+            ];
+        }
+
+        return response()->json(['bookmarks' => $formattedBookmarks]);
+    }
+
+    /**
+     * Create a new bookmark (OpenAPI spec version)
+     */
+    public function createBookmarkOpenApi(Request $request, string $bookId)
+    {
+        // Validate request
+        $request->validate([
+            'position_ms' => 'required|integer|min:0',
+            'title' => 'nullable|string|max:255',
+            'note' => 'nullable|string',
+            'is_auto' => 'nullable|boolean',
+        ]);
+
+        // Verify the book exists
+        $book = $this->documentStoreService->getBook($bookId);
+        if (!$book) {
+            return response()->json(['error' => 'Book not found'], 404);
+        }
+
+        // Get user ID from authenticated user
+        $userId = auth('api')->id();
+
+        // Create bookmark data
+        $bookmarkData = [
+            'user_id' => $userId,
+            'book_id' => (int) $bookId,
+            'chapter' => 1, // Default chapter for compatibility
+            'position' => (int) ($request->input('position_ms') / 1000), // Convert from milliseconds
+            'title' => $request->input('title'),
+            'note' => $request->input('note'),
+            'is_auto' => $request->input('is_auto', false),
+            'created_at' => now()->toISOString(),
+            'updated_at' => now()->toISOString(),
+        ];
+
+        // Insert bookmark into the document store
+        $bookmarkId = $this->documentStoreService->createBookmark($bookmarkData);
+
+        // Format response
+        return response()->json([
+            'id' => (int) $bookmarkId,
+            'book_id' => (int) $bookId,
+            'position_ms' => $request->input('position_ms'),
+            'title' => $request->input('title'),
+            'note' => $request->input('note'),
+            'is_auto' => $request->input('is_auto', false),
+            'created_at' => now()->toISOString(),
+        ], 201);
+    }
+
+    /**
+     * Get all bookmarks for a book (existing method for backward compatibility)
      *
      * @return \Illuminate\Http\JsonResponse
      */

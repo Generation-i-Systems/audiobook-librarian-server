@@ -450,15 +450,24 @@ class BookApiController extends Controller
     {
         $book = $this->documentStoreService->getBook($id);
         if (!$book) {
-            abort(404);
+            return response()->json([
+                'error' => 'Book not found',
+                'message' => 'The specified book could not be found',
+            ], 404);
         }
         $directoryPath = $book['directoryPath'] ?? null;
         if (!$directoryPath || !Storage::disk('books')->exists($directoryPath)) {
-            abort(404, 'Book directory not found.');
+            return response()->json([
+                'error' => 'Book directory not found',
+                'message' => 'The book files could not be located',
+            ], 404);
         }
         $files = Storage::disk('books')->files($directoryPath);
         if (empty($files)) {
-            abort(404, 'No files found for this book.');
+            return response()->json([
+                'error' => 'No files found',
+                'message' => 'No audio files found for this book',
+            ], 404);
         }
         $zipFileName = str_replace(' ', '_', $book['title']) . '.zip';
 
@@ -579,6 +588,52 @@ class BookApiController extends Controller
                 'Accept-Ranges' => 'bytes',
             ]
         );
+    }
+
+    /**
+     * Get a temporary download URL for a book
+     */
+    public function downloadUrl($id)
+    {
+        $book = $this->documentStoreService->getBook($id);
+        if (!$book) {
+            return response()->json([
+                'error' => 'Book not found',
+                'message' => 'The specified book could not be found',
+            ], 404);
+        }
+
+        $directoryPath = $book['directoryPath'] ?? null;
+        if (!$directoryPath || !Storage::disk('books')->exists($directoryPath)) {
+            return response()->json([
+                'error' => 'Book directory not found',
+                'message' => 'The book files could not be located',
+            ], 404);
+        }
+
+        $files = Storage::disk('books')->files($directoryPath);
+        if (empty($files)) {
+            return response()->json([
+                'error' => 'No files found',
+                'message' => 'No audio files found for this book',
+            ], 404);
+        }
+
+        // Calculate total file size
+        $totalSize = 0;
+        foreach ($files as $file) {
+            $totalSize += Storage::disk('books')->size($file);
+        }
+
+        // Generate a temporary signed URL that expires in 1 hour
+        $expiresAt = now()->addHour();
+        $downloadUrl = route('api.books.download', ['book' => $id]) . '?expires=' . $expiresAt->timestamp . '&signature=' . hash('sha256', $id . $expiresAt->timestamp . config('app.key'));
+
+        return response()->json([
+            'download_url' => $downloadUrl,
+            'expires_at' => $expiresAt->toISOString(),
+            'file_size' => $totalSize,
+        ]);
     }
 
     public function queueDownload(Request $request)

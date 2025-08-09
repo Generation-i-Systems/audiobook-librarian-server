@@ -1039,6 +1039,29 @@ class BookController extends Controller
             return redirect()->route('admin.books.index')->withErrors(['Book not found.']);
         }
 
+        // Normalize incoming keys to match our internal schema
+        // Accept plural and snake_case variants coming from various forms
+        $incoming = $request->all();
+        $normalizations = [];
+        if (array_key_exists('authors', $incoming) && !array_key_exists('author', $incoming)) {
+            $normalizations['author'] = $incoming['authors'];
+        }
+        if (array_key_exists('genres', $incoming) && !array_key_exists('genre', $incoming)) {
+            $normalizations['genre'] = $incoming['genres'];
+        }
+        if (array_key_exists('narrators', $incoming) && !array_key_exists('narrator', $incoming)) {
+            $normalizations['narrator'] = $incoming['narrators'];
+        }
+        if (array_key_exists('published_year', $incoming) && !array_key_exists('publishedYear', $incoming)) {
+            $normalizations['publishedYear'] = $incoming['published_year'];
+        }
+        if (array_key_exists('directory_path', $incoming) && !array_key_exists('directoryPath', $incoming)) {
+            $normalizations['directoryPath'] = $incoming['directory_path'];
+        }
+        if (!empty($normalizations)) {
+            $request->merge($normalizations);
+        }
+
         try {
             $validated = $request->validate([
                 'title' => 'required|string|max:255',
