@@ -92,5 +92,4 @@ class RotateLogs extends Command
             }
         }
     }
-    }
 }

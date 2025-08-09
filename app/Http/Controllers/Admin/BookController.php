@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use ZipArchive;
 
 class BookController extends Controller
 {
@@ -1045,10 +1046,14 @@ class BookController extends Controller
                 'author.*' => 'required|string|max:255',
                 'genre' => 'required|array|min:1',
                 'genre.*' => 'required|string|max:255',
+                // Allow narrator to be optional array of strings
+                'narrator' => 'sometimes|array',
+                'narrator.*' => 'nullable|string|max:255',
                 'publishedYear' => 'nullable|integer',
                 'description' => 'nullable|string',
+                // Support series entries and prefer seriesName key
                 'series' => 'nullable|array',
-                'series.*.name' => 'nullable|string',
+                'series.*.seriesName' => 'nullable|string',
                 'series.*.number' => 'nullable|string',
                 'directoryPath' => 'nullable|string',
             ]);
@@ -1065,8 +1070,59 @@ class BookController extends Controller
         $validated['author'] = array_map('trim', $validated['author']);
 
         // Optional fields
+        // Narrator: accept array, trim values, drop empties
+        if ($request->has('narrator')) {
+            $narr = $request->input('narrator', []);
+            if (!is_array($narr)) {
+                $narr = [$narr];
+            }
+            $validated['narrator'] = array_values(array_filter(array_map(function ($v) {
+                return is_string($v) ? trim($v) : '';
+            }, $narr), function ($v) {
+                return $v !== '';
+            }));
+        }
+
+        // Series: normalize entries and resolve/create series IDs
         if ($request->has('series')) {
-            $validated['series'] = $request->input('series');
+            $incomingSeries = $request->input('series', []);
+            if (!is_array($incomingSeries)) {
+                $incomingSeries = [];
+            }
+
+            try {
+                $seriesLinks = collect($incomingSeries)->map(function ($seriesEntry) {
+                    // Map legacy 'name' to 'seriesName' if present
+                    $seriesName = '';
+                    if (is_array($seriesEntry)) {
+                        $seriesName = trim($seriesEntry['seriesName'] ?? $seriesEntry['name'] ?? '');
+                    } elseif (is_string($seriesEntry)) {
+                        $seriesName = trim($seriesEntry);
+                    }
+                    if (empty($seriesName)) {
+                        return null;
+                    }
+
+                    $existingSeries = $this->documentStoreService->getSeriesByName($seriesName);
+                    $seriesId = $existingSeries['id'] ?? null;
+
+                    if (!$seriesId) {
+                        $seriesId = $this->documentStoreService->createSeries($seriesName);
+                    }
+
+                    return [
+                        'id' => $seriesId,
+                        'seriesName' => $seriesName,
+                        'number' => is_array($seriesEntry) ? ($seriesEntry['number'] ?? null) : null,
+                    ];
+                })->filter()->values();
+
+                $validated['series'] = $seriesLinks->all();
+                Log::debug('BookController@update: Series processed successfully', ['processed_series' => $validated['series']]);
+            } catch (\Exception $e) {
+                Log::error('BookController@update: Error processing series', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+                // Do not fail the whole update due to series error
+            }
         }
         if ($request->has('directoryPath')) {
             $validated['directoryPath'] = trim($request->input('directoryPath'));
@@ -1082,7 +1138,7 @@ class BookController extends Controller
         $oldDirectoryPath = $book['directoryPath'] ?? null;
         $newDirectoryPath = $validated['directoryPath'] ?? null;
         if ($oldDirectoryPath && $newDirectoryPath && $oldDirectoryPath !== $newDirectoryPath) {
-            Log::info('Moving files from old directory to new directory' . $oldDirectoryPath . '' . $newDirectoryPath . '' . $oldDirectoryPath . '');
+            Log::info('Moving files from old directory to new directory: ' . $oldDirectoryPath . ' -> ' . $newDirectoryPath);
 
             $disk = \Illuminate\Support\Facades\Storage::disk('books');
             if ($disk->exists($oldDirectoryPath)) {

@@ -33,9 +33,7 @@ class BookFactory extends Factory
             'publisher' => $this->faker->company(),
             'needs_review' => false,
             'audio_file_count' => $this->faker->numberBetween(1, 20),
-            'total_size' => $this->faker->numberBetween(10000000, 1000000000),
-            'created_at' => $this->faker->dateTimeBetween('-1 year', 'now'),
-            'updated_at' => $this->faker->dateTimeBetween('-1 year', 'now'),
+            'isbn' => $this->faker->isbn13(),
         ];
     }
 }

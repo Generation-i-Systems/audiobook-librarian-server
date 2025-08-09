@@ -7,8 +7,10 @@ use App\Http\Controllers\Api\BookRequestApiController;
 use App\Http\Controllers\Api\ExternalReadApiController;
 use App\Http\Controllers\Api\FollowApiController;
 use App\Http\Controllers\Api\MessageApiController;
+use App\Http\Controllers\Api\ProgressController;
 use App\Http\Controllers\Api\ReadingProgressApiController;
 use App\Http\Controllers\Api\ReadingStatsApiController;
+use App\Http\Controllers\Api\StatisticsController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -96,6 +98,22 @@ Route::prefix('v1')->group(function () {
         Route::get('/books/{book}/reading-stats', [ReadingStatsApiController::class, 'getBookStats']);
         Route::get('/reading-stats/user', [ReadingStatsApiController::class, 'getUserStats']);
         Route::get('/reading-stats/streaks', [ReadingStatsApiController::class, 'getStreaks']);
+
+        // Book Progress Routes (cross-device listening continuity)
+        Route::get('/books/{book}/progress', [ProgressController::class, 'getProgress']);
+        Route::put('/books/{book}/progress', [ProgressController::class, 'updateProgress']);
+        Route::post('/books/{book}/progress/complete', [ProgressController::class, 'markCompleted']);
+        Route::delete('/books/{book}/progress', [ProgressController::class, 'resetProgress']);
+        Route::get('/progress/device', [ProgressController::class, 'getDeviceProgress']);
+
+        // Listening Statistics Routes (detailed analytics)
+        Route::post('/statistics/sessions', [StatisticsController::class, 'recordSession']);
+        Route::get('/statistics/daily', [StatisticsController::class, 'getDailyStats']);
+        Route::get('/statistics/weekly', [StatisticsController::class, 'getWeeklyStats']);
+        Route::get('/statistics/trends', [StatisticsController::class, 'getListeningTrends']);
+        Route::get('/statistics/top-books', [StatisticsController::class, 'getTopBooks']);
+        Route::get('/statistics/dashboard', [StatisticsController::class, 'getDashboardStats']);
+        Route::get('/books/{book}/statistics', [StatisticsController::class, 'getBookStats']);
 
         // Message Route
         Route::post('/messages', [MessageApiController::class, 'store']);

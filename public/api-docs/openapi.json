@@ -630,6 +630,455 @@
             "description": "List of series this book belongs to"
           }
         }
+      },
+      "BookProgress": {
+        "type": "object",
+        "properties": {
+          "book_id": {
+            "type": "integer",
+            "description": "Book ID"
+          },
+          "device_id": {
+            "type": "string",
+            "description": "Device identifier"
+          },
+          "current_position_seconds": {
+            "type": "integer",
+            "description": "Current position in seconds"
+          },
+          "total_duration_seconds": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Total book duration in seconds"
+          },
+          "progress_percentage": {
+            "type": "number",
+            "format": "float",
+            "description": "Progress percentage (0.00 to 100.00)"
+          },
+          "current_chapter": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Current chapter number"
+          },
+          "current_chapter_name": {
+            "type": "string",
+            "nullable": true,
+            "description": "Current chapter name"
+          },
+          "last_listened_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Last listened timestamp"
+          },
+          "completed": {
+            "type": "boolean",
+            "description": "Whether the book is completed"
+          },
+          "completed_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Completion timestamp"
+          },
+          "formatted_progress": {
+            "type": "string",
+            "description": "Human-readable progress time"
+          },
+          "formatted_duration": {
+            "type": "string",
+            "description": "Human-readable total duration"
+          }
+        }
+      },
+      "UpdateProgressRequest": {
+        "type": "object",
+        "required": ["device_id", "current_position_seconds"],
+        "properties": {
+          "device_id": {
+            "type": "string",
+            "description": "Device identifier"
+          },
+          "current_position_seconds": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Current position in seconds"
+          },
+          "total_duration_seconds": {
+            "type": "integer",
+            "minimum": 1,
+            "nullable": true,
+            "description": "Total book duration in seconds"
+          },
+          "current_chapter": {
+            "type": "integer",
+            "minimum": 1,
+            "nullable": true,
+            "description": "Current chapter number"
+          },
+          "current_chapter_name": {
+            "type": "string",
+            "maxLength": 255,
+            "nullable": true,
+            "description": "Current chapter name"
+          },
+          "user_id": {
+            "type": "string",
+            "maxLength": 255,
+            "nullable": true,
+            "description": "User identifier for future use"
+          }
+        }
+      },
+      "ProgressResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Progress updated successfully"
+          },
+          "data": {
+            "$ref": "#/components/schemas/BookProgress"
+          }
+        }
+      },
+      "DeviceProgressResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "book_id": {
+                  "type": "integer"
+                },
+                "book": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "cover_image": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  }
+                },
+                "current_position_seconds": {
+                  "type": "integer"
+                },
+                "progress_percentage": {
+                  "type": "number",
+                  "format": "float"
+                },
+                "formatted_progress": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "count": {
+            "type": "integer"
+          }
+        }
+      },
+      "RecordSessionRequest": {
+        "type": "object",
+        "required": ["book_id", "device_id", "seconds_listened"],
+        "properties": {
+          "book_id": {
+            "type": "integer",
+            "description": "Book ID"
+          },
+          "device_id": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "Device identifier"
+          },
+          "seconds_listened": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Duration of listening session in seconds"
+          },
+          "start_position_seconds": {
+            "type": "integer",
+            "minimum": 0,
+            "nullable": true,
+            "description": "Starting position in seconds"
+          },
+          "end_position_seconds": {
+            "type": "integer",
+            "minimum": 0,
+            "nullable": true,
+            "description": "Ending position in seconds"
+          },
+          "session_type": {
+            "type": "string",
+            "enum": ["listening", "completed", "resumed", "paused"],
+            "nullable": true,
+            "description": "Type of session"
+          },
+          "user_id": {
+            "type": "string",
+            "maxLength": 255,
+            "nullable": true,
+            "description": "User identifier"
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true,
+            "description": "Additional session metadata"
+          }
+        }
+      },
+      "SessionResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Listening session recorded successfully"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "book_id": {
+                "type": "integer"
+              },
+              "device_id": {
+                "type": "string"
+              },
+              "listening_date": {
+                "type": "string",
+                "format": "date"
+              },
+              "seconds_listened": {
+                "type": "integer"
+              },
+              "session_type": {
+                "type": "string"
+              },
+              "formatted_duration": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "DailyStatsResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "date": {
+                "type": "string",
+                "format": "date"
+              },
+              "total_seconds": {
+                "type": "integer"
+              },
+              "books_listened": {
+                "type": "integer"
+              },
+              "session_count": {
+                "type": "integer"
+              },
+              "formatted_duration": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "DashboardStatsResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "today": {
+                "type": "object",
+                "properties": {
+                  "total_seconds": {
+                    "type": "integer"
+                  },
+                  "books_listened": {
+                    "type": "integer"
+                  },
+                  "session_count": {
+                    "type": "integer"
+                  },
+                  "formatted_duration": {
+                    "type": "string"
+                  }
+                }
+              },
+              "this_week": {
+                "type": "object",
+                "properties": {
+                  "total_seconds": {
+                    "type": "integer"
+                  },
+                  "books_listened": {
+                    "type": "integer"
+                  },
+                  "session_count": {
+                    "type": "integer"
+                  },
+                  "formatted_duration": {
+                    "type": "string"
+                  }
+                }
+              },
+              "this_month": {
+                "type": "object",
+                "properties": {
+                  "total_seconds": {
+                    "type": "integer"
+                  },
+                  "books_listened": {
+                    "type": "integer"
+                  },
+                  "session_count": {
+                    "type": "integer"
+                  },
+                  "formatted_duration": {
+                    "type": "string"
+                  }
+                }
+              },
+              "all_time": {
+                "type": "object",
+                "properties": {
+                  "total_seconds": {
+                    "type": "integer"
+                  },
+                  "books_listened": {
+                    "type": "integer"
+                  },
+                  "session_count": {
+                    "type": "integer"
+                  },
+                  "days_listened": {
+                    "type": "integer"
+                  },
+                  "first_day": {
+                    "type": "string",
+                    "format": "date",
+                    "nullable": true
+                  },
+                  "last_day": {
+                    "type": "string",
+                    "format": "date",
+                    "nullable": true
+                  },
+                  "formatted_duration": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "SuccessResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "CompletedResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Book marked as completed"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "book_id": {
+                "type": "integer"
+              },
+              "device_id": {
+                "type": "string"
+              },
+              "completed": {
+                "type": "boolean",
+                "example": true
+              },
+              "completed_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "progress_percentage": {
+                "type": "number",
+                "format": "float",
+                "example": 100.00
+              }
+            }
+          }
+        }
+      },
+      "ValidationError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "example": "Validation failed"
+          },
+          "message": {
+            "type": "string",
+            "example": "Invalid input data"
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -1861,6 +2310,405 @@
           }
         }
       }
+    },
+    "/books/{book}/progress": {
+      "get": {
+        "tags": ["Progress"],
+        "summary": "Get book progress for a device",
+        "description": "Retrieves the current listening progress for a specific book and device. Returns default values if no progress exists.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "book",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Book ID"
+          },
+          {
+            "name": "device_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Device identifier"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Progress retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookProgress"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Book not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["Progress"],
+        "summary": "Update book progress",
+        "description": "Updates the listening progress for a specific book and device. Creates a new progress record if none exists.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "book",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Book ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProgressRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Progress updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgressResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Progress"],
+        "summary": "Reset book progress",
+        "description": "Removes all progress data for a specific book and device.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "book",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Book ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "device_id": {
+                    "type": "string",
+                    "description": "Device identifier"
+                  }
+                },
+                "required": ["device_id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Progress reset successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/books/{book}/progress/complete": {
+      "post": {
+        "tags": ["Progress"],
+        "summary": "Mark book as completed",
+        "description": "Marks a book as completed for the specified device.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "book",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Book ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "device_id": {
+                    "type": "string",
+                    "description": "Device identifier"
+                  }
+                },
+                "required": ["device_id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Book marked as completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompletedResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Book or progress not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/progress/device": {
+      "get": {
+        "tags": ["Progress"],
+        "summary": "Get device progress",
+        "description": "Returns recent listening progress for all books on a specific device.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Device identifier"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "description": "Maximum number of books to return"
+          },
+          {
+            "name": "completed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Filter by completion status"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Device progress retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceProgressResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/statistics/sessions": {
+      "post": {
+        "tags": ["Statistics"],
+        "summary": "Record listening session",
+        "description": "Records a listening session with duration and metadata for analytics.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordSessionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Session recorded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/statistics/daily": {
+      "get": {
+        "tags": ["Statistics"],
+        "summary": "Get daily statistics",
+        "description": "Returns listening statistics for a specific day and device.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Device identifier"
+          },
+          {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Date in YYYY-MM-DD format (defaults to today)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daily statistics retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyStatsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/statistics/dashboard": {
+      "get": {
+        "tags": ["Statistics"],
+        "summary": "Get dashboard statistics",
+        "description": "Returns comprehensive statistics for dashboard display including today, week, month, and all-time data.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "device_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Device identifier"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dashboard statistics retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardStatsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "tags": [
@@ -1879,6 +2727,14 @@
     {
       "name": "Books",
       "description": "Audiobook management and browsing endpoints"
+    },
+    {
+      "name": "Progress",
+      "description": "Cross-device listening progress tracking endpoints"
+    },
+    {
+      "name": "Statistics",
+      "description": "Listening analytics and statistics endpoints"
     }
   ]
 }
