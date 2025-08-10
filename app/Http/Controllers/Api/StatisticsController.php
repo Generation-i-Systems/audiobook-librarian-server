@@ -93,8 +93,8 @@ class StatisticsController extends Controller
 
         $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
 
-        $startDate = $validated['start_date'] ? Carbon::parse($validated['start_date']) : now()->subDays(29);
-        $endDate = $validated['end_date'] ? Carbon::parse($validated['end_date']) : now();
+        $startDate = ($validated['start_date'] ?? null) ? Carbon::parse($validated['start_date']) : now()->subDays(29);
+        $endDate = ($validated['end_date'] ?? null) ? Carbon::parse($validated['end_date']) : now();
         $limit = $validated['limit'] ?? 30;
 
         $stats = ListeningStatistic::where('device_id', $userId)

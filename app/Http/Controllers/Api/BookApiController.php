@@ -455,6 +455,7 @@ class BookApiController extends Controller
                 'message' => 'The specified book could not be found',
             ], 404);
         }
+
         $directoryPath = $book['directoryPath'] ?? null;
         if (!$directoryPath || !Storage::disk('books')->exists($directoryPath)) {
             return response()->json([
@@ -462,6 +463,7 @@ class BookApiController extends Controller
                 'message' => 'The book files could not be located',
             ], 404);
         }
+
         $files = Storage::disk('books')->files($directoryPath);
         if (empty($files)) {
             return response()->json([
@@ -469,125 +471,259 @@ class BookApiController extends Controller
                 'message' => 'No audio files found for this book',
             ], 404);
         }
-        $zipFileName = str_replace(' ', '_', $book['title']) . '.zip';
 
-        // Ensure temp directory exists
-        $tempDir = storage_path('app/public/temp');
-        if (!file_exists($tempDir)) {
-            if (!mkdir($tempDir, 0755, true)) {
-                Log::error('Failed to create temp directory', ['path' => $tempDir]);
-                abort(500, 'Failed to create temporary directory for zip archive.');
-            }
-        }
-
-        $zipPath = $tempDir . '/' . $zipFileName;
-        $zip = new ZipArchive();
-
-        $result = $zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
-        if ($result !== true) {
-            Log::error('Failed to open zip archive', [
-                'zipPath' => $zipPath,
-                'result' => $result,
-                'tempDir' => $tempDir,
-                'tempDirExists' => file_exists($tempDir),
-                'tempDirWritable' => is_writable($tempDir),
-            ]);
-            abort(500, 'Failed to create zip archive: ' . $result);
-        }
+        // Filter and categorize files
+        $audioFiles = [];
+        $coverFile = null;
+        $otherFiles = [];
 
         foreach ($files as $file) {
-            $filePath = Storage::disk('books')->path($file);
-            if (!$zip->addFile($filePath, basename($file))) {
-                Log::warning('Failed to add file to zip', [
-                    'file' => $file,
-                    'filePath' => $filePath,
-                    'fileExists' => file_exists($filePath),
-                ]);
+            $extension = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+            $fileName = basename($file);
+
+            if (in_array($extension, ['mp3', 'm4a', 'wav', 'aac', 'ogg', 'flac', 'm4b'])) {
+                $audioFiles[] = [
+                    'filename' => $fileName,
+                    'path' => $file,
+                    'size' => Storage::disk('books')->size($file),
+                    'type' => 'audio',
+                    'download_url' => route('api.books.downloadFile', ['book' => $id, 'file' => urlencode($fileName)]),
+                ];
+            } elseif (in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp']) && 
+                      (strpos(strtolower($fileName), 'cover') !== false || strpos(strtolower($fileName), 'folder') !== false)) {
+                $coverFile = [
+                    'filename' => $fileName,
+                    'path' => $file,
+                    'size' => Storage::disk('books')->size($file),
+                    'type' => 'cover',
+                    'download_url' => route('api.books.downloadFile', ['book' => $id, 'file' => urlencode($fileName)]),
+                ];
+            } else {
+                $otherFiles[] = [
+                    'filename' => $fileName,
+                    'path' => $file,
+                    'size' => Storage::disk('books')->size($file),
+                    'type' => 'other',
+                    'download_url' => route('api.books.downloadFile', ['book' => $id, 'file' => urlencode($fileName)]),
+                ];
             }
         }
 
-        if (!$zip->close()) {
-            Log::error('Failed to close zip archive', [
-                'zipPath' => $zipPath,
-                'numFiles' => $zip->numFiles,
-            ]);
-            abort(500, 'Failed to finalize zip archive.');
+        // Sort audio files alphanumerically
+        usort($audioFiles, function ($a, $b) {
+            return strnatcmp($a['filename'], $b['filename']);
+        });
+
+        // Calculate total size
+        $totalSize = array_sum(array_column($audioFiles, 'size'));
+        if ($coverFile) {
+            $totalSize += $coverFile['size'];
+        }
+        $totalSize += array_sum(array_column($otherFiles, 'size'));
+
+        // Build ordered file list (cover first, then audio files alphabetically, then other files)
+        $orderedFiles = [];
+        if ($coverFile) {
+            $orderedFiles[] = $coverFile;
+        }
+        $orderedFiles = array_merge($orderedFiles, $audioFiles, $otherFiles);
+
+        // Generate download manifest
+        $manifest = [
+            'book_id' => (int) $id,
+            'title' => $book['title'] ?? '',
+            'total_files' => count($orderedFiles),
+            'total_size' => $totalSize,
+            'files' => $orderedFiles,
+            'download_instructions' => [
+                'order' => 'Files should be downloaded in the provided order',
+                'recommended_start' => 'Start with cover image, then first audio file',
+                'resume' => 'Use Range headers to resume interrupted downloads',
+            ],
+            'generated_at' => now()->toISOString(),
+        ];
+
+        return response()->json($manifest);
+    }
+
+    /**
+     * Download individual file from a book
+     */
+    public function downloadFile($id, $fileName)
+    {
+        $book = $this->documentStoreService->getBook($id);
+        if (!$book) {
+            return response()->json([
+                'error' => 'Book not found',
+                'message' => 'The specified book could not be found',
+            ], 404);
         }
 
-        // Verify the zip file exists and is readable before starting the stream
-        if (!file_exists($zipPath) || !is_readable($zipPath)) {
-            Log::error('Zip file not found or not readable for streaming', [
-                'zipPath' => $zipPath,
-                'exists' => file_exists($zipPath),
-                'readable' => is_readable($zipPath)
-            ]);
-            abort(500, 'Zip file is not accessible for download.');
+        $directoryPath = $book['directoryPath'] ?? null;
+        if (!$directoryPath || !Storage::disk('books')->exists($directoryPath)) {
+            return response()->json([
+                'error' => 'Book directory not found',
+                'message' => 'The book files could not be located',
+            ], 404);
         }
 
-        // Get file size for Content-Length header
-        $fileSize = filesize($zipPath);
+        // Decode the filename and find the file
+        $fileName = urldecode($fileName);
+        $filePath = null;
+        $files = Storage::disk('books')->files($directoryPath);
+        
+        foreach ($files as $file) {
+            if (basename($file) === $fileName) {
+                $filePath = $file;
+                break;
+            }
+        }
 
-        // Use chunked transfer encoding for streaming large zip files
-        return response()->stream(
-            function () use ($zipPath) {
-                $handle = fopen($zipPath, 'rb');
-                if ($handle === false) {
-                    Log::error('Failed to open zip file for streaming', ['zipPath' => $zipPath]);
-                    // Don't abort here as headers are already sent
-                    return;
+        if (!$filePath || !Storage::disk('books')->exists($filePath)) {
+            return response()->json([
+                'error' => 'File not found',
+                'message' => 'The requested file could not be found',
+            ], 404);
+        }
+
+        // Determine content type based on file extension
+        $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+        $contentType = $this->getContentTypeByExtension($extension);
+        
+        // Get file size for Range header support
+        $fileSize = Storage::disk('books')->size($filePath);
+        $fullPath = Storage::disk('books')->path($filePath);
+
+        // Handle Range requests for resumable downloads
+        $headers = [
+            'Content-Type' => $contentType,
+            'Content-Length' => $fileSize,
+            'Accept-Ranges' => 'bytes',
+            'Cache-Control' => 'public, max-age=3600',
+            'Access-Control-Allow-Origin' => '*',
+            'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+            'Access-Control-Allow-Headers' => 'Content-Type, Authorization, Range',
+            'Access-Control-Expose-Headers' => 'Content-Range, Accept-Ranges, Content-Length',
+        ];
+
+        $request = request();
+        $rangeHeader = $request->header('Range');
+        
+        if ($rangeHeader) {
+            return $this->handleRangeRequest($fullPath, $fileSize, $rangeHeader, $contentType);
+        }
+
+        // Regular download
+        return response()->stream(function () use ($fullPath) {
+            $handle = fopen($fullPath, 'rb');
+            if ($handle === false) {
+                return;
+            }
+
+            while (!feof($handle)) {
+                $chunk = fread($handle, 8192);
+                if ($chunk !== false && strlen($chunk) > 0) {
+                    echo $chunk;
+                    if (ob_get_level()) {
+                        ob_flush();
+                    }
+                    flush();
                 }
-
-                try {
-                    while (!feof($handle)) {
-                        $chunk = fread($handle, 8192); // Read in 8KB chunks
-                        if ($chunk === false) {
-                            Log::error('Failed to read chunk from zip file', ['zipPath' => $zipPath]);
-                            break;
-                        }
-
-                        if (strlen($chunk) > 0) {
-                            echo $chunk;
-                            if (ob_get_level()) {
-                                ob_flush();
-                            }
-                            flush(); // Force output of current buffer
-                        }
-
-                        // Check if client disconnected
-                        if (connection_aborted()) {
-                            Log::info('Client disconnected during zip download', ['zipPath' => $zipPath]);
-                            break;
-                        }
-                    }
-                } catch (\Exception $e) {
-                    Log::error('Exception during zip file streaming', [
-                        'zipPath' => $zipPath,
-                        'message' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString()
-                    ]);
-                } finally {
-                    if (is_resource($handle)) {
-                        fclose($handle);
-                    }
-                    // Clean up the temporary file after streaming
-                    if (file_exists($zipPath)) {
-                        unlink($zipPath);
-                    }
+                if (connection_aborted()) {
+                    break;
                 }
-            },
-            200,
-            [
-                'Content-Type' => 'application/zip',
-                'Content-Disposition' => 'attachment; filename="' . $zipFileName . '"',
-                'Content-Length' => $fileSize,
-                'Cache-Control' => 'no-store, no-cache, must-revalidate',
-                'Pragma' => 'no-cache',
-                'Access-Control-Allow-Origin' => '*',
-                'Access-Control-Allow-Methods' => 'GET, OPTIONS',
-                'Access-Control-Allow-Headers' => 'Content-Type, Authorization',
-                'Accept-Ranges' => 'bytes',
-            ]
-        );
+            }
+            fclose($handle);
+        }, 200, $headers);
+    }
+
+    /**
+     * Handle HTTP Range requests for resumable downloads
+     */
+    private function handleRangeRequest($filePath, $fileSize, $rangeHeader, $contentType)
+    {
+        if (!preg_match('/bytes=(\d+)-(\d+)?/', $rangeHeader, $matches)) {
+            return response('Invalid range', 416);
+        }
+
+        $start = (int) $matches[1];
+        $end = isset($matches[2]) && $matches[2] !== '' ? (int) $matches[2] : $fileSize - 1;
+        
+        if ($start > $end || $start >= $fileSize || $end >= $fileSize) {
+            return response('Range not satisfiable', 416, [
+                'Content-Range' => "bytes */{$fileSize}"
+            ]);
+        }
+
+        $length = $end - $start + 1;
+        
+        $headers = [
+            'Content-Type' => $contentType,
+            'Content-Length' => $length,
+            'Accept-Ranges' => 'bytes',
+            'Content-Range' => "bytes {$start}-{$end}/{$fileSize}",
+            'Access-Control-Allow-Origin' => '*',
+            'Access-Control-Allow-Methods' => 'GET, OPTIONS',
+            'Access-Control-Allow-Headers' => 'Content-Type, Authorization, Range',
+            'Access-Control-Expose-Headers' => 'Content-Range, Accept-Ranges, Content-Length',
+        ];
+
+        return response()->stream(function () use ($filePath, $start, $length) {
+            $handle = fopen($filePath, 'rb');
+            if ($handle === false) {
+                return;
+            }
+
+            fseek($handle, $start);
+            $remaining = $length;
+            
+            while ($remaining > 0 && !feof($handle)) {
+                $chunkSize = min(8192, $remaining);
+                $chunk = fread($handle, $chunkSize);
+                
+                if ($chunk === false || strlen($chunk) === 0) {
+                    break;
+                }
+                
+                echo $chunk;
+                $remaining -= strlen($chunk);
+                
+                if (ob_get_level()) {
+                    ob_flush();
+                }
+                flush();
+                
+                if (connection_aborted()) {
+                    break;
+                }
+            }
+            fclose($handle);
+        }, 206, $headers);
+    }
+
+    /**
+     * Get MIME content type by file extension
+     */
+    private function getContentTypeByExtension($extension)
+    {
+        $mimeTypes = [
+            'mp3' => 'audio/mpeg',
+            'm4a' => 'audio/mp4',
+            'm4b' => 'audio/mp4',
+            'wav' => 'audio/wav',
+            'aac' => 'audio/aac',
+            'ogg' => 'audio/ogg',
+            'flac' => 'audio/flac',
+            'jpg' => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            'txt' => 'text/plain',
+            'nfo' => 'text/plain',
+        ];
+
+        return $mimeTypes[$extension] ?? 'application/octet-stream';
     }
 
     /**
@@ -619,20 +755,58 @@ class BookApiController extends Controller
             ], 404);
         }
 
-        // Calculate total file size
+        // Generate signed URLs for individual files with 1 hour expiration
+        $expiresAt = now()->addHour();
+        $signature = hash('sha256', $id . $expiresAt->timestamp . config('app.key'));
+        
+        $fileUrls = [];
         $totalSize = 0;
+
         foreach ($files as $file) {
-            $totalSize += Storage::disk('books')->size($file);
+            $fileName = basename($file);
+            $fileSize = Storage::disk('books')->size($file);
+            $totalSize += $fileSize;
+            
+            $fileUrls[] = [
+                'filename' => $fileName,
+                'size' => $fileSize,
+                'download_url' => route('api.books.downloadFile', [
+                    'book' => $id, 
+                    'file' => urlencode($fileName)
+                ]) . "?expires={$expiresAt->timestamp}&signature={$signature}",
+            ];
         }
 
-        // Generate a temporary signed URL that expires in 1 hour
-        $expiresAt = now()->addHour();
-        $downloadUrl = route('api.books.download', ['book' => $id]) . '?expires=' . $expiresAt->timestamp . '&signature=' . hash('sha256', $id . $expiresAt->timestamp . config('app.key'));
+        // Sort files to prioritize cover first, then audio files alphabetically
+        usort($fileUrls, function($a, $b) {
+            $extensionA = strtolower(pathinfo($a['filename'], PATHINFO_EXTENSION));
+            $extensionB = strtolower(pathinfo($b['filename'], PATHINFO_EXTENSION));
+            
+            // Cover images first
+            $isCoverA = in_array($extensionA, ['jpg', 'jpeg', 'png', 'gif', 'webp']) && 
+                       (strpos(strtolower($a['filename']), 'cover') !== false || strpos(strtolower($a['filename']), 'folder') !== false);
+            $isCoverB = in_array($extensionB, ['jpg', 'jpeg', 'png', 'gif', 'webp']) && 
+                       (strpos(strtolower($b['filename']), 'cover') !== false || strpos(strtolower($b['filename']), 'folder') !== false);
+            
+            if ($isCoverA && !$isCoverB) return -1;
+            if (!$isCoverA && $isCoverB) return 1;
+            
+            // Then alphabetical
+            return strnatcmp($a['filename'], $b['filename']);
+        });
 
         return response()->json([
-            'download_url' => $downloadUrl,
+            'book_id' => (int) $id,
+            'title' => $book['title'] ?? '',
             'expires_at' => $expiresAt->toISOString(),
-            'file_size' => $totalSize,
+            'total_size' => $totalSize,
+            'total_files' => count($fileUrls),
+            'files' => $fileUrls,
+            'download_instructions' => [
+                'order' => 'Download files in the provided order for best experience',
+                'resume' => 'All URLs support HTTP Range headers for resumable downloads',
+                'authentication' => 'URLs are signed and will expire at the specified time',
+            ]
         ]);
     }
 

@@ -258,7 +258,7 @@ class BookController extends Controller
                 'series' => $request->get('series', []),
                 'title' => $request->get('title', ''),
                 'description' => $request->get('description', ''),
-                'publishedYear' => $request->get('publishedYear', ''),
+                'release_date' => $request->get('release_date', ''),
                 'language' => $request->get('language', 'en'),
                 'isbn' => $request->get('isbn', ''),
                 'asin' => $request->get('asin', ''),
@@ -333,11 +333,16 @@ class BookController extends Controller
                         $initial['narrator'] = $tags['composer'];
                     }
 
-                    if (!empty($tags['date']) && empty($initial['publishedYear'])) {
-                        // Extract year from date (e.g., "2025-06-17" -> "2025")
-                        $year = substr($tags['date'], 0, 4);
-                        if (is_numeric($year) && $year >= 1000 && $year <= date('Y')) {
-                            $initial['publishedYear'] = (int)$year;
+                    if (!empty($tags['date']) && empty($initial['release_date'])) {
+                        // Use the date directly if it's a valid date format
+                        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $tags['date'])) {
+                            $initial['release_date'] = $tags['date'];
+                        } else {
+                            // Extract year and create a date (e.g., "2025" -> "2025-01-01")
+                            $year = substr($tags['date'], 0, 4);
+                            if (is_numeric($year) && $year >= 1000 && $year <= date('Y')) {
+                                $initial['release_date'] = $year . '-01-01';
+                            }
                         }
                     }
 
@@ -350,8 +355,11 @@ class BookController extends Controller
                 if (!empty($meta['description']) && empty($initial['description'])) {
                     $initial['description'] = $meta['description'];
                 }
-                if (!empty($meta['year']) && empty($initial['publishedYear'])) {
-                    $initial['publishedYear'] = $meta['year'];
+                if (!empty($meta['year']) && empty($initial['release_date'])) {
+                    // Convert year to date format
+                    if (is_numeric($meta['year']) && $meta['year'] >= 1000 && $meta['year'] <= date('Y')) {
+                        $initial['release_date'] = $meta['year'] . '-01-01';
+                    }
                 }
             }
         }
@@ -1052,8 +1060,11 @@ class BookController extends Controller
         if (array_key_exists('narrators', $incoming) && !array_key_exists('narrator', $incoming)) {
             $normalizations['narrator'] = $incoming['narrators'];
         }
-        if (array_key_exists('published_year', $incoming) && !array_key_exists('publishedYear', $incoming)) {
-            $normalizations['publishedYear'] = $incoming['published_year'];
+        if (array_key_exists('published_year', $incoming) && !array_key_exists('release_date', $incoming)) {
+            // Convert old published_year to release_date format
+            if (is_numeric($incoming['published_year'])) {
+                $normalizations['release_date'] = $incoming['published_year'] . '-01-01';
+            }
         }
         if (array_key_exists('directory_path', $incoming) && !array_key_exists('directoryPath', $incoming)) {
             $normalizations['directoryPath'] = $incoming['directory_path'];
@@ -1072,7 +1083,7 @@ class BookController extends Controller
                 // Allow narrator to be optional array of strings
                 'narrator' => 'sometimes|array',
                 'narrator.*' => 'nullable|string|max:255',
-                'publishedYear' => 'nullable|integer',
+                'release_date' => 'nullable|date',
                 'description' => 'nullable|string',
                 // Support series entries and prefer seriesName key
                 'series' => 'nullable|array',
@@ -1153,8 +1164,8 @@ class BookController extends Controller
         if ($request->has('description')) {
             $validated['description'] = trim($request->input('description'));
         }
-        if ($request->has('publishedYear')) {
-            $validated['publishedYear'] = $request->input('publishedYear');
+        if ($request->has('release_date')) {
+            $validated['release_date'] = $request->input('release_date');
         }
 
         // Move files if directoryPath changed

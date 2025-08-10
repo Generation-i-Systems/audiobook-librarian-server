@@ -31,6 +31,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/books/enhanced', [BookApiController::class, 'booksEnhanced']);
         Route::get('/books/{book}', [BookApiController::class, 'show']);
         Route::get('/books/{book}/download', [BookApiController::class, 'download']);
+        Route::get('/books/{book}/download/{file}', [BookApiController::class, 'downloadFile'])->name('api.books.downloadFile');
         Route::get('/books/{book}/download-url', [BookApiController::class, 'downloadUrl']);
         Route::get('/books/browse', [BookApiController::class, 'browse']);
         Route::get('/books/search', [BookApiController::class, 'search']);

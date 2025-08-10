@@ -219,11 +219,11 @@
             </div>
         </div>
         <div class="form-group">
-            <label for="publishedYear">Published Year (Optional):</label>
-            <input type="number" class="form-control @error('publishedYear') is-invalid @enderror" id="publishedYear"
-                name="publishedYear" min="1000" max="9999"
-                value="{{ old('publishedYear', old('publishedYear', isset($book) && !empty($book['publishedYear']) ? $book['publishedYear'] : (isset($book) && !empty($book['published_year']) ? $book['published_year'] : ($initial['publishedYear'] ?? $initial['published_year'] ?? null)))) }}">
-            @error('publishedYear')
+            <label for="release_date">Release Date (Optional):</label>
+            <input type="date" class="form-control @error('release_date') is-invalid @enderror" id="release_date"
+                name="release_date"
+                value="{{ old('release_date', isset($book) && !empty($book['release_date']) ? $book['release_date'] : ($initial['release_date'] ?? null)) }}">
+            @error('release_date')
                 <span class="invalid-feedback d-block">{{ $message }}</span>
             @enderror
         </div>

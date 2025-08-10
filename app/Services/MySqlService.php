@@ -54,8 +54,8 @@ class MySqlService implements DocumentStoreServiceInterface
         if (!empty($bookArray['series'])) {
             $camelCasedBook['series'] = collect($bookArray['series'])->map(function ($series) {
                 return [
-                    'name' => $series['name'] ?? null,
-                    'series_number' => $series['pivot']['series_number'] ?? null,
+                    'seriesName' => $series['name'] ?? null,
+                    'number' => $series['pivot']['series_number'] ?? null,
                 ];
             })->all();
         }
@@ -63,6 +63,18 @@ class MySqlService implements DocumentStoreServiceInterface
         // Handle cover image separately to ensure the key is correct
         if (isset($bookArray['cover_image'])) {
             $camelCasedBook['coverImage'] = $bookArray['cover_image'];
+        }
+        
+        // Map release_date to publishedYear (extract year if date is YYYY-01-01, otherwise keep full date)
+        if (isset($bookArray['release_date'])) {
+            $releaseDate = $bookArray['release_date'];
+            if ($releaseDate && preg_match('/^(\d{4})-01-01/', $releaseDate, $matches)) {
+                // If the date is YYYY-01-01, just use the year
+                $camelCasedBook['publishedYear'] = (int)$matches[1];
+            } elseif ($releaseDate) {
+                // Otherwise, keep the full date
+                $camelCasedBook['publishedYear'] = $releaseDate;
+            }
         }
 
         return $camelCasedBook;
@@ -583,7 +595,7 @@ class MySqlService implements DocumentStoreServiceInterface
             $book = Book::findOrFail($id);
             
             // Handle publishedYear -> release_date mapping
-            if (isset($data['publishedYear']) && !empty($data['publishedYear'])) {
+            if (isset($data['publishedYear']) && !empty($data['publishedYear']) && is_numeric($data['publishedYear'])) {
                 $data['release_date'] = $data['publishedYear'] . '-01-01';
             }
 

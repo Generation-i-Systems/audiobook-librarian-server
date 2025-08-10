@@ -267,7 +267,11 @@ function initializeAutocomplete($container, selector, sourceUrl) {
             .then(data => {
                 $container.find('#autofill-btn').prop('disabled', false).html('<i class="fas fa-search"></i> Autofill from Google Books');
                 if (data.match_type === 'close') {
-                    if (data.published_year) $container.find('#published_year').val(data.published_year);
+                    if (data.published_year) {
+                        // Convert year to date format
+                        const year = data.published_year;
+                        $container.find('#release_date').val(year + '-01-01');
+                    }
                     if (data.description) $container.find('#description').val(data.description);
                     if (data.cover_image_url) {
                         try {
@@ -304,7 +308,10 @@ function initializeAutocomplete($container, selector, sourceUrl) {
                     $container.find('input[name="google_books_match_select"]').off('change').on('change', function () {
                         const idx = $(this).val();
                         const match = data.matches[idx];
-                        if (match.published_year) $container.find('#published_year').val(match.published_year);
+                        if (match.published_year) {
+                            // Convert year to date format
+                            $container.find('#release_date').val(match.published_year + '-01-01');
+                        }
                         if (match.description) $container.find('#description').val(match.description);
                         // Update authors
                         $container.find('#authors-group').empty();
@@ -1305,15 +1312,17 @@ $(function () {
                                     );
                                 }
 
-                                // Published Year - handle both formats
-                                var pubYearInput = $("#publishedYear");
+                                // Release Date - handle both formats
+                                var releaseDateInput = $("#release_date");
                                 var publishedYear =
                                     item.publishedYear ||
                                     (item.published_date
                                         ? item.published_date.substring(0, 4)
                                         : "");
-                                if (pubYearInput.length && publishedYear)
-                                    pubYearInput.val(publishedYear);
+                                if (releaseDateInput.length && publishedYear) {
+                                    // Convert year to date format
+                                    releaseDateInput.val(publishedYear + '-01-01');
+                                }
 
                                 // Cover - handle both formats
                                 var coverUrl =

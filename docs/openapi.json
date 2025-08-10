@@ -335,6 +335,166 @@
           }
         }
       },
+      "DownloadManifest": {
+        "type": "object",
+        "properties": {
+          "book_id": {
+            "type": "integer",
+            "description": "Book identifier",
+            "example": 1
+          },
+          "title": {
+            "type": "string",
+            "description": "Book title",
+            "example": "The Fellowship of the Ring"
+          },
+          "total_files": {
+            "type": "integer",
+            "description": "Total number of files available",
+            "example": 13
+          },
+          "total_size": {
+            "type": "integer",
+            "description": "Total size of all files in bytes",
+            "example": 687194112
+          },
+          "files": {
+            "type": "array",
+            "description": "List of all downloadable files ordered by priority (cover first, then audio alphabetically)",
+            "items": {
+              "$ref": "#/components/schemas/DownloadFile"
+            }
+          },
+          "download_instructions": {
+            "$ref": "#/components/schemas/DownloadInstructions"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When this manifest was generated",
+            "example": "2024-01-15T10:30:00Z"
+          }
+        },
+        "required": ["book_id", "title", "total_files", "total_size", "files", "download_instructions", "generated_at"]
+      },
+      "DownloadFile": {
+        "type": "object", 
+        "properties": {
+          "filename": {
+            "type": "string",
+            "description": "Original filename",
+            "example": "01 - Chapter 1.mp3"
+          },
+          "size": {
+            "type": "integer",
+            "description": "File size in bytes",
+            "example": 58720000
+          },
+          "type": {
+            "type": "string",
+            "enum": ["audio", "cover", "other"],
+            "description": "Type of file",
+            "example": "audio"
+          },
+          "download_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Direct download URL for this file",
+            "example": "https://books.thelin.org/api/v1/books/1/download/01%20-%20Chapter%201.mp3"
+          }
+        },
+        "required": ["filename", "size", "type", "download_url"]
+      },
+      "SignedDownloadUrls": {
+        "type": "object",
+        "properties": {
+          "book_id": {
+            "type": "integer", 
+            "description": "Book identifier",
+            "example": 1
+          },
+          "title": {
+            "type": "string",
+            "description": "Book title",
+            "example": "The Fellowship of the Ring"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When all URLs expire",
+            "example": "2024-01-15T11:30:00Z"
+          },
+          "total_size": {
+            "type": "integer",
+            "description": "Total size of all files in bytes", 
+            "example": 687194112
+          },
+          "total_files": {
+            "type": "integer",
+            "description": "Total number of files",
+            "example": 13
+          },
+          "files": {
+            "type": "array",
+            "description": "List of files with signed download URLs",
+            "items": {
+              "$ref": "#/components/schemas/SignedDownloadFile"
+            }
+          },
+          "download_instructions": {
+            "$ref": "#/components/schemas/DownloadInstructions"
+          }
+        },
+        "required": ["book_id", "title", "expires_at", "total_size", "total_files", "files", "download_instructions"]
+      },
+      "SignedDownloadFile": {
+        "type": "object",
+        "properties": {
+          "filename": {
+            "type": "string",
+            "description": "Original filename",
+            "example": "01 - Chapter 1.mp3"
+          },
+          "size": {
+            "type": "integer",
+            "description": "File size in bytes",
+            "example": 58720000
+          },
+          "download_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Signed URL with expiration for downloading this file",
+            "example": "https://books.thelin.org/api/v1/books/1/download/01%20-%20Chapter%201.mp3?expires=1705314600&signature=abc123"
+          }
+        },
+        "required": ["filename", "size", "download_url"]
+      },
+      "DownloadInstructions": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "type": "string",
+            "description": "Recommended download order",
+            "example": "Files should be downloaded in the provided order"
+          },
+          "recommended_start": {
+            "type": "string", 
+            "description": "Suggested starting files for optimal experience",
+            "example": "Start with cover image, then first audio file"
+          },
+          "resume": {
+            "type": "string",
+            "description": "Information about resumable downloads",
+            "example": "Use Range headers to resume interrupted downloads"
+          },
+          "authentication": {
+            "type": "string",
+            "description": "Authentication information for signed URLs",
+            "example": "URLs are signed and will expire at the specified time"
+          }
+        },
+        "required": ["order", "recommended_start", "resume"]
+      },
       "PaginationMeta": {
         "type": "object",
         "properties": {
@@ -1789,6 +1949,355 @@
                       "error": "Unauthorized"
                     }
                   }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/books/{book}/download": {
+      "get": {
+        "tags": ["Books"],
+        "summary": "Get book download manifest",
+        "description": "Returns a manifest containing all files for the book with individual download URLs. Files are ordered with cover image first, then audio files alphabetically.",
+        "operationId": "getBookDownload",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "book",
+            "in": "path",
+            "description": "Book ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Download manifest generated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DownloadManifest"
+                },
+                "examples": {
+                  "download_manifest": {
+                    "summary": "Complete download manifest with files",
+                    "value": {
+                      "book_id": 1,
+                      "title": "The Fellowship of the Ring",
+                      "total_files": 13,
+                      "total_size": 687194112,
+                      "files": [
+                        {
+                          "filename": "cover.jpg",
+                          "size": 256000,
+                          "type": "cover",
+                          "download_url": "https://books.thelin.org/api/v1/books/1/download/cover.jpg"
+                        },
+                        {
+                          "filename": "01 - Chapter 1.mp3",
+                          "size": 58720000,
+                          "type": "audio",
+                          "download_url": "https://books.thelin.org/api/v1/books/1/download/01%20-%20Chapter%201.mp3"
+                        },
+                        {
+                          "filename": "02 - Chapter 2.mp3", 
+                          "size": 61440000,
+                          "type": "audio",
+                          "download_url": "https://books.thelin.org/api/v1/books/1/download/02%20-%20Chapter%202.mp3"
+                        },
+                        {
+                          "filename": "12 - Epilogue.mp3",
+                          "size": 34560000,
+                          "type": "audio", 
+                          "download_url": "https://books.thelin.org/api/v1/books/1/download/12%20-%20Epilogue.mp3"
+                        }
+                      ],
+                      "download_instructions": {
+                        "order": "Files should be downloaded in the provided order",
+                        "recommended_start": "Start with cover image, then first audio file",
+                        "resume": "Use Range headers to resume interrupted downloads"
+                      },
+                      "generated_at": "2024-01-15T10:30:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Book not found or has no files",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "examples": {
+                  "book_not_found": {
+                    "summary": "Book does not exist",
+                    "value": {
+                      "error": "Book not found",
+                      "message": "The specified book could not be found"
+                    }
+                  },
+                  "no_files_found": {
+                    "summary": "Book has no downloadable files",
+                    "value": {
+                      "error": "No files found",
+                      "message": "No audio files found for this book"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/books/{book}/download/{filename}": {
+      "get": {
+        "tags": ["Books"],
+        "summary": "Download individual book file",
+        "description": "Downloads a specific file from the book. Supports HTTP Range headers for resumable downloads.",
+        "operationId": "downloadBookFile",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "book",
+            "in": "path", 
+            "description": "Book ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          },
+          {
+            "name": "filename",
+            "in": "path",
+            "description": "URL-encoded filename to download",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "01%20-%20Chapter%201.mp3"
+            }
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "description": "HTTP Range header for resumable downloads",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "bytes=0-1023"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File downloaded successfully",
+            "content": {
+              "audio/mpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "audio/mp4": {
+                "schema": {
+                  "type": "string", 
+                  "format": "binary"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "headers": {
+              "Content-Length": {
+                "description": "Size of the file in bytes",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "Accept-Ranges": {
+                "description": "Indicates that range requests are supported",
+                "schema": {
+                  "type": "string",
+                  "example": "bytes"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "Partial content (range request)",
+            "content": {
+              "audio/mpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "headers": {
+              "Content-Range": {
+                "description": "The range of bytes being returned",
+                "schema": {
+                  "type": "string",
+                  "example": "bytes 0-1023/2048000"
+                }
+              },
+              "Content-Length": {
+                "description": "Size of the partial content in bytes",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Book or file not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range not satisfiable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/books/{book}/download-url": {
+      "get": {
+        "tags": ["Books"],
+        "summary": "Get signed download URLs for all book files",
+        "description": "Returns temporary signed URLs for all files in the book. URLs expire after 1 hour and support resumable downloads.",
+        "operationId": "getBookDownloadUrls",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "book",
+            "in": "path",
+            "description": "Book ID", 
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signed download URLs generated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignedDownloadUrls"
+                },
+                "examples": {
+                  "signed_urls": {
+                    "summary": "Signed URLs for all book files",
+                    "value": {
+                      "book_id": 1,
+                      "title": "The Fellowship of the Ring",
+                      "expires_at": "2024-01-15T11:30:00Z",
+                      "total_size": 687194112,
+                      "total_files": 13,
+                      "files": [
+                        {
+                          "filename": "cover.jpg",
+                          "size": 256000,
+                          "download_url": "https://books.thelin.org/api/v1/books/1/download/cover.jpg?expires=1705314600&signature=abc123"
+                        },
+                        {
+                          "filename": "01 - Chapter 1.mp3",
+                          "size": 58720000,
+                          "download_url": "https://books.thelin.org/api/v1/books/1/download/01%20-%20Chapter%201.mp3?expires=1705314600&signature=def456"
+                        }
+                      ],
+                      "download_instructions": {
+                        "order": "Download files in the provided order for best experience",
+                        "resume": "All URLs support HTTP Range headers for resumable downloads",
+                        "authentication": "URLs are signed and will expire at the specified time"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Book not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized", 
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
