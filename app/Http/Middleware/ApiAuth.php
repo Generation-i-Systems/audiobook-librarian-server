@@ -6,6 +6,7 @@ use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Laravel\Sanctum\PersonalAccessToken;
 
@@ -36,17 +37,42 @@ class ApiAuth
         $tokenPreview = substr($token, 0, 8) . '...' . substr($token, -4); // Show first 8 and last 4 chars
 
         // Try to find the token in the personal_access_tokens table
-        $accessToken = PersonalAccessToken::findToken($token);
-
-        if (!$accessToken) {
-            Log::warning('API Auth failed: Token not found in database', [
+        try {
+            $accessToken = PersonalAccessToken::findToken($token);
+            
+            // Log additional debug info for failed token lookups
+            if (!$accessToken) {
+                // Try to get more info about what's in the database
+                $tokenHash = hash('sha256', $token);
+                $directLookup = \DB::table('personal_access_tokens')
+                    ->where('token', $tokenHash)
+                    ->first();
+                    
+                Log::warning('API Auth failed: Token not found in database', [
+                    'ip' => $clientIp,
+                    'user_agent' => $userAgent,
+                    'uri' => $requestUri,
+                    'method' => $requestMethod,
+                    'token_preview' => $tokenPreview,
+                    'token_length' => strlen($token),
+                    'token_hash_preview' => substr($tokenHash, 0, 16) . '...',
+                    'direct_lookup_found' => $directLookup !== null,
+                    'db_connection' => \DB::connection()->getName(),
+                    'reason' => 'token_not_found'
+                ]);
+                return response()->json(['error' => 'Invalid or expired token'], 401);
+            }
+        } catch (\Exception $e) {
+            Log::error('API Auth failed: Database exception during token lookup', [
                 'ip' => $clientIp,
                 'user_agent' => $userAgent,
                 'uri' => $requestUri,
                 'method' => $requestMethod,
                 'token_preview' => $tokenPreview,
-                'token_length' => strlen($token),
-                'reason' => 'token_not_found'
+                'exception' => $e->getMessage(),
+                'exception_class' => get_class($e),
+                'db_connection' => \DB::connection()->getName(),
+                'reason' => 'database_exception'
             ]);
             return response()->json(['error' => 'Invalid or expired token'], 401);
         }
@@ -104,6 +130,21 @@ class ApiAuth
             ]);
             return response()->json(['error' => 'Account pending admin approval'], 403);
         }
+
+        // Log successful authentication with token preview for comparison
+        Log::info('API Auth successful', [
+            'ip' => $clientIp,
+            'user_agent' => $userAgent,
+            'uri' => $requestUri,
+            'method' => $requestMethod,
+            'token_preview' => $tokenPreview,
+            'token_id' => $accessToken->id,
+            'token_name' => $accessToken->name,
+            'user_id' => $user->id,
+            'user_email' => $user->email,
+            'user_role' => $user->role,
+            'reason' => 'auth_success'
+        ]);
 
         // Set the user in the request
         Auth::setUser($user);

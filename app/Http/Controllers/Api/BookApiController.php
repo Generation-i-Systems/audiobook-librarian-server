@@ -448,6 +448,23 @@ class BookApiController extends Controller
 
     public function download($id)
     {
+        // Log download request with token preview for comparison
+        $authHeader = request()->header('Authorization');
+        $tokenPreview = 'none';
+        if ($authHeader && preg_match('/Bearer\s(.*)/', $authHeader, $matches)) {
+            $token = $matches[1];
+            $tokenPreview = substr($token, 0, 8) . '...' . substr($token, -4);
+        }
+        
+        Log::info('Book download requested', [
+            'book_id' => $id,
+            'ip' => request()->ip(),
+            'user_agent' => request()->header('User-Agent'),
+            'token_preview' => $tokenPreview,
+            'user_id' => Auth::id(),
+            'user_email' => Auth::user()->email ?? null
+        ]);
+        
         $book = $this->documentStoreService->getBook($id);
         if (!$book) {
             return response()->json([
@@ -551,6 +568,24 @@ class BookApiController extends Controller
      */
     public function downloadFile($id, $fileName)
     {
+        // Log file download request with token preview for comparison
+        $authHeader = request()->header('Authorization');
+        $tokenPreview = 'none';
+        if ($authHeader && preg_match('/Bearer\s(.*)/', $authHeader, $matches)) {
+            $token = $matches[1];
+            $tokenPreview = substr($token, 0, 8) . '...' . substr($token, -4);
+        }
+        
+        Log::info('Book file download requested', [
+            'book_id' => $id,
+            'file_name' => $fileName,
+            'ip' => request()->ip(),
+            'user_agent' => request()->header('User-Agent'),
+            'token_preview' => $tokenPreview,
+            'user_id' => Auth::id(),
+            'user_email' => Auth::user()->email ?? null
+        ]);
+        
         $book = $this->documentStoreService->getBook($id);
         if (!$book) {
             return response()->json([
