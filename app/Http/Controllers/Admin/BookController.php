@@ -624,10 +624,12 @@ class BookController extends Controller
 
             // Create the book in the document store and capture returned ID
             $createdId = $this->documentStoreService->createBook($validated);
+            Log::debug('createBook returned ID', ['createdId' => $createdId, 'originalId' => $id]);
             if (!empty($createdId)) {
                 $id = (string) $createdId;
+                $validated['id'] = $id; // Update the validated data with the actual ID
             }
-            Log::info('Book imported successfully', ['id' => $id]);
+            Log::info('Book imported successfully', ['finalId' => $id]);
 
             // If we have import path information, attempt to move the files to the library
             if ($importPath && $importRoot && $directoryPath) {
@@ -1535,17 +1537,24 @@ class BookController extends Controller
             'seriesNumber' => $seriesNumber,
         ]);
 
+        Log::debug('SearchBooks: About to enter switch statement', [
+            'source_lower' => strtolower($source),
+            'has_apiId' => !empty($apiId),
+        ]);
+
         try {
             $results = [];
 
             switch (strtolower($source)) {
                 case 'audible':
+                    Log::debug('SearchBooks: Entered audible case', ['apiId' => $apiId]);
                     if ($apiId) {
                         $bookDetails = $this->audibleService->getBookDetails($apiId);
                         if ($bookDetails) {
                             $results[] = $bookDetails; // Already transformed by the service
                         }
                     } else {
+                        Log::debug('SearchBooks: About to call searchBooksWithFiltering');
                         // Debug Audible search parameters
                         Log::debug('Audible search parameters', [
                             'title' => $title,
@@ -1560,6 +1569,7 @@ class BookController extends Controller
                         $results = $this->audibleService->searchBooksWithFiltering($title, $authorParam, [
                             'limit' => $limit,
                         ]);
+                        Log::debug('SearchBooks: searchBooksWithFiltering completed', ['results_count' => count($results)]);
                     }
                     break;
 

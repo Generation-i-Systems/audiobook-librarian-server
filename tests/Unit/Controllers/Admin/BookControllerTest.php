@@ -91,7 +91,8 @@ class BookControllerTest extends TestCase
 
         // Mock the Google Books API service
         $this->googleBooksApiService = Mockery::mock(GoogleBooksApiService::class);
-        $this->googleBooksApiService->shouldReceive('searchBooks')->andReturnUsing(function () {
+        $this->googleBooksApiService->shouldReceive('searchBooks')->andReturnUsing(function ($query, $options = []) {
+            Log::debug('GoogleBooksApiService mock called', ['query' => $query, 'options' => $options]);
             return [
                 ['title' => 'Test Book', 'author' => 'Test Author'],
             ];
@@ -104,11 +105,7 @@ class BookControllerTest extends TestCase
                 ['title' => 'Test Book', 'author' => 'Test Author'],
             ];
         });
-        $this->audibleService->shouldReceive('searchBooksWithFiltering')->andReturnUsing(function () {
-            return [
-                ['title' => 'Test Book', 'author' => 'Test Author'],
-            ];
-        });
+        // Note: searchBooksWithFiltering expectations are set up in individual tests
 
         // Mock the external cover service
         $this->externalCoverService = Mockery::mock(ExternalCoverService::class);
@@ -156,7 +153,7 @@ class BookControllerTest extends TestCase
         // Set up the mock to return specific data for this test
         $this->googleBooksApiService = Mockery::mock(GoogleBooksApiService::class);
         $this->googleBooksApiService->shouldReceive('searchBooks')
-            ->with(Mockery::any(), Mockery::any(), Mockery::any(), Mockery::any())
+            ->with(Mockery::type('string'), Mockery::type('array'))
             ->once()
             ->andReturn([
                 ['title' => 'Test Book', 'author' => 'Test Author'],
@@ -201,6 +198,14 @@ class BookControllerTest extends TestCase
         // Assert response is successful and contains the expected data
         $this->assertEquals(200, $response->getStatusCode());
         $responseData = json_decode($response->getContent(), true);
+        
+        // Debug: Log the actual response content
+        Log::debug('Google Books test response', [
+            'status' => $response->getStatusCode(),
+            'content' => $response->getContent(),
+            'responseData' => $responseData
+        ]);
+        
         $this->assertIsArray($responseData);
         $this->assertNotEmpty($responseData);
         $this->assertEquals('Test Book', $responseData[0]['title']);
@@ -387,12 +392,13 @@ class BookControllerTest extends TestCase
             ->andReturn(['genre-id-1']);
 
         // Ensure createBook actually adds the book to our mock store
+        $storedBooks = &$this->storedBooks; // Capture reference
         $this->documentStore->shouldReceive('createBook')
             ->once()
-            ->andReturnUsing(function ($book) {
+            ->andReturnUsing(function ($book) use (&$storedBooks) {
                 $id = 'test-book-id-' . time();
                 $book['id'] = $id;
-                $this->storedBooks[$id] = $book;
+                $storedBooks[$id] = $book;
                 return $id;
             });
 
@@ -538,22 +544,28 @@ class BookControllerTest extends TestCase
         // Note: NewBookAdded event is not dispatched in the store method, only in processImport
     }
 
-    #\PHPUnit\Framework\Attributes\Test
+    #[\PHPUnit\Framework\Attributes\Test]
     public function testUpdateMethodUpdatesBook()
     {
-        // Mock the book ID
+        // Initialize session for the test
+        $this->startSession();
+        
         $bookId = 'test-book-id';
 
         // Create a request with updated book data
         $request = new Request([
             'title' => 'Updated Title',
             'authors' => ['Updated Author'],
+            'narrators' => ['Updated Narrator'],
             'genres' => ['Updated Genre'],
             'series' => 'Updated Series',
             'description' => 'Updated description',
             'sourceType' => 'file',
-            'directoryPath' => 'test/path',
+            'directoryPath' => 'test/updated/path',
         ]);
+        
+        // Set the session on the request
+        $request->setLaravelSession($this->app['session.store']);
 
         // Set up specific mocks for this test
         $this->documentStore->shouldReceive('findOrCreateMany')
@@ -562,9 +574,9 @@ class BookControllerTest extends TestCase
             ->andReturn(['author-id-1']);
 
         $this->documentStore->shouldReceive('findOrCreateMany')
-            ->with('narrators', [])
+            ->with('narrators', ['Updated Narrator'])
             ->once()
-            ->andReturn([]);
+            ->andReturn(['narrator-id-1']);
 
         $this->documentStore->shouldReceive('findOrCreateMany')
             ->with('genres', ['Updated Genre'])
@@ -596,11 +608,7 @@ class BookControllerTest extends TestCase
         // Mock the updateBook method
         $this->documentStore->shouldReceive('updateBook')
             ->once()
-            ->andReturnUsing(function () {
-                // Simulate flashing a success message to the session
-                session()->flash('success', 'Book updated successfully');
-                return ['success' => true];
-            });
+            ->andReturn(['success' => true]);
 
         // Call the update method
         $response = $this->controller->update($request, $bookId);
@@ -612,7 +620,7 @@ class BookControllerTest extends TestCase
         $this->assertEquals(route('admin.books.index'), $response->getTargetUrl());
 
         // Assert that a success message is flashed to the session
-        $this->assertEquals('Book updated successfully', session('success'));
+        $this->assertEquals('Book updated successfully', $response->getSession()->get('success'));
     }
 
     /**
