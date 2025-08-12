@@ -628,6 +628,17 @@ class BookApiController extends Controller
         // Get file size for Range header support
         $fileSize = Storage::disk('books')->size($filePath);
         $fullPath = Storage::disk('books')->path($filePath);
+        
+        // Log download start with file details
+        Log::info('File download starting', [
+            'book_id' => $id,
+            'file_name' => $fileName,
+            'file_size' => $fileSize,
+            'file_size_mb' => round($fileSize / 1024 / 1024, 2),
+            'full_path' => $fullPath,
+            'user_id' => Auth::id(),
+            'ip' => request()->ip()
+        ]);
 
         // Handle Range requests for resumable downloads
         $headers = [
@@ -649,25 +660,155 @@ class BookApiController extends Controller
         }
 
         // Regular download
-        return response()->stream(function () use ($fullPath) {
+        return response()->stream(function () use ($fullPath, $fileSize, $book, $file) {
+            $startTime = microtime(true);
+            $bytesSent = 0;
+            $chunkCount = 0;
+            $user = Auth::user();
+            
+            Log::info('Starting file download stream', [
+                'book_id' => $book['id'] ?? $id,
+                'book_title' => $book['title'] ?? 'Unknown',
+                'file_name' => $file,
+                'file_path' => $fullPath,
+                'file_size_bytes' => $fileSize,
+                'file_size_mb' => round($fileSize / (1024 * 1024), 2),
+                'user_id' => $user->id,
+                'user_email' => $user->email,
+                'client_ip' => request()->ip(),
+                'user_agent' => request()->header('User-Agent'),
+                'start_time' => date('Y-m-d H:i:s'),
+                'start_timestamp' => $startTime
+            ]);
+
             $handle = fopen($fullPath, 'rb');
             if ($handle === false) {
+                Log::error('Failed to open file for streaming', [
+                    'book_id' => $book['id'] ?? $id,
+                    'file_name' => $file,
+                    'file_path' => $fullPath,
+                    'user_id' => $user->id,
+                    'error' => 'fopen_failed'
+                ]);
                 return;
             }
 
-            while (!feof($handle)) {
-                $chunk = fread($handle, 8192);
-                if ($chunk !== false && strlen($chunk) > 0) {
-                    echo $chunk;
-                    if (ob_get_level()) {
-                        ob_flush();
+            $lastProgressLog = 0;
+            $progressLogInterval = 10 * 1024 * 1024; // Log every 10MB
+
+            try {
+                while (!feof($handle)) {
+                    $chunk = fread($handle, 8192);
+                    if ($chunk !== false && strlen($chunk) > 0) {
+                        echo $chunk;
+                        $bytesSent += strlen($chunk);
+                        $chunkCount++;
+                        
+                        if (ob_get_level()) {
+                            ob_flush();
+                        }
+                        flush();
+                        
+                        // Log progress every 10MB or at significant milestones
+                        if ($bytesSent - $lastProgressLog >= $progressLogInterval || 
+                            ($fileSize > 0 && $bytesSent >= $fileSize)) {
+                            
+                            $currentTime = microtime(true);
+                            $elapsedSeconds = $currentTime - $startTime;
+                            $progressPercent = $fileSize > 0 ? round(($bytesSent / $fileSize) * 100, 2) : 0;
+                            $avgSpeedMBps = $elapsedSeconds > 0 ? round(($bytesSent / (1024 * 1024)) / $elapsedSeconds, 2) : 0;
+                            
+                            Log::info('File download progress', [
+                                'book_id' => $book['id'] ?? $id,
+                                'file_name' => $file,
+                                'user_id' => $user->id,
+                                'bytes_sent' => $bytesSent,
+                                'bytes_sent_mb' => round($bytesSent / (1024 * 1024), 2),
+                                'total_size_bytes' => $fileSize,
+                                'total_size_mb' => round($fileSize / (1024 * 1024), 2),
+                                'progress_percent' => $progressPercent,
+                                'elapsed_seconds' => round($elapsedSeconds, 2),
+                                'avg_speed_mbps' => $avgSpeedMBps,
+                                'chunks_sent' => $chunkCount,
+                                'is_complete' => $bytesSent >= $fileSize
+                            ]);
+                            
+                            $lastProgressLog = $bytesSent;
+                        }
                     }
-                    flush();
+                    
+                    if (connection_aborted()) {
+                        $endTime = microtime(true);
+                        $elapsedSeconds = $endTime - $startTime;
+                        
+                        Log::warning('File download connection aborted by client', [
+                            'book_id' => $book['id'] ?? $id,
+                            'file_name' => $file,
+                            'user_id' => $user->id,
+                            'bytes_sent' => $bytesSent,
+                            'bytes_sent_mb' => round($bytesSent / (1024 * 1024), 2),
+                            'total_size_bytes' => $fileSize,
+                            'progress_percent' => $fileSize > 0 ? round(($bytesSent / $fileSize) * 100, 2) : 0,
+                            'elapsed_seconds' => round($elapsedSeconds, 2),
+                            'chunks_sent' => $chunkCount,
+                            'reason' => 'connection_aborted'
+                        ]);
+                        break;
+                    }
                 }
-                if (connection_aborted()) {
-                    break;
+                
+                $endTime = microtime(true);
+                $elapsedSeconds = $endTime - $startTime;
+                $isComplete = $bytesSent >= $fileSize;
+                
+                if ($isComplete) {
+                    Log::info('File download completed successfully', [
+                        'book_id' => $book['id'] ?? $id,
+                        'file_name' => $file,
+                        'user_id' => $user->id,
+                        'bytes_sent' => $bytesSent,
+                        'bytes_sent_mb' => round($bytesSent / (1024 * 1024), 2),
+                        'total_size_bytes' => $fileSize,
+                        'elapsed_seconds' => round($elapsedSeconds, 2),
+                        'avg_speed_mbps' => $elapsedSeconds > 0 ? round(($bytesSent / (1024 * 1024)) / $elapsedSeconds, 2) : 0,
+                        'chunks_sent' => $chunkCount,
+                        'status' => 'completed'
+                    ]);
+                } else {
+                    Log::warning('File download ended incomplete', [
+                        'book_id' => $book['id'] ?? $id,
+                        'file_name' => $file,
+                        'user_id' => $user->id,
+                        'bytes_sent' => $bytesSent,
+                        'bytes_sent_mb' => round($bytesSent / (1024 * 1024), 2),
+                        'total_size_bytes' => $fileSize,
+                        'progress_percent' => $fileSize > 0 ? round(($bytesSent / $fileSize) * 100, 2) : 0,
+                        'elapsed_seconds' => round($elapsedSeconds, 2),
+                        'chunks_sent' => $chunkCount,
+                        'status' => 'incomplete',
+                        'reason' => 'stream_ended_early'
+                    ]);
                 }
+                
+            } catch (\Exception $e) {
+                $endTime = microtime(true);
+                $elapsedSeconds = $endTime - $startTime;
+                
+                Log::error('File download failed with exception', [
+                    'book_id' => $book['id'] ?? $id,
+                    'file_name' => $file,
+                    'user_id' => $user->id,
+                    'bytes_sent' => $bytesSent,
+                    'bytes_sent_mb' => round($bytesSent / (1024 * 1024), 2),
+                    'elapsed_seconds' => round($elapsedSeconds, 2),
+                    'chunks_sent' => $chunkCount,
+                    'exception_message' => $e->getMessage(),
+                    'exception_class' => get_class($e),
+                    'status' => 'error'
+                ]);
+                throw $e;
             }
+            
             fclose($handle);
         }, 200, $headers);
     }
@@ -703,35 +844,160 @@ class BookApiController extends Controller
             'Access-Control-Expose-Headers' => 'Content-Range, Accept-Ranges, Content-Length',
         ];
 
-        return response()->stream(function () use ($filePath, $start, $length) {
+        return response()->stream(function () use ($filePath, $start, $length, $fileSize) {
+            $startTime = microtime(true);
+            $bytesSent = 0;
+            $chunkCount = 0;
+            $user = Auth::user();
+            
+            Log::info('Starting range download stream', [
+                'file_path' => basename($filePath),
+                'range_start' => $start,
+                'range_length' => $length,
+                'range_end' => $start + $length - 1,
+                'total_file_size' => $fileSize,
+                'user_id' => $user->id,
+                'user_email' => $user->email,
+                'client_ip' => request()->ip(),
+                'user_agent' => request()->header('User-Agent'),
+                'start_time' => date('Y-m-d H:i:s'),
+                'start_timestamp' => $startTime
+            ]);
+            
             $handle = fopen($filePath, 'rb');
             if ($handle === false) {
+                Log::error('Failed to open file for range streaming', [
+                    'file_path' => basename($filePath),
+                    'range_start' => $start,
+                    'range_length' => $length,
+                    'user_id' => $user->id,
+                    'error' => 'fopen_failed'
+                ]);
                 return;
             }
 
             fseek($handle, $start);
             $remaining = $length;
+            $progressLogInterval = max(1048576, $length / 10); // Log every 1MB or 10% of range
+            $lastProgressLog = 0;
             
-            while ($remaining > 0 && !feof($handle)) {
-                $chunkSize = min(8192, $remaining);
-                $chunk = fread($handle, $chunkSize);
-                
-                if ($chunk === false || strlen($chunk) === 0) {
-                    break;
+            try {
+                while ($remaining > 0 && !feof($handle)) {
+                    $chunkSize = min(8192, $remaining);
+                    $chunk = fread($handle, $chunkSize);
+                    
+                    if ($chunk === false || strlen($chunk) === 0) {
+                        break;
+                    }
+                    
+                    echo $chunk;
+                    $bytesSent += strlen($chunk);
+                    $chunkCount++;
+                    $remaining -= strlen($chunk);
+                    
+                    if (ob_get_level()) {
+                        ob_flush();
+                    }
+                    flush();
+                    
+                    // Log progress for range downloads
+                    if ($bytesSent - $lastProgressLog >= $progressLogInterval || $remaining <= 0) {
+                        $currentTime = microtime(true);
+                        $elapsedSeconds = $currentTime - $startTime;
+                        $progressPercent = $length > 0 ? round(($bytesSent / $length) * 100, 2) : 100;
+                        $avgSpeedMBps = $elapsedSeconds > 0 ? round(($bytesSent / (1024 * 1024)) / $elapsedSeconds, 2) : 0;
+                        
+                        Log::info('Range download progress', [
+                            'file_path' => basename($filePath),
+                            'user_id' => $user->id,
+                            'range_start' => $start,
+                            'bytes_sent' => $bytesSent,
+                            'bytes_sent_mb' => round($bytesSent / (1024 * 1024), 2),
+                            'range_length' => $length,
+                            'range_length_mb' => round($length / (1024 * 1024), 2),
+                            'progress_percent' => $progressPercent,
+                            'elapsed_seconds' => round($elapsedSeconds, 2),
+                            'avg_speed_mbps' => $avgSpeedMBps,
+                            'chunks_sent' => $chunkCount,
+                            'remaining_bytes' => $remaining,
+                            'is_complete' => $remaining <= 0
+                        ]);
+                        
+                        $lastProgressLog = $bytesSent;
+                    }
+                    
+                    if (connection_aborted()) {
+                        $endTime = microtime(true);
+                        $elapsedSeconds = $endTime - $startTime;
+                        
+                        Log::warning('Range download connection aborted by client', [
+                            'file_path' => basename($filePath),
+                            'user_id' => $user->id,
+                            'range_start' => $start,
+                            'bytes_sent' => $bytesSent,
+                            'range_length' => $length,
+                            'progress_percent' => $length > 0 ? round(($bytesSent / $length) * 100, 2) : 0,
+                            'elapsed_seconds' => round($elapsedSeconds, 2),
+                            'chunks_sent' => $chunkCount,
+                            'remaining_bytes' => $remaining,
+                            'reason' => 'connection_aborted'
+                        ]);
+                        break;
+                    }
                 }
                 
-                echo $chunk;
-                $remaining -= strlen($chunk);
+                $endTime = microtime(true);
+                $elapsedSeconds = $endTime - $startTime;
+                $isComplete = $remaining <= 0;
                 
-                if (ob_get_level()) {
-                    ob_flush();
+                if ($isComplete) {
+                    Log::info('Range download completed successfully', [
+                        'file_path' => basename($filePath),
+                        'user_id' => $user->id,
+                        'range_start' => $start,
+                        'bytes_sent' => $bytesSent,
+                        'bytes_sent_mb' => round($bytesSent / (1024 * 1024), 2),
+                        'range_length' => $length,
+                        'elapsed_seconds' => round($elapsedSeconds, 2),
+                        'avg_speed_mbps' => $elapsedSeconds > 0 ? round(($bytesSent / (1024 * 1024)) / $elapsedSeconds, 2) : 0,
+                        'chunks_sent' => $chunkCount,
+                        'status' => 'completed'
+                    ]);
+                } else {
+                    Log::warning('Range download ended incomplete', [
+                        'file_path' => basename($filePath),
+                        'user_id' => $user->id,
+                        'range_start' => $start,
+                        'bytes_sent' => $bytesSent,
+                        'range_length' => $length,
+                        'progress_percent' => $length > 0 ? round(($bytesSent / $length) * 100, 2) : 0,
+                        'elapsed_seconds' => round($elapsedSeconds, 2),
+                        'chunks_sent' => $chunkCount,
+                        'remaining_bytes' => $remaining,
+                        'status' => 'incomplete',
+                        'reason' => 'stream_ended_early'
+                    ]);
                 }
-                flush();
                 
-                if (connection_aborted()) {
-                    break;
-                }
+            } catch (\Exception $e) {
+                $endTime = microtime(true);
+                $elapsedSeconds = $endTime - $startTime;
+                
+                Log::error('Range download failed with exception', [
+                    'file_path' => basename($filePath),
+                    'user_id' => $user->id,
+                    'range_start' => $start,
+                    'bytes_sent' => $bytesSent,
+                    'elapsed_seconds' => round($elapsedSeconds, 2),
+                    'chunks_sent' => $chunkCount,
+                    'remaining_bytes' => $remaining,
+                    'exception_message' => $e->getMessage(),
+                    'exception_class' => get_class($e),
+                    'status' => 'error'
+                ]);
+                throw $e;
             }
+            
             fclose($handle);
         }, 206, $headers);
     }

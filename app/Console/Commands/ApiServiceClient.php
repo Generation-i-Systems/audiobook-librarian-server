@@ -19,8 +19,14 @@ class ApiServiceClient extends Command
     protected $signature = 'api:client 
                             {url : The API URL or URI to call}
                             {--user= : User ID to impersonate (defaults to first admin user)}
-                            {--method=GET : HTTP method to use}
+                            {--method=GET : HTTP method to use (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS)}
                             {--data= : JSON data to send with the request}
+                            {--header=* : Additional headers to send (format: "Header-Name: value")}
+                            {--download= : Download response to file (provide filename)}
+                            {--show-token : Display the auth token being used}
+                            {--timeout=30 : Request timeout in seconds}
+                            {--max-time=0 : Maximum time for the entire request (0 = unlimited)}
+                            {--show-details : Show detailed request/response information}
                             {--no-color : Disable colored output}';
 
     /**
@@ -28,7 +34,7 @@ class ApiServiceClient extends Command
      *
      * @var string
      */
-    protected $description = 'Service client to make API calls as a specific user or admin';
+    protected $description = 'Service client to make API calls as a specific user or admin with curl-like capabilities';
 
     protected DocumentStoreServiceInterface $documentStoreService;
 
@@ -52,6 +58,12 @@ class ApiServiceClient extends Command
         $userId = $this->option('user');
         $method = strtoupper($this->option('method'));
         $data = $this->option('data');
+        $headers = $this->option('header');
+        $downloadFile = $this->option('download');
+        $showToken = $this->option('show-token');
+        $timeout = (int) $this->option('timeout');
+        $maxTime = (int) $this->option('max-time');
+        $verbose = $this->option('show-details');
         $noColor = $this->option('no-color');
 
         try {
@@ -71,11 +83,26 @@ class ApiServiceClient extends Command
                 $this->info("Request Host: {$host}");
             }
 
-            // Make the API call
-            $response = $this->makeApiCall($uri, $method, $data, $user, $host);
+            // Generate token and show if requested
+            $tempToken = $this->generateTempTokenForUser($user);
+            if ($showToken) {
+                $this->line('');
+                $this->info('Auth Token: ' . $tempToken);
+                $this->line('');
+            }
 
-            // Display the response
-            $this->displayResponse($response, $noColor);
+            // Make the API call
+            $response = $this->makeApiCall($uri, $method, $data, $user, $host, $headers, $timeout, $maxTime, $verbose, $tempToken);
+
+            // Handle download or display response
+            if ($downloadFile) {
+                $this->handleDownload($response, $downloadFile);
+            } else {
+                $this->displayResponse($response, $noColor);
+            }
+
+            // Clean up token
+            $this->cleanupTempToken($tempToken);
 
             return 0;
         } catch (\Exception $e) {
@@ -177,13 +204,22 @@ class ApiServiceClient extends Command
      * @param string|null $data
      * @param DocumentstoreUser $user
      * @param string|null $host
+     * @param array $headers
+     * @param int $timeout
+     * @param int $maxTime
+     * @param bool $verbose
+     * @param string $tempToken
      * @return array
      */
-    protected function makeApiCall(string $uri, string $method, ?string $data, DocumentstoreUser $user, ?string $host = null): array
+    protected function makeApiCall(string $uri, string $method, ?string $data, DocumentstoreUser $user, ?string $host = null, array $headers = [], int $timeout = 30, int $maxTime = 0, bool $verbose = false, string $tempToken = null): array
     {
-        // Generate a temporary Sanctum token for API authentication
-        $userData = $user->getRawUser();
-        $tempToken = $this->generateTempToken($userData);
+        // Use the provided temp token
+        if (!$tempToken) {
+            $userData = $user->getRawUser();
+            $tempToken = $this->generateTempToken($userData);
+        }
+
+        $startTime = microtime(true);
 
         // Create a request object
         $request = Request::create($uri, $method);
@@ -221,6 +257,24 @@ class ApiServiceClient extends Command
         // Set the Authorization header with Bearer token
         $request->headers->set('Authorization', 'Bearer ' . $tempToken);
 
+        // Add custom headers
+        foreach ($headers as $header) {
+            if (strpos($header, ':') !== false) {
+                [$name, $value] = explode(':', $header, 2);
+                $request->headers->set(trim($name), trim($value));
+            }
+        }
+
+        if ($verbose) {
+            $this->line('');
+            $this->info('> ' . $method . ' ' . $uri);
+            $this->info('> Host: ' . ($host ?: 'localhost'));
+            $this->info('> Authorization: Bearer ' . substr($tempToken, 0, 10) . '...');
+            foreach ($headers as $header) {
+                $this->info('> ' . $header);
+            }
+        }
+
         // Add JSON data if provided
         if ($data && in_array($method, ['POST', 'PUT', 'PATCH'])) {
             $jsonData = json_decode($data, true);
@@ -231,24 +285,43 @@ class ApiServiceClient extends Command
             $request->headers->set('Content-Type', 'application/json');
         }
 
+        // Set timeout if specified
+        if ($maxTime > 0) {
+            set_time_limit($maxTime);
+        }
+
+        if ($verbose) {
+            $this->info('> Sending request...');
+        }
+
         // Dispatch the request through Laravel's router
         $response = app()->handle($request);
 
         // Get response content
         $content = $response->getContent();
         $statusCode = $response->getStatusCode();
+        $endTime = microtime(true);
+        $duration = round(($endTime - $startTime) * 1000, 2); // milliseconds
+
+        if ($verbose) {
+            $this->info('< Response received in ' . $duration . 'ms');
+            $this->info('< Status: ' . $statusCode);
+            foreach ($response->headers->all() as $name => $values) {
+                $this->info('< ' . $name . ': ' . implode(', ', $values));
+            }
+        }
 
         // Try to decode JSON response
         $jsonResponse = json_decode($content, true);
-
-        // Clean up the temporary token after the request
-        $this->cleanupTempToken($tempToken);
 
         return [
             'status_code' => $statusCode,
             'headers' => $response->headers->all(),
             'content' => $jsonResponse !== null ? $jsonResponse : $content,
-            'is_json' => $jsonResponse !== null
+            'raw_content' => $content,
+            'is_json' => $jsonResponse !== null,
+            'duration_ms' => $duration,
+            'response' => $response
         ];
     }
 
@@ -261,13 +334,17 @@ class ApiServiceClient extends Command
      */
     protected function displayResponse(array $response, bool $noColor = false): void
     {
-        // Display status code
+        // Display status code and timing
         $statusColor = $response['status_code'] >= 200 && $response['status_code'] < 300 ? 'info' : 'error';
         $this->line('');
         $this->{$statusColor}("Status Code: {$response['status_code']}");
+        
+        if (isset($response['duration_ms'])) {
+            $this->info("Response Time: {$response['duration_ms']}ms");
+        }
 
         // Display headers (only important ones)
-        $importantHeaders = ['content-type', 'content-length', 'cache-control'];
+        $importantHeaders = ['content-type', 'content-length', 'cache-control', 'accept-ranges', 'content-disposition'];
         $this->line('');
         $this->line('<comment>Response Headers:</comment>');
         foreach ($importantHeaders as $header) {
@@ -275,6 +352,12 @@ class ApiServiceClient extends Command
                 $value = is_array($response['headers'][$header]) ? implode(', ', $response['headers'][$header]) : $response['headers'][$header];
                 $this->line("  {$header}: {$value}");
             }
+        }
+        
+        // Show response size
+        if (isset($response['raw_content'])) {
+            $size = strlen($response['raw_content']);
+            $this->info("Response Size: " . $this->formatBytes($size));
         }
 
         // Display response body
@@ -337,6 +420,70 @@ class ApiServiceClient extends Command
         $line = preg_replace('/([{}\[\]])/', '<fg=white>$1</>', $line);
 
         return $line;
+    }
+
+    /**
+     * Generate a temporary token for a user
+     *
+     * @param DocumentstoreUser $user
+     * @return string
+     */
+    protected function generateTempTokenForUser(DocumentstoreUser $user): string
+    {
+        $userData = $user->getRawUser();
+        return $this->generateTempToken($userData);
+    }
+
+    /**
+     * Handle file download
+     *
+     * @param array $response
+     * @param string $filename
+     * @return void
+     */
+    protected function handleDownload(array $response, string $filename): void
+    {
+        if ($response['status_code'] >= 200 && $response['status_code'] < 300) {
+            $content = $response['raw_content'];
+            $size = strlen($content);
+            
+            if (file_put_contents($filename, $content)) {
+                $this->info("Downloaded successfully: {$filename}");
+                $this->info("File size: " . $this->formatBytes($size));
+                $this->info("Duration: {$response['duration_ms']}ms");
+                
+                // Show content type if available
+                if (isset($response['headers']['content-type'])) {
+                    $contentType = is_array($response['headers']['content-type']) 
+                        ? $response['headers']['content-type'][0] 
+                        : $response['headers']['content-type'];
+                    $this->info("Content-Type: {$contentType}");
+                }
+            } else {
+                $this->error("Failed to save file: {$filename}");
+            }
+        } else {
+            $this->error("Download failed with status code: {$response['status_code']}");
+            $this->displayResponse($response, false);
+        }
+    }
+
+    /**
+     * Format bytes to human readable format
+     *
+     * @param int $bytes
+     * @return string
+     */
+    protected function formatBytes(int $bytes): string
+    {
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        $bytes = max($bytes, 0);
+        $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
+        $pow = min($pow, count($units) - 1);
+        
+        $bytes /= (1 << (10 * $pow));
+        
+        return round($bytes, 2) . ' ' . $units[$pow];
     }
 
     /**

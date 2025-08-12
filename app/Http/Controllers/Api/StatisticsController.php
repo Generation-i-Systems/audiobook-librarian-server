@@ -166,10 +166,47 @@ class StatisticsController extends Controller
             auth('api')->id()
         );
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Session reported successfully'
-        ], 201);
+        // Check for badge achievements after recording the session
+        try {
+            $badgeService = app(\App\Services\BadgeService::class);
+            $newBadges = $badgeService->evaluateUserBadges($userId, $request->header('X-Device-ID'));
+            
+            $response = [
+                'success' => true,
+                'message' => 'Session reported successfully'
+            ];
+            
+            // Include new badges in response if any were earned
+            if (!empty($newBadges)) {
+                $response['badges_earned'] = array_map(function ($userBadge) {
+                    return [
+                        'id' => $userBadge->badge->id,
+                        'key' => $userBadge->badge->key,
+                        'name' => $userBadge->badge->name,
+                        'description' => $userBadge->badge->description,
+                        'icon' => $userBadge->badge->icon,
+                        'tier' => $userBadge->badge->tier,
+                        'points' => $userBadge->badge->points,
+                        'earned_at' => $userBadge->earned_at->toISOString(),
+                        'tier_level' => $userBadge->tier_level,
+                    ];
+                }, $newBadges);
+            }
+            
+            return response()->json($response, 201);
+            
+        } catch (\Exception $e) {
+            // Log badge evaluation error but don't fail the session recording
+            \Log::warning('Badge evaluation failed after session recording', [
+                'user_id' => $userId,
+                'error' => $e->getMessage()
+            ]);
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Session reported successfully'
+            ], 201);
+        }
     }
 
     /**
@@ -207,19 +244,68 @@ class StatisticsController extends Controller
             $validated['user_id'] ?? null
         );
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Listening session recorded successfully',
-            'data' => [
-                'id' => $statistic->id,
-                'book_id' => $statistic->book_id,
-                'device_id' => $statistic->device_id,
-                'listening_date' => $statistic->listening_date->toDateString(),
-                'seconds_listened' => $statistic->seconds_listened,
-                'session_type' => $statistic->session_type,
-                'formatted_duration' => $statistic->formatted_duration,
-            ]
-        ], 201);
+        // Check for badge achievements after recording the session
+        try {
+            $badgeService = app(\App\Services\BadgeService::class);
+            $newBadges = $badgeService->evaluateUserBadges(
+                $validated['device_id'], 
+                $validated['device_id'] // Use device_id as both user and device identifier
+            );
+            
+            $response = [
+                'success' => true,
+                'message' => 'Listening session recorded successfully',
+                'data' => [
+                    'id' => $statistic->id,
+                    'book_id' => $statistic->book_id,
+                    'device_id' => $statistic->device_id,
+                    'listening_date' => $statistic->listening_date->toDateString(),
+                    'seconds_listened' => $statistic->seconds_listened,
+                    'session_type' => $statistic->session_type,
+                    'formatted_duration' => $statistic->formatted_duration,
+                ]
+            ];
+            
+            // Include new badges in response if any were earned
+            if (!empty($newBadges)) {
+                $response['badges_earned'] = array_map(function ($userBadge) {
+                    return [
+                        'id' => $userBadge->badge->id,
+                        'key' => $userBadge->badge->key,
+                        'name' => $userBadge->badge->name,
+                        'description' => $userBadge->badge->description,
+                        'icon' => $userBadge->badge->icon,
+                        'tier' => $userBadge->badge->tier,
+                        'points' => $userBadge->badge->points,
+                        'earned_at' => $userBadge->earned_at->toISOString(),
+                        'tier_level' => $userBadge->tier_level,
+                    ];
+                }, $newBadges);
+            }
+            
+            return response()->json($response, 201);
+            
+        } catch (\Exception $e) {
+            // Log badge evaluation error but don't fail the session recording
+            \Log::warning('Badge evaluation failed after session recording', [
+                'device_id' => $validated['device_id'],
+                'error' => $e->getMessage()
+            ]);
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Listening session recorded successfully',
+                'data' => [
+                    'id' => $statistic->id,
+                    'book_id' => $statistic->book_id,
+                    'device_id' => $statistic->device_id,
+                    'listening_date' => $statistic->listening_date->toDateString(),
+                    'seconds_listened' => $statistic->seconds_listened,
+                    'session_type' => $statistic->session_type,
+                    'formatted_duration' => $statistic->formatted_duration,
+                ]
+            ], 201);
+        }
     }
 
     /**

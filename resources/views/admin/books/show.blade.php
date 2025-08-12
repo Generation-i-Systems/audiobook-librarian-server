@@ -61,7 +61,7 @@
             <strong>Description:</strong> {{ is_array($book['description'] ?? null) ? nl2br(e(implode("\n", $book['description']))) : e($book['description'] ?? 'No description available') }}
         </li>
         <li class="list-group-item">
-            <strong>Published Year:</strong> {{ $book['publishedYear'] ?? $book['published_year'] ?? 'N/A' }}
+            <strong>Release Date:</strong> {{ $book['release_date'] ?? 'N/A' }}
         </li>
         <li class="list-group-item">
             <strong>Date Added:</strong> {{ is_array($book['createdAt'] ?? $book['created_at'] ?? null) ? (($book['createdAt'] ?? $book['created_at'])['date'] ?? 'N/A') : ($book['createdAt'] ?? $book['created_at'] ?? 'N/A') }}

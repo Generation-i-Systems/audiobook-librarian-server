@@ -186,8 +186,8 @@ const createFormHtml = (isModal = false) => {
             </div>
 
             <div class="form-group">
-                <label for="published_year">Published Year</label>
-                <input type="number" id="published_year" name="published_year" class="form-control" placeholder="e.g. 2023">
+                <label for="release_date">Release Date</label>
+                <input type="date" id="release_date" name="release_date" class="form-control">
             </div>
 
             <button type="submit" class="btn btn-primary">Save Book</button>
@@ -464,7 +464,7 @@ describe('Book Form', () => {
             $('#title').val('Test Book');
             $('.author-autocomplete').first().val('Test Author');
             $('#directoryPath').val('/test/books/test-book');
-            $('#published_year').val('2023');
+            $('#release_date').val('2023-01-01');
             $('#description').val('A test book description');
 
             // Mock form submission
@@ -512,7 +512,7 @@ describe('Book Form', () => {
             $('#title').val('Updated Book Title');
             $('.author-autocomplete').first().val('Updated Author');
             $('#directoryPath').val('/test/books/updated-book');
-            $('#published_year').val('2023');
+            $('#release_date').val('2023-01-01');
 
             // Mock form submission
             let formSubmitted = false;
@@ -703,7 +703,7 @@ describe('Book Form', () => {
             // Fill in required fields
             $('#title').val('Test Book');
             $('.author-autocomplete').first().val('Test Author');
-            $('#published_year').val('2023');
+            $('#release_date').val('2023-01-01');
 
             // Mock form submission
             let formSubmitted = false;

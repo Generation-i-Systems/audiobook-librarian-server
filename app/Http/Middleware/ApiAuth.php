@@ -20,6 +20,14 @@ class ApiAuth
         $requestUri = $request->getRequestUri();
         $requestMethod = $request->getMethod();
         
+        // Log every request that hits this middleware for debugging
+        Log::info('ApiAuth middleware called', [
+            'uri' => $requestUri,
+            'method' => $requestMethod,
+            'ip' => $clientIp,
+            'has_auth_header' => !empty($authHeader)
+        ]);
+        
         if (!$authHeader || !preg_match('/Bearer\s(.*)/', $authHeader, $matches)) {
             Log::warning('API Auth failed: Missing or malformed Authorization header', [
                 'ip' => $clientIp,
@@ -34,7 +42,31 @@ class ApiAuth
         }
 
         $token = $matches[1];
+        
+        // Handle duplicate Authorization headers (fix for client sending multiple headers)
+        if (strpos($token, ',Bearer ') !== false) {
+            $tokens = explode(',Bearer ', $token);
+            $token = trim($tokens[0]); // Use the first token
+            Log::info('Duplicate Authorization headers detected, using first token', [
+                'uri' => $requestUri,
+                'duplicate_count' => count($tokens),
+                'original_length' => strlen($matches[1]),
+                'cleaned_length' => strlen($token)
+            ]);
+        }
         $tokenPreview = substr($token, 0, 8) . '...' . substr($token, -4); // Show first 8 and last 4 chars
+        
+        // Log the exact token details for debugging hash mismatches
+        Log::info('Token details for debugging', [
+            'uri' => $requestUri,
+            'token_preview' => $tokenPreview,
+            'token_length' => strlen($token),
+            'token_starts_with' => substr($token, 0, 10),
+            'token_ends_with' => substr($token, -10),
+            'token_has_spaces' => strpos($token, ' ') !== false,
+            'token_has_plus' => strpos($token, '+') !== false,
+            'raw_auth_header' => $authHeader
+        ]);
 
         // Try to find the token in the personal_access_tokens table
         try {
@@ -44,9 +76,16 @@ class ApiAuth
             if (!$accessToken) {
                 // Try to get more info about what's in the database
                 $tokenHash = hash('sha256', $token);
-                $directLookup = \DB::table('personal_access_tokens')
+                $directLookup = DB::table('personal_access_tokens')
                     ->where('token', $tokenHash)
                     ->first();
+                
+                // Get info about what tokens DO exist for this user/token ID pattern
+                $tokenPrefix = substr($token, 0, strpos($token, '|'));
+                $similarTokens = DB::table('personal_access_tokens')
+                    ->where('id', $tokenPrefix)
+                    ->orWhere('name', 'api-token')
+                    ->get(['id', 'name', 'created_at', 'expires_at']);
                     
                 Log::warning('API Auth failed: Token not found in database', [
                     'ip' => $clientIp,
@@ -56,8 +95,11 @@ class ApiAuth
                     'token_preview' => $tokenPreview,
                     'token_length' => strlen($token),
                     'token_hash_preview' => substr($tokenHash, 0, 16) . '...',
+                    'token_prefix' => $tokenPrefix,
                     'direct_lookup_found' => $directLookup !== null,
-                    'db_connection' => \DB::connection()->getName(),
+                    'similar_tokens_count' => $similarTokens->count(),
+                    'similar_tokens' => $similarTokens->toArray(),
+                    'db_connection' => DB::connection()->getName(),
                     'reason' => 'token_not_found'
                 ]);
                 return response()->json(['error' => 'Invalid or expired token'], 401);
@@ -71,7 +113,7 @@ class ApiAuth
                 'token_preview' => $tokenPreview,
                 'exception' => $e->getMessage(),
                 'exception_class' => get_class($e),
-                'db_connection' => \DB::connection()->getName(),
+                'db_connection' => DB::connection()->getName(),
                 'reason' => 'database_exception'
             ]);
             return response()->json(['error' => 'Invalid or expired token'], 401);

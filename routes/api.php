@@ -131,6 +131,18 @@ Route::prefix('v1')->group(function () {
         Route::get('/statistics/dashboard', [StatisticsController::class, 'getDashboardStats']);
         Route::get('/books/{book}/statistics', [StatisticsController::class, 'getBookStats']);
 
+        // Badge routes
+        Route::prefix('badges')->group(function () {
+            Route::get('/', [App\Http\Controllers\Api\BadgeController::class, 'index']); // Get all badges with progress
+            Route::get('/user', [App\Http\Controllers\Api\BadgeController::class, 'userBadges']); // Get user's earned badges
+            Route::get('/stats', [App\Http\Controllers\Api\BadgeController::class, 'userStats']); // Get user badge statistics
+            Route::get('/categories', [App\Http\Controllers\Api\BadgeController::class, 'byCategory']); // Get badges by category
+            Route::get('/progress', [App\Http\Controllers\Api\BadgeController::class, 'progress']); // Get badge progress
+            Route::get('/unnotified', [App\Http\Controllers\Api\BadgeController::class, 'unnotified']); // Get unnotified badges
+            Route::post('/mark-notified', [App\Http\Controllers\Api\BadgeController::class, 'markNotified']); // Mark badges as seen
+            Route::get('/leaderboard', [App\Http\Controllers\Api\BadgeController::class, 'leaderboard']); // Badge leaderboard
+        });
+
         // Message Route
         Route::post('/messages', [MessageApiController::class, 'store']);
 

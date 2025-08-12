@@ -68,8 +68,8 @@ class MySqlService implements DocumentStoreServiceInterface
         // Map release_date to publishedYear (extract year if date is YYYY-01-01, otherwise keep full date)
         if (isset($bookArray['release_date'])) {
             $releaseDate = $bookArray['release_date'];
-            if ($releaseDate && preg_match('/^(\d{4})-01-01/', $releaseDate, $matches)) {
-                // If the date is YYYY-01-01, just use the year
+            if ($releaseDate && preg_match('/^(\d{4})-01-01(?:\s|T|$)/', $releaseDate, $matches)) {
+                // If the date is YYYY-01-01 (with or without time), just use the year
                 $camelCasedBook['publishedYear'] = (int)$matches[1];
             } elseif ($releaseDate) {
                 // Otherwise, keep the full date
