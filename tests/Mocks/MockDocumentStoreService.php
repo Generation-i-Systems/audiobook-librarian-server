@@ -880,6 +880,58 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         return $results;
     }
 
+    /**
+     * Return books flagged as needs_review with optional reason filter.
+     * This is a simple in-memory implementation for tests.
+     */
+    public function listNeedsReviewBooks(?string $reason = null, int $limit = 100, int $page = 1): array
+    {
+        $items = [];
+        foreach ($this->books as $book) {
+            $needsReview = (bool)($book['needs_review'] ?? false);
+            if (!$needsReview) {
+                continue;
+            }
+
+            $reasons = $book['needs_review_reasons'] ?? [];
+            if ($reason !== null) {
+                if (!is_array($reasons) || !in_array($reason, $reasons, true)) {
+                    continue;
+                }
+            }
+
+            $items[] = [
+                'id' => $book['id'] ?? null,
+                'title' => $book['title'] ?? '',
+                'directoryPath' => $book['directory_path'] ?? $book['directoryPath'] ?? '',
+                'needsReviewReasons' => $reasons,
+                'createdAt' => $book['created_at'] ?? $book['createdAt'] ?? null,
+            ];
+        }
+
+        // Basic pagination on the array
+        $offset = max(0, ($page - 1) * $limit);
+        return array_slice($items, $offset, $limit);
+    }
+
+    /**
+     * Return distinct needs_review reasons from mock books.
+     */
+    public function listNeedsReviewReasons(): array
+    {
+        $set = [];
+        foreach ($this->books as $book) {
+            if (!empty($book['needs_review'])) {
+                foreach (($book['needs_review_reasons'] ?? []) as $r) {
+                    $set[$r] = true;
+                }
+            }
+        }
+        $reasons = array_keys($set);
+        sort($reasons);
+        return $reasons;
+    }
+
     public function createMessage(array $messageData): ?string
     {
         $id = $messageData['id'] ?? uniqid('message_');

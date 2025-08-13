@@ -2035,7 +2035,7 @@ class MongoService implements DocumentStoreServiceInterface
      * @param  string  $term  The search term.
      * @return array A list of unique genre names.
      */
-    public function searchGenresByName(string $term): array
+    public function searchGenres(string $term): array
     {
         if (empty($term)) {
             return [];
@@ -2069,5 +2069,40 @@ class MongoService implements DocumentStoreServiceInterface
             Log::error('Failed to search genres: ' . $e->getMessage());
             return [];
         }
+    }
+
+    /**
+     * Deprecated backend: return empty results for needs review listings.
+     * Kept only to satisfy DocumentStoreServiceInterface for legacy tools.
+     *
+     * @param string|null $reason
+     * @param int $limit
+     * @param int $page
+     * @return array
+     */
+    public function listNeedsReviewBooks(?string $reason = null, int $limit = 100, int $page = 1): array
+    {
+        // Mongo backend is deprecated and not queried by the app; return empty set.
+        return [];
+    }
+
+    /**
+     * Deprecated backend: return empty list of reasons.
+     *
+     * @return array
+     */
+    public function listNeedsReviewReasons(): array
+    {
+        // Mongo backend is deprecated and not queried by the app; return empty set.
+        return [];
+    }
+
+    /**
+     * Backward-compatible implementation to satisfy the interface.
+     * Delegates to searchGenres().
+     */
+    public function searchGenresByName(string $term): array
+    {
+        return $this->searchGenres($term);
     }
 }
