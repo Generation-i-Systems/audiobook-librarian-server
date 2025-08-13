@@ -31,3 +31,14 @@
 - Added JS `resources/js/utils/dateNormalizer.js` (CommonJS) with Jest tests `tests/Javascript/utils/dateNormalizer.test.js` to normalize dates consistently on the client.
 - Fixed PSR-12 line-length in `routes/api.php` by wrapping long chained route definitions.
 - Syntax checks run; PHPUnit and Jest tests for new code pass.
+
+2025-08-13: More TODOs
+more todos
+   ☐ implement a script to verify directory_paths are correct and update the ones that are not to a status where it is hidden from the api but shows up on a needs_review page that also needs to be created_at
+   update all badges in the table to have both an emoji icon and a icon_url for the icon
+   ☐ Add tests for badge system functionality
+   ☐ Fix release date handling across the application
+   ☐ Ensure release_date field is properly handled in all forms and controllers
+   ☐ Update JavaScript to properly handle date field conversions
+   ☐ Test release date functionality end-to-end
+   ☐ Create badge display components and UI elements
