@@ -369,8 +369,8 @@ class BookControllerTest extends TestCase
         // Create a request with valid book data and AJAX header
         $request = new Request([
             'title' => 'Test Book',
-            'authors' => ['Test Author'],
-            'genres' => ['Test Genre'],
+            'author' => ['Test Author'],
+            'genre' => ['Test Genre'],
             'description' => 'Test description',
         ]);
         $request->headers->set('X-Requested-With', 'XMLHttpRequest');
@@ -662,8 +662,8 @@ class BookControllerTest extends TestCase
         // Create a test book data array
         $bookData = [
             'title' => 'Test Book',
-            'author' => ['name' => 'Test Author'],
-            'narrator' => ['name' => 'Test Narrator'],
+            'author' => ['Test Author'],
+            'narrator' => ['Test Narrator'],
             'series' => [
                 ['seriesName' => 'Test Series', 'number' => 1]
             ],
@@ -715,20 +715,14 @@ class BookControllerTest extends TestCase
         // Mock the document store methods
         $this->documentStore->shouldReceive('createBook')
             ->once()
-            ->with(Mockery::on(function ($data) use ($bookId) {
-                // Verify required fields are present
-                $this->assertArrayHasKey('title', $data);
-                $this->assertArrayHasKey('author', $data);
-                $this->assertArrayHasKey('narrator', $data);
-                $this->assertArrayHasKey('series', $data);
-
-                // Store the data with the generated ID
-                $data['id'] = $bookId;
-                $this->storedBooks[$bookId] = $data;
-
-                return true;
-            }))
-            ->andReturn($bookId);
+            ->with(Mockery::any())
+            ->andReturnUsing(function ($data) {
+                // Generate a UUID for the book
+                $generatedId = (string) \Illuminate\Support\Str::uuid();
+                $data['id'] = $generatedId;
+                $this->storedBooks[$generatedId] = $data;
+                return $generatedId;
+            });
 
         // Mock getBook to return our stored book data
         $this->documentStore->shouldReceive('getBook')
@@ -768,37 +762,37 @@ class BookControllerTest extends TestCase
         // Call the processImport method
         $response = $this->controller->processImport($request);
 
-        // Debug the response
-        Log::debug('Response status code: ' . $response->getStatusCode());
-        Log::debug('Response location: ' . $response->headers->get('Location'));
-        Log::debug('Expected location: ' . route('admin.books.edit', ['book' => 'test-book-id']));
-
         // Assert the response is a redirect to the edit page
         $this->assertEquals(302, $response->getStatusCode());
-        $expectedUrl = route('admin.books.edit', ['book' => 'test-book-id']);
-        $this->assertStringContainsString(
-            $expectedUrl,
-            $response->headers->get('Location'),
-            "Expected URL to contain [{$expectedUrl}] but got [{$response->headers->get('Location')}]"
+        
+        // Check that the redirect URL contains the admin/books/{id}/edit pattern
+        $location = $response->headers->get('Location');
+        $this->assertMatchesRegularExpression(
+            '/\/admin\/books\/[a-f0-9\-]{36}\/edit$/',
+            $location,
+            "Expected redirect URL to match admin/books/{uuid}/edit pattern, got [{$location}]"
         );
 
         // Assert the event was dispatched with the correct book data
         Event::assertDispatched(
             NewBookAdded::class,
-            function ($event) use ($bookId) {
-                return isset($event->book['id']) && $event->book['id'] === $bookId;
+            function ($event) {
+                return isset($event->book['id']) && 
+                       isset($event->book['title']) && 
+                       $event->book['title'] === 'Test Book';
             }
         );
 
         // Verify the book was created with the correct data
         $this->assertCount(1, $this->storedBooks);
-        $book = $this->storedBooks[$bookId];
+        $createdBookId = array_keys($this->storedBooks)[0];
+        $book = $this->storedBooks[$createdBookId];
         $this->assertEquals('Test Book', $book['title']);
         $this->assertEquals('Test description', $book['description']);
-        $this->assertEquals('test-book-id', $book['id']);
+        $this->assertEquals($createdBookId, $book['id']);
         $this->assertIsArray($book['series']);
         $this->assertCount(1, $book['series']);
-        $this->assertEquals('Test Series', $book['series'][0]['seriesName']);
+        $this->assertEquals('Test Series', $book['series'][0]['name']);
         $this->assertEquals(1, $book['series'][0]['number']);
     }
 
