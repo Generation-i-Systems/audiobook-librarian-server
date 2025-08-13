@@ -369,8 +369,9 @@ class BookControllerTest extends TestCase
         // Create a request with valid book data and AJAX header
         $request = new Request([
             'title' => 'Test Book',
-            'author' => ['Test Author'],
-            'genre' => ['Test Genre'],
+            'authors' => ['Test Author'],
+            'narrators' => ['Test Narrator'],
+            'genres' => ['Test Genre'],
             'description' => 'Test description',
         ]);
         $request->headers->set('X-Requested-With', 'XMLHttpRequest');
@@ -382,9 +383,9 @@ class BookControllerTest extends TestCase
             ->andReturn(['author-id-1']);
 
         $this->documentStore->shouldReceive('findOrCreateMany')
-            ->with('narrators', [])
+            ->with('narrators', ['Test Narrator'])
             ->once()
-            ->andReturn([]);
+            ->andReturn(['narrator-id-1']);
 
         $this->documentStore->shouldReceive('findOrCreateMany')
             ->with('genres', ['Test Genre'])
@@ -397,32 +398,10 @@ class BookControllerTest extends TestCase
         $this->documentStore->shouldReceive('createSeries')
             ->andReturn('series-id-1');
 
-        // Ensure createBook actually adds the book to our mock store
-        $storedBooks = &$this->storedBooks; // Capture reference
-        $this->documentStore->shouldReceive('createBook')
-            ->once()
-            ->andReturnUsing(function ($book) use (&$storedBooks) {
-                $id = 'test-book-id-' . time();
-                $book['id'] = $id;
-                $storedBooks[$id] = $book;
-                return $id;
-            });
 
-        // Mock getBook which is called after createBook in the store method
-        $this->documentStore->shouldReceive('getBook')
-            ->once()
-            ->andReturnUsing(function ($id) use (&$storedBooks) {
-                return $storedBooks[$id] ?? null;
-            });
 
         // Call the store method
-        try {
-            $response = $this->controller->store($request, $this->importFileController);
-            Log::debug('Store method completed successfully', ['response_status' => $response->getStatusCode()]);
-        } catch (\Exception $e) {
-            Log::error('Store method threw exception', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
-            throw $e;
-        }
+        $response = $this->controller->store($request, $this->importFileController);
 
         // The controller should return a redirect response even for AJAX requests on success
         $this->assertInstanceOf(\Illuminate\Http\RedirectResponse::class, $response);
@@ -439,7 +418,7 @@ class BookControllerTest extends TestCase
         // Assert book data
         $this->assertEquals('Test Book', $book['title']);
         $this->assertEquals(['author-id-1'], $book['authors']);
-        $this->assertEquals([], $book['narrators']);
+        $this->assertEquals(['narrator-id-1'], $book['narrators']);
         $this->assertEquals(['genre-id-1'], $book['genres']);
 
         // Test that validation errors return a JSON response for AJAX requests
@@ -574,10 +553,12 @@ class BookControllerTest extends TestCase
         // Create a request with updated book data
         $request = new Request([
             'title' => 'Updated Title',
-            'authors' => ['Updated Author'],
-            'narrators' => ['Updated Narrator'],
-            'genres' => ['Updated Genre'],
-            'series' => 'Updated Series',
+            'author' => ['Updated Author'],
+            'narrator' => ['Updated Narrator'],
+            'genre' => ['Updated Genre'],
+            'series' => [
+                ['seriesName' => 'Updated Series', 'number' => '1']
+            ],
             'description' => 'Updated description',
             'sourceType' => 'file',
             'directoryPath' => 'test/updated/path',
@@ -669,7 +650,7 @@ class BookControllerTest extends TestCase
             ],
             'genre' => ['Test Genre'],
             'description' => 'Test description',
-            'publishedDate' => '2023-01-01',
+            'year' => '2023',
             'publisher' => 'Test Publisher',
             'isbn' => '1234567890',
             'asin' => 'B0A1B2C3D4',
@@ -684,20 +665,8 @@ class BookControllerTest extends TestCase
         $bookId = 'test-book-id';
         $this->storedBooks = [];
 
-        // Create a mock request with the book data
-        $request = Mockery::mock(Request::class);
-        $request->shouldReceive('all')->andReturn($bookData);
-        $request->shouldReceive('except')->with(Mockery::any())->andReturn($bookData);
-        $request->shouldReceive('has')->with('coverImage')->andReturn(false);
-        $request->shouldReceive('has')->with('cover_url')->andReturn(true);
-        $request->shouldReceive('input')->with('cover_url')->andReturn('http://example.com/cover.jpg');
-        $request->shouldReceive('input')->with('import_path')->andReturn('/path/to/import');
-        $request->shouldReceive('input')->with('import_root')->andReturn('/import/root');
-        $request->shouldReceive('input')->with('import_type')->andReturn('dir');
-        $request->shouldReceive('ajax')->andReturn(false);
-        $request->shouldReceive('validate')->andReturnUsing(function ($rules) use ($bookData) {
-            return $bookData;
-        });
+        // Create a real request with the book data
+        $request = Request::create('/admin/books/process-import', 'POST', $bookData);
 
         // Mock the document store methods for authors, narrators, and genres
         $this->documentStore->shouldReceive('findOrCreateMany')

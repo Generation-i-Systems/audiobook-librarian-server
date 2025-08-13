@@ -28,10 +28,10 @@ abstract class TestCase extends BaseTestCase
             );
         }
 
-        // Force SQLite for tests by default
+        // Force the dedicated 'testing' SQLite connection for tests so that
+        // RefreshDatabase runs consistently without cross-connection conflicts
         if (!defined('ALLOW_MYSQL_IN_TESTS') || !ALLOW_MYSQL_IN_TESTS) {
-            config(['database.default' => 'sqlite']);
-            config(['database.connections.sqlite.database' => ':memory:']);
+            config(['database.default' => 'testing']);
         }
     }
 }
