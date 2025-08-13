@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\ReadingProgressApiController;
 use App\Http\Controllers\Api\ReadingStatsApiController;
 use App\Http\Controllers\Api\StatisticsController;
 use App\Http\Controllers\Api\UserApiController;
+use App\Http\Controllers\Api\BadgeController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -30,7 +31,8 @@ Route::prefix('v1')->group(function () {
         Route::get('/books/enhanced', [BookApiController::class, 'booksEnhanced']);
         Route::get('/books/{book}', [BookApiController::class, 'show']);
         Route::get('/books/{book}/download', [BookApiController::class, 'download']);
-        Route::get('/books/{book}/download/{file}', [BookApiController::class, 'downloadFile'])->name('api.books.downloadFile');
+        Route::get('/books/{book}/download/{file}', [BookApiController::class, 'downloadFile'])
+            ->name('api.books.downloadFile');
         Route::get('/books/{book}/download-url', [BookApiController::class, 'downloadUrl']);
         Route::get('/books/browse', [BookApiController::class, 'browse']);
         Route::get('/books/search', [BookApiController::class, 'search']);
@@ -132,14 +134,15 @@ Route::prefix('v1')->group(function () {
 
         // Badge routes
         Route::prefix('badges')->group(function () {
-            Route::get('/', [App\Http\Controllers\Api\BadgeController::class, 'index']); // Get all badges with progress
-            Route::get('/user', [App\Http\Controllers\Api\BadgeController::class, 'userBadges']); // Get user's earned badges
-            Route::get('/stats', [App\Http\Controllers\Api\BadgeController::class, 'userStats']); // Get user badge statistics
-            Route::get('/categories', [App\Http\Controllers\Api\BadgeController::class, 'byCategory']); // Get badges by category
-            Route::get('/progress', [App\Http\Controllers\Api\BadgeController::class, 'progress']); // Get badge progress
-            Route::get('/unnotified', [App\Http\Controllers\Api\BadgeController::class, 'unnotified']); // Get unnotified badges
-            Route::post('/mark-notified', [App\Http\Controllers\Api\BadgeController::class, 'markNotified']); // Mark badges as seen
-            Route::get('/leaderboard', [App\Http\Controllers\Api\BadgeController::class, 'leaderboard']); // Badge leaderboard
+            // Core badge endpoints
+            Route::get('/', [BadgeController::class, 'index']);
+            Route::get('/user', [BadgeController::class, 'userBadges']);
+            Route::get('/stats', [BadgeController::class, 'userStats']);
+            Route::get('/categories', [BadgeController::class, 'byCategory']);
+            Route::get('/progress', [BadgeController::class, 'progress']);
+            Route::get('/unnotified', [BadgeController::class, 'unnotified']);
+            Route::post('/mark-notified', [BadgeController::class, 'markNotified']);
+            Route::get('/leaderboard', [BadgeController::class, 'leaderboard']);
         });
 
         // Message Route

@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\BadgeService;
 use App\Models\Badge;
 use App\Models\UserBadge;
-use Illuminate\Http\Request;
+use App\Services\BadgeService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 class BadgeController extends Controller
 {
@@ -23,7 +25,7 @@ class BadgeController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
+        $userId = auth()->id() ?? $request->header('X-Device-ID', 'unknown');
         $deviceId = $request->header('X-Device-ID');
 
         $validated = $request->validate([
@@ -39,7 +41,7 @@ class BadgeController extends Controller
             $query->category($validated['category']);
         }
 
-        // Filter by tier if specified  
+        // Filter by tier if specified
         if (!empty($validated['tier'])) {
             $query->tier($validated['tier']);
         }
@@ -51,7 +53,7 @@ class BadgeController extends Controller
             ->keyBy('badge_id');
 
         $userStats = null;
-        
+
         $result = $badges->map(function ($badge) use ($userBadges, $userId, $deviceId, &$userStats, $validated) {
             $userBadge = $userBadges->get($badge->id);
             $hasEarned = $userBadge !== null;
@@ -103,7 +105,7 @@ class BadgeController extends Controller
      */
     public function userBadges(Request $request): JsonResponse
     {
-        $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
+        $userId = auth()->id() ?? $request->header('X-Device-ID', 'unknown');
         $deviceId = $request->header('X-Device-ID');
 
         $validated = $request->validate([
@@ -154,7 +156,7 @@ class BadgeController extends Controller
      */
     public function userStats(Request $request): JsonResponse
     {
-        $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
+        $userId = auth()->id() ?? $request->header('X-Device-ID', 'unknown');
         $deviceId = $request->header('X-Device-ID');
 
         $stats = $this->badgeService->getUserBadgeSummary($userId, $deviceId);
@@ -170,7 +172,7 @@ class BadgeController extends Controller
      */
     public function byCategory(Request $request): JsonResponse
     {
-        $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
+        $userId = auth()->id() ?? $request->header('X-Device-ID', 'unknown');
         $deviceId = $request->header('X-Device-ID');
 
         $badges = Badge::active()->ordered()->get()->groupBy('category');
@@ -218,7 +220,7 @@ class BadgeController extends Controller
      */
     public function unnotified(Request $request): JsonResponse
     {
-        $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
+        $userId = auth()->id() ?? $request->header('X-Device-ID', 'unknown');
         $deviceId = $request->header('X-Device-ID');
 
         $unnotifiedBadges = $this->badgeService->getUnnotifiedBadges($userId, $deviceId);
@@ -234,13 +236,22 @@ class BadgeController extends Controller
      */
     public function markNotified(Request $request): JsonResponse
     {
-        $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
+        $userId = auth()->id() ?? $request->header('X-Device-ID', 'unknown');
         $deviceId = $request->header('X-Device-ID');
 
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
             'badge_ids' => 'required|array|min:1',
             'badge_ids.*' => 'integer|exists:badges,id',
         ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'The given data was invalid.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $validated = $validator->validated();
 
         $this->badgeService->markBadgesAsNotified($validated['badge_ids'], $userId, $deviceId);
 
@@ -256,7 +267,7 @@ class BadgeController extends Controller
      */
     public function progress(Request $request): JsonResponse
     {
-        $userId = auth('api')->id() ?? $request->header('X-Device-ID', 'unknown');
+        $userId = auth()->id() ?? $request->header('X-Device-ID', 'unknown');
         $deviceId = $request->header('X-Device-ID');
 
         $validated = $request->validate([

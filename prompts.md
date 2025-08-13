@@ -23,3 +23,11 @@
 - DocumentStoreServiceProvider now always binds MySqlService at runtime; MongoService marked @deprecated for migration-only use
 - BookController@update and MongoService@updateBook normalized inputs to persist narrator, series, and publishedYear
 - Added/updated feature tests for narrator trimming and series normalization/persistence
+
+2025-08-13: Badge Seeder, Date Normalization, and PSR-12 fixes
+- Implemented `Database/Seeders/CanonicalBadgeSeeder` with 13 categories × 6 badges = 78 canonical badges (idempotent by key).
+- Added `tests/Feature/BadgeSeederTest.php` verifying all 78 canonical keys exist and structure fields (category/tier/is_active/is_repeatable/sort_order).
+- Added PHP `App/Support/DateNormalizer` with unit tests `tests/Unit/Support/DateNormalizerTest.php` to normalize `release_date` inputs to `Y-m-d`.
+- Added JS `resources/js/utils/dateNormalizer.js` (CommonJS) with Jest tests `tests/Javascript/utils/dateNormalizer.test.js` to normalize dates consistently on the client.
+- Fixed PSR-12 line-length in `routes/api.php` by wrapping long chained route definitions.
+- Syntax checks run; PHPUnit and Jest tests for new code pass.
