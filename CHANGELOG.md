@@ -24,6 +24,7 @@
 - Artisan command: `php artisan badges:generate-icons` to generate per-badge SVG placeholders
   - Writes files to `public/images/badges/{key}.svg`
   - Use `--force` to overwrite existing files
+- Artisan command `books:mark-invalid-directories` to mark books with missing/invalid `directory_path` as `needs_review` and append reason `missing_directory`. Supports `--disk`, `--limit`, and `--dry-run`.
 - Reading Progress & Statistics requirements documentation
   - Added `docs/requirements/reading-progress-and-stats.md`
   - Linked from root `README.md` and `docs/README.md`
