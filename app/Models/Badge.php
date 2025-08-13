@@ -10,7 +10,7 @@ class Badge extends Model
 {
     protected $fillable = [
         'key',
-        'name', 
+        'name',
         'description',
         'icon',
         'image_url',
@@ -34,7 +34,7 @@ class Badge extends Model
      */
     public const CATEGORIES = [
         'listening' => 'Listening',
-        'milestone' => 'Milestone', 
+        'milestone' => 'Milestone',
         'streak' => 'Streak',
         'variety' => 'Variety',
         'social' => 'Social',
@@ -59,7 +59,7 @@ class Badge extends Model
      */
     public const TIERS = [
         'bronze' => 'Bronze',
-        'silver' => 'Silver', 
+        'silver' => 'Silver',
         'gold' => 'Gold',
         'platinum' => 'Platinum',
         'diamond' => 'Diamond',
@@ -118,7 +118,7 @@ class Badge extends Model
     public function hasBeenEarnedByUser(string $userId, ?string $deviceId = null): bool
     {
         $query = $this->userBadges()->where('user_id', $userId);
-        
+
         if ($deviceId) {
             $query->orWhere('device_id', $deviceId);
         }
@@ -132,7 +132,7 @@ class Badge extends Model
     public function getTimesEarnedByUser(string $userId, ?string $deviceId = null): int
     {
         $query = $this->userBadges()->where('user_id', $userId);
-        
+
         if ($deviceId) {
             $query->orWhere('device_id', $deviceId);
         }
@@ -202,13 +202,13 @@ class Badge extends Model
     public function evaluateCriteria(array $userStats): bool
     {
         $criteria = $this->criteria;
-        
+
         foreach ($criteria as $type => $requirement) {
             if (!$this->checkSingleCriterion($type, $requirement, $userStats)) {
                 return false;
             }
         }
-        
+
         return true;
     }
 
@@ -218,12 +218,12 @@ class Badge extends Model
     protected function checkSingleCriterion(string $type, $requirement, array $userStats): bool
     {
         $value = $userStats[$type] ?? 0;
-        
+
         // Handle different requirement formats
         if (is_numeric($requirement)) {
             return $value >= $requirement;
         }
-        
+
         if (is_array($requirement)) {
             // Handle range requirements like ['min' => 5, 'max' => 10]
             if (isset($requirement['min']) && $value < $requirement['min']) {
@@ -234,7 +234,7 @@ class Badge extends Model
             }
             return true;
         }
-        
+
         return false;
     }
 
@@ -246,17 +246,17 @@ class Badge extends Model
         $criteria = $this->criteria;
         $totalCriteria = count($criteria);
         $metCriteria = 0;
-        
+
         foreach ($criteria as $type => $requirement) {
             if ($this->checkSingleCriterion($type, $requirement, $userStats)) {
                 $metCriteria++;
             }
         }
-        
+
         if ($totalCriteria === 0) {
             return 100;
         }
-        
+
         return (int) (($metCriteria / $totalCriteria) * 100);
     }
 }

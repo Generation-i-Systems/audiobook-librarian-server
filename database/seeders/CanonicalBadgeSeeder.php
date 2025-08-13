@@ -12,10 +12,11 @@ class CanonicalBadgeSeeder extends Seeder
         $badges = $this->badges();
         $order = 1;
         foreach ($badges as $b) {
+            $emoji = $this->emojiForCategory($b['category']);
             $data = array_merge([
                 'description' => '',
-                'icon' => null,
-                'image_url' => null,
+                'icon' => $emoji, // store emoji directly in 'icon'
+                'image_url' => '/images/badges/' . $b['key'] . '.svg', // URI to exported SVG
                 'points' => 0,
                 'criteria' => [],
                 'is_active' => true,
@@ -148,5 +149,26 @@ class CanonicalBadgeSeeder extends Seeder
                 'tier' => $i[2],
             ];
         }, $items);
+    }
+
+    private function emojiForCategory(string $category): string
+    {
+        $map = [
+            'listening' => '🎧',
+            'milestone' => '🏁',
+            'streak' => '🔥',
+            'variety' => '🎲',
+            'social' => '💬',
+            'completion' => '✅',
+            'speed' => '⚡',
+            'exploration' => '🧭',
+            'dedication' => '📅',
+            'discovery' => '🔎',
+            'seasonal' => '🍂',
+            'collection' => '📚',
+            'habit' => '📈',
+        ];
+
+        return $map[$category] ?? '🏆';
     }
 }

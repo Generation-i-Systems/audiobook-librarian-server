@@ -11,7 +11,7 @@ class BadgeSeederTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_canonical_badge_seeder_creates_78_badges_with_expected_structure(): void
+    public function testCanonicalBadgeSeederCreates78BadgesWithExpectedStructure(): void
     {
         $this->seed(CanonicalBadgeSeeder::class);
 
@@ -44,6 +44,14 @@ class BadgeSeederTest extends TestCase
             $this->assertIsBool($b->is_active);
             $this->assertIsBool($b->is_repeatable);
             $this->assertIsInt($b->sort_order);
+
+            // icon expectations (emoji stored in 'icon', SVG URI stored in 'image_url')
+            $this->assertIsString($b->icon);
+            $this->assertNotSame('', (string) $b->icon, 'icon should not be empty');
+            $this->assertIsString($b->image_url);
+            $this->assertNotSame('', (string) $b->image_url, 'image_url should not be empty');
+            $this->assertStringEndsWith('.svg', $b->image_url, 'image_url should point to an SVG');
+            $this->assertStringContainsString($b->key, $b->image_url, 'image_url should include the key');
         });
     }
 
@@ -154,7 +162,7 @@ class BadgeSeederTest extends TestCase
                 'habit_six_months_diamond',
                 'habit_year_habit_mythic',
             ],
-            
+
         ];
 
         return array_values(array_merge(...array_values($sets)));
