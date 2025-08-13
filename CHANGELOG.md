@@ -3,6 +3,11 @@
 - `/api/v1/me` endpoint now explicitly returns only the authenticated user's `name` and `email` via `UserApiController@me`
   - Route wired to controller method; no longer aliases full user object
   - Feature and unit tests added to validate response shape and authentication behavior
+- Badge icon fields standardized across schema, models, seeders, and API
+  - Store a single-character emoji in `icon`
+  - Store SVG URI in `image_url` (e.g., `/images/badges/{key}.svg`)
+  - Deprecated fields `emoji_icon` and `icon_url` migrated and removed
+  - API responses now include both `icon` and `image_url` for badges
 - Authentication documentation updated to reflect Laravel Sanctum Bearer tokens instead of Firebase JWT
   - Updated root `README.md`
   - Updated `docs/api/README.md` and `docs/api/authentication.md`
@@ -16,6 +21,9 @@
 - Created PersistentDatabaseTestCase for tests that need persistent data
 
 ### Added
+- Artisan command: `php artisan badges:generate-icons` to generate per-badge SVG placeholders
+  - Writes files to `public/images/badges/{key}.svg`
+  - Use `--force` to overwrite existing files
 - Reading Progress & Statistics requirements documentation
   - Added `docs/requirements/reading-progress-and-stats.md`
   - Linked from root `README.md` and `docs/README.md`

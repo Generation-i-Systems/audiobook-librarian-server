@@ -35,7 +35,7 @@
 2025-08-13: More TODOs
 more todos
    ☐ implement a script to verify directory_paths are correct and update the ones that are not to a status where it is hidden from the api but shows up on a needs_review page that also needs to be created_at
-   update all badges in the table to have both an emoji icon and a icon_url for the icon
+   update all badges in the table to have both an emoji icon and an image_url for the icon (SVG URI)
    ☐ Add tests for badge system functionality
    ☐ Fix release date handling across the application
    ☐ Ensure release_date field is properly handled in all forms and controllers

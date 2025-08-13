@@ -81,6 +81,17 @@ Content-Type: application/json
 - `GET /api/v1/authors/{id}/books` - Books by author
 - `GET /api/v1/series/{id}/books` - Books in series
 
+### Badges
+- `GET /api/v1/badges` - List all badges with user-earned metadata
+- `GET /api/v1/badges/category/{category}` - List badges by category with user-earned metadata
+- `GET /api/v1/user/badges` - List badges earned by the current user
+
+Badge fields include:
+- `icon` — single-character emoji for quick display
+- `image_url` — URI to the exported SVG file for the badge (e.g., `/images/badges/{key}.svg`)
+- `key`, `name`, `description`, `category`, `tier`, `points`
+- User context fields where applicable: `earned`, `earned_at`, `times_earned`
+
 *See [OpenAPI specification](openapi.yaml) for complete endpoint documentation.*
 
 ## 🔧 User Roles
