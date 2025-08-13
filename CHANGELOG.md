@@ -1,5 +1,12 @@
 ## [Unreleased]
 ### Changed
+- `/api/v1/me` endpoint now explicitly returns only the authenticated user's `name` and `email` via `UserApiController@me`
+  - Route wired to controller method; no longer aliases full user object
+  - Feature and unit tests added to validate response shape and authentication behavior
+- Authentication documentation updated to reflect Laravel Sanctum Bearer tokens instead of Firebase JWT
+  - Updated root `README.md`
+  - Updated `docs/api/README.md` and `docs/api/authentication.md`
+- User role names aligned across docs and middleware: `standard`, `admin`, `superadmin`
 - Archived MongoService for application runtime; it is now migration-only
   - `DocumentStoreServiceProvider` always binds `MySqlService` at runtime (even if `DOCUMENT_STORE_DRIVER=mongodb`)
   - Added deprecation docblock to `App\\Services\\MongoService`

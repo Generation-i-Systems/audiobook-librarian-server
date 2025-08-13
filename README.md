@@ -148,14 +148,15 @@ A Laravel-based audiobook library and management system for personal and family 
 **OpenAPI Specification:** [`/api-docs/openapi.json`](/api-docs/openapi.json)
 
 ### Authentication & Headers
-- Most endpoints require authentication via Firebase JWT (`Authorization: Bearer <firebase-jwt-token>`).
+- Most endpoints require authentication via Laravel Sanctum personal access tokens (`Authorization: Bearer <personal-access-token>`).
 - Responses are JSON. Errors use standard HTTP codes with a JSON error message.
 
 ### Authentication
-Authentication is handled by Firebase. Obtain a Firebase JWT token from your Firebase client and include it in the `Authorization: Bearer <token>` header for protected endpoints.
+Authentication is handled by Laravel Sanctum. Obtain a Personal Access Token using the login endpoint and include it in the `Authorization: Bearer <token>` header for protected endpoints. Tokens are stored hashed in the database and validated by custom `ApiAuth` middleware.
 
 ### User
-- `GET /user` — Get current user (requires auth)
+- `GET /user` — Get current authenticated user object (requires auth)
+- `GET /me` — Get current user profile (name and email only; requires auth)
 
 ### Books
 - `GET /books` — List all books with pagination

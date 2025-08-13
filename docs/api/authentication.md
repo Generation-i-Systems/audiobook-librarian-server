@@ -115,9 +115,13 @@ Authorization: Bearer 1|abc123def456ghi789jkl012mno345pqr678stu901vwx234yz
 
 ### Get Current User
 
-**Endpoint**: `GET /api/v1/user` or `GET /api/v1/me`
+There are two endpoints:
 
-Returns the authenticated user's information.
+1) Full user object
+
+**Endpoint**: `GET /api/v1/user`
+
+Returns the full authenticated user object.
 
 ```http
 GET /api/v1/user
@@ -135,6 +139,25 @@ Authorization: Bearer 1|abc123def456ghi789jkl012mno345pqr678stu901vwx234yz
   "email_verified_at": null,
   "created_at": "2024-01-01T12:00:00Z",
   "updated_at": "2024-01-01T12:00:00Z"
+}
+```
+
+2) Minimal profile
+
+**Endpoint**: `GET /api/v1/me`
+
+Returns only the authenticated user's `name` and `email`.
+
+```http
+GET /api/v1/me
+Authorization: Bearer 1|abc123def456ghi789jkl012mno345pqr678stu901vwx234yz
+```
+
+**Success Response** (200):
+```json
+{
+  "name": "John Doe",
+  "email": "john@example.com"
 }
 ```
 

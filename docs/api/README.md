@@ -66,8 +66,8 @@ Content-Type: application/json
 - `POST /api/v1/register` - Register new user
 - `POST /api/v1/login` - Authenticate user
 - `POST /api/v1/logout` - Logout user
-- `GET /api/v1/user` - Get current user info
-- `GET /api/v1/me` - Get current user info (alias)
+- `GET /api/v1/user` - Get current user object
+- `GET /api/v1/me` - Get current user profile (name and email only)
 
 ### Books
 - `GET /api/v1/books` - List books
@@ -87,9 +87,9 @@ Content-Type: application/json
 
 | Role | Description | Access Level |
 |------|-------------|--------------|
-| `admin` | Administrator | Full API access |
-| `user` | Regular user | Standard API access |
-| `unverified` | New user | No API access (pending approval) |
+| `superadmin` | Super Administrator | Full API access |
+| `admin` | Administrator | Elevated API access |
+| `standard` | Regular user | Standard API access |
 
 ## 📝 Request/Response Format
 
