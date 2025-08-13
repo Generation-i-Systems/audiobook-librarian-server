@@ -64,7 +64,7 @@ class MySqlService implements DocumentStoreServiceInterface
         if (isset($bookArray['cover_image'])) {
             $camelCasedBook['coverImage'] = $bookArray['cover_image'];
         }
-        
+
         // Map release_date to publishedYear (extract year if date is YYYY-01-01, otherwise keep full date)
         if (isset($bookArray['release_date'])) {
             $releaseDate = $bookArray['release_date'];
@@ -211,6 +211,9 @@ class MySqlService implements DocumentStoreServiceInterface
         $order = in_array(strtolower($order), ['asc', 'desc']) ? strtolower($order) : 'asc';
 
         $query = Book::query();
+
+        // Exclude books flagged for review from API listings by default
+        $query->where('needs_review', false);
 
         // Eager load all relationships required by the OpenAPI spec
         $query->with([
@@ -364,6 +367,7 @@ class MySqlService implements DocumentStoreServiceInterface
                 'description' => $book->description,
                 'coverImage' => $book->cover_image, // Add coverImage field for BookApiController::getBookWithCover
                 'cover_url' => $coverUrl,
+                'needs_review' => (bool) $book->needs_review,
                 'file_count' => $book->audio_file_count,
                 'total_size' => $book->total_size,
                 'created_at' => $book->created_at ? $book->created_at->toIso8601String() : null,
@@ -401,6 +405,7 @@ class MySqlService implements DocumentStoreServiceInterface
             // Minimal query with only essential fields and limited relationships
             return Book::query()
                 ->select('id', 'title', 'cover_image', 'directory_path', 'created_at', 'description', 'duration', 'release_date', 'audio_file_count', 'total_size')
+                ->where('needs_review', false)
                 ->with([
                     'authors' => function ($q) {
                         $q->select('id', 'name');
@@ -593,7 +598,7 @@ class MySqlService implements DocumentStoreServiceInterface
     {
         try {
             $book = Book::findOrFail($id);
-            
+
             // Handle publishedYear -> release_date mapping
             if (isset($data['publishedYear']) && !empty($data['publishedYear']) && is_numeric($data['publishedYear'])) {
                 $data['release_date'] = $data['publishedYear'] . '-01-01';

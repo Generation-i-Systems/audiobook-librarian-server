@@ -64,11 +64,11 @@ class UserBadge extends Model
     public function scopeForUserOrDevice(Builder $query, string $userId, ?string $deviceId = null): Builder
     {
         $query->where('user_id', $userId);
-        
+
         if ($deviceId) {
             $query->orWhere('device_id', $deviceId);
         }
-        
+
         return $query;
     }
 
@@ -171,20 +171,20 @@ class UserBadge extends Model
     public static function getUserBadgeStats(string $userId, ?string $deviceId = null): array
     {
         $badges = self::forUserOrDevice($userId, $deviceId)->with('badge')->get();
-        
+
         $totalBadges = $badges->count();
         $totalPoints = $badges->sum(function ($userBadge) {
             return $userBadge->badge->points;
         });
-        
+
         $categoryCounts = $badges->groupBy(function ($userBadge) {
             return $userBadge->badge->category;
         })->map->count();
-        
+
         $tierCounts = $badges->groupBy(function ($userBadge) {
             return $userBadge->badge->tier;
         })->map->count();
-        
+
         $recentBadges = $badges->filter(function ($userBadge) {
             return $userBadge->earned_at->isAfter(Carbon::now()->subDays(7));
         })->count();

@@ -198,14 +198,14 @@ class BookControllerTest extends TestCase
         // Assert response is successful and contains the expected data
         $this->assertEquals(200, $response->getStatusCode());
         $responseData = json_decode($response->getContent(), true);
-        
+
         // Debug: Log the actual response content
         Log::debug('Google Books test response', [
             'status' => $response->getStatusCode(),
             'content' => $response->getContent(),
             'responseData' => $responseData
         ]);
-        
+
         $this->assertIsArray($responseData);
         $this->assertNotEmpty($responseData);
         $this->assertEquals('Test Book', $responseData[0]['title']);
@@ -547,7 +547,7 @@ class BookControllerTest extends TestCase
     {
         // Initialize session for the test
         $this->startSession();
-        
+
         $bookId = 'test-book-id';
 
         // Create a request with updated book data
@@ -563,7 +563,7 @@ class BookControllerTest extends TestCase
             'sourceType' => 'file',
             'directoryPath' => 'test/updated/path',
         ]);
-        
+
         // Set the session on the request
         $request->setLaravelSession($this->app['session.store']);
 
@@ -672,11 +672,11 @@ class BookControllerTest extends TestCase
         $this->documentStore->shouldReceive('findOrCreateMany')
             ->with('authors', Mockery::any())
             ->andReturn(['author-id-1']);
-        
+
         $this->documentStore->shouldReceive('findOrCreateMany')
             ->with('narrators', Mockery::any())
             ->andReturn(['narrator-id-1']);
-        
+
         $this->documentStore->shouldReceive('findOrCreateMany')
             ->with('genres', Mockery::any())
             ->andReturn(['genre-id-1']);
@@ -733,7 +733,7 @@ class BookControllerTest extends TestCase
 
         // Assert the response is a redirect to the edit page
         $this->assertEquals(302, $response->getStatusCode());
-        
+
         // Check that the redirect URL contains the admin/books/{id}/edit pattern
         $location = $response->headers->get('Location');
         $this->assertMatchesRegularExpression(
@@ -746,8 +746,8 @@ class BookControllerTest extends TestCase
         Event::assertDispatched(
             NewBookAdded::class,
             function ($event) {
-                return isset($event->book['id']) && 
-                       isset($event->book['title']) && 
+                return isset($event->book['id']) &&
+                       isset($event->book['title']) &&
                        $event->book['title'] === 'Test Book';
             }
         );

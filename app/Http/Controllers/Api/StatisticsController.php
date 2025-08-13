@@ -170,12 +170,12 @@ class StatisticsController extends Controller
         try {
             $badgeService = app(\App\Services\BadgeService::class);
             $newBadges = $badgeService->evaluateUserBadges($userId, $request->header('X-Device-ID'));
-            
+
             $response = [
                 'success' => true,
                 'message' => 'Session reported successfully'
             ];
-            
+
             // Include new badges in response if any were earned
             if (!empty($newBadges)) {
                 $response['badges_earned'] = array_map(function ($userBadge) {
@@ -192,16 +192,15 @@ class StatisticsController extends Controller
                     ];
                 }, $newBadges);
             }
-            
+
             return response()->json($response, 201);
-            
         } catch (\Exception $e) {
             // Log badge evaluation error but don't fail the session recording
             \Log::warning('Badge evaluation failed after session recording', [
                 'user_id' => $userId,
                 'error' => $e->getMessage()
             ]);
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'Session reported successfully'
@@ -248,10 +247,10 @@ class StatisticsController extends Controller
         try {
             $badgeService = app(\App\Services\BadgeService::class);
             $newBadges = $badgeService->evaluateUserBadges(
-                $validated['device_id'], 
+                $validated['device_id'],
                 $validated['device_id'] // Use device_id as both user and device identifier
             );
-            
+
             $response = [
                 'success' => true,
                 'message' => 'Listening session recorded successfully',
@@ -265,7 +264,7 @@ class StatisticsController extends Controller
                     'formatted_duration' => $statistic->formatted_duration,
                 ]
             ];
-            
+
             // Include new badges in response if any were earned
             if (!empty($newBadges)) {
                 $response['badges_earned'] = array_map(function ($userBadge) {
@@ -282,16 +281,15 @@ class StatisticsController extends Controller
                     ];
                 }, $newBadges);
             }
-            
+
             return response()->json($response, 201);
-            
         } catch (\Exception $e) {
             // Log badge evaluation error but don't fail the session recording
             \Log::warning('Badge evaluation failed after session recording', [
                 'device_id' => $validated['device_id'],
                 'error' => $e->getMessage()
             ]);
-            
+
             return response()->json([
                 'success' => true,
                 'message' => 'Listening session recorded successfully',

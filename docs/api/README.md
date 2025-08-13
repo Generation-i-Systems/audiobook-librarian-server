@@ -75,6 +75,8 @@ Content-Type: application/json
 - `GET /api/v1/books/search` - Search books
 - `GET /api/v1/books/{id}/download` - Download book
 
+Note: Public book listings automatically exclude titles flagged as `needs_review`. These records remain accessible to privileged workflows but are hidden from general API listings to ensure data quality.
+
 ### Authors & Series
 - `GET /api/v1/authors/autocomplete` - Author suggestions
 - `GET /api/v1/series/autocomplete` - Series suggestions

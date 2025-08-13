@@ -93,9 +93,17 @@ class BookApiController extends Controller
         // Transform books to match OpenAPI spec
         $transformedBooks = [];
         if (isset($booksData['data']) && is_array($booksData['data'])) {
+            // Exclude books flagged as needing review from API output
+            $filtered = array_filter(
+                array_filter($booksData['data'], 'is_array'),
+                function ($book) {
+                    return empty($book['needs_review']);
+                }
+            );
+
             $transformedBooks = array_map(function ($book) use ($withCover, $inlineCovers) {
                 return $this->getBookWithCover($book, $withCover, $inlineCovers);
-            }, array_filter($booksData['data'], 'is_array'));
+            }, $filtered);
         }
 
         return response()->json([
@@ -455,7 +463,7 @@ class BookApiController extends Controller
             $token = $matches[1];
             $tokenPreview = substr($token, 0, 8) . '...' . substr($token, -4);
         }
-        
+
         Log::info('Book download requested', [
             'book_id' => $id,
             'ip' => request()->ip(),
@@ -464,7 +472,7 @@ class BookApiController extends Controller
             'user_id' => Auth::id(),
             'user_email' => Auth::user()->email ?? null
         ]);
-        
+
         $book = $this->documentStoreService->getBook($id);
         if (!$book) {
             return response()->json([
@@ -506,7 +514,7 @@ class BookApiController extends Controller
                     'type' => 'audio',
                     'download_url' => route('api.books.downloadFile', ['book' => $id, 'file' => urlencode($fileName)]),
                 ];
-            } elseif (in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp']) && 
+            } elseif (in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp']) &&
                       (strpos(strtolower($fileName), 'cover') !== false || strpos(strtolower($fileName), 'folder') !== false)) {
                 $coverFile = [
                     'filename' => $fileName,
@@ -575,7 +583,7 @@ class BookApiController extends Controller
             $token = $matches[1];
             $tokenPreview = substr($token, 0, 8) . '...' . substr($token, -4);
         }
-        
+
         Log::info('Book file download requested', [
             'book_id' => $id,
             'file_name' => $fileName,
@@ -585,7 +593,7 @@ class BookApiController extends Controller
             'user_id' => Auth::id(),
             'user_email' => Auth::user()->email ?? null
         ]);
-        
+
         $book = $this->documentStoreService->getBook($id);
         if (!$book) {
             return response()->json([
@@ -606,7 +614,7 @@ class BookApiController extends Controller
         $fileName = urldecode($fileName);
         $filePath = null;
         $files = Storage::disk('books')->files($directoryPath);
-        
+
         foreach ($files as $file) {
             if (basename($file) === $fileName) {
                 $filePath = $file;
@@ -624,11 +632,11 @@ class BookApiController extends Controller
         // Determine content type based on file extension
         $extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
         $contentType = $this->getContentTypeByExtension($extension);
-        
+
         // Get file size for Range header support
         $fileSize = Storage::disk('books')->size($filePath);
         $fullPath = Storage::disk('books')->path($filePath);
-        
+
         // Log download start with file details
         Log::info('File download starting', [
             'book_id' => $id,
@@ -654,7 +662,7 @@ class BookApiController extends Controller
 
         $request = request();
         $rangeHeader = $request->header('Range');
-        
+
         if ($rangeHeader) {
             return $this->handleRangeRequest($fullPath, $fileSize, $rangeHeader, $contentType);
         }
@@ -665,7 +673,7 @@ class BookApiController extends Controller
             $bytesSent = 0;
             $chunkCount = 0;
             $user = Auth::user();
-            
+
             Log::info('Starting file download stream', [
                 'book_id' => $book['id'] ?? $id,
                 'book_title' => $book['title'] ?? 'Unknown',
@@ -703,21 +711,20 @@ class BookApiController extends Controller
                         echo $chunk;
                         $bytesSent += strlen($chunk);
                         $chunkCount++;
-                        
+
                         if (ob_get_level()) {
                             ob_flush();
                         }
                         flush();
-                        
+
                         // Log progress every 10MB or at significant milestones
-                        if ($bytesSent - $lastProgressLog >= $progressLogInterval || 
+                        if ($bytesSent - $lastProgressLog >= $progressLogInterval ||
                             ($fileSize > 0 && $bytesSent >= $fileSize)) {
-                            
                             $currentTime = microtime(true);
                             $elapsedSeconds = $currentTime - $startTime;
                             $progressPercent = $fileSize > 0 ? round(($bytesSent / $fileSize) * 100, 2) : 0;
                             $avgSpeedMBps = $elapsedSeconds > 0 ? round(($bytesSent / (1024 * 1024)) / $elapsedSeconds, 2) : 0;
-                            
+
                             Log::info('File download progress', [
                                 'book_id' => $book['id'] ?? $id,
                                 'file_name' => $file,
@@ -732,15 +739,15 @@ class BookApiController extends Controller
                                 'chunks_sent' => $chunkCount,
                                 'is_complete' => $bytesSent >= $fileSize
                             ]);
-                            
+
                             $lastProgressLog = $bytesSent;
                         }
                     }
-                    
+
                     if (connection_aborted()) {
                         $endTime = microtime(true);
                         $elapsedSeconds = $endTime - $startTime;
-                        
+
                         Log::warning('File download connection aborted by client', [
                             'book_id' => $book['id'] ?? $id,
                             'file_name' => $file,
@@ -756,11 +763,11 @@ class BookApiController extends Controller
                         break;
                     }
                 }
-                
+
                 $endTime = microtime(true);
                 $elapsedSeconds = $endTime - $startTime;
                 $isComplete = $bytesSent >= $fileSize;
-                
+
                 if ($isComplete) {
                     Log::info('File download completed successfully', [
                         'book_id' => $book['id'] ?? $id,
@@ -789,11 +796,10 @@ class BookApiController extends Controller
                         'reason' => 'stream_ended_early'
                     ]);
                 }
-                
             } catch (\Exception $e) {
                 $endTime = microtime(true);
                 $elapsedSeconds = $endTime - $startTime;
-                
+
                 Log::error('File download failed with exception', [
                     'book_id' => $book['id'] ?? $id,
                     'file_name' => $file,
@@ -808,7 +814,7 @@ class BookApiController extends Controller
                 ]);
                 throw $e;
             }
-            
+
             fclose($handle);
         }, 200, $headers);
     }
@@ -824,7 +830,7 @@ class BookApiController extends Controller
 
         $start = (int) $matches[1];
         $end = isset($matches[2]) && $matches[2] !== '' ? (int) $matches[2] : $fileSize - 1;
-        
+
         if ($start > $end || $start >= $fileSize || $end >= $fileSize) {
             return response('Range not satisfiable', 416, [
                 'Content-Range' => "bytes */{$fileSize}"
@@ -832,7 +838,7 @@ class BookApiController extends Controller
         }
 
         $length = $end - $start + 1;
-        
+
         $headers = [
             'Content-Type' => $contentType,
             'Content-Length' => $length,
@@ -849,7 +855,7 @@ class BookApiController extends Controller
             $bytesSent = 0;
             $chunkCount = 0;
             $user = Auth::user();
-            
+
             Log::info('Starting range download stream', [
                 'file_path' => basename($filePath),
                 'range_start' => $start,
@@ -863,7 +869,7 @@ class BookApiController extends Controller
                 'start_time' => date('Y-m-d H:i:s'),
                 'start_timestamp' => $startTime
             ]);
-            
+
             $handle = fopen($filePath, 'rb');
             if ($handle === false) {
                 Log::error('Failed to open file for range streaming', [
@@ -880,33 +886,33 @@ class BookApiController extends Controller
             $remaining = $length;
             $progressLogInterval = max(1048576, $length / 10); // Log every 1MB or 10% of range
             $lastProgressLog = 0;
-            
+
             try {
                 while ($remaining > 0 && !feof($handle)) {
                     $chunkSize = min(8192, $remaining);
                     $chunk = fread($handle, $chunkSize);
-                    
+
                     if ($chunk === false || strlen($chunk) === 0) {
                         break;
                     }
-                    
+
                     echo $chunk;
                     $bytesSent += strlen($chunk);
                     $chunkCount++;
                     $remaining -= strlen($chunk);
-                    
+
                     if (ob_get_level()) {
                         ob_flush();
                     }
                     flush();
-                    
+
                     // Log progress for range downloads
                     if ($bytesSent - $lastProgressLog >= $progressLogInterval || $remaining <= 0) {
                         $currentTime = microtime(true);
                         $elapsedSeconds = $currentTime - $startTime;
                         $progressPercent = $length > 0 ? round(($bytesSent / $length) * 100, 2) : 100;
                         $avgSpeedMBps = $elapsedSeconds > 0 ? round(($bytesSent / (1024 * 1024)) / $elapsedSeconds, 2) : 0;
-                        
+
                         Log::info('Range download progress', [
                             'file_path' => basename($filePath),
                             'user_id' => $user->id,
@@ -922,14 +928,14 @@ class BookApiController extends Controller
                             'remaining_bytes' => $remaining,
                             'is_complete' => $remaining <= 0
                         ]);
-                        
+
                         $lastProgressLog = $bytesSent;
                     }
-                    
+
                     if (connection_aborted()) {
                         $endTime = microtime(true);
                         $elapsedSeconds = $endTime - $startTime;
-                        
+
                         Log::warning('Range download connection aborted by client', [
                             'file_path' => basename($filePath),
                             'user_id' => $user->id,
@@ -945,11 +951,11 @@ class BookApiController extends Controller
                         break;
                     }
                 }
-                
+
                 $endTime = microtime(true);
                 $elapsedSeconds = $endTime - $startTime;
                 $isComplete = $remaining <= 0;
-                
+
                 if ($isComplete) {
                     Log::info('Range download completed successfully', [
                         'file_path' => basename($filePath),
@@ -978,11 +984,10 @@ class BookApiController extends Controller
                         'reason' => 'stream_ended_early'
                     ]);
                 }
-                
             } catch (\Exception $e) {
                 $endTime = microtime(true);
                 $elapsedSeconds = $endTime - $startTime;
-                
+
                 Log::error('Range download failed with exception', [
                     'file_path' => basename($filePath),
                     'user_id' => $user->id,
@@ -997,7 +1002,7 @@ class BookApiController extends Controller
                 ]);
                 throw $e;
             }
-            
+
             fclose($handle);
         }, 206, $headers);
     }
@@ -1059,7 +1064,7 @@ class BookApiController extends Controller
         // Generate signed URLs for individual files with 1 hour expiration
         $expiresAt = now()->addHour();
         $signature = hash('sha256', $id . $expiresAt->timestamp . config('app.key'));
-        
+
         $fileUrls = [];
         $totalSize = 0;
 
@@ -1067,31 +1072,35 @@ class BookApiController extends Controller
             $fileName = basename($file);
             $fileSize = Storage::disk('books')->size($file);
             $totalSize += $fileSize;
-            
+
             $fileUrls[] = [
                 'filename' => $fileName,
                 'size' => $fileSize,
                 'download_url' => route('api.books.downloadFile', [
-                    'book' => $id, 
+                    'book' => $id,
                     'file' => urlencode($fileName)
                 ]) . "?expires={$expiresAt->timestamp}&signature={$signature}",
             ];
         }
 
         // Sort files to prioritize cover first, then audio files alphabetically
-        usort($fileUrls, function($a, $b) {
+        usort($fileUrls, function ($a, $b) {
             $extensionA = strtolower(pathinfo($a['filename'], PATHINFO_EXTENSION));
             $extensionB = strtolower(pathinfo($b['filename'], PATHINFO_EXTENSION));
-            
+
             // Cover images first
-            $isCoverA = in_array($extensionA, ['jpg', 'jpeg', 'png', 'gif', 'webp']) && 
+            $isCoverA = in_array($extensionA, ['jpg', 'jpeg', 'png', 'gif', 'webp']) &&
                        (strpos(strtolower($a['filename']), 'cover') !== false || strpos(strtolower($a['filename']), 'folder') !== false);
-            $isCoverB = in_array($extensionB, ['jpg', 'jpeg', 'png', 'gif', 'webp']) && 
+            $isCoverB = in_array($extensionB, ['jpg', 'jpeg', 'png', 'gif', 'webp']) &&
                        (strpos(strtolower($b['filename']), 'cover') !== false || strpos(strtolower($b['filename']), 'folder') !== false);
-            
-            if ($isCoverA && !$isCoverB) return -1;
-            if (!$isCoverA && $isCoverB) return 1;
-            
+
+            if ($isCoverA && !$isCoverB) {
+                return -1;
+            }
+            if (!$isCoverA && $isCoverB) {
+                return 1;
+            }
+
             // Then alphabetical
             return strnatcmp($a['filename'], $b['filename']);
         });
@@ -1948,10 +1957,11 @@ class BookApiController extends Controller
             $sort = 'title_asc';
         }
 
-        // Build the base query
+        // Build the base query (exclude items needing review)
         $query = \App\Models\Book::query()
             ->with(['authors', 'narrators', 'genres', 'series'])
-            ->select('books.*');
+            ->select('books.*')
+            ->where('books.needs_review', false);
 
         // Add genre filtering
         if ($genreId || $genreName) {
@@ -2034,7 +2044,7 @@ class BookApiController extends Controller
         }
 
         // Get total count before pagination - create clean count query without GROUP BY
-        $countQuery = \App\Models\Book::query();
+        $countQuery = \App\Models\Book::query()->where('books.needs_review', false);
 
         // Add same filtering as main query
         if ($genreId || $genreName) {

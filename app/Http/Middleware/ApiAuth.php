@@ -19,7 +19,7 @@ class ApiAuth
         $userAgent = $request->header('User-Agent');
         $requestUri = $request->getRequestUri();
         $requestMethod = $request->getMethod();
-        
+
         // Log every request that hits this middleware for debugging
         Log::info('ApiAuth middleware called', [
             'uri' => $requestUri,
@@ -27,7 +27,7 @@ class ApiAuth
             'ip' => $clientIp,
             'has_auth_header' => !empty($authHeader)
         ]);
-        
+
         if (!$authHeader || !preg_match('/Bearer\s(.*)/', $authHeader, $matches)) {
             Log::warning('API Auth failed: Missing or malformed Authorization header', [
                 'ip' => $clientIp,
@@ -42,7 +42,7 @@ class ApiAuth
         }
 
         $token = $matches[1];
-        
+
         // Handle duplicate Authorization headers (fix for client sending multiple headers)
         if (strpos($token, ',Bearer ') !== false) {
             $tokens = explode(',Bearer ', $token);
@@ -55,7 +55,7 @@ class ApiAuth
             ]);
         }
         $tokenPreview = substr($token, 0, 8) . '...' . substr($token, -4); // Show first 8 and last 4 chars
-        
+
         // Log the exact token details for debugging hash mismatches
         Log::info('Token details for debugging', [
             'uri' => $requestUri,
@@ -71,7 +71,7 @@ class ApiAuth
         // Try to find the token in the personal_access_tokens table
         try {
             $accessToken = PersonalAccessToken::findToken($token);
-            
+
             // Log additional debug info for failed token lookups
             if (!$accessToken) {
                 // Try to get more info about what's in the database
@@ -79,14 +79,14 @@ class ApiAuth
                 $directLookup = DB::table('personal_access_tokens')
                     ->where('token', $tokenHash)
                     ->first();
-                
+
                 // Get info about what tokens DO exist for this user/token ID pattern
                 $tokenPrefix = substr($token, 0, strpos($token, '|'));
                 $similarTokens = DB::table('personal_access_tokens')
                     ->where('id', $tokenPrefix)
                     ->orWhere('name', 'api-token')
                     ->get(['id', 'name', 'created_at', 'expires_at']);
-                    
+
                 Log::warning('API Auth failed: Token not found in database', [
                     'ip' => $clientIp,
                     'user_agent' => $userAgent,

@@ -13,7 +13,7 @@ class BadgeSeeder extends Seeder
     public function run(): void
     {
         $badges = $this->getBadgeDefinitions();
-        
+
         foreach ($badges as $badgeData) {
             Badge::updateOrCreate(
                 ['key' => $badgeData['key']], // Update if exists, create if not

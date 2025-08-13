@@ -18,14 +18,14 @@ class BadgeService
     public function evaluateUserBadges(string $userId, ?string $deviceId = null): array
     {
         $newBadges = [];
-        
+
         try {
             // Get user's current listening statistics
             $userStats = $this->getUserListeningStatistics($userId, $deviceId);
-            
+
             // Get all active badges
             $badges = Badge::active()->ordered()->get();
-            
+
             foreach ($badges as $badge) {
                 if ($this->shouldEvaluateBadge($badge, $userId, $deviceId, $userStats)) {
                     if ($badge->evaluateCriteria($userStats)) {
@@ -36,9 +36,8 @@ class BadgeService
                     }
                 }
             }
-            
+
             return $newBadges;
-            
         } catch (\Exception $e) {
             Log::error('Error evaluating user badges', [
                 'user_id' => $userId,
@@ -56,7 +55,7 @@ class BadgeService
     protected function getUserListeningStatistics(string $userId, ?string $deviceId = null): array
     {
         $cacheKey = "user_stats_{$userId}" . ($deviceId ? "_{$deviceId}" : '');
-        
+
         return Cache::remember($cacheKey, 300, function () use ($userId, $deviceId) {
             $query = ListeningStatistic::where('device_id', $userId);
             if ($deviceId) {
@@ -144,7 +143,7 @@ class BadgeService
             if ($deviceId) {
                 $query->orWhere('device_id', $deviceId);
             }
-            
+
             $hasActivity = $query->where('listening_date', $currentDate->toDateString())->exists();
 
             if (!$hasActivity) {
@@ -272,7 +271,7 @@ class BadgeService
         }
 
         $startDate = Carbon::now()->subDays($days);
-        
+
         return $query->where('session_type', 'completed')
             ->where('listening_date', '>=', $startDate)
             ->distinct('book_id')
@@ -355,7 +354,7 @@ class BadgeService
         if ($deviceId) {
             $query->orWhere('device_id', $deviceId);
         }
-        
+
         // Rough estimate: assume average session covers 1-2 chapters
         return $query->count() * 1.5;
     }
@@ -369,7 +368,7 @@ class BadgeService
         if ($deviceId) {
             $query->orWhere('device_id', $deviceId);
         }
-        
+
         // This is simplified - you'd need to track actual device info
         return 1; // For now, return 1 as they're using at least one device
     }
@@ -439,7 +438,6 @@ class BadgeService
             Cache::forget($cacheKey);
 
             return $userBadge;
-
         } catch (\Exception $e) {
             Log::error('Error awarding badge', [
                 'badge_id' => $badge->id,
@@ -460,14 +458,14 @@ class BadgeService
         $userStats = $this->getUserListeningStatistics($userId, $deviceId);
         $earnedBadges = UserBadge::getUserBadgesWithDetails($userId, $deviceId);
         $earnedBadgeIds = $earnedBadges->pluck('badge_id')->toArray();
-        
+
         $availableBadges = Badge::active()->ordered()->get();
         $badgeProgress = [];
 
         foreach ($availableBadges as $badge) {
             $hasEarned = in_array($badge->id, $earnedBadgeIds);
             $progress = $badge->getProgressPercentage($userStats);
-            
+
             $badgeProgress[] = [
                 'badge' => $badge,
                 'earned' => $hasEarned,

@@ -16,7 +16,7 @@ class FirebaseAuth
         $userAgent = $request->header('User-Agent');
         $requestUri = $request->getRequestUri();
         $requestMethod = $request->getMethod();
-        
+
         if (!$authHeader || !preg_match('/Bearer\s(.*)/', $authHeader, $matches)) {
             Log::warning('Firebase Auth failed: Missing or malformed Authorization header', [
                 'ip' => $clientIp,
@@ -32,9 +32,9 @@ class FirebaseAuth
 
         $idToken = $matches[1];
         $tokenPreview = substr($idToken, 0, 12) . '...' . substr($idToken, -8); // Show first 12 and last 8 chars
-        
+
         $firebaseAuth = new FirebaseAuthService();
-        
+
         try {
             $uid = $firebaseAuth->verifyIdToken($idToken);
             if (!$uid) {

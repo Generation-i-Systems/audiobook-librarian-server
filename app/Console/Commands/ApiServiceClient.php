@@ -338,7 +338,7 @@ class ApiServiceClient extends Command
         $statusColor = $response['status_code'] >= 200 && $response['status_code'] < 300 ? 'info' : 'error';
         $this->line('');
         $this->{$statusColor}("Status Code: {$response['status_code']}");
-        
+
         if (isset($response['duration_ms'])) {
             $this->info("Response Time: {$response['duration_ms']}ms");
         }
@@ -353,7 +353,7 @@ class ApiServiceClient extends Command
                 $this->line("  {$header}: {$value}");
             }
         }
-        
+
         // Show response size
         if (isset($response['raw_content'])) {
             $size = strlen($response['raw_content']);
@@ -446,16 +446,16 @@ class ApiServiceClient extends Command
         if ($response['status_code'] >= 200 && $response['status_code'] < 300) {
             $content = $response['raw_content'];
             $size = strlen($content);
-            
+
             if (file_put_contents($filename, $content)) {
                 $this->info("Downloaded successfully: {$filename}");
                 $this->info("File size: " . $this->formatBytes($size));
                 $this->info("Duration: {$response['duration_ms']}ms");
-                
+
                 // Show content type if available
                 if (isset($response['headers']['content-type'])) {
-                    $contentType = is_array($response['headers']['content-type']) 
-                        ? $response['headers']['content-type'][0] 
+                    $contentType = is_array($response['headers']['content-type'])
+                        ? $response['headers']['content-type'][0]
                         : $response['headers']['content-type'];
                     $this->info("Content-Type: {$contentType}");
                 }
@@ -480,9 +480,9 @@ class ApiServiceClient extends Command
         $bytes = max($bytes, 0);
         $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
         $pow = min($pow, count($units) - 1);
-        
+
         $bytes /= (1 << (10 * $pow));
-        
+
         return round($bytes, 2) . ' ' . $units[$pow];
     }
 

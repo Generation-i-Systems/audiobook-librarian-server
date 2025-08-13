@@ -36,7 +36,7 @@ class RequireStandardRole
             ]);
             return response()->json(['message' => 'Forbidden'], 403);
         }
-        
+
         // Only allow if role is standard or higher
         $allowedRoles = ['standard', 'admin', 'superadmin'];
         if (!in_array($user->role, $allowedRoles)) {

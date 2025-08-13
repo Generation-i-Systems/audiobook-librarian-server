@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class () extends Migration {
     /**
      * Run the migrations.
      */
@@ -22,12 +21,12 @@ return new class extends Migration
             $table->boolean('is_notified')->default(false); // Whether user has been notified of earning this
             $table->integer('tier_level')->default(1); // For repeatable badges (e.g., 1st, 2nd, 3rd time earned)
             $table->timestamps();
-            
+
             $table->index(['user_id', 'badge_id']);
             $table->index(['device_id', 'badge_id']);
             $table->index(['earned_at']);
             $table->index(['is_notified']);
-            
+
             // Unique constraint for non-repeatable badges per user
             $table->unique(['user_id', 'badge_id', 'tier_level'], 'unique_user_badge_tier');
         });

@@ -21,7 +21,7 @@ class CheckAdminRole
         $userAgent = $request->header('User-Agent');
         $requestUri = $request->getRequestUri();
         $requestMethod = $request->getMethod();
-        
+
         if (!Auth::check()) {
             Log::warning('Admin access denied: User not authenticated', [
                 'ip' => $clientIp,
@@ -32,10 +32,10 @@ class CheckAdminRole
             ]);
             abort(403, 'Unauthorized. Admin access required.');
         }
-        
+
         $user = Auth::user();
         $documentStore = app(\App\Contracts\DocumentStoreServiceInterface::class);
-        
+
         if (!$documentStore->isAdmin(Auth::id())) {
             Log::warning('Admin access denied: User lacks admin role', [
                 'ip' => $clientIp,

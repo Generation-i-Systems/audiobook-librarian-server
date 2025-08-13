@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Commands;
 
-use App\Console\Commands\MarkInvalidBookDirectories;
 use App\Models\Book;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;

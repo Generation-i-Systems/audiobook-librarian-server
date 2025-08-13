@@ -46,6 +46,7 @@ class Book extends Model
         'release_date' => 'date:Y-m-d',
         'duration' => 'integer',
         'needs_review' => 'boolean',
+        'needs_review_reasons' => 'array',
         'audio_file_count' => 'integer',
         'mongo_record' => 'array',
         'file_tags' => 'array',
