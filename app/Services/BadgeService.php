@@ -8,6 +8,7 @@ use App\Models\ListeningStatistic;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class BadgeService
 {
@@ -293,7 +294,7 @@ class BadgeService
      */
     protected function getBookmarksCreated(string $userId, ?string $deviceId = null): int
     {
-        $query = \DB::table('bookmarks')->where('user_id', $userId);
+        $query = DB::table('bookmarks')->where('user_id', $userId);
         if ($deviceId) {
             $query->orWhere('device_id', $deviceId);
         }
@@ -315,7 +316,7 @@ class BadgeService
      */
     protected function getLibrarySize(string $userId, ?string $deviceId = null): int
     {
-        $query = \DB::table('book_user')->where('user_id', $userId);
+        $query = DB::table('book_user')->where('user_id', $userId);
         if ($deviceId) {
             // If using device-based tracking, you might need a different approach
             $query->orWhere('device_id', $deviceId);

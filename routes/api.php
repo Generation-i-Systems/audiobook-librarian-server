@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\ProgressController;
 use App\Http\Controllers\Api\ReadingProgressApiController;
 use App\Http\Controllers\Api\ReadingStatsApiController;
 use App\Http\Controllers\Api\StatisticsController;
+use App\Http\Controllers\Api\UserApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -22,9 +23,7 @@ Route::prefix('v1')->group(function () {
             return $request->user();
         });
 
-        Route::get('/me', function (Request $request) {
-            return response()->json($request->user());
-        });
+        Route::get('/me', [UserApiController::class, 'me']);
 
         // Book Routes
         Route::get('/books', [BookApiController::class, 'index']);
