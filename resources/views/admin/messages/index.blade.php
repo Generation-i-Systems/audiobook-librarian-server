@@ -117,7 +117,7 @@
                     <h5 class="modal-title">New Message</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <form action="{{ route('messages.storeAdmin') }}" method="POST">
+                <form action="{{ route('admin.messages.store') }}" method="POST">
                     @csrf
                     <div class="modal-body">
                         <div class="mb-3">

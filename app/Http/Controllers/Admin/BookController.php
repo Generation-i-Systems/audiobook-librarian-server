@@ -848,6 +848,13 @@ class BookController extends Controller
             Log::info('Book creation started', ['request_data' => $request->except(['cover', 'coverImage'])]);
 
             Log::debug('STEP 1: Validating book creation request.');
+            // Normalize year-only input for release_date (e.g., "2011" -> "2011-01-01") before validation
+            if ($request->filled('release_date')) {
+                $rd = trim((string) $request->input('release_date'));
+                if (preg_match('/^\d{4}$/', $rd)) {
+                    $request->merge(['release_date' => $rd . '-01-01']);
+                }
+            }
             $validated = $request->validate([
                 'title' => 'required|string|max:255',
                 'subtitle' => 'nullable|string|max:255',
@@ -1060,6 +1067,13 @@ class BookController extends Controller
         }
 
         try {
+            // Normalize year-only input for release_date (e.g., "2011" -> "2011-01-01") before validation
+            if ($request->filled('release_date')) {
+                $rd = trim((string) $request->input('release_date'));
+                if (preg_match('/^\d{4}$/', $rd)) {
+                    $request->merge(['release_date' => $rd . '-01-01']);
+                }
+            }
             $validated = $request->validate([
                 'title' => 'required|string|max:255',
                 'author' => 'required|array|min:1',

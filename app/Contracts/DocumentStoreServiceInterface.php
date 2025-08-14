@@ -40,6 +40,24 @@ interface DocumentStoreServiceInterface
     public function listBooks(int $page = 1, int $perPage = 24, array $filters = [], bool $withRelated = true, string $sort = 'title', string $order = 'asc'): array;
 
     /**
+     * Return books flagged as needs_review. Optional reason filter narrows results to books whose
+     * needs_review_reasons contain the provided reason string.
+     *
+     * @param string|null $reason
+     * @param int $limit
+     * @param int $page
+     * @return array
+     */
+    public function listNeedsReviewBooks(?string $reason = null, int $limit = 100, int $page = 1): array;
+
+    /**
+     * Return a list of distinct needs_review reasons across all flagged books.
+     *
+     * @return array
+     */
+    public function listNeedsReviewReasons(): array;
+
+    /**
      * Get recently added books
      *
      * @param int $limit Maximum number of recent books to return

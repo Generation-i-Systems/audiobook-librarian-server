@@ -400,9 +400,6 @@ class MySqlService implements DocumentStoreServiceInterface
     public function getRecentBooks(int $limit = 5, int $days = 7): array
     {
         try {
-            $dateThreshold = now()->subDays($days);
-
-            // Minimal query with only essential fields and limited relationships
             return Book::query()
                 ->select('id', 'title', 'cover_image', 'directory_path', 'created_at', 'description', 'duration', 'release_date', 'audio_file_count', 'total_size')
                 ->where('needs_review', false)
@@ -410,62 +407,113 @@ class MySqlService implements DocumentStoreServiceInterface
                     'authors' => function ($q) {
                         $q->select('id', 'name');
                     },
-                    'genres' => function ($q) {
-                        $q->select('id', 'name');
-                    },
                     'narrators' => function ($q) {
                         $q->select('id', 'name');
                     },
-                    'series' => function ($q) {
-                        $q->select('id', 'name')->withPivot('series_number');
-                    },
                 ])
-                ->where('created_at', '>=', $dateThreshold)
+                ->where('created_at', '>=', now()->subDays($days))
                 ->orderBy('created_at', 'desc')
                 ->limit($limit)
                 ->get()
-                ->map(function ($book) {
-                    $coverUrl = null;
-                    if ($book->cover_image) {
-                        $coverUrl = url('/api/v1/books/' . $book->id . '/cover');
-                    }
-
-                    $durationFormatted = null;
-                    if ($book->duration) {
-                        $durationFormatted = gmdate('H:i:s', $book->duration);
-                    }
-
-                    // Format series data as an array of objects with name and series_number
-                    $seriesData = [];
-                    if ($book->series->isNotEmpty()) {
-                        foreach ($book->series as $series) {
-                            $seriesData[] = [
-                                'name' => $series->name,
-                                'series_number' => $series->pivot->series_number,
-                            ];
-                        }
-                    }
-
+                ->map(function (Book $book) {
                     return [
-                        'id' => $book->id,
-                        'title' => $book->title,
-                        'author' => $book->authors->pluck('name')->toArray(),
-                        'narrator' => $book->narrators->pluck('name')->toArray(),
-                        'series' => $seriesData,
-                        'genre' => $book->genres->pluck('name')->toArray(),
-                        'year' => $book->release_date ? (int) (is_object($book->release_date) && method_exists($book->release_date, 'format') ? $book->release_date->format('Y') : date('Y', strtotime((string) $book->release_date))) : null,
-                        'duration' => $durationFormatted,
-                        'description' => $book->description,
-                        'cover_url' => $coverUrl,
-                        'file_count' => $book->audio_file_count,
-                        'total_size' => $book->total_size,
-                        'created_at' => $book->created_at ? $book->created_at->toIso8601String() : null,
-                        'updated_at' => $book->updated_at ? $book->updated_at->toIso8601String() : null,
+                        'id' => (string) $book->id,
+                        'title' => (string) $book->title,
+                        'coverImageUrl' => $book->cover_image,
+                        'directoryPath' => $book->directory_path,
+                        'createdAt' => $book->created_at ? $book->created_at->toIso8601String() : null,
+                        'description' => (string) ($book->description ?? ''),
+                        'duration' => (int) ($book->duration ?? 0),
+                        'releaseDate' => $book->release_date ? (is_object($book->release_date) && method_exists($book->release_date, 'toDateString') ? $book->release_date->toDateString() : (string) $book->release_date) : null,
+                        'audioFileCount' => (int) ($book->audio_file_count ?? 0),
+                        'totalSize' => (int) ($book->total_size ?? 0),
+                        'authors' => $book->authors->pluck('name')->values()->all(),
+                        'narrators' => $book->narrators->pluck('name')->values()->all(),
                     ];
-                })->toArray();
+                })
+                ->toArray();
         } catch (\Exception $e) {
-            // Log the error and return an empty array as fallback
             Log::error('Error fetching recent books: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Return books flagged as needs_review with optional reason filter.
+     *
+     * @param string|null $reason
+     * @param int $limit
+     * @param int $page
+     * @return array
+     */
+    public function listNeedsReviewBooks(?string $reason = null, int $limit = 100, int $page = 1): array
+    {
+        try {
+            $query = Book::query()
+                ->select('id', 'title', 'directory_path', 'needs_review_reasons', 'created_at')
+                ->where('needs_review', true)
+                ->orderBy('created_at', 'desc');
+
+            if ($reason !== null && $reason !== '') {
+                $query->where(function ($q) use ($reason) {
+                    try {
+                        $q->whereJsonContains('needs_review_reasons', $reason);
+                    } catch (\Throwable $t) {
+                        $q->where('needs_review_reasons', 'like', '%"' . addcslashes($reason, '\\"') . '"%');
+                    }
+                });
+            }
+
+            return $query
+                ->forPage(max(1, $page), max(1, $limit))
+                ->get()
+                ->map(function (Book $book) {
+                    return [
+                        'id' => (string) $book->id,
+                        'title' => (string) $book->title,
+                        'directoryPath' => (string) ($book->directory_path ?? ''),
+                        'needsReviewReasons' => (array) ($book->needs_review_reasons ?? []),
+                        'createdAt' => $book->created_at ? $book->created_at->toIso8601String() : null,
+                    ];
+                })
+                ->toArray();
+        } catch (\Exception $e) {
+            Log::error('MySqlService listNeedsReviewBooks failed: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Return distinct needs_review reasons across all flagged books.
+     *
+     * @return array
+     */
+    public function listNeedsReviewReasons(): array
+    {
+        try {
+            $all = Book::query()
+                ->where('needs_review', true)
+                ->pluck('needs_review_reasons')
+                ->all();
+
+            $reasons = [];
+            foreach ($all as $arr) {
+                if (is_string($arr)) {
+                    $decoded = json_decode($arr, true);
+                    if (is_array($decoded)) {
+                        $reasons = array_merge($reasons, $decoded);
+                        continue;
+                    }
+                }
+                if (is_array($arr)) {
+                    $reasons = array_merge($reasons, $arr);
+                }
+            }
+            $reasons = array_values(array_unique(array_filter(array_map('strval', $reasons))));
+            sort($reasons, SORT_NATURAL | SORT_FLAG_CASE);
+            return $reasons;
+        } catch (\Exception $e) {
+            Log::error('MySqlService listNeedsReviewReasons failed: ' . $e->getMessage());
             return [];
         }
     }

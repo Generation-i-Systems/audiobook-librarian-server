@@ -6,6 +6,7 @@ use App\Services\AudibleApiService;
 // FirestoreService has been archived
 use Google\Cloud\Firestore\FirestoreClient;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\ServiceProvider;
 
@@ -51,5 +52,10 @@ class AppServiceProvider extends ServiceProvider
         Queue::extend('documentstore', function ($app) {
             return new \App\Queue\DocumentstoreQueueConnector();
         });
+
+        // Force HTTPS scheme for generated links when enabled (but not during unit tests)
+        if ((bool) env('FORCE_HTTPS', true) && !app()->runningUnitTests()) {
+            URL::forceScheme('https');
+        }
     }
 }

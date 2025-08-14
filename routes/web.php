@@ -254,6 +254,9 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::get('/', function () {
         return redirect()->route('admin.books.index');
     });
+    // Needs review books listing
+    Route::get('/needs-review', [Admin\NeedsReviewController::class, 'index'])
+        ->name('needs_review.index');
     Route::post('/books/resync-from-path', [Admin\BookController::class, 'resyncFromPath'])
         ->name('books.resyncFromPath');
 

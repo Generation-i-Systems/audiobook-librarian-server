@@ -61,7 +61,14 @@
             <strong>Description:</strong> {{ is_array($book['description'] ?? null) ? nl2br(e(implode("\n", $book['description']))) : e($book['description'] ?? 'No description available') }}
         </li>
         <li class="list-group-item">
-            <strong>Release Date:</strong> {{ $book['release_date'] ?? 'N/A' }}
+            @php
+                $rd = $book['release_date'] ?? null;
+                $rdDisplay = '';
+                if (is_string($rd) && $rd !== '') {
+                    $rdDisplay = preg_match('/^\d{4}-01-01$/', $rd) ? substr($rd, 0, 4) : $rd;
+                }
+            @endphp
+            <strong>Release Date:</strong> {{ $rdDisplay !== '' ? $rdDisplay : 'N/A' }}
         </li>
         <li class="list-group-item">
             <strong>Date Added:</strong> {{ is_array($book['createdAt'] ?? $book['created_at'] ?? null) ? (($book['createdAt'] ?? $book['created_at'])['date'] ?? 'N/A') : ($book['createdAt'] ?? $book['created_at'] ?? 'N/A') }}

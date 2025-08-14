@@ -220,9 +220,18 @@
         </div>
         <div class="form-group">
             <label for="release_date">Release Date (Optional):</label>
-            <input type="date" class="form-control @error('release_date') is-invalid @enderror" id="release_date"
+            @php
+                $rawRelease = old('release_date', isset($book) && !empty($book['release_date']) ? $book['release_date'] : ($initial['release_date'] ?? null));
+                $releaseDisplayValue = '';
+                if (is_string($rawRelease) && $rawRelease !== '') {
+                    // If stored as YYYY-01-01, display as YYYY only; otherwise show the stored value
+                    $releaseDisplayValue = preg_match('/^\d{4}-01-01$/', $rawRelease) ? substr($rawRelease, 0, 4) : $rawRelease;
+                }
+            @endphp
+            <input type="text" class="form-control w-auto @error('release_date') is-invalid @enderror" id="release_date"
                 name="release_date"
-                value="{{ old('release_date', isset($book) && !empty($book['release_date']) ? $book['release_date'] : ($initial['release_date'] ?? null)) }}">
+                style="max-width: 160px; display: inline-block;"
+                value="{{ $releaseDisplayValue }}">
             @error('release_date')
                 <span class="invalid-feedback d-block">{{ $message }}</span>
             @enderror
