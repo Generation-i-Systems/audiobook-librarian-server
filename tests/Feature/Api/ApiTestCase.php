@@ -23,11 +23,16 @@ abstract class ApiTestCase extends TestCase
 
         // Create a test user and authenticate
         $this->user = User::factory()->create([
-            'role' => 'user',
+            'role' => 'standard',
             'email_verified_at' => now(),
         ]);
 
-        // Authenticate the user
+        // Authenticate the user for guards that rely on session
         Sanctum::actingAs($this->user);
+
+        // Also create and attach a personal access token so our custom api.auth
+        // middleware (which expects a Bearer token) authorizes requests.
+        $token = $this->user->createToken('api-token')->plainTextToken;
+        $this->withHeader('Authorization', 'Bearer ' . $token);
     }
 }
