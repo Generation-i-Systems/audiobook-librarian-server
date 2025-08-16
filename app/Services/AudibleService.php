@@ -484,6 +484,20 @@ class AudibleService extends BaseBookService
             $result['description'] = $description;
         }
 
+        // Include runtime length in minutes if provided by API
+        if (isset($book['runtimeLengthMin'])) {
+            $result['runtimeLengthMin'] = (int) $book['runtimeLengthMin'];
+        } elseif (isset($book['runtime_length_min'])) {
+            $result['runtimeLengthMin'] = (int) $book['runtime_length_min'];
+        }
+
+        // Include language if present
+        if (isset($book['language'])) {
+            $result['language'] = $book['language'];
+        } elseif (isset($book['language_locale'])) {
+            $result['language'] = $book['language_locale'];
+        }
+
         // Convert all keys to camelCase for consistency
         return $this->convertKeysToCamelCase($result);
     }

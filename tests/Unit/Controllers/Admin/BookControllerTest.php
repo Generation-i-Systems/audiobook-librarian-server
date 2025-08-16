@@ -61,7 +61,7 @@ class BookControllerTest extends TestCase
             });
 
         // Mock the createBook method - this is what the controller actually calls
-        $this->documentStore->shouldReceive('createBook')
+        $this->documentStore->shouldReceive('createBook')->byDefault()
             ->andReturnUsing(function ($bookData) {
                 $id = $bookData['id'] ?? ('book-' . uniqid());
                 $bookData['id'] = $id;
@@ -69,7 +69,7 @@ class BookControllerTest extends TestCase
                 return $id;
             });
 
-        $this->documentStore->shouldReceive('updateBook')->andReturnUsing(function ($id, $book) {
+        $this->documentStore->shouldReceive('updateBook')->byDefault()->andReturnUsing(function ($id, $book) {
             if (isset($this->storedBooks[$id])) {
                 $this->storedBooks[$id] = array_merge($this->storedBooks[$id], $book);
                 return ['success' => true];
@@ -85,7 +85,7 @@ class BookControllerTest extends TestCase
             return ['success' => false];
         });
 
-        $this->documentStore->shouldReceive('getBook')->andReturnUsing(function ($id) {
+        $this->documentStore->shouldReceive('getBook')->byDefault()->andReturnUsing(function ($id) {
             return $this->storedBooks[$id] ?? null;
         });
 
