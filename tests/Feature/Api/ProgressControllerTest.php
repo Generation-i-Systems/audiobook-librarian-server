@@ -190,6 +190,7 @@ class ProgressControllerTest extends TestCase
             ])
             ->getJson("/api/v1/progress/device?device_id=test-device");
 
+
         $response->assertStatus(200)
             ->assertJson([
                 'success' => true,

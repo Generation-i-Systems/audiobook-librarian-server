@@ -7,15 +7,14 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\WithFaker;
 use Illuminate\Support\Facades\Storage;
-use Tests\PersistentDatabaseTestCase as TestCase;
+use Tests\TestCase;
 use Mockery;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Facade;
 
 class BookControllerIndexTest extends TestCase
 {
-    // Removed RefreshDatabase to prevent database wipes
-    use WithFaker;
+    use RefreshDatabase, WithFaker;
 
     protected $user;
     protected $mockDocumentStoreService;
@@ -23,12 +22,6 @@ class BookControllerIndexTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-
-        // Using persistent database instead of in-memory SQLite
-        // Database configuration is handled in PersistentDatabaseTestCase
-
-        // Run migrations
-        $this->artisan('migrate');
 
         // Mock the filesystem
         Storage::fake('public');
@@ -77,10 +70,10 @@ class BookControllerIndexTest extends TestCase
                     'id' => 1,
                     'title' => 'Test Book 1',
                     'author' => [
-                        ['name' => 'Author 1']
+                        ['name' => 'Author 1'],
                     ],
                     'series' => [
-                        ['seriesName' => 'Test Series 1']
+                        ['seriesName' => 'Test Series 1'],
                     ],
                     'cover_image' => 'test1.jpg',
                     'description' => 'Test description 1',
@@ -98,10 +91,10 @@ class BookControllerIndexTest extends TestCase
                     'id' => 2,
                     'title' => 'Test Book 2',
                     'author' => [
-                        ['name' => 'Author 2']
+                        ['name' => 'Author 2'],
                     ],
                     'series' => [
-                        ['seriesName' => 'Test Series 2']
+                        ['seriesName' => 'Test Series 2'],
                     ],
                     'cover_image' => 'test2.jpg',
                     'description' => 'Test description 2',
@@ -155,10 +148,10 @@ class BookControllerIndexTest extends TestCase
                     'id' => 3,
                     'title' => 'Recent Book 1',
                     'author' => [
-                        ['name' => 'Author 3']
+                        ['name' => 'Author 3'],
                     ],
                     'series' => [
-                        ['seriesName' => 'Test Series 3']
+                        ['seriesName' => 'Test Series 3'],
                     ],
                     'cover_image' => 'recent1.jpg',
                     'coverImage' => 'recent1.jpg', // Add coverImage to match what the view expects
@@ -172,7 +165,7 @@ class BookControllerIndexTest extends TestCase
                     'ratings_count' => 200,
                     'created_at' => now()->subDays(5), // Recent book
                     'updated_at' => now()->subDays(5),
-                ]
+                ],
             ];
 
             $this->mockDocumentStoreService->shouldReceive('getRecentBooks')
@@ -183,8 +176,8 @@ class BookControllerIndexTest extends TestCase
             $response = $this->get(route('books.index'));
 
             // If we get here, the request didn't throw an exception
-            dump('Response status: ' . $response->status());
-            dump('Response content: ' . $response->content());
+            // dump('Response status: ' . $response->status());
+            // dump('Response content: ' . $response->content());
 
             // If we got a non-200 response, dump the exception that would have been thrown
             if ($response->status() !== 200) {
@@ -274,21 +267,8 @@ class BookControllerIndexTest extends TestCase
 
             // If we get here, the status is 200, now check view data
             $view = $response->original;
-            dump('View data keys: ' . implode(', ', array_keys($view->getData())));
-
-            // Check if books data is present in the view
-            if (!isset($view->getData()['books'])) {
-                dump('Books data is missing from the view');
-            } else {
-                dump('Books data found in view');
-            }
-
-            // Check if recentBooks data is present in the view
-            if (!isset($view->getData()['recentBooks'])) {
-                dump('Recent books data is missing from the view');
-            } else {
-                dump('Recent books data found in view');
-            }
+            // Check if books/recentBooks data is present in the view
+            // (No console output on success)
 
             // Assert the view has the books data
             $response->assertViewHas('books');

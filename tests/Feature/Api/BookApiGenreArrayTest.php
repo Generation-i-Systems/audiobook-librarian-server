@@ -4,23 +4,25 @@ namespace Tests\Feature\Api;
 
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery\MockInterface;
 use Tests\TestCase;
 
 class BookApiGenreArrayTest extends TestCase
 {
+    use RefreshDatabase;
+    
     protected string $token;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        // Force SQLite in-memory database to avoid safety check issues
-        config(['database.default' => 'sqlite']);
-        config(['database.connections.sqlite.database' => ':memory:']);
-
         // Create a user and token for API authentication
-        $user = User::factory()->create(['is_admin' => true]);
+        $user = User::factory()->create([
+            'role' => 'standard',
+            'is_admin' => true
+        ]);
         $this->token = $user->createToken('test-token')->plainTextToken;
     }
 

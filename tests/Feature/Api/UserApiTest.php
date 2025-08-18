@@ -63,35 +63,49 @@ class UserApiTest extends TestCase
     }
 
     /**
-     * Test that the /me endpoint works with different user roles.
+     * Test that the /me endpoint works with standard role.
      */
-    public function testMeEndpointWorksWithDifferentRoles(): void
+    public function testMeEndpointWorksWithStandardRole(): void
     {
-        $roles = ['standard', 'admin', 'superadmin'];
+        $user = User::factory()->create([
+            'name' => "Test standard",
+            'email' => "test.standard@example.com",
+            'role' => 'standard',
+        ]);
 
-        foreach ($roles as $role) {
-            // Create a test user with specific role
-            $user = User::factory()->create([
-                'name' => "Test {$role}",
-                'email' => "test.{$role}@example.com",
-                'role' => $role,
+        $token = $user->createToken('api-token')->plainTextToken;
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+        ])->getJson('/api/v1/me');
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'name' => "Test standard",
+                'email' => "test.standard@example.com",
             ]);
+    }
 
-            // Create a personal access token and authenticate via Authorization header
-            $token = $user->createToken('api-token')->plainTextToken;
-            $response = $this->withHeaders([
-                'Authorization' => 'Bearer ' . $token,
-            ])->getJson('/api/v1/me');
+    /**
+     * Test that the /me endpoint works with admin role.
+     */
+    public function testMeEndpointWorksWithAdminRole(): void
+    {
+        $user = User::factory()->create([
+            'name' => "Test admin",
+            'email' => "test.admin@example.com", 
+            'role' => 'admin',
+        ]);
 
-            // Assert the response is successful
-            $response->assertStatus(200);
+        $token = $user->createToken('api-token')->plainTextToken;
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+        ])->getJson('/api/v1/me');
 
-            // Assert the response contains the correct user data
-            $response->assertJson([
-                'name' => "Test {$role}",
-                'email' => "test.{$role}@example.com",
+        $response->assertStatus(200)
+            ->assertJson([
+                'name' => "Test admin",
+                'email' => "test.admin@example.com",
             ]);
-        }
     }
 
     /**

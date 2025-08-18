@@ -148,14 +148,6 @@ class BookControllerTest extends TestCase
 
         $response = $this->post(route('admin.books.store'), $bookData);
 
-        // Debug information to see what's causing the 500 error
-        if ($response->status() === 500) {
-            dump('Response Status: ' . $response->status());
-            dump('Response Content: ' . $response->content());
-            dump('Exception: ' . $response->exception?->getMessage());
-            dump('Exception Trace: ' . $response->exception?->getTraceAsString());
-        }
-
         $response->assertRedirect(route('admin.books.edit', 'new-book-id'));
     }
 

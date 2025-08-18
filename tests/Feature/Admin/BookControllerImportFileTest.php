@@ -20,11 +20,11 @@ class BookControllerImportFileTest extends TestCase
     {
         $admin = new DocumentstoreUser(['id' => 'admin-user', 'role' => 'admin']);
 
-        $this->mock(MySqlService::class, function ($mock) {
+        $this->mock(\App\Contracts\DocumentStoreServiceInterface::class, function ($mock) {
             $mock->shouldReceive('isAdmin')->with('admin-user')->andReturn(true);
         });
 
-        $response = $this->actingAs($admin)->get(route('admin.books.importFile'));
+        $response = $this->actingAs($admin)->get('/admin/books/import-file');
         $response->assertStatus(200);
         $response->assertViewIs('admin.books.import_file');
         $response->assertSee('Import Book from File or Audio');
@@ -35,11 +35,11 @@ class BookControllerImportFileTest extends TestCase
     {
         $user = new DocumentstoreUser(['id' => 'non-admin-user', 'role' => 'user']);
 
-        $this->mock(MySqlService::class, function ($mock) {
+        $this->mock(\App\Contracts\DocumentStoreServiceInterface::class, function ($mock) {
             $mock->shouldReceive('isAdmin')->with('non-admin-user')->andReturn(false);
         });
 
-        $response = $this->actingAs($user)->get(route('admin.books.importFile'));
+        $response = $this->actingAs($user)->get('/admin/books/import-file');
         $response->assertStatus(403);
     }
 }

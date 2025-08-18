@@ -83,28 +83,28 @@ class BookControllerCoverImageTest extends TestCase
         // Verify the direct addition worked
         $directBooks = $this->documentStore->getAllBooks();
         $this->assertNotEmpty($directBooks, 'Direct book addition failed');
-        echo "\nDirect books: " . json_encode($directBooks) . "\n";
+        // echo "\nDirect books: " . json_encode($directBooks) . "\n";
 
         // Call the store method
-        echo "\nBefore store method call\n";
-        echo 'Request has file: ' . ($request->hasFile('cover') ? 'true' : 'false') . "\n";
-        echo 'File is valid: ' . ($file->isValid() ? 'true' : 'false') . "\n";
-        echo 'File extension: ' . $file->getClientOriginalExtension() . "\n";
-        echo 'Storage path: ' . env('BOOK_STORAGE_PATH') . "\n";
+        // echo "\nBefore store method call\n";
+        // echo 'Request has file: ' . ($request->hasFile('cover') ? 'true' : 'false') . "\n";
+        // echo 'File is valid: ' . ($file->isValid() ? 'true' : 'false') . "\n";
+        // echo 'File extension: ' . $file->getClientOriginalExtension() . "\n";
+        // echo 'Storage path: ' . env('BOOK_STORAGE_PATH') . "\n";
 
         $response = $this->controller->store($request);
 
         // Debug output
-        echo "\nAfter store method call\n";
-        echo 'Response: ' . json_encode($response) . "\n";
+        // echo "\nAfter store method call\n";
+        // echo 'Response: ' . json_encode($response) . "\n";
 
         // Get all books from the mock store
         $books = $this->documentStore->getAllBooks();
-        echo 'Books after store: ' . json_encode($books) . "\n";
-        echo 'Raw books array: ' . json_encode($this->documentStore->dumpAllBooks()) . "\n";
+        // echo 'Books after store: ' . json_encode($books) . "\n";
+        // echo 'Raw books array: ' . json_encode($this->documentStore->dumpAllBooks()) . "\n";
 
-        // Output logs
-        $logs = Log::logged();
-        echo 'Logs: ' . json_encode($logs) . "\n";
+        // // Output logs
+        // $logs = Log::logged();
+        // echo 'Logs: ' . json_encode($logs) . "\n";
     }
 }

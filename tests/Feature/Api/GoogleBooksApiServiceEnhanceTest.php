@@ -6,6 +6,7 @@ namespace Tests\Feature\Api;
 
 use App\Services\GoogleBooksApiService;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Http;
 use Orchestra\Testbench\TestCase;
 use PHPUnit\Framework\Attributes\Test;
 
@@ -61,17 +62,20 @@ class GoogleBooksApiServiceEnhanceTest extends TestCase
             ->method('performSearch')
             ->willReturn($mockResults);
 
-        // Pre-create a dummy cover image to ensure the assertion passes if HTTP download is skipped or fails
-        file_put_contents($this->testDir . '/cover.jpg', 'dummy image data');
+        // Mock HTTP facade to simulate successful download
+        Http::fake([
+            $coverUrl => Http::response('fake image data', 200),
+        ]);
 
         // Call the method we're testing
         $result = $service->searchAndMerge($book);
 
         // Assertions
         $this->assertNotNull($result, 'searchAndMerge should not return null');
-        $coverPath = $this->testDir . '/cover.jpg';
-        $this->assertTrue(file_exists($coverPath) || file_exists($this->testDir . '/cover.png'));
-        $this->assertArrayHasKey('cover_image', $result);
-        $this->assertStringContainsString($this->testDir, $result['cover_image']);
+        $this->assertArrayHasKey('coverImage', $result);
+        $this->assertStringContainsString($this->testDir, $result['coverImage']);
+        
+        // Verify the file was actually created
+        $this->assertTrue(file_exists($result['coverImage']));
     }
 }

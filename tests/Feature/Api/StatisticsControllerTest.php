@@ -151,7 +151,7 @@ class StatisticsControllerTest extends TestCase
         $response = $this->withHeaders([
                 'Authorization' => 'Bearer ' . $this->token,
             ])
-            ->getJson("/api/v1/statistics/daily?device_id=test-device&date={$today}");
+            ->getJson("/api/v1/statistics/legacy-daily?device_id=test-device&date={$today}");
 
         $response->assertStatus(200)
             ->assertJson([

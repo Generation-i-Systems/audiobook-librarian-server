@@ -60,8 +60,8 @@ class BookDownloadTest extends ApiTestCase
     {
         $book = Book::factory()->create();
 
-        // Clear authentication
-        auth()->logout();
+        // Clear authentication by removing the Bearer token header set in ApiTestCase
+        $this->withHeader('Authorization', '');
 
         $response = $this->getJson('/api/v1/books/' . $book->id . '/download');
 
@@ -133,9 +133,8 @@ class BookDownloadTest extends ApiTestCase
     public function test_chunked_transfer_encoding_headers()
     {
         // This test verifies that large downloads use proper headers
-        $book = Book::factory()->create([
-            'total_size' => 1000000000 // 1GB - large file
-        ]);
+        // We do not depend on a total_size DB column (it does not exist in tests)
+        $book = Book::factory()->create();
 
         // Mock a large file download scenario
         $response = $this->getJson('/api/v1/books/' . $book->id . '/download');

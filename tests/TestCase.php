@@ -3,6 +3,7 @@
 namespace Tests;
 
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Illuminate\Support\Facades\Artisan;
 use PHPUnit\Framework\SkippedWithMessageException;
 
 abstract class TestCase extends BaseTestCase
@@ -32,6 +33,15 @@ abstract class TestCase extends BaseTestCase
         // RefreshDatabase runs consistently without cross-connection conflicts
         if (!defined('ALLOW_MYSQL_IN_TESTS') || !ALLOW_MYSQL_IN_TESTS) {
             config(['database.default' => 'testing']);
+        }
+
+        // Ensure migrations are run for tests that do not use RefreshDatabase
+        // This prevents "no such table" errors when hitting Eloquent models/routes.
+        try {
+            Artisan::call('migrate', ['--force' => true]);
+        } catch (\Throwable $e) {
+            // If migration fails in certain isolated tests, do not block the entire suite here.
+            // Individual tests that rely on DB should still use RefreshDatabase.
         }
     }
 }

@@ -144,15 +144,9 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
 
     public function createBook(array $data)
     {
-        // Debug logging
-        echo "\nMockDocumentStoreService::createBook called with data: " . json_encode($data) . "\n";
-
         $id = $data['id'] ?? uniqid('book_');
         $data['id'] = $id;
         $this->books[$id] = $data;
-
-        // Verify book was added
-        echo 'Books after adding: ' . json_encode($this->books) . "\n";
 
         return $id;
     }

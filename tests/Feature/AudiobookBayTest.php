@@ -190,6 +190,7 @@ class AudiobookBayTest extends TestCase
         $this->assertIsArray($serviceDetails);
         $this->assertNotEmpty($serviceDetails);
 
+
         $this->assertEquals($bookIdOrSlug, $serviceDetails['id']);
         $this->assertEquals($mockApiDetails['title'], $serviceDetails['title']);
         $this->assertEquals($mockApiDetails['subtitle'], $serviceDetails['subtitle']);
@@ -200,15 +201,15 @@ class AudiobookBayTest extends TestCase
         $this->assertEquals($mockApiDetails['description'], $serviceDetails['description']);
         $this->assertEquals($mockApiDetails['published_date'], $serviceDetails['published_date']);
         $this->assertEquals($mockApiDetails['publisher'], $serviceDetails['publisher']);
-        $this->assertEquals($mockApiDetails['cover_image_url'], $serviceDetails['cover_url']);
+        $this->assertEquals($mockApiDetails['cover_image_url'], $serviceDetails['coverImageUrl']);
         $this->assertCount(2, $serviceDetails['categories']);
         $this->assertEquals($mockApiDetails['categories'][0], $serviceDetails['categories'][0]['genre']['name']);
         $this->assertEquals($mockApiDetails['language'], $serviceDetails['language']);
         $this->assertEquals('Detailed Series #3', $serviceDetails['series']);
-        $this->assertEquals('3', $serviceDetails['series_number']);
+        $this->assertEquals('3', $serviceDetails['seriesNumber']);
 
         // Duration: PT8H15M30S = (8*3600) + (15*60) + 30 = 28800 + 900 + 30 = 29730 seconds
-        $this->assertEquals(29730, $serviceDetails['duration_seconds']);
+        $this->assertEquals(29730, $serviceDetails['durationSeconds']);
 
         $this->assertArrayHasKey('source', $serviceDetails['metadata']);
         $this->assertEquals('AudiobookBay', $serviceDetails['metadata']['source']);

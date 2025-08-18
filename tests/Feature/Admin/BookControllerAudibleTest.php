@@ -88,7 +88,7 @@ class BookControllerAudibleTest extends TestCase
 
         // Debug the response
         if ($response->getStatusCode() !== 200) {
-            echo "\nResponse content: " . $response->getContent() . "\n";
+            // echo "\nResponse content: " . $response->getContent() . "\n";
         }
 
         // Assert response
@@ -155,67 +155,40 @@ class BookControllerAudibleTest extends TestCase
                 'genre' => ['Science Fiction', 'Fantasy'],
             ]);
 
-        // Mock the transform method
-        $mockAudibleService->shouldReceive('transform')
-            ->once()
-            ->andReturnUsing(function ($book) {
-                return [
-                    'title' => $book['title'] ?? '',
-                    'author' => $book['audibleAuthors'] ?? $book['author'] ?? [],
-                    'audibleId' => $book['asin'] ?? '',
-                    'coverImageUrl' => $book['image_url'] ?? '',
-                    'publishedYear' => isset($book['release_date']) ? substr($book['release_date'], 0, 4) : '',
-                    'narratorList' => $book['narrator'] ?? [],
-                    'seriesName' => isset($book['series']) && is_array($book['series']) ? array_key_first($book['series']) : '',
-                    'seriesNumber' => isset($book['series']) && is_array($book['series']) ? reset($book['series']) : '',
-                    'series' => isset($book['series']) && is_array($book['series']) ? array_key_first($book['series']) : '',
-                    'source' => 'Audible',
-                    'publisher' => is_string($book['publisher'] ?? '') ? [$book['publisher']] : ($book['publisher'] ?? []),
-                    'category' => $book['genre'] ?? $book['categories'] ?? [],
-                    'description' => $book['description'] ?? '',
-                ];
-            });
+        // For ASIN search, transform is not called - the raw data is returned directly
 
         $this->app->instance(AudibleService::class, $mockAudibleService);
 
         // Make the request
         $response = $this->getJson('/admin/books/audible?api_id=B123456789');
 
-        // Assert response
+        // Assert response - when searching by ASIN, the controller returns a single object, not an array
         $response->assertStatus(200)
-            ->assertJsonCount(1)
             ->assertJsonStructure([
-                [
-                    'title',
-                    'author',
-                    'audibleId',
-                    'coverImageUrl',
-                    'publishedYear',
-                    'narratorList',
-                    'seriesName',
-                    'seriesNumber',
-                    'series',
-                    'source',
-                    'publisher',
-                    'category',
-                    'description',
-                ],
+                'title',
+                'author',
+                'audibleAuthors',
+                'asin',
+                'image_url',
+                'release_date',
+                'narrator',
+                'series',
+                'publisher',
+                'description',
+                'categories',
+                'genre',
             ])
             ->assertJson([
-                [
-                    'title' => 'Test Book',
-                    'author' => ['Test Author'],
-                    'audibleId' => 'B123456789',
-                    'coverImageUrl' => 'https://example.com/cover.jpg',
-                    'publishedYear' => '2023',
-                    'narratorList' => ['Test Narrator'],
-                    'seriesName' => 'Test Series',
-                    'seriesNumber' => '1',
-                    'source' => 'Audible',
-                    'publisher' => ['Test Publisher'],
-                    'category' => ['Science Fiction', 'Fantasy'],
-                    'description' => 'Test description',
-                ],
+                'title' => 'Test Book',
+                'audibleAuthors' => ['Test Author'],
+                'asin' => 'B123456789',
+                'image_url' => 'https://example.com/cover.jpg',
+                'release_date' => '2023-01-01',
+                'narrator' => ['Test Narrator'],
+                'publisher' => 'Test Publisher',
+                'description' => 'Test description',
+                'categories' => ['Fiction', 'Fantasy'],
+                'genre' => ['Science Fiction', 'Fantasy'],
             ]);
     }
 
@@ -252,54 +225,42 @@ class BookControllerAudibleTest extends TestCase
         // Mock the AudibleService
         $mockAudibleService = Mockery::mock(AudibleService::class);
 
-        // First call with just the title
-        $mockAudibleService->shouldReceive('searchBooks')
+        // The controller calls searchBooksWithFiltering which handles author filtering internally
+        $mockAudibleService->shouldReceive('searchBooksWithFiltering')
             ->once()
-            ->with('Fantasy Book', ['limit' => 10])
+            ->with('Fantasy Book', 'John Smith', ['limit' => 10])
             ->andReturn([
                 [
                     'title' => 'Fantasy Book',
-                    'author' => 'John Smith',
-                    'asin' => 'B123456789',
-                    'image_url' => 'https://example.com/cover1.jpg',
-                    'release_date' => '2023-01-01',
-                ],
-                [
-                    'title' => 'Fantasy Book',
-                    'author' => 'Jane Doe',
-                    'asin' => 'B987654321',
-                    'image_url' => 'https://example.com/cover2.jpg',
-                    'release_date' => '2022-01-01',
+                    'author' => ['John Smith'],
+                    'audibleId' => 'B123456789',
+                    'coverImageUrl' => 'https://example.com/cover1.jpg',
+                    'publishedYear' => '2023',
+                    'narratorList' => [],
+                    'seriesName' => '',
+                    'seriesNumber' => '',
+                    'series' => '',
+                    'source' => 'Audible',
+                    'publisher' => [],
+                    'category' => [],
+                    'description' => '',
                 ],
                 [
                     'title' => 'Fantasy Book: The Sequel',
-                    'author' => 'John Smith',
-                    'asin' => 'B555555555',
-                    'image_url' => 'https://example.com/cover3.jpg',
-                    'release_date' => '2024-01-01',
+                    'author' => ['John Smith'],
+                    'audibleId' => 'B555555555',
+                    'coverImageUrl' => 'https://example.com/cover3.jpg',
+                    'publishedYear' => '2024',
+                    'narratorList' => [],
+                    'seriesName' => '',
+                    'seriesNumber' => '',
+                    'series' => '',
+                    'source' => 'Audible',
+                    'publisher' => [],
+                    'category' => [],
+                    'description' => '',
                 ],
             ]);
-
-        // Mock the transform method
-        $mockAudibleService->shouldReceive('transform')
-            ->times(3)
-            ->andReturnUsing(function ($book) {
-                return [
-                    'title' => $book['title'] ?? '',
-                    'author' => is_array($book['author'] ?? '') ? $book['author'] : [$book['author'] ?? ''],
-                    'audibleId' => $book['asin'] ?? '',
-                    'coverImageUrl' => $book['image_url'] ?? '',
-                    'publishedYear' => isset($book['release_date']) ? substr($book['release_date'], 0, 4) : '',
-                    'narratorList' => $book['narrator'] ?? [],
-                    'seriesName' => isset($book['series']) && is_array($book['series']) ? array_key_first($book['series']) : '',
-                    'seriesNumber' => isset($book['series']) && is_array($book['series']) ? reset($book['series']) : '',
-                    'series' => isset($book['series']) && is_array($book['series']) ? array_key_first($book['series']) : '',
-                    'source' => 'Audible',
-                    'publisher' => isset($book['publisher']) ? (is_string($book['publisher']) ? [$book['publisher']] : $book['publisher']) : [],
-                    'category' => $book['genre'] ?? $book['categories'] ?? [],
-                    'description' => $book['description'] ?? '',
-                ];
-            });
 
         $this->app->instance(AudibleService::class, $mockAudibleService);
 
@@ -308,36 +269,37 @@ class BookControllerAudibleTest extends TestCase
 
         // Debug the response
         if ($response->getStatusCode() !== 200) {
-            echo "\nResponse content: " . $response->getContent() . "\n";
+            // echo "\nResponse content: " . $response->getContent() . "\n";
         }
 
-        // The controller doesn't actually filter by author in the response JSON, it filters the input data
-        // So we need to check the response content manually
-        $response->assertStatus(200);
+        // Assert response
+        $response->assertStatus(200)
+            ->assertJsonCount(2)
+            ->assertJsonStructure([
+                [
+                    'title',
+                    'author',
+                    'audibleId',
+                    'coverImageUrl',
+                    'publishedYear',
+                    'narratorList',
+                    'seriesName',
+                    'seriesNumber',
+                    'series',
+                    'source',
+                    'publisher',
+                    'category',
+                    'description',
+                ],
+            ]);
 
         // Get the response data
         $responseData = json_decode($response->getContent(), true);
 
-        // Find books by John Smith
-        $johnSmithBooks = array_filter($responseData, function ($book) {
-            return isset($book['author']) &&
-                ((is_string($book['author']) && stripos($book['author'], 'John Smith') !== false) ||
-                    (is_array($book['author']) && in_array('John Smith', $book['author'])));
-        });
-
-        // Assert we have John Smith books
-        $this->assertNotEmpty($johnSmithBooks, 'No books by John Smith found in response');
-
-        // Verify that the Jane Doe book is not included
-        $responseData = json_decode($response->getContent(), true);
-        $foundJaneDoe = false;
+        // Verify all books are by John Smith
         foreach ($responseData as $book) {
-            if (isset($book['author']) && is_array($book['author']) && in_array('Jane Doe', $book['author'])) {
-                $foundJaneDoe = true;
-                break;
-            }
+            $this->assertContains('John Smith', $book['author'], 'All books should be by John Smith');
         }
-        $this->assertFalse($foundJaneDoe, 'Jane Doe book should be filtered out');
     }
 
     /**
@@ -348,48 +310,27 @@ class BookControllerAudibleTest extends TestCase
         // Mock the AudibleService
         $mockAudibleService = Mockery::mock(AudibleService::class);
 
-        // First call with just the title returns no results
-        $mockAudibleService->shouldReceive('searchBooks')
+        // The controller calls searchBooksWithFiltering, which handles the fallback internally
+        $mockAudibleService->shouldReceive('searchBooksWithFiltering')
             ->once()
-            ->with('Rare Book Title', ['limit' => 10])
-            ->andReturn([]);
-
-        // Second call with combined title and author should return results
-        $mockAudibleService->shouldReceive('searchBooks')
-            ->once()
-            ->with('Rare Book Title Famous Author', ['limit' => 10])
+            ->with('Rare Book Title', 'Famous Author', ['limit' => 10])
             ->andReturn([
                 [
                     'title' => 'Rare Book Title',
-                    'author' => 'Famous Author',
-                    'asin' => 'B123456789',
-                    'image_url' => 'https://example.com/cover.jpg',
-                    'release_date' => '2023-01-01',
-                    'narrator' => ['Great Narrator'],
-                    'publisher' => 'Publishing House',
+                    'author' => ['Famous Author'],
+                    'audibleId' => 'B123456789',
+                    'coverImageUrl' => 'https://example.com/cover.jpg',
+                    'publishedYear' => '2023',
+                    'narratorList' => ['Great Narrator'],
+                    'seriesName' => '',
+                    'seriesNumber' => '',
+                    'series' => '',
+                    'source' => 'Audible',
+                    'publisher' => ['Publishing House'],
+                    'category' => [],
+                    'description' => '',
                 ],
             ]);
-
-        // Mock the transform method
-        $mockAudibleService->shouldReceive('transform')
-            ->once()
-            ->andReturnUsing(function ($book) {
-                return [
-                    'title' => $book['title'] ?? '',
-                    'author' => is_array($book['author'] ?? '') ? $book['author'] : [$book['author'] ?? ''],
-                    'audibleId' => $book['asin'] ?? '',
-                    'coverImageUrl' => $book['image_url'] ?? '',
-                    'publishedYear' => isset($book['release_date']) ? substr($book['release_date'], 0, 4) : '',
-                    'narratorList' => $book['narrator'] ?? [],
-                    'seriesName' => isset($book['series']) && is_array($book['series']) ? array_key_first($book['series']) : '',
-                    'seriesNumber' => isset($book['series']) && is_array($book['series']) ? reset($book['series']) : '',
-                    'series' => isset($book['series']) && is_array($book['series']) ? array_key_first($book['series']) : '',
-                    'source' => 'Audible',
-                    'publisher' => isset($book['publisher']) ? (is_string($book['publisher']) ? [$book['publisher']] : $book['publisher']) : [],
-                    'category' => $book['genre'] ?? $book['categories'] ?? [],
-                    'description' => $book['description'] ?? '',
-                ];
-            });
 
         $this->app->instance(AudibleService::class, $mockAudibleService);
 
@@ -397,17 +338,33 @@ class BookControllerAudibleTest extends TestCase
         $response = $this->getJson('/admin/books/audible?title=Rare+Book+Title&author=Famous+Author');
 
         // Assert response
-        $response->assertStatus(200);
-
-        // Get the response data
-        $responseData = json_decode($response->getContent(), true);
-
-        // Check if we have any books with the expected title and author
-        $matchingBooks = array_filter($responseData, function ($book) {
-            return isset($book['title']) && $book['title'] === 'Rare Book Title' &&
-                isset($book['author']) && in_array('Famous Author', (array) $book['author']);
-        });
-
-        $this->assertNotEmpty($matchingBooks, 'No books matching title "Rare Book Title" and author "Famous Author" found');
+        $response->assertStatus(200)
+            ->assertJsonCount(1)
+            ->assertJsonStructure([
+                [
+                    'title',
+                    'author',
+                    'audibleId',
+                    'coverImageUrl',
+                    'publishedYear',
+                    'narratorList',
+                    'seriesName',
+                    'seriesNumber',
+                    'series',
+                    'source',
+                    'publisher',
+                    'category',
+                    'description',
+                ],
+            ])
+            ->assertJson([
+                [
+                    'title' => 'Rare Book Title',
+                    'author' => ['Famous Author'],
+                    'audibleId' => 'B123456789',
+                    'coverImageUrl' => 'https://example.com/cover.jpg',
+                    'publishedYear' => '2023',
+                ],
+            ]);
     }
 }
