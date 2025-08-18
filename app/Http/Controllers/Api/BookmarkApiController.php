@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 
 class BookmarkApiController extends Controller
 {
@@ -57,13 +58,17 @@ class BookmarkApiController extends Controller
      */
     public function createBookmarkOpenApi(Request $request, string $bookId)
     {
-        // Validate request
-        $request->validate([
+        // Validate request (manual to ensure JSON 422 without relying on global handler)
+        $validator = Validator::make($request->all(), [
             'position_ms' => 'required|integer|min:0',
             'title' => 'nullable|string|max:255',
             'note' => 'nullable|string',
             'is_auto' => 'nullable|boolean',
         ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
 
         // Verify the book exists
         $book = $this->documentStoreService->getBook($bookId);
@@ -147,13 +152,17 @@ class BookmarkApiController extends Controller
      */
     public function createBookmark(Request $request, string $bookId)
     {
-        // Validate request
-        $request->validate([
+        // Validate request (manual to ensure JSON 422 without relying on global handler)
+        $validator = Validator::make($request->all(), [
             'chapter' => 'required|integer|min:1',
             'position' => 'required|integer|min:0',
             'title' => 'nullable|string|max:255',
             'note' => 'nullable|string',
         ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
 
         // Verify the book exists
         $book = $this->documentStoreService->getBook($bookId);
@@ -227,13 +236,17 @@ class BookmarkApiController extends Controller
      */
     public function updateBookmark(Request $request, string $bookId, string $bookmarkId)
     {
-        // Validate request
-        $request->validate([
+        // Validate request (manual to ensure JSON 422 without relying on global handler)
+        $validator = Validator::make($request->all(), [
             'chapter' => 'sometimes|integer|min:1',
             'position' => 'sometimes|integer|min:0',
             'title' => 'sometimes|nullable|string|max:255',
             'note' => 'sometimes|nullable|string',
         ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
 
         // Get user ID from authenticated user
         $userId = auth('api')->id();

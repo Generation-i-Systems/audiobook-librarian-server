@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ListeningStatistic;
 use App\Models\Book;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
@@ -99,25 +100,52 @@ class StatisticsController extends Controller
 
         $stats = ListeningStatistic::where('device_id', $userId)
             ->whereBetween('listening_date', [$startDate->toDateString(), $endDate->toDateString()])
-            ->selectRaw('
+            ->groupBy('listening_date')
+            ->orderByDesc('listening_date')
+            ->limit($limit);
+
+        // Use different aggregation methods based on database driver
+        if (DB::getDriverName() === 'sqlite') {
+            // SQLite doesn't have JSON_ARRAYAGG, so we'll fetch the data and group it in PHP
+            $rawStats = $stats->selectRaw('
+                listening_date as date,
+                SUM(seconds_listened) * 1000 as listening_time_ms,
+                COUNT(*) as sessions_count
+            ')->get();
+
+            // Get book IDs separately for each date
+            $dailyStats = $rawStats->map(function ($stat) use ($userId, $startDate, $endDate) {
+                $bookIds = ListeningStatistic::where('device_id', $userId)
+                    ->where('listening_date', $stat->date)
+                    ->distinct('book_id')
+                    ->pluck('book_id')
+                    ->toArray();
+
+                return [
+                    'date' => $stat->date,
+                    'listening_time_ms' => (int) $stat->listening_time_ms,
+                    'sessions_count' => $stat->sessions_count,
+                    'books_listened' => $bookIds,
+                ];
+            });
+        } else {
+            // MySQL and other databases that support JSON_ARRAYAGG
+            $dailyStats = $stats->selectRaw('
                 listening_date as date,
                 SUM(seconds_listened) * 1000 as listening_time_ms,
                 COUNT(*) as sessions_count,
                 JSON_ARRAYAGG(DISTINCT book_id) as books_listened
             ')
-            ->groupBy('listening_date')
-            ->orderByDesc('listening_date')
-            ->limit($limit)
-            ->get();
-
-        $dailyStats = $stats->map(function ($stat) {
-            return [
-                'date' => $stat->date,
-                'listening_time_ms' => (int) $stat->listening_time_ms,
-                'sessions_count' => $stat->sessions_count,
-                'books_listened' => json_decode($stat->books_listened, true) ?? [],
-            ];
-        });
+            ->get()
+            ->map(function ($stat) {
+                return [
+                    'date' => $stat->date,
+                    'listening_time_ms' => (int) $stat->listening_time_ms,
+                    'sessions_count' => $stat->sessions_count,
+                    'books_listened' => json_decode($stat->books_listened, true) ?? [],
+                ];
+            });
+        }
 
         return response()->json([
             'daily_stats' => $dailyStats

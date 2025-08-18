@@ -28,6 +28,13 @@ class BackupDatabase extends Command
     {
         $this->info('Starting database backup...');
 
+        // Safety: never execute external mysqldump during automated tests
+        if (app()->environment('testing')) {
+            $this->warn('Skipping database backup in testing environment.');
+            Log::info('Backup skipped in testing environment');
+            return Command::SUCCESS;
+        }
+
         // Get database configuration
         $dbHost = config('database.connections.mysql.host');
         $dbPort = config('database.connections.mysql.port');

@@ -264,8 +264,8 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         '/users/{user}/update-role',
         [Admin\AdminController::class, 'updateRole']
     )->name('users.updateRole');
-    Route::get('/books/import', [Admin\BookController::class, 'import'])->name('books.import');
-    Route::get('/books/import-file', [Admin\BookController::class, 'importFile'])->name('books.importFile');
+    Route::get('/books/import', [Admin\BookController::class, 'import'])->name('admin.books.import');
+    Route::get('/books/import-file', [Admin\BookController::class, 'importFile'])->name('admin.books.importFile');
 
     // Import file browser routes
     Route::prefix('import')->group(function () {
