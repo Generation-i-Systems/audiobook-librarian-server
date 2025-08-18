@@ -4,6 +4,7 @@ namespace Tests\Feature\Commands;
 
 use App\Console\Commands\FixRemoteImageUrlsCommand;
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Services\ExternalCoverService;
 use Tests\TestCase;
 use Mockery;
 
@@ -15,7 +16,10 @@ class FixRemoteImageUrlsCommandTest extends TestCase
     public function testCommandProcessesRemoteUrls(): void
     {
         // Mock the document store service
-        $mockDocStore = Mockery::mock([DocumentStoreServiceInterface::class]);
+        $mockDocStore = Mockery::mock(DocumentStoreServiceInterface::class);
+        
+        // Mock the external cover service  
+        $mockExternalCover = Mockery::mock(ExternalCoverService::class);
 
         // Setup test data
         $testBooks = [
@@ -63,7 +67,7 @@ class FixRemoteImageUrlsCommandTest extends TestCase
 
         // Create a partial mock of the command to avoid actual HTTP requests
         $command = $this->getMockBuilder(FixRemoteImageUrlsCommand::class)
-            ->setConstructorArgs([$mockDocStore])
+            ->setConstructorArgs([$mockDocStore, $mockExternalCover])
             ->onlyMethods(['importCoverImageFromUrl'])
             ->getMock();
 
@@ -84,7 +88,10 @@ class FixRemoteImageUrlsCommandTest extends TestCase
     public function testDryRunOption(): void
     {
         // Mock the document store service
-        $mockDocStore = Mockery::mock([DocumentStoreServiceInterface::class]);
+        $mockDocStore = Mockery::mock(DocumentStoreServiceInterface::class);
+        
+        // Mock the external cover service
+        $mockExternalCover = Mockery::mock(ExternalCoverService::class);
 
         // Setup test data with one remote URL
         $testBooks = [
@@ -109,7 +116,7 @@ class FixRemoteImageUrlsCommandTest extends TestCase
 
         // Create a partial mock of the command
         $command = $this->getMockBuilder(FixRemoteImageUrlsCommand::class)
-            ->setConstructorArgs([$mockDocStore])
+            ->setConstructorArgs([$mockDocStore, $mockExternalCover])
             ->onlyMethods(['importCoverImageFromUrl'])
             ->getMock();
 
@@ -129,7 +136,10 @@ class FixRemoteImageUrlsCommandTest extends TestCase
     public function testLimitOption(): void
     {
         // Mock the document store service
-        $mockDocStore = Mockery::mock([DocumentStoreServiceInterface::class]);
+        $mockDocStore = Mockery::mock(DocumentStoreServiceInterface::class);
+        
+        // Mock the external cover service
+        $mockExternalCover = Mockery::mock(ExternalCoverService::class);
 
         // Setup test data with multiple books
         $testBooks = [
@@ -169,7 +179,7 @@ class FixRemoteImageUrlsCommandTest extends TestCase
 
         // Create a partial mock of the command
         $command = $this->getMockBuilder(FixRemoteImageUrlsCommand::class)
-            ->setConstructorArgs([$mockDocStore])
+            ->setConstructorArgs([$mockDocStore, $mockExternalCover])
             ->onlyMethods(['importCoverImageFromUrl'])
             ->getMock();
 
