@@ -28,6 +28,7 @@
     <server name="FIREBASE_PROJECT_ID" value="ab-librarian"/>
     <server name="FIREBASE_CREDENTIALS" value="storage/app/private/ab-librarian-firebase-adminsdk-fbsvc-ba5d49c1fd.json"/>
     <server name="GCLOUD_PROJECT" value="ab-librarian"/>
+    <server name="DOCUMENT_STORE_DRIVER" value="mysql"/>
     <server name="LOG_CHANNEL" value="stack"/>
   </php>
   <source>
