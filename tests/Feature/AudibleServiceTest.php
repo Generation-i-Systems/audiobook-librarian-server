@@ -49,7 +49,7 @@ class AudibleServiceTest extends TestCase
         $this->assertNotEmpty($result['authors']);
         $this->assertArrayHasKey('author', $result['authors'][0]);
         $this->assertEquals('Test Author', $result['authors'][0]['author']['name']);
-        $this->assertStringContainsString('500x500', $result['cover_image_url']);
+        $this->assertStringContainsString('500x500', $result['coverImageUrl']);
         $this->assertArrayHasKey('publisher', $result);
         $this->assertEquals('Test Publisher', $result['publisher']['name']);
         $this->assertEquals('This is a test book description.', $result['description']);
@@ -88,7 +88,7 @@ class AudibleServiceTest extends TestCase
         // Test other fields
         $this->assertArrayHasKey('publisher', $book);
         $this->assertEquals('Test Publisher', $book['publisher']['name']);
-        $this->assertStringContainsString('500x500', $book['cover_image_url']);
+        $this->assertStringContainsString('500x500', $book['coverImageUrl']);
         $this->assertEquals('This is a test book description.', $book['description']);
         $this->assertEquals(630, $book['runtime']);
     }

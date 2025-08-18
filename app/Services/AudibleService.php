@@ -442,9 +442,12 @@ class AudibleService extends BaseBookService
         } else {
             $result['author'] = [];
         }
+        
+        // Set authors field with structured data
+        $result['authors'] = $authorsData;
 
         // Ensure narrators is properly formatted
-        $result['narrators'] = $narratorsList;
+        $result['narrators'] = $narratorsData;
 
         // Ensure series is properly formatted
         $result['seriesName'] = $seriesName;
@@ -466,10 +469,12 @@ class AudibleService extends BaseBookService
             $result['category'] = [];
         }
 
-        // Format publisher as an array
-        if (isset($book['publisher_name'])) {
+        // Format publisher - prioritize structured data over publisher_name
+        if (isset($book['publisher']) && is_array($book['publisher'])) {
+            $result['publisher'] = $book['publisher'];
+        } elseif (isset($book['publisher_name'])) {
             if (is_string($book['publisher_name'])) {
-                $result['publisher'] = [$book['publisher_name']];
+                $result['publisher'] = ['name' => $book['publisher_name']];
             } elseif (is_array($book['publisher_name'])) {
                 $result['publisher'] = $book['publisher_name'];
             } else {
@@ -487,8 +492,10 @@ class AudibleService extends BaseBookService
         // Include runtime length in minutes if provided by API
         if (isset($book['runtimeLengthMin'])) {
             $result['runtimeLengthMin'] = (int) $book['runtimeLengthMin'];
+            $result['runtime'] = (int) $book['runtimeLengthMin'];
         } elseif (isset($book['runtime_length_min'])) {
             $result['runtimeLengthMin'] = (int) $book['runtime_length_min'];
+            $result['runtime'] = (int) $book['runtime_length_min'];
         }
 
         // Include language if present
