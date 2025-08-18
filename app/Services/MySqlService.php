@@ -843,7 +843,12 @@ class MySqlService implements DocumentStoreServiceInterface
     {
         $user = User::where('email', $email)->first();
 
-        return $user ? $user->toArray() : null;
+        if (!$user) {
+            return null;
+        }
+
+        // Ensure hidden attributes like password are included for auth flow
+        return $user->makeVisible(['password'])->toArray();
     }
 
     /**
@@ -895,7 +900,10 @@ class MySqlService implements DocumentStoreServiceInterface
     public function getUserByUsername(string $username): ?array
     {
         $user = User::where('username', $username)->first();
-        return $user ? $user->toArray() : null;
+        if (!$user) {
+            return null;
+        }
+        return $user->makeVisible(['password'])->toArray();
     }
 
     /**

@@ -3,7 +3,6 @@
 namespace App\Providers;
 
 use App\Contracts\DocumentStoreServiceInterface;
-// FirestoreService has been archived
 use App\Services\MongoService;
 use App\Services\MySqlService;
 use Illuminate\Support\Facades\Log;
@@ -19,14 +18,16 @@ class DocumentStoreServiceProvider extends ServiceProvider
         $this->app->singleton(DocumentStoreServiceInterface::class, function ($app) {
             $driver = config('documentstore.driver');
 
+            // In testing, force MySqlService to stabilize tests without external deps
+            if ($app->environment('testing')) {
+                Log::info('Testing environment detected; binding MySqlService for DocumentStoreServiceInterface');
+                return $this->createMysqlService();
+            }
+
             switch ($driver) {
-                case 'firestore':
-                    // FirestoreService has been archived - fallback to MySQL
-                    Log::warning('FirestoreService has been archived. Using MySqlService instead.');
-                    return $this->createMysqlService();
                 case 'mongodb':
                     // Mongo driver is archived and should not be used at runtime
-                    Log::warning("MongoService is archived and only intended for migration commands. Using MySqlService instead.");
+                    Log::warning('MongoService is archived and only intended for migration commands. Using MySqlService instead.');
                     return $this->createMysqlService();
                 case 'mysql':
                 default:
@@ -60,6 +61,8 @@ class DocumentStoreServiceProvider extends ServiceProvider
     {
         return new MySqlService();
     }
+
+    // Firestore support removed
 
     /**
      * Bootstrap services.

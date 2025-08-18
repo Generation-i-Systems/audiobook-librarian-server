@@ -498,13 +498,16 @@ class BookDirectoryParser
         $audioFiles = (new Finder())
             ->files()
             ->in($directory)
+            ->depth('== 0')  // Only search in the current directory, not subdirectories
             ->name(['*.mp3', '*.m4b', '*.m4a', '*.aac', '*.flac', '*.wav', '*.ogg']);
 
-        $audioFileCount = iterator_count($audioFiles);
+        // Convert to array to allow multiple iterations
+        $audioFilesArray = iterator_to_array($audioFiles);
+        $audioFileCount = count($audioFilesArray);
 
-        if ($this->audioAnalyzer) {
-            $totalDuration = 0;
-            foreach ($audioFiles as $file) {
+        $totalDuration = 0;
+        if ($this->audioAnalyzer && $audioFileCount > 0) {
+            foreach ($audioFilesArray as $file) {
                 try {
                     if ($this->audioAnalyzer) {
                         $duration = $this->audioAnalyzer->getAudioDuration($file->getPathname());
@@ -515,27 +518,19 @@ class BookDirectoryParser
                 } catch (\Exception $e) {
                 }
             }
-            if ($totalDuration > 0) {
-                $book['duration'] = $totalDuration;
-                $book['durationFormatted'] = $this->formatDuration($totalDuration);
-            }
-        } else {
-            $totalDuration = 'N/A';
         }
 
         $tags = null;
         if ($audioFileCount > 0) {
-            // Get the first audio file from the Finder iterator
-            foreach ($audioFiles as $file) {
-                $audioFilePath = $file->getPathname();
-                $tags = $this->extractTagData($audioFilePath);
-                break;
-            }
+            // Get the first audio file from the array
+            $firstFile = reset($audioFilesArray);
+            $audioFilePath = $firstFile->getPathname();
+            $tags = $this->extractTagData($audioFilePath);
         }
 
         return [
             'count' => $audioFileCount,
-            'audioFiles' => $audioFiles,
+            'audioFiles' => $audioFilesArray,
             'totalDuration' => $totalDuration,
             'fileTags' => $tags,
         ];
@@ -728,41 +723,30 @@ class BookDirectoryParser
 
             foreach ($dirs as $dir) {
                 $path = trim(str_replace($this->storageRoot, '', $dir->getPathname()), '/');
+                \Illuminate\Support\Facades\Log::debug("Processing directory: {$path}");
+                
                 $bookPathInfo = $this->processDirPath($path);
+                \Illuminate\Support\Facades\Log::debug("Path info: " . json_encode($bookPathInfo));
 
                 if (!empty($bookPathInfo['skipped'])) {
+                    \Illuminate\Support\Facades\Log::debug("Skipping directory (skipped): {$path}");
                     continue;
                 }
                 if (!empty($bookPathInfo['error'])) {
+                    \Illuminate\Support\Facades\Log::debug("Skipping directory (error): {$path}");
                     continue;
                 }
 
-                // Skip if any direct subdirectory contains audio files (treat only leaf-most dirs as books)
-                $subdirs = iterator_to_array(
-                    (new Finder())->directories()->in($this->storageRoot . '/' . $path)->depth('== 0')
-                );
-                $hasAudioInSubdir = false;
-                foreach ($subdirs as $subdir) {
-                    $audioFiles = (new Finder())->files()
-                        ->in($subdir->getPathname())
-                        ->name(['*.mp3', '*.m4b', '*.m4a', '*.aac', '*.flac', '*.wav', '*.ogg'])
-                        ->depth('== 0');
-                    if (iterator_count($audioFiles) > 0) {
-                        $hasAudioInSubdir = true;
-                        break;
-                    }
-                }
-                if ($hasAudioInSubdir) {
-                    continue;
-                }
-
-                // Get audio file data
-                $audioFilesData = $this->getAudioFiles($this->storageRoot . '/' . $path);
+                // Get audio file data for this directory
+                $audioFilesData = $this->getAudioFiles($dir->getPathname());
                 $audioFileCount = $audioFilesData['count'];
                 $totalDuration = $audioFilesData['totalDuration'];
                 $fileTags = $audioFilesData['fileTags'];
+                
+                \Illuminate\Support\Facades\Log::debug("Audio file count for {$path}: {$audioFileCount}");
 
                 if ($audioFileCount === 0) {
+                    \Illuminate\Support\Facades\Log::debug("Skipping directory (no audio files): {$path}");
                     continue;
                 }
 
@@ -803,6 +787,7 @@ class BookDirectoryParser
                     'edition' => $bookPathInfo['edition'] ?? null,
                 ];
 
+                \Illuminate\Support\Facades\Log::debug("Adding book: " . json_encode($book));
                 $books[] = $book;
             }
         } catch (\Exception $e) {
