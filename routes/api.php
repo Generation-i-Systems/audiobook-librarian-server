@@ -106,17 +106,17 @@ Route::prefix('v1')->group(function () {
         Route::get('/reading-stats/user', [ReadingStatsApiController::class, 'getUserStats']);
         Route::get('/reading-stats/streaks', [ReadingStatsApiController::class, 'getStreaks']);
 
-        // OpenAPI spec progress routes
+        // OpenAPI spec progress routes - specific routes must come before dynamic ones
+        Route::get('/progress/device', [ProgressController::class, 'getDeviceProgress']);
+        Route::get('/progress', [ProgressController::class, 'getAllProgress']);
         Route::get('/progress/{book}', [ProgressController::class, 'getBookProgress']);
         Route::put('/progress/{book}', [ProgressController::class, 'updateBookProgress']);
-        Route::get('/progress', [ProgressController::class, 'getAllProgress']);
 
         // Book Progress Routes (cross-device listening continuity) - legacy routes
         Route::get('/books/{book}/progress', [ProgressController::class, 'getProgress']);
         Route::put('/books/{book}/progress', [ProgressController::class, 'updateProgress']);
         Route::post('/books/{book}/progress/complete', [ProgressController::class, 'markCompleted']);
         Route::delete('/books/{book}/progress', [ProgressController::class, 'resetProgress']);
-        Route::get('/progress/device', [ProgressController::class, 'getDeviceProgress']);
 
         // OpenAPI spec statistics routes
         Route::get('/statistics/overview', [StatisticsController::class, 'getOverview']);

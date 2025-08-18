@@ -264,7 +264,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
             'description' => $details['description'] ?? null,
             'published_date' => $details['published_date'] ?? null,
             'publisher' => $details['publisher'] ?? null,
-            'coverImageUrl' => $details['coverImageUrl'] ?? null,
+            'coverImageUrl' => $details['coverImageUrl'] ?? $details['cover_image_url'] ?? null,
             'categories' => $this->formatCategories($details['categories'] ??
                 ($details['metadata']['categories'] ?? [])),
             'language' => $details['language'] ?? null,
