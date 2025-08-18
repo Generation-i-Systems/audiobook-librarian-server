@@ -113,7 +113,7 @@ class BookControllerIndexTest extends TestCase
             // Mock the DocumentStoreService to return our test data
             $this->mockDocumentStoreService->shouldReceive('listBooks')
                 ->once()
-                ->with(1, 24, [], true)
+                ->with(1, 12, [], true)
                 ->andReturn([
                     'data' => $testBooks,
                     'total' => 2,
