@@ -16,6 +16,14 @@ class Series extends Model
 
     protected $fillable = ['name'];
 
+    /**
+     * Create a new factory instance for the model.
+     */
+    protected static function newFactory()
+    {
+        return \Database\Factories\SeriesFactory::new();
+    }
+
     public function books(): BelongsToMany
     {
         return $this->belongsToMany(Book::class, 'book_series')
