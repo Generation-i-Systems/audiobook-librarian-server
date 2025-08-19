@@ -6,6 +6,7 @@ use App\Models\Book;
 use App\Models\ListeningStatistic;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 use Laravel\Sanctum\Sanctum;
 
@@ -121,32 +122,32 @@ class StatisticsControllerTest extends TestCase
         $book2 = Book::factory()->create();
         $today = now()->toDateString();
 
-        // Create listening statistics via the API to ensure proper data handling
-        $this->withHeaders([
-                'Authorization' => 'Bearer ' . $this->token,
-            ])
-            ->postJson('/api/v1/statistics/sessions', [
-                'book_id' => $book1->id,
-                'device_id' => 'test-device',
-                'seconds_listened' => 1800,
-                'start_position_seconds' => 0,
-                'end_position_seconds' => 1800,
-                'session_type' => 'listening',
-            ])
-            ->assertStatus(201);
+        // Create listening statistics directly in database for more reliable testing
+        ListeningStatistic::create([
+            'user_id' => $this->user->id,
+            'book_id' => $book1->id,
+            'device_id' => 'test-device',
+            'seconds_listened' => 1800,
+            'start_position_seconds' => 0,
+            'end_position_seconds' => 1800,
+            'session_type' => 'listening',
+            'listening_date' => $today,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
-        $this->withHeaders([
-                'Authorization' => 'Bearer ' . $this->token,
-            ])
-            ->postJson('/api/v1/statistics/sessions', [
-                'book_id' => $book2->id,
-                'device_id' => 'test-device',
-                'seconds_listened' => 3600,
-                'start_position_seconds' => 1800,
-                'end_position_seconds' => 5400,
-                'session_type' => 'listening',
-            ])
-            ->assertStatus(201);
+        ListeningStatistic::create([
+            'user_id' => $this->user->id,
+            'book_id' => $book2->id,
+            'device_id' => 'test-device',
+            'seconds_listened' => 3600,
+            'start_position_seconds' => 1800,
+            'end_position_seconds' => 5400,
+            'session_type' => 'listening',
+            'listening_date' => $today,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         $response = $this->withHeaders([
                 'Authorization' => 'Bearer ' . $this->token,

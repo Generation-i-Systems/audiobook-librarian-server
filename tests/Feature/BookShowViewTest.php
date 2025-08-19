@@ -34,9 +34,12 @@ class BookShowViewTest extends TestCase
             'id' => 'test-book-1',
             'title' => 'Test Book with Series',
             'author' => ['Test Author'],
-            'authors' => [['name' => 'Test Author']],
+            'authors' => ['Test Author'],
             'series' => [
-                'Test Series' => ['sequence' => 1]
+                [
+                    'seriesName' => 'Test Series',
+                    'number' => 1
+                ]
             ],
             'description' => 'Test description',
             'cover' => 'test-cover.jpg',
@@ -50,7 +53,7 @@ class BookShowViewTest extends TestCase
             'id' => 'test-book-2',
             'title' => 'Test Book without Series',
             'author' => ['Test Author'],
-            'authors' => [['name' => 'Test Author']],
+            'authors' => ['Test Author'],
             'description' => 'Test description',
             'cover' => 'test-cover.jpg',
             'cover_image' => 'test-cover.jpg',
@@ -75,10 +78,23 @@ class BookShowViewTest extends TestCase
                 'current_page' => 1,
                 'last_page' => 1
             ]);
+            
+        // Add expectation for related books in show method
+        $this->mockService->shouldReceive('listBooks')
+            ->with(1, 100)
+            ->andReturn([
+                'data' => [
+                    $this->testBook1,
+                    $this->testBook2
+                ],
+                'total' => 2,
+                'per_page' => 100,
+                'current_page' => 1,
+                'last_page' => 1
+            ]);
 
-        // Set up default expectations for getBook
-        $this->mockService->shouldReceive('getBook')
-            ->andReturn(null);
+        // Set up default expectations for getBook - allow any calls but no default return
+        $this->mockService->shouldReceive('getBook')->byDefault();
 
         // Bind the mock service to the service container
         $this->app->instance(DocumentStoreServiceInterface::class, $this->mockService);

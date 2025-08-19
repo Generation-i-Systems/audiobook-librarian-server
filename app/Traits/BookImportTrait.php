@@ -334,7 +334,7 @@ trait BookImportTrait
 
             // First part is always genre
             $genre = array_shift($parts);
-            $book['genre'] = $genre;  // For test compatibility, use string
+            $book['genre'] = [$genre];  // Return as array for test compatibility
             $book['genres'] = [$genre];  // Keep array version for other uses
 
             // Second part is author(s)
@@ -416,7 +416,7 @@ trait BookImportTrait
 
             // Set series data if we have a valid series name (string, not numeric)
             if (!empty($series) && is_string($series)) {
-                $book['series'] = $series;  // For test compatibility, use string
+                $book['series'] = empty($seriesNumber) ? [$series => null] : [$series => $seriesNumber];  // For test compatibility, use array
                 $book['seriesData'] = empty($seriesNumber) ? [$series => null] : [$series => $seriesNumber];
                 $book['series_number'] = $seriesNumber;  // For test compatibility
             }

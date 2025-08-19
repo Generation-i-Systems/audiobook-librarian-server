@@ -102,7 +102,7 @@ class QueueController extends Controller
     public function status()
     {
         // Check for running worker (simple: look for process, or use a cache heartbeat)
-        $running = Cache::get('queueWorkerHeartbeat') ? true : false;
+        $running = Cache::get('queue_worker_heartbeat') ? true : false;
         $pending = $this->documentStoreService->getJobCount();
 
         return response()->json(['workerRunning' => $running, 'pendingJobs' => $pending]);

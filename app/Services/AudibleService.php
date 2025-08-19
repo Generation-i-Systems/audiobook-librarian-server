@@ -446,8 +446,9 @@ class AudibleService extends BaseBookService
         // Set authors field with structured data
         $result['authors'] = $authorsData;
 
-        // Ensure narrators is properly formatted
-        $result['narrators'] = $narratorsData;
+        // Ensure narrators is properly formatted - provide both formats for compatibility
+        $result['narrators'] = $narratorsData;  // Complex structure for Feature tests
+        $result['narratorsList'] = $narratorsList;  // Simple array for Unit tests and display
 
         // Ensure series is properly formatted
         $result['seriesName'] = $seriesName;

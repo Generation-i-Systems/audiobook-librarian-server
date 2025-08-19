@@ -63,7 +63,7 @@ class AudibleServiceMockTest extends TestCase
         $this->assertIsArray($book);
         $this->assertEquals('Test Book', $book['title']);
         $this->assertEquals('Test Author', $book['author'][0]);
-        $this->assertEquals('Test Narrator', $book['narrators'][0]);
+        $this->assertEquals('Test Narrator', $book['narratorsList'][0]);
         // The runtime is in minutes, so 630 minutes = 10 hours and 30 minutes
         $this->assertEquals(630, $book['runtimeLengthMin']);
 

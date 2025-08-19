@@ -614,7 +614,10 @@ class AudiobookBayApiService
         $this->rateLimit = $config['rate_limit'] ?? $this->rateLimit;
 
         if (empty($this->username) || empty($this->password)) {
-            Log::warning('AudiobookBayApiService: Missing username or password. Authentication will likely fail.');
+            // Only log warning if not in testing environment
+            if (!app()->environment('testing')) {
+                Log::warning('AudiobookBayApiService: Missing username or password. Authentication will likely fail.');
+            }
         }
     }
 

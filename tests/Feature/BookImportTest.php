@@ -41,8 +41,8 @@ class BookImportTest extends TestCase
 
         $this->assertEquals('Test Book', $result['title']);
         $this->assertEquals('Test Author', $result['authors'][0]);
-        $this->assertEquals('Test Genre', $result['genre']);
-        $this->assertEquals('Test Series', $result['series']);
+        $this->assertEquals(['Test Genre'], $result['genre']);
+        $this->assertEquals(['Test Series' => '1'], $result['series']);
         $this->assertEquals(1, $result['series_number']);
     }
 
@@ -56,7 +56,7 @@ class BookImportTest extends TestCase
 
         $this->assertEquals('Test Book', $result['title']);
         $this->assertEquals('Test Author', $result['authors'][0]);
-        $this->assertEquals('Test Genre', $result['genre']);
+        $this->assertEquals(['Test Genre'], $result['genre']);
         $this->assertArrayNotHasKey('series', $result);
         $this->assertArrayNotHasKey('series_number', $result);
     }

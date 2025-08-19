@@ -92,7 +92,7 @@ class ListeningStatistic extends Model
         $date = $date ?: now()->toDateString();
 
         $stats = self::where('device_id', $deviceId)
-            ->where('listening_date', $date)
+            ->whereDate('listening_date', $date)
             ->selectRaw('
                 SUM(seconds_listened) as total_seconds,
                 COUNT(DISTINCT book_id) as books_listened,

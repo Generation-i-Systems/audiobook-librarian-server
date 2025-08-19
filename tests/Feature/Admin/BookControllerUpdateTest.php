@@ -21,6 +21,8 @@ class BookControllerUpdateTest extends TestCase
 
     private $documentStoreService;
 
+    private $externalCoverService;
+
     private $user;
 
 
@@ -36,13 +38,16 @@ class BookControllerUpdateTest extends TestCase
 
         // Create a mock DocumentStoreService
         $this->documentStoreService = $this->createMock(\App\Contracts\DocumentStoreServiceInterface::class);
+        
+        // Create a mock ExternalCoverService
+        $this->externalCoverService = $this->createMock(\App\Services\ExternalCoverService::class);
 
         // Create a controller instance with the mock service
         $this->controller = new BookController(
             $this->documentStoreService,
             $this->createMock(\App\Services\GoogleBooksApiService::class),
             $this->createMock(\App\Services\AudibleService::class),
-            $this->createMock(\App\Services\ExternalCoverService::class)
+            $this->externalCoverService
         );
 
         // Create a test user with admin role
@@ -256,14 +261,44 @@ class BookControllerUpdateTest extends TestCase
             )
             ->willReturn(true);
 
+        // Mock ExternalCoverService to return successful download and create the file
+        $this->externalCoverService->expects($this->once())
+            ->method('downloadCoverImage')
+            ->with(
+                $this->equalTo('https://images-na.ssl-images-amazon.com/images/I/B01234ABCD.jpg'),
+                $this->equalTo('test/path'),
+                $this->equalTo('audible'),
+                $this->equalTo($asin)
+            )
+            ->willReturnCallback(function () {
+                // Create the file in the fake storage to simulate successful download
+                Storage::disk('books')->put('test/path/cover_audible_B01234ABCD.jpg', 'fake image content');
+                return [
+                    'success' => true,
+                    'path' => 'test/path/cover_audible_B01234ABCD.jpg'
+                ];
+            });
+
+        // Mock findOrCreateMany calls that the controller makes
+        $this->documentStoreService->method('findOrCreateMany')
+            ->willReturnCallback(function ($type, $items) {
+                // Return mock IDs for authors and genres
+                if ($type === 'authors') {
+                    return ['author-1'];
+                } elseif ($type === 'genres') {
+                    return ['genre-1'];
+                }
+                return [];
+            });
+
         // Create request with data including Audible cover URL
         $request = new Request([
             'title' => 'Updated Audible Book',
-            'author' => 'Updated Author',
+            'author' => ['Updated Author'], // Controller expects array
             'genre' => ['Updated Genre'],
             'description' => 'Updated desc',
             'directoryPath' => 'test/path',
-            'audible_cover_image_url' => 'https://images-na.ssl-images-amazon.com/images/I/B01234ABCD.jpg',
+            'audibleCoverImageUrl' => 'https://images-na.ssl-images-amazon.com/images/I/B01234ABCD.jpg',
             'audibleId' => $asin,
         ]);
         $this->app->instance('request', $request);
