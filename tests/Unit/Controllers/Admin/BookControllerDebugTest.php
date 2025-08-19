@@ -42,7 +42,7 @@ class BookControllerDebugTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
-    public function test_debug_book_creation()
+    public function testDebugBookCreation()
     {
         // Test direct book creation first
         $testBookId = $this->documentStore->createBook([

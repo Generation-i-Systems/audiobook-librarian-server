@@ -169,98 +169,11 @@ class BookControllerIndexTest extends TestCase
             ];
 
             $this->mockDocumentStoreService->shouldReceive('getRecentBooks')
-                ->with(10, 30)
+                ->with(5, 7)
                 ->andReturn($recentBooks);
 
             // Make the request to the index page
             $response = $this->get(route('books.index'));
-
-            // If we get here, the request didn't throw an exception
-            // dump('Response status: ' . $response->status());
-            // dump('Response content: ' . $response->content());
-
-            // If we got a non-200 response, dump the exception that would have been thrown
-            if ($response->status() !== 200) {
-                $exception = $response->exception;
-                if ($exception) {
-                    dump('Exception class: ' . get_class($exception));
-                    dump('Exception message: ' . $exception->getMessage());
-                    dump('Exception trace: ' . $exception->getTraceAsString());
-                }
-            }
-
-            // Get the response content before making assertions
-            $content = $response->getContent();
-
-            // If we get a 500 error, dump the full response content for debugging
-            if ($response->status() === 500) {
-                dump('Response status: 500');
-                dump('Response content:');
-                dump($content);
-
-                // Get the actual exception if available
-                $exception = $response->exception ?? null;
-
-                if ($exception) {
-                    dump('Exception class: ' . get_class($exception));
-                    dump('Exception message: ' . $exception->getMessage());
-                    dump('Exception file: ' . $exception->getFile() . ':' . $exception->getLine());
-                    dump('Exception trace: ' . $exception->getTraceAsString());
-
-                    // If there's a previous exception, show that too
-                    $previous = $exception->getPrevious();
-                    while ($previous) {
-                        dump('Previous exception:');
-                        dump('  Class: ' . get_class($previous));
-                        dump('  Message: ' . $previous->getMessage());
-                        dump('  File: ' . $previous->getFile() . ':' . $previous->getLine());
-                        $previous = $previous->getPrevious();
-                    }
-                } else {
-                    // Try to get the exception from the container if not in the response
-                    try {
-                        $exception = app('Illuminate\Contracts\Debug\ExceptionHandler');
-                        if (method_exists($exception, 'getException')) {
-                            $exception = $exception->getException();
-                            if ($exception) {
-                                dump('Exception from handler: ' . get_class($exception));
-                                dump('Message: ' . $exception->getMessage());
-                            }
-                        }
-                    } catch (\Exception $e) {
-                        dump('Could not get exception from handler: ' . $e->getMessage());
-                    }
-                }
-
-                // Also check the session for errors
-                if (session()->has('errors')) {
-                    dump('Validation errors:', session('errors')->all());
-                }
-
-                // Dump the full response headers
-                dump('Response headers:', $response->headers->all());
-
-                // If we have a JSON response, try to decode it
-                if (str_contains($response->headers->get('Content-Type'), 'application/json')) {
-                    $json = json_decode($content, true);
-                    if (json_last_error() === JSON_ERROR_NONE) {
-                        dump('JSON response:', $json);
-                    }
-                }
-
-                // Dump the last few lines of the Laravel log
-                try {
-                    $logPath = storage_path('logs/laravel.log');
-                    if (file_exists($logPath)) {
-                        $logContent = file_get_contents($logPath);
-                        $logLines = explode("\n", $logContent);
-                        $lastLines = array_slice($logLines, -20); // Last 20 lines
-                        dump('Last log entries:', $lastLines);
-                    }
-                } catch (\Exception $e) {
-                    dump('Could not read log file: ' . $e->getMessage());
-                }
-            }
 
             // Now assert the response status
             $response->assertStatus(200);
@@ -282,14 +195,7 @@ class BookControllerIndexTest extends TestCase
             $response->assertSee('Test Series 1');
             $response->assertSee('Test Series 2');
         } catch (\Exception $e) {
-            // Catch any exceptions and dump detailed information
-            dump('Exception caught in test:');
-            dump('Class: ' . get_class($e));
-            dump('Message: ' . $e->getMessage());
-            dump('File: ' . $e->getFile() . ':' . $e->getLine());
-            dump('Trace: ' . $e->getTraceAsString());
-
-            // Re-throw the exception to fail the test
+            // Re-throw the exception to fail the test without noisy dumps
             throw $e;
         }
     }

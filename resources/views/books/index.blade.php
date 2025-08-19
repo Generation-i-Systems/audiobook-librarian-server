@@ -344,12 +344,85 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
 
             <!-- Grid View -->
             <div class="row" id="main-books-grid" style="display: none;">
-                <!-- Books will be loaded here via JavaScript -->
+                <!-- Server-render initial page for non-JS and tests -->
+                @if(isset($books) && count($books) > 0)
+                    @foreach($books as $book)
+                        @php
+                            $cover = isset($book['coverImage']) && $book['coverImage'] ? $book['coverImage'] : url('/images/placeholder.png');
+                            $title = $book['title'] ?? 'Unknown Title';
+                            $title = is_array($title) ? ($title[0] ?? 'Unknown Title') : (string)$title;
+                            $authors = !empty($book['authors']) && is_array($book['authors']) ? implode(', ', $book['authors']) : 'Unknown';
+                            $seriesText = '';
+                            if (!empty($book['series']) && is_array($book['series'])) {
+                                $tmp = [];
+                                foreach ($book['series'] as $s) {
+                                    if (isset($s['seriesName'])) {
+                                        $tmp[] = $s['seriesName'] . (isset($s['number']) ? ' (Book ' . $s['number'] . ')' : '');
+                                    }
+                                }
+                                $seriesText = implode(', ', $tmp);
+                            }
+                        @endphp
+                        <div class="col-md-3 mb-4">
+                            <a href="{{ route('books.show', $book['id']) }}" class="text-decoration-none card-link" style="color:inherit">
+                                <div class="card h-100 book-card-hover" style="cursor:pointer;">
+                                    <div class="pt-3" style="background: #f8f9fa; border-top-left-radius: 0.375rem; border-top-right-radius: 0.375rem;">
+                                        <img src="{{ $cover }}" class="card-img-top book-cover-thumb" alt="{{ $title }}"
+                                             style="height: 160px; width: auto; max-width: 100%; object-fit: contain; display: block; margin-left: auto; margin-right: auto;">
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <h6 class="card-title small mb-0">{{ $title }}</h6>
+                                        <p class="card-text small mb-0">{{ $authors }}</p>
+                                        @if($seriesText)
+                                            <p class="card-text small text-muted mb-0" style="font-size: 0.75rem;">{{ $seriesText }}</p>
+                                        @endif
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+                    @endforeach
+                @endif
             </div>
 
             <!-- Compact View -->
             <div class="row" id="main-books-compact" style="display: none;">
-                <!-- Books will be loaded here via JavaScript -->
+                @if(isset($books) && count($books) > 0)
+                    @foreach($books as $book)
+                        @php
+                            $cover = isset($book['coverImage']) && $book['coverImage'] ? $book['coverImage'] : url('/images/placeholder.png');
+                            $title = $book['title'] ?? 'Unknown Title';
+                            $title = is_array($title) ? ($title[0] ?? 'Unknown Title') : (string)$title;
+                            $authors = !empty($book['authors']) && is_array($book['authors']) ? implode(', ', $book['authors']) : 'Unknown';
+                            $seriesText = '';
+                            if (!empty($book['series']) && is_array($book['series'])) {
+                                $tmp = [];
+                                foreach ($book['series'] as $s) {
+                                    if (isset($s['seriesName'])) {
+                                        $tmp[] = $s['seriesName'] . (isset($s['number']) ? ' (Book ' . $s['number'] . ')' : '');
+                                    }
+                                }
+                                $seriesText = implode(', ', $tmp);
+                            }
+                        @endphp
+                        <div class="col-md-2 mb-3">
+                            <a href="{{ route('books.show', $book['id']) }}" class="text-decoration-none card-link" style="color:inherit">
+                                <div class="card h-100 book-card-hover" style="cursor:pointer;">
+                                    <div class="pt-2" style="background: #f8f9fa; border-top-left-radius: 0.375rem; border-top-right-radius: 0.375rem;">
+                                        <img src="{{ $cover }}" class="card-img-top book-cover-thumb" alt="{{ $title }}"
+                                             style="height: 120px; width: auto; max-width: 100%; object-fit: contain; display: block; margin-left: auto; margin-right: auto;">
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <h6 class="card-title small mb-0" style="font-size: 0.8rem;">{{ $title }}</h6>
+                                        <p class="card-text small mb-0" style="font-size: 0.75rem;">{{ $authors }}</p>
+                                        @if($seriesText)
+                                            <p class="card-text small text-muted mb-0" style="font-size: 0.7rem;">{{ $seriesText }}</p>
+                                        @endif
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+                    @endforeach
+                @endif
             </div>
 
             <!-- List View -->
@@ -365,7 +438,43 @@ $showFilters = request()->has('search') || request()->has('genre_id') || request
                         </tr>
                     </thead>
                     <tbody>
-                        <!-- Books will be loaded here via JavaScript -->
+                        @if(isset($books) && count($books) > 0)
+                            @foreach($books as $book)
+                                @php
+                                    $cover = isset($book['coverImage']) && $book['coverImage'] ? $book['coverImage'] : url('/images/placeholder.png');
+                                    $title = $book['title'] ?? 'Unknown Title';
+                                    $title = is_array($title) ? ($title[0] ?? 'Unknown Title') : (string)$title;
+                                    $authors = !empty($book['authors']) && is_array($book['authors']) ? implode(', ', $book['authors']) : 'Unknown';
+                                    $genres = !empty($book['genres']) && is_array($book['genres']) ? implode(', ', $book['genres']) : 'Unknown';
+                                    $seriesText = '';
+                                    if (!empty($book['series']) && is_array($book['series'])) {
+                                        $tmp = [];
+                                        foreach ($book['series'] as $s) {
+                                            if (isset($s['seriesName'])) {
+                                                $tmp[] = $s['seriesName'] . (isset($s['number']) ? ' (Book ' . $s['number'] . ')' : '');
+                                            }
+                                        }
+                                        $seriesText = implode(', ', $tmp);
+                                    }
+                                @endphp
+                                <tr>
+                                    <td>
+                                        <img src="{{ $cover }}" alt="{{ $title }}" style="height: 64px; width: auto; max-width: 64px; object-fit: contain;">
+                                    </td>
+                                    <td>
+                                        <a href="{{ route('books.show', $book['id']) }}" class="text-decoration-none">{{ $title }}</a>
+                                        @if($seriesText)
+                                            <div class="small text-muted">{{ $seriesText }}</div>
+                                        @endif
+                                    </td>
+                                    <td>{{ $authors }}</td>
+                                    <td>{{ $genres }}</td>
+                                    <td>
+                                        <a href="{{ route('books.download', $book['id']) }}" class="btn btn-sm btn-secondary"><i class="fas fa-download"></i></a>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        @endif
                     </tbody>
                 </table>
             </div>

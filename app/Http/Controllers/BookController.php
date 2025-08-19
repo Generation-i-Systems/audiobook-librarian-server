@@ -467,7 +467,9 @@ class BookController extends Controller
                 return is_array($author) && isset($author['name']) ? $author['name'] : (string) $author;
             }, array_slice($book['authors'], 0, 2));
         } elseif (isset($book['author']) && is_array($book['author'])) {
-            $authors = array_slice($book['author'], 0, 2);
+            $authors = array_map(function ($author) {
+                return is_array($author) && isset($author['name']) ? $author['name'] : (string) $author;
+            }, array_slice($book['author'], 0, 2));
         }
 
         // Handle genres - support both MongoDB format (genre) and MySQL format (genres with relationships)
@@ -477,7 +479,9 @@ class BookController extends Controller
                 return is_array($genre) && isset($genre['name']) ? $genre['name'] : (string) $genre;
             }, array_slice($book['genres'], 0, 1));
         } elseif (isset($book['genre']) && is_array($book['genre'])) {
-            $genres = array_slice($book['genre'], 0, 1);
+            $genres = array_map(function ($genre) {
+                return is_array($genre) && isset($genre['name']) ? $genre['name'] : (string) $genre;
+            }, array_slice($book['genre'], 0, 1));
         }
 
         // Handle series - support both formats

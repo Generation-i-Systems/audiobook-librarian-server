@@ -66,7 +66,11 @@ class BookControllerTest extends TestCase
             ['id' => '2', 'title' => 'Test Book 2'],
         ];
 
-        $this->documentStoreServiceMock->shouldReceive('listBooks')->andReturn($books);
+        // Mock listBooks to return expected structure with data and total keys
+        $this->documentStoreServiceMock->shouldReceive('listBooks')->andReturn([
+            'data' => $books,
+            'total' => count($books),
+        ]);
 
         $response = $this->get(route('admin.books.index'));
 

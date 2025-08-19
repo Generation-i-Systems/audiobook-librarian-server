@@ -3,10 +3,12 @@
 namespace Tests\Feature;
 
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Jobs\CreateImportJobsForDirectory;
 use Google\Cloud\Firestore\CollectionReference;
 use Google\Cloud\Firestore\DocumentReference;
 use Google\Cloud\Firestore\DocumentSnapshot;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Queue;
 use Mockery;
 use Tests\TestCase;
 
@@ -128,6 +130,9 @@ class QueueControllerTest extends TestCase
 
     public function test_bulk_import_books_from_dir_dispatches_job()
     {
+        // Fake the queue to prevent actual job execution
+        Queue::fake();
+        
         // This simply checks the endpoint returns the right response (job dispatching is not tested here)
         $response = $this->post('/admin/books/bulk-import-dir', [
             'dir' => 'test',
@@ -136,5 +141,8 @@ class QueueControllerTest extends TestCase
             ->assertJson([
                 'message' => 'Queued job to scan and import all book directories.',
             ]);
+            
+        // Verify that the job was dispatched
+        Queue::assertPushed(CreateImportJobsForDirectory::class);
     }
 }
