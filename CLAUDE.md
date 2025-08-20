@@ -1,10 +1,12 @@
 ### Code Preferences
+
 - Always detect and follow existing project patterns and conventions
 - Check for existing scripts in package.json, build.gradle.kts, Makefile, etc.
 - Minimize comments unless explicitly requested
 - Follow existing import organization and naming conventions
 
 ### Platform-Native Development Philosophy
+
 - **"Let the platform do what it does best"** - Leverage platform strengths rather than creating complex abstractions
 - **Avoid over-engineering**: Question whether custom abstractions add value vs. using platform solutions
 - **Prefer**: Essential logging + coordination over complex resource management layers
@@ -12,36 +14,43 @@
 ## Important Workflow Guidelines
 
 ## Code Commit Guidelines
+
 - IMPORTANT: Work should be committed in logical, reasonably sized chunks for human and AI review.
 - IMPORTANT: Commits should always leave the code in a working state.
 - IMPORTANT: Never add Claude or Gemini attributions or as a co-editor or mention them in commit messages.
 
 ## Verification Guidelines
+
 - IMPORTANT: Always verify/validate the changes through compilation, tests, etc. or ask the human to do the verification/validation if unable to do so.
 
 ## Mobile Development Notes
+
 - When you install to a device or emulator, go ahead and launch the app
 
 ## Efficiency Guidelines
+
 - **Build Tools**: When running fire-and-forget tasks (builds, tests, installs), use quiet/minimal output flags to minimize tokens
-  - **Gradle**: Use `--quiet` and `--console=plain`
+    - **Gradle**: Use `--quiet` and `--console=plain`
 - Reduced ktlint output from ~400+ to ~10 tokens by setting debug.set(false) and verbose.set(false) in the Gradle configuration and adding --quiet to the gradle command, while adding a simple success message for acknowledgment
 
 ## General Guidance
+
 - Use full paths instead of changing directories. Instead of `cd` into a dir, the `ls`, just `ls /full/path`
 
 ## Subagent Investigation Guidelines
+
 - When investigating other code bases/repos, use subagents and report back relevant details
 - Proactively add details that may be helpful for context
 - Reports should include a very brief set of instructions to find the most relevant parts of the code
 - Provide context to help the parent agent guide subsequent subagent investigations
 
 ## Tool Usage Guidelines
+
 - Make sure to read files fully before doing updates on them
 - Do batch updates when possible to reduce tool calls
 
-
 # Claude Code Guidelines, adopted from guidelines by Sabrina Ramonov
+
 # https://www.sabrina.dev/p/ultimate-ai-coding-guide-claude-code
 
 ## Implementation Best Practices
@@ -90,6 +99,7 @@ These rules ensure maintainability, safety, and developer velocity.
 - **C-18 (MUST)** use a database abstraction layer for database access from laravel.
 - **C-19 (MUST)** Laravel projects use Laravel 11+ (no Console Kernel.php, use bootstrap/app.php for scheduling).
 - **C-20 (SHOULD)** Classes with over 1000 lines should be split into smaller, focused pieces to improve maintainability and testability.
+- **C-21 (MUST)** update openapi.json after any api change
 
 ---
 
@@ -116,7 +126,6 @@ These rules ensure maintainability, safety, and developer velocity.
 - **D-9 (MUST)** Implement comprehensive database operation logging.
 - **D-10 (MUST)** Add confirmation prompts for any destructive database operations.
 
-
 ---
 
 ### 4 — Code Organization
@@ -129,7 +138,6 @@ These rules ensure maintainability, safety, and developer velocity.
 - **G-2 (MUST)** `php artisan test` passes for all modules for laravel.
 - **G-3 (MUST)** `php artisan build` passes for any changed modules for laravel.
 - **G-4 (MUST)** run `phpcbf` for laravel on all changed files.
-
 
 ---
 
@@ -159,6 +167,7 @@ When evaluating whether a function you implemented is good or not, use this chec
 8. Brainstorm 3 better function names and see if the current name is the best, consistent with rest of codebase.
 
 IMPORTANT: you SHOULD NOT refactor out a separate function unless there is a compelling need, such as:
+
 - the refactored function is used in more than one place
 - the refactored function is easily unit testable while the original function is not AND you can't test it any other way
 - the original function is extremely hard to follow and you resort to putting comments everywhere just to explain it
@@ -176,6 +185,3 @@ When evaluating whether a test you've implemented is good or not, use this check
 7. Use descriptive test method names that state what is being verified.
 8. ALWAYS use strong assertions over weaker ones e.g. `assertThat(x).isEqualTo(1)` instead of `assertThat(x).isAtLeast(1)`.
 9. SHOULD test edge cases, realistic input, unexpected input, and value boundaries.
-
-
-

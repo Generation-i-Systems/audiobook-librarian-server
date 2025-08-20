@@ -1,5 +1,9 @@
 ## [Unreleased]
 ### Changed
+- Authors and Series endpoints now exclude `needs_review` books by default
+  - `/api/v1/authors` and `/api/v1/series` filter out books flagged as `needs_review` unless explicitly included
+  - Counts (e.g., `book_count`) now respect the `needs_review` filter to avoid inflated totals
+  - Sorting by `book_count` uses the filtered count to ensure correct order
 - `/api/v1/me` endpoint now explicitly returns only the authenticated user's `name` and `email` via `UserApiController@me`
   - Route wired to controller method; no longer aliases full user object
   - Feature and unit tests added to validate response shape and authentication behavior
@@ -21,6 +25,9 @@
 - Created PersistentDatabaseTestCase for tests that need persistent data
 
 ### Added
+- Support for `includeNeedsReview` (also `include_needs_review`) query flag on Authors and Series endpoints
+  - When set to a truthy value, responses include books and entities otherwise excluded due to `needs_review`
+  - Added feature tests to verify default exclusion and override behavior for both endpoints
 - Artisan command: `php artisan badges:generate-icons` to generate per-badge SVG placeholders
   - Writes files to `public/images/badges/{key}.svg`
   - Use `--force` to overwrite existing files

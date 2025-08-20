@@ -1,0 +1,21 @@
+meta {
+  name: get for author (Andrew Seiple)
+  type: http
+  seq: 6
+}
+
+get {
+  url: https://books.thelin.org/api/v1/books/enhanced?author_id=82&page=1&per_page=10
+  body: none
+  auth: none
+}
+
+params:query {
+  author_id: 82
+  page: 1
+  per_page: 10
+}
+
+headers {
+  Authorization: Bearer 82|Un5snLddo7PRNqzJsKHyGEMMjmxDc022qrI1G4djef2f1420
+}

@@ -574,6 +574,42 @@
             },
             "description": "List of genres this author writes in",
             "example": ["Fantasy", "Science Fiction"]
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer",
+                  "description": "Series ID",
+                  "example": 684
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Series name",
+                  "example": "Benjamin Ashwood Series"
+                },
+                "books_in_series": {
+                  "type": "integer",
+                  "description": "Number of books by this author in this series",
+                  "example": 5
+                }
+              }
+            },
+            "description": "List of series this author has written books for",
+            "example": [
+              {
+                "id": 684,
+                "name": "Benjamin Ashwood Series",
+                "books_in_series": 5
+              },
+              {
+                "id": 1696,
+                "name": "Golden Road",
+                "books_in_series": 1
+              }
+            ]
           }
         }
       },

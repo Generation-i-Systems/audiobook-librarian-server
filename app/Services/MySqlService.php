@@ -213,7 +213,11 @@ class MySqlService implements DocumentStoreServiceInterface
         $query = Book::query();
 
         // Exclude books flagged for review from API listings by default
-        $query->where('needs_review', false);
+        // Allow override via filters['include_needs_review'] === true
+        $includeNeedsReview = (bool)($filters['include_needs_review'] ?? false);
+        if (!$includeNeedsReview) {
+            $query->where('needs_review', false);
+        }
 
         // Eager load all relationships required by the OpenAPI spec
         $query->with([
