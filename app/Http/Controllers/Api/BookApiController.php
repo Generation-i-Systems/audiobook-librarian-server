@@ -77,6 +77,7 @@ class BookApiController extends Controller
         $page = (int) $request->input('page', 1);
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
+        $includeNeedsReview = $request->boolean('includeNeedsReview', $request->boolean('include_needs_review', false));
 
         $filters = [
             'search' => $request->input('search'),
@@ -88,22 +89,24 @@ class BookApiController extends Controller
             'date_added' => $request->input('date_added'),
         ];
 
+        // Respect includeNeedsReview override
+        $filters['include_needs_review'] = $includeNeedsReview;
         $booksData = $this->documentStoreService->listBooks($page, $perPage, $filters);
 
         // Transform books to match OpenAPI spec
         $transformedBooks = [];
         if (isset($booksData['data']) && is_array($booksData['data'])) {
-            // Exclude books flagged as needing review from API output
-            $filtered = array_filter(
-                array_filter($booksData['data'], 'is_array'),
-                function ($book) {
+            $booksArray = array_filter($booksData['data'], 'is_array');
+            // If not including needs_review, filter them out here as a safety net
+            if (!$includeNeedsReview) {
+                $booksArray = array_filter($booksArray, function ($book) {
                     return empty($book['needs_review']);
-                }
-            );
+                });
+            }
 
             $transformedBooks = array_map(function ($book) use ($withCover, $inlineCovers) {
                 return $this->getBookWithCover($book, $withCover, $inlineCovers);
-            }, $filtered);
+            }, $booksArray);
         }
 
         return response()->json([
@@ -131,6 +134,16 @@ class BookApiController extends Controller
             ], 404);
         }
 
+        // Hide needs_review books unless explicitly requested
+        $includeNeedsReview = $request->boolean('includeNeedsReview', $request->boolean('include_needs_review', false));
+        $isNeedsReview = !empty($book['needs_review']) || !empty($book['needsReview']);
+        if ($isNeedsReview && !$includeNeedsReview) {
+            return response()->json([
+                'error' => 'Book not available',
+                'message' => 'This book is pending review',
+            ], 404);
+        }
+
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
 
@@ -146,6 +159,16 @@ class BookApiController extends Controller
             return response()->json([
                 'error' => 'Book not found',
                 'message' => 'The specified book could not be found',
+            ], 404);
+        }
+
+        // Hide needs_review books unless explicitly requested
+        $includeNeedsReview = request()->boolean('includeNeedsReview', request()->boolean('include_needs_review', false));
+        $isNeedsReview = !empty($book['needs_review']) || !empty($book['needsReview']);
+        if ($isNeedsReview && !$includeNeedsReview) {
+            return response()->json([
+                'error' => 'Cover not found',
+                'message' => 'Cover image not available for a book pending review',
             ], 404);
         }
 
@@ -421,6 +444,7 @@ class BookApiController extends Controller
         $page = (int) $request->input('page', 1);
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
+        $includeNeedsReview = $request->boolean('includeNeedsReview', $request->boolean('include_needs_review', false));
 
         $filters = [
             'search' => $request->input('search'),
@@ -431,12 +455,18 @@ class BookApiController extends Controller
             'date_added' => $request->input('date_added'),
         ];
 
+        $filters['include_needs_review'] = $includeNeedsReview;
         $booksData = $this->documentStoreService->listBooks($page, $perPage, $filters);
         $books = $booksData['data'];
         $total = $booksData['total'];
 
         // Transform books to match OpenAPI spec
         $books = array_filter($books, 'is_array');
+        if (!$includeNeedsReview) {
+            $books = array_filter($books, function ($book) {
+                return empty($book['needs_review']);
+            });
+        }
         $books = array_map(function ($book) use ($withCover, $inlineCovers) {
             return $this->getBookWithCover($book, $withCover, $inlineCovers);
         }, $books);
@@ -478,6 +508,16 @@ class BookApiController extends Controller
             return response()->json([
                 'error' => 'Book not found',
                 'message' => 'The specified book could not be found',
+            ], 404);
+        }
+
+        // Hide needs_review books unless explicitly requested
+        $includeNeedsReview = request()->boolean('includeNeedsReview', request()->boolean('include_needs_review', false));
+        $isNeedsReview = !empty($book['needs_review']) || !empty($book['needsReview']);
+        if ($isNeedsReview && !$includeNeedsReview) {
+            return response()->json([
+                'error' => 'File not found',
+                'message' => 'Files not available for a book pending review',
             ], 404);
         }
 
@@ -668,7 +708,7 @@ class BookApiController extends Controller
         }
 
         // Regular download
-        return response()->stream(function () use ($fullPath, $fileSize, $book, $file) {
+        return response()->stream(function () use ($fullPath, $fileSize, $book, $fileName, $id) {
             $startTime = microtime(true);
             $bytesSent = 0;
             $chunkCount = 0;
@@ -677,7 +717,7 @@ class BookApiController extends Controller
             Log::info('Starting file download stream', [
                 'book_id' => $book['id'] ?? $id,
                 'book_title' => $book['title'] ?? 'Unknown',
-                'file_name' => $file,
+                'file_name' => $fileName,
                 'file_path' => $fullPath,
                 'file_size_bytes' => $fileSize,
                 'file_size_mb' => round($fileSize / (1024 * 1024), 2),
@@ -693,7 +733,7 @@ class BookApiController extends Controller
             if ($handle === false) {
                 Log::error('Failed to open file for streaming', [
                     'book_id' => $book['id'] ?? $id,
-                    'file_name' => $file,
+                    'file_name' => $fileName,
                     'file_path' => $fullPath,
                     'user_id' => $user->id,
                     'error' => 'fopen_failed'
@@ -727,7 +767,7 @@ class BookApiController extends Controller
 
                             Log::info('File download progress', [
                                 'book_id' => $book['id'] ?? $id,
-                                'file_name' => $file,
+                                'file_name' => $fileName,
                                 'user_id' => $user->id,
                                 'bytes_sent' => $bytesSent,
                                 'bytes_sent_mb' => round($bytesSent / (1024 * 1024), 2),
@@ -750,7 +790,7 @@ class BookApiController extends Controller
 
                         Log::warning('File download connection aborted by client', [
                             'book_id' => $book['id'] ?? $id,
-                            'file_name' => $file,
+                            'file_name' => $fileName,
                             'user_id' => $user->id,
                             'bytes_sent' => $bytesSent,
                             'bytes_sent_mb' => round($bytesSent / (1024 * 1024), 2),
@@ -771,7 +811,7 @@ class BookApiController extends Controller
                 if ($isComplete) {
                     Log::info('File download completed successfully', [
                         'book_id' => $book['id'] ?? $id,
-                        'file_name' => $file,
+                        'file_name' => $fileName,
                         'user_id' => $user->id,
                         'bytes_sent' => $bytesSent,
                         'bytes_sent_mb' => round($bytesSent / (1024 * 1024), 2),
@@ -784,7 +824,7 @@ class BookApiController extends Controller
                 } else {
                     Log::warning('File download ended incomplete', [
                         'book_id' => $book['id'] ?? $id,
-                        'file_name' => $file,
+                        'file_name' => $fileName,
                         'user_id' => $user->id,
                         'bytes_sent' => $bytesSent,
                         'bytes_sent_mb' => round($bytesSent / (1024 * 1024), 2),
@@ -802,7 +842,7 @@ class BookApiController extends Controller
 
                 Log::error('File download failed with exception', [
                     'book_id' => $book['id'] ?? $id,
-                    'file_name' => $file,
+                    'file_name' => $fileName,
                     'user_id' => $user->id,
                     'bytes_sent' => $bytesSent,
                     'bytes_sent_mb' => round($bytesSent / (1024 * 1024), 2),
@@ -1670,6 +1710,7 @@ class BookApiController extends Controller
         $perPage = min(100, max(1, (int) $request->input('per_page', 50)));
         $sort = $request->input('sort', 'name_asc');
         $search = $request->input('search');
+        $includeNeedsReview = $request->boolean('includeNeedsReview', $request->boolean('include_needs_review', false));
 
         // Validate sort parameter
         $allowedSorts = ['name_asc', 'name_desc', 'book_count_asc', 'book_count_desc'];
@@ -1683,9 +1724,22 @@ class BookApiController extends Controller
                 'authors.id',
                 'authors.name'
             ])
-            ->withCount('books as book_count')
+            ->selectSub(function ($q) use ($includeNeedsReview) {
+                $q->from('author_book')
+                    ->join('books', 'author_book.book_id', '=', 'books.id')
+                    ->whereColumn('author_book.author_id', 'authors.id');
+                if (!$includeNeedsReview) {
+                    $q->where('books.needs_review', false);
+                }
+                $q->selectRaw('COUNT(DISTINCT books.id)');
+            }, 'book_count')
             ->join('author_book', 'authors.id', '=', 'author_book.author_id')
             ->join('books', 'author_book.book_id', '=', 'books.id');
+
+        // Exclude needs_review books unless explicitly included
+        if (!$includeNeedsReview) {
+            $query->where('books.needs_review', false);
+        }
 
         // Add genre filtering if specified
         if ($genreId || $genreName) {
@@ -1722,10 +1776,10 @@ class BookApiController extends Controller
                 $query->orderBy('authors.name', 'desc');
                 break;
             case 'book_count_asc':
-                $query->orderByRaw('COUNT(DISTINCT books.id) ASC');
+                $query->orderBy('book_count', 'asc');
                 break;
             case 'book_count_desc':
-                $query->orderByRaw('COUNT(DISTINCT books.id) DESC');
+                $query->orderBy('book_count', 'desc');
                 break;
             case 'name_asc':
             default:
@@ -1737,6 +1791,10 @@ class BookApiController extends Controller
         $countQuery = \App\Models\Author::query()
             ->join('author_book', 'authors.id', '=', 'author_book.author_id')
             ->join('books', 'author_book.book_id', '=', 'books.id');
+
+        if (!$includeNeedsReview) {
+            $countQuery->where('books.needs_review', false);
+        }
 
         // Add same genre filtering as main query if present
         if ($genreId || $genreName) {
@@ -1760,9 +1818,14 @@ class BookApiController extends Controller
         $offset = ($page - 1) * $perPage;
         $authors = $query->offset($offset)->limit($perPage)->get();
 
-        // Get genres for each author if needed for response
-        $authorsWithGenres = $authors->map(function ($author) {
-            $author->genres = $author->books()
+        // Get genres and series for each author
+        $authorsWithDetails = $authors->map(function ($author) use ($includeNeedsReview) {
+            // Get genres for this author
+            $authorBooksQuery = $author->books();
+            if (!$includeNeedsReview) {
+                $authorBooksQuery->where('books.needs_review', false);
+            }
+            $author->genres = $authorBooksQuery
                 ->join('book_genre', 'books.id', '=', 'book_genre.book_id')
                 ->join('genres', 'book_genre.genre_id', '=', 'genres.id')
                 ->select('genres.name')
@@ -1770,14 +1833,46 @@ class BookApiController extends Controller
                 ->pluck('name')
                 ->toArray();
 
+            // Compute total book count for this author independent of outer joins
+            $totalBookCount = \App\Models\Book::query()
+                ->join('author_book', 'books.id', '=', 'author_book.book_id')
+                ->where('author_book.author_id', $author->id)
+                ->when(!$includeNeedsReview, function ($q) {
+                    $q->where('books.needs_review', false);
+                })
+                ->distinct('books.id')
+                ->count('books.id');
+
+            // Get series for this author with book counts
+            $authorSeries = \App\Models\Series::query()
+                ->select('series.id', 'series.name')
+                ->selectRaw('COUNT(DISTINCT books.id) as books_in_series')
+                ->join('book_series', 'series.id', '=', 'book_series.series_id')
+                ->join('books', 'book_series.book_id', '=', 'books.id')
+                ->join('author_book', 'books.id', '=', 'author_book.book_id')
+                ->where('author_book.author_id', $author->id)
+                ->when(!$includeNeedsReview, function ($q) {
+                    $q->where('books.needs_review', false);
+                })
+                ->groupBy('series.id', 'series.name')
+                ->get()
+                ->map(function ($series) {
+                    return [
+                        'id' => $series->id,
+                        'name' => $series->name,
+                        'books_in_series' => $series->books_in_series
+                    ];
+                });
+
             return [
                 'id' => $author->id,
                 'name' => $author->name,
                 'biography' => null, // Column doesn't exist in database
-                'book_count' => $author->book_count,
+                'book_count' => $totalBookCount,
                 'book_count_in_genre' => $author->book_count_in_genre ?? $author->book_count,
                 'image_url' => null, // Column doesn't exist in database
-                'genres' => $author->genres
+                'genres' => $author->genres,
+                'series' => $authorSeries->toArray()
             ];
         });
 
@@ -1787,7 +1882,7 @@ class BookApiController extends Controller
         $hasPrev = $page > 1;
 
         return response()->json([
-            'authors' => $authorsWithGenres,
+            'authors' => $authorsWithDetails,
             'pagination' => [
                 'current_page' => $page,
                 'per_page' => $perPage,
@@ -1813,6 +1908,7 @@ class BookApiController extends Controller
         $perPage = min(100, max(1, (int) $request->input('per_page', 50)));
         $sort = $request->input('sort', 'name_asc');
         $search = $request->input('search');
+        $includeNeedsReview = $request->boolean('includeNeedsReview', $request->boolean('include_needs_review', false));
 
         // Validate sort parameter
         $allowedSorts = ['name_asc', 'name_desc', 'book_count_asc', 'book_count_desc'];
@@ -1830,6 +1926,10 @@ class BookApiController extends Controller
             ->join('book_series', 'series.id', '=', 'book_series.series_id')
             ->join('books', 'book_series.book_id', '=', 'books.id');
 
+        if (!$includeNeedsReview) {
+            $query->where('books.needs_review', false);
+        }
+
         // Add author filtering if specified
         if ($authorId || $authorName) {
             $query->join('author_book', 'books.id', '=', 'author_book.book_id')
@@ -1843,7 +1943,7 @@ class BookApiController extends Controller
 
             // Add book count by specific author
             $query->selectRaw(
-                'COUNT(DISTINCT CASE WHEN authors.id = ? OR authors.name = ? THEN books.id END) as book_count_by_author',
+                'COUNT(DISTINCT CASE WHEN (authors.id = ? OR authors.name = ?) THEN books.id END) as book_count_by_author',
                 [$authorId, $authorName]
             );
         } else {
@@ -1881,6 +1981,10 @@ class BookApiController extends Controller
             ->join('book_series', 'series.id', '=', 'book_series.series_id')
             ->join('books', 'book_series.book_id', '=', 'books.id');
 
+        if (!$includeNeedsReview) {
+            $countQuery->where('books.needs_review', false);
+        }
+
         // Add same author filtering as main query if present
         if ($authorId || $authorName) {
             $countQuery->join('author_book', 'books.id', '=', 'author_book.book_id')
@@ -1904,20 +2008,33 @@ class BookApiController extends Controller
         $series = $query->offset($offset)->limit($perPage)->get();
 
         // Get authors for each series if needed for response
-        $seriesWithAuthors = $series->map(function ($series) {
+        $seriesWithAuthors = $series->map(function ($series) use ($includeNeedsReview) {
             $series->authors = $series->books()
                 ->join('author_book', 'books.id', '=', 'author_book.book_id')
                 ->join('authors', 'author_book.author_id', '=', 'authors.id')
                 ->select('authors.name')
                 ->distinct()
+                ->when(!$includeNeedsReview, function ($q) {
+                    $q->where('books.needs_review', false);
+                })
                 ->pluck('name')
                 ->toArray();
+
+            // Compute total book count for this series respecting needs_review filter
+            $totalBookCount = \App\Models\Book::query()
+                ->join('book_series', 'books.id', '=', 'book_series.book_id')
+                ->where('book_series.series_id', $series->id)
+                ->when(!$includeNeedsReview, function ($q) {
+                    $q->where('books.needs_review', false);
+                })
+                ->distinct('books.id')
+                ->count('books.id');
 
             return [
                 'id' => $series->id,
                 'name' => $series->name,
                 'description' => null, // Column doesn't exist in database
-                'book_count' => $series->book_count,
+                'book_count' => $totalBookCount,
                 'book_count_by_author' => $series->book_count_by_author ?? $series->book_count,
                 'authors' => $series->authors
             ];
