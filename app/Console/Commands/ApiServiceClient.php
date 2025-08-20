@@ -16,7 +16,7 @@ class ApiServiceClient extends Command
      *
      * @var string
      */
-    protected $signature = 'api:client 
+    protected $signature = 'api:client
                             {url : The API URL or URI to call}
                             {--user= : User ID to impersonate (defaults to first admin user)}
                             {--method=GET : HTTP method to use (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS)}
@@ -27,7 +27,10 @@ class ApiServiceClient extends Command
                             {--timeout=30 : Request timeout in seconds}
                             {--max-time=0 : Maximum time for the entire request (0 = unlimited)}
                             {--show-details : Show detailed request/response information}
-                            {--no-color : Disable colored output}';
+                            {--curl : Generate and display equivalent curl command}
+                            {--curl-only : Only show curl command without making the request}
+                            {--no-color : Disable colored output}
+                            ';
 
     /**
      * The console command description.
@@ -63,8 +66,22 @@ class ApiServiceClient extends Command
         $showToken = $this->option('show-token');
         $timeout = (int) $this->option('timeout');
         $maxTime = (int) $this->option('max-time');
-        $verbose = $this->option('show-details');
+        $showDetails = $this->option('show-details');
+        $generateCurl = $this->option('curl');
+        $curlOnly = $this->option('curl-only');
         $noColor = $this->option('no-color');
+        $verbose = $this->getOutput()->isVerbose();
+
+        // If curl-only is specified, also enable curl generation
+        if ($curlOnly) {
+            $generateCurl = true;
+        }
+
+        // If verbose is enabled, also show token and details
+        if ($verbose) {
+            $showToken = true;
+            $showDetails = true;
+        }
 
         try {
             // Get the user to impersonate
@@ -91,8 +108,23 @@ class ApiServiceClient extends Command
                 $this->line('');
             }
 
+            // Generate curl command if requested
+            if ($generateCurl) {
+                $curlCommand = $this->generateCurlCommand($uri, $method, $data, $headers, $tempToken, $host);
+                $this->line('');
+                $this->line('<comment>Equivalent curl command:</comment>');
+                $this->line($curlCommand);
+                $this->line('');
+
+                // If curl-only is specified, exit here
+                if ($curlOnly) {
+                    $this->cleanupTempToken($tempToken);
+                    return 0;
+                }
+            }
+
             // Make the API call
-            $response = $this->makeApiCall($uri, $method, $data, $user, $host, $headers, $timeout, $maxTime, $verbose, $tempToken);
+            $response = $this->makeApiCall($uri, $method, $data, $user, $host, $headers, $timeout, $maxTime, $showDetails, $tempToken);
 
             // Handle download or display response
             if ($downloadFile) {
@@ -269,7 +301,8 @@ class ApiServiceClient extends Command
             $this->line('');
             $this->info('> ' . $method . ' ' . $uri);
             $this->info('> Host: ' . ($host ?: 'localhost'));
-            $this->info('> Authorization: Bearer ' . substr($tempToken, 0, 10) . '...');
+            $this->info('> Authorization: Bearer ' . $tempToken);
+
             foreach ($headers as $header) {
                 $this->info('> ' . $header);
             }
@@ -321,7 +354,7 @@ class ApiServiceClient extends Command
             'raw_content' => $content,
             'is_json' => $jsonResponse !== null,
             'duration_ms' => $duration,
-            'response' => $response
+            'response' => $response,
         ];
     }
 
@@ -523,5 +556,53 @@ class ApiServiceClient extends Command
         PersonalAccessToken::where('token', $hashedToken)
             ->where('name', 'api-service-client-temp')
             ->delete();
+    }
+
+    /**
+     * Generate equivalent curl command
+     *
+     * @param string $uri
+     * @param string $method
+     * @param string|null $data
+     * @param array $headers
+     * @param string $tempToken
+     * @param string|null $host
+     * @param bool $includeToken
+     * @return string
+     */
+    protected function generateCurlCommand(string $uri, string $method, ?string $data, array $headers, string $tempToken, ?string $host = null): string
+    {
+        $curl = 'curl';
+
+        // Add method
+        if ($method !== 'GET') {
+            $curl .= " -X {$method}";
+        }
+
+        // Build full URL
+        $fullUrl = $host ? $host . $uri : url($uri);
+
+        $curl .= " -H 'Authorization: Bearer {$tempToken}'";
+
+        // Add custom headers
+        foreach ($headers as $header) {
+            if (strpos($header, ':') !== false) {
+                $curl .= " -H '{$header}'";
+            }
+        }
+
+        // Add content-type header for POST/PUT/PATCH with data
+        if ($data && in_array($method, ['POST', 'PUT', 'PATCH'])) {
+            $curl .= " -H 'Content-Type: application/json'";
+
+            // Add data
+            $escapedData = addcslashes($data, "'");
+            $curl .= " -d '{$escapedData}'";
+        }
+
+        // Add URL (quote it to handle special characters)
+        $curl .= " '{$fullUrl}'";
+
+        return $curl;
     }
 }
