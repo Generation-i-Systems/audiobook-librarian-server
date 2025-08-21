@@ -28,6 +28,10 @@
 - Support for `includeNeedsReview` (also `include_needs_review`) query flag on Authors and Series endpoints
   - When set to a truthy value, responses include books and entities otherwise excluded due to `needs_review`
   - Added feature tests to verify default exclusion and override behavior for both endpoints
+- Artisan command: `php artisan books:list-missing-directories` to list book `directory_path` values that don't exist on disk
+  - Options: `--disk=books` to select storage disk, `--format=txt|json` (default txt), `--output=path` to write to a file
+  - Produces a stable, unique, sorted list; JSON output uses unescaped slashes for readability
+  - Feature tests added covering text output and JSON output
 - Artisan command: `php artisan badges:generate-icons` to generate per-badge SVG placeholders
   - Writes files to `public/images/badges/{key}.svg`
   - Use `--force` to overwrite existing files
