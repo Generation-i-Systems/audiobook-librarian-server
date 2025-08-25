@@ -38,7 +38,7 @@ class BookControllerUpdateTest extends TestCase
 
         // Create a mock DocumentStoreService
         $this->documentStoreService = $this->createMock(\App\Contracts\DocumentStoreServiceInterface::class);
-        
+
         // Create a mock ExternalCoverService
         $this->externalCoverService = $this->createMock(\App\Services\ExternalCoverService::class);
 

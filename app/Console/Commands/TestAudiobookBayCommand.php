@@ -38,8 +38,7 @@ class TestAudiobookBayCommand extends Command
      *
      * @var string
      */
-    protected $description =
-        'Test AudiobookBay API login and search functionality. Use --get-images to download cover images.';
+    protected $description = 'Test AudiobookBay API login and search functionality. Use --get-images to download cover images.';
 
     /**
      * Execute the console command.
@@ -177,8 +176,7 @@ class TestAudiobookBayCommand extends Command
                     $this->line('  Search results:');
                     foreach ($results as $i => $r) {
                         $sim = AudiobookBayApiService::calculateSimilarity($inputTitle, $r['title'] ?? '');
-                        $authorMatch = $inputAuthor ? (stripos($r['title'] ?? '', $inputAuthor) !== false ?
-                            'yes' : 'no') : 'n/a';
+                        $authorMatch = $inputAuthor ? (stripos($r['title'] ?? '', $inputAuthor) !== false ? 'yes' : 'no') : 'n/a';
                         $this->line(
                             "    [{$i}] Title: '{$r['title']}' | Author match: {$authorMatch} | Similarity: {$sim}"
                         );
@@ -236,9 +234,7 @@ class TestAudiobookBayCommand extends Command
     {
         $getImages = $this->option('get-images');
         // If it's not a full URL, assume it's just the ID
-        $url = filter_var($bookIdOrUrl, FILTER_VALIDATE_URL)
-            ? $bookIdOrUrl
-            : 'https://audiobookbay.lu/audiobook/' . $bookIdOrUrl;
+        $url = filter_var($bookIdOrUrl, FILTER_VALIDATE_URL) ? $bookIdOrUrl : 'https://audiobookbay.lu/audiobook/' . $bookIdOrUrl;
 
         $this->info('Fetching details from: ' . $url);
 
@@ -266,8 +262,7 @@ class TestAudiobookBayCommand extends Command
         $info = [
             'Author' => $this->mapToString($book['authors'] ?? 'Unknown'),
             'Narrator' => $this->mapToString($book['narrators'] ?? 'Unknown'),
-            'Series' => isset($book['series']) ?
-                ($book['series'] . (isset($book['seriesNumber']) ? ' #' . $book['seriesNumber'] : '')) : 'N/A',
+            'Series' => isset($book['series']) ? ($book['series'] . (isset($book['seriesNumber']) ? ' #' . $book['seriesNumber'] : '')) : 'N/A',
             'Published' => $book['datePublished'] ?? 'Unknown',
             'Genres' => !empty($book['genres']) ? implode(', ', $book['genres']) : 'N/A',
             'Tags' => !empty($book['tags']) ? implode(', ', $book['tags']) : 'N/A',

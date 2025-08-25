@@ -348,7 +348,7 @@ trait BookImportTrait
             } else {
                 $book['author'] = [trim($author)];
             }
-            
+
             // Add authors field for compatibility with tests
             $book['authors'] = $book['author'];
 
@@ -701,11 +701,10 @@ trait BookImportTrait
             $itemSeriesNumber = $info['seriesNumber'] ?? '';
             $score = 0;
             // Title similarity (Levenshtein, case-insensitive)
-            $titleLev = 100 -
-                min(
-                    levenshtein(mb_strtolower($title), mb_strtolower($itemTitle)),
-                    100
-                );
+            $titleLev = 100 - min(
+                levenshtein(mb_strtolower($title), mb_strtolower($itemTitle)),
+                100
+            );
             $score += $titleLev;
             // Author similarity (Levenshtein, case-insensitive)
             $authorString = '';
@@ -721,11 +720,10 @@ trait BookImportTrait
             } elseif (is_string($itemAuthors)) {
                 $itemAuthorsString = $itemAuthors;
             }
-            $authorLev = 100 -
-                min(
-                    levenshtein(mb_strtolower($authorString), mb_strtolower($itemAuthorsString)),
-                    100
-                );
+            $authorLev = 100 - min(
+                levenshtein(mb_strtolower($authorString), mb_strtolower($itemAuthorsString)),
+                100
+            );
             $score += $authorLev;
             // Series similarity
             if ($series && stripos($itemSeries, $series) !== false) {
@@ -796,8 +794,7 @@ trait BookImportTrait
 
             // Add specific fields with proper camelCase naming
             $camelCaseResult['author'] = $authorArray;
-            $camelCaseResult['publishedYear'] = isset($info['publishedDate']) ?
-                substr($info['publishedDate'], 0, 4) : '';
+            $camelCaseResult['publishedYear'] = isset($info['publishedDate']) ? substr($info['publishedDate'], 0, 4) : '';
             $camelCaseResult['coverImageUrl'] = $info['imageLinks']['thumbnail'] ?? '';
             $camelCaseResult['matchScore'] = $score;
             $camelCaseResult['series'] = $info['series'] ?? '';
@@ -997,13 +994,13 @@ trait BookImportTrait
         if (property_exists($this, 'documentStore') && $this->documentStore) {
             return $this->documentStore->createBook($bookData);
         }
-        
+
         // Fallback to resolving from container if available
         if (method_exists($this, 'app') && $this->app) {
             $documentStore = $this->app->make(\App\Contracts\DocumentStoreServiceInterface::class);
             return $documentStore->createBook($bookData);
         }
-        
+
         throw new \RuntimeException('DocumentStore service not available');
     }
 }

@@ -383,11 +383,10 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         Route::post('/queue/clear', [Admin\QueueController::class, 'clear'])->name('queue.clear');
     });
 
-    Route::resource('messages', Admin\MessageController::class);
     // Admin messaging system
-    Route::get('messages', [Admin\MessagesController::class, 'index'])->name('messages.index');
+    Route::get('messages', [Admin\MessageController::class, 'index'])->name('messages.index');
     Route::get('messages/create', [Admin\MessagesController::class, 'create'])->name('messages.create');
-    Route::post('messages', [Admin\MessagesController::class, 'store'])->name('messages.store');
+    Route::post('messages', [MessageController::class, 'storeAdmin'])->name('messages.store');
     // Route::get('messages/{id}', [Admin\MessagesController::class, 'show'])->name('messages.show');
     Route::post('messages/{id}/mark-as-read', [
         Admin\MessagesController::class,
@@ -398,15 +397,12 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         '/send-notification',
         [AdminNotificationController::class, 'sendNotification']
     )->name('send.notification');
-    Route::post('/messages', [MessageController::class, 'storeAdmin'])->name('messages.storeAdmin');
     // Message routes
     Route::post(
         '/messages/{messageId}/acknowledge',
         [Admin\MessageController::class, 'acknowledge']
     )->name('messages.acknowledge');
 
-    // Admin message creation
-    Route::post('/admin/messages', [MessageController::class, 'storeAdmin'])->name('admin.messages.store');
 
     // Job management
     Route::get('/jobs', [

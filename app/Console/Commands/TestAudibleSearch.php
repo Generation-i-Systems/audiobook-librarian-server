@@ -57,8 +57,7 @@ class TestAudibleSearch extends Command
             $this->info("\nFound " . count($results) . " results:\n");
 
             foreach ($results as $index => $book) {
-                $this->line('<fg=yellow>[' . ($index + 1) . '] ' . (is_array($book['title']) ?
-                    implode(', ', $book['title']) : $book['title']) . '</>');
+                $this->line('<fg=yellow>[' . ($index + 1) . '] ' . (is_array($book['title']) ? implode(', ', $book['title']) : $book['title']) . '</>');
                 $this->line('ASIN: ' . (is_array($book['id']) ? implode(', ', $book['id']) : $book['id']));
 
                 if (!empty($book['authors'])) {
@@ -88,23 +87,20 @@ class TestAudibleSearch extends Command
                 }
 
                 if (!empty($book['publisher'])) {
-                    $publisher = is_array($book['publisher']) && isset($book['publisher']['name']) ?
-                        $book['publisher']['name'] : (is_array($book['publisher']) ? implode(
-                            ', ',
-                            $book['publisher']
-                        ) : $book['publisher']);
+                    $publisher = is_array($book['publisher']) && isset($book['publisher']['name']) ? $book['publisher']['name'] : (is_array($book['publisher']) ? implode(
+                        ', ',
+                        $book['publisher']
+                    ) : $book['publisher']);
                     $this->line('Publisher: ' . $publisher);
                 }
 
                 if (!empty($book['release_date'])) {
-                    $releaseDate = is_array($book['release_date']) ? implode(', ', $book['release_date']) :
-                        $book['release_date'];
+                    $releaseDate = is_array($book['release_date']) ? implode(', ', $book['release_date']) : $book['release_date'];
                     $this->line('Release Date: ' . $releaseDate);
                 }
 
                 if (!empty($book['coverImageUrl'])) {
-                    $coverImage = is_array($book['coverImageUrl']) ? implode(', ', $book['coverImageUrl']) :
-                        $book['coverImageUrl'];
+                    $coverImage = is_array($book['coverImageUrl']) ? implode(', ', $book['coverImageUrl']) : $book['coverImageUrl'];
                     $this->line('Cover: ' . $coverImage);
                 }
 
@@ -124,8 +120,7 @@ class TestAudibleSearch extends Command
                         $this->line('Series: ' . $book['series']);
                     }
                 } elseif (!empty($book['series_number'])) {
-                    $seriesNumber = is_array($book['series_number']) ? implode(', ', $book['series_number']) :
-                        $book['series_number'];
+                    $seriesNumber = is_array($book['series_number']) ? implode(', ', $book['series_number']) : $book['series_number'];
                     $this->line('Series Part: ' . $seriesNumber);
                 }
 

@@ -153,9 +153,7 @@ class ImportFileController extends Controller
                     'error' => 'Permission denied',
                     'details' => "The directory '{$root}' exists but cannot be read due to insufficient permissions.",
                     'permissions' => $perms,
-                    'user' => function_exists('posix_getpwuid') && function_exists('posix_geteuid') ?
-                        (posix_getpwuid(posix_geteuid())['name'] ?? 'unknown') :
-                        (getenv('USER') ?: getenv('USERNAME') ?: 'unknown'),
+                    'user' => function_exists('posix_getpwuid') && function_exists('posix_geteuid') ? (posix_getpwuid(posix_geteuid())['name'] ?? 'unknown') : (getenv('USER') ?: getenv('USERNAME') ?: 'unknown'),
                 ], 403);
             }
 
@@ -202,9 +200,7 @@ class ImportFileController extends Controller
                     'error' => 'Permission denied',
                     'details' => "The path '{$path}' exists but cannot be read due to insufficient permissions.",
                     'permissions' => $perms,
-                    'user' => function_exists('posix_getpwuid') && function_exists('posix_geteuid') ?
-                        (posix_getpwuid(posix_geteuid())['name'] ?? 'unknown') :
-                        (getenv('USER') ?: getenv('USERNAME') ?: 'unknown'),
+                    'user' => function_exists('posix_getpwuid') && function_exists('posix_geteuid') ? (posix_getpwuid(posix_geteuid())['name'] ?? 'unknown') : (getenv('USER') ?: getenv('USERNAME') ?: 'unknown'),
                 ], 403);
             }
 
@@ -946,9 +942,7 @@ class ImportFileController extends Controller
                         $meta['chapters'][] = [
                             'title' => $chapter['title'],
                             'start' => $chapter['timestamp'],
-                            'duration' => isset($chapter['duration_seconds'])
-                                ? $chapter['duration_seconds']
-                                : null,
+                            'duration' => isset($chapter['duration_seconds']) ? $chapter['duration_seconds'] : null,
                         ];
                     }
                 }

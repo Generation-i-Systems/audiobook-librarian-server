@@ -59,7 +59,7 @@
                                     <td>{{ \Carbon\Carbon::parse($message['created_at'] ?? now())->diffForHumans() }}</td>
                                     <td>
                                         @if(!($message['acknowledged_at'] ?? false))
-                                            <form action="{{ route('messages.acknowledge', $message['id']) }}" method="POST" class="d-inline">
+                                            <form action="{{ route('admin.messages.acknowledge', $message['id']) }}" method="POST" class="d-inline">
                                                 @csrf
                                                 <button type="submit" class="btn btn-sm btn-success" title="Acknowledge">
                                                     <i class="fas fa-check"></i>
@@ -88,7 +88,7 @@
                                             <div class="modal-footer">
                                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                                                 @if(!($message['acknowledged_at'] ?? false))
-                                                    <form action="{{ route('messages.acknowledge', ['messageId' => $message['id']]) }}" method="POST" class="d-inline">
+                                                    <form action="{{ route('admin.messages.acknowledge', ['messageId' => $message['id']]) }}" method="POST" class="d-inline">
                                                         @csrf
                                                         <button type="submit" class="btn btn-success">Acknowledge</button>
                                                     </form>

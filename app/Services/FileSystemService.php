@@ -156,8 +156,10 @@ class FileSystemService
             }
 
             // Check for substring matches (one contains the other)
-            if (stripos($baseName, $dirBaseName) !== false ||
-                stripos($dirBaseName, $baseName) !== false) {
+            if (
+                stripos($baseName, $dirBaseName) !== false ||
+                stripos($dirBaseName, $baseName) !== false
+            ) {
                 $duplicates[] = $dir;
             }
         }

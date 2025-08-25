@@ -1033,13 +1033,13 @@ class BookController extends Controller
             }
 
             Log::debug('BookController@store: Method completed successfully', ['bookId' => $bookId]);
-            
+
             // Ensure we have a valid book ID before redirecting
             if (empty($bookId)) {
                 Log::error('BookController@store: No bookId returned from createBook');
                 return redirect()->route('admin.books.index')->with('error', 'Book creation failed - no ID returned.');
             }
-            
+
             return redirect()->route('admin.books.edit', $bookId)->with('success', 'Book created successfully.');
         } catch (\Illuminate\Validation\ValidationException $e) {
             Log::error('Book creation validation failed', ['errors' => $e->errors(), 'input' => $request->all()]);

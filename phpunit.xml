@@ -6,6 +6,7 @@
     </testsuite>
     <testsuite name="Feature">
       <directory suffix="Test.php">./tests/Feature</directory>
+      <exclude>./tests/Feature/Api/BaseApiTest.php</exclude>
     </testsuite>
   </testsuites>
   <coverage includeUncoveredFiles="true">

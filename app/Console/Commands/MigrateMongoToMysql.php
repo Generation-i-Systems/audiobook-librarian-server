@@ -656,41 +656,17 @@ class MigrateMongoToMysql extends Command
             'duration' => $mongoBook['duration'] ?? $mongoBook['length'] ?? null,
             'publisher' => $mongoBook['publisher'] ?? $mongoBook['publisherName'] ?? null,
             'needs_review' => $mongoBook['needsReview'] ?? $mongoBook['needs_review'] ?? false,
-            'needs_review_reasons' => isset($mongoBook['needsReviewReasons'])
-                ? (is_string($mongoBook['needsReviewReasons'])
-                    ? $mongoBook['needsReviewReasons']
-                    : json_encode($mongoBook['needsReviewReasons']))
-                : null,
+            'needs_review_reasons' => isset($mongoBook['needsReviewReasons']) ? (is_string($mongoBook['needsReviewReasons']) ? $mongoBook['needsReviewReasons'] : json_encode($mongoBook['needsReviewReasons'])) : null,
             'audio_file_count' => $mongoBook['audioFileCount'] ?? $mongoBook['num_files'] ?? 0,
             'directory_path' => $mongoBook['directoryPath'] ?? $mongoBook['path'] ?? null,
 
             // JSON fields - handle both string and array input
             'mongo_record' => is_string($mongoBook) ? $mongoBook : json_encode($mongoBook, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
-            'file_tags' => !empty($mongoBook['fileTags'])
-                ? (is_string($mongoBook['fileTags'])
-                    ? $mongoBook['fileTags']
-                    : json_encode((array) $mongoBook['fileTags']))
-                : null,
-            'audible_info' => !empty($mongoBook['audible'])
-                ? (is_string($mongoBook['audible'])
-                    ? $mongoBook['audible']
-                    : json_encode((array) $mongoBook['audible']))
-                : null,
-            'google_books_info' => !empty($mongoBook['googleBooks'])
-                ? (is_string($mongoBook['googleBooks'])
-                    ? $mongoBook['googleBooks']
-                    : json_encode((array) $mongoBook['googleBooks']))
-                : null,
-            'hardcover_info' => !empty($mongoBook['hardcover'])
-                ? (is_string($mongoBook['hardcover'])
-                    ? $mongoBook['hardcover']
-                    : json_encode((array) $mongoBook['hardcover']))
-                : null,
-            'audiobook_bay_info' => !empty($mongoBook['audiobookBay'])
-                ? (is_string($mongoBook['audiobookBay'])
-                    ? $mongoBook['audiobookBay']
-                    : json_encode((array) $mongoBook['audiobookBay']))
-                : null,
+            'file_tags' => !empty($mongoBook['fileTags']) ? (is_string($mongoBook['fileTags']) ? $mongoBook['fileTags'] : json_encode((array) $mongoBook['fileTags'])) : null,
+            'audible_info' => !empty($mongoBook['audible']) ? (is_string($mongoBook['audible']) ? $mongoBook['audible'] : json_encode((array) $mongoBook['audible'])) : null,
+            'google_books_info' => !empty($mongoBook['googleBooks']) ? (is_string($mongoBook['googleBooks']) ? $mongoBook['googleBooks'] : json_encode((array) $mongoBook['googleBooks'])) : null,
+            'hardcover_info' => !empty($mongoBook['hardcover']) ? (is_string($mongoBook['hardcover']) ? $mongoBook['hardcover'] : json_encode((array) $mongoBook['hardcover'])) : null,
+            'audiobook_bay_info' => !empty($mongoBook['audiobookBay']) ? (is_string($mongoBook['audiobookBay']) ? $mongoBook['audiobookBay'] : json_encode((array) $mongoBook['audiobookBay'])) : null,
 
             // Timestamps - handle both string and Carbon instances
             'created_at' => $mongoBook['dateAdded'] ?? $mongoBook['created_at'] ?? now(),
@@ -981,9 +957,7 @@ class MigrateMongoToMysql extends Command
                 $mongoAuthorNames = [];
                 if (is_iterable($mongoAuthors)) {
                     foreach ($mongoAuthors as $author) {
-                        $name = is_array($author)
-                            ? ($author['name'] ?? null)
-                            : (is_object($author) ? ($author->name ?? null) : $author);
+                        $name = is_array($author) ? ($author['name'] ?? null) : (is_object($author) ? ($author->name ?? null) : $author);
                         if ($name) {
                             $mongoAuthorNames[] = $name;
                         }
@@ -994,9 +968,7 @@ class MigrateMongoToMysql extends Command
                 // For MySQL, extract names from the author objects/arrays
                 if (is_iterable($mysqlAuthors)) {
                     foreach ($mysqlAuthors as $author) {
-                        $name = is_array($author)
-                            ? ($author['name'] ?? null)
-                            : (is_object($author) ? ($author->name ?? null) : $author);
+                        $name = is_array($author) ? ($author['name'] ?? null) : (is_object($author) ? ($author->name ?? null) : $author);
                         if ($name) {
                             $mysqlAuthorNames[] = $name;
                         }
@@ -1047,12 +1019,8 @@ class MigrateMongoToMysql extends Command
             $mongoNarrators = $this->mongoService->searchNarratorsByName('');
             $mysqlNarrators = $mysqlService->listNarrators();
 
-            $mongoNarratorCount = is_countable($mongoNarrators)
-                ? count($mongoNarrators)
-                : 0;
-            $mysqlNarratorCount = is_countable($mysqlNarrators)
-                ? count($mysqlNarrators)
-                : 0;
+            $mongoNarratorCount = is_countable($mongoNarrators) ? count($mongoNarrators) : 0;
+            $mysqlNarratorCount = is_countable($mysqlNarrators) ? count($mysqlNarrators) : 0;
 
             $this->info("MongoDB narrators (original): $mongoNarratorCount");
             $this->info("MySQL narrators (created): $mysqlNarratorCount");
@@ -1070,12 +1038,8 @@ class MigrateMongoToMysql extends Command
                 // For MySQL, extract names from the narrator objects/arrays
                 if (is_iterable($mysqlNarrators)) {
                     foreach ($mysqlNarrators as $narrator) {
-                        $name = is_array($narrator)
-                            ? ($narrator['name'] ?? null)
-                            : (
-                                is_object($narrator)
-                                ? ($narrator->name ?? null)
-                                : $narrator
+                        $name = is_array($narrator) ? ($narrator['name'] ?? null) : (
+                                is_object($narrator) ? ($narrator->name ?? null) : $narrator
                             );
                         if ($name) {
                             $mysqlNarratorNames[] = $name;

@@ -62,8 +62,7 @@ class TestHardcoverCommand extends Command
                 $details = $hardcoverService->getBookDetails($book['id']);
 
                 if ($details) {
-                    $this->line('    Description: ' . substr($details['description'] ??
-                        'N/A', 0, 100) . '...');
+                    $this->line('    Description: ' . substr($details['description'] ?? 'N/A', 0, 100) . '...');
                     $this->line('    Pages: ' . ($details['pages'] ?? 'N/A'));
                     $this->line('    Publisher: ' . ($details['publisher']['name'] ?? 'N/A'));
                     $this->line('    Narrators: ' . implode(

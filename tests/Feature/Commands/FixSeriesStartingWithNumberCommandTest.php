@@ -7,7 +7,6 @@ namespace Tests\Feature\Commands;
 use App\Console\Commands\FixSeriesStartingWithNumberCommand;
 use App\Models\Series;
 use Illuminate\Console\Command;
-use Illuminate\Support\Collection;
 use Mockery;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -67,14 +66,12 @@ class FixSeriesStartingWithNumberCommandTest extends TestCase
         // Create a command instance with mocked methods
         $command = $this->getMockBuilder(FixSeriesStartingWithNumberCommand::class)
             ->onlyMethods(['choice'])
-            ->getMock()
-        ;
+            ->getMock();
 
         // Set expectations for the choice method
         $command->expects($this->exactly(3))
             ->method('choice')
-            ->willReturnOnConsecutiveCalls('y', 'n', '')
-        ;
+            ->willReturnOnConsecutiveCalls('y', 'n', '');
 
         // Create a reflection of the command class to test private method
         $reflectionClass = new \ReflectionClass(FixSeriesStartingWithNumberCommand::class);

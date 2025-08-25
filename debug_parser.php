@@ -25,10 +25,11 @@ $simpleStructure = [
     ]
 ];
 
-function createDirectories($basePath, $structure): void {
+function createDirectories($basePath, $structure): void
+{
     foreach ($structure as $path => $content) {
         $fullPath = $basePath . '/' . $path;
-        
+
         if (is_array($content)) {
             // It's a directory
             if (!File::exists($fullPath)) {
@@ -46,14 +47,15 @@ function createDirectories($basePath, $structure): void {
 createDirectories($testDataPath, $simpleStructure);
 
 echo "Created directory structure:\n";
-function showDirectoryStructure($path, $indent = 0): void {
+function showDirectoryStructure($path, $indent = 0): void
+{
     $files = File::files($path);
     $directories = File::directories($path);
-    
+
     foreach ($files as $file) {
         echo str_repeat('  ', $indent) . $file->getFilename() . "\n";
     }
-    
+
     foreach ($directories as $dir) {
         echo str_repeat('  ', $indent) . basename($dir) . "/\n";
         showDirectoryStructure($dir, $indent + 1);
@@ -76,7 +78,7 @@ $books = $parser->parseDirectory($testDataPath);
 
 echo "\nFound " . count($books) . " books:\n";
 foreach ($books as $book) {
-    echo "- " . ($book['title'] ?? 'Unknown') . " by " . 
+    echo "- " . ($book['title'] ?? 'Unknown') . " by " .
          (is_array($book['author'] ?? null) ? implode(', ', $book['author']) : ($book['author'] ?? 'Unknown')) . "\n";
     echo "  Path: " . ($book['directoryPath'] ?? 'Unknown') . "\n";
     echo "  Series: " . ($book['seriesName'] ?? 'None') . "\n";

@@ -6,7 +6,6 @@ use App\Models\Book;
 use App\Models\ListeningStatistic;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 use Laravel\Sanctum\Sanctum;
 

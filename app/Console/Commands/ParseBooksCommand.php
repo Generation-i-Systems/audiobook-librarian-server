@@ -254,8 +254,7 @@ class ParseBooksCommand extends Command
                             $this->info('  Audible: found and merged');
                         } else {
                             $titleQuery = $book['title'] ?? '[unknown]';
-                            $authorQuery = is_array($book['author'] ?? null) ? implode(', ', $book['author']) :
-                                ($book['author'] ?? '[unknown]');
+                            $authorQuery = is_array($book['author'] ?? null) ? implode(', ', $book['author']) : ($book['author'] ?? '[unknown]');
                             $this->info("  Audible: no match (query: '$titleQuery' by '$authorQuery')");
                         }
                     }
@@ -442,12 +441,8 @@ class ParseBooksCommand extends Command
                     }
 
                     // Then by series (case-insensitive, empty series last)
-                    $seriesA = !empty($a['seriesName'])
-                        ? strtolower($a['seriesName'])
-                        : 'zzz_no_series';
-                    $seriesB = !empty($b['seriesName'])
-                        ? strtolower($b['seriesName'])
-                        : 'zzz_no_series';
+                    $seriesA = !empty($a['seriesName']) ? strtolower($a['seriesName']) : 'zzz_no_series';
+                    $seriesB = !empty($b['seriesName']) ? strtolower($b['seriesName']) : 'zzz_no_series';
                     $cmp = strnatcasecmp($seriesA, $seriesB);
 
                     if ($cmp !== 0) {

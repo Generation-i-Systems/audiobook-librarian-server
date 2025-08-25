@@ -440,12 +440,8 @@ class AudibleApiService
 
         $itemAttributes = $item['ItemAttributes'] ?? [];
         // API has variations for editorial review
-        $editorialReview = $item['EditorialReviews']['EditorialReview']
-            ?? $item['EditorialReview']
-            ?? null;
-        $coverImageUrl = $item['LargeImage']['URL']
-            ?? $item['MediumImage']['URL']
-            ?? $item['SmallImage']['URL'] ?? null;
+        $editorialReview = $item['EditorialReviews']['EditorialReview'] ?? $item['EditorialReview'] ?? null;
+        $coverImageUrl = $item['LargeImage']['URL'] ?? $item['MediumImage']['URL'] ?? $item['SmallImage']['URL'] ?? null;
 
         $description = null;
         if (is_array($editorialReview) && isset($editorialReview['Content'])) {
@@ -487,9 +483,7 @@ class AudibleApiService
             'url' => $item['DetailPageURL'] ?? null,
             'language' => $itemAttributes['Languages']['Language'][0]['Name'] ?? ($itemAttributes['Language'] ?? null),
             'format' => 'Audible Audiobook',
-            'series' => (isset($itemAttributes['SeriesSequence']) && !empty($itemAttributes['SeriesSequence']))
-                ? [['name' => $itemAttributes['Title'] ?? 'N/A', 'part' => $itemAttributes['SeriesSequence']]]
-                : [],
+            'series' => (isset($itemAttributes['SeriesSequence']) && !empty($itemAttributes['SeriesSequence'])) ? [['name' => $itemAttributes['Title'] ?? 'N/A', 'part' => $itemAttributes['SeriesSequence']]] : [],
             'tags' => [], // Audible API doesn't directly provide tags like user tags
             'sourceApi' => 'Audible',
             'rawResponse' => $item, // Optionally include for debugging or further processing

@@ -487,9 +487,7 @@ class ApiServiceClient extends Command
 
                 // Show content type if available
                 if (isset($response['headers']['content-type'])) {
-                    $contentType = is_array($response['headers']['content-type'])
-                        ? $response['headers']['content-type'][0]
-                        : $response['headers']['content-type'];
+                    $contentType = is_array($response['headers']['content-type']) ? $response['headers']['content-type'][0] : $response['headers']['content-type'];
                     $this->info("Content-Type: {$contentType}");
                 }
             } else {

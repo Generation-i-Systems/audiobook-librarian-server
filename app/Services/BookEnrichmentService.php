@@ -283,18 +283,16 @@ class BookEnrichmentService
 
         // Validate author consistency if both exist
         if (!empty($originalMetadata['author']) && !empty($enrichedData['author'])) {
-            $originalAuthors = is_array($originalMetadata['author'])
-                ? $originalMetadata['author']
-                : [$originalMetadata['author']];
-            $enrichedAuthors = is_array($enrichedData['author'])
-                ? $enrichedData['author']
-                : [$enrichedData['author']];
+            $originalAuthors = is_array($originalMetadata['author']) ? $originalMetadata['author'] : [$originalMetadata['author']];
+            $enrichedAuthors = is_array($enrichedData['author']) ? $enrichedData['author'] : [$enrichedData['author']];
 
             $hasMatchingAuthor = false;
             foreach ($originalAuthors as $originalAuthor) {
                 foreach ($enrichedAuthors as $enrichedAuthor) {
-                    if (stripos($originalAuthor, $enrichedAuthor) !== false ||
-                        stripos($enrichedAuthor, $originalAuthor) !== false) {
+                    if (
+                        stripos($originalAuthor, $enrichedAuthor) !== false ||
+                        stripos($enrichedAuthor, $originalAuthor) !== false
+                    ) {
                         $hasMatchingAuthor = true;
                         break 2;
                     }
@@ -430,8 +428,10 @@ class BookEnrichmentService
     {
         $sourcePath = $metadata['source_path'] ?? '';
 
-        if (stripos($sourcePath, 'graphicaudio') !== false ||
-            (isset($metadata['narrator']) && stripos($metadata['narrator'], 'full cast') !== false)) {
+        if (
+            stripos($sourcePath, 'graphicaudio') !== false ||
+            (isset($metadata['narrator']) && stripos($metadata['narrator'], 'full cast') !== false)
+        ) {
             if (stripos($title, 'GraphicAudio') === false) {
                 return $title . ' (GraphicAudio)';
             }

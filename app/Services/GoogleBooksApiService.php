@@ -60,9 +60,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
             }
             if (!empty($inputAuthor) && !empty($result['authors'])) {
                 foreach ($result['authors'] as $authorObj) {
-                    $authorName = is_array($authorObj['author'] ?? null)
-                        ? $authorObj['author']['name'] ?? ''
-                        : ($authorObj['author'] ?? '');
+                    $authorName = is_array($authorObj['author'] ?? null) ? $authorObj['author']['name'] ?? '' : ($authorObj['author'] ?? '');
                     if ($authorName && stripos($authorName, $inputAuthor) !== false) {
                         $score += 2;
                         break;

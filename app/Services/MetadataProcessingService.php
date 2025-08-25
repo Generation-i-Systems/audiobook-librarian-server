@@ -38,8 +38,10 @@ class MetadataProcessingService
             $fileTags = [];
             if (!empty($audiobook['files'])) {
                 foreach ($audiobook['files'] as $file) {
-                    if (pathinfo($file, PATHINFO_EXTENSION) === 'm4b' ||
-                        pathinfo($file, PATHINFO_EXTENSION) === 'mp3') {
+                    if (
+                        pathinfo($file, PATHINFO_EXTENSION) === 'm4b' ||
+                        pathinfo($file, PATHINFO_EXTENSION) === 'mp3'
+                    ) {
                         $tags = $this->aiProcessor->extractFileTags($file);
                         if (!empty($tags)) {
                             $fileTags = array_merge($fileTags, $tags);

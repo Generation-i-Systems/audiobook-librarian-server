@@ -93,9 +93,7 @@ class AuthController extends Controller
         $lookupValue = $request->input($lookupBy);
         Log::debug('Auth login lookup', ['by' => $lookupBy, 'value' => $lookupValue]);
 
-        $user = $request->filled('email')
-            ? $this->documentStoreService->getUserByEmail($request->input('email'))
-            : $this->documentStoreService->getUserByUsername($request->input('username'));
+        $user = $request->filled('email') ? $this->documentStoreService->getUserByEmail($request->input('email')) : $this->documentStoreService->getUserByUsername($request->input('username'));
 
         Log::debug('Auth login user fetched', [
             'found' => (bool) $user,

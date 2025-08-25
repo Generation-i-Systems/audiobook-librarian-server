@@ -265,22 +265,16 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
             'published_date' => $details['published_date'] ?? null,
             'publisher' => $details['publisher'] ?? null,
             'coverImageUrl' => $details['coverImageUrl'] ?? $details['cover_image_url'] ?? null,
-            'categories' => $this->formatCategories($details['categories'] ??
-                ($details['metadata']['categories'] ?? [])),
+            'categories' => $this->formatCategories($details['categories'] ?? ($details['metadata']['categories'] ?? [])),
             'language' => $details['language'] ?? null,
-            'series' => (!empty($details['series']['name'])) ?
-                ($details['series']['name'] . (!empty($details['series']['number']) ?
-                    ' #' . $details['series']['number'] : '')) :
-                null,
+            'series' => (!empty($details['series']['name'])) ? ($details['series']['name'] . (!empty($details['series']['number']) ? ' #' . $details['series']['number'] : '')) : null,
             'seriesNumber' => $details['series']['number'] ?? null,
-            'durationSeconds' => $this->parseDuration($details['metadata']['duration'] ??
-                $details['duration'] ?? null),
+            'durationSeconds' => $this->parseDuration($details['metadata']['duration'] ?? $details['duration'] ?? null),
             'metadata' => array_merge(
                 $details['metadata'] ?? [],
                 [
                     'source' => 'AudiobookBay',
-                    'url' => $details['url'] ??
-                        null,
+                    'url' => $details['url'] ?? null,
                 ]
             ),
         ];

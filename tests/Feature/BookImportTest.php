@@ -87,8 +87,7 @@ class BookImportTest extends TestCase
 
         $this->documentStore->expects($this->once())
             ->method('createBook')
-            ->willReturn('some-book-id')
-        ;
+            ->willReturn('some-book-id');
 
         // Import the book
         $bookId = $this->importBookFromPath($bookData);

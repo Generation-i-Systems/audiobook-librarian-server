@@ -14,7 +14,8 @@ use Illuminate\Support\Facades\Facade;
 
 class BookControllerIndexTest extends TestCase
 {
-    use RefreshDatabase, WithFaker;
+    use RefreshDatabase;
+    use WithFaker;
 
     protected $user;
     protected $mockDocumentStoreService;

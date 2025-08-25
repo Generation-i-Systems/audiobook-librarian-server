@@ -142,7 +142,16 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
      */
     public function getServiceName(): string
     {
-        return 'hardcover';
+        return 'Hardcover';
+    }
+
+    /**
+     * {@inheritDoc}
+     * Override to propagate null on failure for Feature tests expectations.
+     */
+    public function searchBooks(string $query, array $options = []): ?array
+    {
+        return $this->performSearch($query, $options);
     }
 
     /**
@@ -196,6 +205,11 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
         ]);
 
         $result = $this->makeRequest($query, $variables);
+
+        if ($result === null) {
+            // API call failed
+            return null;
+        }
 
         \Illuminate\Support\Facades\Log::debug('Search request result', [
             'result' => $result,
@@ -352,28 +366,25 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
     }
 
     /**
-}
-
-// Check if the service is available
-public function isAvailable(): bool
-{
-    return !empty($this->apiToken) && !empty($this->apiUrl);
-}
-
-/**
-     * Search books by title (public API)
+     * Format genres to a consistent structure
      */
-    public function searchBooks(string $title, array $options = []): ?array
+    protected function formatGenres(array $genres): array
     {
-        return $this->performSearch($title, $options);
+        return array_map(function ($g) {
+            if (isset($g['genre'])) {
+                return ['genre' => ['name' => $g['genre']['name'] ?? 'Unknown']];
+            }
+            // already normalized or name-only
+            return ['genre' => ['name' => $g['name'] ?? 'Unknown']];
+        }, $genres);
     }
 
     /**
-     * Get book details by ID (public API)
+     * Override availability check to validate configuration
      */
-    public function getBookDetails(string $id): ?array
+    public function isAvailable(): bool
     {
-        return $this->performGetBookDetails($id);
+        return !empty($this->apiToken) && !empty($this->apiUrl);
     }
 
     /**
@@ -406,5 +417,42 @@ public function isAvailable(): bool
         ]);
 
         return $result['data']['books'] ?? null;
+    }
+
+    /**
+     * Download a cover image for a book to the specified directory and basename.
+     */
+    public function downloadCoverImage(string $imageUrl, string $directoryPath, string $targetBasename): ?string
+    {
+        try {
+            if (empty($imageUrl)) {
+                return null;
+            }
+
+            if (!is_dir($directoryPath)) {
+                if (!mkdir($directoryPath, 0775, true) && !is_dir($directoryPath)) {
+                    return null;
+                }
+            }
+
+            $ext = pathinfo(parse_url($imageUrl, PHP_URL_PATH) ?? '', PATHINFO_EXTENSION) ?: 'jpg';
+            $targetPath = rtrim($directoryPath, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $targetBasename . '.' . $ext;
+
+            $response = Http::timeout(20)->get($imageUrl);
+            if (!$response->successful()) {
+                return null;
+            }
+
+            file_put_contents($targetPath, $response->body());
+
+            return $targetPath;
+        } catch (\Throwable $e) {
+            Log::warning('downloadCoverImage failed', [
+                'url' => $imageUrl,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 }

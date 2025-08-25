@@ -11,7 +11,7 @@ use Tests\TestCase;
 class BookApiGenreArrayTest extends TestCase
 {
     use RefreshDatabase;
-    
+
     protected string $token;
 
     protected function setUp(): void

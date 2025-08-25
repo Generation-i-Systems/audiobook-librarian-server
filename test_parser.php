@@ -21,14 +21,15 @@ if (!File::exists($testDataPath)) {
 }
 
 // Show directory structure
-function showDirectoryStructure($path, $indent = 0) {
+function showDirectoryStructure($path, $indent = 0)
+{
     $files = File::files($path);
     $directories = File::directories($path);
-    
+
     foreach ($files as $file) {
         echo str_repeat('  ', $indent) . $file->getFilename() . "\n";
     }
-    
+
     foreach ($directories as $dir) {
         echo str_repeat('  ', $indent) . basename($dir) . "/\n";
         showDirectoryStructure($dir, $indent + 1);
@@ -44,7 +45,7 @@ $books = $parser->parseDirectory($testDataPath);
 
 echo "\nFound " . count($books) . " books:\n";
 foreach ($books as $book) {
-    echo "- " . ($book['title'] ?? 'Unknown') . " by " . 
+    echo "- " . ($book['title'] ?? 'Unknown') . " by " .
          (is_array($book['author'] ?? null) ? implode(', ', $book['author']) : ($book['author'] ?? 'Unknown')) . "\n";
     echo "  Path: " . ($book['directoryPath'] ?? 'Unknown') . "\n";
     echo "  Series: " . ($book['seriesName'] ?? 'None') . "\n";

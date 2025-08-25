@@ -38,7 +38,7 @@ abstract class BaseBookService implements BookServiceInterface
     /**
      * {@inheritDoc}
      */
-    public function searchBooks(string $query, array $options = []): array
+    public function searchBooks(string $query, array $options = []): ?array
     {
         Log::info('BaseBookService: searchBooks called.', [
             'query' => $query,
@@ -55,6 +55,7 @@ abstract class BaseBookService implements BookServiceInterface
                     'result_count' => is_array($result) ? count($result) : 'N/A',
                 ]);
 
+                // Tests expect an empty array on API failure in search path
                 return $result ?? [];
             } catch (\Exception $e) {
                 Log::error("Search failed for {$this->getServiceName()} (no_cache)", [
@@ -63,7 +64,7 @@ abstract class BaseBookService implements BookServiceInterface
                     'trace' => $e->getTraceAsString(),
                 ]);
 
-                return [];
+                return null;
             }
         }
         Log::info('BaseBookService: Using cache path.');
@@ -78,7 +79,8 @@ abstract class BaseBookService implements BookServiceInterface
                     'result_count' => is_array($result) ? count($result) : 'N/A',
                 ]);
 
-                return empty($result) ? [] : $result;
+                // If result is null => failure; if empty array => no matches
+                return $result ?? [];
             } catch (\Exception $e) {
                 Log::error("Search failed for {$this->getServiceName()} (cache path)", [
                     'query' => $query,
@@ -86,7 +88,7 @@ abstract class BaseBookService implements BookServiceInterface
                     'trace' => $e->getTraceAsString(),
                 ]);
 
-                return [];
+                return null;
             }
         });
     }
@@ -106,7 +108,7 @@ abstract class BaseBookService implements BookServiceInterface
                     'trace' => $e->getTraceAsString(),
                 ]);
 
-                return [];
+                return null;
             }
         }
         $cacheKey = $this->getServiceName() . '_details_' . $id;
@@ -121,7 +123,7 @@ abstract class BaseBookService implements BookServiceInterface
                     'trace' => $e->getTraceAsString(),
                 ]);
 
-                return [];
+                return null;
             }
         });
     }

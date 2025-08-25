@@ -243,9 +243,7 @@ class HardcoverApiTest extends TestCase
     #[Test]
     public function test_get_service_name(): void
     {
-        $this->assertEquals('hardcover', method_exists($this->hardcoverApiService, 'getServiceName')
-            ? $this->hardcoverApiService->getServiceName()
-            : 'hardcover');
+        $this->assertEquals('hardcover', method_exists($this->hardcoverApiService, 'getServiceName') ? $this->hardcoverApiService->getServiceName() : 'hardcover');
     }
 
     protected function getMockSearchResponse(): array

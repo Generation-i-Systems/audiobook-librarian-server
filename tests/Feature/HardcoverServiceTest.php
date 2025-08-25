@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Services\HardcoverService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class HardcoverServiceTest extends TestCase

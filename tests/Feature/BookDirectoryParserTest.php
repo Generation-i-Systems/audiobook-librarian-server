@@ -155,8 +155,7 @@ class BookDirectoryParserTest extends TestCase
             ->filter(fn ($book) => str_contains($book['seriesName'] ?? '', 'Lord of the Rings'))
             ->sortBy('seriesNumber')
             ->values()
-            ->all()
-        ;
+            ->all();
 
         // Parser currently treats directory as single book, not individual files
         if (count($lotrBooks) !== 3) {
@@ -173,12 +172,12 @@ class BookDirectoryParserTest extends TestCase
         $books = $this->parser->parseDirectory($this->testDataPath);
 
         $rhythmOfWar = collect($books)->first(fn ($book) => str_contains($book['title'] ?? '', 'Rhythm of War'));
-        
+
         if ($rhythmOfWar === null) {
             // If the specific book isn't found, skip this test until parser behavior is fixed
             $this->markTestSkipped('Parser behavior needs to be fixed to extract individual book titles from filenames');
         }
-        
+
         $this->assertEquals('Graphic Audio', $rhythmOfWar['edition']);
     }
 }

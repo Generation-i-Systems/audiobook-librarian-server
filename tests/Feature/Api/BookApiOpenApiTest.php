@@ -4,7 +4,6 @@ namespace Tests\Feature\Api;
 
 use Tests\TestCase;
 use App\Contracts\DocumentStoreServiceInterface;
-use Illuminate\Support\Facades\Artisan;
 use App\Models\User;
 use App\Models\Book;
 use Mockery\MockInterface;
@@ -114,7 +113,7 @@ class BookApiOpenApiTest extends TestCase
             }
             $this->assertIsInt($book['file_count']);
             $this->assertIsInt($book['total_size'] ?? 0);
-            // Timestamps can be in Z format or +00:00 format  
+            // Timestamps can be in Z format or +00:00 format
             $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|\+00:00)$/', $book['created_at'] ?? ''); // ISO 8601
             $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|\+00:00)$/', $book['updated_at'] ?? ''); // ISO 8601
         }

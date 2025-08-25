@@ -111,8 +111,10 @@ class FixDuplicateDirectoryPathsCommand extends Command
                             $titlePart = $matches[1];
 
                             // Check if the title part matches the book title
-                            if (stripos($book->title, $titlePart) !== false ||
-                                stripos($titlePart, $book->title) !== false) {
+                            if (
+                                stripos($book->title, $titlePart) !== false ||
+                                stripos($titlePart, $book->title) !== false
+                            ) {
                                 $potentialPaths[] = $directoryPath . '/' . $subdirName;
                             }
                         }
@@ -151,9 +153,11 @@ class FixDuplicateDirectoryPathsCommand extends Command
                                     // Check if the subdirectory title part matches the book title
                                     // Use more flexible matching to catch variations
                                     $sanitizedTitle = $this->sanitizeForPath($title);
-                                    if (stripos($sanitizedBookTitle, $sanitizedTitle) !== false ||
+                                    if (
+                                        stripos($sanitizedBookTitle, $sanitizedTitle) !== false ||
                                         stripos($sanitizedTitle, $sanitizedBookTitle) !== false ||
-                                        similar_text($sanitizedBookTitle, $sanitizedTitle) > min(strlen($sanitizedBookTitle), strlen($sanitizedTitle)) * 0.7) {
+                                        similar_text($sanitizedBookTitle, $sanitizedTitle) > min(strlen($sanitizedBookTitle), strlen($sanitizedTitle)) * 0.7
+                                    ) {
                                         $this->info(sprintf('Found matching subdirectory with narrator: %s', $subdirName));
                                         $betterPath = sprintf('%s/%s', $directoryPath, $subdirName);
                                         break;
@@ -161,9 +165,11 @@ class FixDuplicateDirectoryPathsCommand extends Command
                                 } else {
                                     // Also check for direct title match without narrator pattern
                                     $sanitizedSubdirName = $this->sanitizeForPath($subdirName);
-                                    if (stripos($sanitizedBookTitle, $sanitizedSubdirName) !== false ||
+                                    if (
+                                        stripos($sanitizedBookTitle, $sanitizedSubdirName) !== false ||
                                         stripos($sanitizedSubdirName, $sanitizedBookTitle) !== false ||
-                                        similar_text($sanitizedBookTitle, $sanitizedSubdirName) > min(strlen($sanitizedBookTitle), strlen($sanitizedSubdirName)) * 0.7) {
+                                        similar_text($sanitizedBookTitle, $sanitizedSubdirName) > min(strlen($sanitizedBookTitle), strlen($sanitizedSubdirName)) * 0.7
+                                    ) {
                                         $this->info(sprintf('Found matching subdirectory: %s', $subdirName));
                                         $betterPath = sprintf('%s/%s', $directoryPath, $subdirName);
                                         break;

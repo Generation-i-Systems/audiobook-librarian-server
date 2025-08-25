@@ -1,5 +1,6 @@
 // Mock the loadDirectoryFiles function
-function loadDirectoryFiles($container) {
+function loadDirectoryFiles($container)
+{
     const dirPath = $container.find('#directoryPath').val();
     const filesList = $container.find('#directory-files-list');
     const $viewFilesBtn = $container.find('#show-files-link');
@@ -24,9 +25,12 @@ function loadDirectoryFiles($container) {
             const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(filename);
             const isAudio = /\.(mp3|m4b|m4a|ogg|wav|flac)$/i.test(filename);
             let icon = '📄';
-            if (isImage) icon = '🖼️';
-            else if (isAudio) icon = '🔊';
-            html += `<div class="list-group-item">${icon} ${filename}</div>`;
+            if (isImage) {
+                icon = '🖼️';
+            } else if (isAudio) {
+                icon = '🔊';
+            }
+            html += ` < div class = "list-group-item" > ${icon} ${filename} < / div > `;
         });
         html += '</div>';
 
@@ -36,18 +40,19 @@ function loadDirectoryFiles($container) {
 }
 
 // Mock autocomplete functionality
-function initializeAutocomplete($container) {
+function initializeAutocomplete($container)
+{
     // Mock author autocomplete
     $container.find('.author-autocomplete').autocomplete({
-        source: function(request, response) {
+        source: function (request, response) {
             const mockAuthors = [
                 'Stephen King',
                 'J.K. Rowling',
                 'George R.R. Martin',
                 'Agatha Christie',
                 'J.R.R. Tolkien'
-            ].filter(author =>
-                author.toLowerCase().includes(request.term.toLowerCase())
+            ].filter(
+                author => author.toLowerCase().includes(request.term.toLowerCase())
             );
             response(mockAuthors);
         },
@@ -56,15 +61,15 @@ function initializeAutocomplete($container) {
 
     // Mock series autocomplete
     $container.find('.series-autocomplete').autocomplete({
-        source: function(request, response) {
+        source: function (request, response) {
             const mockSeries = [
                 'Harry Potter',
                 'A Song of Ice and Fire',
                 'The Lord of the Rings',
                 'The Dark Tower',
                 'Sherlock Holmes'
-            ].filter(series =>
-                series.toLowerCase().includes(request.term.toLowerCase())
+            ].filter(
+                series => series.toLowerCase().includes(request.term.toLowerCase())
             );
             response(mockSeries);
         },
@@ -73,9 +78,10 @@ function initializeAutocomplete($container) {
 }
 
 // Initialize the form
-function initBookForm($container) {
+function initBookForm($container)
+{
     // Directory files loading
-    $container.off('click', '#show-files-link').on('click', '#show-files-link', function(e) {
+    $container.off('click', '#show-files-link').on('click', '#show-files-link', function (e) {
         e.preventDefault();
         loadDirectoryFiles($container);
     });
@@ -84,39 +90,28 @@ function initBookForm($container) {
     initializeAutocomplete($container);
 
     // Add author row
-    $container.off('click', '.add-author-row').on('click', '.add-author-row', function(e) {
+    $container.off('click', '.add-author-row').on('click', '.add-author-row', function (e) {
         e.preventDefault();
         const $authorsGroup = $container.find('#authors-group');
-        const newRow = `
-            <div class="author-row mb-2 d-flex align-items-center">
-                <input type="text" class="form-control author-autocomplete" name="authors[]" placeholder="Author name">
-                <button type="button" class="btn btn-outline-danger btn-sm ms-2 remove-author">&times;</button>
-            </div>
-        `;
+        const newRow = ` < div class = "author-row mb-2 d-flex align-items-center" > < input type = "text" class = "form-control author-autocomplete" name = "authors[]" placeholder = "Author name" > < button type = "button" class = "btn btn-outline-danger btn-sm ms-2 remove-author" > & times; < / button > < / div > `;
         $authorsGroup.append(newRow);
     });
 
     // Remove author row
-    $container.on('click', '.remove-author', function() {
+    $container.on('click', '.remove-author', function () {
         $(this).closest('.author-row').remove();
     });
 
     // Add series row
-    $container.off('click', '.add-series-row').on('click', '.add-series-row', function(e) {
+    $container.off('click', '.add-series-row').on('click', '.add-series-row', function (e) {
         e.preventDefault();
         const $seriesGroup = $container.find('#series-group');
-        const newRow = `
-            <div class="series-row mb-2 d-flex align-items-center">
-                <input type="text" class="form-control series-autocomplete me-2" name="series_names[]" placeholder="Series name">
-                <input type="number" class="form-control me-2" name="series_numbers[]" placeholder="Book #" min="1" step="1">
-                <button type="button" class="btn btn-outline-danger btn-sm remove-series">&times;</button>
-            </div>
-        `;
+        const newRow = ` < div class = "series-row mb-2 d-flex align-items-center" > < input type = "text" class = "form-control series-autocomplete me-2" name = "series_names[]" placeholder = "Series name" > < input type = "number" class = "form-control me-2" name = "series_numbers[]" placeholder = "Book #" min = "1" step = "1" > < button type = "button" class = "btn btn-outline-danger btn-sm remove-series" > & times; < / button > < / div > `;
         $seriesGroup.append(newRow);
     });
 
     // Remove series row
-    $container.on('click', '.remove-series', function() {
+    $container.on('click', '.remove-series', function () {
         $(this).closest('.series-row').remove();
     });
 }
@@ -137,82 +132,10 @@ if (typeof window !== 'undefined') {
 
 // Helper function to create form HTML with optional modal wrapper
 const createFormHtml = (isModal = false) => {
-    const formHtml = `
-        <form id="book-form" ${isModal ? 'data-modal-form="true"' : ''}>
-            <!-- Directory Path -->
-            <div class="form-group">
-                <label for="directoryPath">Directory Path</label>
-                <div class="input-group">
-                    <input type="text" id="directoryPath" class="form-control">
-                    <a href="#" id="showFilesLink">
-                        <i class="fas fa-folder-open me-1"></i>View Directory Files
-                    </a>
-                </div>
-                <div id="directory-files-list" style="display:none;"></div>
-            </div>
-
-            <!-- Authors -->
-            <div class="form-group">
-                <label>Authors</label>
-                <div id="authors-group">
-                    <div class="author-row mb-2 d-flex align-items-center">
-                        <input type="text" class="form-control author-autocomplete" name="authors[]" placeholder="Author name">
-                        <button type="button" class="btn btn-outline-success btn-sm ms-2 add-author-row">+</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Series -->
-            <div class="form-group">
-                <label>Series</label>
-                <div id="series-group">
-                    <div class="series-row mb-2 d-flex align-items-center">
-                        <input type="text" class="form-control series-autocomplete me-2" name="series_names[]" placeholder="Series name">
-                        <input type="number" class="form-control me-2" name="series_numbers[]" placeholder="Book #" min="1" step="1" style="width: 80px;">
-                        <button type="button" class="btn btn-outline-success btn-sm add-series-row">+</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Other form fields -->
-            <div class="form-group">
-                <label for="title">Title</label>
-                <input type="text" id="title" name="title" class="form-control" placeholder="Book Title">
-            </div>
-
-            <div class="form-group">
-                <label for="description">Description</label>
-                <textarea id="description" name="description" class="form-control" rows="4" placeholder="Book Description"></textarea>
-            </div>
-
-            <div class="form-group">
-                <label for="release_date">Release Date</label>
-                <input type="date" id="release_date" name="release_date" class="form-control">
-            </div>
-
-            <button type="submit" class="btn btn-primary">Save Book</button>
-        </form>
-    `;
+    const formHtml = ` < form id = "book-form" ${isModal ? 'data-modal-form="true"' : ''} > < !--Directory Path-- > < div class = "form-group" > < label for = "directoryPath" > Directory Path < / label > < div class = "input-group" > < input type = "text" id = "directoryPath" class = "form-control" > < a href = "#" id = "showFilesLink" > < i class = "fas fa-folder-open me-1" > < / i > View Directory Files < / a > < / div > < div id = "directory-files-list" style = "display:none;" > < / div > < / div > < !--Authors-- > < div class = "form-group" > < label > Authors < / label > < div id = "authors-group" > < div class = "author-row mb-2 d-flex align-items-center" > < input type = "text" class = "form-control author-autocomplete" name = "authors[]" placeholder = "Author name" > < button type = "button" class = "btn btn-outline-success btn-sm ms-2 add-author-row" > + < / button > < / div > < / div > < / div > < !--Series-- > < div class = "form-group" > < label > Series < / label > < div id = "series-group" > < div class = "series-row mb-2 d-flex align-items-center" > < input type = "text" class = "form-control series-autocomplete me-2" name = "series_names[]" placeholder = "Series name" > < input type = "number" class = "form-control me-2" name = "series_numbers[]" placeholder = "Book #" min = "1" step = "1" style = "width: 80px;" > < button type = "button" class = "btn btn-outline-success btn-sm add-series-row" > + < / button > < / div > < / div > < / div > < !--Other form fields-- > < div class = "form-group" > < label for = "title" > Title < / label > < input type = "text" id = "title" name = "title" class = "form-control" placeholder = "Book Title" > < / div > < div class = "form-group" > < label for = "description" > Description < / label > < textarea id = "description" name = "description" class = "form-control" rows = "4" placeholder = "Book Description" > < / textarea > < / div > < div class = "form-group" > < label for = "release_date" > Release Date < / label > < input type = "date" id = "release_date" name = "release_date" class = "form-control" > < / div > < button type = "submit" class = "btn btn-primary" > Save Book < / button > < / form > `;
 
     if (isModal) {
-        return `
-            <div class="modal fade" id="bookModal" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">${isModal === 'edit' ? 'Edit Book' : 'Add New Book'}</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body">
-                            ${formHtml}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#bookModal">
-                Open Modal
-            </button>
-        `;
+        return ` < div class = "modal fade" id = "bookModal" tabindex = "-1" aria - hidden = "true" > < div class = "modal-dialog" > < div class = "modal-content" > < div class = "modal-header" > < h5 class = "modal-title" > ${isModal === 'edit' ? 'Edit Book' : 'Add New Book'} < / h5 > < button type = "button" class = "btn-close" data - bs - dismiss = "modal" aria - label = "Close" > < / button > < / div > < div class = "modal-body" > ${formHtml} < / div > < / div > < / div > < / div > < button type = "button" class = "btn btn-primary" data - bs - toggle = "modal" data - bs - target = "#bookModal" > Open Modal < / button > `;
     }
 
     return formHtml;
@@ -229,13 +152,13 @@ describe('Book Form', () => {
         global.jQuery = $;
 
         // Mock jQuery UI autocomplete
-        $.fn.autocomplete = function(options) {
+        $.fn.autocomplete = function (options) {
             if (typeof options === 'string') {
                 // Handle method calls like 'search'
                 return this;
             }
             // Store options for later use
-            this.each(function() {
+            this.each(function () {
                 $(this).data('ui-autocomplete', { options: options });
             });
             return this;
@@ -245,9 +168,9 @@ describe('Book Form', () => {
         const Modal = jest.fn();
         Modal.prototype.show = jest.fn();
         Modal.prototype.hide = jest.fn();
-        $.fn.modal = function(method) {
+        $.fn.modal = function (method) {
             if (method === 'show' || method === 'hide') {
-                return this.each(function() {
+                return this.each(function () {
                     // Call the corresponding method if it exists
                     if (method === 'show') {
                         $(this).addClass('show').css('display', 'block');
@@ -381,27 +304,21 @@ describe('Book Form', () => {
 
         test('should filter files by type when filter is applied', (done) => {
             // Add a filter button to the test DOM
-            $('body').append(`
-                <div class="btn-group mb-3" role="group">
-                    <button type="button" class="btn btn-outline-secondary active" data-filter="all">All</button>
-                    <button type="button" class="btn btn-outline-secondary" data-filter="audio">Audio</button>
-                    <button type="button" class="btn btn-outline-secondary" data-filter="image">Images</button>
-                </div>
-            `);
+            $('body').append(` < div class = "btn-group mb-3" role = "group" > < button type = "button" class = "btn btn-outline-secondary active" data - filter = "all" > All < / button > < button type = "button" class = "btn btn-outline-secondary" data - filter = "audio" > Audio < / button > < button type = "button" class = "btn btn-outline-secondary" data - filter = "image" > Images < / button > < / div > `);
 
             // Initialize the filter functionality
-            $('[data-filter]').on('click', function() {
+            $('[data-filter]').on('click', function () {
                 const filter = $(this).data('filter');
                 $('[data-filter]').removeClass('active');
                 $(this).addClass('active');
 
                 // Simulate filtering (actual implementation would filter the displayed items)
                 if (filter === 'audio') {
-                    $('.list-group-item').hide().filter(function() {
+                    $('.list-group-item').hide().filter(function () {
                         return $(this).data('type') === 'audio';
                     }).show();
                 } else if (filter === 'image') {
-                    $('.list-group-item').hide().filter(function() {
+                    $('.list-group-item').hide().filter(function () {
                         return $(this).data('type') === 'image';
                     }).show();
                 } else {
@@ -471,7 +388,7 @@ describe('Book Form', () => {
             let formSubmitted = false;
             let responseData = null;
 
-            $('#book-form').on('submit', function(e) {
+            $('#book-form').on('submit', function (e) {
                 e.preventDefault();
                 formSubmitted = true;
 
@@ -480,7 +397,7 @@ describe('Book Form', () => {
                     url: '/admin/books',
                     type: 'POST',
                     data: $(this).serialize(),
-                    success: function(data) {
+                    success: function (data) {
                         responseData = data;
                         // Show success message
                         $('<div class="alert alert-success">' + data.message + '</div>').insertBefore('#book-form');
@@ -506,7 +423,7 @@ describe('Book Form', () => {
         test('should update an existing book', (done) => {
             // Set up form with existing book data
             const bookId = 'existing-book-123';
-            $('body').append(`<input type="hidden" name="id" value="${bookId}">`);
+            $('body').append(` < input type = "hidden" name = "id" value = "${bookId}" > `);
 
             // Fill in form data
             $('#title').val('Updated Book Title');
@@ -518,16 +435,16 @@ describe('Book Form', () => {
             let formSubmitted = false;
             let responseData = null;
 
-            $('#book-form').on('submit', function(e) {
+            $('#book-form').on('submit', function (e) {
                 e.preventDefault();
                 formSubmitted = true;
 
                 // Simulate AJAX success
                 $.ajax({
-                    url: `/admin/books/${bookId}`,
+                    url: ` / admin / books / ${bookId}`,
                     type: 'PUT',
                     data: $(this).serialize(),
-                    success: function(data) {
+                    success: function (data) {
                         responseData = data;
                         // Show success message
                         $('<div class="alert alert-success">' + data.message + '</div>').insertBefore('#book-form');
@@ -567,7 +484,7 @@ describe('Book Form', () => {
             });
 
             // Submit empty form
-            $('#book-form').on('submit', function(e) {
+            $('#book-form').on('submit', function (e) {
                 e.preventDefault();
 
                 // Simulate AJAX call
@@ -575,12 +492,12 @@ describe('Book Form', () => {
                     url: '/admin/books',
                     type: 'POST',
                     data: $(this).serialize(),
-                    error: function(xhr) {
+                    error: function (xhr) {
                         // Show validation errors
                         const errors = xhr.responseJSON.errors;
                         for (const field in errors) {
                             $(`#${field}`).addClass('is-invalid');
-                            $(`<div class="invalid-feedback">${errors[field][0]}</div>`).insertAfter(`#${field}`);
+                            $(` < div class = "invalid-feedback" > ${errors[field][0]} < / div > `).insertAfter(`#${field}`);
                         }
                     }
                 });
@@ -612,8 +529,8 @@ describe('Book Form', () => {
 
             // Mock the source function
             const originalSource = autocomplete.options.source;
-            autocomplete.options.source = function(request, response) {
-                originalSource.call(this, request, function(items) {
+            autocomplete.options.source = function (request, response) {
+                originalSource.call(this, request, function (items) {
                     expect(Array.isArray(items)).toBe(true);
                     if (request.term.toLowerCase() === 'king') {
                         expect(items).toContain('Stephen King');
@@ -650,8 +567,8 @@ describe('Book Form', () => {
 
             // Mock the source function
             const originalSource = autocomplete.options.source;
-            autocomplete.options.source = function(request, response) {
-                originalSource.call(this, request, function(items) {
+            autocomplete.options.source = function (request, response) {
+                originalSource.call(this, request, function (items) {
                     expect(Array.isArray(items)).toBe(true);
                     if (request.term.toLowerCase() === 'harry') {
                         expect(items).toContain('Harry Potter');
@@ -683,7 +600,7 @@ describe('Book Form', () => {
 
             // Mock form submission
             let formSubmitted = false;
-            $('#book-form').on('submit', function(e) {
+            $('#book-form').on('submit', function (e) {
                 e.preventDefault();
                 formSubmitted = true;
             });
@@ -709,7 +626,7 @@ describe('Book Form', () => {
             let formSubmitted = false;
             let formData = null;
 
-            $('#book-form').on('submit', function(e) {
+            $('#book-form').on('submit', function (e) {
                 e.preventDefault();
                 formSubmitted = true;
                 formData = $(this).serializeArray();

@@ -225,7 +225,8 @@ class AudibleService extends BaseBookService
                 ]
             );
 
-            return null;
+            // Tests expect an array (empty) to indicate no results on API failure
+            return [];
         }
 
         $products = $response->json()['products'] ?? [];
@@ -380,10 +381,7 @@ class AudibleService extends BaseBookService
         }
 
         // Cover image: Check common locations from 'media' or 'product_images' response groups
-        $coverUrl = $book['media']['source_url'] ??
-            $book['product_images']['500'] ??
-            $book['media']['image']['url'] ??
-            $book['image_url'] ?? // A common fallback key
+        $coverUrl = $book['media']['source_url'] ?? $book['product_images']['500'] ?? $book['media']['image']['url'] ?? $book['image_url'] ?? // A common fallback key
             null;
 
         // Format series data as {seriesName: seriesNumber}
@@ -442,7 +440,7 @@ class AudibleService extends BaseBookService
         } else {
             $result['author'] = [];
         }
-        
+
         // Set authors field with structured data
         $result['authors'] = $authorsData;
 

@@ -78,7 +78,7 @@ class BookShowViewTest extends TestCase
                 'current_page' => 1,
                 'last_page' => 1
             ]);
-            
+
         // Add expectation for related books in show method
         $this->mockService->shouldReceive('listBooks')
             ->with(1, 100)

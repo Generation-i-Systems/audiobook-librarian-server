@@ -41,8 +41,7 @@ class HardcoverApiService
             if (!empty($authors) && !empty($result['authors'])) {
                 foreach ($authors as $inputAuthor) {
                     foreach ($result['authors'] as $authorObj) {
-                        $authorName = is_array($authorObj['author'] ?? null) ? $authorObj['author']['name'] ?? '' :
-                            ($authorObj['author'] ?? '');
+                        $authorName = is_array($authorObj['author'] ?? null) ? $authorObj['author']['name'] ?? '' : ($authorObj['author'] ?? '');
                         if ($authorName && stripos($authorName, $inputAuthor) !== false) {
                             $score += 2;
                             break 2;

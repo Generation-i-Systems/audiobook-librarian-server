@@ -20,8 +20,7 @@ class MigrateBooksCamelCaseCommand extends Command
      *
      * @var string
      */
-    protected $description =
-        'Migrate all book records in Firestore from snake_case to camelCase and remove snake_case fields (creates a database backup by default)';
+    protected $description = 'Migrate all book records in Firestore from snake_case to camelCase and remove snake_case fields (creates a database backup by default)';
 
     /**
      * The Firestore service instance.

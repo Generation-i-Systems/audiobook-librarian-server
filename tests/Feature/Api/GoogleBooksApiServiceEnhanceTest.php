@@ -74,7 +74,7 @@ class GoogleBooksApiServiceEnhanceTest extends TestCase
         $this->assertNotNull($result, 'searchAndMerge should not return null');
         $this->assertArrayHasKey('coverImage', $result);
         $this->assertStringContainsString($this->testDir, $result['coverImage']);
-        
+
         // Verify the file was actually created
         $this->assertTrue(file_exists($result['coverImage']));
     }

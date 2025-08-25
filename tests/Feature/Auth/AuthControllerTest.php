@@ -14,6 +14,7 @@ use Tests\TestCase;
 class AuthControllerTest extends TestCase
 {
     use RefreshDatabase;
+
     // No external document store in tests; we use the database
 
 

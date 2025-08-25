@@ -286,8 +286,10 @@ class BookImportService
             $realBookStoragePath = realpath($bookStoragePath);
             $realSourcePath = realpath($sourcePath);
 
-            if ($realBookStoragePath && $realSourcePath &&
-                strpos($realSourcePath, $realBookStoragePath) === 0) {
+            if (
+                $realBookStoragePath && $realSourcePath &&
+                strpos($realSourcePath, $realBookStoragePath) === 0
+            ) {
                 // Files are already in the book storage path - use in-place import
                 $book->directory_path = $sourcePath;
                 $book->save();
@@ -451,9 +453,11 @@ class BookImportService
         if (!empty($metadata['narrator'])) {
             $narrators = is_array($metadata['narrator']) ? $metadata['narrator'] : [$metadata['narrator']];
             foreach ($narrators as $narrator) {
-                if (is_string($narrator) &&
+                if (
+                    is_string($narrator) &&
                     (stripos($narrator, 'Graphic Audio') !== false ||
-                     stripos($narrator, 'GraphicAudio') !== false)) {
+                     stripos($narrator, 'GraphicAudio') !== false)
+                ) {
                     return true;
                 }
             }
@@ -463,9 +467,11 @@ class BookImportService
         if (!empty($metadata['publisher'])) {
             $publishers = is_array($metadata['publisher']) ? $metadata['publisher'] : [$metadata['publisher']];
             foreach ($publishers as $publisher) {
-                if (is_string($publisher) &&
+                if (
+                    is_string($publisher) &&
                     (stripos($publisher, 'Graphic Audio') !== false ||
-                     stripos($publisher, 'GraphicAudio') !== false)) {
+                     stripos($publisher, 'GraphicAudio') !== false)
+                ) {
                     return true;
                 }
             }

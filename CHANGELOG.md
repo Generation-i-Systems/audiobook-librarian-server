@@ -25,6 +25,15 @@
 - Created PersistentDatabaseTestCase for tests that need persistent data
 
 ### Added
+- AI-assisted suggestions for reconciling book directories
+  - Extended Artisan command `books:list-missing-directories` with `--ai-suggest` and `--ai-output`
+  - Compares DB-referenced missing directories to on-disk unreferenced audio directories
+  - Produces suggested mappings with confidence and reason via the configured AI provider
+  - Suggestions appear under `ai_suggestions` (JSON) or as a `# AI suggestions` section (TXT)
+- Public helper `AIBookProcessor::complete()` to allow generic prompt completion using the configured model/provider
+- Feature test `ListMissingBookDirectoriesAiTest` validating AI suggestion integration with a mocked processor
+
+### Added
 - Support for `includeNeedsReview` (also `include_needs_review`) query flag on Authors and Series endpoints
   - When set to a truthy value, responses include books and entities otherwise excluded due to `needs_review`
   - Added feature tests to verify default exclusion and override behavior for both endpoints

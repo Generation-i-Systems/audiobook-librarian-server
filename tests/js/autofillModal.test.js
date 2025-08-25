@@ -5,17 +5,7 @@ const $ = require('jquery');
 describe('Autofill Modal UI', () => {
     let $container;
     beforeEach(() => {
-        document.body.innerHTML = `
-        <div id="book-form">
-            <button id="autofill-btn">Autofill</button>
-            <input id="title" />
-            <input id="published_year" />
-            <input id="description" />
-            <div id="cover-preview-group" style="display:none"><img id="cover-preview-img"></div>
-            <div id="google-books-matches-table-wrapper" style="display:none"><table id="google-books-matches-table"><tbody></tbody></table></div>
-            <div id="authors-group"></div>
-            <div id="series-group"></div>
-        </div>`;
+        document.body.innerHTML = ` < div id = "book-form" > < button id = "autofill-btn" > Autofill < / button > < input id = "title" / > < input id = "published_year" / > < input id = "description" / > < div id = "cover-preview-group" style = "display:none" > < img id = "cover-preview-img" > < / div > < div id = "google-books-matches-table-wrapper" style = "display:none" > < table id = "google-books-matches-table" > < tbody > < / tbody > < / table > < / div > < div id = "authors-group" > < / div > < div id = "series-group" > < / div > < / div > `;
         $container = $("#book-form");
         window.BOOK_FORM_ROUTES = {
             authorsAutocomplete: '/authors',

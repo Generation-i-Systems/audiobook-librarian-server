@@ -45,8 +45,12 @@ class ListMissingBookDirectoriesCommandTest extends TestCase
 
         $contents = file_get_contents($out);
         $this->assertIsString($contents);
-        $this->assertStringContainsString('"paths"', $contents);
-        $this->assertStringContainsString('missing/path', $contents);
+        $json = json_decode((string) $contents, true);
+        $this->assertIsArray($json);
+        $this->assertArrayHasKey('mode', $json);
+        $this->assertSame('missing', $json['mode']);
+        $this->assertArrayHasKey('paths', $json);
+        $this->assertContains('missing/path', (array) $json['paths']);
     }
 
     public function test_unreferenced_mode_lists_directories_with_audio_files_not_in_db(): void
@@ -90,5 +94,64 @@ class ListMissingBookDirectoriesCommandTest extends TestCase
         ])->expectsOutput('rootB/book2')
           ->doesntExpectOutput('rootA/book1')
           ->assertExitCode(0);
+    }
+
+    public function test_default_mode_can_include_unreferenced_in_json_and_write_second_file(): void
+    {
+        Storage::fake('books');
+
+        // DB book references one path; another dir has audio but is unreferenced
+        Book::factory()->create(['directory_path' => 'rootA/book1']);
+        Storage::disk('books')->put('rootA/book1/track1.mp3', 'X');
+        Storage::disk('books')->put('rootB/book2/track1.m4b', 'Y');
+
+        $mainOut = tempnam(sys_get_temp_dir(), 'missing-json-');
+        $unrefOut = tempnam(sys_get_temp_dir(), 'unref-json-');
+
+        $this->artisan('books:list-missing-directories', [
+            '--disk' => 'books',
+            '--format' => 'json',
+            '--output' => $mainOut,
+            '--include-unreferenced' => true,
+            '--unreferenced-output' => $unrefOut,
+        ])->assertExitCode(0);
+
+        $main = file_get_contents($mainOut);
+        $this->assertIsString($main);
+        $jsonMain = json_decode((string) $main, true);
+        $this->assertIsArray($jsonMain);
+        $this->assertSame('missing', $jsonMain['mode'] ?? null);
+        $this->assertArrayHasKey('unreferenced', $jsonMain);
+        $this->assertContains('rootB/book2', (array) ($jsonMain['unreferenced']['directories'] ?? []));
+
+        $secondary = file_get_contents($unrefOut);
+        $this->assertIsString($secondary);
+        $secondaryJson = json_decode((string) $secondary, true);
+        $this->assertIsArray($secondaryJson);
+        $this->assertSame('unreferenced', $secondaryJson['mode'] ?? null);
+        $this->assertContains('rootB/book2', (array) ($secondaryJson['directories'] ?? []));
+    }
+
+    public function test_default_mode_txt_appends_unreferenced_section_when_requested(): void
+    {
+        Storage::fake('books');
+
+        Book::factory()->create(['directory_path' => 'alpha/referenced']);
+        Storage::disk('books')->put('alpha/referenced/01.mp3', 'A');
+        Storage::disk('books')->put('beta/unref/track1.mp3', 'B');
+
+        $out = tempnam(sys_get_temp_dir(), 'missing-txt-');
+
+        $this->artisan('books:list-missing-directories', [
+            '--disk' => 'books',
+            '--format' => 'txt',
+            '--output' => $out,
+            '--include-unreferenced' => true,
+        ])->assertExitCode(0);
+
+        $contents = file_get_contents($out);
+        $this->assertIsString($contents);
+        $this->assertStringContainsString('# Unreferenced directories', $contents);
+        $this->assertStringContainsString('beta/unref', $contents);
     }
 }

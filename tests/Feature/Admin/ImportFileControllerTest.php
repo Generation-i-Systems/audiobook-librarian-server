@@ -43,16 +43,13 @@ class ImportFileControllerTest extends TestCase
         $this->documentStoreMock = $this->mock(DocumentStoreServiceInterface::class);
         $this->documentStoreMock->shouldReceive('listGenres')
             ->zeroOrMoreTimes()
-            ->andReturn(['Fantasy', 'Science Fiction', 'Mystery', 'Other'])
-        ;
+            ->andReturn(['Fantasy', 'Science Fiction', 'Mystery', 'Other']);
         $this->documentStoreMock->shouldReceive('searchSeriesByName')
             ->zeroOrMoreTimes()
-            ->andReturn([])
-        ;
+            ->andReturn([]);
         $this->documentStoreMock->shouldReceive('searchAuthorsByName')
             ->zeroOrMoreTimes()
-            ->andReturn([])
-        ;
+            ->andReturn([]);
 
         // Create test directory structure
         $this->testRoot = sys_get_temp_dir() . '/import_test_' . uniqid();
@@ -114,8 +111,7 @@ class ImportFileControllerTest extends TestCase
 
         // Act: Call the roots endpoint
         $response = $this->withoutMiddleware()
-            ->get('/admin/import/roots')
-        ;
+            ->get('/admin/import/roots');
 
         // Assert: Verify response contains configured roots
         $response->assertStatus(200);
@@ -131,8 +127,7 @@ class ImportFileControllerTest extends TestCase
 
         // Act: Call the roots endpoint
         $response = $this->withoutMiddleware()
-            ->get('/admin/import/roots')
-        ;
+            ->get('/admin/import/roots');
 
         // Assert: Verify response is still valid (may return default paths)
         $response->assertStatus(200);
@@ -144,8 +139,7 @@ class ImportFileControllerTest extends TestCase
     {
         // Act: Call the list endpoint
         $response = $this->withoutMiddleware()
-            ->get('/admin/import/list?root=' . urlencode($this->testRoot))
-        ;
+            ->get('/admin/import/list?root=' . urlencode($this->testRoot));
 
         // Assert: Verify response structure and content
         $response->assertStatus(200);
@@ -189,8 +183,7 @@ class ImportFileControllerTest extends TestCase
 
         // Act: Call the list endpoint
         $response = $this->withoutMiddleware()
-            ->get('/admin/import/list?root=' . urlencode($this->testRoot))
-        ;
+            ->get('/admin/import/list?root=' . urlencode($this->testRoot));
 
         // Assert: Verify response contains only directories with matching files
         $response->assertStatus(200);
@@ -237,8 +230,7 @@ class ImportFileControllerTest extends TestCase
     {
         // Act: Attempt path traversal attack
         $response = $this->withoutMiddleware()
-            ->get('/admin/import/list?root=' . urlencode($this->testRoot) . '&path=../../../etc')
-        ;
+            ->get('/admin/import/list?root=' . urlencode($this->testRoot) . '&path=../../../etc');
 
         // Assert: Verify security check prevents traversal
         $response->assertStatus(403);
@@ -260,8 +252,7 @@ class ImportFileControllerTest extends TestCase
                 'root' => $this->testRoot,
                 'path' => basename($testMp3),
                 'type' => 'file',
-            ])
-        ;
+            ]);
 
         // Assert: Verify metadata extraction
         $response->assertStatus(200);
@@ -293,8 +284,7 @@ class ImportFileControllerTest extends TestCase
                 'root' => $this->testRoot,
                 'path' => basename($testDir),
                 'type' => 'dir',
-            ])
-        ;
+            ]);
 
         // Assert: Verify directory metadata extraction
         $response->assertStatus(200);
@@ -316,8 +306,7 @@ class ImportFileControllerTest extends TestCase
             ->post('/admin/import/extract', [
                 'path' => 'test.mp3',
                 'type' => 'file',
-            ])
-        ;
+            ]);
         $response->assertStatus(400);
         $json = $response->json();
         $this->assertFalse($json['success']);
@@ -328,8 +317,7 @@ class ImportFileControllerTest extends TestCase
             ->post('/admin/import/extract', [
                 'root' => $this->testRoot,
                 'path' => 'test.mp3',
-            ])
-        ;
+            ]);
         $response->assertStatus(400);
         $json = $response->json();
         $this->assertFalse($json['success']);
@@ -341,8 +329,7 @@ class ImportFileControllerTest extends TestCase
                 'root' => $this->testRoot,
                 'path' => 'test.mp3',
                 'type' => 'invalid',
-            ])
-        ;
+            ]);
         $response->assertStatus(400);
         $json = $response->json();
         $this->assertFalse($json['success']);
@@ -364,8 +351,7 @@ class ImportFileControllerTest extends TestCase
                 'path' => 'test_book',
                 'type' => 'dir',
                 'redirectToForm' => 'true',
-            ])
-        ;
+            ]);
 
         // Assert: Verify redirect to book creation form
         $response->assertRedirect();
@@ -463,8 +449,7 @@ class ImportFileControllerTest extends TestCase
             ->with('Test Author')
             ->andReturn([
                 ['genre' => 'Fantasy', 'author' => 'Test Author'],
-            ])
-        ;
+            ]);
 
         // Act: Call extract endpoint
         $response = $this->withoutMiddleware()
@@ -473,8 +458,7 @@ class ImportFileControllerTest extends TestCase
                 'path' => basename($bookDir),
                 'type' => 'dir',
                 '_token' => csrf_token(),
-            ])
-        ;
+            ]);
 
         // Assert: Should suggest Fantasy genre based on existing structure
         $response->assertStatus(200);
@@ -507,8 +491,7 @@ class ImportFileControllerTest extends TestCase
                 'path' => basename($bookDir),
                 'type' => 'dir',
                 'redirectToForm' => 'true',
-            ])
-        ;
+            ]);
 
         // Assert: Verify redirect contains necessary parameters
         $response->assertRedirect();

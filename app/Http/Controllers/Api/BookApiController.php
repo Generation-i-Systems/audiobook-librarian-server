@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use ZipArchive;
 
 class BookApiController extends Controller
 {
@@ -554,8 +553,10 @@ class BookApiController extends Controller
                     'type' => 'audio',
                     'download_url' => route('api.books.downloadFile', ['book' => $id, 'file' => urlencode($fileName)]),
                 ];
-            } elseif (in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp']) &&
-                      (strpos(strtolower($fileName), 'cover') !== false || strpos(strtolower($fileName), 'folder') !== false)) {
+            } elseif (
+                in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp']) &&
+                      (strpos(strtolower($fileName), 'cover') !== false || strpos(strtolower($fileName), 'folder') !== false)
+            ) {
                 $coverFile = [
                     'filename' => $fileName,
                     'path' => $file,
@@ -758,8 +759,10 @@ class BookApiController extends Controller
                         flush();
 
                         // Log progress every 10MB or at significant milestones
-                        if ($bytesSent - $lastProgressLog >= $progressLogInterval ||
-                            ($fileSize > 0 && $bytesSent >= $fileSize)) {
+                        if (
+                            $bytesSent - $lastProgressLog >= $progressLogInterval ||
+                            ($fileSize > 0 && $bytesSent >= $fileSize)
+                        ) {
                             $currentTime = microtime(true);
                             $elapsedSeconds = $currentTime - $startTime;
                             $progressPercent = $fileSize > 0 ? round(($bytesSent / $fileSize) * 100, 2) : 0;
@@ -2221,7 +2224,7 @@ class BookApiController extends Controller
         $transformedBooks = $books->map(function ($book) use ($withCover, $inlineCovers) {
             // Convert book to array and prepare relationship data for getBookWithCover
             $bookArray = $book->toArray();
-            
+
             // Extract relationship data and format it for getBookWithCover
             if (isset($bookArray['authors'])) {
                 $bookArray['author'] = collect($bookArray['authors'])->pluck('name')->toArray();
@@ -2238,9 +2241,9 @@ class BookApiController extends Controller
             if (isset($bookArray['series'])) {
                 $bookArray['series'] = $bookArray['series']; // Keep for enhanced response
             }
-            
+
             $result = $this->getBookWithCover($bookArray, $withCover, $inlineCovers);
-            
+
             // Add relationship data back to the result for enhanced endpoint
             if (isset($bookArray['authors'])) {
                 $result['authors'] = $bookArray['authors'];
@@ -2254,7 +2257,7 @@ class BookApiController extends Controller
             if (isset($bookArray['series'])) {
                 $result['series'] = $bookArray['series'];
             }
-            
+
             return $result;
         });
 

@@ -4,9 +4,6 @@ namespace Tests\Feature;
 
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Jobs\CreateImportJobsForDirectory;
-use Google\Cloud\Firestore\CollectionReference;
-use Google\Cloud\Firestore\DocumentReference;
-use Google\Cloud\Firestore\DocumentSnapshot;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 use Mockery;
@@ -17,10 +14,10 @@ class QueueControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Set APP_KEY for testing
         $this->app['config']->set('app.key', 'base64:' . base64_encode(str_repeat('a', 32)));
-        
+
         // Create an admin user for authentication
         $adminUser = new \App\Auth\DocumentstoreUser([
             'id' => 'admin-user',
@@ -29,7 +26,7 @@ class QueueControllerTest extends TestCase
             'is_admin' => true,
             'permissions' => ['admin.*'],
         ]);
-        
+
         // Authenticate as admin user and bypass admin middleware
         $this->actingAs($adminUser);
         $this->withoutMiddleware(\App\Http\Middleware\CheckAdminRole::class);
@@ -37,10 +34,10 @@ class QueueControllerTest extends TestCase
 
     public function test_status_returns_worker_and_pending_jobs()
     {
-        // Mock the Cache facade  
+        // Mock the Cache facade
         Cache::spy();
         Cache::shouldReceive('get')->with('queue_worker_heartbeat')->andReturn(now());
-        
+
         // Mock the DocumentStoreService
         $mockFirestore = Mockery::mock(DocumentStoreServiceInterface::class);
         $mockFirestore->shouldReceive('getJobCount')->andReturn(3);
@@ -90,21 +87,21 @@ class QueueControllerTest extends TestCase
         mkdir($testDir . '/subdir', 0755, true);
         mkdir($testDir . '/subdir/book1', 0755, true);
         file_put_contents($testDir . '/subdir/book1/metadata.abs', '{"title": "Test Book"}');
-        
+
         // Set the BOOK_STORAGE_PATH to our test directory
         $this->app['config']->set('app.env.BOOK_STORAGE_PATH', $testDir);
         putenv("BOOK_STORAGE_PATH=$testDir");
-        
+
         try {
             $response = $this->post('/admin/books/bulk-import', [
                 'dir' => $testDir . '/subdir',
             ]);
-            
+
             // Debug validation errors
             if ($response->getStatusCode() === 422) {
                 dump('Validation errors:', $response->json());
             }
-            
+
             $response->assertStatus(200)
                 ->assertJsonStructure([
                     'message',
@@ -132,7 +129,7 @@ class QueueControllerTest extends TestCase
     {
         // Fake the queue to prevent actual job execution
         Queue::fake();
-        
+
         // This simply checks the endpoint returns the right response (job dispatching is not tested here)
         $response = $this->post('/admin/books/bulk-import-dir', [
             'dir' => 'test',
@@ -141,7 +138,7 @@ class QueueControllerTest extends TestCase
             ->assertJson([
                 'message' => 'Queued job to scan and import all book directories.',
             ]);
-            
+
         // Verify that the job was dispatched
         Queue::assertPushed(CreateImportJobsForDirectory::class);
     }

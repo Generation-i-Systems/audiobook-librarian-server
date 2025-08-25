@@ -92,7 +92,7 @@ class UserApiTest extends TestCase
     {
         $user = User::factory()->create([
             'name' => "Test admin",
-            'email' => "test.admin@example.com", 
+            'email' => "test.admin@example.com",
             'role' => 'admin',
         ]);
 

@@ -45,10 +45,11 @@ $structure = [
     ],
 ];
 
-function createDirectories($basePath, $structure): void {
+function createDirectories($basePath, $structure): void
+{
     foreach ($structure as $path => $content) {
         $fullPath = $basePath . '/' . $path;
-        
+
         if (is_array($content)) {
             // It's a directory
             if (!File::exists($fullPath)) {
@@ -66,14 +67,15 @@ function createDirectories($basePath, $structure): void {
 createDirectories($testDataPath, $structure);
 
 echo "Created directory structure:\n";
-function showDirectoryStructure($path, $indent = 0): void {
+function showDirectoryStructure($path, $indent = 0): void
+{
     $files = File::files($path);
     $directories = File::directories($path);
-    
+
     foreach ($files as $file) {
         echo str_repeat('  ', $indent) . $file->getFilename() . "\n";
     }
-    
+
     foreach ($directories as $dir) {
         echo str_repeat('  ', $indent) . basename($dir) . "/\n";
         showDirectoryStructure($dir, $indent + 1);
@@ -84,42 +86,44 @@ showDirectoryStructure($testDataPath);
 
 // Check each directory individually to see which ones contain audio files
 echo "\nChecking each directory for audio files:\n";
-function checkDirectoryForAudioFiles($path, $storageRoot): void {
+function checkDirectoryForAudioFiles($path, $storageRoot): void
+{
     echo "Checking directory: $path\n";
-    
+
     // Check if this directory contains audio files directly
     $audioFiles = (new Finder())
         ->files()
         ->in($path)
         ->depth('== 0')
         ->name(['*.mp3', '*.m4b', '*.m4a', '*.aac', '*.flac', '*.wav', '*.ogg']);
-    
+
     $count = iterator_count($audioFiles);
     echo "  Direct audio files: $count\n";
-    
+
     // Check if any subdirectories contain audio files
     $subdirs = (new Finder())
         ->directories()
         ->in($path)
         ->depth('== 0');
-    
+
     foreach ($subdirs as $subdir) {
         echo "  Subdirectory: " . $subdir->getFilename() . "/\n";
-        
+
         $subAudioFiles = (new Finder())
             ->files()
             ->in($subdir->getPathname())
             ->depth('== 0')
             ->name(['*.mp3', '*.m4b', '*.m4a', '*.aac', '*.flac', '*.wav', '*.ogg']);
-        
+
         $subCount = iterator_count($subAudioFiles);
         echo "    Audio files: $subCount\n";
     }
 }
 
-function traverseDirectories($path, $storageRoot): void {
+function traverseDirectories($path, $storageRoot): void
+{
     checkDirectoryForAudioFiles($path, $storageRoot);
-    
+
     $directories = File::directories($path);
     foreach ($directories as $dir) {
         traverseDirectories($dir, $storageRoot);
@@ -134,7 +138,7 @@ $books = $parser->parseDirectory($testDataPath);
 
 echo "\nFound " . count($books) . " books:\n";
 foreach ($books as $book) {
-    echo "- " . ($book['title'] ?? 'Unknown') . " by " . 
+    echo "- " . ($book['title'] ?? 'Unknown') . " by " .
          (is_array($book['author'] ?? null) ? implode(', ', $book['author']) : ($book['author'] ?? 'Unknown')) . "\n";
     echo "  Path: " . ($book['directoryPath'] ?? 'Unknown') . "\n";
     echo "  Series: " . ($book['seriesName'] ?? 'None') . "\n";

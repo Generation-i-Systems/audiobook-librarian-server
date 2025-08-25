@@ -32,7 +32,7 @@ class CreateAdminUserCommandTest extends TestCase
                     // Note: We can't easily check the password hash in this context
                 });
         });
-        
+
         $this->artisan('app:create-admin-user', ['--no-backup' => true])
             ->expectsOutput('Admin user created!')
             ->expectsOutput('Email: admin@example.com')

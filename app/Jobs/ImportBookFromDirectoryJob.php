@@ -219,9 +219,7 @@ class ImportBookFromDirectoryJob implements ShouldQueue
                     $authorName = 'Unknown Author';
                     if (isset($bookData['authors'])) {
                         if (is_array($bookData['authors']) && !empty($bookData['authors'][0])) {
-                            $authorName = is_string($bookData['authors'][0])
-                                ? $bookData['authors'][0]
-                                : 'Unknown Author';
+                            $authorName = is_string($bookData['authors'][0]) ? $bookData['authors'][0] : 'Unknown Author';
                         }
                     }
 
@@ -412,9 +410,7 @@ class ImportBookFromDirectoryJob implements ShouldQueue
             }
 
             Log::info(
-                '[BulkImport] Book imported: ' . ($bookData['title'] ??
-                    '') . " ({$bookId}) " . ($bookData['directoryPath'] ??
-                    '')
+                '[BulkImport] Book imported: ' . ($bookData['title'] ?? '') . " ({$bookId}) " . ($bookData['directoryPath'] ?? '')
             );
 
             // Update job status to completed

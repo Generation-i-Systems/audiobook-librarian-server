@@ -109,14 +109,10 @@ class TestAudibleCommand extends Command
 
         if (isset($book['rating']) && is_array($book['rating'])) {
             if (isset($book['rating']['average_rating'])) {
-                $rating = is_numeric($book['rating']['average_rating'])
-                    ? round($book['rating']['average_rating'], 1)
-                    : null;
+                $rating = is_numeric($book['rating']['average_rating']) ? round($book['rating']['average_rating'], 1) : null;
             }
             if (isset($book['rating']['ratings_count'])) {
-                $ratingsCount = is_numeric($book['rating']['ratings_count'])
-                    ? (int) $book['rating']['ratings_count']
-                    : 0;
+                $ratingsCount = is_numeric($book['rating']['ratings_count']) ? (int) $book['rating']['ratings_count'] : 0;
             }
         }
 

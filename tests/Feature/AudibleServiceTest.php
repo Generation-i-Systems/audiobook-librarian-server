@@ -20,8 +20,7 @@ class AudibleServiceTest extends TestCase
 
         // Mock the cache to prevent database connections
         Cache::shouldReceive('remember')
-            ->andReturnUsing(fn ($key, $seconds, $callback) => $callback())
-        ;
+            ->andReturnUsing(fn ($key, $seconds, $callback) => $callback());
 
         $this->service = new AudibleService();
     }

@@ -655,10 +655,12 @@ class MongoService implements DocumentStoreServiceInterface
         $set = $normalized;
         $unset = [];
         // If we set singular keys, clear out plural/snake_case legacy ones
-        foreach ([
+        foreach (
+            [
             'authors', 'genres', 'narrators',
             'directory_path', 'published_year',
-        ] as $legacyKey) {
+            ] as $legacyKey
+        ) {
             if (array_key_exists($legacyKey, $set)) {
                 // already unset above, skip
                 continue;

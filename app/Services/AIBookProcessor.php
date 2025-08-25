@@ -480,6 +480,16 @@ class AIBookProcessor
     }
 
     /**
+     * Public helper to complete an arbitrary prompt using the configured provider/model.
+     * Returns the same structure as callAIAPI():
+     * ['success' => bool, 'data' => string] on success, or ['success' => false, 'error' => string] on failure.
+     */
+    public function complete(string $prompt): array
+    {
+        return $this->callAIAPI($prompt);
+    }
+
+    /**
      * Call the Gemini API
      */
     protected function callGeminiAPI(string $prompt, int $estimatedInputTokens, int $estimatedOutputTokens): array

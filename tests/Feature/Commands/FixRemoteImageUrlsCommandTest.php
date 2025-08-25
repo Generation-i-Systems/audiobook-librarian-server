@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Commands;
 
-use App\Console\Commands\FixRemoteImageUrlsCommand;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Services\ExternalCoverService;
 use Tests\TestCase;

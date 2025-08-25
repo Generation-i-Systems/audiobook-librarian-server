@@ -21,15 +21,15 @@ class AdminNotificationControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Set APP_KEY for testing
         $this->app['config']->set('app.key', 'base64:' . base64_encode(str_repeat('a', 32)));
-        
+
         // Disable debugging in tests
         $this->app['config']->set('app.debug', false);
         $this->app['config']->set('telescope.enabled', false);
-        
-        // Create an admin user for authentication  
+
+        // Create an admin user for authentication
         $adminUser = new \App\Auth\DocumentstoreUser([
             'id' => 'admin-user',
             'name' => 'Test Admin',
@@ -37,25 +37,25 @@ class AdminNotificationControllerTest extends TestCase
             'is_admin' => true,
             'permissions' => ['admin.*'],
         ]);
-        
+
         // Authenticate as admin user and bypass admin middleware
         $this->actingAs($adminUser);
         $this->withoutMiddleware(\App\Http\Middleware\CheckAdminRole::class);
-        
+
         // Mock DocumentStoreServiceInterface
         $mock = Mockery::mock(DocumentStoreServiceInterface::class);
-        
+
         // Mock getUserById method - returns user data when user exists
         $mock->shouldReceive('getUserById')
             ->with('user123')
             ->andReturn(['device_token' => 'testtoken', 'id' => 'user123']);
-            
+
         // Mock getAllUsers method - returns array of users
         $mock->shouldReceive('getAllUsers')
             ->andReturn([
                 ['device_token' => 'testtoken', 'id' => 'user123']
             ]);
-        
+
         $this->app->instance(DocumentStoreServiceInterface::class, $mock);
         Log::spy();
     }
@@ -67,10 +67,10 @@ class AdminNotificationControllerTest extends TestCase
             'message' => 'Test message',
             'user_id' => 'user123',
         ]);
-        
+
         $response->assertStatus(302); // Should redirect back
         $response->assertSessionHas('success', 'Notification sent to specific user!');
-        
+
         // Verify the log call was made (only if device token exists)
         Log::shouldHaveReceived('info')->atLeast()->once()->withArgs(function ($message) {
             return str_contains($message, 'Sending push notification to user user123') &&
@@ -84,10 +84,10 @@ class AdminNotificationControllerTest extends TestCase
         $response = $this->post(route('admin.send.notification'), [
             'message' => 'Broadcast message',
         ]);
-        
+
         $response->assertStatus(302);
         $response->assertSessionHas('success', 'Notification sent to all users!');
-        
+
         // Verify the log call was made for all users with device tokens
         Log::shouldHaveReceived('info')->atLeast()->once()->withArgs(function ($message) {
             return str_contains($message, 'Sending push notification to user user123') &&
@@ -109,7 +109,7 @@ class AdminNotificationControllerTest extends TestCase
             'message' => 'Test message',
             'user_id' => 'notfound',
         ]);
-        
+
         $response->assertStatus(302);
         $response->assertSessionHasErrors(['user_id']);
     }
@@ -120,7 +120,7 @@ class AdminNotificationControllerTest extends TestCase
         $response = $this->post(route('admin.send.notification'), [
             'user_id' => 'user123',
         ]);
-        
+
         $response->assertStatus(302);
         $response->assertSessionHasErrors(['message']);
     }

@@ -370,9 +370,7 @@ class BookDirectoryParser
                                     break;
                                 case 'publishedyear':
                                     $publishedYearTrimmed = trim($value);
-                                    $metadata['publishedYear'] = is_numeric($publishedYearTrimmed)
-                                        ? (int) $publishedYearTrimmed
-                                        : null;
+                                    $metadata['publishedYear'] = is_numeric($publishedYearTrimmed) ? (int) $publishedYearTrimmed : null;
                                     break;
                                 default:
                                     $metadata[$key] = $value;
@@ -389,28 +387,14 @@ class BookDirectoryParser
                     }
                     $fileMetadata = [
                         'title' => array_key_exists('title', $metadata) ? $metadata['title'] : '',
-                        'author' => array_key_exists('author', $metadata)
-                            ? (is_array($metadata['author']) ? $metadata['author'] : [$metadata['author']])
-                            : [],
+                        'author' => array_key_exists('author', $metadata) ? (is_array($metadata['author']) ? $metadata['author'] : [$metadata['author']]) : [],
                         'narrator' => array_key_exists('narrator', $metadata) ? $metadata['narrator'] : '',
                         'series' => array_key_exists('series', $metadata) ? $metadata['series'] : '',
-                        'seriesNumber' => array_key_exists('seriesNumber', $metadata)
-                            ? (is_numeric($metadata['seriesNumber']) ? (int) $metadata['seriesNumber'] : null)
-                            : (array_key_exists('series_number', $metadata)
-                                ? (is_numeric($metadata['series_number']) ? (int) $metadata['series_number'] : null)
-                                : (array_key_exists('seriesIndex', $metadata) && is_numeric($metadata['seriesIndex'])
-                                    ? (int) $metadata['seriesIndex']
-                                    : null)),
+                        'seriesNumber' => array_key_exists('seriesNumber', $metadata) ? (is_numeric($metadata['seriesNumber']) ? (int) $metadata['seriesNumber'] : null) : (array_key_exists('series_number', $metadata) ? (is_numeric($metadata['series_number']) ? (int) $metadata['series_number'] : null) : (array_key_exists('seriesIndex', $metadata) && is_numeric($metadata['seriesIndex']) ? (int) $metadata['seriesIndex'] : null)),
                         'year' => (
-                            (array_key_exists('year', $metadata) && is_numeric($metadata['year']))
-                            ? (int) $metadata['year']
-                            : ((array_key_exists('publishedYear', $metadata) && is_numeric($metadata['publishedYear']))
-                                ? (int) $metadata['publishedYear']
-                                : null)
+                            (array_key_exists('year', $metadata) && is_numeric($metadata['year'])) ? (int) $metadata['year'] : ((array_key_exists('publishedYear', $metadata) && is_numeric($metadata['publishedYear'])) ? (int) $metadata['publishedYear'] : null)
                         ),
-                        'description' => array_key_exists('description', $metadata)
-                            ? preg_replace('/^\[description\]\s*/i', '', $metadata['description'])
-                            : '',
+                        'description' => array_key_exists('description', $metadata) ? preg_replace('/^\[description\]\s*/i', '', $metadata['description']) : '',
                     ];
                 }
             } catch (\Exception $e) {
@@ -630,9 +614,7 @@ class BookDirectoryParser
                 if (!empty($metadata['year'])) {
                     $book['year'] = $metadata['year'];
                 } elseif (!empty($metadata['publishedYear'])) {
-                    $book['year'] = is_numeric($metadata['publishedYear'])
-                        ? (int) $metadata['publishedYear']
-                        : $metadata['publishedYear'];
+                    $book['year'] = is_numeric($metadata['publishedYear']) ? (int) $metadata['publishedYear'] : $metadata['publishedYear'];
                 }
                 if (isset($metadata['description'])) {
                     $book['description'] = $metadata['description'];
@@ -694,9 +676,7 @@ class BookDirectoryParser
                     $book = [
                         'directoryPath' => $path,
                         'genre' => $bookPathInfo['genre'] ?? [],
-                        'author' => is_array($bookPathInfo['author'])
-                            ? $bookPathInfo['author']
-                            : [$bookPathInfo['author'] ?? 'Unknown Author'],
+                        'author' => is_array($bookPathInfo['author']) ? $bookPathInfo['author'] : [$bookPathInfo['author'] ?? 'Unknown Author'],
                         'series' => $seriesName,
                         'seriesName' => $seriesName,
                         'seriesNumber' => $seriesNumber,
@@ -704,8 +684,7 @@ class BookDirectoryParser
                         'title' => $bookPathInfo['title'] ?? '',
                         'audioFileCount' => $audioFilesData['count'],
                         'duration' => round($audioFilesData['totalDuration'], 0),
-                        'durationFormatted' => is_numeric($audioFilesData['totalDuration']) ?
-                            $this->formatDuration($audioFilesData['totalDuration']) : 'N/A',
+                        'durationFormatted' => is_numeric($audioFilesData['totalDuration']) ? $this->formatDuration($audioFilesData['totalDuration']) : 'N/A',
                         'fileTags' => $audioFilesData['fileTags'],
                         'needsReview' => false,
                         'coverImage' => $coverImage ?? null,
@@ -724,7 +703,7 @@ class BookDirectoryParser
             foreach ($dirs as $dir) {
                 $path = trim(str_replace($this->storageRoot, '', $dir->getPathname()), '/');
                 \Illuminate\Support\Facades\Log::debug("Processing directory: {$path}");
-                
+
                 $bookPathInfo = $this->processDirPath($path);
                 \Illuminate\Support\Facades\Log::debug("Path info: " . json_encode($bookPathInfo));
 
@@ -742,7 +721,7 @@ class BookDirectoryParser
                 $audioFileCount = $audioFilesData['count'];
                 $totalDuration = $audioFilesData['totalDuration'];
                 $fileTags = $audioFilesData['fileTags'];
-                
+
                 \Illuminate\Support\Facades\Log::debug("Audio file count for {$path}: {$audioFileCount}");
 
                 if ($audioFileCount === 0) {
@@ -770,9 +749,7 @@ class BookDirectoryParser
                 $book = [
                     'directoryPath' => $path,
                     'genre' => $bookPathInfo['genre'] ?? [],
-                    'author' => is_array($bookPathInfo['author'])
-                        ? $bookPathInfo['author']
-                        : [$bookPathInfo['author'] ?? 'Unknown Author'],
+                    'author' => is_array($bookPathInfo['author']) ? $bookPathInfo['author'] : [$bookPathInfo['author'] ?? 'Unknown Author'],
                     'series' => $seriesName,
                     'seriesName' => $seriesName,
                     'seriesNumber' => $seriesNumber,
@@ -974,8 +951,7 @@ class BookDirectoryParser
                 'title' => $pathInfo['title'] ?? '',
                 'audioFileCount' => $audioFilesData['count'],
                 'duration' => round($audioFilesData['totalDuration'] ?? 0, 0),
-                'durationFormatted' => is_numeric($audioFilesData['totalDuration'] ?? null) ?
-                    $this->formatDuration($audioFilesData['totalDuration']) : 'N/A',
+                'durationFormatted' => is_numeric($audioFilesData['totalDuration'] ?? null) ? $this->formatDuration($audioFilesData['totalDuration']) : 'N/A',
                 'fileTags' => $audioFilesData['fileTags'] ?? null,
                 'needsReview' => false,
                 'coverImage' => $coverImage ?? null,

@@ -123,9 +123,7 @@ class SendNewBookNotification
             $title = 'New Book Available';
             // Format authors for display
             $authors = $book['author'] ?? [];
-            $authorText = !empty($authors)
-                ? (is_array($authors) ? implode(', ', $authors) : $authors)
-                : 'an unknown author';
+            $authorText = !empty($authors) ? (is_array($authors) ? implode(', ', $authors) : $authors) : 'an unknown author';
 
             $body = sprintf(
                 '%s by %s has been added to the library',
