@@ -218,8 +218,12 @@ class AuthorsApiTest extends ApiTestCase
 
     public function test_authors_endpoint_requires_authentication()
     {
-        // Skip this test - authentication is handled by middleware and tested elsewhere
-        $this->markTestSkipped('Authentication testing is handled by middleware tests');
+        // Clear the Authorization header set in ApiTestCase to simulate unauthenticated request
+        $this->withHeader('Authorization', '');
+
+        $response = $this->getJson('/api/v1/authors');
+
+        $response->assertStatus(401);
     }
 
     public function test_authors_endpoint_validates_parameters()
