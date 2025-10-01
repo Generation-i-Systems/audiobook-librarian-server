@@ -1,4 +1,17 @@
 ## [Unreleased]
+### Added
+- Extended `cover:check` command to validate and fix book cover images
+  - Options:
+    - `--attempt-audible` to fetch missing covers from Audible using `AudibleService`
+    - `--dry-run` to preview changes without modifying files or database
+    - `--limit[=N]` to process only the first N books (0 means no limit)
+  - Behavior:
+    - Tries to find a valid local cover image in the book's directory first
+    - If none found and `--attempt-audible` is provided, searches Audible using book title and author
+    - Downloads cover via `ExternalCoverService` and saves it to the book directory on the `books` disk
+    - Updates `cover_image` and clears `needs_review` flags on success; appends review reason when unresolved
+  - Tests: feature tests added for dry-run, limit, and Audible fetch paths
+
 ### Changed
 - Authors and Series endpoints now exclude `needs_review` books by default
   - `/api/v1/authors` and `/api/v1/series` filter out books flagged as `needs_review` unless explicitly included

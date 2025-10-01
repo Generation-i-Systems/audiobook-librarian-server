@@ -4,6 +4,8 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Models\Book; // Assuming your Book model is here
+use App\Services\ExternalCoverService;
+use App\Services\AudibleService;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -15,7 +17,7 @@ class CheckCoverImages extends Command
      *
      * @var string
      */
-    protected $signature = 'cover:check';
+    protected $signature = 'cover:check {--attempt-audible : Attempt to fetch cover from Audible when local image not found} {--dry-run : Do not modify data or download files} {--limit=0 : Limit number of books processed (0 = no limit)}';
 
     /**
      * The console command description.
@@ -40,6 +42,17 @@ class CheckCoverImages extends Command
     {
         $this->info('Starting cover image consistency check and fix...');
 
+        $dryRun = (bool) $this->option('dry-run');
+        $limit = (int) ($this->option('limit') ?? 0);
+        $attemptAudible = (bool) $this->option('attempt-audible');
+
+        if ($dryRun) {
+            $this->info('DRY RUN MODE: No changes will be made');
+        }
+        if ($limit > 0) {
+            $this->info("Limiting to {$limit} books");
+        }
+
         // Use the 'books' disk as defined in config/filesystems.php
         $diskName = 'books';
 
@@ -49,7 +62,7 @@ class CheckCoverImages extends Command
             return Command::FAILURE;
         }
 
-        $books = Book::all();
+        $books = Book::query()->when($limit > 0, fn ($q) => $q->limit($limit))->get();
 
         $this->comment("\n--- Attempting to fix missing/invalid cover images ---");
         $fixedCount = 0;
@@ -57,7 +70,11 @@ class CheckCoverImages extends Command
         foreach ($books as $book) {
             $currentCoverImage = $book->coverImage;
             $directoryPath = $book->directoryPath;
-            $needsReviewReasons = json_decode($book->needs_review_reasons ?? '[]', true);
+            // Handle needs_review_reasons as an array per model casts; tolerate legacy string JSON
+            $rawReasons = $book->needs_review_reasons;
+            $needsReviewReasons = is_array($rawReasons)
+                ? $rawReasons
+                : (is_string($rawReasons) ? (json_decode($rawReasons, true) ?? []) : []);
             $originalNeedsReview = $book->needs_review;
 
             $needsFix = false;
@@ -72,7 +89,8 @@ class CheckCoverImages extends Command
                 }
                 $book->needs_review = true;
                 // If directory is invalid, we cannot find a cover, so skip further cover checks for this book
-                $book->needs_review_reasons = json_encode($needsReviewReasons);
+                // Save as array (casted by Eloquent)
+                $book->needs_review_reasons = array_values($needsReviewReasons);
                 if ($book->isDirty()) {
                     $book->save();
                 }
@@ -109,23 +127,56 @@ class CheckCoverImages extends Command
                 if ($bestImage) {
                     // Check if the best image needs directoryPath prefix
                     $finalCoverPath = $this->processCoverImagePath($bestImage, $directoryPath);
-                    $book->coverImage = $finalCoverPath;
-                    $book->needs_review = false; // Clear needs_review if fixed
-                    $needsReviewReasons = array_diff($needsReviewReasons, ['invalid image']); // Remove reason
-                    $book->needs_review_reasons = json_encode(array_values($needsReviewReasons));
-                    $book->save();
-                    $this->info("  -> Fixed Book ID: {$book->id} - new coverImage: {$finalCoverPath}");
+                    if ($dryRun) {
+                        $this->info("  -> DRY RUN: Would set coverImage to {$finalCoverPath} for Book ID: {$book->id}");
+                    } else {
+                        $book->coverImage = $finalCoverPath;
+                        $book->needs_review = false; // Clear needs_review if fixed
+                        $needsReviewReasons = array_diff($needsReviewReasons, ['invalid image']); // Remove reason
+                        $book->needs_review_reasons = array_values($needsReviewReasons);
+                        $book->save();
+                        $this->info("  -> Fixed Book ID: {$book->id} - new coverImage: {$finalCoverPath}");
+                    }
                     $fixedCount++;
                 } else {
                     $this->error("  -> Could not find a suitable cover image for Book ID: {$book->id} in directory: {$directoryPath}");
+
+                    // Attempt Audible fetch if requested
+                    if ($attemptAudible) {
+                        $this->comment('    -> Attempting to fetch cover from Audible...');
+                        $audibleResult = $this->attemptFetchFromAudible($book, $directoryPath, $dryRun);
+                        if ($audibleResult['success']) {
+                            $finalCoverPath = $audibleResult['path'];
+                            if ($dryRun) {
+                                $this->info("    -> DRY RUN: Would set coverImage to {$finalCoverPath} for Book ID: {$book->id}");
+                            } else {
+                                $book->coverImage = $finalCoverPath;
+                                $book->needs_review = false;
+                                $needsReviewReasons = array_diff($needsReviewReasons, ['invalid image']);
+                                $book->needs_review_reasons = array_values($needsReviewReasons);
+                                $book->save();
+                                $this->info("    -> Fetched and set cover from Audible: {$finalCoverPath}");
+                            }
+                            $fixedCount++;
+                            // Continue to next book
+                            continue;
+                        } else {
+                            $this->warn('    -> Audible fetch failed: ' . ($audibleResult['error'] ?? 'unknown error'));
+                        }
+                    }
+
                     // If no fix found, ensure needs_review is set
                     if (!$originalNeedsReview) { // Only set if it wasn't already set by directoryPath check
-                        $book->needs_review = true;
-                        if (!in_array('no suitable image found', $needsReviewReasons)) {
-                            $needsReviewReasons[] = 'no suitable image found';
+                        if ($dryRun) {
+                            $this->info("    -> DRY RUN: Would set needs_review and add reason for Book ID: {$book->id}");
+                        } else {
+                            $book->needs_review = true;
+                            if (!in_array('no suitable image found', $needsReviewReasons)) {
+                                $needsReviewReasons[] = 'no suitable image found';
+                            }
+                            $book->needs_review_reasons = array_values($needsReviewReasons);
+                            $book->save();
                         }
-                        $book->needs_review_reasons = json_encode($needsReviewReasons);
-                        $book->save();
                     }
                 }
             } else {
@@ -134,9 +185,13 @@ class CheckCoverImages extends Command
                 if (empty($needsReviewReasons)) {
                     $book->needs_review = false;
                 }
-                $book->needs_review_reasons = json_encode(array_values($needsReviewReasons));
+                $book->needs_review_reasons = array_values($needsReviewReasons);
                 if ($book->isDirty()) {
-                    $book->save();
+                    if ($dryRun) {
+                        $this->info("  -> DRY RUN: Would update review flags for Book ID: {$book->id}");
+                    } else {
+                        $book->save();
+                    }
                 }
             }
         }
@@ -204,6 +259,76 @@ class CheckCoverImages extends Command
         $this->info('Cover image consistency check complete.');
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Attempt to fetch a cover image from Audible using existing audible_info or a live search.
+     *
+     * @param  Book   $book
+     * @param  string $directoryPath
+     * @param  bool   $dryRun
+     * @return array{success: bool, path: string|null, error: string|null}
+     */
+    protected function attemptFetchFromAudible(Book $book, string $directoryPath, bool $dryRun = false): array
+    {
+        $result = ['success' => false, 'path' => null, 'error' => null];
+
+        // Validate directory path exists on books disk before attempting download
+        if (!Storage::disk('books')->exists($directoryPath)) {
+            $result['error'] = 'Directory does not exist on books disk';
+            return $result;
+        }
+
+        /** @var ExternalCoverService $externalCover */
+        $externalCover = app(ExternalCoverService::class);
+        /** @var AudibleService $audible */
+        $audible = app(AudibleService::class);
+
+        // 1) Try using audible_info if present
+        $audibleInfo = $book->audibleInfo ?? [];
+        $audibleCoverUrl = is_array($audibleInfo) ? ($audibleInfo['coverImageUrl'] ?? null) : null;
+        $audibleId = is_array($audibleInfo) ? ($audibleInfo['id'] ?? null) : null;
+
+        if ($audibleCoverUrl && $audibleId) {
+            if ($dryRun) {
+                return ['success' => true, 'path' => rtrim($directoryPath, '/') . '/cover_audible_' . $audibleId . '.jpg', 'error' => null];
+            }
+            $download = $externalCover->downloadCoverImage($audibleCoverUrl, $directoryPath, 'audible', $audibleId);
+            if (!empty($download['success'])) {
+                return ['success' => true, 'path' => $download['path'], 'error' => null];
+            }
+            // Fall through to search if download failed
+        }
+
+        // 2) Live search via Audible using title and first author if available
+        $title = $book->title;
+        $authorName = null;
+        try {
+            $authorName = $book->authors()->exists() ? ($book->authors()->first()->name ?? null) : null;
+        } catch (\Throwable $e) {
+            Log::debug('CheckCoverImages: failed to load authors for book', ['bookId' => $book->id, 'error' => $e->getMessage()]);
+        }
+
+        $searchResults = $audible->searchBooksWithFiltering($title, $authorName, ['limit' => 3]);
+        if (!empty($searchResults) && is_array($searchResults)) {
+            $best = $searchResults[0];
+            $coverUrl = $best['coverImageUrl'] ?? ($best['audibleCoverImageUrl'] ?? null);
+            $asin = $best['id'] ?? null;
+            if ($coverUrl && $asin) {
+                if ($dryRun) {
+                    return ['success' => true, 'path' => rtrim($directoryPath, '/') . '/cover_audible_' . $asin . '.jpg', 'error' => null];
+                }
+                $download = $externalCover->downloadCoverImage($coverUrl, $directoryPath, 'audible', $asin);
+                if (!empty($download['success'])) {
+                    return ['success' => true, 'path' => $download['path'], 'error' => null];
+                }
+                $result['error'] = $download['error'] ?? 'Download failed';
+                return $result;
+            }
+        }
+
+        $result['error'] = 'No Audible match found';
+        return $result;
     }
 
     /**

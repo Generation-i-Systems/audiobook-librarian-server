@@ -1039,8 +1039,8 @@ class MigrateMongoToMysql extends Command
                 if (is_iterable($mysqlNarrators)) {
                     foreach ($mysqlNarrators as $narrator) {
                         $name = is_array($narrator) ? ($narrator['name'] ?? null) : (
-                                is_object($narrator) ? ($narrator->name ?? null) : $narrator
-                            );
+                            is_object($narrator) ? ($narrator->name ?? null) : $narrator
+                        );
                         if ($name) {
                             $mysqlNarratorNames[] = $name;
                         }

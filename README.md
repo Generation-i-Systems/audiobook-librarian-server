@@ -465,6 +465,38 @@ php artisan books:test-parse /path/to/audiobooks --extensions=m4b,mp3
 php artisan books:test-parse /path/to/audiobooks --min-size=1048576  # 1MB
 ```
 
+### Repair: Cover Check
+
+Validate and fix book cover images stored on the `books` disk. The command verifies each book's `cover_image` against files in its `directory_path`, tries to locate a local image, and can optionally fetch a missing cover from Audible.
+
+```bash
+# Basic run (checks and fixes locally when possible)
+php artisan cover:check
+
+# Preview actions without changing files or DB
+php artisan cover:check --dry-run
+
+# Limit processing to the first N books
+php artisan cover:check --limit=25
+
+# Attempt fetching from Audible when local cover is missing
+php artisan cover:check --attempt-audible
+
+# Combine options
+php artisan cover:check --attempt-audible --limit=50
+```
+
+Options:
+- `--attempt-audible`: If no suitable local cover is found, search Audible by book title and author, then download the cover via `ExternalCoverService`.
+- `--dry-run`: Perform all checks and log intended changes without downloading files or updating the database.
+- `--limit[=N]`: Process only the first N books. Use `0` (default) for no limit.
+
+Behavior:
+- Scans the book's directory for common image names (e.g., `cover.jpg`, `folder.png`) and sets `cover_image` when found.
+- If none found and `--attempt-audible` is provided, performs an Audible search using `AudibleService` and downloads the best match cover.
+- Saves downloaded images into the book's directory on the `books` disk (e.g., `cover_audible_<ASIN>.jpg`).
+- Updates the `cover_image` field and clears `needs_review` flags on success; otherwise appends a reason to `needs_review_reasons`.
+
 ### Queue Processing
 
 ```bash
