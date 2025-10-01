@@ -155,4 +155,5 @@ Route::prefix('v1')->group(function () {
     // Authentication Routes (outside the auth:sanctum middleware)
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/auth/google', [AuthController::class, 'googleLogin']);
 });

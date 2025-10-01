@@ -140,6 +140,118 @@ class AuthController extends Controller
     }
 
 
+    public function googleLogin(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'idToken' => 'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            Log::error('Google login validation failed', ['errors' => $validator->errors()]);
+            return response()->json($validator->errors(), 400);
+        }
+
+        try {
+            // Verify the Google ID token
+            $client = new \Google_Client(['client_id' => env('GOOGLE_CLIENT_ID')]);
+            $payload = $client->verifyIdToken($request->idToken);
+
+            if (!$payload) {
+                Log::error('Invalid Google ID token');
+                return response()->json(['message' => 'Invalid Google ID token'], 401);
+            }
+
+            $email = $payload['email'] ?? null;
+            $name = $payload['name'] ?? null;
+            $googleId = $payload['sub'] ?? null;
+            $photoUrl = $payload['picture'] ?? null;
+
+            if (!$email || !$googleId) {
+                Log::error('Missing required fields from Google token', ['payload' => $payload]);
+                return response()->json(['message' => 'Invalid token payload'], 401);
+            }
+
+            Log::debug('Google login verified', [
+                'email' => $email,
+                'name' => $name,
+                'google_id' => $googleId
+            ]);
+
+            // Check if user exists by email
+            $user = $this->documentStoreService->getUserByEmail($email);
+
+            if (!$user) {
+                // Create new user with Google info
+                $userData = [
+                    'name' => $name,
+                    'username' => explode('@', $email)[0], // Use email prefix as username
+                    'email' => $email,
+                    'google_id' => $googleId,
+                    'photo_url' => $photoUrl,
+                    'role' => 'unverified', // New Google users start as unverified
+                    'password' => null, // No password for Google-authenticated users
+                ];
+
+                $createdId = $this->documentStoreService->createUser($userData);
+                if (!$createdId) {
+                    Log::error('Failed to create Google user in document store');
+                    return response()->json(['message' => 'Registration failed'], 500);
+                }
+
+                // Fetch the newly created user
+                $user = $this->documentStoreService->getUserByEmail($email);
+                if (!$user) {
+                    Log::error('Failed to fetch newly created Google user');
+                    return response()->json(['message' => 'User creation failed'], 500);
+                }
+
+                Log::info('New Google user created', ['email' => $email, 'id' => $createdId]);
+            } else {
+                // Update existing user's Google info if not set
+                if (empty($user['google_id'])) {
+                    $this->documentStoreService->updateUser($user['id'], [
+                        'google_id' => $googleId,
+                        'photo_url' => $photoUrl ?? $user['photo_url'],
+                    ]);
+                    Log::debug('Updated existing user with Google ID', ['user_id' => $user['id']]);
+                }
+            }
+
+            // Check if user is approved
+            if (($user['role'] ?? '') === 'unverified') {
+                return response()->json(['message' => 'Account pending admin approval'], 403);
+            }
+
+            // Create an API token
+            $tokenValue = bin2hex(random_bytes(32));
+            $tokenData = [
+                'user_id' => (string) ($user['id'] ?? ''),
+                'token' => $tokenValue,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+            $this->documentStoreService->createApiToken($tokenData);
+
+            return response()->json([
+                'id' => (string) ($user['id'] ?? ''),
+                'name' => $user['name'] ?? null,
+                'username' => $user['username'] ?? null,
+                'email' => $user['email'] ?? null,
+                'photo_url' => $user['photo_url'] ?? null,
+                'role' => $user['role'] ?? null,
+                'authToken' => $tokenValue,
+                'refreshToken' => $tokenValue,
+                'token' => $tokenValue,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Google login failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json(['message' => 'Google authentication failed: ' . $e->getMessage()], 500);
+        }
+    }
+
     public function logout(Request $request)
     {
         // Extract bearer token and delete from document store
