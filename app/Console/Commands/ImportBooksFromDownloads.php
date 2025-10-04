@@ -2030,7 +2030,8 @@ class ImportBooksFromDownloads extends Command
             $this->line("1. (A)ccept all metadata as shown");
             $this->line("2. (E)dit individual fields");
             $this->line("3. (P)ath - edit directory path only");
-            $this->line("4. (S)kip this book");
+            $this->line("4. (C)over - edit cover image URL only");
+            $this->line("5. (S)kip this book");
 
             // Default to accept all if confidence is over 80%, otherwise default to edit
             $confidence = $metadata['confidence'] ?? 0;
@@ -2043,7 +2044,7 @@ class ImportBooksFromDownloads extends Command
                 ['type' => 'duplicate_check', 'data' => $audiobook],
             ];
 
-            $choice = $this->askWithBackground("Choose an option (1-4)", $defaultChoice, $backgroundTasks);
+            $choice = $this->askWithBackground("Choose an option (1-5)", $defaultChoice, $backgroundTasks);
 
             // Normalize choice to handle letters
             $choice = strtolower(trim($choice));
@@ -2056,8 +2057,11 @@ class ImportBooksFromDownloads extends Command
             if (in_array($choice, ['p', 'path'])) {
                 $choice = '3';
             }
-            if (in_array($choice, ['s', 'skip'])) {
+            if (in_array($choice, ['c', 'cover'])) {
                 $choice = '4';
+            }
+            if (in_array($choice, ['s', 'skip'])) {
+                $choice = '5';
             }
 
             switch ($choice) {
@@ -2074,6 +2078,13 @@ class ImportBooksFromDownloads extends Command
                     }
                     return true;
                 case '4':
+                    // Edit cover image URL only
+                    $metadata = $this->editCoverImageOnly($metadata, $audiobook);
+                    if ($this->inputInterrupted) {
+                        return false;
+                    }
+                    return true;
+                case '5':
                     return false;
                 default:
                     // Use the determined default behavior
@@ -2770,6 +2781,34 @@ class ImportBooksFromDownloads extends Command
         } catch (\Exception $e) {
             Log::warning("Error scanning subdirectories in {$directory}: " . $e->getMessage());
         }
+    }
+
+    /**
+     * Edit cover image URL only
+     */
+    protected function editCoverImageOnly(array $metadata, array $audiobook): array
+    {
+        $this->newLine();
+        $this->info("📸 Edit Cover Image URL");
+
+        $currentCover = $metadata['cover_url'] ?? '';
+        $this->line("Current cover: {$currentCover}");
+
+        $newCover = $this->askWithImmediateInterrupt("Cover Image URL (or local path)", $currentCover);
+        if ($this->inputInterrupted) {
+            return $metadata;
+        }
+
+        if ($newCover !== $currentCover && !empty($newCover)) {
+            $metadata['cover_url'] = trim($newCover);
+            $this->info("✓ Cover image URL updated");
+
+            // Show updated metadata
+            $this->newLine();
+            $this->displayEnrichedMetadata($metadata);
+        }
+
+        return $metadata;
     }
 
     /**
