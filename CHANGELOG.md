@@ -1,5 +1,60 @@
 ## [Unreleased]
+### Fixed
+- Fixed `BackgroundProcessingService` to properly handle completed processes
+  - Changed `maintainConcurrentTasks()` to call `wait()` on `InvokedProcess` before accessing result methods
+  - Resolves "Call to undefined method Illuminate\Process\InvokedProcess::exitCode()" error
+  - Added comprehensive unit tests for process completion handling
+- Fixed directory path generation to include series numbers in book titles
+  - `BookImportService::generateTargetDirectory()` now includes series number from pivot table
+  - Series numbers are zero-padded (e.g., "01", "09") and prefixed to book titles
+  - Display in import command now shows correct path: "Genre/Author/Series/01 Book Title"
+  - Added comprehensive unit tests for series number formatting
+- Fixed missing `analyzeDirectory()` method in `AudioFileAnalyzer`
+  - Added method to extract metadata from audio file tags using getID3
+  - Properly handles M4B/M4A files using QuickTime metadata atoms (not ID3 tags)
+  - Falls back to ID3 tags for MP3 and other formats
+  - Extracts title, author, series, genre, year, publisher, narrator
+  - Calculates total duration from all audio files in directory
+  - Returns null if no metadata found or directory has no audio files
+  - Added comprehensive unit tests for audio analysis functionality
+- Enhanced `AIBookProcessor::extractFileTags()` to extract embedded cover images
+  - Now extracts picture data from M4B files (`$fileInfo['comments']['picture']`)
+  - Extracts picture data from MP3 files (`$fileInfo['id3v2']['APIC']`)
+  - Prioritizes front cover (picturetypeid == 3) for MP3 files
+  - Returns picture as array with 'data', 'mime', and 'type' fields
+  - Enables multi-book series to use embedded covers from individual M4B files
+- Fixed "Attempt to read property 'role' on null" error on profile page
+  - Moved profile routes inside auth middleware group to require authentication
+  - Added `@auth` directive in profile view to handle unauthenticated access gracefully
+  - Shows login prompt for unauthenticated users instead of throwing error
+  - Removed duplicate profile route definitions
+- Fixed admin users page showing no users
+  - Removed invalid `roles` relationship from `MySqlService::getAllUsers()`
+  - User model uses `role` field, not a `roles` relationship
+  - Simplified UserController to remove unnecessary role normalization logic
+  - Users now display correctly on `/admin/users` page
+- Fixed import-downloads silently failing when database entry exists but files are missing
+  - Removed calls to non-existent `promptForDuplicateAction()` method
+  - Added proper handling for existing books with missing files
+  - Now offers to restore files from new download to existing database entry
+  - User can choose to: restore files, skip import, or continue anyway
+  - Prevents silent failures and provides clear feedback
+
 ### Added
+- Multi-book series detection and splitting in import-downloads command
+  - Automatically detects when a directory contains multiple books from a series
+  - Checks for: multiple large files (>100MB, >3 hours each), different titles
+  - Falls back to filename parsing when metadata is unavailable
+  - Extracts series number from filename patterns (Book 1, Vol 1, 01-, etc.)
+  - Extracts book titles from filenames (e.g., "Willful Child - 01 - Willful Child.m4b" → "Willful Child")
+  - Splits multi-book directories into separate database entries during processing
+  - Preserves series information and relationships
+  - Each book gets proper series number and title from metadata
+  - Extracts embedded cover images from individual M4B files (takes priority over external sources)
+  - Extracts additional metadata (narrator, year, publisher) from M4B file tags
+  - Uses existing AIBookProcessor::extractFileTags() method for metadata extraction
+  - Includes extensive debug output to troubleshoot detection issues
+  - Added comprehensive unit tests covering all detection and splitting scenarios
 - Extended `cover:check` command to validate and fix book cover images
   - Options:
     - `--attempt-audible` to fetch missing covers from Audible using `AudibleService`

@@ -64,7 +64,14 @@ class BookImportService
 
             // Handle publisher
             if (!empty($metadata['publisher'])) {
-                $publisher = is_array($metadata['publisher']) ? $metadata['publisher'][0] : $metadata['publisher'];
+                if (is_array($metadata['publisher'])) {
+                    // If it's an array with 'name' key (from Audible)
+                    $publisher = $metadata['publisher']['name'] ?? $metadata['publisher'][0] ?? null;
+                } elseif (is_object($metadata['publisher'])) {
+                    $publisher = $metadata['publisher']->name ?? null;
+                } else {
+                    $publisher = $metadata['publisher'];
+                }
                 $book->publisher = $publisher;
             }
 
@@ -349,10 +356,17 @@ class BookImportService
         $genre = $book->genres->first()?->name ?? 'Unknown';
         $authorDir = $this->formatAuthorsForDirectory($authors);
 
+        // Get series number from pivot table if book has a series
+        $seriesNumber = null;
+        if ($book->series->isNotEmpty()) {
+            $seriesNumber = $book->series->first()->pivot->series_number ?? null;
+        }
+
         $metadata = [
             'author' => $authors,
             'genre' => $genre,
             'series' => $book->series->first()?->name,
+            'series_number' => $seriesNumber,
             'title' => $book->title
         ];
 
@@ -361,7 +375,15 @@ class BookImportService
 
         // Always include title in path unless explicitly disabled
         if (!isset($options['include_title_in_path']) || $options['include_title_in_path'] !== false) {
-            $path .= "/{$book->title}";
+            $title = $book->title;
+
+            // If we have a series number, prefix it to the title
+            if (!empty($seriesNumber)) {
+                $formattedNumber = str_pad($seriesNumber, 2, '0', STR_PAD_LEFT);
+                $title = $formattedNumber . ' ' . $title;
+            }
+
+            $path .= "/{$title}";
         }
 
         return $path;

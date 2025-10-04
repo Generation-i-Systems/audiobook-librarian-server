@@ -747,9 +747,9 @@ class AIBookProcessor
             $getID3 = new \getID3();
             $fileInfo = $getID3->analyze($filePath);
 
-            if (isset($fileInfo['tags'])) {
-                $tags = [];
+            $tags = [];
 
+            if (isset($fileInfo['tags'])) {
                 // Merge all tag formats (ID3v2, ID3v1, etc.)
                 foreach ($fileInfo['tags'] as $tagFormat => $tagData) {
                     foreach ($tagData as $key => $values) {
@@ -758,9 +758,43 @@ class AIBookProcessor
                         }
                     }
                 }
-
-                return $tags;
             }
+
+            // Extract cover image from QuickTime/M4B files
+            if (!empty($fileInfo['comments']['picture'][0])) {
+                $tags['picture'] = [
+                    'data' => $fileInfo['comments']['picture'][0]['data'],
+                    'mime' => $fileInfo['comments']['picture'][0]['image_mime'] ?? 'image/jpeg',
+                    'type' => 'front_cover',
+                ];
+            }
+
+            // Extract cover image from ID3v2 tags (MP3 files)
+            if (empty($tags['picture']) && !empty($fileInfo['id3v2']['APIC'])) {
+                // Try to find the front cover
+                foreach ($fileInfo['id3v2']['APIC'] as $pic) {
+                    if (isset($pic['picturetypeid']) && $pic['picturetypeid'] == 3) { // 3 = front cover
+                        $tags['picture'] = [
+                            'data' => $pic['data'],
+                            'mime' => $pic['mime'] ?? 'image/jpeg',
+                            'type' => 'front_cover',
+                        ];
+                        break;
+                    }
+                }
+
+                // If no front cover found, use the first picture
+                if (empty($tags['picture']) && !empty($fileInfo['id3v2']['APIC'][0]['data'])) {
+                    $pic = $fileInfo['id3v2']['APIC'][0];
+                    $tags['picture'] = [
+                        'data' => $pic['data'],
+                        'mime' => $pic['mime'] ?? 'image/jpeg',
+                        'type' => 'unknown',
+                    ];
+                }
+            }
+
+            return $tags;
         } catch (\Exception $e) {
             Log::warning('Failed to extract audio file tags', [
                 'file' => $filePath,

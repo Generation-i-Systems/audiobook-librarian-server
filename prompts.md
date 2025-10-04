@@ -42,3 +42,194 @@ more todos
    ☐ Update JavaScript to properly handle date field conversions
    ☐ Test release date functionality end-to-end
    ☐ Create badge display components and UI elements
+
+2025-10-04: Fixed BackgroundProcessingService InvokedProcess Error
+- User reported error: "Call to undefined method Illuminate\Process\InvokedProcess::exitCode()" in BackgroundProcessingService at line 125
+- Root cause: In Laravel 12, Process::start() returns InvokedProcess which doesn't have exitCode() method directly
+- Solution: Call wait() on InvokedProcess to get ProcessResult, then access exitCode(), output(), and errorOutput()
+- Updated maintainConcurrentTasks() method to properly handle process completion
+- Added comprehensive unit tests with Mockery mocks for InvokedProcess and ProcessResult
+- All tests pass, code formatted with Pint, syntax checked
+
+2025-10-04: Fixed Directory Path Generation to Include Series Numbers
+- User reported: Series number not being factored into directory path (e.g., "Willful Child #1" showing as "Science Fiction/Steven Erikson/Willful Child/Willful Child" instead of including "01" prefix)
+- Root cause: generateTargetDirectory() was manually appending title without series number, and metadata didn't include series_number
+- Solution:
+  - Updated BookImportService::generateTargetDirectory() to extract series_number from book's pivot table
+  - Added series_number to metadata array passed to generateDirectoryPath()
+  - Format series number with zero-padding (01, 02, etc.) and prefix to title
+  - Updated ImportBooksFromDownloads::displayEnrichedMetadata() to show correct path with series number
+- Result: Books in series now have paths like "Genre/Author/Series/01 Book Title"
+- Added 5 comprehensive unit tests to verify series number formatting
+- All tests pass, code formatted with Pint
+
+2025-10-04: Fixed Missing analyzeDirectory() Method in AudioFileAnalyzer
+- User reported error: "Call to undefined method App\Services\AudioFileAnalyzer::analyzeDirectory()" at MetadataProcessingService.php:89
+- Context: When AI confidence is low (75%), system tries audio analysis fallback but method didn't exist
+- Root cause: AudioFileAnalyzer had getDirectoryAudioDuration() but not analyzeDirectory() for metadata extraction
+- Solution:
+  - Added analyzeDirectory() method to extract metadata from audio file ID3 tags
+  - Uses getID3 library to read tags from first audio file in directory
+  - Extracts: title, author (artist), series (album), genre, year, publisher, narrator
+  - Calculates total duration using existing getDirectoryAudioDuration()
+  - Returns null if no audio files or no metadata found
+  - Sets confidence to 75% for audio-extracted metadata
+- Added 6 comprehensive unit tests covering edge cases
+- All tests pass, code formatted with Pint
+
+2025-10-04: Fixed Profile Page "Attempt to read property 'role' on null" Error
+- User reported error: "Attempt to read property 'role' on null" at resources/views/profile/index.blade.php:15
+- Context: Profile page accessible at https://books.thelin.org/profile
+- Root cause: Profile routes were not protected by auth middleware, allowing unauthenticated access
+- View was calling Auth::user()->role without checking if user is authenticated
+- Solution:
+  - Moved all profile routes (index, update, changePassword, requestAdminPermissions) inside auth middleware group
+  - Wrapped profile content in @auth directive in view
+  - Added @else block showing login prompt for unauthenticated users
+  - Removed duplicate profile route definitions that were outside auth middleware
+- Result: Profile page now requires authentication and shows friendly login prompt if not authenticated
+- Code formatted with Pint
+
+2025-10-04: Fixed Admin Users Page Showing No Users
+- User reported: https://books.thelin.org/admin/users shows no users
+- Root cause: MySqlService::getAllUsers() was trying to eager load non-existent 'roles' relationship
+- User model has a 'role' field (string), not a 'roles' relationship
+- The invalid relationship was causing the query to fail silently
+- Solution:
+  - Removed ->with(['roles']) from getAllUsers() method in MySqlService
+  - Changed to simple User::all()->toArray()
+  - Simplified UserController::index() to remove unnecessary role normalization logic
+  - Role normalization was trying to handle non-existent roles array from service
+- Result: Admin users page now displays all users correctly
+- Code formatted with Pint
+
+2025-10-04: Fixed Import-Downloads Silently Failing for Existing Books with Missing Files
+- User reported: import-downloads silently failing when database entry exists but files were deleted
+- Goal: Use existing database entry and restore files from new download
+- Root cause: Code was calling non-existent promptForDuplicateAction() method, causing silent failure
+- When existing directory not found, it would fail without proper error handling
+- Solution:
+  - Replaced promptForDuplicateAction() calls with proper inline handling
+  - When existing book found but files missing, now offers options:
+    1. Restore files from new download (uses existing database entry)
+    2. Skip import (leave database as-is)
+  - When storage path/directory path missing, offers:
+    1. Skip import
+    2. Continue anyway (with warning)
+  - Uses BookImportService::moveFilesToLibrary() to restore files to existing book
+  - Properly tracks restored books in processedBooks array
+- Result: Books with missing files can now be restored from new downloads
+- Code formatted with Pint
+
+2025-10-04: Added Multi-Book Series Detection and Splitting
+- User requested: Handle directories with multiple large audiobook files that are separate books in a series
+- Example: "/media/download/Steven Erikson - Willful Child" with multiple m4b files, each >3 hours
+- Requirements:
+  - Check file length (>3 hours each)
+  - Check metadata for different titles
+  - Extract series number from filename
+  - Split into multiple folders and DB entries
+- Solution:
+  - Added detectMultiBookSeries() method to identify multi-book directories
+  - Checks for: multiple files >100MB, duration >3 hours each, different titles in metadata
+  - Added splitMultiBookSeries() to create separate book entries
+  - Added extractSeriesNumber() to parse series numbers from filenames (Book 1, Vol 1, 01-, etc.)
+  - Added extractFileMetadata() to get title, author, album, genre, year from ID3 tags
+  - Integrated into processAudiobook() to check each directory individually during processing
+  - Each book gets: proper series name, series number, individual title, single file
+- User feedback: Check directories one at a time during processing, not all at once during scanning
+- Updated: Moved detection from scanForAudiobooks() to processAudiobook()
+- Issue found: "/media/download/Steven Erikson - Willful Child" not being detected
+- Debug output showed: 3 large files (>3 hours each) but metadata titles all "N/A"
+- Root cause: Files don't have title metadata in ID3 tags, only filenames
+- Solution update:
+  - Added fallback to filename parsing when metadata is unavailable
+  - Extracts clean titles from filenames (removes series prefixes like "01 - ")
+  - Pattern: "Willful Child - 01 - Willful Child.m4b" → "Willful Child"
+  - Updated splitMultiBookSeries() to extract titles from filenames
+  - Added extensive debug output showing file sizes, durations, titles
+- User feedback: M4B files don't use ID3 tags, they use M4B/QuickTime metadata
+- Fixed extractFileMetadata() to properly handle M4B files:
+  - Check fileInfo['quicktime']['comments'] first for M4B/M4A files
+  - Fall back to fileInfo['comments'] for MP3 and other formats
+  - Handle creation_date field for year in QuickTime metadata
+- Also updated AudioFileAnalyzer::analyzeDirectory() with same fix
+- Issue: Infinite loop detected - same directory being split repeatedly
+- Root cause: Split books had same 'path' as parent, so re-detection kept triggering
+- Solution: Added 'is_split_book' flag to split books, skip detection if flag is set
+- Issue: Filename parsing not extracting correct titles
+- Example: "Willful Child - 01 - Willful Child.m4b" was keeping full name instead of just "Willful Child"
+- Root cause: Regex pattern only removed number prefix, not series name prefix
+- Solution: Changed to extract last part after last " - " separator
+- Pattern: /.*\s+-\s+(.+)$/ extracts "Title" from "Series - 01 - Title"
+- Updated both detectMultiBookSeries() and splitMultiBookSeries()
+- User request: Ensure series number is preserved and cover images from individual files are used
+- Created comprehensive unit tests in tests/Unit/Commands/ImportBooksMultiBookSeriesTest.php:
+  - detectMultiBookSeriesIdentifiesMultipleLargeFiles()
+  - extractSeriesNumberFromVariousFilenamePatterns()
+  - splitMultiBookSeriesCreatesIndividualBookEntries()
+  - splitMultiBookSeriesExtractsAuthorFromDirectoryName()
+  - extractFileMetadataHandlesBothQuicktimeAndId3Tags()
+  - splitBooksHaveCorrectMetadataStructure()
+- Tests verify:
+  - Series numbers are correctly extracted (1, 2, 3, etc.)
+  - Metadata structure includes series_number field
+  - Author is extracted from directory name
+  - Original metadata (genre, year) is preserved
+  - Each book has single file reference
+  - is_split_book flag is set
+- All 6 tests pass with 30 assertions
+- Issue: Series number still getting lost after AI processing
+- Root cause: AI processing was overwriting the pre-set series_number from split books
+- Solution: Added metadata preservation logic in processAudiobook():
+  - Check if audiobook['metadata'] exists (from split books)
+  - Preserve series_number, series, and title from split book metadata
+  - Only run extractSeriesNumberFromTitle() if series_number not already set
+  - Skip detectMultiBookPattern() for split books (already processed)
+  - Added debug output showing when pre-set series number is used
+- User request: Cover images from individual M4B files should take priority, use existing methods
+- Solution: Use AIBookProcessor::extractFileTags() instead of custom extraction
+- Extracts from split book M4B files:
+  - Embedded cover image (picture data) - saved as cover.jpg
+  - Narrator metadata
+  - Year metadata  
+  - Publisher metadata
+- Cover from M4B takes priority over external sources (Audible, etc.)
+- Removed custom extractCoverImage() method from AudioFileAnalyzer
+- Added getAIProcessor() helper method
+- Issue: M4B cover still being overwritten by external enrichment
+- Root cause: performExternalDataEnrichment() uses array_merge which overwrites cover_url
+- Solution: Preserve M4B cover before merge, restore after
+  - Check if cover_source === 'Embedded in M4B'
+  - Save cover_url before array_merge
+  - Restore cover_url and cover_source after merge
+  - Added debug output: "Preserving M4B cover (priority over external sources)"
+- Issue: Still using Amazon cover - debug shows "✗ No embedded cover image found in M4B file"
+- Root cause: AIBookProcessor::extractFileTags() wasn't extracting picture data
+- The method only extracted from $fileInfo['tags'], not $fileInfo['comments']['picture']
+- Solution: Enhanced extractFileTags() to extract embedded cover images
+  - Added extraction from $fileInfo['comments']['picture'][0] for M4B files
+  - Added extraction from $fileInfo['id3v2']['APIC'] for MP3 files
+  - Prioritizes front cover (picturetypeid == 3) for MP3
+  - Returns picture as array: ['data' => binary, 'mime' => type, 'type' => 'front_cover']
+- Now extractFileTags() returns complete metadata including embedded artwork
+- Issue: Files not being moved after import - all 3 M4B files stay in download directory
+- Root cause: moveFilesToLibrary() moves entire directory contents, not individual files
+- For split books, we need to move only the single M4B file + cover for each book
+- Solution: Added moveSplitBookFiles() method for split books
+  - Generates target directory using metadata (includes series number in path)
+  - Moves/copies only the single M4B file for this book
+  - Copies the extracted cover.jpg
+  - Updates book.directory_path to target location
+  - Provides debug output showing file operations
+- Split books now bypass normal moveFilesToLibrary() and use custom logic
+- Result: Multi-book series directories are automatically split into individual books during processing
+- Works with both metadata-based and filename-based detection
+- Properly reads M4B metadata atoms and ID3 tags
+- Correctly extracts book titles from filenames
+- Series numbers are preserved through AI processing
+- Pre-set metadata takes priority over AI-extracted metadata
+- Embedded cover images extracted from individual M4B files
+- Additional metadata (narrator, year, publisher) extracted from M4B tags
+- No infinite loops - split books are processed once
+- Code formatted with Pint

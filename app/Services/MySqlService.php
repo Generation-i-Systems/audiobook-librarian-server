@@ -1112,7 +1112,7 @@ class MySqlService implements DocumentStoreServiceInterface
     public function getAllUsers(): array
     {
         try {
-            return User::with(['roles'])->get()->toArray();
+            return User::all()->toArray();
         } catch (\Exception $e) {
             Log::error('MySqlService getAllUsers failed: ' . $e->getMessage());
             return [];

@@ -20,22 +20,9 @@ class UserController extends Controller
 
     public function index()
     {
-        $userList = $this->documentStoreService->getAllUsers();
+        $users = $this->documentStoreService->getAllUsers();
 
-        // Normalize role for view consumption if service provided a roles array
-        $normalized = array_map(function ($u) {
-            if (!isset($u['role'])) {
-                if (isset($u['roles']) && is_array($u['roles']) && !empty($u['roles'])) {
-                    $first = $u['roles'][0] ?? null;
-                    if (is_array($first) && isset($first['name'])) {
-                        $u['role'] = $first['name'];
-                    }
-                }
-            }
-            return $u;
-        }, $userList ?? []);
-
-        return view('admin.users.index', ['users' => $normalized]);
+        return view('admin.users.index', ['users' => $users]);
     }
 
 

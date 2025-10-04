@@ -205,6 +205,12 @@ Route::middleware(['auth'])->group(function () {
         '/reading-progress/{book}',
         [ReadingProgressController::class, 'get']
     )->name('reading_progress.get');
+
+    // Profile routes (require authentication)
+    Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
+    Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::put('/profile/change-password', [ProfileController::class, 'changePassword'])->name('profile.changePassword');
+    Route::post('/profile/request-admin', [ProfileController::class, 'requestAdminPermissions'])->name('profile.requestAdminPermissions');
 });
 
 Route::post('/messages', [MessageController::class, 'store'])->name('messages.store');
@@ -221,16 +227,6 @@ Route::get('/api/books/json', [BookController::class, 'jsonIndex'])->name('api.b
 Route::get('/api/books/recent/json', [BookController::class, 'jsonRecent'])->name('api.books.recent.json');
 Route::get('/books/{id}/download', [BookController::class, 'download'])->name('books.download');
 Route::post('/books/set-preference', [BookController::class, 'setPreference'])->name('books.set-preference');
-Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
-Route::put(
-    '/profile/change-password',
-    [ProfileController::class, 'changePassword']
-)->name('profile.changePassword');
-Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
-Route::post(
-    '/profile/request-admin',
-    [ProfileController::class, 'requestAdminPermissions']
-)->name('profile.requestAdminPermissions');
 
 // General image proxy for covers and previews
 Route::get('/image-proxy', [ImageProxyController::class, 'show'])->name('image.proxy');

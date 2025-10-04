@@ -120,9 +120,10 @@ class BackgroundProcessingService
             $process = $taskInfo['process'];
 
             if (!$process->running()) {
-                $output = $process->output();
-                $errorOutput = $process->errorOutput();
-                $exitCode = $process->exitCode();
+                $processResult = $process->wait();
+                $output = $processResult->output();
+                $errorOutput = $processResult->errorOutput();
+                $exitCode = $processResult->exitCode();
 
                 $result = [
                     'success' => $exitCode === 0,

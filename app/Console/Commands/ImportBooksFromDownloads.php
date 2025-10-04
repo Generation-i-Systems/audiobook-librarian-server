@@ -504,6 +504,274 @@ class ImportBooksFromDownloads extends Command
         return null;
     }
 
+    /**
+     * Detect if directory contains multiple books in a series
+     * Checks for: multiple large files (>3 hours each), numbered files, different titles in metadata
+     *
+     * @param  string  $directory  Path to directory
+     * @return array|null Array of individual book data if multi-book series detected, null otherwise
+     */
+    protected function detectMultiBookSeries(string $directory): ?array
+    {
+        $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
+        $largeFiles = [];
+        $minDuration = 3 * 3600; // 3 hours in seconds
+
+        $this->line("🔍 Checking for multi-book series in: " . basename($directory));
+
+        // Find all audio files directly in this directory (not subdirectories)
+        $files = File::files($directory);
+        $this->line("  Found " . count($files) . " files in directory");
+
+        foreach ($files as $file) {
+            $extension = strtolower($file->getExtension());
+            if (! in_array($extension, $audioExtensions)) {
+                continue;
+            }
+
+            $fileSize = $file->getSize();
+            $filePath = $file->getPathname();
+            $sizeMB = round($fileSize / (1024 * 1024), 2);
+
+            $this->line("  Audio file: " . $file->getFilename() . " ({$sizeMB} MB)");
+
+            // Check if file is large enough (rough estimate: >100MB suggests long audiobook)
+            if ($fileSize > 100 * 1024 * 1024) {
+                // Get duration and metadata
+                $duration = $this->getAudioAnalyzer()->getAudioDuration($filePath);
+                $durationHours = $duration ? round($duration / 3600, 2) : 0;
+                $this->line("    Duration: {$durationHours} hours");
+
+                $metadata = $this->extractFileMetadata($filePath);
+                $this->line("    Title from metadata: " . ($metadata['title'] ?? 'N/A'));
+
+                if ($duration && $duration >= $minDuration) {
+                    $largeFiles[] = [
+                        'path' => $filePath,
+                        'filename' => $file->getFilename(),
+                        'size' => $fileSize,
+                        'duration' => $duration,
+                        'metadata' => $metadata,
+                    ];
+                    $this->line("    ✓ Qualifies as large file (>3 hours)");
+                } else {
+                    $this->line("    ✗ Too short (need >3 hours)");
+                }
+            } else {
+                $this->line("    ✗ Too small (need >100MB)");
+            }
+        }
+
+        $this->line("  Large files found: " . count($largeFiles));
+
+        // Need at least 2 large files to be a multi-book series
+        if (count($largeFiles) < 2) {
+            $this->line("  Not a multi-book series (need at least 2 large files)");
+            return null;
+        }
+
+        // Check if files have different titles in metadata or filenames
+        $uniqueTitles = [];
+        $hasMetadata = false;
+
+        foreach ($largeFiles as $fileData) {
+            // Try metadata first
+            if (! empty($fileData['metadata']['title'])) {
+                $uniqueTitles[$fileData['metadata']['title']] = true;
+                $hasMetadata = true;
+            } else {
+                // Fall back to filename (without extension and series number prefix)
+                $filename = pathinfo($fileData['filename'], PATHINFO_FILENAME);
+                // Extract the last part after the last " - " (e.g., "Series - 01 - Title" → "Title")
+                if (preg_match('/.*\s+-\s+(.+)$/', $filename, $matches)) {
+                    $cleanName = $matches[1];
+                } else {
+                    $cleanName = $filename;
+                }
+                $uniqueTitles[$cleanName] = true;
+            }
+        }
+
+        $this->line("  Unique titles found: " . count($uniqueTitles) . " (from " . ($hasMetadata ? 'metadata' : 'filenames') . ")");
+        foreach ($uniqueTitles as $title => $val) {
+            $this->line("    - {$title}");
+        }
+
+        // If we have multiple unique titles, this is likely a multi-book series
+        if (count($uniqueTitles) >= 2) {
+            $this->info("🔍 Detected multi-book series in directory: " . basename($directory));
+            $this->line("  Found " . count($largeFiles) . " books with " . count($uniqueTitles) . " unique titles");
+
+            return $this->splitMultiBookSeries($directory, $largeFiles);
+        }
+
+        $this->line("  Not a multi-book series (need at least 2 unique titles)");
+        return null;
+    }
+
+    /**
+     * Split multi-book series into individual book entries
+     *
+     * @param  string  $directory  Parent directory path
+     * @param  array  $largeFiles  Array of large file data
+     * @return array Array of individual book data
+     */
+    protected function splitMultiBookSeries(string $directory, array $largeFiles): array
+    {
+        $books = [];
+        $seriesName = basename($directory);
+
+        // Extract series info from directory name (e.g., "Author - Series Name")
+        if (preg_match('/^(.+?)\s*-\s*(.+)$/', $seriesName, $matches)) {
+            $author = trim($matches[1]);
+            $series = trim($matches[2]);
+        } else {
+            $author = '';
+            $series = $seriesName;
+        }
+
+        foreach ($largeFiles as $fileData) {
+            $filename = $fileData['filename'];
+            $metadata = $fileData['metadata'];
+
+            // Extract series number from filename (look for patterns like "01", "1", "Book 1", etc.)
+            $seriesNumber = $this->extractSeriesNumber($filename);
+
+            // Use metadata title or extract from filename
+            if (! empty($metadata['title'])) {
+                $bookTitle = $metadata['title'];
+            } else {
+                // Extract title from filename (get the last part after the last " - ")
+                $filenameWithoutExt = pathinfo($filename, PATHINFO_FILENAME);
+                // Pattern: "Series - 01 - Title" → "Title"
+                if (preg_match('/.*\s+-\s+(.+)$/', $filenameWithoutExt, $matches)) {
+                    $bookTitle = $matches[1];
+                } else {
+                    $bookTitle = $filenameWithoutExt;
+                }
+            }
+
+            $books[] = [
+                'path' => $directory, // Keep same parent directory
+                'name' => $bookTitle,
+                'files' => [$fileData['path']], // Single file for this book
+                'total_size' => $fileData['size'],
+                'duration' => $fileData['duration'],
+                'is_split_book' => true, // Flag to prevent re-detection
+                'metadata' => array_merge($metadata, [
+                    'title' => $bookTitle, // Ensure title is set
+                    'series' => $series,
+                    'series_number' => $seriesNumber,
+                    'author' => $metadata['author'] ?? [$author],
+                    'is_split_from_multi_book' => true,
+                    'original_directory' => $directory,
+                ]),
+            ];
+        }
+
+        return $books;
+    }
+
+    /**
+     * Extract series number from filename
+     *
+     * @param  string  $filename  Filename to parse
+     * @return int|null Series number or null if not found
+     */
+    protected function extractSeriesNumber(string $filename): ?int
+    {
+        // Try various patterns
+        $patterns = [
+            '/(?:book|vol|volume|part|#)\s*(\d+)/i', // "Book 1", "Vol 1", "Part 1", "#1"
+            '/^(\d+)\s*-/', // "01 - Title"
+            '/\s(\d+)\s*-/', // "Title 1 - Subtitle"
+            '/\s(\d+)\./', // "Title 1.m4b"
+            '/[^\d](\d+)[^\d]*$/', // Number at end
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $filename, $matches)) {
+                return (int) $matches[1];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Extract metadata from a single audio file
+     * Handles both ID3 tags (MP3) and MP4/M4A/M4B metadata atoms
+     *
+     * @param  string  $filePath  Path to audio file
+     * @return array Metadata array
+     */
+    protected function extractFileMetadata(string $filePath): array
+    {
+        if (! class_exists('getID3')) {
+            return [];
+        }
+
+        try {
+            $getID3 = new \getID3();
+            $fileInfo = $getID3->analyze($filePath);
+            \getid3_lib::CopyTagsToComments($fileInfo);
+
+            $metadata = [];
+
+            // For M4B/M4A files, check quicktime tags first
+            if (isset($fileInfo['quicktime']['comments'])) {
+                $qtComments = $fileInfo['quicktime']['comments'];
+
+                if (isset($qtComments['title'][0])) {
+                    $metadata['title'] = $qtComments['title'][0];
+                }
+
+                if (isset($qtComments['artist'][0])) {
+                    $metadata['author'] = [$qtComments['artist'][0]];
+                }
+
+                if (isset($qtComments['album'][0])) {
+                    $metadata['album'] = $qtComments['album'][0];
+                }
+
+                if (isset($qtComments['genre'][0])) {
+                    $metadata['genre'] = [$qtComments['genre'][0]];
+                }
+
+                if (isset($qtComments['creation_date'][0])) {
+                    $metadata['year'] = substr($qtComments['creation_date'][0], 0, 4);
+                }
+            }
+
+            // Fall back to standard comments (for MP3 and other formats)
+            if (empty($metadata) && isset($fileInfo['comments'])) {
+                if (isset($fileInfo['comments']['title'][0])) {
+                    $metadata['title'] = $fileInfo['comments']['title'][0];
+                }
+
+                if (isset($fileInfo['comments']['artist'][0])) {
+                    $metadata['author'] = [$fileInfo['comments']['artist'][0]];
+                }
+
+                if (isset($fileInfo['comments']['album'][0])) {
+                    $metadata['album'] = $fileInfo['comments']['album'][0];
+                }
+
+                if (isset($fileInfo['comments']['genre'][0])) {
+                    $metadata['genre'] = [$fileInfo['comments']['genre'][0]];
+                }
+
+                if (isset($fileInfo['comments']['year'][0])) {
+                    $metadata['year'] = $fileInfo['comments']['year'][0];
+                }
+            }
+
+            return $metadata;
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
 
 
     /**
@@ -986,6 +1254,21 @@ class ImportBooksFromDownloads extends Command
      */
     protected function processAudiobook(array $audiobook): void
     {
+        // Skip multi-book detection if this is already a split book
+        if (empty($audiobook['is_split_book'])) {
+            // Check if this directory contains multiple books in a series
+            // This must be done BEFORE validation and AI processing
+            $multiBooks = $this->detectMultiBookSeries($audiobook['path']);
+            if ($multiBooks) {
+                $this->info("📚 Processing multi-book series separately...");
+                foreach ($multiBooks as $individualBook) {
+                    // Process each book individually
+                    $this->processAudiobook($individualBook);
+                }
+                return; // Stop processing the parent directory
+            }
+        }
+
         // Validate audiobook files before processing
         if (!$this->validateAudiobookFiles($audiobook)) {
             return; // Skip if validation fails
@@ -999,15 +1282,82 @@ class ImportBooksFromDownloads extends Command
 
         $this->info("✅ AI processing successful (confidence: {$aiMetadata['confidence']}%)");
 
-        // Extract series number from title and clean metadata
-        $this->getEnrichmentService()->extractSeriesNumberFromTitle($aiMetadata);
+        // If this is a split book, preserve the pre-set series number and other metadata
+        if (!empty($audiobook['metadata'])) {
+            // Merge pre-set metadata, giving priority to split book metadata for series info
+            if (isset($audiobook['metadata']['series_number'])) {
+                $aiMetadata['series_number'] = $audiobook['metadata']['series_number'];
+                $this->line("  Using pre-set series number: {$aiMetadata['series_number']}");
+            }
+            if (isset($audiobook['metadata']['series'])) {
+                $aiMetadata['series'] = $audiobook['metadata']['series'];
+            }
+            if (isset($audiobook['metadata']['title'])) {
+                $aiMetadata['title'] = $audiobook['metadata']['title'];
+            }
 
-        // Handle multi-book patterns (simplified)
-        $multiBookInfo = $this->getMetadataService()->detectMultiBookPattern($audiobook['name']);
-        if ($multiBookInfo) {
-            $this->info("📚 Detected multi-book directory: {$multiBookInfo['series_name']} [{$multiBookInfo['start_number']}-{$multiBookInfo['end_number']}]");
-            $aiMetadata['series'] = $multiBookInfo['series_name'];
-            $aiMetadata['multi_book_numbers'] = range($multiBookInfo['start_number'], $multiBookInfo['end_number']);
+            // Extract cover image and additional metadata from the M4B file if this is a split book
+            if (!empty($audiobook['is_split_book']) && !empty($audiobook['files'][0])) {
+                $audioFilePath = $audiobook['files'][0];
+
+                // Extract file tags using existing AIBookProcessor method
+                $this->line("  Extracting metadata from M4B file: " . basename($audioFilePath));
+                $fileTags = $this->getAIProcessor()->extractFileTags($audioFilePath);
+
+                $this->line("  File tags extracted: " . (empty($fileTags) ? 'NONE' : count($fileTags) . ' fields'));
+                if (!empty($fileTags)) {
+                    $this->line("  Available fields: " . implode(', ', array_keys($fileTags)));
+                }
+
+                // Use metadata from file tags if available and not already set
+                if (!empty($fileTags)) {
+                    if (empty($aiMetadata['narrator']) && !empty($fileTags['narrator'])) {
+                        $aiMetadata['narrator'] = is_array($fileTags['narrator']) ? $fileTags['narrator'] : [$fileTags['narrator']];
+                        $this->line("  ✓ Using narrator from M4B: " . (is_array($aiMetadata['narrator']) ? implode(', ', $aiMetadata['narrator']) : $aiMetadata['narrator']));
+                    }
+                    if (empty($aiMetadata['year']) && !empty($fileTags['year'])) {
+                        $aiMetadata['year'] = $fileTags['year'];
+                        $this->line("  ✓ Using year from M4B: {$aiMetadata['year']}");
+                    }
+                    if (empty($aiMetadata['publisher']) && !empty($fileTags['publisher'])) {
+                        $aiMetadata['publisher'] = $fileTags['publisher'];
+                        $this->line("  ✓ Using publisher from M4B: {$aiMetadata['publisher']}");
+                    }
+
+                    // Extract embedded cover image if available
+                    if (!empty($fileTags['picture']['data'])) {
+                        $this->line("  Found embedded cover image in M4B file");
+                        $coverFile = $audiobook['path'] . '/cover.jpg';
+                        $bytesWritten = file_put_contents($coverFile, $fileTags['picture']['data']);
+                        $this->line("  Wrote {$bytesWritten} bytes to: {$coverFile}");
+                        $aiMetadata['cover_url'] = $coverFile;
+                        $aiMetadata['cover_source'] = 'Embedded in M4B';
+                        $this->info("  ✓ Extracted cover from M4B file: {$coverFile}");
+                    } else {
+                        $this->warn("  ✗ No embedded cover image found in M4B file");
+                        if (isset($fileTags['picture'])) {
+                            $this->line("  Picture field exists but no data: " . json_encode(array_keys($fileTags['picture'])));
+                        }
+                    }
+                } else {
+                    $this->warn("  ✗ No file tags extracted from M4B");
+                }
+            }
+        }
+
+        // Extract series number from title and clean metadata (only if not already set)
+        if (empty($aiMetadata['series_number'])) {
+            $this->getEnrichmentService()->extractSeriesNumberFromTitle($aiMetadata);
+        }
+
+        // Handle multi-book patterns (simplified) - skip if already a split book
+        if (empty($audiobook['is_split_book'])) {
+            $multiBookInfo = $this->getMetadataService()->detectMultiBookPattern($audiobook['name']);
+            if ($multiBookInfo) {
+                $this->info("📚 Detected multi-book directory: {$multiBookInfo['series_name']} [{$multiBookInfo['start_number']}-{$multiBookInfo['end_number']}]");
+                $aiMetadata['series'] = $multiBookInfo['series_name'];
+                $aiMetadata['multi_book_numbers'] = range($multiBookInfo['start_number'], $multiBookInfo['end_number']);
+            }
         }
 
         // Check for duplicates with AI-extracted metadata (more accurate than path-based check)
@@ -1055,14 +1405,68 @@ class ImportBooksFromDownloads extends Command
         $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
         if (!$bookStoragePath || !$existingBook->directory_path) {
             $this->warn("📁 Cannot compare directories (storage path or directory path missing)");
-            return $this->promptForDuplicateAction($audiobook, $existingBook);
+            $this->warn("  This may indicate a configuration issue or corrupted database entry");
+
+            $this->line("\nOptions:");
+            $this->line("1. Skip import");
+            $this->line("2. Continue anyway (may cause issues)");
+
+            $choice = $this->ask("Choose an option (1-2)", '1');
+
+            if ($choice === '2') {
+                return true; // Continue with import
+            } else {
+                $this->skippedBooks[] = [
+                    'path' => $audiobook['path'],
+                    'reason' => 'Cannot compare directories - missing configuration or path',
+                ];
+                return false; // Stop processing
+            }
         }
 
         $existingDir = $bookStoragePath . '/' . $existingBook->directory_path;
         if (!File::isDirectory($existingDir)) {
-            $this->warn("📁 Cannot compare directories (existing directory not found)");
-            $this->line("  Existing path: {$existingDir}");
-            return $this->promptForDuplicateAction($audiobook, $existingBook);
+            $this->warn("📁 Existing directory not found - files may have been deleted");
+            $this->line("  Expected path: {$existingDir}");
+            $this->info("  Database entry exists but files are missing");
+
+            // Offer to restore files from new download
+            $this->line("\nOptions:");
+            $this->line("1. Restore files from new download (use existing database entry)");
+            $this->line("2. Skip import (leave database entry as-is)");
+
+            $choice = $this->ask("Choose an option (1-2)", '1');
+
+            if ($choice === '1') {
+                $this->info("📁 Restoring files to existing book entry");
+                // Use the existing book and just move the files
+                $success = $this->getImportService()->moveFilesToLibrary($audiobook, $existingBook, [
+                    'operation' => $this->option('copy-files') ? 'copy' : 'move'
+                ]);
+
+                if ($success) {
+                    $this->info("✅ Files restored successfully to existing book (ID: {$existingBook->id})");
+                    $this->processedBooks[] = [
+                        'path' => $audiobook['path'],
+                        'book_id' => $existingBook->id,
+                        'title' => $existingBook->title,
+                    ];
+                } else {
+                    $this->error("❌ Failed to restore files");
+                    $this->failedBooks[] = [
+                        'path' => $audiobook['path'],
+                        'error' => 'Failed to restore files to existing book',
+                    ];
+                }
+                return false; // Stop processing since we handled it
+            } else {
+                $this->info("📁 Skipping import");
+                $this->skippedBooks[] = [
+                    'path' => $audiobook['path'],
+                    'reason' => 'User chose to skip (existing book with missing files)',
+                ];
+                return false; // Stop processing
+            }
         }
 
         // Compare directories to see if they're identical
@@ -1158,7 +1562,21 @@ class ImportBooksFromDownloads extends Command
         }
 
         if ($this->getEnrichmentService()->isValidEnrichment($aiMetadata, $enrichedData)) {
+            // Preserve M4B-extracted cover if it exists
+            $m4bCover = null;
+            if (isset($aiMetadata['cover_source']) && $aiMetadata['cover_source'] === 'Embedded in M4B') {
+                $m4bCover = $aiMetadata['cover_url'];
+                $this->line("  Preserving M4B cover (priority over external sources)");
+            }
+
             $aiMetadata = array_merge($aiMetadata, $enrichedData);
+
+            // Restore M4B cover if it was set
+            if ($m4bCover) {
+                $aiMetadata['cover_url'] = $m4bCover;
+                $aiMetadata['cover_source'] = 'Embedded in M4B';
+            }
+
             $this->info("✅ Found enrichment data!");
         } else {
             $this->warn("⚠️  Invalid enrichment data - skipping merge.");
@@ -1197,6 +1615,9 @@ class ImportBooksFromDownloads extends Command
      */
     protected function performDatabaseImport(array $aiMetadata, array $audiobook): void
     {
+        $this->line("DEBUG: performDatabaseImport called for: " . ($aiMetadata['title'] ?? 'UNKNOWN'));
+        $this->line("DEBUG: is_split_book = " . ($audiobook['is_split_book'] ?? 'NOT SET'));
+
         if ($this->option('dry-run')) {
             $this->info("🔍 [DRY RUN] Would import: {$aiMetadata['title']}");
             return;
@@ -1207,22 +1628,81 @@ class ImportBooksFromDownloads extends Command
         $spinner->setMessage("💾 Creating database record...");
         $spinner->start();
 
-        $book = $this->getImportService()->createBookFromMetadata($aiMetadata, $audiobook);
+        try {
+            $book = $this->getImportService()->createBookFromMetadata($aiMetadata, $audiobook);
+        } catch (\Exception $e) {
+            $book = null;
+            $spinner->finish();
+            $this->output->write("\r\033[K");
+            $this->error("DEBUG: Exception during book creation: " . $e->getMessage());
+            $this->line("DEBUG: Exception trace: " . $e->getTraceAsString());
+        }
 
-        $spinner->finish();
-        $this->output->write("\r\033[K");
+        if (!isset($book)) {
+            $spinner->finish();
+            $this->output->write("\r\033[K");
+        }
+
+        $this->line("DEBUG: Book created: " . ($book ? "YES (ID: {$book->id})" : "NO - FAILED"));
 
         if (!$book) {
-            return;
+            // Check Laravel logs for more details
+            $this->line("DEBUG: Check storage/logs/laravel.log for detailed error information");
+        }
+
+        if (!$book) {
+            // Book creation failed - likely because it already exists
+            $this->warn("⚠️  Book creation failed - checking if book already exists...");
+
+            // Try to find existing book
+            $existingBook = $this->findExistingBookForRestore($aiMetadata);
+
+            if ($existingBook) {
+                $this->info("Found existing book: '{$existingBook->title}' (ID: {$existingBook->id})");
+
+                // Check if files exist
+                $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
+                $existingDir = $bookStoragePath . '/' . $existingBook->directory_path;
+
+                if (!File::isDirectory($existingDir) || $this->isDirectoryEmpty($existingDir)) {
+                    $this->warn("📁 Existing book has missing or empty directory");
+                    $this->line("  Expected: {$existingDir}");
+                    $this->info("Will merge metadata and restore files to existing book record");
+
+                    $book = $this->mergeAndRestoreBook($existingBook, $aiMetadata, $audiobook);
+                } else {
+                    $this->warn("Existing book has files - cannot import duplicate");
+                    $this->line("  Directory: {$existingDir}");
+
+                    if ($this->confirm("Do you want to overwrite the existing files?", false)) {
+                        $book = $this->mergeAndRestoreBook($existingBook, $aiMetadata, $audiobook);
+                    } else {
+                        $this->info("Skipping - existing files preserved");
+                        return;
+                    }
+                }
+            } else {
+                $this->error("❌ Failed to create book record and no existing book found");
+                return;
+            }
         }
 
         $this->info("✅ Book imported successfully: {$book->title} (ID: {$book->id})");
 
         // Step 5: Move/copy files
-        $options = [
-            'operation' => $this->option('copy-files') ? 'copy' : 'move'
-        ];
-        $success = $this->getImportService()->moveFilesToLibrary($audiobook, $book, $options);
+        // For split books, we need special handling since we only want to move one file
+        if (!empty($audiobook['is_split_book'])) {
+            $this->info("📦 Using split book file handling");
+            $this->line("  Source file: " . ($audiobook['files'][0] ?? 'NONE'));
+            $this->line("  Is split book: " . ($audiobook['is_split_book'] ? 'YES' : 'NO'));
+            $success = $this->moveSplitBookFiles($audiobook, $book, $aiMetadata);
+        } else {
+            $this->info("📦 Using standard file handling");
+            $options = [
+                'operation' => $this->option('copy-files') ? 'copy' : 'move'
+            ];
+            $success = $this->getImportService()->moveFilesToLibrary($audiobook, $book, $options);
+        }
 
         if ($success) {
             $this->info("📁 Files " . ($this->option('copy-files') ? 'copied' : 'moved') . " to library successfully");
@@ -1305,9 +1785,17 @@ class ImportBooksFromDownloads extends Command
             $tableData[] = ['Source Path', $displayPath];
         }
 
-        // Calculate and add expected directory path (including book title)
+        // Calculate and add expected directory path (including book title with series number)
         $basePath = $this->getImportService()->generateDirectoryPath($metadata);
-        $expectedPath = $basePath . '/' . ($metadata['title'] ?? 'Unknown Title');
+        $title = $metadata['title'] ?? 'Unknown Title';
+
+        // If we have a series number, prefix it to the title
+        if (!empty($metadata['series_number'])) {
+            $formattedNumber = str_pad($metadata['series_number'], 2, '0', STR_PAD_LEFT);
+            $title = $formattedNumber . ' ' . $title;
+        }
+
+        $expectedPath = $basePath . '/' . $title;
         $tableData[] = ['Directory Path', $expectedPath];
 
         // Add description if available (truncated for display)
@@ -1881,6 +2369,267 @@ class ImportBooksFromDownloads extends Command
         }
 
         return $this->directoryParser;
+    }
+
+    /**
+     * Get audio file analyzer instance
+     */
+    protected function getAudioAnalyzer(): AudioFileAnalyzer
+    {
+        if (!$this->audioAnalyzer) {
+            $this->audioAnalyzer = app(AudioFileAnalyzer::class);
+        }
+        return $this->audioAnalyzer;
+    }
+
+    /**
+     * Get AI processor instance
+     */
+    protected function getAIProcessor(): AIBookProcessor
+    {
+        if (!$this->aiProcessor) {
+            $this->aiProcessor = app(AIBookProcessor::class);
+        }
+        return $this->aiProcessor;
+    }
+
+    /**
+ * Find existing book for restore operation
+ */
+    protected function findExistingBookForRestore(array $aiMetadata): ?Book
+    {
+        $title = $aiMetadata['title'] ?? null;
+        $author = is_array($aiMetadata['author']) ? $aiMetadata['author'][0] : ($aiMetadata['author'] ?? null);
+
+        if (!$title || !$author) {
+            $this->line("  Cannot search: title='" . ($title ?: 'EMPTY') . "', author='" . ($author ?: 'EMPTY') . "'");
+            return null;
+        }
+
+        $this->line("  Searching for: title='{$title}', author='{$author}'");
+
+        // Try exact match first
+        $book = Book::where('title', $title)
+            ->whereHas('authors', function ($query) use ($author) {
+                $query->where('name', $author);
+            })
+            ->first();
+
+        if ($book) {
+            $this->line("  Found by exact title match");
+            return $book;
+        }
+
+        // Try with series info if available
+        if (!empty($aiMetadata['series']) && !empty($aiMetadata['series_number'])) {
+            $series = $aiMetadata['series'];
+            $seriesNumber = $aiMetadata['series_number'];
+
+            $this->line("  Trying series match: series='{$series}', number={$seriesNumber}");
+
+            $book = Book::whereHas('authors', function ($query) use ($author) {
+                $query->where('name', $author);
+            })
+                ->whereHas('series', function ($query) use ($series) {
+                    $query->where('name', $series);
+                })
+                ->get()
+                ->first(function ($b) use ($seriesNumber) {
+                    // Check series number in the pivot
+                    $bookSeries = $b->series->first();
+                    return $bookSeries && $bookSeries->pivot->series_number == $seriesNumber;
+                });
+
+            if ($book) {
+                $this->line("  ✓ Found by series + number match: '{$book->title}'");
+                return $book;
+            }
+        }
+
+        $this->line("  ✗ No existing book found");
+        return null;
+    }
+
+    /**
+     * Check if directory is empty
+     */
+    protected function isDirectoryEmpty(string $directory): bool
+    {
+        if (!is_dir($directory)) {
+            return true;
+        }
+
+        $files = scandir($directory);
+        return count($files) <= 2; // Only . and ..
+    }
+
+    /**
+     * Merge metadata and restore book
+     */
+    protected function mergeAndRestoreBook(Book $existingBook, array $newMetadata, array $audiobook): Book
+    {
+        $this->info("🔄 Merging metadata with existing book...");
+
+        // Compare and prompt for differences
+        $fieldsToCheck = ['title', 'description', 'language', 'publisher', 'year', 'isbn'];
+
+        foreach ($fieldsToCheck as $field) {
+            $existingValue = $existingBook->$field;
+            $newValue = $newMetadata[$field] ?? null;
+
+            // Skip if values are the same or new value is empty
+            if ($existingValue == $newValue || empty($newValue)) {
+                continue;
+            }
+
+            $this->newLine();
+            $this->line("Field: <info>{$field}</info>");
+            $this->line("  Existing: " . ($existingValue ?: '(empty)'));
+            $this->line("  New:      " . ($newValue ?: '(empty)'));
+
+            $choice = $this->choice(
+                "Which value should we use?",
+                ['Keep existing', 'Use new', 'Skip (keep existing)'],
+                0
+            );
+
+            if ($choice === 'Use new') {
+                $existingBook->$field = $newValue;
+            }
+        }
+
+        $existingBook->save();
+        $this->info("✓ Metadata merged");
+
+        return $existingBook;
+    }
+
+    /**
+     * Move files for a split book (single M4B file + cover)
+     *
+     * @param  array  $audiobook  Audiobook data
+     * @param  Book  $book  Book model
+     * @param  array  $aiMetadata  Metadata including cover path
+     * @return bool Success status
+     */
+    protected function moveSplitBookFiles(array $audiobook, Book $book, array $aiMetadata): bool
+    {
+        try {
+            $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
+            if (!$bookStoragePath) {
+                throw new \Exception('Book storage path not configured');
+            }
+
+            // Generate target directory using metadata
+            $relativePath = $this->getImportService()->generateDirectoryPath($aiMetadata);
+
+            // For split books, the directory path should include the book-specific subdirectory
+            // which includes the series number (e.g., "01 Willful Child")
+            $bookSubdir = $aiMetadata['title'];
+            if (!empty($aiMetadata['series_number'])) {
+                $bookSubdir = str_pad($aiMetadata['series_number'], 2, '0', STR_PAD_LEFT) . ' ' . $bookSubdir;
+            }
+            $targetDir = $bookStoragePath . '/' . $relativePath . '/' . $bookSubdir;
+
+            $this->line("  Creating target directory: {$targetDir}");
+            if (!File::isDirectory($targetDir)) {
+                File::makeDirectory($targetDir, 0775, true);
+            }
+
+            // Get the single M4B file for this book
+            $sourceFile = $audiobook['files'][0];
+            $targetFile = $targetDir . '/' . basename($sourceFile);
+
+            $operation = $this->option('copy-files') ? 'copy' : 'move';
+            $this->line("  {$operation}ing M4B file: " . basename($sourceFile));
+
+            if ($operation === 'copy') {
+                if (!File::copy($sourceFile, $targetFile)) {
+                    throw new \Exception("Failed to copy file from {$sourceFile} to {$targetFile}");
+                }
+            } else {
+                // Use copy+delete instead of move to avoid cross-filesystem issues
+                if (!File::copy($sourceFile, $targetFile)) {
+                    throw new \Exception("Failed to copy file from {$sourceFile} to {$targetFile}");
+                }
+                if (!File::delete($sourceFile)) {
+                    $this->warn("  Warning: Failed to delete source file after copy: {$sourceFile}");
+                }
+            }
+
+            // Copy the extracted cover image if it exists
+            if (!empty($aiMetadata['cover_url']) && File::exists($aiMetadata['cover_url'])) {
+                $coverTarget = $targetDir . '/cover.jpg';
+                $this->line("  Copying cover image");
+                File::copy($aiMetadata['cover_url'], $coverTarget);
+
+                // Delete the source cover.jpg from download directory
+                if ($operation === 'move' && File::exists($aiMetadata['cover_url'])) {
+                    File::delete($aiMetadata['cover_url']);
+                    $this->line("  Deleted source cover image");
+                }
+            }
+
+            // Update book directory path (relative to storage path)
+            $book->directory_path = $relativePath . '/' . $bookSubdir;
+            $book->save();
+
+            // Check if source directory is empty and prompt for cleanup
+            $sourceDir = $audiobook['path'];
+            if ($operation === 'move' && File::isDirectory($sourceDir)) {
+                $this->checkAndCleanupSourceDirectory($sourceDir);
+            }
+
+            $this->line("  ✓ Split book files moved successfully");
+            return true;
+        } catch (\Exception $e) {
+            $this->error("  ✗ Failed to move split book files: " . $e->getMessage());
+            Log::error("Failed to move split book files", [
+                'audiobook' => $audiobook,
+                'book_id' => $book->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * Check if source directory has remaining files and prompt for cleanup
+     */
+    protected function checkAndCleanupSourceDirectory(string $directory): void
+    {
+        if (!File::isDirectory($directory)) {
+            return;
+        }
+
+        $files = File::files($directory);
+        $directories = File::directories($directory);
+
+        if (empty($files) && empty($directories)) {
+            // Directory is empty, delete it
+            $this->line("  Source directory is empty, deleting: {$directory}");
+            File::deleteDirectory($directory);
+            $this->info("  ✓ Deleted empty source directory");
+        } elseif (!empty($files) || !empty($directories)) {
+            // Directory has remaining files
+            $this->newLine();
+            $this->warn("⚠️  Source directory still contains files:");
+            $this->line("  Directory: {$directory}");
+
+            // Show directory contents
+            $this->line("  Contents:");
+            $process = new \Symfony\Component\Process\Process(['ls', '-lh', $directory]);
+            $process->run();
+            $this->line($process->getOutput());
+
+            if ($this->confirm("Delete this directory and all remaining files?", false)) {
+                File::deleteDirectory($directory);
+                $this->info("  ✓ Deleted source directory");
+            } else {
+                $this->info("  Source directory preserved");
+            }
+        }
     }
 
     /**

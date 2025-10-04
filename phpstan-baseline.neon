@@ -1,0 +1,8 @@
+parameters:
+    ignoreErrors:
+        # Mockery false positives - shouldReceive() returns proper mock interface
+        -
+            message: '#Call to an undefined method Mockery\\ExpectationInterface\|Mockery\\HigherOrderMessage::#'
+            paths:
+                - tests/Unit/Services/BackgroundProcessingServiceTest.php
+                - */tests/Unit/Services/BackgroundProcessingServiceTest.php

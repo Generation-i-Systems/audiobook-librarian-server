@@ -117,4 +117,102 @@ class AudioFileAnalyzer
             'file_count' => $fileCount,
         ];
     }
+
+    /**
+     * Analyze directory and extract metadata from audio files
+     *
+     * @param  string  $directory  Path to directory containing audio files
+     * @return array|null Metadata extracted from audio files, or null if no metadata found
+     */
+    public function analyzeDirectory(string $directory): ?array
+    {
+        if (!is_dir($directory)) {
+            return null;
+        }
+
+        // Find first audio file to extract metadata from
+        $files = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($directory, \RecursiveDirectoryIterator::SKIP_DOTS)
+        );
+
+        $audioFile = null;
+        foreach ($files as $file) {
+            if ($file->isFile()) {
+                $extension = strtolower($file->getExtension());
+                if (in_array($extension, $this->supportedExtensions)) {
+                    $audioFile = $file->getPathname();
+                    break;
+                }
+            }
+        }
+
+        if (!$audioFile) {
+            return null;
+        }
+
+        try {
+            $fileInfo = $this->getID3->analyze($audioFile);
+            getid3_lib::CopyTagsToComments($fileInfo);
+
+            $metadata = [
+                'confidence' => 75, // Audio file metadata has medium confidence
+            ];
+
+            // For M4B/M4A files, check quicktime tags first
+            $comments = null;
+            if (isset($fileInfo['quicktime']['comments'])) {
+                $comments = $fileInfo['quicktime']['comments'];
+            } elseif (isset($fileInfo['comments'])) {
+                $comments = $fileInfo['comments'];
+            }
+
+            if ($comments) {
+                // Extract common metadata fields
+                if (isset($comments['title'][0])) {
+                    $metadata['title'] = $comments['title'][0];
+                }
+
+                if (isset($comments['artist'][0])) {
+                    $metadata['author'] = [$comments['artist'][0]];
+                }
+
+                if (isset($comments['album'][0])) {
+                    $metadata['series'] = $comments['album'][0];
+                }
+
+                if (isset($comments['genre'][0])) {
+                    $metadata['genre'] = [$comments['genre'][0]];
+                }
+
+                if (isset($comments['year'][0])) {
+                    $metadata['year'] = $comments['year'][0];
+                } elseif (isset($comments['creation_date'][0])) {
+                    $metadata['year'] = substr($comments['creation_date'][0], 0, 4);
+                }
+
+                if (isset($comments['publisher'][0])) {
+                    $metadata['publisher'] = $comments['publisher'][0];
+                }
+
+                if (isset($comments['narrator'][0])) {
+                    $metadata['narrator'] = [$comments['narrator'][0]];
+                }
+            }
+
+            // Get duration from directory
+            $durationInfo = $this->getDirectoryAudioDuration($directory);
+            if ($durationInfo['total_seconds'] > 0) {
+                $metadata['duration'] = (int) $durationInfo['total_seconds'];
+            }
+
+            // Only return metadata if we found at least title or author
+            if (isset($metadata['title']) || isset($metadata['author'])) {
+                return $metadata;
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
 }
