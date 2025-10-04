@@ -44,6 +44,7 @@ class ImportBooksFromDownloads extends Command
                             {--skip-enrichment : Skip external data enrichment (Audible, Google Books)}
                             {--copy-files : Copy files after successful import instead of moving (default is move)}
                             {--no-backup : Skip automatic database backup}
+                            {--background : Enable background processing for enrichment (disabled by default)}
                             {--no-cache : Disable background processing cache}
                             {--clear-cache : Clear background processing cache before starting}
                             {--force-audio : Force audio transcription even when AI confidence is high}';
@@ -71,7 +72,7 @@ class ImportBooksFromDownloads extends Command
     // Background processing
     protected array $backgroundTasks = [];
     protected array $preloadedData = [];
-    protected bool $backgroundProcessingEnabled = true;
+    protected bool $backgroundProcessingEnabled = false; // Disabled by default
     protected array $taskQueue = [];
     protected int $maxConcurrentTasks = 3;
     protected int $runningTaskCount = 0;
@@ -101,6 +102,12 @@ class ImportBooksFromDownloads extends Command
 
         // Initialize persistent cache system
         $this->getCacheService()->initializeCache();
+
+        // Check if background processing should be enabled
+        if ($this->option('background')) {
+            $this->backgroundProcessingEnabled = true;
+            $this->info('✅ Background processing enabled');
+        }
 
         // Create a database backup unless --no-backup is specified
         if (!$this->option('no-backup')) {
@@ -901,12 +908,14 @@ class ImportBooksFromDownloads extends Command
             usleep(50000); // 50ms
         }
 
-        // Show final background processing status
-        $stats = $this->getBackgroundService()->getTaskStatistics();
-        if (!empty($stats)) {
-            $this->info("📊 Background Processing Summary:");
-            foreach ($stats as $key => $value) {
-                $this->line("  • " . ucwords(str_replace('_', ' ', $key)) . ": $value");
+        // Show final background processing status (only if enabled)
+        if ($this->backgroundProcessingEnabled) {
+            $stats = $this->getBackgroundService()->getTaskStatistics();
+            if (!empty($stats)) {
+                $this->info("📊 Background Processing Summary:");
+                foreach ($stats as $key => $value) {
+                    $this->line("  • " . ucwords(str_replace('_', ' ', $key)) . ": $value");
+                }
             }
         }
     }
@@ -1280,7 +1289,8 @@ class ImportBooksFromDownloads extends Command
             return; // Skip if metadata processing failed
         }
 
-        $this->info("✅ AI processing successful (confidence: {$aiMetadata['confidence']}%)");
+        // Fix Graphic Audio metadata BEFORE enrichment
+        $this->fixGraphicAudioMetadata($aiMetadata, $audiobook);
 
         // If this is a split book, preserve the pre-set series number and other metadata
         if (!empty($audiobook['metadata'])) {
@@ -2391,6 +2401,45 @@ class ImportBooksFromDownloads extends Command
             $this->aiProcessor = app(AIBookProcessor::class);
         }
         return $this->aiProcessor;
+    }
+
+    /**
+     * Fix Graphic Audio metadata by extracting real author from M4B copyright field
+     */
+    protected function fixGraphicAudioMetadata(array &$aiMetadata, array $audiobook): void
+    {
+        // Check if author is "Graphic Audio" or similar
+        $author = is_array($aiMetadata['author']) ? $aiMetadata['author'][0] : $aiMetadata['author'];
+
+        if (stripos($author, 'Graphic Audio') === false) {
+            return; // Not a Graphic Audio book
+        }
+
+        $this->line("  🎭 Detected Graphic Audio book - extracting real author...");
+
+        // Try to extract author from M4B file metadata
+        if (!empty($audiobook['files'][0])) {
+            try {
+                $fileTags = $this->getAIProcessor()->extractFileTags($audiobook['files'][0]);
+
+                // Check copyright field (e.g., "© 2024 by Brandon Sanderson")
+                if (!empty($fileTags['copyright'])) {
+                    $copyright = is_array($fileTags['copyright']) ? $fileTags['copyright'][0] : $fileTags['copyright'];
+                    if (preg_match('/\bby\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i', $copyright, $matches)) {
+                        $aiMetadata['author'] = [trim($matches[1])];
+                        $aiMetadata['publisher'] = 'GraphicAudio';
+                        $this->info("  ✓ Extracted author from copyright: {$aiMetadata['author'][0]}");
+                        return;
+                    }
+                }
+            } catch (\Exception $e) {
+                // Continue to fallback
+            }
+        }
+
+        // Set publisher even if we couldn't extract author
+        $aiMetadata['publisher'] = 'GraphicAudio';
+        $this->warn("  ✗ Could not extract real author - keeping 'Graphic Audio'");
     }
 
     /**

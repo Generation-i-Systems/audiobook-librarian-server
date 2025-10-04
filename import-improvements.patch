@@ -1,0 +1,33 @@
+# Remaining improvements to apply manually:
+
+## 1. Remove duplicate "AI processing successful" message
+Line 1283 in ImportBooksFromDownloads.php - remove this line since it's already printed at line 3102
+
+## 2. Add Graphic Audio author extraction
+After line 1283, add call to fixGraphicAudioMetadata()
+
+## 3. Add fixGraphicAudioMetadata() method
+After getAIProcessor() method around line 2376, add:
+- Checks if author contains "Graphic Audio"
+- Extracts real author from M4B copyright field using regex: /\bby\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i
+- Sets publisher to "GraphicAudio"
+
+## 4. Add --background flag
+Line 49: Add {--background : Enable background processing for enrichment (disabled by default)}
+Line 74: Change default to false
+Line 107: Check option('background') and enable if set
+
+## 5. Hide background summary when disabled
+Line 930: Wrap in if ($this->backgroundProcessingEnabled)
+
+## 6. Add cover edit option
+Lines 2046-2049: Add option 4 for cover editing
+Add editCoverImageOnly() method
+
+## 7. Wrap debug output in verbose checks
+Lines with "DEBUG:" should check $this->option('verbose')
+Multi-book detection verbose output should check verbose flag
+
+## 8. Fix directory path editing
+Line 2286: Show full path with book subdirectory when editing
+Line 2647: Check custom_directory_path to avoid duplicate subdirectories
