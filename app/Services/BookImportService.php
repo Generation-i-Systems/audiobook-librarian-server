@@ -333,7 +333,8 @@ class BookImportService
             }
 
             // Update book directory path to target location (only for move/copy operations)
-            $book->directory_path = $targetDir;
+            // Store as relative path, not absolute
+            $book->directory_path = str_replace($bookStoragePath . '/', '', $targetDir);
             $book->save();
 
             return true;
@@ -436,10 +437,16 @@ class BookImportService
                 File::makeDirectory($targetSubDir, 0775, true);
             }
 
-            File::move($file->getPathname(), $targetFile);
+            // Use copy+delete instead of move to avoid cross-filesystem issues
+            if (!File::copy($file->getPathname(), $targetFile)) {
+                throw new \Exception("Failed to copy file: {$file->getPathname()} to {$targetFile}");
+            }
 
-            // Set file permissions after moving
+            // Set file permissions after copying
             chmod($targetFile, 0664);
+
+            // Delete source file after successful copy
+            File::delete($file->getPathname());
         }
 
         // Remove empty directories from source

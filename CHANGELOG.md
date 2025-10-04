@@ -41,6 +41,15 @@
   - Prevents silent failures and provides clear feedback
 
 ### Added
+- Graphic Audio multi-part book handling in import-downloads command
+  - Detects Graphic Audio books by directory name containing "Graphic Audio"
+  - Identifies multi-part books by numbered filenames (01.m4b, 02.m4b, etc.)
+  - Extracts actual author from description text ("by [Author Name]")
+  - Removes "Graphic Audio" from author field
+  - Sets publisher to "GraphicAudio"
+  - Cleans up title by removing "X of Y" patterns
+  - Moves all parts to single directory
+  - Automatically cleans up source directory after successful import
 - Multi-book series detection and splitting in import-downloads command
   - Automatically detects when a directory contains multiple books from a series
   - Checks for: multiple large files (>100MB, >3 hours each), different titles

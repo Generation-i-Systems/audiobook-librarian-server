@@ -233,3 +233,27 @@ more todos
 - Additional metadata (narrator, year, publisher) extracted from M4B tags
 - No infinite loops - split books are processed once
 - Code formatted with Pint
+
+## Graphic Audio Multi-Part Book Handling (2025-10-04)
+- User request: Handle Graphic Audio books with special rules
+- Graphic Audio is a publisher, not an author
+- Author can be extracted from description: "by [Author Name]"
+- Books come in multiple parts (e.g., "3 of 5")
+- Filenames end in part numbers: 01.m4b, 02.m4b, 03.m4b
+- Solution: Added detectGraphicAudioMultiPart() method
+  - Detects by "Graphic Audio" in directory name
+  - Finds numbered parts using regex: /[_\s](\d{2})$/
+  - Returns array with all parts sorted by number
+- Added processGraphicAudioMultiPart() method
+  - Extracts metadata from first part
+  - Extracts author from description using regex: /\bby\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i
+  - Removes "Graphic Audio" from author array
+  - Sets publisher = "GraphicAudio"
+  - Cleans title by removing "X of Y" pattern
+  - Creates single audiobook with all parts in files array
+- Added moveGraphicAudioFiles() method
+  - Moves all parts to single directory
+  - Uses copy+delete for cross-filesystem support
+  - Cleans up source directory after move
+- All parts go into one book record with one directory
+- Source directory cleanup with ls -lh and confirmation prompt
