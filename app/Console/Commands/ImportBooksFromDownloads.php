@@ -1652,8 +1652,10 @@ class ImportBooksFromDownloads extends Command
      */
     protected function performDatabaseImport(array $aiMetadata, array $audiobook): void
     {
-        $this->line("DEBUG: performDatabaseImport called for: " . ($aiMetadata['title'] ?? 'UNKNOWN'));
-        $this->line("DEBUG: is_split_book = " . ($audiobook['is_split_book'] ?? 'NOT SET'));
+        if ($this->option('verbose')) {
+            $this->line("DEBUG: performDatabaseImport called for: " . ($aiMetadata['title'] ?? 'UNKNOWN'));
+            $this->line("DEBUG: is_split_book = " . ($audiobook['is_split_book'] ?? 'NOT SET'));
+        }
 
         if ($this->option('dry-run')) {
             $this->info("🔍 [DRY RUN] Would import: {$aiMetadata['title']}");
@@ -1671,8 +1673,10 @@ class ImportBooksFromDownloads extends Command
             $book = null;
             $spinner->finish();
             $this->output->write("\r\033[K");
-            $this->error("DEBUG: Exception during book creation: " . $e->getMessage());
-            $this->line("DEBUG: Exception trace: " . $e->getTraceAsString());
+            $this->error("Exception during book creation: " . $e->getMessage());
+            if ($this->option('verbose')) {
+                $this->line("DEBUG: Exception trace: " . $e->getTraceAsString());
+            }
         }
 
         if (!isset($book)) {
@@ -1680,11 +1684,13 @@ class ImportBooksFromDownloads extends Command
             $this->output->write("\r\033[K");
         }
 
-        $this->line("DEBUG: Book created: " . ($book ? "YES (ID: {$book->id})" : "NO - FAILED"));
+        if ($this->option('verbose')) {
+            $this->line("DEBUG: Book created: " . ($book ? "YES (ID: {$book->id})" : "NO - FAILED"));
 
-        if (!$book) {
-            // Check Laravel logs for more details
-            $this->line("DEBUG: Check storage/logs/laravel.log for detailed error information");
+            if (!$book) {
+                // Check Laravel logs for more details
+                $this->line("DEBUG: Check storage/logs/laravel.log for detailed error information");
+            }
         }
 
         if (!$book) {
