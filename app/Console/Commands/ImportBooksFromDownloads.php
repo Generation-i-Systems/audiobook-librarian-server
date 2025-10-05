@@ -70,6 +70,9 @@ class ImportBooksFromDownloads extends Command
     protected ?MetadataProcessingService $metadataService = null;
     protected ?FileSystemService $fileSystemService = null;
 
+    // Cache for file tags to avoid re-extracting
+    protected array $fileTagsCache = [];
+
     // Background processing
     protected array $backgroundTasks = [];
     protected array $preloadedData = [];
@@ -546,6 +549,17 @@ class ImportBooksFromDownloads extends Command
         } catch (\Exception $e) {
             return false;
         }
+    }
+
+    /**
+     * Get file tags with caching to avoid re-extraction
+     */
+    protected function getCachedFileTags(string $filePath): array
+    {
+        if (!isset($this->fileTagsCache[$filePath])) {
+            $this->fileTagsCache[$filePath] = $this->getAIProcessor()->extractFileTags($filePath);
+        }
+        return $this->fileTagsCache[$filePath];
     }
 
     /**
@@ -1371,9 +1385,9 @@ class ImportBooksFromDownloads extends Command
             if (!empty($audiobook['is_split_book']) && !empty($audiobook['files'][0])) {
                 $audioFilePath = $audiobook['files'][0];
 
-                // Extract file tags using existing AIBookProcessor method
+                // Extract file tags using existing AIBookProcessor method (cached)
                 $this->line("  Extracting metadata from M4B file: " . basename($audioFilePath));
-                $fileTags = $this->getAIProcessor()->extractFileTags($audioFilePath);
+                $fileTags = $this->getCachedFileTags($audioFilePath);
 
                 $this->line("  File tags extracted: " . (empty($fileTags) ? 'NONE' : count($fileTags) . ' fields'));
                 if (!empty($fileTags)) {
@@ -2505,10 +2519,10 @@ class ImportBooksFromDownloads extends Command
 
         $this->line("  🎭 Detected Graphic Audio book - extracting real author...");
 
-        // Try to extract author from M4B file metadata
+        // Try to extract author from M4B file metadata (cached)
         if (!empty($audiobook['files'][0])) {
             try {
-                $fileTags = $this->getAIProcessor()->extractFileTags($audiobook['files'][0]);
+                $fileTags = $this->getCachedFileTags($audiobook['files'][0]);
 
                 // Check copyright field (e.g., "© 2024 by Brandon Sanderson")
                 if (!empty($fileTags['copyright'])) {
