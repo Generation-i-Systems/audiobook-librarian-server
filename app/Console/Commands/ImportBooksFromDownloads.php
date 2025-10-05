@@ -213,7 +213,7 @@ class ImportBooksFromDownloads extends Command
                 // Start background processing for upcoming books
                 $this->getBackgroundService()->scheduleBackgroundTask('process_audiobook', $audiobooks[$index + 1] ?? []);
 
-                if ($this->option('verbose')) {
+                if ($this->isOptionEnabled('verbose')) {
                     $this->info("Debug: Calling processAudiobook for: " . $audiobook['name']);
                 }
                 $this->processAudiobook($audiobook);
@@ -423,7 +423,7 @@ class ImportBooksFromDownloads extends Command
 
             // Check if directory should be skipped
             if ($this->shouldSkipDirectory($directory)) {
-                if ($this->option('verbose')) {
+                if ($this->isOptionEnabled('verbose')) {
                     $this->line("  Skipping scan of '{$directory}' (matches skip pattern)");
                 }
                 continue;
@@ -533,6 +533,22 @@ class ImportBooksFromDownloads extends Command
     }
 
     /**
+     * Safely check if an option is enabled (handles test scenarios where input may be null)
+     */
+    protected function isOptionEnabled(string $option): bool
+    {
+        if (!isset($this->input) || $this->input === null) {
+            return false;
+        }
+
+        try {
+            return $this->option($option) ?? false;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    /**
      * Detect if directory contains multiple books in a series
      * Checks for: multiple large files (>3 hours each), numbered files, different titles in metadata
      *
@@ -545,14 +561,14 @@ class ImportBooksFromDownloads extends Command
         $largeFiles = [];
         $minDuration = 3 * 3600; // 3 hours in seconds
 
-        if ($this->option('verbose')) {
+        if ($this->isOptionEnabled('verbose')) {
             $this->line("🔍 Checking for multi-book series in: " . basename($directory));
         }
 
         // Find all audio files directly in this directory (not subdirectories)
         $files = File::files($directory);
 
-        if ($this->option('verbose')) {
+        if ($this->isOptionEnabled('verbose')) {
             $this->line("  Found " . count($files) . " files in directory");
         }
 
@@ -566,7 +582,7 @@ class ImportBooksFromDownloads extends Command
             $filePath = $file->getPathname();
             $sizeMB = round($fileSize / (1024 * 1024), 2);
 
-            if ($this->option('verbose')) {
+            if ($this->isOptionEnabled('verbose')) {
                 $this->line("  Audio file: " . $file->getFilename() . " ({$sizeMB} MB)");
             }
 
@@ -576,13 +592,13 @@ class ImportBooksFromDownloads extends Command
                 $duration = $this->getAudioAnalyzer()->getAudioDuration($filePath);
                 $durationHours = $duration ? round($duration / 3600, 2) : 0;
 
-                if ($this->option('verbose')) {
+                if ($this->isOptionEnabled('verbose')) {
                     $this->line("    Duration: {$durationHours} hours");
                 }
 
                 $metadata = $this->extractFileMetadata($filePath);
 
-                if ($this->option('verbose')) {
+                if ($this->isOptionEnabled('verbose')) {
                     $this->line("    Title from metadata: " . ($metadata['title'] ?? 'N/A'));
                 }
 
@@ -594,18 +610,18 @@ class ImportBooksFromDownloads extends Command
                         'duration' => $duration,
                         'metadata' => $metadata,
                     ];
-                    if ($this->option('verbose')) {
+                    if ($this->isOptionEnabled('verbose')) {
                         $this->line("    ✓ Qualifies as large file (>3 hours)");
                     }
                 } else {
-                    if ($this->option('verbose')) {
+                    if ($this->isOptionEnabled('verbose')) {
                         $this->line("    ✗ Too short (need >3 hours)");
                     }
                     // Early exit: if we found a file that doesn't meet criteria, likely not multi-book
                     break;
                 }
             } else {
-                if ($this->option('verbose')) {
+                if ($this->isOptionEnabled('verbose')) {
                     $this->line("    ✗ Too small (need >100MB)");
                 }
                 // Early exit: if we found a small file, likely not multi-book
@@ -613,13 +629,13 @@ class ImportBooksFromDownloads extends Command
             }
         }
 
-        if ($this->option('verbose')) {
+        if ($this->isOptionEnabled('verbose')) {
             $this->line("  Large files found: " . count($largeFiles));
         }
 
         // Need at least 2 large files to be a multi-book series
         if (count($largeFiles) < 2) {
-            if ($this->option('verbose')) {
+            if ($this->isOptionEnabled('verbose')) {
                 $this->line("  Not a multi-book series (need at least 2 large files)");
             }
             return null;
@@ -1673,7 +1689,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function performDatabaseImport(array $aiMetadata, array $audiobook): void
     {
-        if ($this->option('verbose')) {
+        if ($this->isOptionEnabled('verbose')) {
             $this->line("DEBUG: performDatabaseImport called for: " . ($aiMetadata['title'] ?? 'UNKNOWN'));
             $this->line("DEBUG: is_split_book = " . ($audiobook['is_split_book'] ?? 'NOT SET'));
         }
@@ -1695,7 +1711,7 @@ class ImportBooksFromDownloads extends Command
             $spinner->finish();
             $this->output->write("\r\033[K");
             $this->error("Exception during book creation: " . $e->getMessage());
-            if ($this->option('verbose')) {
+            if ($this->isOptionEnabled('verbose')) {
                 $this->line("DEBUG: Exception trace: " . $e->getTraceAsString());
             }
         }
@@ -1705,7 +1721,7 @@ class ImportBooksFromDownloads extends Command
             $this->output->write("\r\033[K");
         }
 
-        if ($this->option('verbose')) {
+        if ($this->isOptionEnabled('verbose')) {
             $this->line("DEBUG: Book created: " . ($book ? "YES (ID: {$book->id})" : "NO - FAILED"));
 
             if (!$book) {
@@ -2750,6 +2766,18 @@ class ImportBooksFromDownloads extends Command
             File::deleteDirectory($directory);
             $this->info("  ✓ Deleted empty source directory");
         } elseif (!empty($files) || !empty($directories)) {
+            // Check if there are any audio files remaining
+            $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac', 'wav'];
+            $hasAudioFiles = false;
+
+            foreach ($files as $file) {
+                $extension = strtolower($file->getExtension());
+                if (in_array($extension, $audioExtensions)) {
+                    $hasAudioFiles = true;
+                    break;
+                }
+            }
+
             // Directory has remaining files
             $this->newLine();
             $this->warn("⚠️  Source directory still contains files:");
@@ -2761,11 +2789,16 @@ class ImportBooksFromDownloads extends Command
             $process->run();
             $this->line($process->getOutput());
 
-            if ($this->confirm("Delete this directory and all remaining files?", false)) {
-                File::deleteDirectory($directory);
-                $this->info("  ✓ Deleted source directory");
+            // Only offer to delete if there are no audio files
+            if (!$hasAudioFiles) {
+                if ($this->confirm("Delete this directory and all remaining files?", false)) {
+                    File::deleteDirectory($directory);
+                    $this->info("  ✓ Deleted source directory");
+                } else {
+                    $this->info("  Source directory preserved");
+                }
             } else {
-                $this->info("  Source directory preserved");
+                $this->info("  ℹ️  Source directory contains audio files - preserved automatically");
             }
         }
     }
@@ -3164,7 +3197,7 @@ class ImportBooksFromDownloads extends Command
         foreach ($patterns as $pattern) {
             // Use fnmatch for wildcard matching on directory name
             if (fnmatch($pattern, $dirName)) {
-                if ($this->option('verbose')) {
+                if ($this->isOptionEnabled('verbose')) {
                     $this->line("  Skipping '{$path}' (matches pattern: {$pattern})");
                 }
                 return true;
@@ -3172,7 +3205,7 @@ class ImportBooksFromDownloads extends Command
 
             // Also check if pattern contains path separator, then match full path
             if (str_contains($pattern, '/') && fnmatch($pattern, $path)) {
-                if ($this->option('verbose')) {
+                if ($this->isOptionEnabled('verbose')) {
                     $this->line("  Skipping '{$path}' (matches pattern: {$pattern})");
                 }
                 return true;
@@ -3182,7 +3215,7 @@ class ImportBooksFromDownloads extends Command
             $pathParts = explode('/', trim($path, '/'));
             foreach ($pathParts as $part) {
                 if (fnmatch($pattern, $part)) {
-                    if ($this->option('verbose')) {
+                    if ($this->isOptionEnabled('verbose')) {
                         $this->line("  Skipping '{$path}' (parent '{$part}' matches pattern: {$pattern})");
                     }
                     return true;
