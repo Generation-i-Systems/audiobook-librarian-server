@@ -213,8 +213,10 @@ class ImportBooksFromDownloads extends Command
                     continue;
                 }
 
-                // Start background processing for upcoming books
-                $this->getBackgroundService()->scheduleBackgroundTask('process_audiobook', $audiobooks[$index + 1] ?? []);
+                // Start background processing for upcoming books (only if enabled)
+                if ($this->backgroundProcessingEnabled && isset($audiobooks[$index + 1])) {
+                    $this->getBackgroundService()->scheduleBackgroundTask('process_audiobook', $audiobooks[$index + 1]);
+                }
 
                 if ($this->isOptionEnabled('verbose')) {
                     $this->info("Debug: Calling processAudiobook for: " . $audiobook['name']);
@@ -953,15 +955,17 @@ class ImportBooksFromDownloads extends Command
      */
     protected function askWithBackground(string $question, string $default = null, array $backgroundData = []): string
     {
-        // Start background processing if data provided
-        if (!empty($backgroundData)) {
+        // Start background processing if data provided and enabled
+        if ($this->backgroundProcessingEnabled && !empty($backgroundData)) {
             foreach ($backgroundData as $task) {
-                $this->getBackgroundService()->scheduleBackgroundTask($task['type'], $task['data'], 'high');
+                $this->getBackgroundService()->scheduleBackgroundTask($task['type'], $task['data']);
             }
         }
 
-        // Continuously process background tasks while waiting for user input
-        $this->startContinuousBackgroundProcessing();
+        // Continuously process background tasks while waiting for user input (only if enabled)
+        if ($this->backgroundProcessingEnabled) {
+            $this->startContinuousBackgroundProcessing();
+        }
 
         $response = $this->askWithImmediateInterrupt($question, $default);
 
