@@ -2419,10 +2419,17 @@ class ImportBooksFromDownloads extends Command
      */
     protected function fixGraphicAudioMetadata(array &$aiMetadata, array $audiobook): void
     {
-        // Check if author is "Graphic Audio" or similar
+        // Check if this is a Graphic Audio book by:
+        // 1. Author field contains "Graphic Audio"
+        // 2. Directory/filename contains "GraphicAudio" or "(GraphicAudio)"
         $author = is_array($aiMetadata['author']) ? $aiMetadata['author'][0] : $aiMetadata['author'];
+        $path = $audiobook['path'] ?? '';
 
-        if (stripos($author, 'Graphic Audio') === false) {
+        $isGraphicAudio = stripos($author, 'Graphic Audio') !== false ||
+                         stripos($path, 'GraphicAudio') !== false ||
+                         stripos($path, 'Graphic Audio') !== false;
+
+        if (!$isGraphicAudio) {
             return; // Not a Graphic Audio book
         }
 
@@ -2451,6 +2458,12 @@ class ImportBooksFromDownloads extends Command
         // Set publisher even if we couldn't extract author
         $aiMetadata['publisher'] = 'GraphicAudio';
         $this->warn("  ✗ Could not extract real author - keeping 'Graphic Audio'");
+
+        // Clear narrator field for Graphic Audio (they have huge casts that clutter the display)
+        if (!empty($aiMetadata['narrator'])) {
+            $this->line("  ℹ Clearing narrator field (Graphic Audio has large casts)");
+            $aiMetadata['narrator'] = [];
+        }
     }
 
     /**

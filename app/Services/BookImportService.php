@@ -114,13 +114,19 @@ class BookImportService
                 $book->authors()->sync($authorIds);
             }
 
-            // Handle narrators
+            // Handle narrators (limit to first 10 to avoid excessive data)
             if (!empty($metadata['narrator'])) {
                 $narrators = is_array($metadata['narrator']) ? $metadata['narrator'] : [$metadata['narrator']];
+
+                // Limit to 10 narrators max (Graphic Audio books can have huge casts)
+                $narrators = array_slice($narrators, 0, 10);
+
                 $narratorIds = [];
                 foreach ($narrators as $narratorName) {
-                    $narrator = Narrator::firstOrCreate(['name' => trim($narratorName)]);
-                    $narratorIds[] = $narrator->id;
+                    if (!empty($narratorName) && is_string($narratorName)) {
+                        $narrator = Narrator::firstOrCreate(['name' => trim($narratorName)]);
+                        $narratorIds[] = $narrator->id;
+                    }
                 }
                 $book->narrators()->sync($narratorIds);
             }
