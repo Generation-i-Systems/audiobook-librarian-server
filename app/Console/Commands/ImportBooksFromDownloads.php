@@ -2757,6 +2757,23 @@ class ImportBooksFromDownloads extends Command
             return;
         }
 
+        // Safety check: Never delete parent/root directories
+        $protectedPaths = [
+            '/media/download',
+            '/media/download/audiobooks',
+            config('filesystems.disks.books.root'),
+            env('BOOK_STORAGE_PATH'),
+        ];
+
+        foreach ($protectedPaths as $protectedPath) {
+            if ($protectedPath && rtrim($directory, '/') === rtrim($protectedPath, '/')) {
+                if ($this->isOptionEnabled('verbose')) {
+                    $this->line("  Skipping cleanup check for protected directory: {$directory}");
+                }
+                return;
+            }
+        }
+
         $files = File::files($directory);
         $directories = File::directories($directory);
 
