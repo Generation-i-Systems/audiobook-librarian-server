@@ -3145,9 +3145,19 @@ class ImportBooksFromDownloads extends Command
             return false;
         }
 
+        $dirName = basename($path);
+
         foreach ($patterns as $pattern) {
-            // Use fnmatch for wildcard matching
-            if (fnmatch($pattern, $path) || fnmatch($pattern, basename($path))) {
+            // Use fnmatch for wildcard matching on directory name
+            if (fnmatch($pattern, $dirName)) {
+                if ($this->option('verbose')) {
+                    $this->line("  Skipping '{$path}' (matches pattern: {$pattern})");
+                }
+                return true;
+            }
+
+            // Also check if pattern contains path separator, then match full path
+            if (str_contains($pattern, '/') && fnmatch($pattern, $path)) {
                 if ($this->option('verbose')) {
                     $this->line("  Skipping '{$path}' (matches pattern: {$pattern})");
                 }
