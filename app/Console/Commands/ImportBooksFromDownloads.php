@@ -421,6 +421,14 @@ class ImportBooksFromDownloads extends Command
                 continue;
             }
 
+            // Check if directory should be skipped
+            if ($this->shouldSkipDirectory($directory)) {
+                if ($this->option('verbose')) {
+                    $this->line("  Skipping scan of '{$directory}' (matches skip pattern)");
+                }
+                continue;
+            }
+
             $this->info("🔍 Scanning directory: {$directory}");
 
             // Find individual audiobook directories within this directory
