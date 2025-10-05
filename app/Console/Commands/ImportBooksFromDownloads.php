@@ -47,7 +47,8 @@ class ImportBooksFromDownloads extends Command
                             {--background : Enable background processing for enrichment (disabled by default)}
                             {--no-cache : Disable background processing cache}
                             {--clear-cache : Clear background processing cache before starting}
-                            {--force-audio : Force audio transcription even when AI confidence is high}';
+                            {--force-audio : Force audio transcription even when AI confidence is high}
+                            {--skip-pattern=* : Skip directories matching these patterns (supports wildcards)}';
 
     /**
      * The console command description.
@@ -199,6 +200,16 @@ class ImportBooksFromDownloads extends Command
 
         foreach ($audiobooks as $index => $audiobook) {
             try {
+                // Check if directory should be skipped based on patterns
+                if ($this->shouldSkipDirectory($audiobook['path'])) {
+                    $this->skippedBooks[] = [
+                        'path' => $audiobook['path'],
+                        'reason' => 'Matched skip pattern',
+                    ];
+                    $progressBar->advance();
+                    continue;
+                }
+
                 // Start background processing for upcoming books
                 $this->getBackgroundService()->scheduleBackgroundTask('process_audiobook', $audiobooks[$index + 1] ?? []);
 
@@ -3122,5 +3133,28 @@ class ImportBooksFromDownloads extends Command
 
         $this->info("✅ AI processing successful (confidence: {$aiMetadata['confidence']}%)");
         return $aiMetadata;
+    }
+
+    /**
+     * Check if directory should be skipped based on skip patterns
+     */
+    protected function shouldSkipDirectory(string $path): bool
+    {
+        $patterns = $this->option('skip-pattern');
+        if (empty($patterns)) {
+            return false;
+        }
+
+        foreach ($patterns as $pattern) {
+            // Use fnmatch for wildcard matching
+            if (fnmatch($pattern, $path) || fnmatch($pattern, basename($path))) {
+                if ($this->option('verbose')) {
+                    $this->line("  Skipping '{$path}' (matches pattern: {$pattern})");
+                }
+                return true;
+            }
+        }
+
+        return false;
     }
 }
