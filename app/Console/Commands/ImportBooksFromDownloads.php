@@ -2749,7 +2749,7 @@ class ImportBooksFromDownloads extends Command
             // Check if source directory is empty and prompt for cleanup
             $sourceDir = $audiobook['path'];
             if ($operation === 'move' && File::isDirectory($sourceDir)) {
-                $this->checkAndCleanupSourceDirectory($sourceDir);
+                $this->checkAndCleanupSourceDirectory($sourceDir, $targetDir);
             }
 
             $this->line("  ✓ Split book files moved successfully");
@@ -2769,7 +2769,7 @@ class ImportBooksFromDownloads extends Command
     /**
      * Check if source directory has remaining files and prompt for cleanup
      */
-    protected function checkAndCleanupSourceDirectory(string $directory): void
+    protected function checkAndCleanupSourceDirectory(string $directory, ?string $targetDirectory = null): void
     {
         if (!File::isDirectory($directory)) {
             return;
@@ -2840,11 +2840,60 @@ class ImportBooksFromDownloads extends Command
             $process->run();
             $this->line($process->getOutput());
 
-            if ($this->confirm("Delete this directory and all remaining files?", false)) {
-                File::deleteDirectory($directory);
-                $this->info("  ✓ Deleted source directory");
-            } else {
-                $this->info("  Source directory preserved");
+            // Offer options for handling remaining files
+            $this->line("\nOptions:");
+            $this->line("1. (M)ove remaining files to imported directory" . ($targetDirectory ? " (default)" : ""));
+            $this->line("2. (D)elete this directory and all remaining files");
+            $this->line("3. (K)eep - preserve source directory");
+
+            $choice = $this->ask("Choose an option (1-3)", $targetDirectory ? '1' : '3');
+            $choice = strtolower(trim($choice));
+
+            // Normalize choice
+            if (in_array($choice, ['m', 'move'])) {
+                $choice = '1';
+            } elseif (in_array($choice, ['d', 'delete'])) {
+                $choice = '2';
+            } elseif (in_array($choice, ['k', 'keep'])) {
+                $choice = '3';
+            }
+
+            switch ($choice) {
+                case '1':
+                    // Move remaining files to target directory
+                    if ($targetDirectory && File::isDirectory($targetDirectory)) {
+                        $this->info("  Moving remaining files to: {$targetDirectory}");
+                        $movedCount = 0;
+                        foreach ($files as $file) {
+                            $targetFile = $targetDirectory . '/' . $file->getFilename();
+                            if (File::copy($file->getPathname(), $targetFile)) {
+                                File::delete($file->getPathname());
+                                $movedCount++;
+                            }
+                        }
+                        $this->info("  ✓ Moved {$movedCount} files");
+
+                        // Check if directory is now empty
+                        if (empty(File::files($directory)) && empty(File::directories($directory))) {
+                            File::deleteDirectory($directory);
+                            $this->info("  ✓ Deleted empty source directory");
+                        }
+                    } else {
+                        $this->warn("  Target directory not available - preserving source");
+                    }
+                    break;
+
+                case '2':
+                    // Delete directory
+                    File::deleteDirectory($directory);
+                    $this->info("  ✓ Deleted source directory");
+                    break;
+
+                case '3':
+                default:
+                    // Keep directory
+                    $this->info("  Source directory preserved");
+                    break;
             }
         }
     }
