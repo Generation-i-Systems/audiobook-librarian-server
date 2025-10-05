@@ -2828,6 +2828,11 @@ class ImportBooksFromDownloads extends Command
             return;
         }
 
+        // Check if directory should be skipped
+        if ($this->shouldSkipDirectory($directory)) {
+            return;
+        }
+
         // Check if current directory has audio files
         $audioFiles = $this->getDirectoryParser()->getAudioFiles($directory);
         if (!empty($audioFiles)) {
