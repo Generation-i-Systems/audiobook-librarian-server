@@ -1289,9 +1289,6 @@ class ImportBooksFromDownloads extends Command
             return; // Skip if metadata processing failed
         }
 
-        // Fix Graphic Audio metadata BEFORE enrichment
-        $this->fixGraphicAudioMetadata($aiMetadata, $audiobook);
-
         // If this is a split book, preserve the pre-set series number and other metadata
         if (!empty($audiobook['metadata'])) {
             // Merge pre-set metadata, giving priority to split book metadata for series info
@@ -1377,6 +1374,9 @@ class ImportBooksFromDownloads extends Command
 
         // Step 2: External data enrichment (before manual review)
         $this->performExternalDataEnrichment($aiMetadata);
+
+        // Fix Graphic Audio metadata AFTER enrichment (so it overrides external data)
+        $this->fixGraphicAudioMetadata($aiMetadata, $audiobook);
 
         $this->newLine();
 
