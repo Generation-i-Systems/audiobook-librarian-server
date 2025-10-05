@@ -44,6 +44,12 @@ class MetadataProcessingService
                     ) {
                         $tags = $this->aiProcessor->extractFileTags($file);
                         if (!empty($tags)) {
+                            // Clean Graphic Audio suffixes from title tag
+                            if (!empty($tags['title'])) {
+                                $tags['title'] = preg_replace('/\s*\[Dramatized Adaptation\]\s*/i', '', $tags['title']);
+                                $tags['title'] = preg_replace('/\s*\(Dramatized Adaptation\)\s*/i', '', $tags['title']);
+                                $tags['title'] = preg_replace('/\s*-\s*Dramatized Adaptation\s*/i', '', $tags['title']);
+                            }
                             $fileTags = array_merge($fileTags, $tags);
                         }
                     }
