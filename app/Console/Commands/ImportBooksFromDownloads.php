@@ -202,7 +202,9 @@ class ImportBooksFromDownloads extends Command
                 // Start background processing for upcoming books
                 $this->getBackgroundService()->scheduleBackgroundTask('process_audiobook', $audiobooks[$index + 1] ?? []);
 
-                $this->info("Debug: Calling processAudiobook for: " . $audiobook['name']);
+                if ($this->option('verbose')) {
+                    $this->info("Debug: Calling processAudiobook for: " . $audiobook['name']);
+                }
                 $this->processAudiobook($audiobook);
             } catch (\Exception $e) {
                 $errorMessage = $e->getMessage();
