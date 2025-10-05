@@ -524,11 +524,16 @@ class ImportBooksFromDownloads extends Command
         $largeFiles = [];
         $minDuration = 3 * 3600; // 3 hours in seconds
 
-        $this->line("🔍 Checking for multi-book series in: " . basename($directory));
+        if ($this->option('verbose')) {
+            $this->line("🔍 Checking for multi-book series in: " . basename($directory));
+        }
 
         // Find all audio files directly in this directory (not subdirectories)
         $files = File::files($directory);
-        $this->line("  Found " . count($files) . " files in directory");
+
+        if ($this->option('verbose')) {
+            $this->line("  Found " . count($files) . " files in directory");
+        }
 
         foreach ($files as $file) {
             $extension = strtolower($file->getExtension());
@@ -540,17 +545,25 @@ class ImportBooksFromDownloads extends Command
             $filePath = $file->getPathname();
             $sizeMB = round($fileSize / (1024 * 1024), 2);
 
-            $this->line("  Audio file: " . $file->getFilename() . " ({$sizeMB} MB)");
+            if ($this->option('verbose')) {
+                $this->line("  Audio file: " . $file->getFilename() . " ({$sizeMB} MB)");
+            }
 
             // Check if file is large enough (rough estimate: >100MB suggests long audiobook)
             if ($fileSize > 100 * 1024 * 1024) {
                 // Get duration and metadata
                 $duration = $this->getAudioAnalyzer()->getAudioDuration($filePath);
                 $durationHours = $duration ? round($duration / 3600, 2) : 0;
-                $this->line("    Duration: {$durationHours} hours");
+
+                if ($this->option('verbose')) {
+                    $this->line("    Duration: {$durationHours} hours");
+                }
 
                 $metadata = $this->extractFileMetadata($filePath);
-                $this->line("    Title from metadata: " . ($metadata['title'] ?? 'N/A'));
+
+                if ($this->option('verbose')) {
+                    $this->line("    Title from metadata: " . ($metadata['title'] ?? 'N/A'));
+                }
 
                 if ($duration && $duration >= $minDuration) {
                     $largeFiles[] = [
@@ -560,20 +573,34 @@ class ImportBooksFromDownloads extends Command
                         'duration' => $duration,
                         'metadata' => $metadata,
                     ];
-                    $this->line("    ✓ Qualifies as large file (>3 hours)");
+                    if ($this->option('verbose')) {
+                        $this->line("    ✓ Qualifies as large file (>3 hours)");
+                    }
                 } else {
-                    $this->line("    ✗ Too short (need >3 hours)");
+                    if ($this->option('verbose')) {
+                        $this->line("    ✗ Too short (need >3 hours)");
+                    }
+                    // Early exit: if we found a file that doesn't meet criteria, likely not multi-book
+                    break;
                 }
             } else {
-                $this->line("    ✗ Too small (need >100MB)");
+                if ($this->option('verbose')) {
+                    $this->line("    ✗ Too small (need >100MB)");
+                }
+                // Early exit: if we found a small file, likely not multi-book
+                break;
             }
         }
 
-        $this->line("  Large files found: " . count($largeFiles));
+        if ($this->option('verbose')) {
+            $this->line("  Large files found: " . count($largeFiles));
+        }
 
         // Need at least 2 large files to be a multi-book series
         if (count($largeFiles) < 2) {
-            $this->line("  Not a multi-book series (need at least 2 large files)");
+            if ($this->option('verbose')) {
+                $this->line("  Not a multi-book series (need at least 2 large files)");
+            }
             return null;
         }
 
