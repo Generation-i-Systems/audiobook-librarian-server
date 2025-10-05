@@ -3158,6 +3158,7 @@ class ImportBooksFromDownloads extends Command
             return false;
         }
 
+        // Check current directory name
         $dirName = basename($path);
 
         foreach ($patterns as $pattern) {
@@ -3175,6 +3176,17 @@ class ImportBooksFromDownloads extends Command
                     $this->line("  Skipping '{$path}' (matches pattern: {$pattern})");
                 }
                 return true;
+            }
+
+            // Check if any parent directory matches the pattern
+            $pathParts = explode('/', trim($path, '/'));
+            foreach ($pathParts as $part) {
+                if (fnmatch($pattern, $part)) {
+                    if ($this->option('verbose')) {
+                        $this->line("  Skipping '{$path}' (parent '{$part}' matches pattern: {$pattern})");
+                    }
+                    return true;
+                }
             }
         }
 
