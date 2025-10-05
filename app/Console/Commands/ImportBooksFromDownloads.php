@@ -2783,6 +2783,14 @@ class ImportBooksFromDownloads extends Command
             File::deleteDirectory($directory);
             $this->info("  ✓ Deleted empty source directory");
         } elseif (!empty($files) || !empty($directories)) {
+            // Safety check: Never delete directories with more than 10 files
+            if (count($files) > 10) {
+                if ($this->isOptionEnabled('verbose')) {
+                    $this->info("  ℹ️  Source directory has many files (" . count($files) . ") - preserved automatically");
+                }
+                return;
+            }
+
             // Check if there are any audio files remaining
             $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac', 'wav'];
             $hasAudioFiles = false;
