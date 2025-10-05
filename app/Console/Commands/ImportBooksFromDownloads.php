@@ -2464,6 +2464,17 @@ class ImportBooksFromDownloads extends Command
             $this->line("  ℹ Clearing narrator field (Graphic Audio has large casts)");
             $aiMetadata['narrator'] = [];
         }
+
+        // Clean up Graphic Audio title suffixes
+        if (!empty($aiMetadata['title'])) {
+            $originalTitle = $aiMetadata['title'];
+            $aiMetadata['title'] = preg_replace('/\s*\[Dramatized Adaptation\]\s*/i', '', $aiMetadata['title']);
+            $aiMetadata['title'] = preg_replace('/\s*\(Dramatized Adaptation\)\s*/i', '', $aiMetadata['title']);
+            $aiMetadata['title'] = preg_replace('/\s*-\s*Dramatized Adaptation\s*/i', '', $aiMetadata['title']);
+            if ($originalTitle !== $aiMetadata['title']) {
+                $this->line("  ✓ Cleaned title: '{$aiMetadata['title']}'");
+            }
+        }
     }
 
     /**
@@ -3010,13 +3021,22 @@ class ImportBooksFromDownloads extends Command
             " (" . $this->getFileSystemService()->formatBytes($audiobook['total_size']) . ")"
         );
 
+        // Pre-process Graphic Audio titles to improve AI recognition
+        $cleanedAudiobook = $audiobook;
+        if (stripos($audiobook['path'], 'GraphicAudio') !== false || stripos($audiobook['path'], 'Graphic Audio') !== false) {
+            // Clean up the name for AI processing
+            $cleanedAudiobook['name'] = preg_replace('/\s*\(GraphicAudio\)\s*/i', '', $audiobook['name']);
+            $cleanedAudiobook['name'] = preg_replace('/\s*\(Graphic Audio\)\s*/i', '', $cleanedAudiobook['name']);
+            $cleanedAudiobook['name'] = preg_replace('/\s*\(GA\)\s*/i', '', $cleanedAudiobook['name']);
+        }
+
         // Step 1: AI Processing
         $spinner = $this->output->createProgressBar();
         $spinner->setFormat(" %message%");
         $spinner->setMessage("🤖 Analyzing metadata with AI...");
         $spinner->start();
 
-        $aiMetadata = $this->getMetadataService()->processWithAI($audiobook);
+        $aiMetadata = $this->getMetadataService()->processWithAI($cleanedAudiobook);
 
         $spinner->finish();
         $this->output->write("\r\033[K");
