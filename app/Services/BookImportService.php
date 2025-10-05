@@ -90,12 +90,18 @@ class BookImportService
 
             // Calculate and store audio file information if available
             if (!empty($audiobook['files'])) {
-                $audioInfo = $this->calculateAudioInfo($audiobook['files']);
-                $book->audio_file_count = $audioInfo['count'];
-                if ($audioInfo['duration'] > 0) {
-                    $book->duration = $audioInfo['duration'];
+                // Only calculate if we don't already have duration from metadata
+                if (empty($book->duration)) {
+                    $audioInfo = $this->calculateAudioInfo($audiobook['files']);
+                    $book->audio_file_count = $audioInfo['count'];
+                    if ($audioInfo['duration'] > 0) {
+                        $book->duration = $audioInfo['duration'];
+                    }
+                    $book->file_tags = $audioInfo['tags'];
+                } else {
+                    // Just count the files without analyzing them
+                    $book->audio_file_count = count($audiobook['files']);
                 }
-                $book->file_tags = $audioInfo['tags'];
             }
 
             // Set data source
