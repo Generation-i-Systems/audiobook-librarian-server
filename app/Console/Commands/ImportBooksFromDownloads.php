@@ -2795,7 +2795,15 @@ class ImportBooksFromDownloads extends Command
                 }
             }
 
-            // Directory has remaining files
+            // If audio files remain, preserve directory automatically without prompting
+            if ($hasAudioFiles) {
+                if ($this->isOptionEnabled('verbose')) {
+                    $this->info("  ℹ️  Source directory contains audio files - preserved automatically");
+                }
+                return;
+            }
+
+            // Directory has remaining non-audio files - show and prompt
             $this->newLine();
             $this->warn("⚠️  Source directory still contains files:");
             $this->line("  Directory: {$directory}");
@@ -2806,16 +2814,11 @@ class ImportBooksFromDownloads extends Command
             $process->run();
             $this->line($process->getOutput());
 
-            // Only offer to delete if there are no audio files
-            if (!$hasAudioFiles) {
-                if ($this->confirm("Delete this directory and all remaining files?", false)) {
-                    File::deleteDirectory($directory);
-                    $this->info("  ✓ Deleted source directory");
-                } else {
-                    $this->info("  Source directory preserved");
-                }
+            if ($this->confirm("Delete this directory and all remaining files?", false)) {
+                File::deleteDirectory($directory);
+                $this->info("  ✓ Deleted source directory");
             } else {
-                $this->info("  ℹ️  Source directory contains audio files - preserved automatically");
+                $this->info("  Source directory preserved");
             }
         }
     }
