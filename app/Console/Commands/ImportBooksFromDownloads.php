@@ -1499,6 +1499,16 @@ class ImportBooksFromDownloads extends Command
             $this->warn("📁 Cannot compare directories (storage path or directory path missing)");
             $this->warn("  This may indicate a configuration issue or corrupted database entry");
 
+            // In auto mode, skip books that need user decision
+            if ($this->option('auto')) {
+                $this->warn("⚠️  Auto mode: Skipping book that requires user decision");
+                $this->skippedBooks[] = [
+                    'path' => $audiobook['path'],
+                    'reason' => 'Cannot compare directories - requires manual review',
+                ];
+                return false;
+            }
+
             $this->line("\nOptions:");
             $this->line("1. Skip import");
             $this->line("2. Continue anyway (may cause issues)");
@@ -1521,6 +1531,16 @@ class ImportBooksFromDownloads extends Command
             $this->warn("📁 Existing directory not found - files may have been deleted");
             $this->line("  Expected path: {$existingDir}");
             $this->info("  Database entry exists but files are missing");
+
+            // In auto mode, skip books that need user decision
+            if ($this->option('auto')) {
+                $this->warn("⚠️  Auto mode: Skipping book that requires user decision");
+                $this->skippedBooks[] = [
+                    'path' => $audiobook['path'],
+                    'reason' => 'Existing book missing files - requires manual review',
+                ];
+                return false;
+            }
 
             // Offer to restore files from new download
             $this->line("\nOptions:");
@@ -1584,9 +1604,22 @@ class ImportBooksFromDownloads extends Command
     protected function handleDirectoryConflict(array $audiobook, $existingBook, array $comparison, array &$aiMetadata): bool
     {
         $this->warn("📁 Directories differ - manual decision needed");
-        $this->line("🔍 Debug: Comparison data structure exists: " . (is_array($comparison) ? 'YES' : 'NO'));
-        if (is_array($comparison)) {
-            $this->line("🔍 Debug: Keys present: " . implode(', ', array_keys($comparison)));
+
+        // In auto mode, skip books that need user decision
+        if ($this->option('auto')) {
+            $this->warn("⚠️  Auto mode: Skipping book that requires user decision");
+            $this->skippedBooks[] = [
+                'path' => $audiobook['path'],
+                'reason' => 'Duplicate with different content - requires manual review',
+            ];
+            return false;
+        }
+
+        if ($this->isOptionEnabled('verbose')) {
+            $this->line("🔍 Debug: Comparison data structure exists: " . (is_array($comparison) ? 'YES' : 'NO'));
+            if (is_array($comparison)) {
+                $this->line("🔍 Debug: Keys present: " . implode(', ', array_keys($comparison)));
+            }
         }
         $this->displayDirectoryComparison($comparison);
 
