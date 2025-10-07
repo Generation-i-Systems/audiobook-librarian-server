@@ -2862,7 +2862,41 @@ class ImportBooksFromDownloads extends Command
                 return;
             }
 
-            // Directory has remaining non-audio files - show and prompt
+            // Directory has remaining non-audio files
+            // In auto mode, automatically move files to target if available, otherwise keep
+            if ($this->option('auto')) {
+                if ($targetDirectory && File::isDirectory($targetDirectory)) {
+                    if ($this->isOptionEnabled('verbose')) {
+                        $this->info("  Auto mode: Moving remaining files to imported directory");
+                    }
+                    $movedCount = 0;
+                    foreach ($files as $file) {
+                        $targetFile = $targetDirectory . '/' . $file->getFilename();
+                        if (File::copy($file->getPathname(), $targetFile)) {
+                            File::delete($file->getPathname());
+                            $movedCount++;
+                        }
+                    }
+                    if ($this->isOptionEnabled('verbose')) {
+                        $this->info("  ✓ Moved {$movedCount} files");
+                    }
+
+                    // Check if directory is now empty
+                    if (empty(File::files($directory)) && empty(File::directories($directory))) {
+                        File::deleteDirectory($directory);
+                        if ($this->isOptionEnabled('verbose')) {
+                            $this->info("  ✓ Deleted empty source directory");
+                        }
+                    }
+                } else {
+                    if ($this->isOptionEnabled('verbose')) {
+                        $this->info("  Auto mode: Preserving source directory (no target available)");
+                    }
+                }
+                return;
+            }
+
+            // Manual mode - show and prompt
             $this->newLine();
             $this->warn("⚠️  Source directory still contains files:");
             $this->line("  Directory: {$directory}");

@@ -259,7 +259,8 @@ class BookImportService
     protected function buildGenreAuthorSeriesPath(string $genre, string $authorDir, array $metadata): string
     {
         if (!empty($metadata['series'])) {
-            return "{$genre}/{$authorDir}/{$metadata['series']}";
+            $series = $this->addGraphicAudioMarker($metadata['series'], $metadata);
+            return "{$genre}/{$authorDir}/{$series}";
         }
         return "{$genre}/{$authorDir}";
     }
@@ -270,7 +271,8 @@ class BookImportService
     protected function buildAuthorSeriesPath(string $authorDir, array $metadata): string
     {
         if (!empty($metadata['series'])) {
-            return "{$authorDir}/{$metadata['series']}";
+            $series = $this->addGraphicAudioMarker($metadata['series'], $metadata);
+            return "{$authorDir}/{$series}";
         }
         return $authorDir;
     }
@@ -281,7 +283,8 @@ class BookImportService
     protected function buildSeriesAuthorPath(array $metadata, string $authorDir): string
     {
         if (!empty($metadata['series'])) {
-            return "{$metadata['series']}/{$authorDir}";
+            $series = $this->addGraphicAudioMarker($metadata['series'], $metadata);
+            return "{$series}/{$authorDir}";
         }
         return "Standalone/{$authorDir}";
     }
