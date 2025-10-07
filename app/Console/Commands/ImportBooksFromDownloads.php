@@ -1599,6 +1599,64 @@ class ImportBooksFromDownloads extends Command
     }
 
     /**
+     * Compare two directories to check if they're identical
+     */
+    protected function compareDirectories(string $sourceDir, string $targetDir): array
+    {
+        $sourceFiles = File::allFiles($sourceDir);
+        $targetFiles = File::allFiles($targetDir);
+
+        $sourceFileNames = array_map(fn ($file) => $file->getFilename(), $sourceFiles);
+        $targetFileNames = array_map(fn ($file) => $file->getFilename(), $targetFiles);
+
+        $identical = count($sourceFiles) === count($targetFiles) &&
+                     empty(array_diff($sourceFileNames, $targetFileNames));
+
+        return [
+            'identical' => $identical,
+            'source_count' => count($sourceFiles),
+            'target_count' => count($targetFiles),
+            'source_files' => $sourceFileNames,
+            'target_files' => $targetFileNames,
+        ];
+    }
+
+    /**
+     * Display directory comparison information
+     */
+    protected function displayDirectoryComparison(array $comparison): void
+    {
+        $this->line("\n📊 Directory Comparison:");
+        $this->line("  Source files: " . $comparison['source_count']);
+        $this->line("  Target files: " . $comparison['target_count']);
+
+        if (!empty($comparison['source_files']) && !empty($comparison['target_files'])) {
+            $onlyInSource = array_diff($comparison['source_files'], $comparison['target_files']);
+            $onlyInTarget = array_diff($comparison['target_files'], $comparison['source_files']);
+
+            if (!empty($onlyInSource)) {
+                $this->line("\n  Files only in source:");
+                foreach (array_slice($onlyInSource, 0, 5) as $file) {
+                    $this->line("    - {$file}");
+                }
+                if (count($onlyInSource) > 5) {
+                    $this->line("    ... and " . (count($onlyInSource) - 5) . " more");
+                }
+            }
+
+            if (!empty($onlyInTarget)) {
+                $this->line("\n  Files only in target:");
+                foreach (array_slice($onlyInTarget, 0, 5) as $file) {
+                    $this->line("    - {$file}");
+                }
+                if (count($onlyInTarget) > 5) {
+                    $this->line("    ... and " . (count($onlyInTarget) - 5) . " more");
+                }
+            }
+        }
+    }
+
+    /**
      * Handle directory conflict when duplicate books have different content
      */
     protected function handleDirectoryConflict(array $audiobook, $existingBook, array $comparison, array &$aiMetadata): bool
