@@ -937,39 +937,48 @@ document.addEventListener("DOMContentLoaded", function () {
             
             if (selectedCoverRadio && (selectedCoverRadio.dataset.source === "audible" || selectedCoverRadio.dataset.source === "google")) {
                 console.log("[DEBUG] External cover image selected: " + selectedCoverRadio.dataset.source);
-
-                // Verify we have the corresponding ID for the external source
-                if (selectedCoverRadio.dataset.source === "audible") {
-                    const audibleIdInput = form.querySelector('#audibleId');
-                    if (!audibleIdInput || !audibleIdInput.value.trim()) {
-                        $(audibleIdInput).closest('.form-group').addClass("is-invalid");
-                        $(audibleIdInput).closest('.form-group').after(
-                            '<span class="invalid-feedback d-block">Audible ID is missing. Cannot download Audible cover image.</span>'
-                        );
-                        hasError = true;
-                        console.log("[DEBUG] (error) Audible ID is missing");
+                
+                // Check if the cover has already been downloaded (filename starts with cover_audible_ or cover_google_)
+                const coverValue = selectedCoverRadio.value;
+                const isAlreadyDownloaded = coverValue && (coverValue.startsWith('cover_audible_') || coverValue.startsWith('cover_google_'));
+                
+                if (!isAlreadyDownloaded) {
+                    // Only validate IDs and URLs if we need to download the cover
+                    // Verify we have the corresponding ID for the external source
+                    if (selectedCoverRadio.dataset.source === "audible") {
+                        const audibleIdInput = form.querySelector('#audibleId');
+                        if (!audibleIdInput || !audibleIdInput.value.trim()) {
+                            $(audibleIdInput).closest('.form-group').addClass("is-invalid");
+                            $(audibleIdInput).closest('.form-group').after(
+                                '<span class="invalid-feedback d-block">Audible ID is missing. Cannot download Audible cover image.</span>'
+                            );
+                            hasError = true;
+                            console.log("[DEBUG] (error) Audible ID is missing");
+                        }
+                    } else if (selectedCoverRadio.dataset.source === "google") {
+                        const googleBooksIdInput = form.querySelector('#googleBooksId');
+                        if (!googleBooksIdInput || !googleBooksIdInput.value.trim()) {
+                            $(selectedCoverRadio).closest('.form-group').addClass("is-invalid");
+                            $(selectedCoverRadio).closest('.form-group').after(
+                                '<span class="invalid-feedback d-block">Google Books ID is missing. Cannot download Google Books cover image.</span>'
+                            );
+                            hasError = true;
+                            console.log("[DEBUG] (error) Google Books ID is missing");
+                        }
                     }
-                } else if (selectedCoverRadio.dataset.source === "google") {
-                    const googleBooksIdInput = form.querySelector('#googleBooksId');
-                    if (!googleBooksIdInput || !googleBooksIdInput.value.trim()) {
+
+                    // Verify we have a cover URL if using external cover
+                    const coverUrlInput = form.querySelector('#coverImageUrl');
+                    if (!coverUrlInput || !coverUrlInput.value.trim()) {
                         $(selectedCoverRadio).closest('.form-group').addClass("is-invalid");
                         $(selectedCoverRadio).closest('.form-group').after(
-                            '<span class="invalid-feedback d-block">Google Books ID is missing. Cannot download Google Books cover image.</span>'
+                            '<span class="invalid-feedback d-block">External cover image URL is missing. Cannot download cover image.</span>'
                         );
                         hasError = true;
-                        console.log("[DEBUG] (error) Google Books ID is missing");
+                        console.log("[DEBUG] (error) External cover image URL is missing");
                     }
-                }
-
-                // Verify we have a cover URL if using external cover
-                const coverUrlInput = form.querySelector('#coverImageUrl');
-                if (!coverUrlInput || !coverUrlInput.value.trim()) {
-                    $(selectedCoverRadio).closest('.form-group').addClass("is-invalid");
-                    $(selectedCoverRadio).closest('.form-group').after(
-                        '<span class="invalid-feedback d-block">External cover image URL is missing. Cannot download cover image.</span>'
-                    );
-                    hasError = true;
-                    console.log("[DEBUG] (error) External cover image URL is missing");
+                } else {
+                    console.log("[DEBUG] Cover already downloaded, skipping validation");
                 }
             }
 
