@@ -513,9 +513,22 @@ class MySqlService implements DocumentStoreServiceInterface
                     $reasons = array_merge($reasons, $arr);
                 }
             }
-            $reasons = array_values(array_unique(array_filter(array_map('strval', $reasons))));
-            sort($reasons, SORT_NATURAL | SORT_FLAG_CASE);
-            return $reasons;
+
+            // Extract base reason (before any "Parsed:" or "Document:" details)
+            $baseReasons = [];
+            foreach ($reasons as $reason) {
+                $reasonStr = strval($reason);
+                // Split on "Parsed:" or "Document:" and take the first part
+                $parts = preg_split('/(Parsed:|Document:)/', $reasonStr);
+                $baseReason = trim($parts[0]);
+                if (!empty($baseReason)) {
+                    $baseReasons[] = $baseReason;
+                }
+            }
+
+            $baseReasons = array_values(array_unique(array_filter($baseReasons)));
+            sort($baseReasons, SORT_NATURAL | SORT_FLAG_CASE);
+            return $baseReasons;
         } catch (\Exception $e) {
             Log::error('MySqlService listNeedsReviewReasons failed: ' . $e->getMessage());
             return [];

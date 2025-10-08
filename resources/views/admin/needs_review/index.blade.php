@@ -10,7 +10,7 @@
     <form method="GET" action="{{ route('admin.needs_review.index') }}" class="row g-2 mb-3">
         <div class="col-sm-6 col-md-4">
             <label for="reason" class="form-label">Filter by reason</label>
-            <select id="reason" name="reason" class="form-select" onchange="this.form.submit()">
+            <select id="reason" name="reason" class="form-select" onchange="if(this.value === '') { window.location.href = '{{ route('admin.needs_review.index') }}?limit={{ $limit }}'; } else { this.form.submit(); }">
                 <option value="">All reasons</option>
                 @foreach ($reasons as $r)
                     <option value="{{ $r }}" {{ ($selectedReason === $r) ? 'selected' : '' }}>{{ $r }}</option>
@@ -68,8 +68,25 @@
         </div>
 
         <div class="d-flex justify-content-center">
-            {{ $books->withQueryString()->links() }}
+            {{ $books->withQueryString()->links('pagination::bootstrap-5') }}
         </div>
     @endif
 </div>
+
+<style>
+/* Fix pagination arrow sizing */
+.pagination .page-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.5rem;
+    padding: 0.375rem 0.75rem;
+}
+.pagination svg {
+    width: 1em;
+    height: 1em;
+    display: inline-block;
+    vertical-align: middle;
+}
+</style>
 @endsection
