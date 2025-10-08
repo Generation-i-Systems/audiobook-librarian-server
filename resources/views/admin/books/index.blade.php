@@ -54,7 +54,15 @@
             </thead>
             <tbody>
                 @foreach($books as $book)
-                    <tr class="{{ $loop->iteration % 2 == 0 ? 'table-secondary' : '' }}">
+                    @php
+                        $rowClass = '';
+                        if (!empty($book['directoryExists']) && $book['directoryExists'] === false) {
+                            $rowClass = 'table-danger';
+                        } elseif ($loop->iteration % 2 == 0) {
+                            $rowClass = 'table-secondary';
+                        }
+                    @endphp
+                    <tr class="{{ $rowClass }}" @if(!empty($book['directoryExists']) && $book['directoryExists'] === false) title="Directory not found: {{ $book['directoryPath'] ?? 'unknown' }}" @endif>
                         <td style="vertical-align: middle; text-align: center;">
                             @php
                                 $coverImage = $book['coverImage'] ?? null;

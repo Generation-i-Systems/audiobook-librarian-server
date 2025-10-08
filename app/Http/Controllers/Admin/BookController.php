@@ -202,6 +202,17 @@ class BookController extends Controller
 
             $books = $result['data'];
 
+            // Check directory existence for each book
+            $storagePath = env('BOOK_STORAGE_PATH');
+            foreach ($books as &$book) {
+                if (!empty($book['directoryPath'])) {
+                    $fullPath = rtrim($storagePath, '/') . '/' . ltrim($book['directoryPath'], '/');
+                    $book['directoryExists'] = is_dir($fullPath);
+                } else {
+                    $book['directoryExists'] = false;
+                }
+            }
+
             // Wrap in paginator
             $paginator = new \Illuminate\Pagination\LengthAwarePaginator(
                 $books,
