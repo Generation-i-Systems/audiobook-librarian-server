@@ -8,8 +8,28 @@
 .cursor-pointer:hover {
     background-color: #f8f9fa;
 }
+.book-form-card {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+.book-form-card .form-label {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 0.5rem;
+}
+.book-form-section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #212529;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e9ecef;
+}
 </style>
-<div class="container">
+<div class="container-fluid" style="max-width: 1400px;">
     @if(empty($isModal))
         <h1>{{ isset($book) ? 'Edit Book' : 'Create New Book' }}</h1>
     @endif
@@ -82,21 +102,35 @@
         @if(!empty($initial['importMode']))
             <input type="hidden" name="importMode" value="{{ $initial['importMode'] ? '1' : '0' }}">
         @endif
-        <button type="button" class="btn btn-info mb-3" id="autofill-modal-btn"><i class="fas fa-magic"></i> Autofill Book Metadata</button>
-        @if(isset($book))
-        <button type="button" class="btn btn-secondary mb-3 ms-2" id="raw-json-edit-btn"><i class="fas fa-code"></i> Raw JSON Edit</button>
-        @endif
-
         <div class="mb-3">
-            <label for="title" class="form-label">Title</label>
-            <input type="text" class="form-control @error('title') is-invalid @enderror" id="title" name="title"
-                value="{{ old('title') ?? request()->get('title') ?? ($book['title'] ?? null) ?? ($initial['title'] ?? '') }}" required>
-            @error('title')
-                <span class="invalid-feedback d-block">{{ $message }}</span>
-            @enderror
+            <button type="button" class="btn btn-info" id="autofill-modal-btn"><i class="fas fa-magic me-2"></i>Autofill Book Metadata</button>
+            @if(isset($book))
+            <button type="button" class="btn btn-secondary ms-2" id="raw-json-edit-btn"><i class="fas fa-code me-2"></i>Raw JSON Edit</button>
+            @endif
         </div>
-        <div class="mb-3">
-            <label class="form-label">Authors</label>
+
+        {{-- Basic Information Card --}}
+        <div class="book-form-card">
+            <h5 class="book-form-section-title"><i class="fas fa-book me-2"></i>Basic Information</h5>
+            
+            <div class="mb-3">
+                <label for="title" class="form-label">Title</label>
+                <input type="text" class="form-control @error('title') is-invalid @enderror" id="title" name="title"
+                    value="{{ old('title') ?? request()->get('title') ?? ($book['title'] ?? null) ?? ($initial['title'] ?? '') }}" 
+                    placeholder="Enter book title" required>
+                @error('title')
+                    <span class="invalid-feedback d-block">{{ $message }}</span>
+                @enderror
+            </div>
+        </div>
+
+        {{-- People Section - Two Columns --}}
+        <div class="book-form-card">
+            <h5 class="book-form-section-title"><i class="fas fa-users me-2"></i>People</h5>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">Authors</label>
             <div id="authors-group">
                 @php
                     $authors = old('author') ?? (request()->get('author') ? [request()->get('author')] : null) ?? ($book['author'] ?? null) ?? ($initial['author'] ?? []);
