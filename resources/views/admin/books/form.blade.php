@@ -236,16 +236,6 @@
                 <span class="invalid-feedback d-block">{{ $message }}</span>
             @enderror
         </div>
-        <div class="form-group mb-3" style="margin-top: 0.5rem;">
-            <a href="#" class="text-decoration-none" id="show-files-link">
-                <i class="fas fa-folder-open me-1"></i>View Directory Files
-            </a>
-            <div id="directory-files-list"
-                class="w-100 mt-2"
-                style="max-height:220px; overflow-y:auto; border:1px solid #ccc; border-radius:4px; background:#fafbfc; padding:8px; display:none; position: relative;">
-                <span class="text-muted">No files loaded yet.</span>
-            </div>
-        </div>
         @php
             $directoryPath = isset($book) && !empty($book['directoryPath']) ? $book['directoryPath'] : ($directoryPath ?? ($initial['directoryPath'] ?? null));
             $coverImg = isset($book) && !empty($book['coverImage']) ? $book['coverImage'] : ($initial['coverImage'] ?? null);
@@ -462,6 +452,16 @@
             @error('directoryPath')
                 <span class="invalid-feedback d-block ms-2">{{ $message }}</span>
             @enderror
+        </div>
+        <div class="form-group mb-3" style="margin-top: 0.5rem;">
+            <a href="#" class="text-decoration-none" id="show-files-link">
+                <i class="fas fa-folder-open me-1"></i>View Directory Files
+            </a>
+            <div id="directory-files-list"
+                class="w-100 mt-2"
+                style="max-height:220px; overflow-y:auto; border:1px solid #ccc; border-radius:4px; background:#fafbfc; padding:8px; display:none; position: relative;">
+                <span class="text-muted">No files loaded yet.</span>
+            </div>
         </div>
         <script>
 // Function to initialize book form UI elements
