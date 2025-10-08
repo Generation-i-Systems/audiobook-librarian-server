@@ -88,7 +88,7 @@
         @endif
 
         <div class="mb-3">
-            <label for="title">Title:</label>
+            <label for="title" class="form-label">Title</label>
             <input type="text" class="form-control @error('title') is-invalid @enderror" id="title" name="title"
                 value="{{ old('title') ?? request()->get('title') ?? ($book['title'] ?? null) ?? ($initial['title'] ?? '') }}" required>
             @error('title')
@@ -109,7 +109,7 @@
                 @endphp
                 @php $authorsCount = count($authors); @endphp
                 @foreach($authors as $idx => $author)
-                    <div class="input-group author-row align-items-start mb-3">
+                    <div class="d-flex align-items-start mb-3 author-row">
                         @php
                             if ($author instanceof \MongoDB\Model\BSONArray) {
                                 $author = (array) $author;
@@ -118,8 +118,8 @@
                                 $author = implode(', ', $author);
                             }
                         @endphp
-                        <input type="text" name="author[]" class="form-control w-auto author-autocomplete" style="max-width:300px; height:32px;"
-                            value="{{ $author }}" required>
+                        <input type="text" name="author[]" class="form-control author-autocomplete" style="height:32px; flex:1;"
+                            value="{{ $author }}" placeholder="Author Name" required>
                         <datalist id="author-list"></datalist>
                         <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
                             <button type="button" class="btn btn-outline-danger btn-sm remove-author p-0 mb-0"
@@ -146,7 +146,7 @@
                 @endphp
                 @php $narratorsCount = count($narrators); @endphp
                 @foreach($narrators as $idx => $narrator)
-                    <div class="input-group narrator-row align-items-start mb-3">
+                    <div class="d-flex align-items-start mb-3 narrator-row">
                         @php
                             if ($narrator instanceof \MongoDB\Model\BSONArray) {
                                 $narrator = (array) $narrator;
@@ -155,8 +155,8 @@
                                 $narrator = implode(', ', $narrator);
                             }
                         @endphp
-                        <input type="text" name="narrator[]" class="form-control w-auto narrator-autocomplete" style="max-width:300px; height:32px;"
-                            value="{{ $narrator }}">
+                        <input type="text" name="narrator[]" class="form-control narrator-autocomplete" style="height:32px; flex:1;"
+                            value="{{ $narrator }}" placeholder="Narrator Name">
                         <datalist id="narrator-list"></datalist>
                         <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
                             <button type="button" class="btn btn-outline-danger btn-sm remove-row p-0 mb-0"
@@ -216,8 +216,8 @@
             </div>
 
         </div>
-        <div class="form-group">
-            <label>Genres</label>
+        <div class="mb-3">
+            <label class="form-label">Genres</label>
             <div id="genres-group">
                 @php
                     $genres = old('genre') ?? request()->get('genre') ?? ($book['genre'] ?? null) ?? ($initial['genre'] ?? []);
@@ -230,8 +230,8 @@
                     $genresCount = count($genres);
                 @endphp
                 @foreach($genres as $idx => $genre)
-                    <div class="input-group genre-row align-items-start mb-3">
-                        <select name="genre[]" class="form-select w-auto" style="max-width:200px; height:32px;" required>
+                    <div class="d-flex align-items-start mb-3 genre-row">
+                        <select name="genre[]" class="form-select" style="height:32px; flex:1;" required>
                             <option value="">Select a genre</option>
                             @foreach($genreList as $g)
                                 <option value="{{ $g }}" {{ $genre === $g ? 'selected' : '' }}>{{ $g }}</option>
@@ -249,8 +249,8 @@
                 @endforeach
             </div>
         </div>
-        <div class="form-group">
-            <label for="release_date">Release Date (Optional):</label>
+        <div class="mb-3">
+            <label for="release_date" class="form-label">Release Date <span class="text-muted">(Optional)</span></label>
             @php
                 $rawRelease = old('release_date', isset($book) && !empty($book['release_date']) ? $book['release_date'] : ($initial['release_date'] ?? null));
                 $releaseDisplayValue = '';
