@@ -116,20 +116,49 @@
                 // Enable/disable up button
                 $('#dir-browser-up-btn').prop('disabled', !response.canGoUp);
                 
-                // Render directories
+                // Render directories and files
                 let html = '';
-                if (response.directories && response.directories.length > 0) {
+                const hasDirectories = response.directories && response.directories.length > 0;
+                const hasFiles = response.files && response.files.length > 0;
+                
+                if (hasDirectories || hasFiles) {
                     html = '<div class="list-group">';
-                    response.directories.forEach(function(dir) {
-                        html += `
-                            <a href="#" class="list-group-item list-group-item-action dir-browser-item" data-path="${dir.path}">
-                                <i class="fas fa-folder text-warning me-2"></i>${dir.name}
-                            </a>
-                        `;
-                    });
+                    
+                    // Show directories first (clickable)
+                    if (hasDirectories) {
+                        response.directories.forEach(function(dir) {
+                            html += `
+                                <a href="#" class="list-group-item list-group-item-action dir-browser-item" data-path="${dir.path}">
+                                    <i class="fas fa-folder text-warning me-2"></i>${dir.name}
+                                </a>
+                            `;
+                        });
+                    }
+                    
+                    // Show files (greyed out, not clickable)
+                    if (hasFiles) {
+                        response.files.forEach(function(file) {
+                            const ext = file.extension || '';
+                            let icon = 'fa-file';
+                            if (['mp3', 'm4b', 'm4a', 'aac', 'flac', 'ogg', 'wav'].includes(ext.toLowerCase())) {
+                                icon = 'fa-file-audio';
+                            } else if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext.toLowerCase())) {
+                                icon = 'fa-file-image';
+                            } else if (['txt', 'nfo', 'md'].includes(ext.toLowerCase())) {
+                                icon = 'fa-file-alt';
+                            }
+                            
+                            html += `
+                                <div class="list-group-item text-muted" style="opacity: 0.5; cursor: default;">
+                                    <i class="fas ${icon} me-2"></i>${file.name}
+                                </div>
+                            `;
+                        });
+                    }
+                    
                     html += '</div>';
                 } else {
-                    html = '<div class="text-center text-muted p-3">No subdirectories found</div>';
+                    html = '<div class="text-center text-muted p-3">Empty directory</div>';
                 }
                 
                 $('#dir-browser-list').html(html);

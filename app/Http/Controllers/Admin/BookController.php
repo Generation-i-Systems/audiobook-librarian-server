@@ -2049,8 +2049,9 @@ class BookController extends Controller
             }
         }
 
-        // Get directories in the existing path
+        // Get directories and files in the existing path
         $directories = [];
+        $files = [];
         if (is_dir($existingPath)) {
             $items = scandir($existingPath);
             foreach ($items as $item) {
@@ -2063,7 +2064,15 @@ class BookController extends Controller
                     $directories[] = [
                         'name' => $item,
                         'path' => $relativePath,
-                        'fullPath' => $fullPath
+                        'fullPath' => $fullPath,
+                        'type' => 'directory'
+                    ];
+                } elseif (is_file($fullPath)) {
+                    $files[] = [
+                        'name' => $item,
+                        'type' => 'file',
+                        'size' => filesize($fullPath),
+                        'extension' => pathinfo($item, PATHINFO_EXTENSION)
                     ];
                 }
             }
@@ -2076,6 +2085,7 @@ class BookController extends Controller
         return response()->json([
             'currentPath' => $relativeCurrent === $bookRoot ? '' : $relativeCurrent,
             'directories' => $directories,
+            'files' => $files,
             'canGoUp' => $canGoUp,
             'parentPath' => $canGoUp ? str_replace($bookRoot . '/', '', $parentPath) : null
         ]);
