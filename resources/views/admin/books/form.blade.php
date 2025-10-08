@@ -124,89 +124,89 @@
             </div>
         </div>
 
-        {{-- People Section - Two Columns --}}
+        {{-- Authors & Narrators - Two Columns --}}
         <div class="book-form-card">
-            <h5 class="book-form-section-title"><i class="fas fa-users me-2"></i>People</h5>
+            <h5 class="book-form-section-title"><i class="fas fa-user-edit me-2"></i>Authors & Narrators</h5>
             <div class="row">
                 <div class="col-md-6">
-                    <div class="mb-3">
-                        <label class="form-label">Authors</label>
-            <div id="authors-group">
-                @php
-                    $authors = old('author') ?? (request()->get('author') ? [request()->get('author')] : null) ?? ($book['author'] ?? null) ?? ($initial['author'] ?? []);
-                    if (!is_array($authors)) {
-                        $authors = [$authors];
-                    }
-                    if (empty($authors) || (count($authors) === 1 && ($authors[0] === null || $authors[0] === ''))) {
-                        $authors = [''];
-                    }
-                @endphp
-                @php $authorsCount = count($authors); @endphp
-                @foreach($authors as $idx => $author)
-                    <div class="d-flex align-items-start mb-3 author-row">
+                    <label class="form-label">Authors</label>
+                    <div id="authors-group">
                         @php
-                            if ($author instanceof \MongoDB\Model\BSONArray) {
-                                $author = (array) $author;
+                            $authors = old('author') ?? (request()->get('author') ? [request()->get('author')] : null) ?? ($book['author'] ?? null) ?? ($initial['author'] ?? []);
+                            if (!is_array($authors)) {
+                                $authors = [$authors];
                             }
-                            if (is_array($author)) {
-                                $author = implode(', ', $author);
+                            if (empty($authors) || (count($authors) === 1 && ($authors[0] === null || $authors[0] === ''))) {
+                                $authors = [''];
                             }
                         @endphp
-                        <input type="text" name="author[]" class="form-control author-autocomplete" style="height:32px; flex:1;"
-                            value="{{ $author }}" placeholder="Author Name" required>
-                        <datalist id="author-list"></datalist>
-                        <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
-                            <button type="button" class="btn btn-outline-danger btn-sm remove-author p-0 mb-0"
-                                style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
-                            @if($idx === $authorsCount - 1)
-                                <button type="button" class="btn btn-primary btn-sm add-author-row p-0 mt-1"
-                                    style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
-                            @endif
-                        </div>
+                        @php $authorsCount = count($authors); @endphp
+                        @foreach($authors as $idx => $author)
+                            <div class="d-flex align-items-center mb-2 author-row">
+                                @php
+                                    if ($author instanceof \MongoDB\Model\BSONArray) {
+                                        $author = (array) $author;
+                                    }
+                                    if (is_array($author)) {
+                                        $author = implode(', ', $author);
+                                    }
+                                @endphp
+                                <input type="text" name="author[]" class="form-control author-autocomplete" style="height:32px; flex:1;"
+                                    value="{{ $author }}" placeholder="Author Name" required>
+                                <datalist id="author-list"></datalist>
+                                <button type="button" class="btn btn-outline-danger btn-sm remove-author ms-2"
+                                    style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">&times;</button>
+                                @if($idx === $authorsCount - 1)
+                                    <button type="button" class="btn btn-primary btn-sm add-author-row ms-1"
+                                        style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">+</button>
+                                @endif
+                            </div>
+                        @endforeach
                     </div>
-                @endforeach
-            </div>
-
-        </div>
-        <div class="mb-3">
-            <label class="form-label">Narrators</label>
-            <div id="narrators-group">
-                @php
-                    $narrators = old('narrator') ?? request()->get('narrator') ?? ($book['narrator'] ?? null) ?? ($initial['narrator'] ?? []);
-                    if (!is_array($narrators))
-                        $narrators = [$narrators];
-                    if (empty($narrators) || (count($narrators) === 1 && ($narrators[0] === null || $narrators[0] === '')))
-                        $narrators = [''];
-                @endphp
-                @php $narratorsCount = count($narrators); @endphp
-                @foreach($narrators as $idx => $narrator)
-                    <div class="d-flex align-items-start mb-3 narrator-row">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Narrators</label>
+                    <div id="narrators-group">
                         @php
-                            if ($narrator instanceof \MongoDB\Model\BSONArray) {
-                                $narrator = (array) $narrator;
-                            }
-                            if (is_array($narrator)) {
-                                $narrator = implode(', ', $narrator);
-                            }
+                            $narrators = old('narrator') ?? request()->get('narrator') ?? ($book['narrator'] ?? null) ?? ($initial['narrator'] ?? []);
+                            if (!is_array($narrators))
+                                $narrators = [$narrators];
+                            if (empty($narrators) || (count($narrators) === 1 && ($narrators[0] === null || $narrators[0] === '')))
+                                $narrators = [''];
                         @endphp
-                        <input type="text" name="narrator[]" class="form-control narrator-autocomplete" style="height:32px; flex:1;"
-                            value="{{ $narrator }}" placeholder="Narrator Name">
-                        <datalist id="narrator-list"></datalist>
-                        <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
-                            <button type="button" class="btn btn-outline-danger btn-sm remove-row p-0 mb-0"
-                                style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
-                            @if($idx === $narratorsCount - 1)
-                                <button type="button" class="btn btn-primary btn-sm add-narrator-row p-0 mt-1"
-                                    style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
-                            @endif
-                        </div>
+                        @php $narratorsCount = count($narrators); @endphp
+                        @foreach($narrators as $idx => $narrator)
+                            <div class="d-flex align-items-center mb-2 narrator-row">
+                                @php
+                                    if ($narrator instanceof \MongoDB\Model\BSONArray) {
+                                        $narrator = (array) $narrator;
+                                    }
+                                    if (is_array($narrator)) {
+                                        $narrator = implode(', ', $narrator);
+                                    }
+                                @endphp
+                                <input type="text" name="narrator[]" class="form-control narrator-autocomplete" style="height:32px; flex:1;"
+                                    value="{{ $narrator }}" placeholder="Narrator Name">
+                                <datalist id="narrator-list"></datalist>
+                                <button type="button" class="btn btn-outline-danger btn-sm remove-row ms-2"
+                                    style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">&times;</button>
+                                @if($idx === $narratorsCount - 1)
+                                    <button type="button" class="btn btn-primary btn-sm add-narrator-row ms-1"
+                                        style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">+</button>
+                                @endif
+                            </div>
+                        @endforeach
                     </div>
-                @endforeach
+                </div>
             </div>
-
         </div>
-        <div class="mb-3">
-            <label class="form-label">Series</label>
+
+        {{-- Series & Genres - Two Columns --}}
+        <div class="book-form-card">
+            <h5 class="book-form-section-title"><i class="fas fa-list me-2"></i>Series & Genres</h5>
+            <div class="row">
+                <div class="col-md-6">
+                    <label class="form-label">Series</label>
             <div id="series-group">
                 {{-- Only use canonical format: array of objects with seriesName and number --}}
                 @php
@@ -221,9 +221,9 @@
                     }
                 @endphp
                 @foreach($seriesList as $idx => $series)
-                    <div class="d-flex align-items-start mb-3 series-row">
+                    <div class="d-flex align-items-center mb-2 series-row">
                         <input type="number" name="series[{{ $idx }}][number]" class="form-control"
-                            style="width:70px; height:32px; flex-shrink:0;" placeholder="#" value="{{ $series['number'] ?? '' }}" step="any">
+                            style="width:60px; height:32px; flex-shrink:0;" placeholder="#" value="{{ $series['number'] ?? '' }}" step="any">
                         <input type="text" name="series[{{ $idx }}][seriesName]" class="form-control series-autocomplete ms-2" style="height:32px; flex:1;"
                              placeholder="Series Name" value="{{ $series['seriesName'] ?? '' }}">
                         <datalist id="series-list"></datalist>
@@ -237,69 +237,72 @@
                         @else
                             <div style="width:32px; height:32px; margin-left:0.5rem; flex-shrink:0;"></div>
                         @endif
-                        <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
-                            <button type="button" class="btn btn-outline-danger btn-sm remove-series p-0 mb-0"
-                                style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
-                            @if($idx === count($seriesList) - 1)
-                                <button type="button" class="btn btn-primary btn-sm add-series-row p-0 mt-1"
-                                    style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
-                            @endif
-                        </div>
+                        <button type="button" class="btn btn-outline-danger btn-sm remove-series ms-2"
+                            style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">&times;</button>
+                        @if($idx === count($seriesList) - 1)
+                            <button type="button" class="btn btn-primary btn-sm add-series-row ms-1"
+                                style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">+</button>
+                        @endif
                     </div>
                 @endforeach
             </div>
-
-        </div>
-        <div class="mb-3">
-            <label class="form-label">Genres</label>
-            <div id="genres-group">
-                @php
-                    $genres = old('genre') ?? request()->get('genre') ?? ($book['genre'] ?? null) ?? ($initial['genre'] ?? []);
-                    if (!is_array($genres)) {
-                        $genres = [$genres];
-                    }
-                    if (empty($genres) || (count($genres) === 1 && ($genres[0] === null || $genres[0] === ''))) {
-                        $genres = [''];
-                    }
-                    $genresCount = count($genres);
-                @endphp
-                @foreach($genres as $idx => $genre)
-                    <div class="d-flex align-items-start mb-3 genre-row">
-                        <select name="genre[]" class="form-select" style="height:32px; flex:1;" required>
-                            <option value="">Select a genre</option>
-                            @foreach($genreList as $g)
-                                <option value="{{ $g }}" {{ $genre === $g ? 'selected' : '' }}>{{ $g }}</option>
-                            @endforeach
-                        </select>
-                        <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
-                            <button type="button" class="btn btn-outline-danger btn-sm remove-genre p-0 mb-0"
-                                style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
-                            @if($idx === $genresCount - 1)
-                                <button type="button" class="btn btn-primary btn-sm add-genre-row p-0 mt-1"
-                                    style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
-                            @endif
-                        </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Genres</label>
+                    <div id="genres-group">
+                        @php
+                            $genres = old('genre') ?? request()->get('genre') ?? ($book['genre'] ?? null) ?? ($initial['genre'] ?? []);
+                            if (!is_array($genres)) {
+                                $genres = [$genres];
+                            }
+                            if (empty($genres) || (count($genres) === 1 && ($genres[0] === null || $genres[0] === ''))) {
+                                $genres = [''];
+                            }
+                            $genresCount = count($genres);
+                        @endphp
+                        @foreach($genres as $idx => $genre)
+                            <div class="d-flex align-items-center mb-2 genre-row">
+                                <select name="genre[]" class="form-select" style="height:32px; flex:1;" required>
+                                    <option value="">Select a genre</option>
+                                    @foreach($genreList as $g)
+                                        <option value="{{ $g }}" {{ $genre === $g ? 'selected' : '' }}>{{ $g }}</option>
+                                    @endforeach
+                                </select>
+                                <button type="button" class="btn btn-outline-danger btn-sm remove-genre ms-2"
+                                    style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">&times;</button>
+                                @if($idx === $genresCount - 1)
+                                    <button type="button" class="btn btn-primary btn-sm add-genre-row ms-1"
+                                        style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">+</button>
+                                @endif
+                            </div>
+                        @endforeach
                     </div>
-                @endforeach
+                </div>
             </div>
         </div>
-        <div class="mb-3">
-            <label for="release_date" class="form-label">Release Date <span class="text-muted">(Optional)</span></label>
-            @php
-                $rawRelease = old('release_date', isset($book) && !empty($book['release_date']) ? $book['release_date'] : ($initial['release_date'] ?? null));
-                $releaseDisplayValue = '';
-                if (is_string($rawRelease) && $rawRelease !== '') {
-                    // If stored as YYYY-01-01, display as YYYY only; otherwise show the stored value
-                    $releaseDisplayValue = preg_match('/^\d{4}-01-01$/', $rawRelease) ? substr($rawRelease, 0, 4) : $rawRelease;
-                }
-            @endphp
-            <input type="text" class="form-control w-auto @error('release_date') is-invalid @enderror" id="release_date"
-                name="release_date"
-                style="max-width: 160px; display: inline-block;"
-                value="{{ $releaseDisplayValue }}">
-            @error('release_date')
-                <span class="invalid-feedback d-block">{{ $message }}</span>
-            @enderror
+        {{-- Additional Metadata Card --}}
+        <div class="book-form-card">
+            <h5 class="book-form-section-title"><i class="fas fa-info-circle me-2"></i>Additional Information</h5>
+            <div class="row">
+                <div class="col-md-3">
+                    <label for="release_date" class="form-label">Release Date <span class="text-muted">(Optional)</span></label>
+                    @php
+                        $rawRelease = old('release_date', isset($book) && !empty($book['release_date']) ? $book['release_date'] : ($initial['release_date'] ?? null));
+                        $releaseDisplayValue = '';
+                        if (is_string($rawRelease) && $rawRelease !== '') {
+                            // If stored as YYYY-01-01, display as YYYY only; otherwise show the stored value
+                            $releaseDisplayValue = preg_match('/^\d{4}-01-01$/', $rawRelease) ? substr($rawRelease, 0, 4) : $rawRelease;
+                        }
+                    @endphp
+                    <input type="text" class="form-control @error('release_date') is-invalid @enderror" id="release_date"
+                        name="release_date"
+                        placeholder="YYYY or YYYY-MM-DD"
+                        value="{{ $releaseDisplayValue }}">
+                    @error('release_date')
+                        <span class="invalid-feedback d-block">{{ $message }}</span>
+                    @enderror
+                </div>
+            </div>
         </div>
         @php
             $directoryPath = isset($book) && !empty($book['directoryPath']) ? $book['directoryPath'] : ($directoryPath ?? ($initial['directoryPath'] ?? null));
