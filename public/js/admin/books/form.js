@@ -640,12 +640,14 @@ window.initBookForm = function (formContainerSelector) {
             const group = $container.find("#authors-group")[0];
             const rows = group.querySelectorAll(".author-row");
             const row = $(this).closest(".author-row")[0];
-            if (rows.length > 1) {
-                if (row) row.remove();
-            } else if (row) {
-                // Only one row: clear the input
-                const input = row.querySelector('input[name="author[]"]');
-                if (input) input.value = "";
+            const rowIndex = Array.from(rows).indexOf(row);
+            
+            if (rowIndex === 0) {
+                // First row: just clear the value
+                row.querySelector('input[name="author[]"]').value = "";
+            } else {
+                // Other rows: remove the row
+                row.remove();
             }
             updateAddRowButtons(
                 $container,
@@ -679,25 +681,44 @@ window.initBookForm = function (formContainerSelector) {
                 ".add-series-row",
             );
         });
-    // Legacy: .remove-row handler for rows created before migration to .remove-narrator-row
+    // Legacy: .remove-row handler for narrators
     $container
         .off("click", ".remove-row")
         .on("click", ".remove-row", function () {
-            const $row = $(this).closest(".narrator-row");
-            if ($row.length) {
-                $row.remove();
-                updateAddRowButtons(
-                    $container,
-                    "#narrators-group",
-                    ".narrator-row",
-                    ".add-narrator-row",
-                );
+            const group = $container.find("#narrators-group")[0];
+            const rows = group.querySelectorAll(".narrator-row");
+            const row = $(this).closest(".narrator-row")[0];
+            const rowIndex = Array.from(rows).indexOf(row);
+            
+            if (rowIndex === 0) {
+                // First row: just clear the value
+                row.querySelector('input[name="narrator[]"]').value = "";
+            } else {
+                // Other rows: remove the row
+                row.remove();
             }
+            updateAddRowButtons(
+                $container,
+                "#narrators-group",
+                ".narrator-row",
+                ".add-narrator-row",
+            );
         });
     $container
         .off("click", ".remove-genre")
         .on("click", ".remove-genre", function () {
-            $(this).closest(".genre-row").remove();
+            const group = $container.find("#genres-group")[0];
+            const rows = group.querySelectorAll(".genre-row");
+            const row = $(this).closest(".genre-row")[0];
+            const rowIndex = Array.from(rows).indexOf(row);
+            
+            if (rowIndex === 0) {
+                // First row: just reset the select
+                row.querySelector('select[name="genre[]"]').value = "";
+            } else {
+                // Other rows: remove the row
+                row.remove();
+            }
             updateAddRowButtons(
                 $container,
                 "#genres-group",
