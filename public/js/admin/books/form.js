@@ -395,6 +395,15 @@ function googleBooksProxyUrl(url) {
 }
 window.googleBooksProxyUrl = googleBooksProxyUrl;
 
+// Helper function to format file size
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
 function loadDirectoryFiles($container) {
     console.log("loadDirectoryFiles called. Container:", $container);
     const filesList = $container.find("#directory-files-list");
@@ -474,41 +483,46 @@ function loadDirectoryFiles($container) {
         success: function (response) {
             $viewFilesBtn.prop("disabled", false).html(originalBtnHtml);
             let html = "";
-            let files = [];
-            if (typeof response === "string")
-                try {
-                    response = JSON.parse(response);
-                } catch (e) {
-                    console.error("Error parsing response:", e);
-                }
-            if (response && response.files && Array.isArray(response.files))
-                files = response.files;
-            else if (response && Array.isArray(response)) files = response;
-            else if (response && response.data && Array.isArray(response.data))
-                files = response.data;
+            
+            // Check if directory exists
+            if (response.exists === false) {
+                html = '<div class="p-3 text-danger"><i class="fas fa-exclamation-triangle me-2"></i>Directory not found</div>';
+                filesList.html(html);
+                return;
+            }
+            
+            let files = response.files || [];
 
             if (files.length > 0) {
                 html = '<div class="list-group list-group-flush">';
                 files.forEach(function (file) {
                     if (!file) return;
-                    const filename =
-                        typeof file === "string"
-                            ? file
-                            : file.name || file.filename || "";
-                    if (!filename) return;
-                    const isImage = /(\.(jpg|jpeg|png|gif|webp))$/i.test(
-                        filename,
-                    );
-                    const isAudio = /(\.(mp3|m4b|m4a|ogg|wav|flac))$/i.test(
-                        filename,
-                    );
-                    let icon = "📄";
-                    if (isImage) icon = "🖼️";
-                    else if (isAudio) icon = "🔊";
-                    html += `<div class="list-group-item p-2"><div class="d-flex align-items-center"><span class="me-2">${icon}</span><span class="text-truncate">${filename}</span></div></div>`;
+                    const filename = file.name || file.filename || "Unknown";
+                    const size = file.size ? formatFileSize(file.size) : '';
+                    const ext = file.extension || '';
+                    
+                    // Choose icon based on file type
+                    let icon = 'fa-file';
+                    if (['mp3', 'm4b', 'm4a', 'aac', 'flac', 'ogg', 'wav'].includes(ext.toLowerCase())) {
+                        icon = 'fa-file-audio text-primary';
+                    } else if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext.toLowerCase())) {
+                        icon = 'fa-file-image text-success';
+                    } else if (['txt', 'nfo', 'md'].includes(ext.toLowerCase())) {
+                        icon = 'fa-file-alt text-info';
+                    } else if (['json', 'xml'].includes(ext.toLowerCase())) {
+                        icon = 'fa-file-code text-warning';
+                    }
+                    
+                    html += '<div class="list-group-item py-1 px-2 small d-flex justify-content-between align-items-center">';
+                    html += '<span><i class="fas ' + icon + ' me-2"></i>' + filename + '</span>';
+                    if (size) {
+                        html += '<span class="text-muted">' + size + '</span>';
+                    }
+                    html += '</div>';
                 });
                 html += "</div>";
             } else {
+                html = '<div class="p-3 text-muted">No files found in this directory.</div>';
                 html =
                     '<div class="p-3 text-muted text-center">No files found in this directory.</div>';
             }

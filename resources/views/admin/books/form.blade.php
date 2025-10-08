@@ -446,9 +446,16 @@
         </div>
         <div class="form-group d-flex align-items-center">
             <label for="directoryPath" class="me-2">Directory Path:</label>
-            <input type="text" class="form-control @error('directoryPath') is-invalid @enderror me-2" id="directoryPath"
-                name="directoryPath" value="{{ old('directoryPath', $directoryPath ?? ($initial['directoryPath'] ?? '')) }}" style="max-width: 400px;">
-            <button type="button" class="btn btn-outline-secondary" id="resync-path-btn" title="Resync title, author, and series from path">
+            <div class="position-relative" style="flex: 1; max-width: 400px;">
+                <input type="text" class="form-control @error('directoryPath') is-invalid @enderror" id="directoryPath"
+                    name="directoryPath" value="{{ old('directoryPath', $directoryPath ?? ($initial['directoryPath'] ?? '')) }}" style="padding-right: 35px;">
+                <button type="button" class="btn btn-link text-danger position-absolute" id="directory-not-found-btn" 
+                    style="display: none; right: 5px; top: 50%; transform: translateY(-50%); padding: 0; width: 25px; height: 25px;"
+                    title="Directory not found - Click to browse">
+                    <i class="fas fa-times-circle"></i>
+                </button>
+            </div>
+            <button type="button" class="btn btn-outline-secondary ms-2" id="resync-path-btn" title="Resync title, author, and series from path">
                 <i class="fas fa-sync-alt"></i> Resync Title/Author/Series
             </button>
             @error('directoryPath')
@@ -619,6 +626,38 @@ document.addEventListener('DOMContentLoaded', function() {
     </form>
 </div>
 
+{{-- Directory Browser Modal --}}
+<div class="modal fade" id="directoryBrowserModal" tabindex="-1" aria-labelledby="directoryBrowserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="directoryBrowserModalLabel">Browse Directories</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Current Path:</label>
+                    <div class="d-flex align-items-center">
+                        <button type="button" class="btn btn-sm btn-outline-secondary me-2" id="dir-browser-up-btn" disabled>
+                            <i class="fas fa-arrow-up"></i> Up
+                        </button>
+                        <input type="text" class="form-control" id="dir-browser-current-path" readonly>
+                    </div>
+                </div>
+                <div class="border rounded p-3" style="max-height: 400px; overflow-y: auto;">
+                    <div id="dir-browser-list">
+                        <div class="text-center text-muted">Loading...</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="dir-browser-select-btn">Select This Directory</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @push('scripts')
 <script>
 // Accessibility fix for autofillModal: Remove aria-hidden if set while modal is open and focused
@@ -674,14 +713,16 @@ document.addEventListener('DOMContentLoaded', function() {
     window.APP_URL = "{{ config('app.url') }}";
     window.GENRE_OPTIONS = @json(config('genres.list', []));
     window.AUDIBLE_SEARCH_URL = "{{ route('admin.books.audible') }}";
+    window.BOOK_FORM_ROUTES.browseDirectories = "{{ route('admin.books.browseDirectories') }}";
 
     // Debug: Confirm jQuery and jQuery UI are loaded
     console.log('window.jQuery:', typeof window.jQuery, window.jQuery ? 'OK' : 'MISSING');
     console.log('$.fn.autocomplete:', typeof $.fn.autocomplete, $.fn.autocomplete ? 'OK' : 'MISSING');
 </script>
 
-{{-- Include form.js script --}}
+{{-- Include form.js and directory-browser.js scripts --}}
 <script src="{{ asset('js/admin/books/form.js') }}"></script>
+<script src="{{ asset('js/admin/books/directory-browser.js') }}"></script>
 <script type="text/javascript">
 $(function() {
     var formSelector = '#book-form';
