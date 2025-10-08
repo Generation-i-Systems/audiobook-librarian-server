@@ -50,7 +50,12 @@
                                 @if (!empty($book['needsReviewReasons']))
                                     <ul class="mb-0 ps-3">
                                         @foreach ($book['needsReviewReasons'] as $reason)
-                                            <li>{{ $reason }}</li>
+                                            @php
+                                                // Extract base reason (before "Parsed:" or "Document:" details)
+                                                $parts = preg_split('/(Parsed:|Document:)/', $reason);
+                                                $baseReason = trim($parts[0]);
+                                            @endphp
+                                            <li>{{ $baseReason }}</li>
                                         @endforeach
                                     </ul>
                                 @else

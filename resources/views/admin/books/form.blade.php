@@ -29,6 +29,18 @@
         </div>
     @endif
 
+    @if(isset($book) && !empty($book['needsReview']) && !empty($book['needsReviewReasons']))
+        <div class="alert alert-warning">
+            <h5 class="alert-heading mb-2"><i class="fas fa-exclamation-triangle me-2"></i>This book needs review</h5>
+            <strong>Reasons:</strong>
+            <ul class="mb-0 mt-2">
+                @foreach($book['needsReviewReasons'] as $reason)
+                    <li>{{ $reason }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
     <form action="{{ isset($book) ? route('admin.books.update', ['book' => $book['id']]) : route('admin.books.store') }}"
         method="POST" enctype="multipart/form-data" id="book-form" class="mt-3">
         @php
