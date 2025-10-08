@@ -23,11 +23,20 @@ class NeedsReviewController extends Controller
         $reason = $request->input('reason');
 
         $reasons = $this->documentStoreService->listNeedsReviewReasons();
-        $items = $this->documentStoreService->listNeedsReviewBooks($reason, $limit, $page);
 
-        // Approximate total for paginator; if we got a full page, pretend there is at least one more
+        // Fetch one extra item to check if there are more pages
+        $items = $this->documentStoreService->listNeedsReviewBooks($reason, $limit + 1, $page);
+
         $count = count($items);
-        $total = ($page - 1) * $limit + $count + ($count === $limit ? 1 : 0);
+        $hasMore = $count > $limit;
+
+        // Only show $limit items, trim the extra one
+        if ($hasMore) {
+            $items = array_slice($items, 0, $limit);
+        }
+
+        // Calculate approximate total for paginator
+        $total = ($page - 1) * $limit + count($items) + ($hasMore ? 1 : 0);
 
         $paginator = new LengthAwarePaginator(
             $items,
