@@ -196,8 +196,9 @@
                         @if(!empty($series['seriesName']))
                             <button type="button" class="btn btn-sm btn-outline-primary ms-2 rename-series-btn" 
                                 data-series-name="{{ $series['seriesName'] }}"
-                                style="height:32px; white-space: nowrap;">
-                                <i class="fas fa-edit"></i> Rename
+                                style="height:32px; width:32px; padding:0; display:flex; align-items:center; justify-content:center;"
+                                title="Rename this series">
+                                <i class="fas fa-edit"></i>
                             </button>
                         @endif
                         <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
