@@ -310,8 +310,43 @@
                         <span class="invalid-feedback d-block">{{ $message }}</span>
                     @enderror
                 </div>
+                <div class="col-md-9">
+                    <label for="description" class="form-label">Description <span class="text-muted">(Optional)</span></label>
+                    <textarea class="form-control @error('description') is-invalid @enderror" id="description"
+                        name="description" rows="3" 
+                        placeholder="Enter book description">{{ old('description', isset($book) && !empty($book['description']) ? $book['description'] : ($initial['description'] ?? null)) }}</textarea>
+                    @error('description')
+                        <span class="invalid-feedback d-block">{{ $message }}</span>
+                    @enderror
+                </div>
             </div>
         </div>
+
+        {{-- Directory & Files Card --}}
+        <div class="book-form-card">
+            <h5 class="book-form-section-title"><i class="fas fa-folder me-2"></i>Directory & Files</h5>
+            <div class="mb-3">
+                <label for="directoryPath" class="form-label">Directory Path</label>
+                <div class="d-flex align-items-center">
+                    <div class="position-relative" style="flex: 1;">
+                        <input type="text" class="form-control @error('directoryPath') is-invalid @enderror" id="directoryPath"
+                            name="directoryPath" value="{{ old('directoryPath', $directoryPath ?? ($initial['directoryPath'] ?? '')) }}" 
+                            style="padding-right: 35px;" placeholder="Path to book directory">
+                        <button type="button" class="btn btn-link text-danger position-absolute" id="directory-not-found-btn" 
+                            style="display: none; right: 5px; top: 50%; transform: translateY(-50%); padding: 0; width: 25px; height: 25px;"
+                            title="Directory not found - Click to browse">
+                            <i class="fas fa-times-circle"></i>
+                        </button>
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary ms-2" id="resync-path-btn" 
+                        title="Resync title, author, and series from path">
+                        <i class="fas fa-sync-alt me-1"></i>Resync
+                    </button>
+                </div>
+                @error('directoryPath')
+                    <span class="invalid-feedback d-block">{{ $message }}</span>
+                @enderror
+            </div>
         @php
             $directoryPath = isset($book) && !empty($book['directoryPath']) ? $book['directoryPath'] : ($directoryPath ?? ($initial['directoryPath'] ?? null));
             $coverImg = isset($book) && !empty($book['coverImage']) ? $book['coverImage'] : ($initial['coverImage'] ?? null);
@@ -502,43 +537,21 @@
                 <span class="invalid-feedback d-block">{{ $message }}</span>
             @enderror
         </div>
-        <div class="form-group">
-            <label for="description">Description (Optional):</label>
-            <textarea class="form-control @error('description') is-invalid @enderror" id="description"
-                name="description"
-                rows="3">{{ old('description', isset($book) && !empty($book['description']) ? $book['description'] : ($initial['description'] ?? null)) }}</textarea>
-            @error('description')
-                <span class="invalid-feedback d-block">{{ $message }}</span>
-            @enderror
-        </div>
-        <div class="form-group d-flex align-items-center">
-            <label for="directoryPath" class="me-2">Directory Path:</label>
-            <div class="position-relative" style="flex: 1; max-width: 400px;">
-                <input type="text" class="form-control @error('directoryPath') is-invalid @enderror" id="directoryPath"
-                    name="directoryPath" value="{{ old('directoryPath', $directoryPath ?? ($initial['directoryPath'] ?? '')) }}" style="padding-right: 35px;">
-                <button type="button" class="btn btn-link text-danger position-absolute" id="directory-not-found-btn" 
-                    style="display: none; right: 5px; top: 50%; transform: translateY(-50%); padding: 0; width: 25px; height: 25px;"
-                    title="Directory not found - Click to browse">
-                    <i class="fas fa-times-circle"></i>
-                </button>
-            </div>
-            <button type="button" class="btn btn-outline-secondary ms-2" id="resync-path-btn" title="Resync title, author, and series from path">
-                <i class="fas fa-sync-alt"></i> Resync Title/Author/Series
-            </button>
-            @error('directoryPath')
-                <span class="invalid-feedback d-block ms-2">{{ $message }}</span>
-            @enderror
-        </div>
-        <div class="form-group mb-3" style="margin-top: 0.5rem;">
-            <a href="#" class="text-decoration-none" id="show-files-link">
-                <i class="fas fa-folder-open me-1"></i>View Directory Files
-            </a>
-            <div id="directory-files-list"
-                class="w-100 mt-2"
-                style="max-height:220px; overflow-y:auto; border:1px solid #ccc; border-radius:4px; background:#fafbfc; padding:8px; display:none; position: relative;">
-                <span class="text-muted">No files loaded yet.</span>
+            <div class="mb-3">
+                <a href="#" class="text-decoration-none" id="show-files-link">
+                    <i class="fas fa-folder-open me-1"></i>View Directory Files
+                </a>
+                <div id="directory-files-list"
+                    class="w-100 mt-2"
+                    style="max-height:220px; overflow-y:auto; border:1px solid #ccc; border-radius:4px; background:#fafbfc; padding:8px; display:none; position: relative;">
+                    <span class="text-muted">No files loaded yet.</span>
+                </div>
             </div>
         </div>
+
+        {{-- Cover Image Card --}}
+        <div class="book-form-card">
+            <h5 class="book-form-section-title"><i class="fas fa-image me-2"></i>Cover Image</h5>
         <script>
 // Function to initialize book form UI elements
 function initBookFormUI() {
