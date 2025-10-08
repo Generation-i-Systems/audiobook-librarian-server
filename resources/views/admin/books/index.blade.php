@@ -47,6 +47,7 @@
                     <th>Title</th>
                     <th>Author</th>
                     <th>Series</th>
+                    <th style="width: 60px; text-align: center;">#</th>
                     <th>Genre</th>
                     <th>Actions</th>
                 </tr>
@@ -92,10 +93,10 @@
                                     @foreach($series as $key => $item)
                                         @if(is_array($item) && (isset($item['seriesName']) || isset($item['name'])))
                                             {{-- Canonical: [{seriesName, number}] or [{name, number}] --}}
-                                            {{ $item['seriesName'] ?? $item['name'] }}{{ !empty($item['number']) ? ' (#' . $item['number'] . ')' : '' }}
+                                            {{ $item['seriesName'] ?? $item['name'] }}
                                         @elseif(is_string($key) && (is_scalar($item) || is_null($item)))
                                             {{-- Assoc: ['Name' => number] --}}
-                                            {{ $key }}{{ $item ? ' (#' . $item . ')' : '' }}
+                                            {{ $key }}
                                         @elseif(is_string($item))
                                             {{-- Legacy: ['Name', ...] --}}
                                             {{ $item }}
@@ -104,6 +105,26 @@
                                     @endforeach
                                 @elseif(is_string($series))
                                     {{ $series }}
+                                @endif
+                            @endif
+                        </td>
+                        <td style="text-align: center; vertical-align: middle;">
+                            @if(!empty($book['series']))
+                                @php
+                                    $series = $book['series'] ?? [];
+                                    $seriesNumber = null;
+                                @endphp
+                                @if(is_array($series))
+                                    @foreach($series as $key => $item)
+                                        @if(is_array($item) && !empty($item['number']))
+                                            {{ $item['number'] }}
+                                            @php $seriesNumber = $item['number']; @endphp
+                                        @elseif(is_string($key) && (is_scalar($item) || is_null($item)))
+                                            {{ $item ?: '' }}
+                                            @php $seriesNumber = $item; @endphp
+                                        @endif
+                                        @if(!$loop->last && $seriesNumber)<br>@endif
+                                    @endforeach
                                 @endif
                             @endif
                         </td>
