@@ -863,6 +863,9 @@ class BookController extends Controller
             $genres = [$genres];
         }
 
+        // Capture return URL from request or referer
+        $returnUrl = request()->input('returnUrl') ?? request()->header('referer');
+
         return view('admin.books.edit', [
             'book' => $book,
             'genreList' => $genreList,
@@ -871,6 +874,7 @@ class BookController extends Controller
             'coverAuto' => $coverAuto,
             'directoryPath' => $directoryPath,
             'isModal' => request()->ajax() || request('isModal', false),
+            'returnUrl' => $returnUrl,
         ]);
     }
 

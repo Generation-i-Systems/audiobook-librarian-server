@@ -44,10 +44,11 @@
     <form action="{{ isset($book) ? route('admin.books.update', ['book' => $book['id']]) : route('admin.books.store') }}"
         method="POST" enctype="multipart/form-data" id="book-form" class="mt-3">
         @php
-            $returnUrl = old('returnUrl') ?? request('returnUrl') ?? request()->headers->get('referer');
+            // Priority: old input > passed returnUrl > request returnUrl > referer
+            $finalReturnUrl = old('returnUrl') ?? ($returnUrl ?? null) ?? request('returnUrl') ?? request()->headers->get('referer');
         @endphp
-        @if($returnUrl)
-            <input type="hidden" name="returnUrl" value="{{ $returnUrl }}">
+        @if($finalReturnUrl)
+            <input type="hidden" name="returnUrl" value="{{ $finalReturnUrl }}">
         @endif
         @csrf
         @if(isset($book))
