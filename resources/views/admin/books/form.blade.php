@@ -457,9 +457,12 @@
                 }
             }
         @endphp
+
+        {{-- Cover Image Selection Card --}}
         @if (!empty($coverOptions))
-        <div class="mb-3" id="cover-candidates-group">
-            <label class="form-label">Select Cover Image:</label>
+        <div class="book-form-card">
+            <h5 class="book-form-section-title"><i class="fas fa-images me-2"></i>Cover Image Selection</h5>
+            <div class="mb-3" id="cover-candidates-group">
             @php
                 $initialCoverSource = '';
                 foreach($coverOptions as $option) {
@@ -511,47 +514,33 @@
                                         @endforeach
                                     </div>
                                 </div>
-                            @endif
 
-        <div id="google-books-matches-table-wrapper" style="display:none;">
-            <label>Google Books: Select a Match</label>
-            <table class="table table-bordered table-sm" id="google-books-matches-table">
-                <thead>
-                    <tr>
-                        <th></th>
-                        <th>Title</th>
-                        <th>Authors</th>
-                        <th>Year</th>
-                        <th>Cover</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
-        </div>
+            <div id="google-books-matches-table-wrapper" style="display:none;" class="mt-3">
+                <label class="form-label">Google Books: Select a Match</label>
+                <table class="table table-bordered table-sm" id="google-books-matches-table">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <th>Title</th>
+                            <th>Authors</th>
+                            <th>Year</th>
+                            <th>Cover</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
 
-        <div class="form-group">
-            <label for="coverImage">Cover Image (Optional):</label>
-            <input type="file" class="form-control-file @error('coverImage') is-invalid @enderror" id="coverImage"
-                name="coverImage">
-            @error('coverImage')
-                <span class="invalid-feedback d-block">{{ $message }}</span>
-            @enderror
-        </div>
             <div class="mb-3">
-                <a href="#" class="text-decoration-none" id="show-files-link">
-                    <i class="fas fa-folder-open me-1"></i>View Directory Files
-                </a>
-                <div id="directory-files-list"
-                    class="w-100 mt-2"
-                    style="max-height:220px; overflow-y:auto; border:1px solid #ccc; border-radius:4px; background:#fafbfc; padding:8px; display:none; position: relative;">
-                    <span class="text-muted">No files loaded yet.</span>
-                </div>
+                <label for="coverImage" class="form-label">Upload Cover Image <span class="text-muted">(Optional)</span></label>
+                <input type="file" class="form-control @error('coverImage') is-invalid @enderror" id="coverImage"
+                    name="coverImage">
+                @error('coverImage')
+                    <span class="invalid-feedback d-block">{{ $message }}</span>
+                @enderror
             </div>
         </div>
-
-        {{-- Cover Image Card --}}
-        <div class="book-form-card">
-            <h5 class="book-form-section-title"><i class="fas fa-image me-2"></i>Cover Image</h5>
+        @endif
         <script>
 // Function to initialize book form UI elements
 function initBookFormUI() {
