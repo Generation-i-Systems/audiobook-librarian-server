@@ -311,6 +311,9 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     // AJAX: Browse directories for path selection
     Route::get('books/browse-directories', [Admin\BookController::class, 'browseDirectories'])->name('books.browseDirectories');
 
+    // AJAX: Rename series across all books
+    Route::post('books/rename-series', [Admin\BookController::class, 'renameSeries'])->name('books.renameSeries');
+
     Route::resource('genres', Admin\GenreController::class);
     Route::resource('authors', Admin\AuthorController::class);
     Route::resource('books', Admin\BookController::class);

@@ -563,6 +563,54 @@ class MySqlService implements DocumentStoreServiceInterface
         }
     }
 
+    /**
+     * Rename a series across all books
+     *
+     * @param string $oldName
+     * @param string $newName
+     * @return int Number of books updated
+     */
+    public function renameSeries(string $oldName, string $newName): int
+    {
+        try {
+            $count = 0;
+
+            // Find all books with the old series name
+            $books = Book::whereJsonContains('series', ['seriesName' => $oldName])->get();
+
+            foreach ($books as $book) {
+                $series = $book->series;
+                if (!is_array($series)) {
+                    $series = json_decode($series, true) ?: [];
+                }
+
+                $updated = false;
+                foreach ($series as &$seriesItem) {
+                    if (is_array($seriesItem)) {
+                        if (isset($seriesItem['seriesName']) && $seriesItem['seriesName'] === $oldName) {
+                            $seriesItem['seriesName'] = $newName;
+                            $updated = true;
+                        } elseif (isset($seriesItem['name']) && $seriesItem['name'] === $oldName) {
+                            $seriesItem['name'] = $newName;
+                            $updated = true;
+                        }
+                    }
+                }
+
+                if ($updated) {
+                    $book->series = $series;
+                    $book->save();
+                    $count++;
+                }
+            }
+
+            return $count;
+        } catch (\Exception $e) {
+            Log::error('MySqlService renameSeries failed: ' . $e->getMessage());
+            throw $e;
+        }
+    }
+
     public function listAuthors()
     {
         return Author::orderBy('name')->get()->toArray();

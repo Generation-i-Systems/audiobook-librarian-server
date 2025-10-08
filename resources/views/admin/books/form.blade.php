@@ -172,7 +172,14 @@
 
         </div>
         <div class="mb-3">
-            <label class="form-label">Series</label>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <label class="form-label mb-0">Series</label>
+                @if(isset($book) && !empty($book['series']))
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="rename-series-btn">
+                        <i class="fas fa-edit me-1"></i>Rename Series
+                    </button>
+                @endif
+            </div>
             <div id="series-group">
                 {{-- Only use canonical format: array of objects with seriesName and number --}}
                 @php
@@ -648,6 +655,37 @@ document.addEventListener('DOMContentLoaded', function() {
     </form>
 </div>
 
+{{-- Series Rename Modal --}}
+<div class="modal fade" id="renameSeriesModal" tabindex="-1" aria-labelledby="renameSeriesModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="renameSeriesModalLabel">Rename Series</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Warning:</strong> This will rename the series for ALL books in this series, not just this book.
+                </div>
+                <div class="mb-3">
+                    <label for="old-series-name" class="form-label">Current Series Name</label>
+                    <input type="text" class="form-control" id="old-series-name" readonly>
+                </div>
+                <div class="mb-3">
+                    <label for="new-series-name" class="form-label">New Series Name</label>
+                    <input type="text" class="form-control" id="new-series-name" placeholder="Enter new series name">
+                </div>
+                <div id="rename-series-feedback"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirm-rename-series-btn">Rename Series</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {{-- Directory Browser Modal --}}
 <div class="modal fade" id="directoryBrowserModal" tabindex="-1" aria-labelledby="directoryBrowserModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
@@ -728,7 +766,8 @@ document.addEventListener('DOMContentLoaded', function() {
         filesAjax: "{{ route('admin.books.filesAjax') }}",
         authorsAutocomplete: "{{ route('admin.books.autocomplete.authors') }}",
         seriesAutocomplete: "{{ route('admin.books.autocomplete.series') }}",
-        narratorsAutocomplete: "{{ route('admin.books.autocomplete.narrators') }}"
+        narratorsAutocomplete: "{{ route('admin.books.autocomplete.narrators') }}",
+        renameSeries: "{{ route('admin.books.renameSeries') }}"
     };
 
     // Set other global variables
@@ -742,9 +781,10 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('$.fn.autocomplete:', typeof $.fn.autocomplete, $.fn.autocomplete ? 'OK' : 'MISSING');
 </script>
 
-{{-- Include form.js and directory-browser.js scripts --}}
+{{-- Include form.js, directory-browser.js, and series-rename.js scripts --}}
 <script src="{{ asset('js/admin/books/form.js') }}"></script>
 <script src="{{ asset('js/admin/books/directory-browser.js') }}"></script>
+<script src="{{ asset('js/admin/books/series-rename.js') }}"></script>
 <script type="text/javascript">
 $(function() {
     var formSelector = '#book-form';

@@ -2092,6 +2092,36 @@ class BookController extends Controller
     }
 
     /**
+     * Rename a series across all books
+     */
+    public function renameSeries(Request $request)
+    {
+        $validated = $request->validate([
+            'oldName' => 'required|string',
+            'newName' => 'required|string'
+        ]);
+
+        $oldName = $validated['oldName'];
+        $newName = $validated['newName'];
+
+        try {
+            $count = $this->documentStoreService->renameSeries($oldName, $newName);
+
+            return response()->json([
+                'success' => true,
+                'count' => $count,
+                'message' => "Successfully renamed series from '{$oldName}' to '{$newName}' for {$count} book(s)."
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error renaming series: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred while renaming the series.'
+            ], 500);
+        }
+    }
+
+    /**
      * Provides autocomplete suggestions for author names.
      */
     public function autocompleteAuthors(Request $request): \Illuminate\Http\JsonResponse

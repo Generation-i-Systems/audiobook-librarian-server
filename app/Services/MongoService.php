@@ -2112,6 +2112,19 @@ class MongoService implements DocumentStoreServiceInterface
     }
 
     /**
+     * Rename a series across all books
+     *
+     * @param string $oldName
+     * @param string $newName
+     * @return int Number of books updated
+     */
+    public function renameSeries(string $oldName, string $newName): int
+    {
+        // Mongo backend is deprecated and not queried by the app; return 0.
+        return 0;
+    }
+
+    /**
      * Backward-compatible implementation to satisfy the interface.
      * Delegates to searchGenres().
      */

@@ -66,6 +66,15 @@ interface DocumentStoreServiceInterface
     public function listNeedsReviewReasons(): array;
 
     /**
+     * Rename a series across all books
+     *
+     * @param string $oldName
+     * @param string $newName
+     * @return int Number of books updated
+     */
+    public function renameSeries(string $oldName, string $newName): int;
+
+    /**
      * Get recently added books
      *
      * @param int $limit Maximum number of recent books to return
