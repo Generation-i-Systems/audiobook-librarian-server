@@ -172,14 +172,7 @@
 
         </div>
         <div class="mb-3">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <label class="form-label mb-0">Series</label>
-                @if(isset($book) && !empty($book['series']))
-                    <button type="button" class="btn btn-sm btn-outline-primary" id="rename-series-btn">
-                        <i class="fas fa-edit me-1"></i>Rename Series
-                    </button>
-                @endif
-            </div>
+            <label class="form-label">Series</label>
             <div id="series-group">
                 {{-- Only use canonical format: array of objects with seriesName and number --}}
                 @php
@@ -195,11 +188,18 @@
                 @endphp
                 @foreach($seriesList as $idx => $series)
                     <div class="input-group series-row align-items-start mb-3">
-                        <input type="text" name="series[{{ $idx }}][seriesName]" class="form-control w-auto series-autocomplete" style="max-width:200px; height:32px;"
-                             placeholder="Series Name" value="{{ $series['seriesName'] ?? '' }}">
-                        <datalist id="series-list"></datalist>
                         <input type="number" name="series[{{ $idx }}][number]" class="form-control w-auto"
                             style="max-width:100px; height:32px;" placeholder="Number" value="{{ $series['number'] ?? '' }}" step="any">
+                        <input type="text" name="series[{{ $idx }}][seriesName]" class="form-control w-auto series-autocomplete ms-2" style="max-width:200px; height:32px;"
+                             placeholder="Series Name" value="{{ $series['seriesName'] ?? '' }}">
+                        <datalist id="series-list"></datalist>
+                        @if(!empty($series['seriesName']))
+                            <button type="button" class="btn btn-sm btn-outline-primary ms-2 rename-series-btn" 
+                                data-series-name="{{ $series['seriesName'] }}"
+                                style="height:32px; white-space: nowrap;">
+                                <i class="fas fa-edit"></i> Rename
+                            </button>
+                        @endif
                         <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
                             <button type="button" class="btn btn-outline-danger btn-sm remove-series p-0 mb-0"
                                 style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>

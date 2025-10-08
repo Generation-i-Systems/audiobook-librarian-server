@@ -12,10 +12,11 @@
     function initSeriesRename() {
         renameSeriesUrl = window.BOOK_FORM_ROUTES?.renameSeries || '/admin/books/rename-series';
 
-        // Handle rename series button click
-        $('#rename-series-btn').on('click', function(e) {
+        // Handle rename series button click (using event delegation for dynamically added buttons)
+        $(document).on('click', '.rename-series-btn', function(e) {
             e.preventDefault();
-            openRenameSeriesModal();
+            const seriesName = $(this).data('series-name');
+            openRenameSeriesModal(seriesName);
         });
 
         // Handle confirm rename button
@@ -31,17 +32,13 @@
     }
 
     // Open rename series modal
-    function openRenameSeriesModal() {
-        // Get the first series name from the form
-        const firstSeriesInput = $('input[name^="series"][name$="[seriesName]"]').first();
-        const currentSeriesName = firstSeriesInput.val();
-
-        if (!currentSeriesName) {
+    function openRenameSeriesModal(seriesName) {
+        if (!seriesName) {
             alert('No series name found to rename.');
             return;
         }
 
-        $('#old-series-name').val(currentSeriesName);
+        $('#old-series-name').val(seriesName);
         $('#new-series-name').val('');
         $('#rename-series-feedback').html('');
 
@@ -121,7 +118,7 @@
 
     // Initialize on document ready
     $(document).ready(function() {
-        if ($('#rename-series-btn').length) {
+        if ($('.rename-series-btn').length || $('#series-group').length) {
             initSeriesRename();
         }
     });
