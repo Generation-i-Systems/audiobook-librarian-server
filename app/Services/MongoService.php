@@ -2089,7 +2089,19 @@ class MongoService implements DocumentStoreServiceInterface
     }
 
     /**
-     * Deprecated backend: return empty list of reasons.
+     * Count books needing review, optionally filtered by reason.
+     *
+     * @param string|null $reason
+     * @return int
+     */
+    public function countNeedsReviewBooks(?string $reason = null): int
+    {
+        // Mongo backend is deprecated and not queried by the app; return 0.
+        return 0;
+    }
+
+    /**
+     * Return distinct needs_review reasons across all flagged books.
      *
      * @return array
      */

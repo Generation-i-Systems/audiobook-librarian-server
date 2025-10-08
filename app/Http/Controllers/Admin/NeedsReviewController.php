@@ -24,19 +24,11 @@ class NeedsReviewController extends Controller
 
         $reasons = $this->documentStoreService->listNeedsReviewReasons();
 
-        // Fetch one extra item to check if there are more pages
-        $items = $this->documentStoreService->listNeedsReviewBooks($reason, $limit + 1, $page);
+        // Get total count for accurate pagination
+        $total = $this->documentStoreService->countNeedsReviewBooks($reason);
 
-        $count = count($items);
-        $hasMore = $count > $limit;
-
-        // Only show $limit items, trim the extra one
-        if ($hasMore) {
-            $items = array_slice($items, 0, $limit);
-        }
-
-        // Calculate approximate total for paginator
-        $total = ($page - 1) * $limit + count($items) + ($hasMore ? 1 : 0);
+        // Fetch items for current page
+        $items = $this->documentStoreService->listNeedsReviewBooks($reason, $limit, $page);
 
         $paginator = new LengthAwarePaginator(
             $items,

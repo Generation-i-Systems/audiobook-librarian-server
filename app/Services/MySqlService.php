@@ -488,6 +488,34 @@ class MySqlService implements DocumentStoreServiceInterface
     }
 
     /**
+     * Count books needing review, optionally filtered by reason.
+     *
+     * @param string|null $reason
+     * @return int
+     */
+    public function countNeedsReviewBooks(?string $reason = null): int
+    {
+        try {
+            $query = Book::query()->where('needs_review', true);
+
+            if ($reason !== null && $reason !== '') {
+                $query->where(function ($q) use ($reason) {
+                    try {
+                        $q->whereJsonContains('needs_review_reasons', $reason);
+                    } catch (\Throwable $t) {
+                        $q->where('needs_review_reasons', 'like', '%"' . addcslashes($reason, '\\"') . '"%');
+                    }
+                });
+            }
+
+            return $query->count();
+        } catch (\Exception $e) {
+            Log::error('MySqlService countNeedsReviewBooks failed: ' . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
      * Return distinct needs_review reasons across all flagged books.
      *
      * @return array

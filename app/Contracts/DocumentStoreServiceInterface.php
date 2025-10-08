@@ -51,6 +51,14 @@ interface DocumentStoreServiceInterface
     public function listNeedsReviewBooks(?string $reason = null, int $limit = 100, int $page = 1): array;
 
     /**
+     * Count books needing review, optionally filtered by reason.
+     *
+     * @param string|null $reason
+     * @return int
+     */
+    public function countNeedsReviewBooks(?string $reason = null): int;
+
+    /**
      * Return a list of distinct needs_review reasons across all flagged books.
      *
      * @return array
