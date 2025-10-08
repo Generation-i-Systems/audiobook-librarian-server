@@ -43,16 +43,25 @@ class ImageProxyController extends Controller
     /**
      * Pretty route: /cover/{path}
      * Supports slashes in {path}
+     * Handles both encoded (%2F) and non-encoded (/) paths for backward compatibility
      */
     public function cover($path)
     {
-        Log::info('Cover path: ' . $path);
-        $path = rawurldecode($path);
+        Log::info('Cover path (raw): ' . $path);
+
+        // Decode the path to handle both old (encoded) and new (non-encoded) styles
+        $decodedPath = rawurldecode($path);
+
         $storagePath = env('BOOK_STORAGE_PATH');
-        $fullPath = rtrim($storagePath, '/') . '/' . ltrim($path, '/');
+        $fullPath = rtrim($storagePath, '/') . '/' . ltrim($decodedPath, '/');
+
+        // If not found with decoded path, try the original path (for non-encoded URLs)
+        if (!file_exists($fullPath)) {
+            $fullPath = rtrim($storagePath, '/') . '/' . ltrim($path, '/');
+        }
 
         if (!file_exists($fullPath)) {
-            Log::error('Cover not found at path: ' . $fullPath);
+            Log::error('Cover not found at path: ' . $fullPath . ' (decoded: ' . $decodedPath . ')');
             abort(404);
         }
 
