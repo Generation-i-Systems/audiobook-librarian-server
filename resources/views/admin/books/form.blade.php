@@ -1,6 +1,14 @@
 @extends(isset($layout) ? $layout : 'layouts.app')
 
 @section('content')
+<style>
+.cursor-pointer {
+    cursor: pointer;
+}
+.cursor-pointer:hover {
+    background-color: #f8f9fa;
+}
+</style>
 <div class="container">
     @if(empty($isModal))
         <h1>{{ isset($book) ? 'Edit Book' : 'Create New Book' }}</h1>

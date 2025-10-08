@@ -503,18 +503,27 @@ function loadDirectoryFiles($container) {
                     
                     // Choose icon based on file type
                     let icon = 'fa-file';
+                    let isImage = false;
                     if (['mp3', 'm4b', 'm4a', 'aac', 'flac', 'ogg', 'wav'].includes(ext.toLowerCase())) {
                         icon = 'fa-file-audio text-primary';
                     } else if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext.toLowerCase())) {
                         icon = 'fa-file-image text-success';
+                        isImage = true;
                     } else if (['txt', 'nfo', 'md'].includes(ext.toLowerCase())) {
                         icon = 'fa-file-alt text-info';
                     } else if (['json', 'xml'].includes(ext.toLowerCase())) {
                         icon = 'fa-file-code text-warning';
                     }
                     
-                    html += '<div class="list-group-item py-1 px-2 small d-flex justify-content-between align-items-center">';
-                    html += '<span><i class="fas ' + icon + ' me-2"></i>' + filename + '</span>';
+                    const itemClass = isImage ? 'list-group-item-action cursor-pointer' : '';
+                    const dataAttrs = isImage ? 'data-cover-file="' + filename + '"' : '';
+                    
+                    html += '<div class="list-group-item py-1 px-2 small d-flex justify-content-between align-items-center ' + itemClass + '" ' + dataAttrs + '>';
+                    html += '<span><i class="fas ' + icon + ' me-2"></i>' + filename;
+                    if (isImage) {
+                        html += ' <small class="text-muted">(click to set as cover)</small>';
+                    }
+                    html += '</span>';
                     if (size) {
                         html += '<span class="text-muted">' + size + '</span>';
                     }
@@ -704,6 +713,47 @@ window.initBookForm = function (formContainerSelector) {
             e.preventDefault(); // Prevent the default anchor behavior
             loadDirectoryFiles($container);
         }); // Confirm handler attached
+
+    // Event listener for selecting cover image from directory files
+    $container
+        .off("click", "[data-cover-file]")
+        .on("click", "[data-cover-file]", function (e) {
+            e.preventDefault();
+            const filename = $(this).data("cover-file");
+            const dirPath = $container.find("#directoryPath").val();
+            
+            if (!filename || !dirPath) {
+                alert("Unable to set cover - missing filename or directory path");
+                return;
+            }
+            
+            // Set the cover image field to the selected filename
+            const $coverInput = $container.find("#coverImage");
+            if ($coverInput.length) {
+                $coverInput.val(filename);
+                
+                // Trigger change event to update any preview
+                $coverInput.trigger("change");
+                
+                // Show success message
+                $(this).addClass("bg-success text-white");
+                setTimeout(() => {
+                    $(this).removeClass("bg-success text-white");
+                }, 1000);
+                
+                // If there's a cover preview, update it
+                const coverUrl = window.BOOK_FORM_ROUTES?.filesAjax 
+                    ? "/cover/" + dirPath + "/" + filename
+                    : "";
+                if (coverUrl) {
+                    $container.find(".cover-preview img").attr("src", coverUrl);
+                }
+                
+                console.log("Cover image set to:", filename);
+            } else {
+                console.error("Cover image input field not found");
+            }
+        });
 
     // Attach event handler for Autofill Modal button
     $container
