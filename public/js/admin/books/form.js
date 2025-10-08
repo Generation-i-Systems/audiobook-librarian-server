@@ -34,12 +34,12 @@ function addAuthorRow($container, authorName = "") {
     const group = $container.find("#authors-group")[0];
     if (!group) return;
     const div = document.createElement("div");
-    div.className = "input-group author-row align-items-start mb-3";
+    div.className = "d-flex align-items-start mb-2 author-row";
     div.innerHTML = `
-        <input type="text" name="author[]" class="form-control w-auto author-autocomplete" value="${authorName}" style="max-width:300px; height:32px;" required>
-        <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
-            <button type="button" class="btn btn-outline-danger btn-sm remove-author p-0 mb-0" style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
-            <button type="button" class="btn btn-primary btn-sm add-author-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
+        <input type="text" name="author[]" class="form-control author-autocomplete" value="${authorName}" style="height:32px; flex:1;" placeholder="Author Name" required>
+        <div class="d-flex flex-column ms-2" style="gap:2px;">
+            <button type="button" class="btn btn-outline-danger btn-sm remove-author" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">&times;</button>
+            <button type="button" class="btn btn-primary btn-sm add-author-row" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">+</button>
         </div>`;
     group.appendChild(div);
     // Re-initialize autocomplete for the new element
@@ -64,12 +64,12 @@ function addNarratorRow($container, narratorName = "") {
     const group = $container.find("#narrators-group")[0];
     if (!group) return;
     const div = document.createElement("div");
-    div.className = "input-group narrator-row align-items-start mb-3";
+    div.className = "d-flex align-items-start mb-2 narrator-row";
     div.innerHTML = `
-        <input type="text" name="narrator[]" class="form-control w-auto narrator-autocomplete" value="${narratorName}" style="max-width:300px; height:32px;">
-        <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
-            <button type="button" class="btn btn-outline-danger btn-sm remove-row p-0 mb-0" style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
-            <button type="button" class="btn btn-primary btn-sm add-narrator-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
+        <input type="text" name="narrator[]" class="form-control narrator-autocomplete" value="${narratorName}" style="height:32px; flex:1;" placeholder="Narrator Name">
+        <div class="d-flex flex-column ms-2" style="gap:2px;">
+            <button type="button" class="btn btn-outline-danger btn-sm remove-row" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">&times;</button>
+            <button type="button" class="btn btn-primary btn-sm add-narrator-row" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">+</button>
         </div>`;
     group.appendChild(div);
     if (
@@ -96,13 +96,14 @@ function addSeriesRow($container, seriesName = "", seriesNumber = "") {
     const group = $container.find("#series-group")[0];
     if (!group) return;
     const div = document.createElement("div");
-    div.className = "input-group series-row align-items-start mb-3";
+    div.className = "d-flex align-items-start mb-2 series-row";
     div.innerHTML = `
-        <input type="text" name="series[][seriesName]" class="form-control w-auto series-autocomplete" style="max-width:200px; height:32px;" placeholder="Series Name" value="${seriesName}">
-        <input type="text" name="series[][number]" class="form-control w-auto ms-2" style="max-width:90px; height:32px;" placeholder="# in Series" value="${seriesNumber}">
-        <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
-            <button type="button" class="btn btn-outline-danger btn-sm remove-series p-0 mb-0" style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
-            <button type="button" class="btn btn-primary btn-sm add-series-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
+        <input type="number" name="series[][number]" class="form-control" style="width:60px; height:32px; flex-shrink:0;" placeholder="#" value="${seriesNumber}" step="any">
+        <input type="text" name="series[][seriesName]" class="form-control series-autocomplete ms-2" style="height:32px; flex:1;" placeholder="Series Name" value="${seriesName}">
+        <div style="width:32px; height:32px; margin-left:0.5rem; flex-shrink:0;"></div>
+        <div class="d-flex flex-column ms-2" style="gap:2px;">
+            <button type="button" class="btn btn-outline-danger btn-sm remove-series" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">&times;</button>
+            <button type="button" class="btn btn-primary btn-sm add-series-row" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">+</button>
         </div>`;
     group.appendChild(div);
     // Re-initialize autocomplete for the new element
@@ -127,18 +128,18 @@ function addGenreRow($container, selectedGenre = "") {
     const group = $container.find("#genres-group")[0];
     if (!group) return;
     const div = document.createElement("div");
-    div.className = "input-group genre-row align-items-start mb-3";
+    div.className = "d-flex align-items-start mb-2 genre-row";
     let optionsHtml = '<option value="">Select a genre</option>';
     (window.GENRE_OPTIONS || []).forEach((g) => {
         optionsHtml += `<option value="${g}" ${selectedGenre === g ? "selected" : ""}>${g}</option>`;
     });
     div.innerHTML = `
-        <select name="genre[]" class="form-select w-auto" style="max-width:200px; height:32px;" required>
+        <select name="genre[]" class="form-select" style="height:32px; flex:1;" required>
             ${optionsHtml}
         </select>
-        <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
-            <button type="button" class="btn btn-outline-danger btn-sm remove-genre p-0 mb-0" style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
-            <button type="button" class="btn btn-primary btn-sm add-genre-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
+        <div class="d-flex flex-column ms-2" style="gap:2px;">
+            <button type="button" class="btn btn-outline-danger btn-sm remove-genre" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">&times;</button>
+            <button type="button" class="btn btn-primary btn-sm add-genre-row" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">+</button>
         </div>`;
     group.appendChild(div);
     updateAddRowButtons(
