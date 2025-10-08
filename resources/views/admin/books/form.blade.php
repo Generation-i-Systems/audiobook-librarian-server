@@ -503,17 +503,18 @@
                         <input type="radio" name="coverImageCandidate" value="{{ $option['value'] }}"
                             data-source="{{ $option['type'] }}"
                             @if((isset($biggestCover) && $biggestCover === $option['value']) || (empty($biggestCover) && $option['type'] === 'current')) checked @endif class="mb-2">
-                                                <img src="{{ $option['src'] }}" alt="{{ $option['label'] }}"
-                                                    style="max-width:100px;max-height:140px;border:1px solid #ccc;">
-                                            </label>
-                                            <div class="mt-1" style="font-size:12px;word-break:break-all;">
-                                                {{ $option['label'] }}<br>
-                                                <small class="text-muted">{{ $option['display_name'] ?? $option['value'] }}</small>
-                                            </div>
-                                        </div>
-                                        @endforeach
-                                    </div>
-                                </div>
+                        <img src="{{ $option['src'] }}" alt="{{ $option['label'] }}"
+                            style="max-width:100px;max-height:140px;border:1px solid #ccc;">
+                    </label>
+                    <div class="mt-1" style="font-size:12px;word-break:break-all;">
+                        {{ $option['label'] }}<br>
+                        <small class="text-muted">{{ $option['display_name'] ?? $option['value'] }}</small>
+                    </div>
+                </div>
+                @endforeach
+            </div>
+
+            </div>
 
             <div id="google-books-matches-table-wrapper" style="display:none;" class="mt-3">
                 <label class="form-label">Google Books: Select a Match</label>
@@ -531,7 +532,7 @@
                 </table>
             </div>
 
-            <div class="mb-3">
+            <div class="mt-3">
                 <label for="coverImage" class="form-label">Upload Cover Image <span class="text-muted">(Optional)</span></label>
                 <input type="file" class="form-control @error('coverImage') is-invalid @enderror" id="coverImage"
                     name="coverImage">
