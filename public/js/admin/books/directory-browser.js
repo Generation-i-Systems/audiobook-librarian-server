@@ -9,9 +9,64 @@
     let currentBrowserPath = '';
     let browseDirectoriesUrl = '';
 
+    // Make modal draggable by its header
+    function makeModalDraggable(modalElement) {
+        const modalDialog = modalElement.querySelector('.modal-dialog');
+        const modalHeader = modalElement.querySelector('.modal-header');
+        
+        if (!modalDialog || !modalHeader) return;
+        
+        let isDragging = false;
+        let currentX;
+        let currentY;
+        let initialX;
+        let initialY;
+        
+        modalHeader.style.cursor = 'move';
+        
+        modalHeader.addEventListener('mousedown', function(e) {
+            // Only drag if clicking on header, not buttons
+            if (e.target.closest('.btn-close')) return;
+            
+            isDragging = true;
+            initialX = e.clientX - (parseInt(modalDialog.style.left) || 0);
+            initialY = e.clientY - (parseInt(modalDialog.style.top) || 0);
+            
+            modalDialog.style.position = 'relative';
+        });
+        
+        document.addEventListener('mousemove', function(e) {
+            if (!isDragging) return;
+            
+            e.preventDefault();
+            currentX = e.clientX - initialX;
+            currentY = e.clientY - initialY;
+            
+            modalDialog.style.left = currentX + 'px';
+            modalDialog.style.top = currentY + 'px';
+        });
+        
+        document.addEventListener('mouseup', function() {
+            isDragging = false;
+        });
+        
+        // Reset position when modal is hidden
+        $(modalElement).on('hidden.bs.modal', function() {
+            modalDialog.style.left = '';
+            modalDialog.style.top = '';
+            modalDialog.style.position = '';
+        });
+    }
+
     // Initialize directory browser
     function initDirectoryBrowser() {
         browseDirectoriesUrl = window.BOOK_FORM_ROUTES?.browseDirectories || '/admin/books/browse-directories';
+
+        // Make modal draggable
+        const modalElement = document.getElementById('directoryBrowserModal');
+        if (modalElement) {
+            makeModalDraggable(modalElement);
+        }
 
         // Handle red X button click
         $(document).on('click', '#directory-not-found-btn', function(e) {
