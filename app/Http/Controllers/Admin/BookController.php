@@ -1975,34 +1975,95 @@ class BookController extends Controller
     }
 
     /**
-     * AJAX: List files in a book directory, filtered by audiobook extensions or all files.
+     * AJAX: List ALL files in a book directory and check if directory exists.
      */
     public function filesAjax(Request $request)
     {
         $directory = $request->input('directory');
-        $showAll = $request->boolean('show_all', false);
         $storagePath = env('BOOK_STORAGE_PATH');
         $dir = rtrim($storagePath, '/') . '/' . ltrim($directory, '/');
         $files = [];
-        if (is_dir($dir)) {
+        $exists = is_dir($dir);
+
+        if ($exists) {
             $allFiles = scandir($dir);
-            $audioExts = ['mp3', 'm4b', 'm4a', 'aac', 'flac', 'ogg', 'wav'];
             foreach ($allFiles as $file) {
                 if ($file === '.' || $file === '..') {
                     continue;
                 }
                 $path = $dir . '/' . $file;
-                if (!is_file($path)) {
-                    continue;
-                }
-                $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-                if ($showAll || in_array($ext, $audioExts)) {
-                    $files[] = $file;
+                if (is_file($path)) {
+                    $files[] = [
+                        'name' => $file,
+                        'size' => filesize($path),
+                        'type' => is_dir($path) ? 'directory' : 'file',
+                        'extension' => pathinfo($file, PATHINFO_EXTENSION)
+                    ];
                 }
             }
         }
 
-        return response()->json(['files' => $files]);
+        return response()->json([
+            'files' => $files,
+            'exists' => $exists,
+            'path' => $dir
+        ]);
+    }
+
+    /**
+     * AJAX: Browse directories starting from deepest existing path
+     */
+    public function browseDirectories(Request $request)
+    {
+        $requestedPath = $request->input('path', '');
+        $storagePath = env('BOOK_STORAGE_PATH');
+        $bookRoot = rtrim($storagePath, '/');
+
+        // Find deepest existing path
+        $pathParts = array_filter(explode('/', trim($requestedPath, '/')));
+        $currentPath = $bookRoot;
+        $existingPath = $bookRoot;
+
+        foreach ($pathParts as $part) {
+            $testPath = $currentPath . '/' . $part;
+            if (is_dir($testPath)) {
+                $existingPath = $testPath;
+                $currentPath = $testPath;
+            } else {
+                break;
+            }
+        }
+
+        // Get directories in the existing path
+        $directories = [];
+        if (is_dir($existingPath)) {
+            $items = scandir($existingPath);
+            foreach ($items as $item) {
+                if ($item === '.' || $item === '..') {
+                    continue;
+                }
+                $fullPath = $existingPath . '/' . $item;
+                if (is_dir($fullPath)) {
+                    $relativePath = str_replace($bookRoot . '/', '', $fullPath);
+                    $directories[] = [
+                        'name' => $item,
+                        'path' => $relativePath,
+                        'fullPath' => $fullPath
+                    ];
+                }
+            }
+        }
+
+        $relativeCurrent = str_replace($bookRoot . '/', '', $existingPath);
+        $parentPath = dirname($existingPath);
+        $canGoUp = $parentPath !== $bookRoot && strpos($parentPath, $bookRoot) === 0;
+
+        return response()->json([
+            'currentPath' => $relativeCurrent === $bookRoot ? '' : $relativeCurrent,
+            'directories' => $directories,
+            'canGoUp' => $canGoUp,
+            'parentPath' => $canGoUp ? str_replace($bookRoot . '/', '', $parentPath) : null
+        ]);
     }
 
     /**

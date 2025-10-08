@@ -308,6 +308,9 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     // AJAX: List files in book directory
     Route::get('books/files-ajax', [Admin\BookController::class, 'filesAjax'])->name('books.filesAjax');
 
+    // AJAX: Browse directories for path selection
+    Route::get('books/browse-directories', [Admin\BookController::class, 'browseDirectories'])->name('books.browseDirectories');
+
     Route::resource('genres', Admin\GenreController::class);
     Route::resource('authors', Admin\AuthorController::class);
     Route::resource('books', Admin\BookController::class);
