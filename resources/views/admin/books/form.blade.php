@@ -254,10 +254,11 @@
             $coverOptions = [];
             $addedCovers = [];
 
-            // Helper function to create a safe, encoded URL
+            // Helper function to create a safe cover URL
             $createCoverUrl = function($dir, $file) {
                 if (is_string($dir) && !empty(trim($dir)) && is_string($file) && !empty(trim($file))) {
-                    return route('cover.proxy', ['path' => rawurlencode($dir . '/' . $file)]);
+                    // Don't encode - Laravel route handles the path parameter correctly
+                    return route('cover.proxy', ['path' => $dir . '/' . $file]);
                 }
                 return asset('images/placeholder.png');
             };
