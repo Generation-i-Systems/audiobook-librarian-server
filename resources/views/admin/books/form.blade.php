@@ -187,19 +187,21 @@
                     }
                 @endphp
                 @foreach($seriesList as $idx => $series)
-                    <div class="input-group series-row align-items-start mb-3">
-                        <input type="number" name="series[{{ $idx }}][number]" class="form-control w-auto"
-                            style="max-width:100px; height:32px;" placeholder="Number" value="{{ $series['number'] ?? '' }}" step="any">
-                        <input type="text" name="series[{{ $idx }}][seriesName]" class="form-control w-auto series-autocomplete ms-2" style="max-width:200px; height:32px;"
+                    <div class="d-flex align-items-start mb-3 series-row">
+                        <input type="number" name="series[{{ $idx }}][number]" class="form-control"
+                            style="width:70px; height:32px; flex-shrink:0;" placeholder="#" value="{{ $series['number'] ?? '' }}" step="any">
+                        <input type="text" name="series[{{ $idx }}][seriesName]" class="form-control series-autocomplete ms-2" style="height:32px; flex:1;"
                              placeholder="Series Name" value="{{ $series['seriesName'] ?? '' }}">
                         <datalist id="series-list"></datalist>
                         @if(!empty($series['seriesName']))
                             <button type="button" class="btn btn-sm btn-outline-primary ms-2 rename-series-btn" 
                                 data-series-name="{{ $series['seriesName'] }}"
-                                style="height:32px; width:32px; padding:0; display:flex; align-items:center; justify-content:center;"
+                                style="height:32px; width:32px; padding:0; display:flex; align-items:center; justify-content:center; flex-shrink:0;"
                                 title="Rename this series">
                                 <i class="fas fa-edit"></i>
                             </button>
+                        @else
+                            <div style="width:32px; height:32px; margin-left:0.5rem; flex-shrink:0;"></div>
                         @endif
                         <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
                             <button type="button" class="btn btn-outline-danger btn-sm remove-series p-0 mb-0"
