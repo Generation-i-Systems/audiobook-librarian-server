@@ -756,31 +756,29 @@ window.initBookForm = function (formContainerSelector) {
         });
 
     // Event listener for directory path changes - reload cover image
-    $container
-        .off("change blur", "#directoryPath")
-        .on("change blur", "#directoryPath", function () {
-            const newPath = $(this).val();
-            const $coverInput = $container.find("#coverImage");
-            const coverFilename = $coverInput.val();
+    $container.find("#directoryPath").on("change", function () {
+        const newPath = $(this).val();
+        const $coverInput = $container.find("#coverImage");
+        const coverFilename = $coverInput.val();
+        
+        if (newPath && coverFilename) {
+            // Update cover preview with new path
+            const coverUrl = "/cover/" + newPath + "/" + coverFilename;
+            const $coverPreview = $container.find(".cover-preview img, img[alt='cover'], .cover-option img");
             
-            if (newPath && coverFilename) {
-                // Update cover preview with new path
-                const coverUrl = "/cover/" + newPath + "/" + coverFilename;
-                const $coverPreview = $container.find(".cover-preview img, img[alt='cover'], .cover-option img");
-                
-                if ($coverPreview.length) {
-                    $coverPreview.each(function() {
-                        const $img = $(this);
-                        // Only update if it's showing a cover from the directory (not external URLs)
-                        const currentSrc = $img.attr("src");
-                        if (currentSrc && currentSrc.includes("/cover/")) {
-                            $img.attr("src", coverUrl);
-                            console.log("Updated cover preview to:", coverUrl);
-                        }
-                    });
-                }
+            if ($coverPreview.length) {
+                $coverPreview.each(function() {
+                    const $img = $(this);
+                    // Only update if it's showing a cover from the directory (not external URLs)
+                    const currentSrc = $img.attr("src");
+                    if (currentSrc && currentSrc.includes("/cover/")) {
+                        $img.attr("src", coverUrl);
+                        console.log("Updated cover preview to:", coverUrl);
+                    }
+                });
             }
-        });
+        }
+    });
 
     // Attach event handler for Autofill Modal button
     $container
