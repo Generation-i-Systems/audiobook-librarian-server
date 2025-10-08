@@ -142,7 +142,7 @@
                         @endphp
                         @php $authorsCount = count($authors); @endphp
                         @foreach($authors as $idx => $author)
-                            <div class="d-flex align-items-center mb-2 author-row">
+                            <div class="d-flex align-items-start mb-2 author-row">
                                 @php
                                     if ($author instanceof \MongoDB\Model\BSONArray) {
                                         $author = (array) $author;
@@ -154,12 +154,14 @@
                                 <input type="text" name="author[]" class="form-control author-autocomplete" style="height:32px; flex:1;"
                                     value="{{ $author }}" placeholder="Author Name" required>
                                 <datalist id="author-list"></datalist>
-                                <button type="button" class="btn btn-outline-danger btn-sm remove-author ms-2"
-                                    style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">&times;</button>
-                                @if($idx === $authorsCount - 1)
-                                    <button type="button" class="btn btn-primary btn-sm add-author-row ms-1"
-                                        style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">+</button>
-                                @endif
+                                <div class="d-flex flex-column ms-2" style="gap:2px;">
+                                    <button type="button" class="btn btn-outline-danger btn-sm remove-author"
+                                        style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">&times;</button>
+                                    @if($idx === $authorsCount - 1)
+                                        <button type="button" class="btn btn-primary btn-sm add-author-row"
+                                            style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">+</button>
+                                    @endif
+                                </div>
                             </div>
                         @endforeach
                     </div>
@@ -176,7 +178,7 @@
                         @endphp
                         @php $narratorsCount = count($narrators); @endphp
                         @foreach($narrators as $idx => $narrator)
-                            <div class="d-flex align-items-center mb-2 narrator-row">
+                            <div class="d-flex align-items-start mb-2 narrator-row">
                                 @php
                                     if ($narrator instanceof \MongoDB\Model\BSONArray) {
                                         $narrator = (array) $narrator;
@@ -188,12 +190,14 @@
                                 <input type="text" name="narrator[]" class="form-control narrator-autocomplete" style="height:32px; flex:1;"
                                     value="{{ $narrator }}" placeholder="Narrator Name">
                                 <datalist id="narrator-list"></datalist>
-                                <button type="button" class="btn btn-outline-danger btn-sm remove-row ms-2"
-                                    style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">&times;</button>
-                                @if($idx === $narratorsCount - 1)
-                                    <button type="button" class="btn btn-primary btn-sm add-narrator-row ms-1"
-                                        style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">+</button>
-                                @endif
+                                <div class="d-flex flex-column ms-2" style="gap:2px;">
+                                    <button type="button" class="btn btn-outline-danger btn-sm remove-row"
+                                        style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">&times;</button>
+                                    @if($idx === $narratorsCount - 1)
+                                        <button type="button" class="btn btn-primary btn-sm add-narrator-row"
+                                            style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">+</button>
+                                    @endif
+                                </div>
                             </div>
                         @endforeach
                     </div>
@@ -221,7 +225,7 @@
                     }
                 @endphp
                 @foreach($seriesList as $idx => $series)
-                    <div class="d-flex align-items-center mb-2 series-row">
+                    <div class="d-flex align-items-start mb-2 series-row">
                         <input type="number" name="series[{{ $idx }}][number]" class="form-control"
                             style="width:60px; height:32px; flex-shrink:0;" placeholder="#" value="{{ $series['number'] ?? '' }}" step="any">
                         <input type="text" name="series[{{ $idx }}][seriesName]" class="form-control series-autocomplete ms-2" style="height:32px; flex:1;"
@@ -237,12 +241,14 @@
                         @else
                             <div style="width:32px; height:32px; margin-left:0.5rem; flex-shrink:0;"></div>
                         @endif
-                        <button type="button" class="btn btn-outline-danger btn-sm remove-series ms-2"
-                            style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">&times;</button>
-                        @if($idx === count($seriesList) - 1)
-                            <button type="button" class="btn btn-primary btn-sm add-series-row ms-1"
-                                style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">+</button>
-                        @endif
+                        <div class="d-flex flex-column ms-2" style="gap:2px;">
+                            <button type="button" class="btn btn-outline-danger btn-sm remove-series"
+                                style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">&times;</button>
+                            @if($idx === count($seriesList) - 1)
+                                <button type="button" class="btn btn-primary btn-sm add-series-row"
+                                    style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">+</button>
+                            @endif
+                        </div>
                     </div>
                 @endforeach
             </div>
@@ -261,19 +267,21 @@
                             $genresCount = count($genres);
                         @endphp
                         @foreach($genres as $idx => $genre)
-                            <div class="d-flex align-items-center mb-2 genre-row">
+                            <div class="d-flex align-items-start mb-2 genre-row">
                                 <select name="genre[]" class="form-select" style="height:32px; flex:1;" required>
                                     <option value="">Select a genre</option>
                                     @foreach($genreList as $g)
                                         <option value="{{ $g }}" {{ $genre === $g ? 'selected' : '' }}>{{ $g }}</option>
                                     @endforeach
                                 </select>
-                                <button type="button" class="btn btn-outline-danger btn-sm remove-genre ms-2"
-                                    style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">&times;</button>
-                                @if($idx === $genresCount - 1)
-                                    <button type="button" class="btn btn-primary btn-sm add-genre-row ms-1"
-                                        style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">+</button>
-                                @endif
+                                <div class="d-flex flex-column ms-2" style="gap:2px;">
+                                    <button type="button" class="btn btn-outline-danger btn-sm remove-genre"
+                                        style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">&times;</button>
+                                    @if($idx === $genresCount - 1)
+                                        <button type="button" class="btn btn-primary btn-sm add-genre-row"
+                                            style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">+</button>
+                                    @endif
+                                </div>
                             </div>
                         @endforeach
                     </div>
