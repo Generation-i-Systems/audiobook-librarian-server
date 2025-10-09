@@ -5,11 +5,14 @@ namespace App\Console\Commands;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Services\BookDirectoryParser;
 use App\Services\MetadataProcessingService;
+use App\Traits\BookImportTrait;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 
 class ImportBook extends Command
 {
+    use BookImportTrait;
+
     protected $signature = 'books:import
                             {paths* : Book directories or files to import}
                             {--dry-run : Show what would be imported without making changes}
@@ -202,6 +205,14 @@ class ImportBook extends Command
             // Import or update the book
             if ($isInLibrary) {
                 // Already in library, just update database
+                // Find and add cover image if not already in bookData
+                if (empty($bookData['cover_image'])) {
+                    [$coverImage, $coverCandidates] = $this->findCoverImageCandidate($bookData['directory_path']);
+                    if ($coverImage) {
+                        $bookData['cover_image'] = $coverImage;
+                    }
+                }
+
                 $this->updateBookInDatabase($bookData, $existingBook);
                 $this->line("  <fg=green>✓</> Updated in database");
                 $this->stats['updated']++;
@@ -267,12 +278,30 @@ class ImportBook extends Command
 
         // Copy/move files
         $files = File::files($sourcePath);
+        $coverImage = null;
+
         foreach ($files as $file) {
             $filename = $file->getFilename();
             $destFile = $destPath . '/' . $filename;
 
             // Copy file
             File::copy($file->getPathname(), $destFile);
+
+            // Check if this is a cover image
+            $ext = strtolower($file->getExtension());
+            if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
+                if (stripos($filename, 'cover') !== false) {
+                    $coverImage = $filename;
+                } elseif (!$coverImage) {
+                    // Use first image found if no cover-named image
+                    $coverImage = $filename;
+                }
+            }
+        }
+
+        // Add cover image to book data if found
+        if ($coverImage) {
+            $bookData['cover_image'] = $coverImage;
         }
 
         // Update database
