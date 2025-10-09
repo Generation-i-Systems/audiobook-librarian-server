@@ -292,6 +292,15 @@
         <div class="book-form-card">
             <h5 class="book-form-section-title"><i class="fas fa-info-circle me-2"></i>Additional Information</h5>
             <div class="row">
+                <div class="col-md-9">
+                    <label for="description" class="form-label">Description <span class="text-muted">(Optional)</span></label>
+                    <textarea class="form-control @error('description') is-invalid @enderror" id="description"
+                        name="description" rows="3" 
+                        placeholder="Enter book description">{{ old('description', isset($book) && !empty($book['description']) ? $book['description'] : ($initial['description'] ?? null)) }}</textarea>
+                    @error('description')
+                        <span class="invalid-feedback d-block">{{ $message }}</span>
+                    @enderror
+                </div>
                 <div class="col-md-3">
                     <label for="release_date" class="form-label">Release Date <span class="text-muted">(Optional)</span></label>
                     @php
@@ -307,15 +316,6 @@
                         placeholder="YYYY or YYYY-MM-DD"
                         value="{{ $releaseDisplayValue }}">
                     @error('release_date')
-                        <span class="invalid-feedback d-block">{{ $message }}</span>
-                    @enderror
-                </div>
-                <div class="col-md-9">
-                    <label for="description" class="form-label">Description <span class="text-muted">(Optional)</span></label>
-                    <textarea class="form-control @error('description') is-invalid @enderror" id="description"
-                        name="description" rows="3" 
-                        placeholder="Enter book description">{{ old('description', isset($book) && !empty($book['description']) ? $book['description'] : ($initial['description'] ?? null)) }}</textarea>
-                    @error('description')
                         <span class="invalid-feedback d-block">{{ $message }}</span>
                     @enderror
                 </div>
@@ -340,13 +340,25 @@
                     </div>
                     <button type="button" class="btn btn-outline-secondary ms-2" id="resync-path-btn" 
                         title="Resync title, author, and series from path">
-                        <i class="fas fa-sync-alt me-1"></i>Resync
+                        <i class="fas fa-sync-alt me-1"></i>Resync Title/Author/Series
                     </button>
                 </div>
                 @error('directoryPath')
                     <span class="invalid-feedback d-block">{{ $message }}</span>
                 @enderror
             </div>
+
+            <div class="mb-3">
+                <a href="#" class="text-decoration-none" id="show-files-link">
+                    <i class="fas fa-folder-open me-1"></i>View Directory Files
+                </a>
+                <div id="directory-files-list"
+                    class="w-100 mt-2"
+                    style="max-height:220px; overflow-y:auto; border:1px solid #ccc; border-radius:4px; background:#fafbfc; padding:8px; display:none; position: relative;">
+                    <span class="text-muted">No files loaded yet.</span>
+                </div>
+            </div>
+        </div>
         @php
             $directoryPath = isset($book) && !empty($book['directoryPath']) ? $book['directoryPath'] : ($directoryPath ?? ($initial['directoryPath'] ?? null));
             $coverImg = isset($book) && !empty($book['coverImage']) ? $book['coverImage'] : ($initial['coverImage'] ?? null);
