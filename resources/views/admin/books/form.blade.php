@@ -67,7 +67,7 @@
         }
     @endphp
     @if(empty($isModal))
-        <div class="d-flex justify-content-between align-items-start" style="margin-bottom: 20px;">
+        <div class="d-flex justify-content-between align-items-start" style="margin-bottom: 10px;">
             <div>
                 <h1 style="margin-bottom: 30px;">{{ isset($book) ? 'Edit Book' : 'Create New Book' }}</h1>
                 <div class="mb-3">
