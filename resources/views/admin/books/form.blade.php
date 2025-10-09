@@ -27,6 +27,26 @@
     margin-bottom: 1rem;
     padding-bottom: 0.5rem;
     border-bottom: 2px solid #e9ecef;
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.book-form-section-title:hover {
+    background-color: #f8f9fa;
+}
+.book-form-section-title .toggle-icon {
+    transition: transform 0.2s;
+}
+.book-form-section-title.collapsed .toggle-icon {
+    transform: rotate(-90deg);
+}
+.card-summary {
+    color: #6c757d;
+    font-size: 0.9rem;
+    font-weight: normal;
+    margin-left: 1rem;
 }
 </style>
 <div class="container-fluid" style="max-width: 1400px;">
@@ -111,25 +131,25 @@
 
         {{-- Basic Information Card --}}
         <div class="book-form-card">
-            <h5 class="book-form-section-title"><i class="fas fa-book me-2"></i>Basic Information</h5>
-            
-            <div class="mb-3">
-                <label for="title" class="form-label">Title</label>
-                <input type="text" class="form-control @error('title') is-invalid @enderror" id="title" name="title"
-                    value="{{ old('title') ?? request()->get('title') ?? ($book['title'] ?? null) ?? ($initial['title'] ?? '') }}" 
-                    placeholder="Enter book title" required>
-                @error('title')
-                    <span class="invalid-feedback d-block">{{ $message }}</span>
-                @enderror
-            </div>
-        </div>
-
-        {{-- Authors & Narrators - Two Columns --}}
-        <div class="book-form-card">
-            <h5 class="book-form-section-title"><i class="fas fa-user-edit me-2"></i>Authors & Narrators</h5>
-            <div class="row">
-                <div class="col-md-6">
-                    <label class="form-label">Authors</label>
+            <h5 class="book-form-section-title" data-card="basic-info">
+                <span><i class="fas fa-book me-2"></i>Basic Information</span>
+                <i class="fas fa-chevron-down toggle-icon"></i>
+            </h5>
+            <div class="card-content">
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="mb-3">
+                            <label for="title" class="form-label">Title</label>
+                            <input type="text" class="form-control @error('title') is-invalid @enderror" id="title" name="title"
+                                value="{{ old('title') ?? request()->get('title') ?? ($book['title'] ?? null) ?? ($initial['title'] ?? '') }}" 
+                                placeholder="Enter book title" required>
+                            @error('title')
+                                <span class="invalid-feedback d-block">{{ $message }}</span>
+                            @enderror
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Authors</label>
                     <div id="authors-group">
                         @php
                             $authors = old('author') ?? (request()->get('author') ? [request()->get('author')] : null) ?? ($book['author'] ?? null) ?? ($initial['author'] ?? []);
@@ -165,9 +185,21 @@
                             </div>
                         @endforeach
                     </div>
+                    </div>
                 </div>
-                <div class="col-md-6">
-                    <label class="form-label">Narrators</label>
+            </div>
+        </div>
+
+        {{-- Narrators, Series & Genres Card --}}
+        <div class="book-form-card">
+            <h5 class="book-form-section-title" data-card="metadata">
+                <span><i class="fas fa-tags me-2"></i>Narrators, Series & Genres</span>
+                <i class="fas fa-chevron-down toggle-icon"></i>
+            </h5>
+            <div class="card-content">
+                <div class="row">
+                    <div class="col-md-6">
+                        <label class="form-label">Narrators</label>
                     <div id="narrators-group">
                         @php
                             $narrators = old('narrator') ?? request()->get('narrator') ?? ($book['narrator'] ?? null) ?? ($initial['narrator'] ?? []);
@@ -201,16 +233,9 @@
                             </div>
                         @endforeach
                     </div>
-                </div>
-            </div>
-        </div>
-
-        {{-- Series & Genres - Two Columns --}}
-        <div class="book-form-card">
-            <h5 class="book-form-section-title"><i class="fas fa-list me-2"></i>Series & Genres</h5>
-            <div class="row">
-                <div class="col-md-6">
-                    <label class="form-label">Series</label>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Series</label>
             <div id="series-group">
                 {{-- Only use canonical format: array of objects with seriesName and number --}}
                 @php
@@ -252,9 +277,11 @@
                     </div>
                 @endforeach
             </div>
+                    </div>
                 </div>
-                <div class="col-md-6">
-                    <label class="form-label">Genres</label>
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <label class="form-label">Genres</label>
                     <div id="genres-group">
                         @php
                             $genres = old('genre') ?? request()->get('genre') ?? ($book['genre'] ?? null) ?? ($initial['genre'] ?? []);
@@ -285,12 +312,18 @@
                             </div>
                         @endforeach
                     </div>
+                    </div>
                 </div>
             </div>
         </div>
+        </div>
         {{-- Additional Metadata Card --}}
         <div class="book-form-card">
-            <h5 class="book-form-section-title"><i class="fas fa-info-circle me-2"></i>Additional Information</h5>
+            <h5 class="book-form-section-title" data-card="additional-info">
+                <span><i class="fas fa-info-circle me-2"></i>Additional Information</span>
+                <i class="fas fa-chevron-down toggle-icon"></i>
+            </h5>
+            <div class="card-content">
             <div class="row">
                 <div class="col-md-9">
                     <label for="description" class="form-label">Description <span class="text-muted">(Optional)</span></label>
@@ -320,11 +353,16 @@
                     @enderror
                 </div>
             </div>
+            </div>
         </div>
 
         {{-- Directory & Files Card --}}
         <div class="book-form-card">
-            <h5 class="book-form-section-title"><i class="fas fa-folder me-2"></i>Directory & Files</h5>
+            <h5 class="book-form-section-title" data-card="directory">
+                <span><i class="fas fa-folder me-2"></i>Directory & Files</span>
+                <i class="fas fa-chevron-down toggle-icon"></i>
+            </h5>
+            <div class="card-content">
             <div class="mb-3">
                 <label for="directoryPath" class="form-label">Directory Path</label>
                 <div class="d-flex align-items-center">
@@ -357,6 +395,7 @@
                     style="max-height:220px; overflow-y:auto; border:1px solid #ccc; border-radius:4px; background:#fafbfc; padding:8px; display:none; position: relative;">
                     <span class="text-muted">No files loaded yet.</span>
                 </div>
+            </div>
             </div>
         </div>
         @php
@@ -473,7 +512,11 @@
         {{-- Cover Image Selection Card --}}
         @if (!empty($coverOptions))
         <div class="book-form-card">
-            <h5 class="book-form-section-title"><i class="fas fa-images me-2"></i>Cover Image Selection</h5>
+            <h5 class="book-form-section-title" data-card="cover">
+                <span><i class="fas fa-images me-2"></i>Cover Image Selection</span>
+                <i class="fas fa-chevron-down toggle-icon"></i>
+            </h5>
+            <div class="card-content">
             <div class="mb-3" id="cover-candidates-group">
             @php
                 $initialCoverSource = '';
@@ -552,8 +595,24 @@
                     <span class="invalid-feedback d-block">{{ $message }}</span>
                 @enderror
             </div>
+            </div>
         </div>
         @endif
+
+        <script>
+        // Collapsible card sections
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.book-form-section-title').forEach(function(title) {
+                title.addEventListener('click', function() {
+                    const content = this.nextElementSibling;
+                    if (content && content.classList.contains('card-content')) {
+                        content.style.display = content.style.display === 'none' ? 'block' : 'none';
+                        this.classList.toggle('collapsed');
+                    }
+                });
+            });
+        });
+        </script>
         <script>
 // Function to initialize book form UI elements
 function initBookFormUI() {
