@@ -137,58 +137,100 @@
             </h5>
             <div class="card-content">
                 <div class="row">
-                    <div class="col-md-8">
-                        <div class="mb-3">
-                            <label for="title" class="form-label">Title</label>
-                            <input type="text" class="form-control @error('title') is-invalid @enderror" id="title" name="title"
-                                value="{{ old('title') ?? request()->get('title') ?? ($book['title'] ?? null) ?? ($initial['title'] ?? '') }}" 
-                                placeholder="Enter book title" required>
-                            @error('title')
-                                <span class="invalid-feedback d-block">{{ $message }}</span>
-                            @enderror
-                        </div>
+                    <div class="col-md-6">
+                        <label for="title" class="form-label">Title</label>
+                        <input type="text" class="form-control @error('title') is-invalid @enderror" id="title" name="title"
+                            value="{{ old('title') ?? request()->get('title') ?? ($book['title'] ?? null) ?? ($initial['title'] ?? '') }}" 
+                            placeholder="Enter book title" required>
+                        @error('title')
+                            <span class="invalid-feedback d-block">{{ $message }}</span>
+                        @enderror
                     </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Authors</label>
-                    <div id="authors-group">
-                        @php
-                            $authors = old('author') ?? (request()->get('author') ? [request()->get('author')] : null) ?? ($book['author'] ?? null) ?? ($initial['author'] ?? []);
-                            if (!is_array($authors)) {
-                                $authors = [$authors];
-                            }
-                            if (empty($authors) || (count($authors) === 1 && ($authors[0] === null || $authors[0] === ''))) {
-                                $authors = [''];
-                            }
-                        @endphp
-                        @php $authorsCount = count($authors); @endphp
-                        @foreach($authors as $idx => $author)
-                            <div class="d-flex align-items-start mb-2 author-row">
-                                @php
-                                    if ($author instanceof \MongoDB\Model\BSONArray) {
-                                        $author = (array) $author;
-                                    }
-                                    if (is_array($author)) {
-                                        $author = implode(', ', $author);
-                                    }
-                                @endphp
-                                <input type="text" name="author[]" class="form-control author-autocomplete" style="height:32px; flex:1;"
-                                    value="{{ $author }}" placeholder="Author Name" required>
-                                <datalist id="author-list"></datalist>
-                                <div class="d-flex flex-column ms-2" style="gap:2px;">
-                                    <button type="button" class="btn btn-outline-danger btn-sm remove-author"
-                                        style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">&times;</button>
-                                    @if($idx === $authorsCount - 1)
-                                        <button type="button" class="btn btn-primary btn-sm add-author-row"
-                                            style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">+</button>
+                    <div class="col-md-6">
+                        <label class="form-label">Series</label>
+                        <div id="series-group">
+                            {{-- Only use canonical format: array of objects with seriesName and number --}}
+                            @php
+                                $seriesList = old('series') ?? request()->get('series') ?? ($book['series'] ?? ($initial['series'] ?? []));
+                                // Ensure $seriesList is an array of objects with seriesName/number
+                                if (!is_array($seriesList) || (isset($seriesList[0]) && !is_array($seriesList[0]))) {
+                                    $seriesList = [];
+                                }
+                                // If empty, provide one empty row
+                                if (empty($seriesList)) {
+                                    $seriesList[] = ['seriesName' => '', 'number' => ''];
+                                }
+                            @endphp
+                            @foreach($seriesList as $idx => $series)
+                                <div class="d-flex align-items-start mb-2 series-row">
+                                    <input type="number" name="series[{{ $idx }}][number]" class="form-control"
+                                        style="width:60px; height:32px; flex-shrink:0;" placeholder="#" value="{{ $series['number'] ?? '' }}" step="any">
+                                    <input type="text" name="series[{{ $idx }}][seriesName]" class="form-control series-autocomplete ms-2" style="height:32px; flex:1;"
+                                         placeholder="Series Name" value="{{ $series['seriesName'] ?? '' }}">
+                                    <datalist id="series-list"></datalist>
+                                    @if(!empty($series['seriesName']))
+                                        <button type="button" class="btn btn-sm btn-outline-primary ms-2 rename-series-btn" 
+                                            data-series-name="{{ $series['seriesName'] }}"
+                                            style="height:32px; width:32px; padding:0; display:flex; align-items:center; justify-content:center; flex-shrink:0;"
+                                            title="Rename this series">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                    @else
+                                        <div style="width:32px; height:32px; margin-left:0.5rem; flex-shrink:0;"></div>
                                     @endif
+                                    <div class="d-flex flex-column ms-2" style="gap:2px;">
+                                        <button type="button" class="btn btn-outline-danger btn-sm remove-series"
+                                            style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">&times;</button>
+                                        @if($idx === count($seriesList) - 1)
+                                            <button type="button" class="btn btn-primary btn-sm add-series-row"
+                                                style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">+</button>
+                                        @endif
+                                    </div>
                                 </div>
-                            </div>
-                        @endforeach
-                    </div>
+                            @endforeach
+                        </div>
                     </div>
                 </div>
                 
                 <div class="row">
+                    <div class="col-md-6">
+                        <label class="form-label">Authors</label>
+                        <div id="authors-group">
+                            @php
+                                $authors = old('author') ?? (request()->get('author') ? [request()->get('author')] : null) ?? ($book['author'] ?? null) ?? ($initial['author'] ?? []);
+                                if (!is_array($authors)) {
+                                    $authors = [$authors];
+                                }
+                                if (empty($authors) || (count($authors) === 1 && ($authors[0] === null || $authors[0] === ''))) {
+                                    $authors = [''];
+                                }
+                            @endphp
+                            @php $authorsCount = count($authors); @endphp
+                            @foreach($authors as $idx => $author)
+                                <div class="d-flex align-items-start mb-2 author-row">
+                                    @php
+                                        if ($author instanceof \MongoDB\Model\BSONArray) {
+                                            $author = (array) $author;
+                                        }
+                                        if (is_array($author)) {
+                                            $author = implode(', ', $author);
+                                        }
+                                    @endphp
+                                    <input type="text" name="author[]" class="form-control author-autocomplete" style="height:32px; flex:1;"
+                                        value="{{ $author }}" placeholder="Author Name" required>
+                                    <datalist id="author-list"></datalist>
+                                    <div class="d-flex flex-column ms-2" style="gap:2px;">
+                                        <button type="button" class="btn btn-outline-danger btn-sm remove-author"
+                                            style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">&times;</button>
+                                        @if($idx === $authorsCount - 1)
+                                            <button type="button" class="btn btn-primary btn-sm add-author-row"
+                                                style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">+</button>
+                                        @endif
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
                     <div class="col-md-6">
                         <label class="form-label">Narrators</label>
                     <div id="narrators-group">
@@ -224,50 +266,6 @@
                             </div>
                         @endforeach
                     </div>
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Series</label>
-            <div id="series-group">
-                {{-- Only use canonical format: array of objects with seriesName and number --}}
-                @php
-                    $seriesList = old('series') ?? request()->get('series') ?? ($book['series'] ?? ($initial['series'] ?? []));
-                    // Ensure $seriesList is an array of objects with seriesName/number
-                    if (!is_array($seriesList) || (isset($seriesList[0]) && !is_array($seriesList[0]))) {
-                        $seriesList = [];
-                    }
-                    // If empty, provide one empty row
-                    if (empty($seriesList)) {
-                        $seriesList[] = ['seriesName' => '', 'number' => ''];
-                    }
-                @endphp
-                @foreach($seriesList as $idx => $series)
-                    <div class="d-flex align-items-start mb-2 series-row">
-                        <input type="number" name="series[{{ $idx }}][number]" class="form-control"
-                            style="width:60px; height:32px; flex-shrink:0;" placeholder="#" value="{{ $series['number'] ?? '' }}" step="any">
-                        <input type="text" name="series[{{ $idx }}][seriesName]" class="form-control series-autocomplete ms-2" style="height:32px; flex:1;"
-                             placeholder="Series Name" value="{{ $series['seriesName'] ?? '' }}">
-                        <datalist id="series-list"></datalist>
-                        @if(!empty($series['seriesName']))
-                            <button type="button" class="btn btn-sm btn-outline-primary ms-2 rename-series-btn" 
-                                data-series-name="{{ $series['seriesName'] }}"
-                                style="height:32px; width:32px; padding:0; display:flex; align-items:center; justify-content:center; flex-shrink:0;"
-                                title="Rename this series">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                        @else
-                            <div style="width:32px; height:32px; margin-left:0.5rem; flex-shrink:0;"></div>
-                        @endif
-                        <div class="d-flex flex-column ms-2" style="gap:2px;">
-                            <button type="button" class="btn btn-outline-danger btn-sm remove-series"
-                                style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">&times;</button>
-                            @if($idx === count($seriesList) - 1)
-                                <button type="button" class="btn btn-primary btn-sm add-series-row"
-                                    style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">+</button>
-                            @endif
-                        </div>
-                    </div>
-                @endforeach
-            </div>
                     </div>
                 </div>
                 <div class="row mt-3">
