@@ -68,7 +68,15 @@
     @endphp
     @if(empty($isModal))
         <div class="d-flex justify-content-between align-items-start" style="margin-bottom: 20px;">
-            <h1 class="mb-0">{{ isset($book) ? 'Edit Book' : 'Create New Book' }}</h1>
+            <div>
+                <h1>{{ isset($book) ? 'Edit Book' : 'Create New Book' }}</h1>
+                <div class="mb-3">
+                    <button type="button" class="btn btn-info" id="autofill-modal-btn"><i class="fas fa-magic me-2"></i>Autofill Book Metadata</button>
+                    @if(isset($book))
+                    <button type="button" class="btn btn-secondary ms-2" id="raw-json-edit-btn"><i class="fas fa-code me-2"></i>Raw JSON Edit</button>
+                    @endif
+                </div>
+            </div>
             @if($coverUrl)
                 <div class="position-relative" style="cursor: pointer;" id="cover-preview-trigger">
                     <img src="{{ $coverUrl }}" alt="Book Cover" style="height: 120px; border: 2px solid #dee2e6; border-radius: 4px;">
@@ -149,12 +157,6 @@
         @if(!empty($initial['importMode']))
             <input type="hidden" name="importMode" value="{{ $initial['importMode'] ? '1' : '0' }}">
         @endif
-        <div class="mb-3">
-            <button type="button" class="btn btn-info" id="autofill-modal-btn"><i class="fas fa-magic me-2"></i>Autofill Book Metadata</button>
-            @if(isset($book))
-            <button type="button" class="btn btn-secondary ms-2" id="raw-json-edit-btn"><i class="fas fa-code me-2"></i>Raw JSON Edit</button>
-            @endif
-        </div>
 
         {{-- Basic Information Card --}}
         <div class="book-form-card">
