@@ -1,3 +1,41 @@
+2025-10-08: Book Edit Form UI Refinement and Series Management System
+- Reorganized book edit form layout for better UX
+  - Row 1: Title (50%) | Series (50%)
+  - Row 2: Authors (50%) | Narrators (50%)  
+  - Row 3: Genres (half-width)
+  - Combined first two cards into single "Basic Information" card
+  - Moved Additional Information (Description + Release Date) to last position
+  - Card order: Basic Info → Directory & Files → Additional Info
+- Made all cards collapsible with dynamic summaries
+  - Summary shows when collapsed: "Title (Series #) by Authors narrated by Narrators [Genres]"
+  - Additional Info summary: "Released: YYYY | Description preview..."
+  - Directory summary: Shows directory path
+- Cover image management moved to modal popup
+  - Cover preview shown at top right next to "Edit Book" heading
+  - Click cover to open modal with all cover selection options
+  - Removed large cover section from main form for cleaner layout
+- Implemented "Resync Fields from Path" functionality
+  - Uses existing BookDirectoryParser::processDirPath() method
+  - Server-side parsing via ParsePathController
+  - Populates: genre, author, title, series name, series number
+  - Toast notifications instead of popup alerts
+  - Centered toast at top of screen, auto-dismisses after 2 seconds
+- Created comprehensive Series Management system
+  - New page: "Manage Series" in admin navigation
+  - Automatic detection of potential merges (books split across subdirectories)
+  - Example: "History/Stephen Fry/The Ode Less Travelled/fry 1" + "fry 2" + "fry 3"
+  - Merge multiple book entries into one with checkbox selection
+  - Optional directory flattening (moves audio files to primary directory)
+  - Rename series across all books
+  - Accordion UI for browsing all series with book counts
+  - Routes: admin.series.manage, admin.series.merge, admin.series.rename
+- UI/UX improvements
+  - Reduced collapsed card margins for compact layout
+  - 30px margin below "Edit Book" heading
+  - 10px margin below header section
+  - Genre field properly identified as select dropdown
+  - All styling follows existing Bootstrap/card patterns
+
 2025-06-15: Fixed fatal artisan failure ('migration.creator' binding) by restoring default Laravel providers in config/app.php and correcting Kernel.php PSR-4 compliance. See changelog for details.
 
 2025-06-20: MongoDB Atlas Search Autocomplete Integration
