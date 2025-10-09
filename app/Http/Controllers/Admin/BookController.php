@@ -2114,37 +2114,26 @@ class BookController extends Controller
         }
 
         try {
-            // Check if new series name already exists
-            $allBooks = $this->documentStoreService->getAllBooks();
-            $oldSeriesBooks = [];
-            $newSeriesExists = false;
+            // Check if new series name already exists by searching
+            $newSeriesBooks = $this->documentStoreService->searchBooks([
+                'series' => $newName
+            ], 1);
             
-            foreach ($allBooks as $book) {
-                $seriesName = '';
-                
-                if (!empty($book['series'])) {
-                    if (is_array($book['series'])) {
-                        $seriesName = array_key_first($book['series']);
-                    } else {
-                        $seriesName = $book['series'];
-                    }
-                }
-                
-                if ($seriesName === $oldName) {
-                    $oldSeriesBooks[] = $book;
-                } elseif ($seriesName === $newName) {
-                    $newSeriesExists = true;
-                }
-            }
+            $newSeriesExists = !empty($newSeriesBooks['data']);
             
             // If new series exists and merge not confirmed, return warning
             if ($newSeriesExists && !$merge) {
+                // Get count of books in old series
+                $oldSeriesBooks = $this->documentStoreService->searchBooks([
+                    'series' => $oldName
+                ]);
+                
                 return response()->json([
                     'success' => false,
                     'warning' => "A series named '{$newName}' already exists with other books.",
                     'old_name' => $oldName,
                     'new_name' => $newName,
-                    'book_count' => count($oldSeriesBooks),
+                    'book_count' => $oldSeriesBooks['total'] ?? 0,
                 ]);
             }
             
@@ -2163,7 +2152,7 @@ class BookController extends Controller
             Log::error('Error renaming series: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'An error occurred while renaming the series.'
+                'message' => 'An error occurred while renaming the series: ' . $e->getMessage()
             ], 500);
         }
     }
