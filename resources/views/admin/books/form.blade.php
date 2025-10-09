@@ -69,7 +69,7 @@
     @if(empty($isModal))
         <div class="d-flex justify-content-between align-items-start" style="margin-bottom: 20px;">
             <div>
-                <h1>{{ isset($book) ? 'Edit Book' : 'Create New Book' }}</h1>
+                <h1 style="margin-bottom: 30px;">{{ isset($book) ? 'Edit Book' : 'Create New Book' }}</h1>
                 <div class="mb-3">
                     <button type="button" class="btn btn-info" id="autofill-modal-btn"><i class="fas fa-magic me-2"></i>Autofill Book Metadata</button>
                     @if(isset($book))
