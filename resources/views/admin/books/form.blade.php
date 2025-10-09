@@ -147,10 +147,10 @@
             @endphp
             @if($coverUrl)
                 <div class="position-relative" style="cursor: pointer;" id="cover-preview-trigger">
-                    <img src="{{ $coverUrl }}" alt="Book Cover" style="height: 80px; border: 2px solid #dee2e6; border-radius: 4px;">
+                    <img src="{{ $coverUrl }}" alt="Book Cover" style="height: 120px; border: 2px solid #dee2e6; border-radius: 4px;">
                     <div class="position-absolute top-0 end-0 bg-primary text-white rounded-circle" 
-                         style="width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; margin: -6px;">
-                        <i class="fas fa-edit" style="font-size: 10px;"></i>
+                         style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; margin: -8px;">
+                        <i class="fas fa-edit" style="font-size: 12px;"></i>
                     </div>
                 </div>
             @endif
@@ -333,45 +333,6 @@
             </div>
         </div>
 
-        {{-- Additional Information Card --}}
-        <div class="book-form-card">
-            <h5 class="book-form-section-title" data-card="additional-info">
-                <span><i class="fas fa-info-circle me-2"></i>Additional Information</span>
-                <i class="fas fa-chevron-down toggle-icon"></i>
-            </h5>
-            <div class="card-content">
-                <div class="row">
-                    <div class="col-md-9">
-                        <label for="description" class="form-label">Description <span class="text-muted">(Optional)</span></label>
-                        <textarea class="form-control @error('description') is-invalid @enderror" id="description"
-                            name="description" rows="3" 
-                            placeholder="Enter book description">{{ old('description', isset($book) && !empty($book['description']) ? $book['description'] : ($initial['description'] ?? null)) }}</textarea>
-                        @error('description')
-                            <span class="invalid-feedback d-block">{{ $message }}</span>
-                        @enderror
-                    </div>
-                    <div class="col-md-3">
-                        <label for="release_date" class="form-label">Release Date <span class="text-muted">(Optional)</span></label>
-                        @php
-                            $rawRelease = old('release_date', isset($book) && !empty($book['release_date']) ? $book['release_date'] : ($initial['release_date'] ?? null));
-                            $releaseDisplayValue = '';
-                            if (is_string($rawRelease) && $rawRelease !== '') {
-                                // If stored as YYYY-01-01, display as YYYY only; otherwise show the stored value
-                                $releaseDisplayValue = preg_match('/^\d{4}-01-01$/', $rawRelease) ? substr($rawRelease, 0, 4) : $rawRelease;
-                            }
-                        @endphp
-                        <input type="text" class="form-control @error('release_date') is-invalid @enderror" id="release_date"
-                            name="release_date"
-                            placeholder="YYYY or YYYY-MM-DD"
-                            value="{{ $releaseDisplayValue }}">
-                        @error('release_date')
-                            <span class="invalid-feedback d-block">{{ $message }}</span>
-                        @enderror
-                    </div>
-                </div>
-            </div>
-        </div>
-
         {{-- Directory & Files Card --}}
         <div class="book-form-card">
             <h5 class="book-form-section-title" data-card="directory">
@@ -414,6 +375,46 @@
             </div>
             </div>
         </div>
+
+        {{-- Additional Information Card --}}
+        <div class="book-form-card">
+            <h5 class="book-form-section-title" data-card="additional-info">
+                <span><i class="fas fa-info-circle me-2"></i>Additional Information</span>
+                <i class="fas fa-chevron-down toggle-icon"></i>
+            </h5>
+            <div class="card-content">
+                <div class="row">
+                    <div class="col-md-9">
+                        <label for="description" class="form-label">Description <span class="text-muted">(Optional)</span></label>
+                        <textarea class="form-control @error('description') is-invalid @enderror" id="description"
+                            name="description" rows="3" 
+                            placeholder="Enter book description">{{ old('description', isset($book) && !empty($book['description']) ? $book['description'] : ($initial['description'] ?? null)) }}</textarea>
+                        @error('description')
+                            <span class="invalid-feedback d-block">{{ $message }}</span>
+                        @enderror
+                    </div>
+                    <div class="col-md-3">
+                        <label for="release_date" class="form-label">Release Date <span class="text-muted">(Optional)</span></label>
+                        @php
+                            $rawRelease = old('release_date', isset($book) && !empty($book['release_date']) ? $book['release_date'] : ($initial['release_date'] ?? null));
+                            $releaseDisplayValue = '';
+                            if (is_string($rawRelease) && $rawRelease !== '') {
+                                // If stored as YYYY-01-01, display as YYYY only; otherwise show the stored value
+                                $releaseDisplayValue = preg_match('/^\d{4}-01-01$/', $rawRelease) ? substr($rawRelease, 0, 4) : $rawRelease;
+                            }
+                        @endphp
+                        <input type="text" class="form-control @error('release_date') is-invalid @enderror" id="release_date"
+                            name="release_date"
+                            placeholder="YYYY or YYYY-MM-DD"
+                            value="{{ $releaseDisplayValue }}">
+                        @error('release_date')
+                            <span class="invalid-feedback d-block">{{ $message }}</span>
+                        @enderror
+                    </div>
+                </div>
+            </div>
+        </div>
+
         @php
             $directoryPath = isset($book) && !empty($book['directoryPath']) ? $book['directoryPath'] : ($directoryPath ?? ($initial['directoryPath'] ?? null));
             $coverImg = isset($book) && !empty($book['coverImage']) ? $book['coverImage'] : ($initial['coverImage'] ?? null);
