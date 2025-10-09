@@ -1672,11 +1672,34 @@ function ensureCoverImageSelected() {
     }
 }
 
+// Toast notification helper
+function showToast(message, type = 'success') {
+    const toast = $('<div>')
+        .addClass('alert alert-' + type)
+        .css({
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            zIndex: 9999,
+            minWidth: '250px',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+        })
+        .text(message);
+    
+    $('body').append(toast);
+    
+    setTimeout(function() {
+        toast.fadeOut(300, function() {
+            $(this).remove();
+        });
+    }, 2000);
+}
+
 // Resync fields from directory path
 $(document).on('click', '#resync-path-btn', function() {
     const directoryPath = $('#directoryPath').val();
     if (!directoryPath) {
-        alert('Please enter a directory path first');
+        showToast('Please enter a directory path first', 'warning');
         return;
     }
     
@@ -1702,11 +1725,11 @@ $(document).on('click', '#resync-path-btn', function() {
                 }
             }
             
-            // Set genre (first row)
+            // Set genre (first row) - it's a select dropdown, not an input
             if (data.genre) {
-                const firstGenreInput = $('#genres-group .genre-row:first input[name="genre[]"]');
-                if (firstGenreInput.length) {
-                    firstGenreInput.val(data.genre);
+                const firstGenreSelect = $('#genres-group .genre-row:first select[name="genre[]"]');
+                if (firstGenreSelect.length) {
+                    firstGenreSelect.val(data.genre);
                 }
             }
             
@@ -1725,10 +1748,10 @@ $(document).on('click', '#resync-path-btn', function() {
                 }
             }
             
-            alert('Fields updated from path!');
+            showToast('Fields updated from path!', 'success');
         },
         error: function(xhr) {
-            alert('Error parsing path: ' + (xhr.responseJSON?.error || 'Unknown error'));
+            showToast('Error parsing path: ' + (xhr.responseJSON?.error || 'Unknown error'), 'danger');
         }
     });
 });
