@@ -2114,30 +2114,21 @@ class BookController extends Controller
         }
 
         try {
-            // Check if new series name already exists by searching
-            $newSeriesBooks = $this->documentStoreService->listBooks(
-                1, 
-                1, 
-                ['series' => $newName]
-            );
-            
-            $newSeriesExists = !empty($newSeriesBooks['data']);
+            // Check if new series name already exists using Series model
+            $newSeriesExists = \App\Models\Series::where('name', $newName)->exists();
             
             // If new series exists and merge not confirmed, return warning
             if ($newSeriesExists && !$merge) {
                 // Get count of books in old series
-                $oldSeriesBooks = $this->documentStoreService->listBooks(
-                    1,
-                    1,
-                    ['series' => $oldName]
-                );
+                $oldSeries = \App\Models\Series::where('name', $oldName)->first();
+                $bookCount = $oldSeries ? $oldSeries->books()->count() : 0;
                 
                 return response()->json([
                     'success' => false,
                     'warning' => "A series named '{$newName}' already exists with other books.",
                     'old_name' => $oldName,
                     'new_name' => $newName,
-                    'book_count' => $oldSeriesBooks['total'] ?? 0,
+                    'book_count' => $bookCount,
                 ]);
             }
             
