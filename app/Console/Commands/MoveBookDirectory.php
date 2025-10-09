@@ -50,6 +50,37 @@ class MoveBookDirectory extends Command
             return 1;
         }
 
+        // CRITICAL SAFETY: Validate book root is set and exists
+        if (empty($this->bookRoot)) {
+            $this->error("BOOK_STORAGE_PATH not configured");
+            return 1;
+        }
+
+        if (!is_dir($this->bookRoot)) {
+            $this->error("Book root directory does not exist: {$this->bookRoot}");
+            return 1;
+        }
+
+        // CRITICAL SAFETY: Prevent moving book root itself
+        foreach ($sources as $source) {
+            $absSource = realpath($source) ?: $source;
+            $absBookRoot = realpath($this->bookRoot);
+            
+            if ($absSource === $absBookRoot) {
+                $this->error("Cannot move the book root directory itself");
+                return 1;
+            }
+        }
+
+        // CRITICAL SAFETY: Validate ALL sources exist before ANY operations
+        foreach ($sources as $source) {
+            $sourcePath = $this->normalizePath($source);
+            if (!file_exists($sourcePath)) {
+                $this->error("Source does not exist: {$source}");
+                return 1;
+            }
+        }
+
         // Normalize destination path
         $destPath = $this->normalizePath($destination);
         
@@ -113,59 +144,135 @@ class MoveBookDirectory extends Command
             return 0;
         }
 
-        // Perform moves and database updates
-        $totalUpdated = 0;
-        
+        // CRITICAL SAFETY: Validate destinations don't already exist
         foreach ($bookSources as $bookSource) {
             $sourcePath = $bookSource['path'];
-            $sourceRelative = $bookSource['relative'];
-            
-            // Calculate final destination for this source
             $finalDest = $destPath;
+            
             if (count($sources) > 1 || str_ends_with($destination, '/')) {
                 $finalDest = $destPath . '/' . basename($sourcePath);
             }
             
-            // Move the directory/file
-            if (!rename($sourcePath, $finalDest)) {
-                $this->error("Failed to move: {$sourcePath}");
-                continue;
+            if (file_exists($finalDest)) {
+                $this->error("Destination already exists: {$finalDest}");
+                $this->error("Aborting to prevent data loss");
+                return 1;
+            }
+        }
+
+        // CRITICAL SAFETY: Use database transaction for atomicity
+        DB::beginTransaction();
+        
+        try {
+            $totalUpdated = 0;
+            $movedPaths = []; // Track what we've moved for rollback
+            
+            foreach ($bookSources as $bookSource) {
+                $sourcePath = $bookSource['path'];
+                $sourceRelative = $bookSource['relative'];
+                
+                // Calculate final destination for this source
+                $finalDest = $destPath;
+                if (count($sources) > 1 || str_ends_with($destination, '/')) {
+                    $finalDest = $destPath . '/' . basename($sourcePath);
+                }
+                
+                // CRITICAL SAFETY: Verify source still exists (race condition check)
+                if (!file_exists($sourcePath)) {
+                    throw new \Exception("Source disappeared during operation: {$sourcePath}");
+                }
+                
+                // CRITICAL SAFETY: Verify destination still doesn't exist
+                if (file_exists($finalDest)) {
+                    throw new \Exception("Destination appeared during operation: {$finalDest}");
+                }
+                
+                // Move the directory/file
+                if (!rename($sourcePath, $finalDest)) {
+                    throw new \Exception("Failed to move: {$sourcePath}");
+                }
+                
+                $movedPaths[] = ['from' => $sourcePath, 'to' => $finalDest];
+                $this->info("✓ Moved: " . basename($sourcePath));
+
+                // Update database records
+                if (!$noDb && !empty($bookSource['books'])) {
+                    $destRelative = $this->getRelativePath($finalDest);
+                    $updated = $this->updateBookRecords(
+                        $bookSource['books'], 
+                        $sourceRelative, 
+                        $destRelative
+                    );
+                    $totalUpdated += $updated;
+                }
+            }
+
+            // CRITICAL SAFETY: Commit transaction only if everything succeeded
+            DB::commit();
+            
+            if (!$noDb && $totalUpdated > 0) {
+                $this->info("✓ Updated {$totalUpdated} book record(s)");
+            }
+
+            $this->info("\n✓ Move completed successfully!");
+            return 0;
+            
+        } catch (\Exception $e) {
+            // CRITICAL SAFETY: Rollback database changes
+            DB::rollBack();
+            
+            $this->error("Error during move: " . $e->getMessage());
+            $this->error("Rolling back filesystem changes...");
+            
+            // CRITICAL SAFETY: Attempt to rollback filesystem changes
+            foreach (array_reverse($movedPaths) as $move) {
+                if (file_exists($move['to']) && !file_exists($move['from'])) {
+                    if (@rename($move['to'], $move['from'])) {
+                        $this->info("✓ Rolled back: " . basename($move['from']));
+                    } else {
+                        $this->error("✗ Failed to rollback: " . basename($move['from']));
+                        $this->error("  Manual intervention required!");
+                    }
+                }
             }
             
-            $this->info("✓ Moved: " . basename($sourcePath));
-
-            // Update database records
-            if (!$noDb && !empty($bookSource['books'])) {
-                $destRelative = $this->getRelativePath($finalDest);
-                $updated = $this->updateBookRecords(
-                    $bookSource['books'], 
-                    $sourceRelative, 
-                    $destRelative
-                );
-                $totalUpdated += $updated;
-            }
+            return 1;
         }
-
-        if (!$noDb && $totalUpdated > 0) {
-            $this->info("✓ Updated {$totalUpdated} book record(s)");
-        }
-
-        $this->info("\n✓ Move completed successfully!");
-        return 0;
     }
 
     /**
-     * Normalize path to absolute path
+     * Normalize path to absolute path with security checks
      */
     private function normalizePath(string $path): string
     {
+        // CRITICAL SAFETY: Remove null bytes (security)
+        $path = str_replace("\0", '', $path);
+        
+        // CRITICAL SAFETY: Detect directory traversal attempts
+        if (strpos($path, '..') !== false) {
+            // Allow it but validate the result stays in book root
+            $needsValidation = true;
+        } else {
+            $needsValidation = false;
+        }
+        
         // If already absolute, return as-is
         if (str_starts_with($path, '/')) {
-            return rtrim($path, '/');
+            $normalized = rtrim($path, '/');
+        } else {
+            // If relative, make it relative to book root
+            $normalized = rtrim($this->bookRoot . '/' . ltrim($path, '/'), '/');
         }
-
-        // If relative, make it relative to book root
-        return rtrim($this->bookRoot . '/' . ltrim($path, '/'), '/');
+        
+        // CRITICAL SAFETY: Ensure path stays within book root
+        $realPath = realpath(dirname($normalized)) ?: dirname($normalized);
+        $realBookRoot = realpath($this->bookRoot);
+        
+        if ($realBookRoot && !str_starts_with($realPath, $realBookRoot)) {
+            throw new \Exception("Path escapes book root: {$path}");
+        }
+        
+        return $normalized;
     }
 
     /**
