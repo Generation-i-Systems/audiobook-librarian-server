@@ -138,20 +138,21 @@
                 }
             }
         @endphp
-        @if($coverUrl)
-            <div class="position-relative" style="cursor: pointer; float: right; margin: 20px 0 20px 20px;" id="cover-preview-trigger">
-                <img src="{{ $coverUrl }}" alt="Book Cover" style="height: 120px; border: 2px solid #dee2e6; border-radius: 4px;">
-                <div class="position-absolute top-0 end-0 bg-primary text-white rounded-circle" 
-                     style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; margin: -8px;">
-                    <i class="fas fa-edit" style="font-size: 12px;"></i>
-                </div>
+        <div class="d-flex justify-content-between align-items-start mb-3" style="gap: 20px;">
+            <div>
+                <button type="button" class="btn btn-info" id="autofill-modal-btn"><i class="fas fa-magic me-2"></i>Autofill Book Metadata</button>
+                @if(isset($book))
+                <button type="button" class="btn btn-secondary ms-2" id="raw-json-edit-btn"><i class="fas fa-code me-2"></i>Raw JSON Edit</button>
+                @endif
             </div>
-        @endif
-
-        <div class="mb-3">
-            <button type="button" class="btn btn-info" id="autofill-modal-btn"><i class="fas fa-magic me-2"></i>Autofill Book Metadata</button>
-            @if(isset($book))
-            <button type="button" class="btn btn-secondary ms-2" id="raw-json-edit-btn"><i class="fas fa-code me-2"></i>Raw JSON Edit</button>
+            @if($coverUrl)
+                <div class="position-relative" style="cursor: pointer;" id="cover-preview-trigger">
+                    <img src="{{ $coverUrl }}" alt="Book Cover" style="height: 120px; border: 2px solid #dee2e6; border-radius: 4px;">
+                    <div class="position-absolute top-0 end-0 bg-primary text-white rounded-circle" 
+                         style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; margin: -8px;">
+                        <i class="fas fa-edit" style="font-size: 12px;"></i>
+                    </div>
+                </div>
             @endif
         </div>
 
