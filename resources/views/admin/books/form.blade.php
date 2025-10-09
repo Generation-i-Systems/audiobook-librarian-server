@@ -136,18 +136,20 @@
                 <i class="fas fa-chevron-down toggle-icon"></i>
             </h5>
             <div class="card-content">
-                <div class="mb-3">
-                    <label for="title" class="form-label">Title</label>
-                    <input type="text" class="form-control @error('title') is-invalid @enderror" id="title" name="title"
-                        value="{{ old('title') ?? request()->get('title') ?? ($book['title'] ?? null) ?? ($initial['title'] ?? '') }}" 
-                        placeholder="Enter book title" required>
-                    @error('title')
-                        <span class="invalid-feedback d-block">{{ $message }}</span>
-                    @enderror
-                </div>
-                
-                <div class="mb-3">
-                    <label class="form-label">Authors</label>
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="mb-3">
+                            <label for="title" class="form-label">Title</label>
+                            <input type="text" class="form-control @error('title') is-invalid @enderror" id="title" name="title"
+                                value="{{ old('title') ?? request()->get('title') ?? ($book['title'] ?? null) ?? ($initial['title'] ?? '') }}" 
+                                placeholder="Enter book title" required>
+                            @error('title')
+                                <span class="invalid-feedback d-block">{{ $message }}</span>
+                            @enderror
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Authors</label>
                     <div id="authors-group">
                         @php
                             $authors = old('author') ?? (request()->get('author') ? [request()->get('author')] : null) ?? ($book['author'] ?? null) ?? ($initial['author'] ?? []);
@@ -182,6 +184,7 @@
                                 </div>
                             </div>
                         @endforeach
+                    </div>
                     </div>
                 </div>
                 
