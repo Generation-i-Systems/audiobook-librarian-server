@@ -219,41 +219,71 @@ class ManageSeriesController extends Controller
     {
         $oldName = $request->input('old_name');
         $newName = $request->input('new_name');
+        $merge = $request->input('merge', false);
         
         if (empty($oldName) || empty($newName)) {
             return back()->with('error', 'Both old and new series names are required');
         }
         
+        if ($oldName === $newName) {
+            return back()->with('error', 'New name must be different from old name');
+        }
+        
         try {
-            // Get all books in the series
+            // Get all books in both series
             $allBooks = $this->documentStore->getAllBooks();
-            $updated = 0;
+            $oldSeriesBooks = [];
+            $newSeriesExists = false;
             
             foreach ($allBooks as $book) {
                 $seriesName = '';
-                $seriesNumber = null;
                 
                 if (!empty($book['series'])) {
                     if (is_array($book['series'])) {
                         $seriesName = array_key_first($book['series']);
-                        $seriesNumber = $book['series'][$seriesName] ?? null;
                     } else {
                         $seriesName = $book['series'];
-                        $seriesNumber = $book['seriesNumber'] ?? null;
                     }
                 }
                 
                 if ($seriesName === $oldName) {
-                    // Update the series name
-                    $book['series'] = [$newName => $seriesNumber];
-                    $book['seriesName'] = $newName;
-                    
-                    $this->documentStore->updateBook($book['_id'], $book);
-                    $updated++;
+                    $oldSeriesBooks[] = $book;
+                } elseif ($seriesName === $newName) {
+                    $newSeriesExists = true;
                 }
             }
             
-            return back()->with('success', "Renamed series '{$oldName}' to '{$newName}' for {$updated} books");
+            // If new series exists and merge not confirmed, ask for confirmation
+            if ($newSeriesExists && !$merge) {
+                return back()->with('warning', [
+                    'message' => "A series named '{$newName}' already exists. Do you want to merge '{$oldName}' into it?",
+                    'old_name' => $oldName,
+                    'new_name' => $newName,
+                    'book_count' => count($oldSeriesBooks),
+                ]);
+            }
+            
+            // Perform the rename/merge
+            $updated = 0;
+            foreach ($oldSeriesBooks as $book) {
+                $seriesNumber = null;
+                
+                if (is_array($book['series'])) {
+                    $seriesNumber = $book['series'][$oldName] ?? null;
+                } else {
+                    $seriesNumber = $book['seriesNumber'] ?? null;
+                }
+                
+                // Update the series name
+                $book['series'] = [$newName => $seriesNumber];
+                $book['seriesName'] = $newName;
+                
+                $this->documentStore->updateBook($book['_id'], $book);
+                $updated++;
+            }
+            
+            $action = $newSeriesExists ? 'merged' : 'renamed';
+            return back()->with('success', "Successfully {$action} series '{$oldName}' to '{$newName}' for {$updated} books");
             
         } catch (\Exception $e) {
             Log::error('Error renaming series: ' . $e->getMessage());

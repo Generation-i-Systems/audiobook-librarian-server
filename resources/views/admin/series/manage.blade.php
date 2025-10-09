@@ -16,6 +16,23 @@
     @if(session('error'))
         <div class="alert alert-danger">{{ session('error') }}</div>
     @endif
+    @if(session('warning'))
+        @php $warning = session('warning'); @endphp
+        <div class="alert alert-warning">
+            <p><strong>{{ $warning['message'] }}</strong></p>
+            <p>This will move {{ $warning['book_count'] }} book(s) from "{{ $warning['old_name'] }}" to "{{ $warning['new_name'] }}".</p>
+            <form method="POST" action="{{ route('admin.series.rename') }}" class="d-inline">
+                @csrf
+                <input type="hidden" name="old_name" value="{{ $warning['old_name'] }}">
+                <input type="hidden" name="new_name" value="{{ $warning['new_name'] }}">
+                <input type="hidden" name="merge" value="1">
+                <button type="submit" class="btn btn-warning">
+                    <i class="fas fa-compress-alt me-2"></i>Yes, Merge Series
+                </button>
+                <a href="{{ route('admin.series.manage') }}" class="btn btn-secondary">Cancel</a>
+            </form>
+        </div>
+    @endif
 
     {{-- Potential Merges Section --}}
     @if(count($potentialMerges) > 0)

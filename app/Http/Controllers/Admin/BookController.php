@@ -2098,19 +2098,66 @@ class BookController extends Controller
     {
         $validated = $request->validate([
             'oldName' => 'required|string',
-            'newName' => 'required|string'
+            'newName' => 'required|string',
+            'merge' => 'boolean'
         ]);
 
         $oldName = $validated['oldName'];
         $newName = $validated['newName'];
+        $merge = $validated['merge'] ?? false;
+
+        if ($oldName === $newName) {
+            return response()->json([
+                'success' => false,
+                'message' => 'New name must be different from current name.'
+            ], 400);
+        }
 
         try {
+            // Check if new series name already exists
+            $allBooks = $this->documentStoreService->getAllBooks();
+            $oldSeriesBooks = [];
+            $newSeriesExists = false;
+            
+            foreach ($allBooks as $book) {
+                $seriesName = '';
+                
+                if (!empty($book['series'])) {
+                    if (is_array($book['series'])) {
+                        $seriesName = array_key_first($book['series']);
+                    } else {
+                        $seriesName = $book['series'];
+                    }
+                }
+                
+                if ($seriesName === $oldName) {
+                    $oldSeriesBooks[] = $book;
+                } elseif ($seriesName === $newName) {
+                    $newSeriesExists = true;
+                }
+            }
+            
+            // If new series exists and merge not confirmed, return warning
+            if ($newSeriesExists && !$merge) {
+                return response()->json([
+                    'success' => false,
+                    'warning' => "A series named '{$newName}' already exists with other books.",
+                    'old_name' => $oldName,
+                    'new_name' => $newName,
+                    'book_count' => count($oldSeriesBooks),
+                ]);
+            }
+            
+            // Perform the rename/merge using the service method
             $count = $this->documentStoreService->renameSeries($oldName, $newName);
 
             return response()->json([
                 'success' => true,
+                'merged' => $newSeriesExists,
                 'count' => $count,
-                'message' => "Successfully renamed series from '{$oldName}' to '{$newName}' for {$count} book(s)."
+                'message' => $newSeriesExists 
+                    ? "Successfully merged series '{$oldName}' into '{$newName}' for {$count} book(s)."
+                    : "Successfully renamed series from '{$oldName}' to '{$newName}' for {$count} book(s)."
             ]);
         } catch (\Exception $e) {
             Log::error('Error renaming series: ' . $e->getMessage());

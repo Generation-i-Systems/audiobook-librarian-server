@@ -47,7 +47,7 @@
     }
 
     // Rename series
-    function renameSeries() {
+    function renameSeries(merge = false) {
         const oldName = $('#old-series-name').val();
         const newName = $('#new-series-name').val().trim();
 
@@ -71,6 +71,7 @@
             data: {
                 oldName: oldName,
                 newName: newName,
+                merge: merge ? 1 : 0,
                 _token: $('input[name="_token"]').val()
             },
             dataType: 'json',
@@ -78,8 +79,9 @@
                 confirmBtn.prop('disabled', false).html(originalText);
 
                 if (response.success) {
+                    const action = response.merged ? 'merged' : 'renamed';
                     showFeedback(
-                        `Successfully renamed series "${oldName}" to "${newName}" for ${response.count} book(s).`,
+                        `Successfully ${action} series "${oldName}" to "${newName}" for ${response.count} book(s).`,
                         'success'
                     );
 
@@ -94,6 +96,9 @@
                     setTimeout(function() {
                         bootstrap.Modal.getInstance(document.getElementById('renameSeriesModal')).hide();
                     }, 2000);
+                } else if (response.warning) {
+                    // Series already exists, ask for confirmation
+                    showMergeConfirmation(response.warning, oldName, newName);
                 } else {
                     showFeedback(response.message || 'Failed to rename series.', 'danger');
                 }
@@ -103,6 +108,32 @@
                 console.error('Error renaming series:', error);
                 showFeedback('An error occurred while renaming the series.', 'danger');
             }
+        });
+    }
+    
+    // Show merge confirmation
+    function showMergeConfirmation(message, oldName, newName) {
+        const confirmHtml = `
+            <div class="alert alert-warning mb-0">
+                <p><strong>${message}</strong></p>
+                <p>Do you want to merge these series?</p>
+                <button type="button" class="btn btn-warning btn-sm" id="confirm-merge-btn">
+                    <i class="fas fa-compress-alt me-1"></i>Yes, Merge Series
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" id="cancel-merge-btn">Cancel</button>
+            </div>
+        `;
+        
+        $('#rename-series-feedback').html(confirmHtml);
+        
+        // Handle merge confirmation
+        $('#confirm-merge-btn').on('click', function() {
+            renameSeries(true);
+        });
+        
+        // Handle cancel
+        $('#cancel-merge-btn').on('click', function() {
+            $('#rename-series-feedback').html('');
         });
     }
 
