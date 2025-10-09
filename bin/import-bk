@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+# Import Book - Quick wrapper for books:import command
+# This script can be symlinked to a common bin directory for easy access
+
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Find the Laravel project root (parent of bin directory)
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Change to project directory
+cd "$PROJECT_ROOT" || exit 1
+
+# If no arguments provided, use current working directory
+if [ $# -eq 0 ]; then
+    # Get the original working directory before we changed to project root
+    ORIGINAL_DIR="$OLDPWD"
+    php artisan books:import "$ORIGINAL_DIR" "${@:1}"
+else
+    # Pass all arguments to the artisan command
+    php artisan books:import "$@"
+fi
