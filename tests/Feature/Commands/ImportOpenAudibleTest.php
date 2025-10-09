@@ -151,8 +151,60 @@ class ImportOpenAudibleTest extends TestCase
 
         // Assert
         $book = Book::where('asin', $bookData['asin'])->first();
-        $this->assertGreaterThanOrEqual(1, $book->genres->count());
+        $this->assertEquals(3, $book->genres->count());
         $this->assertTrue($book->genres->contains('name', 'Science Fiction'));
+        $this->assertTrue($book->genres->contains('name', 'Space Opera'));
+        $this->assertTrue($book->genres->contains('name', 'Military'));
+    }
+
+    /** @test */
+    public function it_marks_first_genre_as_primary()
+    {
+        // Arrange
+        $bookData = $this->createTestBookData([
+            'genre' => 'Science Fiction:Space Opera:Military',
+        ]);
+        $this->createBooksJson([$bookData]);
+        $this->createTestAudioFile($bookData['files'][0]['path']);
+
+        // Act
+        $this->artisan('books:import-openaudible', [
+            '--source' => $this->testOpenAudibleDir,
+        ])->assertExitCode(0);
+
+        // Assert
+        $book = Book::where('asin', $bookData['asin'])->first();
+        
+        // First genre should be primary
+        $primaryGenre = $book->genres()->wherePivot('is_primary', true)->first();
+        $this->assertNotNull($primaryGenre);
+        $this->assertEquals('Science Fiction', $primaryGenre->name);
+        
+        // Other genres should be secondary
+        $secondaryGenres = $book->genres()->wherePivot('is_primary', false)->get();
+        $this->assertCount(2, $secondaryGenres);
+    }
+
+    /** @test */
+    public function it_uses_primary_genre_for_directory_organization()
+    {
+        // Arrange
+        $bookData = $this->createTestBookData([
+            'genre' => 'Science Fiction & Fantasy:Fantasy:Dragons',
+        ]);
+        $this->createBooksJson([$bookData]);
+        $this->createTestAudioFile($bookData['files'][0]['path']);
+
+        // Act
+        $this->artisan('books:import-openaudible', [
+            '--source' => $this->testOpenAudibleDir,
+        ])->assertExitCode(0);
+
+        // Assert
+        $book = Book::where('asin', $bookData['asin'])->first();
+        
+        // Should map to Science Fiction directory (not Fantasy)
+        $this->assertStringStartsWith('Science Fiction/', $book->directory_path);
     }
 
     /** @test */

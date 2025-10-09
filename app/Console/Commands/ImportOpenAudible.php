@@ -8,6 +8,7 @@ use App\Models\Book;
 use App\Models\Genre;
 use App\Models\Narrator;
 use App\Models\Series;
+use App\Services\GenreMappingService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -27,6 +28,7 @@ class ImportOpenAudible extends Command
 
     private string $bookRoot;
     private DocumentStoreServiceInterface $documentStore;
+    private GenreMappingService $genreMapper;
     private array $stats = [
         'total' => 0,
         'imported' => 0,
@@ -35,10 +37,13 @@ class ImportOpenAudible extends Command
         'updated' => 0,
     ];
 
-    public function __construct(DocumentStoreServiceInterface $documentStore)
-    {
+    public function __construct(
+        DocumentStoreServiceInterface $documentStore,
+        GenreMappingService $genreMapper
+    ) {
         parent::__construct();
         $this->documentStore = $documentStore;
+        $this->genreMapper = $genreMapper;
         $this->bookRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
     }
 
@@ -285,11 +290,10 @@ class ImportOpenAudible extends Command
 
     private function prepareDestinationDirectory(array $bookData): string
     {
-        // Extract genre (use first genre from hierarchy)
+        // Map OpenAudible genre to library directory genre
         $genre = 'General Fiction'; // Default
         if (!empty($bookData['genre'])) {
-            $genreParts = explode(':', $bookData['genre']);
-            $genre = $this->sanitizePath(trim($genreParts[0]));
+            $genre = $this->sanitizePath($this->genreMapper->mapToPrimaryGenre($bookData['genre']));
         }
         
         $author = $this->sanitizePath($bookData['author'] ?? 'Unknown Author');
@@ -452,16 +456,28 @@ class ImportOpenAudible extends Command
             }
         }
 
-        // Genres
+        // Genres - add all genres from hierarchy with primary/secondary marking
         if (!empty($bookData['genre'])) {
-            $genreNames = explode(':', $bookData['genre']);
-            foreach ($genreNames as $genreName) {
+            $allGenres = $this->genreMapper->extractAllGenres($bookData['genre']);
+            $primaryGenreName = $this->genreMapper->mapToPrimaryGenre($bookData['genre']);
+            
+            foreach ($allGenres as $index => $genreName) {
                 $genreName = trim($genreName);
                 if ($genreName) {
                     $genre = Genre::firstOrCreate(['name' => $genreName]);
                     
+                    // First genre in hierarchy is primary (used for directory organization)
+                    $isPrimary = ($index === 0);
+                    
                     if (!$book->genres()->where('genre_id', $genre->id)->exists()) {
-                        $book->genres()->attach($genre->id);
+                        $book->genres()->attach($genre->id, [
+                            'is_primary' => $isPrimary,
+                        ]);
+                    } else {
+                        // Update is_primary if already attached
+                        $book->genres()->updateExistingPivot($genre->id, [
+                            'is_primary' => $isPrimary,
+                        ]);
                     }
                 }
             }
