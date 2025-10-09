@@ -21,53 +21,62 @@ class ParsePathController extends Controller
             return response()->json(['error' => 'Path is required'], 400);
         }
 
-        // Use the parser's extractAuthorFromPath method
-        $author = $this->parser->extractAuthorFromPath($path);
+        // Use the parser's processDirPath method - this is what parseDirectory uses
+        $reflection = new \ReflectionClass($this->parser);
+        $method = $reflection->getMethod('processDirPath');
+        $method->setAccessible(true);
         
-        // Parse the path components
-        $parts = explode('/', trim($path, '/'));
-        $parts = array_values(array_filter($parts, fn($p) => !empty(trim($p))));
+        // Remove storage root if present and normalize path
+        $storageRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
+        $normalizedPath = trim(str_replace($storageRoot, '', $path), '/');
         
-        $result = [
-            'author' => $author !== 'Unknown Author' ? $author : '',
-            'title' => '',
-            'genre' => '',
-            'series' => '',
-            'seriesNumber' => '',
-        ];
+        $bookPathInfo = $method->invoke($this->parser, $normalizedPath);
         
-        // Extract genre (first part if it exists)
-        if (count($parts) >= 1) {
-            $result['genre'] = $parts[0];
+        // Check if parsing failed
+        if (!empty($bookPathInfo['skipped']) || !empty($bookPathInfo['error'])) {
+            return response()->json(['error' => 'Could not parse path'], 400);
         }
         
-        // Get the last part (usually the title or book directory)
-        if (count($parts) >= 1) {
-            $lastPart = $parts[count($parts) - 1];
-            
-            // Try to extract series info from the last part
-            // Format: "Title - Series Name #Number" or just "Title"
-            if (preg_match('/^(.+?)\s*-\s*(.+?)\s*#\s*(\d+(?:\.\d+)?)$/', $lastPart, $matches)) {
-                $result['title'] = trim($matches[1]);
-                $result['series'] = trim($matches[2]);
-                $result['seriesNumber'] = trim($matches[3]);
-            } elseif (preg_match('/^(.+?)\s*#\s*(\d+(?:\.\d+)?)$/', $lastPart, $matches)) {
-                // Format: "Title #Number" (series name from parent directory)
-                $result['title'] = trim($matches[1]);
-                $result['seriesNumber'] = trim($matches[2]);
-                if (count($parts) >= 3) {
-                    $result['series'] = $parts[count($parts) - 2];
-                }
+        // Extract series info
+        $seriesName = '';
+        $seriesNumber = '';
+        if (!empty($bookPathInfo['series'])) {
+            if (is_array($bookPathInfo['series'])) {
+                $seriesName = array_key_first($bookPathInfo['series']);
+                $seriesNumber = $bookPathInfo['series'][$seriesName] ?? '';
             } else {
-                $result['title'] = $lastPart;
+                $seriesName = $bookPathInfo['series'];
+                $seriesNumber = $bookPathInfo['seriesNumber'] ?? '';
             }
         }
         
-        // If we have 5 parts, it's likely: genre/author/series/number/title
-        if (count($parts) >= 5) {
-            $result['series'] = $parts[2];
-            $result['seriesNumber'] = $parts[3];
+        // Format author as string
+        $author = '';
+        if (!empty($bookPathInfo['author'])) {
+            if (is_array($bookPathInfo['author'])) {
+                $author = implode(', ', $bookPathInfo['author']);
+            } else {
+                $author = $bookPathInfo['author'];
+            }
         }
+        
+        // Format genre as string
+        $genre = '';
+        if (!empty($bookPathInfo['genre'])) {
+            if (is_array($bookPathInfo['genre'])) {
+                $genre = implode(', ', $bookPathInfo['genre']);
+            } else {
+                $genre = $bookPathInfo['genre'];
+            }
+        }
+        
+        $result = [
+            'author' => $author !== 'Unknown Author' ? $author : '',
+            'title' => $bookPathInfo['title'] ?? '',
+            'genre' => $genre,
+            'series' => $seriesName,
+            'seriesNumber' => $seriesNumber,
+        ];
         
         return response()->json($result);
     }
