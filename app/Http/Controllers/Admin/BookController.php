@@ -2115,18 +2115,22 @@ class BookController extends Controller
 
         try {
             // Check if new series name already exists by searching
-            $newSeriesBooks = $this->documentStoreService->searchBooks([
-                'series' => $newName
-            ], 1);
+            $newSeriesBooks = $this->documentStoreService->listBooks(
+                1, 
+                1, 
+                ['series' => $newName]
+            );
             
             $newSeriesExists = !empty($newSeriesBooks['data']);
             
             // If new series exists and merge not confirmed, return warning
             if ($newSeriesExists && !$merge) {
                 // Get count of books in old series
-                $oldSeriesBooks = $this->documentStoreService->searchBooks([
-                    'series' => $oldName
-                ]);
+                $oldSeriesBooks = $this->documentStoreService->listBooks(
+                    1,
+                    1,
+                    ['series' => $oldName]
+                );
                 
                 return response()->json([
                     'success' => false,
