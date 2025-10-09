@@ -81,6 +81,9 @@ use Illuminate\Support\Facades\Route;
                                     <a class="nav-link" style="color:white" href="{{ route('admin.books.index') }}">Books</a>
                                 </li>
                                 <li class="nav-item">
+                                    <a class="nav-link" style="color:white" href="{{ route('admin.series.manage') }}">Manage Series</a>
+                                </li>
+                                <li class="nav-item">
                                     <a class="nav-link" style="color:white"
                                         href="{{ route('admin.messages.index') }}">Messages</a>
                                 </li>

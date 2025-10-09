@@ -346,6 +346,22 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         'parsePath',
     ])->name('books.parsePath');
 
+    // Series management routes
+    Route::get('/series/manage', [
+        Admin\ManageSeriesController::class,
+        'index',
+    ])->name('series.manage');
+    
+    Route::post('/series/merge', [
+        Admin\ManageSeriesController::class,
+        'merge',
+    ])->name('series.merge');
+    
+    Route::post('/series/rename', [
+        Admin\ManageSeriesController::class,
+        'rename',
+    ])->name('series.rename');
+
     Route::resource('account_requests', Admin\AccountRequestController::class);
     Route::get('/books/import-from-title', [
         Admin\BookController::class,
