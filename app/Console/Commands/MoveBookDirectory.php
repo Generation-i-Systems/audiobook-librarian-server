@@ -12,11 +12,11 @@ class MoveBookDirectory extends Command
     /**
      * The name and signature of the console command.
      */
-    protected $signature = 'books:move-directory 
-                            {source : Source directory path (relative to book root or absolute)}
-                            {destination : Destination directory path (relative to book root or absolute)}
+    protected $signature = 'books:move 
+                            {sources* : Source path(s) to move}
                             {--dry-run : Show what would be done without making changes}
-                            {--no-db : Only move files, do not update database}';
+                            {--no-db : Only move files, do not update database}
+                            {--mv-options=* : Options to pass to mv command}';
 
     /**
      * The console command description.
@@ -38,89 +38,116 @@ class MoveBookDirectory extends Command
      */
     public function handle(): int
     {
-        $source = $this->argument('source');
-        $destination = $this->argument('destination');
+        $sources = $this->argument('sources');
         $dryRun = $this->option('dry-run');
         $noDb = $this->option('no-db');
 
-        // Normalize paths
-        $sourcePath = $this->normalizePath($source);
+        // Last argument is destination
+        $destination = array_pop($sources);
+        
+        if (empty($sources)) {
+            $this->error("No source files specified");
+            return 1;
+        }
+
+        // Normalize destination path
         $destPath = $this->normalizePath($destination);
-
-        // Fast validation: check if source is in book root
-        if (!$this->isInBookRoot($sourcePath)) {
-            $this->error("Source path is not in book root: {$sourcePath}");
-            return 1;
-        }
-
-        // Fast validation: check if source exists
-        if (!is_dir($sourcePath)) {
-            $this->error("Source directory does not exist: {$sourcePath}");
-            return 1;
-        }
-
-        // Fast validation: check if destination already exists
-        if (file_exists($destPath)) {
-            $this->error("Destination already exists: {$destPath}");
-            return 1;
-        }
-
-        // Get relative paths for database operations
-        $sourceRelative = $this->getRelativePath($sourcePath);
-        $destRelative = $this->getRelativePath($destPath);
-
-        // Fast check: find affected books
-        $affectedBooks = $this->findAffectedBooks($sourceRelative);
         
-        if (empty($affectedBooks)) {
-            $this->warn("No books found with path: {$sourceRelative}");
-            $this->info("This appears to be a non-book directory. Proceeding with file move only.");
+        // Auto-create parent directories (mkdmv behavior)
+        $destDir = $destPath;
+        if (count($sources) > 1 || str_ends_with($destination, '/')) {
+            // Multiple sources or trailing slash means dest is a directory
+            $destDir = $destPath;
         } else {
-            $this->info("Found " . count($affectedBooks) . " book(s) to update");
+            // Single source, dest might be a file
+            $destDir = dirname($destPath);
         }
-
-        if ($dryRun) {
-            $this->info("\n=== DRY RUN MODE ===");
-            $this->info("Would move: {$sourcePath}");
-            $this->info("        to: {$destPath}");
-            
-            if (!empty($affectedBooks) && !$noDb) {
-                $this->info("\nWould update " . count($affectedBooks) . " book record(s):");
-                foreach ($affectedBooks as $book) {
-                    $oldPath = $book['directoryPath'] ?? $book['directory_path'] ?? 'N/A';
-                    $newPath = $this->calculateNewPath($oldPath, $sourceRelative, $destRelative);
-                    $this->line("  - {$oldPath} -> {$newPath}");
-                }
-            }
-            
-            return 0;
-        }
-
-        // Perform the move
-        $this->info("Moving directory...");
         
-        // Create parent directory if needed
-        $destParent = dirname($destPath);
-        if (!is_dir($destParent)) {
-            if (!mkdir($destParent, 0755, true)) {
-                $this->error("Failed to create parent directory: {$destParent}");
+        if (!$dryRun && !is_dir($destDir)) {
+            if (!mkdir($destDir, 0755, true)) {
+                $this->error("Failed to create destination directory: {$destDir}");
                 return 1;
             }
         }
 
-        // Move the directory
-        if (!rename($sourcePath, $destPath)) {
-            $this->error("Failed to move directory");
-            return 1;
+        $allAffectedBooks = [];
+        $bookSources = [];
+        
+        // Process each source
+        foreach ($sources as $source) {
+            $sourcePath = $this->normalizePath($source);
+            
+            // Check if this source is in book root
+            if ($this->isInBookRoot($sourcePath)) {
+                $sourceRelative = $this->getRelativePath($sourcePath);
+                $affectedBooks = $this->findAffectedBooks($sourceRelative);
+                
+                if (!empty($affectedBooks)) {
+                    $bookSources[] = [
+                        'path' => $sourcePath,
+                        'relative' => $sourceRelative,
+                        'books' => $affectedBooks,
+                    ];
+                    $allAffectedBooks = array_merge($allAffectedBooks, $affectedBooks);
+                }
+            }
         }
 
-        $this->info("✓ Directory moved successfully");
+        // If no book sources found, this is not a book move
+        if (empty($bookSources)) {
+            return 2; // Signal to fall back to regular mv
+        }
 
-        // Update database records
-        if (!$noDb && !empty($affectedBooks)) {
-            $this->info("Updating database records...");
-            $updated = $this->updateBookRecords($affectedBooks, $sourceRelative, $destRelative);
-            $this->info("✓ Updated {$updated} book record(s)");
+        $this->info("Found " . count($allAffectedBooks) . " book(s) to update across " . count($bookSources) . " source(s)");
+
+        if ($dryRun) {
+            $this->info("\n=== DRY RUN MODE ===");
+            foreach ($bookSources as $bookSource) {
+                $this->info("Would move: {$bookSource['path']}");
+                $this->info("        to: {$destPath}");
+                
+                if (!$noDb) {
+                    $this->info("  Would update " . count($bookSource['books']) . " book(s)");
+                }
+            }
+            return 0;
+        }
+
+        // Perform moves and database updates
+        $totalUpdated = 0;
+        
+        foreach ($bookSources as $bookSource) {
+            $sourcePath = $bookSource['path'];
+            $sourceRelative = $bookSource['relative'];
+            
+            // Calculate final destination for this source
+            $finalDest = $destPath;
+            if (count($sources) > 1 || str_ends_with($destination, '/')) {
+                $finalDest = $destPath . '/' . basename($sourcePath);
+            }
+            
+            // Move the directory/file
+            if (!rename($sourcePath, $finalDest)) {
+                $this->error("Failed to move: {$sourcePath}");
+                continue;
+            }
+            
+            $this->info("✓ Moved: " . basename($sourcePath));
+
+            // Update database records
+            if (!$noDb && !empty($bookSource['books'])) {
+                $destRelative = $this->getRelativePath($finalDest);
+                $updated = $this->updateBookRecords(
+                    $bookSource['books'], 
+                    $sourceRelative, 
+                    $destRelative
+                );
+                $totalUpdated += $updated;
+            }
+        }
+
+        if (!$noDb && $totalUpdated > 0) {
+            $this->info("✓ Updated {$totalUpdated} book record(s)");
         }
 
         $this->info("\n✓ Move completed successfully!");

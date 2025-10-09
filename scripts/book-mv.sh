@@ -1,10 +1,9 @@
 #!/bin/bash
 
-# Enhanced mv command for book directories
+# Enhanced mv command for book directories (bkmv replacement)
 # Automatically updates database when moving directories in book root
-# Falls back to regular mv if not in book root or if update fails
-
-set -e
+# Falls back to regular mv if not in book root
+# Supports all standard mv options and multiple sources
 
 # Colors for output
 RED='\033[0;31m'
@@ -16,65 +15,25 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-# Check if we have at least 2 arguments
-if [ $# -lt 2 ]; then
-    echo -e "${RED}Usage: book-mv <source> <destination> [options]${NC}"
-    echo "Options:"
-    echo "  --dry-run    Show what would be done without making changes"
-    echo "  --no-db      Only move files, do not update database"
-    echo "  --force-mv   Use regular mv even if in book root"
-    exit 1
-fi
-
-SOURCE="$1"
-DESTINATION="$2"
-shift 2
-
-# Parse options
-DRY_RUN=""
-NO_DB=""
-FORCE_MV=false
-
+# Separate mv options and positional args (like bkmv does)
+opts=()
+args=()
 while [[ $# -gt 0 ]]; do
-    case $1 in
-        --dry-run)
-            DRY_RUN="--dry-run"
-            shift
-            ;;
-        --no-db)
-            NO_DB="--no-db"
-            shift
-            ;;
-        --force-mv)
-            FORCE_MV=true
-            shift
-            ;;
-        *)
-            echo -e "${RED}Unknown option: $1${NC}"
-            exit 1
-            ;;
+    case "$1" in
+        -*) opts+=("$1"); shift ;;
+        *) args+=("$1"); shift ;;
     esac
 done
 
-# If force-mv, just use regular mv
-if [ "$FORCE_MV" = true ]; then
-    echo -e "${YELLOW}Using regular mv (--force-mv)${NC}"
-    mv "$SOURCE" "$DESTINATION"
+# If less than 2 positional args, fallback to mv
+if [[ ${#args[@]} -lt 2 ]]; then
+    mv "${opts[@]}" "${args[@]}"
     exit $?
 fi
 
-# Check if source exists
-if [ ! -e "$SOURCE" ]; then
-    echo -e "${RED}Error: Source does not exist: $SOURCE${NC}"
-    exit 1
-fi
-
-# Check if source is a directory
-if [ ! -d "$SOURCE" ]; then
-    echo -e "${YELLOW}Source is not a directory, using regular mv${NC}"
-    mv "$SOURCE" "$DESTINATION"
-    exit $?
-fi
+# All but the last positional arg are sources
+sources=("${args[@]:0:${#args[@]}-1}")
+dest="${args[-1]}"
 
 # Load environment to get BOOK_STORAGE_PATH
 if [ -f "$PROJECT_ROOT/.env" ]; then
@@ -83,47 +42,54 @@ fi
 
 # Check if BOOK_STORAGE_PATH is set
 if [ -z "$BOOK_STORAGE_PATH" ]; then
-    echo -e "${YELLOW}BOOK_STORAGE_PATH not set, using regular mv${NC}"
-    mv "$SOURCE" "$DESTINATION"
+    mv "${opts[@]}" "${args[@]}"
     exit $?
 fi
 
-# Resolve absolute paths
-SOURCE_ABS=$(realpath "$SOURCE" 2>/dev/null || echo "$SOURCE")
+# Fast check: is ANY source in book root?
 BOOK_ROOT=$(realpath "$BOOK_STORAGE_PATH" 2>/dev/null || echo "$BOOK_STORAGE_PATH")
+is_book=0
 
-# Fast check: is source in book root?
-if [[ ! "$SOURCE_ABS" == "$BOOK_ROOT"* ]]; then
-    echo -e "${YELLOW}Source not in book root, using regular mv${NC}"
-    mv "$SOURCE" "$DESTINATION"
+for src in "${sources[@]}"; do
+    # Resolve to absolute path if possible
+    abs_src=$(readlink -f -- "$src" 2>/dev/null || realpath "$src" 2>/dev/null || echo "$src")
+    if [[ "$abs_src" == "$BOOK_ROOT"* ]]; then
+        is_book=1
+        break
+    fi
+done
+
+# If no sources are in book root, use regular mv
+if [[ $is_book -eq 0 ]]; then
+    mv "${opts[@]}" "${args[@]}"
     exit $?
 fi
 
-# Source is in book root, use Laravel command
-echo -e "${GREEN}Source is in book root, using enhanced move...${NC}"
+# At least one source is in book root, use Laravel command
+cd "$PROJECT_ROOT" || exit 1
 
-# Run the Laravel command
-cd "$PROJECT_ROOT"
-
-if [ -n "$DRY_RUN" ]; then
-    php artisan books:move-directory "$SOURCE" "$DESTINATION" --dry-run $NO_DB
-    EXIT_CODE=$?
-else
-    php artisan books:move-directory "$SOURCE" "$DESTINATION" $NO_DB
-    EXIT_CODE=$?
+# Check if artisan exists
+if [ ! -f "artisan" ]; then
+    echo -e "${RED}Laravel artisan not found, falling back to mv${NC}" >&2
+    mv "${opts[@]}" "${args[@]}"
+    exit $?
 fi
 
-# If command failed, offer to use regular mv
-if [ $EXIT_CODE -ne 0 ]; then
-    echo -e "${RED}Enhanced move failed${NC}"
-    read -p "Use regular mv instead? (y/n) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        mv "$SOURCE" "$DESTINATION"
-        exit $?
-    else
-        exit $EXIT_CODE
-    fi
+# Run the Laravel command with all arguments
+php artisan books:move "${args[@]}"
+EXIT_CODE=$?
+
+# Exit code 2 means "not a book move, use regular mv"
+if [ $EXIT_CODE -eq 2 ]; then
+    mv "${opts[@]}" "${args[@]}"
+    exit $?
 fi
 
-exit 0
+# Exit code 0 means success
+if [ $EXIT_CODE -eq 0 ]; then
+    exit 0
+fi
+
+# Any other exit code means failure
+echo -e "${RED}Enhanced move failed${NC}" >&2
+exit $EXIT_CODE
