@@ -1686,6 +1686,7 @@ $(document).on('click', '#resync-path-btn', function() {
     // - genre/author/title (3+ parts)
     const parts = directoryPath.split('/').filter(p => p.trim() !== '');
     
+    let genre = '';
     let author = '';
     let title = '';
     let seriesName = '';
@@ -1693,12 +1694,14 @@ $(document).on('click', '#resync-path-btn', function() {
     
     if (parts.length >= 5) {
         // Format: genre/author/series/number/title
+        genre = parts[0];
         author = parts[1];
         seriesName = parts[2];
         seriesNumber = parts[3];
         title = parts[4];
     } else if (parts.length >= 3) {
         // Format: genre/author/title
+        genre = parts[0];
         author = parts[1];
         title = parts[parts.length - 1];
     } else {
@@ -1716,6 +1719,14 @@ $(document).on('click', '#resync-path-btn', function() {
         const firstAuthorInput = $('#authors-group .author-row:first input[name="author[]"]');
         if (firstAuthorInput.length) {
             firstAuthorInput.val(author);
+        }
+    }
+    
+    // Set genre (first row)
+    if (genre) {
+        const firstGenreInput = $('#genres-group .genre-row:first input[name="genre[]"]');
+        if (firstGenreInput.length) {
+            firstGenreInput.val(genre);
         }
     }
     

@@ -9,11 +9,14 @@
     background-color: #f8f9fa;
 }
 .book-form-card {
-    background: #fff;
+    background: white;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     padding: 1.5rem;
     margin-bottom: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.book-form-card.collapsed {
+    padding-bottom: 0.5rem;
 }
 .book-form-card .form-label {
     font-weight: 600;
@@ -708,12 +711,14 @@
                         content.style.display = isCollapsing ? 'none' : 'block';
                         this.classList.toggle('collapsed');
                         
-                        // Show/hide summary
+                        // Show/hide summary and toggle card class
                         if (isCollapsing) {
                             summary.textContent = generateSummary(card);
                             summary.style.display = 'block';
+                            card.classList.add('collapsed');
                         } else {
                             summary.style.display = 'none';
+                            card.classList.remove('collapsed');
                         }
                     }
                 });
