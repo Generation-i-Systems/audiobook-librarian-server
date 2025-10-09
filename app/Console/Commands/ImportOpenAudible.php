@@ -2,18 +2,13 @@
 
 namespace App\Console\Commands;
 
-use App\Contracts\DocumentStoreServiceInterface;
-use App\Models\Author;
 use App\Models\Book;
-use App\Models\Genre;
-use App\Models\Narrator;
-use App\Models\Series;
 use App\Services\GenreMappingService;
+use App\Services\OpenAudibleParser;
+use App\Services\UnifiedBookImporter;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 class ImportOpenAudible extends Command
 {
@@ -30,7 +25,8 @@ class ImportOpenAudible extends Command
     protected $description = 'Import books from OpenAudible with full metadata';
 
     private string $bookRoot;
-    private DocumentStoreServiceInterface $documentStore;
+    private UnifiedBookImporter $importer;
+    private OpenAudibleParser $parser;
     private GenreMappingService $genreMapper;
     private array $stats = [
         'total' => 0,
@@ -41,11 +37,13 @@ class ImportOpenAudible extends Command
     ];
 
     public function __construct(
-        DocumentStoreServiceInterface $documentStore,
+        UnifiedBookImporter $importer,
+        OpenAudibleParser $parser,
         GenreMappingService $genreMapper
     ) {
         parent::__construct();
-        $this->documentStore = $documentStore;
+        $this->importer = $importer;
+        $this->parser = $parser;
         $this->genreMapper = $genreMapper;
         $this->bookRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
     }
@@ -91,21 +89,14 @@ class ImportOpenAudible extends Command
         }
 
         $this->info("Loading OpenAudible metadata...");
-        
-        // Load books.json
+
+        // Load books.json using parser
         try {
-            $booksData = json_decode(file_get_contents($booksJsonPath), true);
-            
-            if (!is_array($booksData)) {
-                $this->error("Invalid books.json format");
-                return 1;
-            }
-            
+            $booksData = $this->parser->loadBooksJson($source);
             $this->stats['total'] = count($booksData);
             $this->info("Found {$this->stats['total']} books in metadata");
-            
         } catch (\Exception $e) {
-            $this->error("Failed to parse books.json: " . $e->getMessage());
+            $this->error("Failed to load books.json: " . $e->getMessage());
             return 1;
         }
 
@@ -134,13 +125,13 @@ class ImportOpenAudible extends Command
                     'error' => $e->getMessage(),
                     'trace' => $e->getTraceAsString(),
                 ]);
-                
+
                 if (!$dryRun) {
                     $this->newLine();
                     $this->error("Error importing '{$bookData['title']}': " . $e->getMessage());
                 }
             }
-            
+
             $progressBar->advance();
         }
 
@@ -153,114 +144,70 @@ class ImportOpenAudible extends Command
         return 0;
     }
 
-    private function processBook(array $bookData, string $source, bool $dryRun, bool $force, bool $includeOld): void
+    private function processBook(array $rawBookData, string $source, bool $dryRun, bool $force, bool $includeOld): void
     {
-        // Extract metadata
-        $title = $bookData['title'] ?? null;
-        $asin = $bookData['asin'] ?? $bookData['product_id'] ?? null;
-        
-        if (!$title) {
+        // Normalize book data using parser
+        $bookData = $this->parser->normalizeBookData($rawBookData);
+
+        // Check if should skip
+        if ($this->parser->shouldSkipBook($bookData)) {
             $this->stats['skipped']++;
             return;
         }
 
-        // Check if book already exists
-        $existingBook = null;
-        if ($asin) {
-            $existingBook = Book::where('asin', $asin)->first();
-        }
-        
-        if (!$existingBook && $title) {
-            $existingBook = Book::where('title', $title)->first();
+        // Find audio file using parser
+        $audioFile = $this->parser->findAudioFile($bookData, $source, $includeOld);
+
+        if (!$audioFile || !file_exists($audioFile)) {
+            $this->stats['skipped']++;
+            return;
         }
 
-        // Handle existing books
+        // Handle duplicate detection for interactive prompts
         $duplicateAction = null;
-        if ($existingBook) {
-            $duplicateAction = $this->handleDuplicateBook($existingBook, $bookData, $dryRun, $force);
-            
-            if ($duplicateAction === 'skip') {
-                $this->stats['skipped']++;
-                return;
+        if (!$dryRun && !$force) {
+            $existingBook = null;
+            if (!empty($bookData['asin'])) {
+                $existingBook = Book::where('asin', $bookData['asin'])->first();
             }
-            
-            // Continue with replace or merge action
-        }
+            if (!$existingBook && !empty($bookData['title'])) {
+                $existingBook = Book::where('title', $bookData['title'])->first();
+            }
 
-        // Find audio file
-        $audioFile = $this->findAudioFile($bookData, $source, $includeOld);
-        
-        if (!$audioFile) {
-            $this->stats['skipped']++;
-            return;
-        }
-
-        // CRITICAL SAFETY: Validate audio file exists
-        if (!file_exists($audioFile)) {
-            $this->stats['skipped']++;
-            return;
-        }
-
-        // Prepare destination directory
-        $destDir = $this->prepareDestinationDirectory($bookData);
-        $destPath = $this->bookRoot . '/' . $destDir;
-
-        if ($dryRun) {
             if ($existingBook) {
-                $this->stats['updated']++;
-            } else {
-                $this->stats['imported']++;
-            }
-            return;
-        }
+                $duplicateAction = $this->handleDuplicateBook($existingBook, $bookData, $dryRun, $force);
 
-        // CRITICAL SAFETY: Use transaction
-        DB::beginTransaction();
-        
-        try {
-            // Create destination directory
-            if (!File::exists($destPath)) {
-                File::makeDirectory($destPath, 0755, true);
-            }
-
-            // Copy audio file and associated files
-            $copiedFiles = $this->copyBookFiles(
-                $audioFile,
-                $destPath,
-                $bookData,
-                $source,
-                $duplicateAction
-            );
-            
-            if (empty($copiedFiles)) {
-                throw new \Exception("Failed to copy any files");
-            }
-
-            // Create or update book record
-            if ($existingBook) {
-                $book = $this->updateBookRecord($existingBook, $bookData, $destDir, $copiedFiles);
-                $this->stats['updated']++;
-            } else {
-                $book = $this->createBookRecord($bookData, $destDir, $copiedFiles);
-                $this->stats['imported']++;
-            }
-
-            // Create relationships
-            $this->createRelationships($book, $bookData);
-
-            DB::commit();
-            
-        } catch (\Exception $e) {
-            DB::rollBack();
-            
-            // CRITICAL SAFETY: Clean up copied files on error
-            if (isset($copiedFiles)) {
-                foreach ($copiedFiles as $file) {
-                    @unlink($destPath . '/' . basename($file));
+                if ($duplicateAction === 'skip') {
+                    $this->stats['skipped']++;
+                    return;
                 }
             }
-            
-            throw $e;
+        }
+
+        // Use unified importer
+        $result = $this->importer->importBook($bookData, [
+            'source_path' => dirname($audioFile),
+            'dry_run' => $dryRun,
+            'force' => $force,
+            'duplicate_action' => $duplicateAction,
+        ]);
+
+        // Update stats based on result
+        switch ($result['status']) {
+            case 'imported':
+            case 'would_import':
+                $this->stats['imported']++;
+                break;
+            case 'updated':
+            case 'would_update':
+                $this->stats['updated']++;
+                break;
+            case 'skipped':
+                $this->stats['skipped']++;
+                break;
+            case 'error':
+                $this->stats['errors']++;
+                break;
         }
     }
 
@@ -270,25 +217,25 @@ class ImportOpenAudible extends Command
         if ($this->option('auto-replace')) {
             return 'replace';
         }
-        
+
         if ($this->option('auto-merge')) {
             return 'merge';
         }
-        
+
         if ($this->option('auto-skip')) {
             return 'skip';
         }
-        
+
         // If --force flag, default to replace
         if ($force) {
             return 'replace';
         }
-        
+
         // If dry-run, just report
         if ($dryRun) {
             return 'replace'; // Simulate replace in dry-run
         }
-        
+
         // Interactive prompt
         $this->newLine();
         $this->warn("Duplicate book found:");
@@ -296,7 +243,7 @@ class ImportOpenAudible extends Command
         $this->line("  Existing: {$existingBook->directory_path}");
         $this->line("  ASIN: " . ($bookData['asin'] ?? 'N/A'));
         $this->newLine();
-        
+
         $choice = $this->choice(
             'How would you like to handle this duplicate?',
             [
@@ -307,315 +254,13 @@ class ImportOpenAudible extends Command
             ],
             'replace'
         );
-        
+
         if ($choice === 'manual') {
             $this->error("Import paused. Please resolve manually and restart.");
             exit(1);
         }
-        
+
         return $choice;
-    }
-
-    private function findAudioFile(array $bookData, string $source, bool $includeOld): ?string
-    {
-        // Try to find audio file from metadata
-        if (!empty($bookData['files'])) {
-            foreach ($bookData['files'] as $file) {
-                if ($file['kind'] === 'audio' && $file['type'] === 'M4B') {
-                    $path = $source . '/books/' . $file['path'];
-                    if (file_exists($path)) {
-                        return $path;
-                    }
-                    
-                    // Try books_old if enabled
-                    if ($includeOld) {
-                        $oldPath = $source . '/books_old/' . $file['path'];
-                        if (file_exists($oldPath)) {
-                            return $oldPath;
-                        }
-                    }
-                }
-            }
-        }
-
-        // Fallback: try to find by filename
-        $filename = $bookData['filename'] ?? $bookData['title'];
-        if ($filename) {
-            $m4bFile = $source . '/books/' . $filename . '.m4b';
-            if (file_exists($m4bFile)) {
-                return $m4bFile;
-            }
-            
-            if ($includeOld) {
-                $oldM4bFile = $source . '/books_old/' . $filename . '.m4b';
-                if (file_exists($oldM4bFile)) {
-                    return $oldM4bFile;
-                }
-            }
-        }
-
-        return null;
-    }
-
-    private function prepareDestinationDirectory(array $bookData): string
-    {
-        // Map OpenAudible genre to library directory genre
-        $genre = 'General Fiction'; // Default
-        if (!empty($bookData['genre'])) {
-            $genre = $this->sanitizePath($this->genreMapper->mapToPrimaryGenre($bookData['genre']));
-        }
-        
-        $author = $this->sanitizePath($bookData['author'] ?? 'Unknown Author');
-        $title = $this->sanitizePath($bookData['title_short'] ?? $bookData['title'] ?? 'Unknown Title');
-        
-        // If part of series, organize by series
-        if (!empty($bookData['series_name'])) {
-            $series = $this->sanitizePath($bookData['series_name']);
-            $sequence = $bookData['series_sequence'] ?? '';
-            
-            // Add sequence number prefix if available
-            if ($sequence) {
-                $title = str_pad($sequence, 2, '0', STR_PAD_LEFT) . ' ' . $title;
-            }
-            
-            return "{$genre}/{$author}/{$series}/{$title}";
-        }
-
-        return "{$genre}/{$author}/{$title}";
-    }
-
-    private function sanitizePath(string $path): string
-    {
-        // Remove invalid characters
-        $path = preg_replace('/[<>:"|?*]/', '', $path);
-        // Remove control characters
-        $path = preg_replace('/[\x00-\x1F\x7F]/', '', $path);
-        // Trim
-        $path = trim($path);
-        // Remove leading/trailing dots
-        $path = trim($path, '.');
-        
-        return $path;
-    }
-
-    private function copyBookFiles(
-        string $audioFile,
-        string $destPath,
-        array $bookData,
-        string $source,
-        ?string $duplicateAction = null
-    ): array {
-        $copiedFiles = [];
-        
-        // Handle audio files based on duplicate action
-        if ($duplicateAction === 'replace') {
-            // Delete existing audio files first
-            $existingAudioFiles = glob($destPath . '/*.{m4b,m4a,mp3}', GLOB_BRACE);
-            foreach ($existingAudioFiles as $existingFile) {
-                @unlink($existingFile);
-            }
-        }
-        
-        // Copy main audio file (skip if merge and audio already exists)
-        $audioFilename = basename($audioFile);
-        $destAudioFile = $destPath . '/' . $audioFilename;
-        
-        if ($duplicateAction === 'merge' && file_exists($destAudioFile)) {
-            // Skip audio file, keep existing
-            $this->line("  Keeping existing audio file: {$audioFilename}");
-        } else {
-            if (!copy($audioFile, $destAudioFile)) {
-                throw new \Exception("Failed to copy audio file");
-            }
-            $copiedFiles[] = $audioFilename;
-        }
-
-        // Copy associated files (cover image, PDFs, etc.) - always merge these
-        if (!empty($bookData['files'])) {
-            foreach ($bookData['files'] as $file) {
-                if ($file['kind'] === 'image' || $file['type'] === 'PDF') {
-                    $srcFile = $source . '/books/' . $file['path'];
-                    
-                    if (!file_exists($srcFile)) {
-                        $srcFile = $source . '/books_old/' . $file['path'];
-                    }
-                    
-                    if (file_exists($srcFile)) {
-                        $filename = basename($file['path']);
-                        $destFile = $destPath . '/' . $filename;
-                        
-                        // Always copy non-audio files (merge behavior)
-                        if (@copy($srcFile, $destFile)) {
-                            $copiedFiles[] = $filename;
-                        }
-                    }
-                }
-            }
-        }
-
-        return $copiedFiles;
-    }
-
-    private function createBookRecord(array $bookData, string $destDir, array $copiedFiles): Book
-    {
-        // Parse duration
-        $duration = $this->parseDuration($bookData);
-        
-        // Find cover image
-        $coverImage = null;
-        foreach ($copiedFiles as $file) {
-            if (preg_match('/\.(jpg|jpeg|png)$/i', $file)) {
-                $coverImage = $destDir . '/' . $file;
-                break;
-            }
-        }
-
-        return Book::create([
-            'directory_path' => $destDir,
-            'title' => $bookData['title'],
-            'description' => strip_tags($bookData['description'] ?? $bookData['summary'] ?? ''),
-            'duration' => $duration,
-            'audio_file_count' => count(array_filter($copiedFiles, fn($f) => str_ends_with($f, '.m4b'))),
-            'total_size' => $this->calculateTotalSize($destDir, $copiedFiles),
-            'cover_image' => $coverImage,
-            'asin' => $bookData['asin'] ?? $bookData['product_id'] ?? null,
-            'release_date' => $bookData['release_date'] ?? null,
-            'publisher' => $bookData['publisher'] ?? null,
-            'language' => $bookData['language'] ?? 'english',
-            'abridged' => ($bookData['abridged'] ?? 'false') === 'true',
-            'needs_review' => false,
-        ]);
-    }
-
-    private function updateBookRecord(Book $book, array $bookData, string $destDir, array $copiedFiles): Book
-    {
-        $duration = $this->parseDuration($bookData);
-        
-        $coverImage = null;
-        foreach ($copiedFiles as $file) {
-            if (preg_match('/\.(jpg|jpeg|png)$/i', $file)) {
-                $coverImage = $destDir . '/' . $file;
-                break;
-            }
-        }
-
-        $book->update([
-            'directory_path' => $destDir,
-            'description' => strip_tags($bookData['description'] ?? $bookData['summary'] ?? $book->description),
-            'duration' => $duration ?: $book->duration,
-            'audio_file_count' => count(array_filter($copiedFiles, fn($f) => str_ends_with($f, '.m4b'))),
-            'total_size' => $this->calculateTotalSize($destDir, $copiedFiles),
-            'cover_image' => $coverImage ?: $book->cover_image,
-            'asin' => $bookData['asin'] ?? $bookData['product_id'] ?? $book->asin,
-            'release_date' => $bookData['release_date'] ?? $book->release_date,
-            'publisher' => $bookData['publisher'] ?? $book->publisher,
-            'language' => $bookData['language'] ?? $book->language,
-            'abridged' => ($bookData['abridged'] ?? 'false') === 'true',
-        ]);
-
-        return $book;
-    }
-
-    private function createRelationships(Book $book, array $bookData): void
-    {
-        // Authors
-        if (!empty($bookData['author'])) {
-            $authorNames = explode(',', $bookData['author']);
-            foreach ($authorNames as $authorName) {
-                $authorName = trim($authorName);
-                $author = Author::firstOrCreate(['name' => $authorName]);
-                
-                if (!$book->authors()->where('author_id', $author->id)->exists()) {
-                    $book->authors()->attach($author->id);
-                }
-            }
-        }
-
-        // Narrators
-        if (!empty($bookData['narrated_by'])) {
-            $narratorNames = explode(',', $bookData['narrated_by']);
-            foreach ($narratorNames as $narratorName) {
-                $narratorName = trim($narratorName);
-                $narrator = Narrator::firstOrCreate(['name' => $narratorName]);
-                
-                if (!$book->narrators()->where('narrator_id', $narrator->id)->exists()) {
-                    $book->narrators()->attach($narrator->id);
-                }
-            }
-        }
-
-        // Genres - add all genres from hierarchy with primary/secondary marking
-        if (!empty($bookData['genre'])) {
-            $allGenres = $this->genreMapper->extractAllGenres($bookData['genre']);
-            $primaryGenreName = $this->genreMapper->mapToPrimaryGenre($bookData['genre']);
-            
-            foreach ($allGenres as $index => $genreName) {
-                $genreName = trim($genreName);
-                if ($genreName) {
-                    $genre = Genre::firstOrCreate(['name' => $genreName]);
-                    
-                    // First genre in hierarchy is primary (used for directory organization)
-                    $isPrimary = ($index === 0);
-                    
-                    if (!$book->genres()->where('genre_id', $genre->id)->exists()) {
-                        $book->genres()->attach($genre->id, [
-                            'is_primary' => $isPrimary,
-                        ]);
-                    } else {
-                        // Update is_primary if already attached
-                        $book->genres()->updateExistingPivot($genre->id, [
-                            'is_primary' => $isPrimary,
-                        ]);
-                    }
-                }
-            }
-        }
-
-        // Series
-        if (!empty($bookData['series_name'])) {
-            $series = Series::firstOrCreate(['name' => $bookData['series_name']]);
-            $seriesNumber = $bookData['series_sequence'] ?? null;
-            
-            if (!$book->series()->where('series_id', $series->id)->exists()) {
-                $book->series()->attach($series->id, [
-                    'series_number' => $seriesNumber,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            }
-        }
-    }
-
-    private function parseDuration(array $bookData): ?int
-    {
-        if (!empty($bookData['seconds'])) {
-            return (int)$bookData['seconds'];
-        }
-
-        if (!empty($bookData['duration'])) {
-            // Parse HH:MM:SS format
-            $parts = explode(':', $bookData['duration']);
-            if (count($parts) === 3) {
-                return ($parts[0] * 3600) + ($parts[1] * 60) + $parts[2];
-            }
-        }
-
-        return null;
-    }
-
-    private function calculateTotalSize(string $destDir, array $copiedFiles): int
-    {
-        $totalSize = 0;
-        $fullPath = $this->bookRoot . '/' . $destDir;
-        
-        foreach ($copiedFiles as $file) {
-            $filePath = $fullPath . '/' . $file;
-            if (file_exists($filePath)) {
-                $totalSize += filesize($filePath);
-            }
-        }
-
-        return $totalSize;
     }
 
     private function displaySummary(bool $dryRun): void
