@@ -50,8 +50,35 @@
 }
 </style>
 <div class="container-fluid" style="max-width: 1400px;">
+    @php
+        $currentCover = null;
+        if (isset($book) && !empty($book['coverImage'])) {
+            $currentCover = $book['coverImage'];
+        } elseif (!empty($initial['coverImage'])) {
+            $currentCover = $initial['coverImage'];
+        }
+        
+        $coverUrl = null;
+        if ($currentCover && is_string($currentCover)) {
+            $bookDir = isset($book) && !empty($book['directoryPath']) ? $book['directoryPath'] : ($directoryPath ?? ($initial['directoryPath'] ?? null));
+            if ($bookDir) {
+                $coverUrl = route('cover.proxy', ['path' => $bookDir . '/' . basename($currentCover)]);
+            }
+        }
+    @endphp
     @if(empty($isModal))
-        <h1>{{ isset($book) ? 'Edit Book' : 'Create New Book' }}</h1>
+        <div class="d-flex justify-content-between align-items-start" style="margin-bottom: 20px;">
+            <h1 class="mb-0">{{ isset($book) ? 'Edit Book' : 'Create New Book' }}</h1>
+            @if($coverUrl)
+                <div class="position-relative" style="cursor: pointer;" id="cover-preview-trigger">
+                    <img src="{{ $coverUrl }}" alt="Book Cover" style="height: 120px; border: 2px solid #dee2e6; border-radius: 4px;">
+                    <div class="position-absolute top-0 end-0 bg-primary text-white rounded-circle" 
+                         style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; margin: -8px;">
+                        <i class="fas fa-edit" style="font-size: 12px;"></i>
+                    </div>
+                </div>
+            @endif
+        </div>
     @endif
     @if(session('error'))
         <div class="alert alert-danger">{{ session('error') }}</div>
@@ -122,37 +149,10 @@
         @if(!empty($initial['importMode']))
             <input type="hidden" name="importMode" value="{{ $initial['importMode'] ? '1' : '0' }}">
         @endif
-        @php
-            $currentCover = null;
-            if (isset($book) && !empty($book['coverImage'])) {
-                $currentCover = $book['coverImage'];
-            } elseif (!empty($initial['coverImage'])) {
-                $currentCover = $initial['coverImage'];
-            }
-            
-            $coverUrl = null;
-            if ($currentCover && is_string($currentCover)) {
-                $bookDir = isset($book) && !empty($book['directoryPath']) ? $book['directoryPath'] : ($directoryPath ?? ($initial['directoryPath'] ?? null));
-                if ($bookDir) {
-                    $coverUrl = route('cover.proxy', ['path' => $bookDir . '/' . basename($currentCover)]);
-                }
-            }
-        @endphp
-        <div class="d-flex justify-content-between align-items-start" style="gap: 20px; margin-bottom: 20px;">
-            <div>
-                <button type="button" class="btn btn-info" id="autofill-modal-btn"><i class="fas fa-magic me-2"></i>Autofill Book Metadata</button>
-                @if(isset($book))
-                <button type="button" class="btn btn-secondary ms-2" id="raw-json-edit-btn"><i class="fas fa-code me-2"></i>Raw JSON Edit</button>
-                @endif
-            </div>
-            @if($coverUrl)
-                <div class="position-relative" style="cursor: pointer;" id="cover-preview-trigger">
-                    <img src="{{ $coverUrl }}" alt="Book Cover" style="height: 120px; border: 2px solid #dee2e6; border-radius: 4px;">
-                    <div class="position-absolute top-0 end-0 bg-primary text-white rounded-circle" 
-                         style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; margin: -8px;">
-                        <i class="fas fa-edit" style="font-size: 12px;"></i>
-                    </div>
-                </div>
+        <div class="mb-3">
+            <button type="button" class="btn btn-info" id="autofill-modal-btn"><i class="fas fa-magic me-2"></i>Autofill Book Metadata</button>
+            @if(isset($book))
+            <button type="button" class="btn btn-secondary ms-2" id="raw-json-edit-btn"><i class="fas fa-code me-2"></i>Raw JSON Edit</button>
             @endif
         </div>
 
