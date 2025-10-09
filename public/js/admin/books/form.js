@@ -1680,69 +1680,57 @@ $(document).on('click', '#resync-path-btn', function() {
         return;
     }
     
-    // Parse the directory path using the same logic as the server
-    // Expected formats:
-    // - genre/author/series/number/title (5 parts)
-    // - genre/author/title (3+ parts)
-    const parts = directoryPath.split('/').filter(p => p.trim() !== '');
-    
-    let genre = '';
-    let author = '';
-    let title = '';
-    let seriesName = '';
-    let seriesNumber = '';
-    
-    if (parts.length >= 5) {
-        // Format: genre/author/series/number/title
-        genre = parts[0];
-        author = parts[1];
-        seriesName = parts[2];
-        seriesNumber = parts[3];
-        title = parts[4];
-    } else if (parts.length >= 3) {
-        // Format: genre/author/title
-        genre = parts[0];
-        author = parts[1];
-        title = parts[parts.length - 1];
-    } else {
-        alert('Could not parse directory path. Expected format: genre/author/title or genre/author/series/number/title');
-        return;
-    }
-    
-    // Set title
-    if (title) {
-        $('#title').val(title);
-    }
-    
-    // Set author (first row)
-    if (author) {
-        const firstAuthorInput = $('#authors-group .author-row:first input[name="author[]"]');
-        if (firstAuthorInput.length) {
-            firstAuthorInput.val(author);
+    // Call the server-side parser to use the existing parsing logic
+    $.ajax({
+        url: window.BOOK_FORM_ROUTES.parsePath,
+        method: 'POST',
+        data: {
+            path: directoryPath,
+            _token: $('meta[name="csrf-token"]').attr('content')
+        },
+        success: function(data) {
+            // Set title
+            if (data.title) {
+                $('#title').val(data.title);
+            }
+            
+            // Set author (first row)
+            if (data.author) {
+                const firstAuthorInput = $('#authors-group .author-row:first input[name="author[]"]');
+                if (firstAuthorInput.length) {
+                    firstAuthorInput.val(data.author);
+                }
+            }
+            
+            // Set genre (first row)
+            if (data.genre) {
+                const firstGenreInput = $('#genres-group .genre-row:first input[name="genre[]"]');
+                if (firstGenreInput.length) {
+                    firstGenreInput.val(data.genre);
+                }
+            }
+            
+            // Set series if present
+            if (data.series) {
+                const firstSeriesNameInput = $('#series-group .series-row:first input[name*="[seriesName]"]');
+                if (firstSeriesNameInput.length) {
+                    firstSeriesNameInput.val(data.series);
+                }
+            }
+            
+            if (data.seriesNumber) {
+                const firstSeriesNumberInput = $('#series-group .series-row:first input[name*="[number]"]');
+                if (firstSeriesNumberInput.length) {
+                    firstSeriesNumberInput.val(data.seriesNumber);
+                }
+            }
+            
+            alert('Fields updated from path!');
+        },
+        error: function(xhr) {
+            alert('Error parsing path: ' + (xhr.responseJSON?.error || 'Unknown error'));
         }
-    }
-    
-    // Set genre (first row)
-    if (genre) {
-        const firstGenreInput = $('#genres-group .genre-row:first input[name="genre[]"]');
-        if (firstGenreInput.length) {
-            firstGenreInput.val(genre);
-        }
-    }
-    
-    // Set series if present
-    if (seriesName) {
-        const firstSeriesNameInput = $('#series-group .series-row:first input[name*="[seriesName]"]');
-        const firstSeriesNumberInput = $('#series-group .series-row:first input[name*="[number]"]');
-        if (firstSeriesNameInput.length) {
-            firstSeriesNameInput.val(seriesName);
-        }
-        if (firstSeriesNumberInput.length && seriesNumber) {
-            firstSeriesNumberInput.val(seriesNumber);
-        }
-    }
-    
-    alert('Fields updated from path!');
+    });
 });
 
 console.log("Form JS loaded 6");

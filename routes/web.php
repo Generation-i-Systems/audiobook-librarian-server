@@ -341,6 +341,11 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         'autocompleteGenres',
     ])->name('books.autocomplete.genres');
 
+    Route::post('/books/parse-path', [
+        Admin\ParsePathController::class,
+        'parsePath',
+    ])->name('books.parsePath');
+
     Route::resource('account_requests', Admin\AccountRequestController::class);
     Route::get('/books/import-from-title', [
         Admin\BookController::class,

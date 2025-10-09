@@ -1009,6 +1009,7 @@ document.addEventListener('DOMContentLoaded', function() {
     window.GENRE_OPTIONS = @json(config('genres.list', []));
     window.AUDIBLE_SEARCH_URL = "{{ route('admin.books.audible') }}";
     window.BOOK_FORM_ROUTES.browseDirectories = "{{ route('admin.books.browseDirectories') }}";
+    window.BOOK_FORM_ROUTES.parsePath = "{{ route('admin.books.parsePath') }}";
 
     // Debug: Confirm jQuery and jQuery UI are loaded
     console.log('window.jQuery:', typeof window.jQuery, window.jQuery ? 'OK' : 'MISSING');
