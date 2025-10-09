@@ -356,8 +356,8 @@
                         </button>
                     </div>
                     <button type="button" class="btn btn-outline-secondary ms-2" id="resync-path-btn" 
-                        title="Resync title, author, and series from path">
-                        <i class="fas fa-sync-alt me-1"></i>Resync Title/Author/Series
+                        title="Parse directory path to populate title, author, and series fields">
+                        <i class="fas fa-sync-alt me-1"></i>Resync Fields from Path
                     </button>
                 </div>
                 @error('directoryPath')

@@ -1672,4 +1672,53 @@ function ensureCoverImageSelected() {
     }
 }
 
+// Resync fields from directory path
+$(document).on('click', '#resync-path-btn', function() {
+    const directoryPath = $('#directoryPath').val();
+    if (!directoryPath) {
+        alert('Please enter a directory path first');
+        return;
+    }
+    
+    // Parse the directory path
+    // Expected format: /path/to/Author - Title - Series #1
+    const pathParts = directoryPath.split('/');
+    const lastPart = pathParts[pathParts.length - 1];
+    
+    // Try to parse: Author - Title - Series #Number
+    const match = lastPart.match(/^(.+?)\s*-\s*(.+?)(?:\s*-\s*(.+?)\s*#(\d+(?:\.\d+)?))?$/);
+    
+    if (match) {
+        const author = match[1].trim();
+        const title = match[2].trim();
+        const seriesName = match[3] ? match[3].trim() : '';
+        const seriesNumber = match[4] ? match[4].trim() : '';
+        
+        // Set title
+        $('#title').val(title);
+        
+        // Set author (first row)
+        const firstAuthorInput = $('#authors-group .author-row:first input[name="author[]"]');
+        if (firstAuthorInput.length) {
+            firstAuthorInput.val(author);
+        }
+        
+        // Set series if present
+        if (seriesName) {
+            const firstSeriesNameInput = $('#series-group .series-row:first input[name*="[seriesName]"]');
+            const firstSeriesNumberInput = $('#series-group .series-row:first input[name*="[number]"]');
+            if (firstSeriesNameInput.length) {
+                firstSeriesNameInput.val(seriesName);
+            }
+            if (firstSeriesNumberInput.length && seriesNumber) {
+                firstSeriesNumberInput.val(seriesNumber);
+            }
+        }
+        
+        alert('Fields updated from path!');
+    } else {
+        alert('Could not parse directory path. Expected format: Author - Title or Author - Title - Series #Number');
+    }
+});
+
 console.log("Form JS loaded 6");
