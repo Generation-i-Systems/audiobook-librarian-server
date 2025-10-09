@@ -1,5 +1,25 @@
 # Audiobook Librarian
 
+## Quick Start
+
+### Import Books
+```bash
+# Install the import tool
+ln -s $(pwd)/bin/import-bk ~/bin/import-bk
+
+# Import current directory
+cd /path/to/audiobook
+import-bk
+
+# Import specific books
+import-bk /path/book1 /path/book2
+
+# See all options
+import-bk --help
+```
+
+See [Import Book Documentation](docs/import-book.md) for detailed usage.
+
 ## Service Architecture
 
 ### Document Storage Services
