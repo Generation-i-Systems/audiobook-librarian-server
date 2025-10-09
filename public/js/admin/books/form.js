@@ -1679,7 +1679,8 @@ function showToast(message, type = 'success') {
         .css({
             position: 'fixed',
             top: '20px',
-            right: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
             zIndex: 9999,
             minWidth: '250px',
             boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
