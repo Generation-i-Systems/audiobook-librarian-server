@@ -47,8 +47,7 @@
     font-size: 0.9rem;
     font-weight: normal;
     padding: 0.5rem 0;
-    margin-bottom: 1rem;
-    border-bottom: 2px solid #e9ecef;
+    margin-bottom: 0.25rem;
 }
 </style>
 <div class="container-fluid" style="max-width: 1400px;">
