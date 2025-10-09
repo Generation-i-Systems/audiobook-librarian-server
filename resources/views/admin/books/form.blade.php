@@ -51,34 +51,7 @@
 </style>
 <div class="container-fluid" style="max-width: 1400px;">
     @if(empty($isModal))
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h1 class="mb-0">{{ isset($book) ? 'Edit Book' : 'Create New Book' }}</h1>
-            @php
-                $currentCover = null;
-                if (isset($book) && !empty($book['coverImage'])) {
-                    $currentCover = $book['coverImage'];
-                } elseif (!empty($initial['coverImage'])) {
-                    $currentCover = $initial['coverImage'];
-                }
-                
-                $coverUrl = null;
-                if ($currentCover && is_string($currentCover)) {
-                    $bookDir = isset($book) && !empty($book['directoryPath']) ? $book['directoryPath'] : ($directoryPath ?? ($initial['directoryPath'] ?? null));
-                    if ($bookDir) {
-                        $coverUrl = route('cover.proxy', ['path' => $bookDir . '/' . basename($currentCover)]);
-                    }
-                }
-            @endphp
-            @if($coverUrl)
-                <div class="position-relative" style="cursor: pointer;" id="cover-preview-trigger">
-                    <img src="{{ $coverUrl }}" alt="Book Cover" style="height: 120px; border: 2px solid #dee2e6; border-radius: 4px;">
-                    <div class="position-absolute top-0 end-0 bg-primary text-white rounded-circle" 
-                         style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; margin: -8px;">
-                        <i class="fas fa-edit" style="font-size: 12px;"></i>
-                    </div>
-                </div>
-            @endif
-        </div>
+        <h1>{{ isset($book) ? 'Edit Book' : 'Create New Book' }}</h1>
     @endif
     @if(session('error'))
         <div class="alert alert-danger">{{ session('error') }}</div>
@@ -155,8 +128,32 @@
                 @if(isset($book))
                 <button type="button" class="btn btn-secondary ms-2" id="raw-json-edit-btn"><i class="fas fa-code me-2"></i>Raw JSON Edit</button>
                 @endif
-                <button type="button" class="btn btn-outline-primary ms-2" id="edit-cover-btn"><i class="fas fa-image me-2"></i>Edit Cover Image</button>
             </div>
+            @php
+                $currentCover = null;
+                if (isset($book) && !empty($book['coverImage'])) {
+                    $currentCover = $book['coverImage'];
+                } elseif (!empty($initial['coverImage'])) {
+                    $currentCover = $initial['coverImage'];
+                }
+                
+                $coverUrl = null;
+                if ($currentCover && is_string($currentCover)) {
+                    $bookDir = isset($book) && !empty($book['directoryPath']) ? $book['directoryPath'] : ($directoryPath ?? ($initial['directoryPath'] ?? null));
+                    if ($bookDir) {
+                        $coverUrl = route('cover.proxy', ['path' => $bookDir . '/' . basename($currentCover)]);
+                    }
+                }
+            @endphp
+            @if($coverUrl)
+                <div class="position-relative" style="cursor: pointer;" id="cover-preview-trigger">
+                    <img src="{{ $coverUrl }}" alt="Book Cover" style="height: 80px; border: 2px solid #dee2e6; border-radius: 4px;">
+                    <div class="position-absolute top-0 end-0 bg-primary text-white rounded-circle" 
+                         style="width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; margin: -6px;">
+                        <i class="fas fa-edit" style="font-size: 10px;"></i>
+                    </div>
+                </div>
+            @endif
         </div>
 
         {{-- Basic Information Card --}}
@@ -626,17 +623,9 @@
         </div>
 
         <script>
-        // Open cover image modal
+        // Open cover image modal when clicking cover preview
         document.addEventListener('DOMContentLoaded', function() {
-            const editCoverBtn = document.getElementById('edit-cover-btn');
             const coverPreviewTrigger = document.getElementById('cover-preview-trigger');
-            
-            if (editCoverBtn) {
-                editCoverBtn.addEventListener('click', function() {
-                    const modal = new bootstrap.Modal(document.getElementById('coverImageModal'));
-                    modal.show();
-                });
-            }
             
             if (coverPreviewTrigger) {
                 coverPreviewTrigger.addEventListener('click', function() {
