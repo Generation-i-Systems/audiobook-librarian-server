@@ -2,17 +2,13 @@
 
 namespace App\Console\Commands;
 
-use App\Contracts\DocumentStoreServiceInterface;
 use App\Services\BookDirectoryParser;
-use App\Services\MetadataProcessingService;
-use App\Traits\BookImportTrait;
+use App\Services\UnifiedBookImporter;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 
 class ImportBook extends Command
 {
-    use BookImportTrait;
-
     protected $signature = 'books:import
                             {paths* : Book directories or files to import}
                             {--dry-run : Show what would be imported without making changes}
@@ -21,9 +17,8 @@ class ImportBook extends Command
     protected $description = 'Import books from filesystem locations into the library';
 
     private string $bookRoot;
-    private DocumentStoreServiceInterface $documentStore;
+    private UnifiedBookImporter $importer;
     private BookDirectoryParser $parser;
-    private MetadataProcessingService $metadataProcessor;
     private array $stats = [
         'total' => 0,
         'imported' => 0,
@@ -33,14 +28,12 @@ class ImportBook extends Command
     ];
 
     public function __construct(
-        DocumentStoreServiceInterface $documentStore,
-        BookDirectoryParser $parser,
-        MetadataProcessingService $metadataProcessor
+        UnifiedBookImporter $importer,
+        BookDirectoryParser $parser
     ) {
         parent::__construct();
-        $this->documentStore = $documentStore;
+        $this->importer = $importer;
         $this->parser = $parser;
-        $this->metadataProcessor = $metadataProcessor;
         $this->bookRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
     }
 
@@ -170,9 +163,6 @@ class ImportBook extends Command
         try {
             $this->line("Processing: {$dirPath}");
 
-            // Check if directory is already in library structure
-            $isInLibrary = str_starts_with($dirPath, $this->bookRoot);
-
             // Parse the directory
             $bookData = $this->parser->parseDirectory($dirPath);
 
@@ -182,130 +172,48 @@ class ImportBook extends Command
                 return;
             }
 
-            // Check if book already exists
-            $existingBook = $this->findExistingBook($bookData);
+            // Use unified importer
+            $result = $this->importer->importBook($bookData, [
+                'source_path' => $dirPath,
+                'dry_run' => $dryRun,
+                'force' => $force,
+            ]);
 
-            if ($existingBook && !$force) {
-                $this->line("  <fg=yellow>Book already exists:</> {$existingBook['title']}");
-                $this->stats['skipped']++;
-                return;
-            }
-
-            if ($dryRun) {
-                if ($existingBook) {
-                    $this->line("  <fg=cyan>Would update:</> {$bookData['title']}");
+            // Handle result and update stats
+            switch ($result['status']) {
+                case 'imported':
+                    $this->line("  <fg=green>✓</> Imported: {$bookData['title']}");
+                    $this->stats['imported']++;
+                    break;
+                case 'updated':
+                    $this->line("  <fg=cyan>✓</> Updated: {$bookData['title']}");
                     $this->stats['updated']++;
-                } else {
+                    break;
+                case 'skipped':
+                    $reason = $result['reason'] ?? 'unknown';
+                    $this->line("  <fg=yellow>Skipped:</> {$bookData['title']} ({$reason})");
+                    $this->stats['skipped']++;
+                    break;
+                case 'would_import':
                     $this->line("  <fg=green>Would import:</> {$bookData['title']}");
                     $this->stats['imported']++;
-                }
-                return;
-            }
-
-            // Import or update the book
-            if ($isInLibrary) {
-                // Already in library, just update database
-                // Find and add cover image if not already in bookData
-                if (empty($bookData['cover_image'])) {
-                    [$coverImage, $coverCandidates] = $this->findCoverImageCandidate($bookData['directory_path']);
-                    if ($coverImage) {
-                        $bookData['cover_image'] = $coverImage;
-                    }
-                }
-
-                $this->updateBookInDatabase($bookData, $existingBook);
-                $this->line("  <fg=green>✓</> Updated in database");
-                $this->stats['updated']++;
-            } else {
-                // Move/copy to library and import
-                $this->importBookToLibrary($bookData, $dirPath, $existingBook);
-                $this->line("  <fg=green>✓</> Imported to library");
-                if ($existingBook) {
+                    break;
+                case 'would_update':
+                    $this->line("  <fg=cyan>Would update:</> {$bookData['title']}");
                     $this->stats['updated']++;
-                } else {
-                    $this->stats['imported']++;
-                }
+                    break;
+                case 'error':
+                    $this->error("  Error: " . ($result['error'] ?? 'Unknown error'));
+                    $this->stats['errors']++;
+                    break;
+                default:
+                    $this->stats['errors']++;
+                    break;
             }
         } catch (\Exception $e) {
             $this->error("  Error: " . $e->getMessage());
             $this->stats['errors']++;
         }
-    }
-
-    private function findExistingBook(array $bookData): ?array
-    {
-        // Try to find by directory path
-        if (!empty($bookData['directory_path'])) {
-            $book = $this->documentStore->findBookByDirectoryPath($bookData['directory_path']);
-            if ($book) {
-                return $book;
-            }
-        }
-
-        // Try to find by title and author
-        if (!empty($bookData['title'])) {
-            $books = $this->documentStore->listBooks(1, 100, ['title' => $bookData['title']]);
-            if (!empty($books['data'])) {
-                foreach ($books['data'] as $book) {
-                    if ($book['title'] === $bookData['title']) {
-                        return $book;
-                    }
-                }
-            }
-        }
-
-        return null;
-    }
-
-    private function updateBookInDatabase(array $bookData, ?array $existingBook): void
-    {
-        if ($existingBook) {
-            $this->documentStore->updateBook($existingBook['_id'], $bookData);
-        } else {
-            $this->documentStore->createBook($bookData);
-        }
-    }
-
-    private function importBookToLibrary(array $bookData, string $sourcePath, ?array $existingBook): void
-    {
-        // Determine destination path
-        $destPath = $this->bookRoot . '/' . $bookData['directory_path'];
-
-        // Create destination directory
-        if (!File::exists($destPath)) {
-            File::makeDirectory($destPath, 0755, true);
-        }
-
-        // Copy/move files
-        $files = File::files($sourcePath);
-        $coverImage = null;
-
-        foreach ($files as $file) {
-            $filename = $file->getFilename();
-            $destFile = $destPath . '/' . $filename;
-
-            // Copy file
-            File::copy($file->getPathname(), $destFile);
-
-            // Check if this is a cover image
-            $ext = strtolower($file->getExtension());
-            if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
-                if (stripos($filename, 'cover') !== false) {
-                    $coverImage = $filename;
-                } elseif (!$coverImage) {
-                    // Use first image found if no cover-named image
-                    $coverImage = $filename;
-                }
-            }
-        }
-
-        // Add cover image to book data if found
-        if ($coverImage) {
-            $bookData['cover_image'] = $coverImage;
-        }
-
-        // Update database
-        $this->updateBookInDatabase($bookData, $existingBook);
     }
 
     private function displaySummary(bool $dryRun): void
