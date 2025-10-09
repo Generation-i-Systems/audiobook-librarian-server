@@ -24,7 +24,7 @@
     font-size: 1.1rem;
     font-weight: 600;
     color: #212529;
-    margin-bottom: 1rem;
+    margin-bottom: 0;
     padding-bottom: 0.5rem;
     border-bottom: 2px solid #e9ecef;
     cursor: pointer;
@@ -46,7 +46,9 @@
     color: #6c757d;
     font-size: 0.9rem;
     font-weight: normal;
-    margin-left: 1rem;
+    padding: 0.5rem 0;
+    margin-bottom: 1rem;
+    border-bottom: 2px solid #e9ecef;
 }
 </style>
 <div class="container-fluid" style="max-width: 1400px;">
@@ -694,10 +696,12 @@
                 const summary = document.createElement('div');
                 summary.className = 'card-summary';
                 summary.style.display = 'none';
-                title.appendChild(summary);
+                
+                // Insert summary after the title
+                title.parentNode.insertBefore(summary, title.nextSibling);
                 
                 title.addEventListener('click', function() {
-                    const content = this.nextElementSibling;
+                    const content = summary.nextElementSibling;
                     const card = this.closest('.book-form-card');
                     
                     if (content && content.classList.contains('card-content')) {
