@@ -163,6 +163,7 @@ class ImportOpenAudibleTest extends TestCase
             'series_name' => 'Epic Series',
             'series_sequence' => '2',
             'title_short' => 'Book Two',
+            'genre' => 'Fantasy:Epic',
         ]);
         $this->createBooksJson([$bookData]);
         $this->createTestAudioFile($bookData['files'][0]['path']);
@@ -174,8 +175,9 @@ class ImportOpenAudibleTest extends TestCase
 
         // Assert
         $book = Book::where('asin', $bookData['asin'])->first();
+        $this->assertStringContainsString('Fantasy', $book->directory_path);
         $this->assertStringContainsString('Epic Series', $book->directory_path);
-        $this->assertStringContainsString('02 - Book Two', $book->directory_path);
+        $this->assertStringContainsString('02 Book Two', $book->directory_path);
     }
 
     /** @test */

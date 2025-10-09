@@ -285,6 +285,13 @@ class ImportOpenAudible extends Command
 
     private function prepareDestinationDirectory(array $bookData): string
     {
+        // Extract genre (use first genre from hierarchy)
+        $genre = 'General Fiction'; // Default
+        if (!empty($bookData['genre'])) {
+            $genreParts = explode(':', $bookData['genre']);
+            $genre = $this->sanitizePath(trim($genreParts[0]));
+        }
+        
         $author = $this->sanitizePath($bookData['author'] ?? 'Unknown Author');
         $title = $this->sanitizePath($bookData['title_short'] ?? $bookData['title'] ?? 'Unknown Title');
         
@@ -293,14 +300,15 @@ class ImportOpenAudible extends Command
             $series = $this->sanitizePath($bookData['series_name']);
             $sequence = $bookData['series_sequence'] ?? '';
             
+            // Add sequence number prefix if available
             if ($sequence) {
-                $title = str_pad($sequence, 2, '0', STR_PAD_LEFT) . ' - ' . $title;
+                $title = str_pad($sequence, 2, '0', STR_PAD_LEFT) . ' ' . $title;
             }
             
-            return "{$author}/{$series}/{$title}";
+            return "{$genre}/{$author}/{$series}/{$title}";
         }
 
-        return "{$author}/{$title}";
+        return "{$genre}/{$author}/{$title}";
     }
 
     private function sanitizePath(string $path): string

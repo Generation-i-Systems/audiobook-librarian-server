@@ -86,16 +86,25 @@ php artisan books:import-openaudible --source=/path/to/OpenAudible
 ### Library Layout (After Import)
 ```
 /media/audiobooks/
-├── Author Name/
-│   ├── Book Title/
-│   │   ├── Book Title.m4b
-│   │   ├── Book Title.jpg
-│   │   └── Book Title.pdf
-│   └── Series Name/
-│       ├── 01 - First Book/
-│       │   └── 01 - First Book.m4b
-│       └── 02 - Second Book/
-│           └── 02 - Second Book.m4b
+├── Fantasy/
+│   └── Author Name/
+│       ├── Standalone Book/
+│       │   ├── Standalone Book.m4b
+│       │   ├── Standalone Book.jpg
+│       │   └── Standalone Book.pdf
+│       └── Series Name/
+│           ├── 01 First Book/
+│           │   └── 01 First Book.m4b
+│           └── 02 Second Book/
+│               └── 02 Second Book.m4b
+├── Science Fiction/
+│   └── Another Author/
+│       └── Book Title/
+│           └── Book Title.m4b
+└── LitRPG/
+    └── Author/
+        └── Series/
+            └── 01 Book One/
 ```
 
 ## Workflow
@@ -214,19 +223,32 @@ php artisan books:import-openaudible --limit=5 --dry-run
 | `abridged` | `abridged` | Boolean |
 | `files` | Copied to directory | Audio, images, PDFs |
 
-## Series Organization
+## Organization Pattern
 
-Books in a series are organized hierarchically:
+Books are organized following the existing library structure:
 
+### Standalone Books
 ```
-Author Name/
-└── Series Name/
-    ├── 01 - First Book/
-    ├── 02 - Second Book/
-    └── 03 - Third Book/
+Genre/Author/Title/
 ```
 
-Sequence numbers are zero-padded for proper sorting.
+Example:
+```
+General Fiction/Stephen King/The Stand/
+```
+
+### Series Books
+```
+Genre/Author/Series/## Title/
+```
+
+Example:
+```
+Fantasy/Brandon Sanderson/Mistborn/01 The Final Empire/
+Fantasy/Brandon Sanderson/Mistborn/02 The Well of Ascension/
+```
+
+Sequence numbers are zero-padded (01, 02, etc.) for proper sorting.
 
 ## Duplicate Handling
 
