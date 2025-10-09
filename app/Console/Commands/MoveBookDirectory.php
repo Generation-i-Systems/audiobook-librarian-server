@@ -61,6 +61,23 @@ class MoveBookDirectory extends Command
             return 1;
         }
 
+        // CRITICAL SAFETY: Validate database connection (unless --no-db)
+        if (!$noDb) {
+            try {
+                DB::connection()->getPdo();
+            } catch (\Exception $e) {
+                $this->error("Database connection failed: " . $e->getMessage());
+                $this->error("Use --no-db to skip database updates");
+                return 1;
+            }
+        }
+
+        // MINOR EDGE CASE: Validate book root is writable
+        if (!is_writable($this->bookRoot)) {
+            $this->error("Book root is not writable: {$this->bookRoot}");
+            return 1;
+        }
+
         // CRITICAL SAFETY: Prevent moving book root itself
         foreach ($sources as $source) {
             $absSource = realpath($source) ?: $source;
@@ -245,8 +262,33 @@ class MoveBookDirectory extends Command
      */
     private function normalizePath(string $path): string
     {
+        // MINOR EDGE CASE: Handle empty paths
+        if (empty(trim($path))) {
+            throw new \Exception("Path cannot be empty");
+        }
+        
+        // MINOR EDGE CASE: Trim whitespace
+        $path = trim($path);
+        
         // CRITICAL SAFETY: Remove null bytes (security)
         $path = str_replace("\0", '', $path);
+        
+        // MINOR EDGE CASE: Remove control characters
+        $path = preg_replace('/[\x00-\x1F\x7F]/', '', $path);
+        
+        // MINOR EDGE CASE: Normalize backslashes to forward slashes
+        $path = str_replace('\\', '/', $path);
+        
+        // MINOR EDGE CASE: Remove multiple consecutive slashes
+        $path = preg_replace('#/+#', '/', $path);
+        
+        // MINOR EDGE CASE: Remove trailing dots (Windows compatibility)
+        $path = rtrim($path, '.');
+        
+        // MINOR EDGE CASE: Reject paths that are just dots
+        if ($path === '.' || $path === '..') {
+            throw new \Exception("Invalid path: {$path}");
+        }
         
         // CRITICAL SAFETY: Detect directory traversal attempts
         if (strpos($path, '..') !== false) {
