@@ -598,38 +598,57 @@ class MySqlService implements DocumentStoreServiceInterface
     public function renameSeries(string $oldName, string $newName): int
     {
         try {
-            $count = 0;
-
-            // Find all books with the old series name
-            $books = Book::whereJsonContains('series', ['seriesName' => $oldName])->get();
-
-            foreach ($books as $book) {
-                $series = $book->series;
-                if (!is_array($series)) {
-                    $series = json_decode($series, true) ?: [];
-                }
-
-                $updated = false;
-                foreach ($series as &$seriesItem) {
-                    if (is_array($seriesItem)) {
-                        if (isset($seriesItem['seriesName']) && $seriesItem['seriesName'] === $oldName) {
-                            $seriesItem['seriesName'] = $newName;
-                            $updated = true;
-                        } elseif (isset($seriesItem['name']) && $seriesItem['name'] === $oldName) {
-                            $seriesItem['name'] = $newName;
-                            $updated = true;
-                        }
+            // Find the old series by name
+            $oldSeries = Series::where('name', $oldName)->first();
+            
+            if (!$oldSeries) {
+                return 0;
+            }
+            
+            // Check if new series already exists
+            $newSeries = Series::where('name', $newName)->first();
+            
+            if ($newSeries) {
+                // Merge: move all books from old series to new series
+                $books = $oldSeries->books;
+                $count = 0;
+                
+                foreach ($books as $book) {
+                    // Get the series number from the old series
+                    $seriesNumber = $book->series()
+                        ->where('series.id', $oldSeries->id)
+                        ->first()
+                        ->pivot
+                        ->series_number ?? null;
+                    
+                    // Detach from old series
+                    $book->series()->detach($oldSeries->id);
+                    
+                    // Attach to new series (if not already attached)
+                    if (!$book->series()->where('series.id', $newSeries->id)->exists()) {
+                        $book->series()->attach($newSeries->id, [
+                            'series_number' => $seriesNumber,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
                     }
-                }
-
-                if ($updated) {
-                    $book->series = $series;
-                    $book->save();
+                    
                     $count++;
                 }
+                
+                // Delete the old series if it has no more books
+                if ($oldSeries->books()->count() === 0) {
+                    $oldSeries->delete();
+                }
+                
+                return $count;
+            } else {
+                // Rename: just update the series name
+                $oldSeries->name = $newName;
+                $oldSeries->save();
+                
+                return $oldSeries->books()->count();
             }
-
-            return $count;
         } catch (\Exception $e) {
             Log::error('MySqlService renameSeries failed: ' . $e->getMessage());
             throw $e;
