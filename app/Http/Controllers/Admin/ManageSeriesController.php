@@ -118,7 +118,7 @@ class ManageSeriesController extends Controller
             // Get all books to merge
             $books = [];
             foreach ($bookIds as $bookId) {
-                $book = $this->documentStore->getBookById($bookId);
+                $book = $this->documentStore->getBook($bookId);
                 if ($book) {
                     $books[] = $book;
                 }
