@@ -638,14 +638,80 @@
             }
         });
         
-        // Collapsible card sections
+        // Collapsible card sections with summaries
         document.addEventListener('DOMContentLoaded', function() {
+            function generateSummary(card) {
+                const cardType = card.querySelector('.book-form-section-title').dataset.card;
+                
+                if (cardType === 'basic-info') {
+                    const title = document.getElementById('title')?.value || '';
+                    const authors = Array.from(document.querySelectorAll('#authors-group input[name="author[]"]'))
+                        .map(i => i.value).filter(v => v).join(' & ') || '';
+                    const narrators = Array.from(document.querySelectorAll('#narrators-group input[name="narrator[]"]'))
+                        .map(i => i.value).filter(v => v).join(' & ') || '';
+                    const series = Array.from(document.querySelectorAll('#series-group .series-row'))
+                        .map(row => {
+                            const name = row.querySelector('input[name*="[seriesName]"]')?.value || '';
+                            const num = row.querySelector('input[name*="[number]"]')?.value || '';
+                            return name ? (num ? `${num} in ${name}` : name) : '';
+                        }).filter(v => v).join(', ') || '';
+                    const genres = Array.from(document.querySelectorAll('#genres-group input[name="genre[]"]'))
+                        .map(i => i.value).filter(v => v).join(', ') || '';
+                    
+                    let summary = title;
+                    if (series) summary += ` (${series})`;
+                    if (authors) summary += ` by ${authors}`;
+                    if (narrators) summary += ` narrated by ${narrators}`;
+                    if (genres) summary += ` [${genres}]`;
+                    
+                    return summary || 'No information entered';
+                }
+                
+                if (cardType === 'additional-info') {
+                    const description = document.getElementById('description')?.value || '';
+                    const releaseDate = document.getElementById('release_date')?.value || '';
+                    
+                    let summary = '';
+                    if (releaseDate) summary += `Released: ${releaseDate}`;
+                    if (description) {
+                        const shortDesc = description.substring(0, 100) + (description.length > 100 ? '...' : '');
+                        summary += (summary ? ' | ' : '') + shortDesc;
+                    }
+                    
+                    return summary || 'No additional information';
+                }
+                
+                if (cardType === 'directory') {
+                    const path = document.getElementById('directoryPath')?.value || '';
+                    return path || 'No directory path set';
+                }
+                
+                return '';
+            }
+            
             document.querySelectorAll('.book-form-section-title').forEach(function(title) {
+                // Create summary element
+                const summary = document.createElement('div');
+                summary.className = 'card-summary';
+                summary.style.display = 'none';
+                title.appendChild(summary);
+                
                 title.addEventListener('click', function() {
                     const content = this.nextElementSibling;
+                    const card = this.closest('.book-form-card');
+                    
                     if (content && content.classList.contains('card-content')) {
-                        content.style.display = content.style.display === 'none' ? 'block' : 'none';
+                        const isCollapsing = content.style.display !== 'none';
+                        content.style.display = isCollapsing ? 'none' : 'block';
                         this.classList.toggle('collapsed');
+                        
+                        // Show/hide summary
+                        if (isCollapsing) {
+                            summary.textContent = generateSummary(card);
+                            summary.style.display = 'block';
+                        } else {
+                            summary.style.display = 'none';
+                        }
                     }
                 });
             });
