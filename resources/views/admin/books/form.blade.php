@@ -138,7 +138,7 @@
                 }
             }
         @endphp
-        <div class="d-flex justify-content-between align-items-start mb-3" style="gap: 20px;">
+        <div class="d-flex justify-content-between align-items-start" style="gap: 20px; margin-bottom: 20px;">
             <div>
                 <button type="button" class="btn btn-info" id="autofill-modal-btn"><i class="fas fa-magic me-2"></i>Autofill Book Metadata</button>
                 @if(isset($book))
