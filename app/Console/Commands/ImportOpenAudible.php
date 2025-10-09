@@ -22,6 +22,9 @@ class ImportOpenAudible extends Command
                             {--dry-run : Show what would be imported without making changes}
                             {--include-old : Also import books from books_old directory}
                             {--force : Reimport books that already exist}
+                            {--auto-replace : Automatically replace audio files for duplicates}
+                            {--auto-merge : Automatically merge files for duplicates}
+                            {--auto-skip : Automatically skip duplicates}
                             {--limit= : Limit number of books to import}';
 
     protected $description = 'Import books from OpenAudible with full metadata';
@@ -171,9 +174,17 @@ class ImportOpenAudible extends Command
             $existingBook = Book::where('title', $title)->first();
         }
 
-        if ($existingBook && !$force) {
-            $this->stats['skipped']++;
-            return;
+        // Handle existing books
+        $duplicateAction = null;
+        if ($existingBook) {
+            $duplicateAction = $this->handleDuplicateBook($existingBook, $bookData, $dryRun, $force);
+            
+            if ($duplicateAction === 'skip') {
+                $this->stats['skipped']++;
+                return;
+            }
+            
+            // Continue with replace or merge action
         }
 
         // Find audio file
@@ -213,7 +224,13 @@ class ImportOpenAudible extends Command
             }
 
             // Copy audio file and associated files
-            $copiedFiles = $this->copyBookFiles($audioFile, $destPath, $bookData, $source);
+            $copiedFiles = $this->copyBookFiles(
+                $audioFile,
+                $destPath,
+                $bookData,
+                $source,
+                $duplicateAction
+            );
             
             if (empty($copiedFiles)) {
                 throw new \Exception("Failed to copy any files");
@@ -245,6 +262,58 @@ class ImportOpenAudible extends Command
             
             throw $e;
         }
+    }
+
+    private function handleDuplicateBook(Book $existingBook, array $bookData, bool $dryRun, bool $force): string
+    {
+        // Check for auto-action flags
+        if ($this->option('auto-replace')) {
+            return 'replace';
+        }
+        
+        if ($this->option('auto-merge')) {
+            return 'merge';
+        }
+        
+        if ($this->option('auto-skip')) {
+            return 'skip';
+        }
+        
+        // If --force flag, default to replace
+        if ($force) {
+            return 'replace';
+        }
+        
+        // If dry-run, just report
+        if ($dryRun) {
+            return 'replace'; // Simulate replace in dry-run
+        }
+        
+        // Interactive prompt
+        $this->newLine();
+        $this->warn("Duplicate book found:");
+        $this->line("  Title: {$bookData['title']}");
+        $this->line("  Existing: {$existingBook->directory_path}");
+        $this->line("  ASIN: " . ($bookData['asin'] ?? 'N/A'));
+        $this->newLine();
+        
+        $choice = $this->choice(
+            'How would you like to handle this duplicate?',
+            [
+                'replace' => 'Replace - Delete old audio files, replace with new OpenAudible files',
+                'merge' => 'Merge - Keep old audio files, add new non-audio files (images, PDFs)',
+                'skip' => 'Skip - Leave existing book unchanged',
+                'manual' => 'Manual - Stop and let me fix it manually',
+            ],
+            'replace'
+        );
+        
+        if ($choice === 'manual') {
+            $this->error("Import paused. Please resolve manually and restart.");
+            exit(1);
+        }
+        
+        return $choice;
     }
 
     private function findAudioFile(array $bookData, string $source, bool $includeOld): ?string
@@ -329,21 +398,39 @@ class ImportOpenAudible extends Command
         return $path;
     }
 
-    private function copyBookFiles(string $audioFile, string $destPath, array $bookData, string $source): array
-    {
+    private function copyBookFiles(
+        string $audioFile,
+        string $destPath,
+        array $bookData,
+        string $source,
+        ?string $duplicateAction = null
+    ): array {
         $copiedFiles = [];
         
-        // Copy main audio file
+        // Handle audio files based on duplicate action
+        if ($duplicateAction === 'replace') {
+            // Delete existing audio files first
+            $existingAudioFiles = glob($destPath . '/*.{m4b,m4a,mp3}', GLOB_BRACE);
+            foreach ($existingAudioFiles as $existingFile) {
+                @unlink($existingFile);
+            }
+        }
+        
+        // Copy main audio file (skip if merge and audio already exists)
         $audioFilename = basename($audioFile);
         $destAudioFile = $destPath . '/' . $audioFilename;
         
-        if (!copy($audioFile, $destAudioFile)) {
-            throw new \Exception("Failed to copy audio file");
+        if ($duplicateAction === 'merge' && file_exists($destAudioFile)) {
+            // Skip audio file, keep existing
+            $this->line("  Keeping existing audio file: {$audioFilename}");
+        } else {
+            if (!copy($audioFile, $destAudioFile)) {
+                throw new \Exception("Failed to copy audio file");
+            }
+            $copiedFiles[] = $audioFilename;
         }
-        
-        $copiedFiles[] = $audioFilename;
 
-        // Copy associated files (cover image, PDFs, etc.)
+        // Copy associated files (cover image, PDFs, etc.) - always merge these
         if (!empty($bookData['files'])) {
             foreach ($bookData['files'] as $file) {
                 if ($file['kind'] === 'image' || $file['type'] === 'PDF') {
@@ -357,6 +444,7 @@ class ImportOpenAudible extends Command
                         $filename = basename($file['path']);
                         $destFile = $destPath . '/' . $filename;
                         
+                        // Always copy non-audio files (merge behavior)
                         if (@copy($srcFile, $destFile)) {
                             $copiedFiles[] = $filename;
                         }
