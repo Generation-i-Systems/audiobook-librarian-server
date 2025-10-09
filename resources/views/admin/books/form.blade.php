@@ -136,20 +136,18 @@
                 <i class="fas fa-chevron-down toggle-icon"></i>
             </h5>
             <div class="card-content">
-                <div class="row">
-                    <div class="col-md-8">
-                        <div class="mb-3">
-                            <label for="title" class="form-label">Title</label>
-                            <input type="text" class="form-control @error('title') is-invalid @enderror" id="title" name="title"
-                                value="{{ old('title') ?? request()->get('title') ?? ($book['title'] ?? null) ?? ($initial['title'] ?? '') }}" 
-                                placeholder="Enter book title" required>
-                            @error('title')
-                                <span class="invalid-feedback d-block">{{ $message }}</span>
-                            @enderror
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Authors</label>
+                <div class="mb-3">
+                    <label for="title" class="form-label">Title</label>
+                    <input type="text" class="form-control @error('title') is-invalid @enderror" id="title" name="title"
+                        value="{{ old('title') ?? request()->get('title') ?? ($book['title'] ?? null) ?? ($initial['title'] ?? '') }}" 
+                        placeholder="Enter book title" required>
+                    @error('title')
+                        <span class="invalid-feedback d-block">{{ $message }}</span>
+                    @enderror
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Authors</label>
                     <div id="authors-group">
                         @php
                             $authors = old('author') ?? (request()->get('author') ? [request()->get('author')] : null) ?? ($book['author'] ?? null) ?? ($initial['author'] ?? []);
@@ -185,18 +183,8 @@
                             </div>
                         @endforeach
                     </div>
-                    </div>
                 </div>
-            </div>
-        </div>
-
-        {{-- Narrators, Series & Genres Card --}}
-        <div class="book-form-card">
-            <h5 class="book-form-section-title" data-card="metadata">
-                <span><i class="fas fa-tags me-2"></i>Narrators, Series & Genres</span>
-                <i class="fas fa-chevron-down toggle-icon"></i>
-            </h5>
-            <div class="card-content">
+                
                 <div class="row">
                     <div class="col-md-6">
                         <label class="form-label">Narrators</label>
@@ -280,7 +268,7 @@
                     </div>
                 </div>
                 <div class="row mt-3">
-                    <div class="col-md-12">
+                    <div class="col-md-6">
                         <label class="form-label">Genres</label>
                     <div id="genres-group">
                         @php
@@ -316,11 +304,11 @@
                 </div>
             </div>
         </div>
-        </div>
-        {{-- Additional Metadata Card --}}
+
+        {{-- Directory & Files Card --}}
         <div class="book-form-card">
-            <h5 class="book-form-section-title" data-card="additional-info">
-                <span><i class="fas fa-info-circle me-2"></i>Additional Information</span>
+            <h5 class="book-form-section-title" data-card="directory">
+                <span><i class="fas fa-folder me-2"></i>Directory & Files</span>
                 <i class="fas fa-chevron-down toggle-icon"></i>
             </h5>
             <div class="card-content">
@@ -356,10 +344,10 @@
             </div>
         </div>
 
-        {{-- Directory & Files Card --}}
+        {{-- Additional Metadata Card --}}
         <div class="book-form-card">
-            <h5 class="book-form-section-title" data-card="directory">
-                <span><i class="fas fa-folder me-2"></i>Directory & Files</span>
+            <h5 class="book-form-section-title" data-card="additional-info">
+                <span><i class="fas fa-info-circle me-2"></i>Additional Information</span>
                 <i class="fas fa-chevron-down toggle-icon"></i>
             </h5>
             <div class="card-content">
