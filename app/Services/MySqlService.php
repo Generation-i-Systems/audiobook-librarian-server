@@ -388,6 +388,31 @@ class MySqlService implements DocumentStoreServiceInterface
         ];
     }
 
+    public function getAllBooks($limit = null, $offset = 0)
+    {
+        $query = Book::with(['authors', 'narrators', 'genres', 'series', 'chapters']);
+        
+        if ($limit !== null) {
+            $query->limit($limit)->offset($offset);
+        }
+        
+        return $query->get()->map(function ($book) {
+            $bookArray = $book->toArray();
+            $bookArray['_id'] = (string) $book->id;
+            
+            // Transform series to match MongoDB format
+            if (!empty($bookArray['series'])) {
+                $series = [];
+                foreach ($bookArray['series'] as $s) {
+                    $series[$s['name']] = $s['pivot']['series_number'] ?? null;
+                }
+                $bookArray['series'] = $series;
+            }
+            
+            return $bookArray;
+        })->toArray();
+    }
+
     public function dumpAllBooks()
     {
         // This is memory intensive, but matches the existing interface.
