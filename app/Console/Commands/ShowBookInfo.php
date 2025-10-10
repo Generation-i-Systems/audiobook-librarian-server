@@ -175,19 +175,24 @@ class ShowBookInfo extends Command
         }
 
         $maxWidth = $this->getTerminalWidth();
+
+        // If we have a cover image, reduce width for fields that will be covered
+        // Assume image takes about 30 columns on the right side
+        $shortWidth = $coverPath ? max($maxWidth - 35, 30) : $maxWidth;
+
         $tableData = [];
 
         $tableData[] = ['ID', $book->id];
-        $tableData[] = ['Title', $this->wrapText($book->title ?? 'N/A', $maxWidth)];
+        $tableData[] = ['Title', $this->wrapText($book->title ?? 'N/A', $shortWidth)];
 
         if ($book->authors()->count() > 0) {
             $authors = $book->authors()->pluck('name')->join(', ');
-            $tableData[] = ['Authors', $this->wrapText($authors, $maxWidth)];
+            $tableData[] = ['Authors', $this->wrapText($authors, $shortWidth)];
         }
 
         if ($book->narrators()->count() > 0) {
             $narrators = $book->narrators()->pluck('name')->join(', ');
-            $tableData[] = ['Narrators', $this->wrapText($narrators, $maxWidth)];
+            $tableData[] = ['Narrators', $this->wrapText($narrators, $shortWidth)];
         }
 
         if ($book->series()->count() > 0) {
@@ -195,15 +200,15 @@ class ShowBookInfo extends Command
                 $number = $series->pivot->series_number;
                 return "{$series->name}" . ($number ? " #{$number}" : '');
             })->join(', ');
-            $tableData[] = ['Series', $this->wrapText($seriesInfo, $maxWidth)];
+            $tableData[] = ['Series', $this->wrapText($seriesInfo, $shortWidth)];
         }
 
         if ($book->genres()->count() > 0) {
             $genres = $book->genres()->pluck('name')->join(', ');
-            $tableData[] = ['Genres', $this->wrapText($genres, $maxWidth)];
+            $tableData[] = ['Genres', $this->wrapText($genres, $shortWidth)];
         }
 
-        $tableData[] = ['Publisher', $this->wrapText($book->publisher ?? 'N/A', $maxWidth)];
+        $tableData[] = ['Publisher', $this->wrapText($book->publisher ?? 'N/A', $shortWidth)];
         $tableData[] = ['Release Date', $book->releaseDate?->format('Y-m-d') ?? 'N/A'];
         $tableData[] = ['Language', $book->language ?? 'N/A'];
 
@@ -220,13 +225,13 @@ class ShowBookInfo extends Command
 
         if ($book->needsReview) {
             $reasons = $book->needsReviewReasons ? implode(', ', $book->needsReviewReasons) : 'Unknown';
-            $tableData[] = ['Needs Review', $this->wrapText("Yes ({$reasons})", $maxWidth)];
+            $tableData[] = ['Needs Review', $this->wrapText("Yes ({$reasons})", $shortWidth)];
         }
 
         if ($book->description) {
             $description = strip_tags($book->description);
             $description = preg_replace('/\s+/', ' ', $description);
-            $tableData[] = ['Description', $this->wrapText(trim($description), $maxWidth)];
+            $tableData[] = ['Description', $this->wrapText(trim($description), $shortWidth)];
         }
 
         if ($book->audibleInfo) {
