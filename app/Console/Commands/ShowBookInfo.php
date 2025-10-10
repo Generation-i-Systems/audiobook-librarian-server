@@ -181,10 +181,19 @@ class ShowBookInfo extends Command
         $this->table(['Field', 'Value'], $tableData);
 
         if ($book->coverImage) {
-            $this->terminalImageService->displayImage(
-                $book->coverImage,
-                fn($msg) => $this->line($msg)
-            );
+            $coverPath = $book->coverImage;
+
+            if (!str_starts_with($coverPath, 'http')) {
+                $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
+                $coverPath = $bookRoot . '/' . ltrim($coverPath, '/');
+            }
+
+            if (file_exists($coverPath) || str_starts_with($book->coverImage, 'http')) {
+                $this->terminalImageService->displayImage(
+                    $coverPath,
+                    fn($msg) => $this->line($msg)
+                );
+            }
         }
     }
 
