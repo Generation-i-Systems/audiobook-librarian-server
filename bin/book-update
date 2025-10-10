@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+# Book Update - Wrapper for books:update command
+# This script can be symlinked to a common bin directory for easy access
+
+# Save the original working directory before any cd commands
+ORIGINAL_DIR="$(pwd)"
+
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Find the Laravel project root (parent of bin directory)
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Resolve the directory argument to absolute path
+DIR_ARG=""
+if [ -n "$1" ] && [[ "$1" != -* ]]; then
+    if [[ "$1" == /* ]]; then
+        # Already absolute
+        DIR_ARG="$1"
+    else
+        # Relative path - resolve it now
+        RESOLVED_PATH="$(cd "$ORIGINAL_DIR" && cd "$1" 2>/dev/null && pwd)"
+        if [ -n "$RESOLVED_PATH" ]; then
+            DIR_ARG="$RESOLVED_PATH"
+        else
+            DIR_ARG="$1"
+        fi
+    fi
+    shift
+fi
+
+# If no directory provided, use current directory
+if [ -z "$DIR_ARG" ]; then
+    DIR_ARG="$ORIGINAL_DIR"
+fi
+
+# Change to project directory
+cd "$PROJECT_ROOT" || exit 1
+
+# Pass directory and all options to the artisan command
+php artisan books:update "$DIR_ARG" "$@"
