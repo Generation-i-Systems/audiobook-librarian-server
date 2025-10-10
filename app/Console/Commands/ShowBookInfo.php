@@ -8,7 +8,7 @@ use Illuminate\Console\Command;
 
 class ShowBookInfo extends Command
 {
-    protected $signature = 'books:show {directories?*} {--current : Use current directory}';
+    protected $signature = 'books:show {directories?*}';
 
     protected $description = 'Display book information from database with terminal graphics';
 
@@ -22,7 +22,7 @@ class ShowBookInfo extends Command
     {
         $directories = $this->argument('directories');
 
-        if (empty($directories) || $this->option('current')) {
+        if (empty($directories)) {
             $directories = [getcwd()];
         }
 

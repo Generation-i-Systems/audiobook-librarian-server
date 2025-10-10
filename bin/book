@@ -17,7 +17,7 @@ cd "$PROJECT_ROOT" || exit 1
 
 # If no arguments provided, use the saved original working directory
 if [ $# -eq 0 ]; then
-    php artisan books:show "$ORIGINAL_DIR" --current
+    php artisan books:show "$ORIGINAL_DIR"
 else
     # Pass all arguments to the artisan command
     php artisan books:show "$@"
