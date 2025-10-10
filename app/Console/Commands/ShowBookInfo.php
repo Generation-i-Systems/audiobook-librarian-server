@@ -221,6 +221,9 @@ class ShowBookInfo extends Command
             $this->terminalImageService->displayImage($coverPath, function ($msg) {
                 // Silent - image will overlay the table
             }, 'right');
+
+            // Move cursor back down to bottom after image
+            echo "\033[{$tableRows}B"; // Move cursor down to restore position
         }
     }
 
