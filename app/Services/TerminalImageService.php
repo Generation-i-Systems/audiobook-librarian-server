@@ -78,7 +78,7 @@ class TerminalImageService
                 imagedestroy($thumb);
 
                 if (file_exists('/usr/bin/kitten') && is_executable('/usr/bin/kitten')) {
-                    system("kitten icat --align=left '$tempFile' 2>/dev/null");
+                    system("kitten icat --align=left '$tempFile'");
                 } else {
                     $base64Image = base64_encode(file_get_contents($tempFile));
                     fwrite(STDOUT, "\033_Ga=T,f=100;{$base64Image}\033\\");

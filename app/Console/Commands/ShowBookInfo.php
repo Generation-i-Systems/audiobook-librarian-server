@@ -215,9 +215,16 @@ class ShowBookInfo extends Command
         $termWidth = 80;
         if (function_exists('exec')) {
             $output = [];
-            @exec('tput cols 2>/dev/null', $output);
+            @exec('tput cols 2>&1 < /dev/tty', $output);
             if (!empty($output[0]) && is_numeric($output[0])) {
                 $termWidth = (int) $output[0];
+            }
+        }
+
+        if ($termWidth === 80 && function_exists('getenv')) {
+            $columns = getenv('COLUMNS');
+            if ($columns && is_numeric($columns)) {
+                $termWidth = (int) $columns;
             }
         }
 
@@ -333,9 +340,16 @@ class ShowBookInfo extends Command
 
         if (function_exists('exec')) {
             $output = [];
-            @exec('tput cols 2>/dev/null', $output);
+            @exec('tput cols 2>&1 < /dev/tty', $output);
             if (!empty($output[0]) && is_numeric($output[0])) {
                 $width = (int) $output[0];
+            }
+        }
+
+        if ($width === 80 && function_exists('getenv')) {
+            $columns = getenv('COLUMNS');
+            if ($columns && is_numeric($columns)) {
+                $width = (int) $columns;
             }
         }
 
