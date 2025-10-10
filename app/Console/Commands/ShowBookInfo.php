@@ -115,33 +115,12 @@ class ShowBookInfo extends Command
 
     protected function displayTableInfo(Book $book): void
     {
-        $hasCoverImage = false;
-        $coverPath = null;
-
-        if ($book->coverImage) {
-            $coverPath = $book->coverImage;
-
-            if (!str_starts_with($coverPath, 'http')) {
-                $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
-                $coverPath = $bookRoot . '/' . ltrim($coverPath, '/');
-            }
-
-            if (file_exists($coverPath) || str_starts_with($book->coverImage, 'http')) {
-                $hasCoverImage = true;
-                $this->terminalImageService->displayImage(
-                    $coverPath,
-                    fn($msg) => $this->line($msg)
-                );
-                $this->newLine();
-            }
-        }
-
         $this->info("═══════════════════════════════════════════════════════════════");
         $this->info("  BOOK INFORMATION");
         $this->info("═══════════════════════════════════════════════════════════════");
         $this->newLine();
 
-        $maxWidth = $hasCoverImage ? max($this->getTerminalWidth() - 30, 30) : $this->getTerminalWidth();
+        $maxWidth = $this->getTerminalWidth();
         $tableData = [];
 
         $tableData[] = ['ID', $book->id];
@@ -212,6 +191,23 @@ class ShowBookInfo extends Command
         $tableData[] = ['Updated', $book->updatedAt?->format('Y-m-d H:i:s') ?? 'N/A'];
 
         $this->table(['Field', 'Value'], $tableData);
+
+        if ($book->coverImage) {
+            $coverPath = $book->coverImage;
+
+            if (!str_starts_with($coverPath, 'http')) {
+                $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
+                $coverPath = $bookRoot . '/' . ltrim($coverPath, '/');
+            }
+
+            if (file_exists($coverPath) || str_starts_with($book->coverImage, 'http')) {
+                $this->newLine();
+                $this->terminalImageService->displayImage(
+                    $coverPath,
+                    fn($msg) => $this->line($msg)
+                );
+            }
+        }
     }
 
     protected function displayCompactInfo(Book $book): void
