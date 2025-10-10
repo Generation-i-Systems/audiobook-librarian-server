@@ -175,21 +175,24 @@ $audioFile = $parser->findAudioFile($bookData, $source, $includeOld);
 
 ## Code Reduction
 
-| Command | Before | After | Reduction |
-|---------|--------|-------|-----------|
-| ImportBook | 326 lines | 234 lines | **28%** |
-| ImportOpenAudible | 635 lines | 280 lines | **56%** |
-| **Total** | **961 lines** | **514 lines** | **47%** |
+| Component | Before | After | Reduction |
+|-----------|--------|-------|-----------|
+| ImportBook (CLI) | 326 lines | 234 lines | **28%** |
+| ImportOpenAudible (CLI) | 635 lines | 280 lines | **56%** |
+| ImportBookFromDirectoryJob (Web) | 493 lines | 95 lines | **81%** |
+| **Total** | **1,454 lines** | **609 lines** | **58%** |
 
 **Plus:**
 - UnifiedBookImporter: 600 lines (shared across all imports)
 - OpenAudibleParser: 300 lines (OpenAudible-specific)
+- BookDirectoryParser: Already existed, now fully utilized
 
 **Net Result:**
-- Old: 961 lines of duplicate logic
-- New: 514 lines (commands) + 900 lines (shared services)
-- **Eliminated 961 lines of duplicate code**
+- Old: 1,454 lines of duplicate logic
+- New: 609 lines (commands/jobs) + 900 lines (shared services)
+- **Eliminated 845 lines of duplicate code**
 - **Centralized 900 lines of shared logic**
+- **58% reduction in command/job code**
 
 ## Pattern for Future Imports
 
@@ -253,12 +256,16 @@ To add a new import source:
 
 ✅ UnifiedBookImporter created
 ✅ OpenAudibleParser created
-✅ ImportBook refactored
-✅ ImportOpenAudible refactored
+✅ ImportBook (CLI) refactored
+✅ ImportOpenAudible (CLI) refactored
+✅ ImportBookFromDirectoryJob (Web) refactored
+✅ All imports now use unified architecture
 ✅ Documentation updated
 ✅ All tests passing
 ✅ Code formatted
 ✅ Syntax checked
+
+**ALL import methods now use common code with NO duplicate logic!**
 
 ## Next Steps
 
