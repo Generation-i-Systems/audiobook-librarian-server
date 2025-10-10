@@ -952,6 +952,31 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
 </div>
 
+{{-- Audio Metadata Modal --}}
+<div class="modal fade" id="audioMetadataModal" tabindex="-1" aria-labelledby="audioMetadataModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="audioMetadataModalLabel">Audio File Metadata</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="metadata-content">
+                    <div class="text-center p-4">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Loading metadata...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @push('scripts')
 <script>
 // Accessibility fix for autofillModal: Remove aria-hidden if set while modal is open and focused
@@ -998,6 +1023,7 @@ document.addEventListener('DOMContentLoaded', function() {
         googleBooks: "{{ route('admin.books.googleBooks') }}",
         audible: "{{ route('admin.books.audible') }}",
         filesAjax: "{{ route('admin.books.filesAjax') }}",
+        audioMetadata: "{{ route('admin.books.audioMetadata') }}",
         authorsAutocomplete: "{{ route('admin.books.autocomplete.authors') }}",
         seriesAutocomplete: "{{ route('admin.books.autocomplete.series') }}",
         narratorsAutocomplete: "{{ route('admin.books.autocomplete.narrators') }}",

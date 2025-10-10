@@ -505,8 +505,10 @@ function loadDirectoryFiles($container) {
                     // Choose icon based on file type
                     let icon = 'fa-file';
                     let isImage = false;
+                    let isAudio = false;
                     if (['mp3', 'm4b', 'm4a', 'aac', 'flac', 'ogg', 'wav'].includes(ext.toLowerCase())) {
                         icon = 'fa-file-audio text-primary';
+                        isAudio = true;
                     } else if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext.toLowerCase())) {
                         icon = 'fa-file-image text-success';
                         isImage = true;
@@ -525,9 +527,14 @@ function loadDirectoryFiles($container) {
                         html += ' <small class="text-muted">(click to set as cover)</small>';
                     }
                     html += '</span>';
+                    html += '<span class="d-flex align-items-center gap-2">';
                     if (size) {
                         html += '<span class="text-muted">' + size + '</span>';
                     }
+                    if (isAudio) {
+                        html += '<a href="#" class="btn btn-sm btn-outline-primary view-metadata" data-file="' + dirPath + '/' + filename + '" title="View Metadata"><i class="fas fa-info-circle"></i></a>';
+                    }
+                    html += '</span>';
                     html += '</div>';
                 });
                 html += "</div>";
@@ -1756,5 +1763,126 @@ $(document).on('click', '#resync-path-btn', function() {
         }
     });
 });
+
+// Handle metadata button clicks
+$(document).on('click', '.view-metadata', function(e) {
+    e.preventDefault();
+    const filePath = $(this).data('file');
+    const modal = new bootstrap.Modal(document.getElementById('audioMetadataModal'));
+    const metadataContent = $('#metadata-content');
+    
+    // Show loading state
+    metadataContent.html(`
+        <div class="text-center p-4">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2 text-muted">Loading metadata...</p>
+        </div>
+    `);
+    
+    modal.show();
+    
+    // Fetch metadata
+    $.ajax({
+        url: window.BOOK_FORM_ROUTES.audioMetadata || '/admin/books/audio-metadata',
+        method: 'GET',
+        data: { file: filePath },
+        success: function(response) {
+            if (response.success && response.metadata) {
+                displayMetadata(response.metadata, response.file);
+            } else {
+                metadataContent.html(`
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Failed to load metadata
+                    </div>
+                `);
+            }
+        },
+        error: function(xhr) {
+            const error = xhr.responseJSON?.error || 'Unknown error';
+            metadataContent.html(`
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Error: ${error}
+                </div>
+            `);
+        }
+    });
+});
+
+function displayMetadata(metadata, filename) {
+    let html = '<div class="metadata-display">';
+    
+    // File info
+    if (metadata.file) {
+        html += '<h6 class="border-bottom pb-2 mb-3"><i class="fas fa-file me-2"></i>File Information</h6>';
+        html += '<table class="table table-sm table-bordered mb-4">';
+        html += '<tr><th style="width: 30%">Filename</th><td>' + filename + '</td></tr>';
+        if (metadata.file.size_formatted) {
+            html += '<tr><th>Size</th><td>' + metadata.file.size_formatted + '</td></tr>';
+        }
+        if (metadata.file.modified) {
+            html += '<tr><th>Modified</th><td>' + metadata.file.modified + '</td></tr>';
+        }
+        if (metadata.file.extension) {
+            html += '<tr><th>Extension</th><td>' + metadata.file.extension.toUpperCase() + '</td></tr>';
+        }
+        html += '</table>';
+    }
+    
+    // Format info
+    if (metadata.format) {
+        html += '<h6 class="border-bottom pb-2 mb-3"><i class="fas fa-info-circle me-2"></i>Format Information</h6>';
+        html += '<table class="table table-sm table-bordered mb-4">';
+        if (metadata.format.format_long_name) {
+            html += '<tr><th style="width: 30%">Format</th><td>' + metadata.format.format_long_name + '</td></tr>';
+        }
+        if (metadata.format.duration_formatted) {
+            html += '<tr><th>Duration</th><td>' + metadata.format.duration_formatted + '</td></tr>';
+        }
+        if (metadata.format.bit_rate_formatted) {
+            html += '<tr><th>Bit Rate</th><td>' + metadata.format.bit_rate_formatted + '</td></tr>';
+        }
+        html += '</table>';
+    }
+    
+    // Stream info
+    if (metadata.streams && metadata.streams.length > 0) {
+        html += '<h6 class="border-bottom pb-2 mb-3"><i class="fas fa-stream me-2"></i>Audio Streams</h6>';
+        metadata.streams.forEach(function(stream, index) {
+            html += '<table class="table table-sm table-bordered mb-3">';
+            html += '<tr><th colspan="2" class="bg-light">Stream ' + (index + 1) + '</th></tr>';
+            if (stream.codec_long_name) {
+                html += '<tr><th style="width: 30%">Codec</th><td>' + stream.codec_long_name + '</td></tr>';
+            }
+            if (stream.sample_rate_formatted) {
+                html += '<tr><th>Sample Rate</th><td>' + stream.sample_rate_formatted + '</td></tr>';
+            }
+            if (stream.channels) {
+                html += '<tr><th>Channels</th><td>' + stream.channels + (stream.channel_layout ? ' (' + stream.channel_layout + ')' : '') + '</td></tr>';
+            }
+            if (stream.bit_rate_formatted) {
+                html += '<tr><th>Bit Rate</th><td>' + stream.bit_rate_formatted + '</td></tr>';
+            }
+            html += '</table>';
+        });
+    }
+    
+    // Tags
+    if (metadata.tags && Object.keys(metadata.tags).length > 0) {
+        html += '<h6 class="border-bottom pb-2 mb-3"><i class="fas fa-tags me-2"></i>Metadata Tags</h6>';
+        html += '<table class="table table-sm table-bordered mb-3">';
+        Object.keys(metadata.tags).forEach(function(key) {
+            const displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            html += '<tr><th style="width: 30%">' + displayKey + '</th><td>' + metadata.tags[key] + '</td></tr>';
+        });
+        html += '</table>';
+    }
+    
+    html += '</div>';
+    $('#metadata-content').html(html);
+}
 
 console.log("Form JS loaded 6");
