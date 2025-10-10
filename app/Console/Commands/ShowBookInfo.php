@@ -228,77 +228,9 @@ class ShowBookInfo extends Command
             }
         }
 
-        $maxWidth = max($termWidth - 5, 40);
-
-        $this->line("<fg=cyan>━━━ BOOK INFO ━━━</>");
-        $this->newLine();
-
-        $this->printField('ID', $book->id, $maxWidth);
-        $this->printField('Title', $book->title ?? 'N/A', $maxWidth);
-
-        if ($book->authors()->count() > 0) {
-            $authors = $book->authors()->pluck('name')->join(', ');
-            $this->printField('Authors', $authors, $maxWidth);
-        }
-
-        if ($book->narrators()->count() > 0) {
-            $narrators = $book->narrators()->pluck('name')->join(', ');
-            $this->printField('Narrators', $narrators, $maxWidth);
-        }
-
-        if ($book->series()->count() > 0) {
-            $seriesInfo = $book->series()->get()->map(function ($series) {
-                $number = $series->pivot->series_number;
-                return "{$series->name}" . ($number ? " #{$number}" : '');
-            })->join(', ');
-            $this->printField('Series', $seriesInfo, $maxWidth);
-        }
-
-        if ($book->genres()->count() > 0) {
-            $genres = $book->genres()->pluck('name')->join(', ');
-            $this->printField('Genres', $genres, $maxWidth);
-        }
-
-        $this->printField('Publisher', $book->publisher ?? 'N/A', $maxWidth);
-        $this->printField('Release Date', $book->releaseDate?->format('Y-m-d') ?? 'N/A', $maxWidth);
-        $this->printField('Language', $book->language ?? 'N/A', $maxWidth);
-
-        if ($book->duration) {
-            $hours = floor($book->duration / 3600);
-            $minutes = floor(($book->duration % 3600) / 60);
-            $durationStr = "{$hours}h {$minutes}m";
-            $this->printField('Duration', $durationStr, $maxWidth);
-        }
-
-        $this->printField('Audio Files', $book->audioFileCount ?? 0, $maxWidth);
-        $this->printField('Source', $book->source ?? 'N/A', $maxWidth);
-        $this->printField('Directory', $book->directoryPath ?? 'N/A', $maxWidth);
-
-        if ($book->needsReview) {
-            $reasons = $book->needsReviewReasons ? implode(', ', $book->needsReviewReasons) : 'Unknown';
-            $this->printField('Needs Review', "Yes ({$reasons})", $maxWidth);
-        }
-
-        if ($book->description) {
-            $description = strip_tags($book->description);
-            $description = preg_replace('/\s+/', ' ', $description);
-            $this->printField('Description', trim($description), $maxWidth);
-        }
-
-        if ($book->audibleInfo) {
-            $this->printField('Audible ASIN', $book->audibleInfo['asin'] ?? 'N/A', $maxWidth);
-        }
-
-        if ($book->googleBooksInfo) {
-            $this->printField('Google Books ID', $book->googleBooksInfo['id'] ?? 'N/A', $maxWidth);
-        }
-
-        if ($book->hardcoverInfo) {
-            $this->printField('Hardcover ID', $book->hardcoverInfo['id'] ?? 'N/A', $maxWidth);
-        }
-
-        $this->printField('Created', $book->createdAt?->format('Y-m-d H:i:s') ?? 'N/A', $maxWidth);
-        $this->printField('Updated', $book->updatedAt?->format('Y-m-d H:i:s') ?? 'N/A', $maxWidth);
+        $hasCoverImage = false;
+        $coverPath = null;
+        $imageHeight = 0;
 
         if ($book->coverImage) {
             $coverPath = $book->coverImage;
@@ -309,12 +241,110 @@ class ShowBookInfo extends Command
             }
 
             if (file_exists($coverPath) || str_starts_with($book->coverImage, 'http')) {
-                $this->newLine();
-                $this->terminalImageService->displayImage(
-                    $coverPath,
-                    fn($msg) => $this->line($msg)
-                );
+                $hasCoverImage = true;
+                $imageHeight = 15;
             }
+        }
+
+        $leftWidth = $hasCoverImage ? max($termWidth - 35, 40) : max($termWidth - 5, 40);
+
+        $this->line("<fg=cyan>═══════════════════════════════════════════════════════════════</>");
+        $this->line("<fg=cyan>  BOOK INFORMATION</>");
+        $this->line("<fg=cyan>═══════════════════════════════════════════════════════════════</>");
+        $this->newLine();
+
+        $fieldsCount = 0;
+
+        $this->printField('ID', $book->id, $leftWidth);
+        $fieldsCount++;
+
+        $this->printField('Title', $book->title ?? 'N/A', $leftWidth);
+        $fieldsCount++;
+
+        if ($book->authors()->count() > 0) {
+            $authors = $book->authors()->pluck('name')->join(', ');
+            $this->printField('Authors', $authors, $leftWidth);
+            $fieldsCount++;
+        }
+
+        if ($book->narrators()->count() > 0) {
+            $narrators = $book->narrators()->pluck('name')->join(', ');
+            $this->printField('Narrators', $narrators, $leftWidth);
+            $fieldsCount++;
+        }
+
+        if ($book->series()->count() > 0) {
+            $seriesInfo = $book->series()->get()->map(function ($series) {
+                $number = $series->pivot->series_number;
+                return "{$series->name}" . ($number ? " #{$number}" : '');
+            })->join(', ');
+            $this->printField('Series', $seriesInfo, $leftWidth);
+            $fieldsCount++;
+        }
+
+        if ($book->genres()->count() > 0) {
+            $genres = $book->genres()->pluck('name')->join(', ');
+            $this->printField('Genres', $genres, $leftWidth);
+            $fieldsCount++;
+        }
+
+        $this->printField('Publisher', $book->publisher ?? 'N/A', $leftWidth);
+        $fieldsCount++;
+
+        $this->printField('Release Date', $book->releaseDate?->format('Y-m-d') ?? 'N/A', $leftWidth);
+        $fieldsCount++;
+
+        $this->printField('Language', $book->language ?? 'N/A', $leftWidth);
+        $fieldsCount++;
+
+        if ($book->duration) {
+            $hours = floor($book->duration / 3600);
+            $minutes = floor(($book->duration % 3600) / 60);
+            $durationStr = "{$hours}h {$minutes}m";
+            $this->printField('Duration', $durationStr, $leftWidth);
+            $fieldsCount++;
+        }
+
+        $this->printField('Audio Files', $book->audioFileCount ?? 0, $leftWidth);
+        $fieldsCount++;
+
+        $this->printField('Source', $book->source ?? 'N/A', $leftWidth);
+        $fieldsCount++;
+
+        if ($hasCoverImage && $fieldsCount >= $imageHeight) {
+            $this->displayImageInline($coverPath);
+        }
+
+        $this->printField('Directory', $book->directoryPath ?? 'N/A', $leftWidth);
+
+        if ($book->needsReview) {
+            $reasons = $book->needsReviewReasons ? implode(', ', $book->needsReviewReasons) : 'Unknown';
+            $this->printField('Needs Review', "Yes ({$reasons})", $leftWidth);
+        }
+
+        if ($book->description) {
+            $description = strip_tags($book->description);
+            $description = preg_replace('/\s+/', ' ', $description);
+            $this->printField('Description', trim($description), $leftWidth);
+        }
+
+        if ($book->audibleInfo) {
+            $this->printField('Audible ASIN', $book->audibleInfo['asin'] ?? 'N/A', $leftWidth);
+        }
+
+        if ($book->googleBooksInfo) {
+            $this->printField('Google Books ID', $book->googleBooksInfo['id'] ?? 'N/A', $leftWidth);
+        }
+
+        if ($book->hardcoverInfo) {
+            $this->printField('Hardcover ID', $book->hardcoverInfo['id'] ?? 'N/A', $leftWidth);
+        }
+
+        $this->printField('Created', $book->createdAt?->format('Y-m-d H:i:s') ?? 'N/A', $leftWidth);
+        $this->printField('Updated', $book->updatedAt?->format('Y-m-d H:i:s') ?? 'N/A', $leftWidth);
+
+        if ($hasCoverImage && $fieldsCount < $imageHeight) {
+            $this->displayImageInline($coverPath);
         }
     }
 
@@ -332,6 +362,16 @@ class ShowBookInfo extends Command
             $padding = str_repeat(' ', $labelLength);
             $this->line("{$padding}{$lines[$i]}");
         }
+    }
+
+    protected function displayImageInline(string $coverPath): void
+    {
+        $this->newLine();
+        $this->terminalImageService->displayImage(
+            $coverPath,
+            fn($msg) => $this->line($msg)
+        );
+        $this->newLine();
     }
 
     protected function getTerminalWidth(): int
