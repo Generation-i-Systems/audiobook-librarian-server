@@ -9,6 +9,11 @@
       <exclude>./tests/Feature/Api/BaseApiTest.php</exclude>
     </testsuite>
   </testsuites>
+  <groups>
+    <exclude>
+      <group>slow</group>
+    </exclude>
+  </groups>
   <coverage includeUncoveredFiles="true">
     <report>
       <html outputDirectory="tests/coverage"/>
