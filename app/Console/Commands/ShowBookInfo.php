@@ -44,14 +44,27 @@ class ShowBookInfo extends Command
     {
         $book = Book::where('directory_path', $directory)->first();
 
-        if (!$book) {
-            $this->error("No book found in database for directory: {$directory}");
+        if ($book) {
+            $this->displayBookInfo($book);
             $this->newLine();
             return;
         }
 
-        $this->displayBookInfo($book);
+        $books = Book::where('directory_path', 'LIKE', $directory . '/%')->get();
+
+        if ($books->isEmpty()) {
+            $this->error("No books found in database for directory: {$directory}");
+            $this->newLine();
+            return;
+        }
+
+        $this->info("Found {$books->count()} book(s) in subdirectories of: {$directory}");
         $this->newLine();
+
+        foreach ($books as $book) {
+            $this->displayBookInfo($book);
+            $this->newLine();
+        }
     }
 
     protected function displayBookInfo(Book $book): void
