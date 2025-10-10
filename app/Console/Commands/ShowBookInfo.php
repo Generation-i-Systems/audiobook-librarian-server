@@ -184,24 +184,32 @@ class ShowBookInfo extends Command
         $imageHeightLines = 13; // Number of table data rows the image will cover
 
         $tableData = [];
-        $currentRow = 0;
+        $tableRows = 0; // Count actual table rows for cursor positioning
+        $displayRow = 0; // Count display lines including wrapped text for determining short/full width
 
         $tableData[] = ['ID', $book->id];
-        $currentRow++;
+        $tableRows++;
+        $displayRow++;
 
-        $tableData[] = ['Title', $this->wrapText($book->title ?? 'N/A', $currentRow < $imageHeightLines ? $shortWidth : $maxWidth)];
-        $currentRow += $this->countWrappedLines($book->title ?? 'N/A', $currentRow < $imageHeightLines ? $shortWidth : $maxWidth);
+        $titleWidth = $displayRow < $imageHeightLines ? $shortWidth : $maxWidth;
+        $tableData[] = ['Title', $this->wrapText($book->title ?? 'N/A', $titleWidth)];
+        $tableRows++;
+        $displayRow += $this->countWrappedLines($book->title ?? 'N/A', $titleWidth);
 
         if ($book->authors()->count() > 0) {
             $authors = $book->authors()->pluck('name')->join(', ');
-            $tableData[] = ['Authors', $this->wrapText($authors, $currentRow < $imageHeightLines ? $shortWidth : $maxWidth)];
-            $currentRow += $this->countWrappedLines($authors, $currentRow < $imageHeightLines ? $shortWidth : $maxWidth);
+            $authorsWidth = $displayRow < $imageHeightLines ? $shortWidth : $maxWidth;
+            $tableData[] = ['Authors', $this->wrapText($authors, $authorsWidth)];
+            $tableRows++;
+            $displayRow += $this->countWrappedLines($authors, $authorsWidth);
         }
 
         if ($book->narrators()->count() > 0) {
             $narrators = $book->narrators()->pluck('name')->join(', ');
-            $tableData[] = ['Narrators', $this->wrapText($narrators, $currentRow < $imageHeightLines ? $shortWidth : $maxWidth)];
-            $currentRow += $this->countWrappedLines($narrators, $currentRow < $imageHeightLines ? $shortWidth : $maxWidth);
+            $narratorsWidth = $displayRow < $imageHeightLines ? $shortWidth : $maxWidth;
+            $tableData[] = ['Narrators', $this->wrapText($narrators, $narratorsWidth)];
+            $tableRows++;
+            $displayRow += $this->countWrappedLines($narrators, $narratorsWidth);
         }
 
         if ($book->series()->count() > 0) {
@@ -209,77 +217,99 @@ class ShowBookInfo extends Command
                 $number = $series->pivot->series_number;
                 return "{$series->name}" . ($number ? " #{$number}" : '');
             })->join(', ');
-            $tableData[] = ['Series', $this->wrapText($seriesInfo, $currentRow < $imageHeightLines ? $shortWidth : $maxWidth)];
-            $currentRow += $this->countWrappedLines($seriesInfo, $currentRow < $imageHeightLines ? $shortWidth : $maxWidth);
+            $seriesWidth = $displayRow < $imageHeightLines ? $shortWidth : $maxWidth;
+            $tableData[] = ['Series', $this->wrapText($seriesInfo, $seriesWidth)];
+            $tableRows++;
+            $displayRow += $this->countWrappedLines($seriesInfo, $seriesWidth);
         }
 
         if ($book->genres()->count() > 0) {
             $genres = $book->genres()->pluck('name')->join(', ');
-            $tableData[] = ['Genres', $this->wrapText($genres, $currentRow < $imageHeightLines ? $shortWidth : $maxWidth)];
-            $currentRow += $this->countWrappedLines($genres, $currentRow < $imageHeightLines ? $shortWidth : $maxWidth);
+            $genresWidth = $displayRow < $imageHeightLines ? $shortWidth : $maxWidth;
+            $tableData[] = ['Genres', $this->wrapText($genres, $genresWidth)];
+            $tableRows++;
+            $displayRow += $this->countWrappedLines($genres, $genresWidth);
         }
 
-        $tableData[] = ['Publisher', $this->wrapText($book->publisher ?? 'N/A', $currentRow < $imageHeightLines ? $shortWidth : $maxWidth)];
-        $currentRow += $this->countWrappedLines($book->publisher ?? 'N/A', $currentRow < $imageHeightLines ? $shortWidth : $maxWidth);
+        $publisherWidth = $displayRow < $imageHeightLines ? $shortWidth : $maxWidth;
+        $tableData[] = ['Publisher', $this->wrapText($book->publisher ?? 'N/A', $publisherWidth)];
+        $tableRows++;
+        $displayRow += $this->countWrappedLines($book->publisher ?? 'N/A', $publisherWidth);
 
         $tableData[] = ['Release Date', $book->releaseDate?->format('Y-m-d') ?? 'N/A'];
-        $currentRow++;
+        $tableRows++;
+        $displayRow++;
 
         $tableData[] = ['Language', $book->language ?? 'N/A'];
-        $currentRow++;
+        $tableRows++;
+        $displayRow++;
 
         if ($book->duration) {
             $hours = floor($book->duration / 3600);
             $minutes = floor(($book->duration % 3600) / 60);
             $durationStr = "{$hours}h {$minutes}m";
             $tableData[] = ['Duration', $durationStr];
-            $currentRow++;
+            $tableRows++;
+            $displayRow++;
         }
 
         $tableData[] = ['Audio Files', $book->audioFileCount ?? 0];
-        $currentRow++;
+        $tableRows++;
+        $displayRow++;
 
         $tableData[] = ['Source', $book->source ?? 'N/A'];
-        $currentRow++;
+        $tableRows++;
+        $displayRow++;
 
-        $tableData[] = ['Directory', $this->wrapText($book->directoryPath ?? 'N/A', $currentRow < $imageHeightLines ? $shortWidth : $maxWidth)];
-        $currentRow += $this->countWrappedLines($book->directoryPath ?? 'N/A', $currentRow < $imageHeightLines ? $shortWidth : $maxWidth);
+        $directoryWidth = $displayRow < $imageHeightLines ? $shortWidth : $maxWidth;
+        $tableData[] = ['Directory', $this->wrapText($book->directoryPath ?? 'N/A', $directoryWidth)];
+        $tableRows++;
+        $displayRow += $this->countWrappedLines($book->directoryPath ?? 'N/A', $directoryWidth);
 
         if ($book->needsReview) {
             $reasons = $book->needsReviewReasons ? implode(', ', $book->needsReviewReasons) : 'Unknown';
             $needsReviewText = "Yes ({$reasons})";
-            $tableData[] = ['Needs Review', $this->wrapText($needsReviewText, $currentRow < $imageHeightLines ? $shortWidth : $maxWidth)];
-            $currentRow += $this->countWrappedLines($needsReviewText, $currentRow < $imageHeightLines ? $shortWidth : $maxWidth);
+            $needsReviewWidth = $displayRow < $imageHeightLines ? $shortWidth : $maxWidth;
+            $tableData[] = ['Needs Review', $this->wrapText($needsReviewText, $needsReviewWidth)];
+            $tableRows++;
+            $displayRow += $this->countWrappedLines($needsReviewText, $needsReviewWidth);
         }
 
         if ($book->description) {
             $description = strip_tags($book->description);
             $description = preg_replace('/\s+/', ' ', $description);
             $description = trim($description);
-            $tableData[] = ['Description', $this->wrapText($description, $currentRow < $imageHeightLines ? $shortWidth : $maxWidth)];
-            $currentRow += $this->countWrappedLines($description, $currentRow < $imageHeightLines ? $shortWidth : $maxWidth);
+            $descriptionWidth = $displayRow < $imageHeightLines ? $shortWidth : $maxWidth;
+            $tableData[] = ['Description', $this->wrapText($description, $descriptionWidth)];
+            $tableRows++;
+            $displayRow += $this->countWrappedLines($description, $descriptionWidth);
         }
 
         if ($book->audibleInfo) {
             $tableData[] = ['Audible ASIN', $book->audibleInfo['asin'] ?? 'N/A'];
-            $currentRow++;
+            $tableRows++;
+            $displayRow++;
         }
 
         if ($book->googleBooksInfo) {
             $tableData[] = ['Google Books ID', $book->googleBooksInfo['id'] ?? 'N/A'];
-            $currentRow++;
+            $tableRows++;
+            $displayRow++;
         }
 
         if ($book->hardcoverInfo) {
             $tableData[] = ['Hardcover ID', $book->hardcoverInfo['id'] ?? 'N/A'];
-            $currentRow++;
+            $tableRows++;
+            $displayRow++;
         }
 
         $tableData[] = ['Created', $book->createdAt?->format('Y-m-d H:i:s') ?? 'N/A'];
-        $currentRow++;
+        $tableRows++;
+        $displayRow++;
 
         $tableData[] = ['Updated', $book->updatedAt?->format('Y-m-d H:i:s') ?? 'N/A'];
-        $currentRow++;
+        $tableRows++;
+        $displayRow++;
 
         // Display table without headers
         $this->table([], $tableData);
@@ -289,8 +319,8 @@ class ShowBookInfo extends Command
             echo "\033[u"; // Restore cursor position
 
             // Move cursor up to top of table
-            // Count actual number of lines including wrapped fields + borders (no header row now)
-            $totalTableLines = $currentRow + 2; // +2 for top/bottom borders only
+            // Use actual table rows (not display lines) + borders
+            $totalTableLines = $tableRows + 2; // +2 for top/bottom borders only
             echo "\033[{$totalTableLines}A"; // Move cursor up to top of table
 
             $this->terminalImageService->displayImage($coverPath, function ($msg) {
