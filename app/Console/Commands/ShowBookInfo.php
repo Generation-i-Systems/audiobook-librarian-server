@@ -164,11 +164,6 @@ class ShowBookInfo extends Command
             }
         }
 
-        $this->info("═══════════════════════════════════════════════════════════════");
-        $this->info("  BOOK INFORMATION");
-        $this->info("═══════════════════════════════════════════════════════════════");
-        $this->newLine();
-
         // Save cursor position if we're going to display an image
         if ($coverPath && $this->terminalImageService->supportsImages()) {
             echo "\033[s"; // Save cursor position
@@ -279,15 +274,16 @@ class ShowBookInfo extends Command
         $tableData[] = ['Updated', $book->updatedAt?->format('Y-m-d H:i:s') ?? 'N/A'];
         $currentRow++;
 
-        $this->table(['Field', 'Value'], $tableData);
+        // Display table without headers
+        $this->table([], $tableData);
 
         // Display image overlaid on upper right of table
         if ($coverPath && $this->terminalImageService->supportsImages()) {
             echo "\033[u"; // Restore cursor position
 
             // Move cursor up to top of table
-            // Count actual number of lines including wrapped fields + header + borders
-            $totalTableLines = $currentRow + 3; // +3 for header row and top/bottom borders
+            // Count actual number of lines including wrapped fields + borders (no header row now)
+            $totalTableLines = $currentRow + 2; // +2 for top/bottom borders only
             echo "\033[{$totalTableLines}A"; // Move cursor up to top of table
 
             $this->terminalImageService->displayImage($coverPath, function ($msg) {
@@ -318,11 +314,6 @@ class ShowBookInfo extends Command
         }
 
         $leftWidth = max($termWidth - 5, 40);
-
-        $this->line("<fg=cyan>═══════════════════════════════════════════════════════════════</>");
-        $this->line("<fg=cyan>  BOOK INFORMATION</>");
-        $this->line("<fg=cyan>═══════════════════════════════════════════════════════════════</>");
-        $this->newLine();
 
         // Display image at the beginning for compact mode
         if ($book->coverImage) {
