@@ -50,9 +50,11 @@ class ShowBookInfo extends Command
         }
 
         $book = Book::where('directory_path', $searchPath)->first();
+        $exactMatch = (bool) $book;
 
         if (!$book) {
             $book = Book::where('directory_path', $directory)->first();
+            $exactMatch = (bool) $book;
         }
 
         if ($book) {
@@ -62,11 +64,13 @@ class ShowBookInfo extends Command
         }
 
         $books = Book::where('directory_path', 'LIKE', $searchPath . '%')->get();
+        $isFuzzyMatch = false;
 
         if ($books->isEmpty()) {
             $books = Book::where('directory_path', 'LIKE', '%' . basename($searchPath) . '%')
                 ->where('directory_path', 'LIKE', dirname($searchPath) . '%')
                 ->get();
+            $isFuzzyMatch = $books->isNotEmpty();
         }
 
         if ($books->isEmpty()) {
@@ -75,8 +79,24 @@ class ShowBookInfo extends Command
             return;
         }
 
-        $this->info("Found {$books->count()} book(s) matching: {$directory}");
-        $this->newLine();
+        if ($books->count() === 1 && $isFuzzyMatch) {
+            $book = $books->first();
+            $this->warn("Found book with mismatched path:");
+            $this->line("  Database: {$book->directoryPath}");
+            $this->line("  Actual:   {$searchPath}");
+            $this->newLine();
+
+            if ($this->confirm('Update database to match actual directory path?', true)) {
+                $oldPath = $book->directoryPath;
+                $book->directoryPath = $searchPath;
+                $book->save();
+                $this->info("✓ Updated directory path from '{$oldPath}' to '{$searchPath}'");
+                $this->newLine();
+            }
+        } else {
+            $this->info("Found {$books->count()} book(s) matching: {$directory}");
+            $this->newLine();
+        }
 
         foreach ($books as $book) {
             $this->displayBookInfo($book);
