@@ -38,7 +38,7 @@ class ApiServiceClientCommandTest extends TestCase
         $this->expectException(\Symfony\Component\Console\Exception\RuntimeException::class);
         $this->expectExceptionMessage('Not enough arguments (missing: "url")');
 
-        $this->artisan('api:client');
+        $this->artisan('api:client')->execute();
     }
 
     #[\PHPUnit\Framework\Attributes\Test]

@@ -24,10 +24,10 @@ class ProgressControllerTest extends TestCase
         if (!self::$migrationsRun) {
             try {
                 // Try to run migrations for the in-memory database
-                $this->artisan('migrate');
+                $this->artisan('migrate')->execute();
             } catch (\Exception $e) {
                 // If migrations fail, try migrate:fresh
-                $this->artisan('migrate:fresh');
+                $this->artisan('migrate:fresh')->execute();
             }
             self::$migrationsRun = true;
         }

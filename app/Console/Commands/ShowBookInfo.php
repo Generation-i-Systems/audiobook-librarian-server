@@ -115,10 +115,28 @@ class ShowBookInfo extends Command
 
     protected function displayTableInfo(Book $book): void
     {
+        // Check if we have a cover image to display
+        $coverPath = null;
+        if ($book->coverImage) {
+            $coverPath = $book->coverImage;
+            if (!str_starts_with($coverPath, 'http')) {
+                $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
+                $coverPath = $bookRoot . '/' . ltrim($coverPath, '/');
+            }
+            if (!file_exists($coverPath) && !str_starts_with($book->coverImage, 'http')) {
+                $coverPath = null;
+            }
+        }
+
         $this->info("═══════════════════════════════════════════════════════════════");
         $this->info("  BOOK INFORMATION");
         $this->info("═══════════════════════════════════════════════════════════════");
         $this->newLine();
+
+        // Save cursor position if we're going to display an image
+        if ($coverPath && $this->terminalImageService->supportsImages()) {
+            echo "\033[s"; // Save cursor position
+        }
 
         $maxWidth = $this->getTerminalWidth();
         $tableData = [];
@@ -192,21 +210,13 @@ class ShowBookInfo extends Command
 
         $this->table(['Field', 'Value'], $tableData);
 
-        if ($book->coverImage) {
-            $coverPath = $book->coverImage;
-
-            if (!str_starts_with($coverPath, 'http')) {
-                $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
-                $coverPath = $bookRoot . '/' . ltrim($coverPath, '/');
-            }
-
-            if (file_exists($coverPath) || str_starts_with($book->coverImage, 'http')) {
-                $this->newLine();
-                $this->terminalImageService->displayImage(
-                    $coverPath,
-                    fn($msg) => $this->line($msg)
-                );
-            }
+        // Display image overlaid on upper right of table
+        if ($coverPath && $this->terminalImageService->supportsImages()) {
+            echo "\033[u"; // Restore cursor position
+            echo "\033[A"; // Move cursor up one line to align with table
+            $this->terminalImageService->displayImage($coverPath, function($msg) {
+                // Silent - image will overlay the table
+            });
         }
     }
 
@@ -228,28 +238,28 @@ class ShowBookInfo extends Command
             }
         }
 
-        $hasCoverImage = false;
-        $coverPath = null;
-
-        if ($book->coverImage) {
-            $coverPath = $book->coverImage;
-
-            if (!str_starts_with($coverPath, 'http')) {
-                $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
-                $coverPath = $bookRoot . '/' . ltrim($coverPath, '/');
-            }
-
-            if (file_exists($coverPath) || str_starts_with($book->coverImage, 'http')) {
-                $hasCoverImage = true;
-            }
-        }
-
-        $leftWidth = $hasCoverImage ? max($termWidth - 35, 40) : max($termWidth - 5, 40);
+        $leftWidth = max($termWidth - 5, 40);
 
         $this->line("<fg=cyan>═══════════════════════════════════════════════════════════════</>");
         $this->line("<fg=cyan>  BOOK INFORMATION</>");
         $this->line("<fg=cyan>═══════════════════════════════════════════════════════════════</>");
         $this->newLine();
+
+        // Display image at the beginning for compact mode
+        if ($book->coverImage) {
+            $coverPath = $book->coverImage;
+            if (!str_starts_with($coverPath, 'http')) {
+                $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
+                $coverPath = $bookRoot . '/' . ltrim($coverPath, '/');
+            }
+            if (file_exists($coverPath) || str_starts_with($book->coverImage, 'http')) {
+                $this->terminalImageService->displayImage(
+                    $coverPath,
+                    fn($msg) => $this->line($msg)
+                );
+                $this->newLine();
+            }
+        }
 
         $this->printField('ID', $book->id, $leftWidth);
         $this->printField('Title', $book->title ?? 'N/A', $leftWidth);
@@ -290,12 +300,6 @@ class ShowBookInfo extends Command
 
         $this->printField('Audio Files', $book->audioFileCount ?? 0, $leftWidth);
         $this->printField('Source', $book->source ?? 'N/A', $leftWidth);
-
-        // Display image after first set of fields if present
-        if ($hasCoverImage) {
-            $this->displayImageInline($coverPath);
-        }
-
         $this->printField('Directory', $book->directoryPath ?? 'N/A', $leftWidth);
 
         if ($book->needsReview) {
