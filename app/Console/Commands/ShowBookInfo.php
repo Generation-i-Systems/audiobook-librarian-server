@@ -213,7 +213,11 @@ class ShowBookInfo extends Command
         // Display image overlaid on upper right of table
         if ($coverPath && $this->terminalImageService->supportsImages()) {
             echo "\033[u"; // Restore cursor position
-            echo "\033[A"; // Move cursor up one line to align with table
+
+            // Move cursor up to top of table (count table rows + header + borders)
+            $tableRows = count($tableData) + 3; // +3 for header row and top/bottom borders
+            echo "\033[{$tableRows}A"; // Move cursor up to top of table
+
             $this->terminalImageService->displayImage($coverPath, function ($msg) {
                 // Silent - image will overlay the table
             }, 'right');
