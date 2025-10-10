@@ -187,6 +187,7 @@ Route::middleware(['auth'])->group(function () {
         'showCreateForm',
     ])->name('books.create');
     Route::get('/books/{book}/download', [BookController::class, 'download'])->name('books.download');
+    Route::get('/books/{book}/play', [\App\Http\Controllers\PlayerController::class, 'show'])->name('books.play');
     Route::post('/books/{book}/reviews', [ReviewController::class, 'store'])->name('reviews.store');
     Route::delete('/reviews/{review}', [ReviewController::class, 'destroy'])->name('reviews.destroy');
     Route::post(
@@ -351,12 +352,12 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         Admin\ManageSeriesController::class,
         'index',
     ])->name('series.manage');
-    
+
     Route::post('/series/merge', [
         Admin\ManageSeriesController::class,
         'merge',
     ])->name('series.merge');
-    
+
     Route::post('/series/rename', [
         Admin\ManageSeriesController::class,
         'rename',

@@ -38,7 +38,12 @@
                 </p>
                 <p>{{ isset($book['description']) ? $book['description'] : 'No description available.' }}</p>
 
-                <a href="{{ route('books.download', $book['id']) }}" class="btn btn-primary">Download</a>
+                <a href="{{ route('books.play', $book['id']) }}" class="btn btn-success me-2">
+                    <i class="bi bi-play-circle-fill"></i> Play
+                </a>
+                <a href="{{ route('books.download', $book['id']) }}" class="btn btn-primary">
+                    <i class="bi bi-download"></i> Download
+                </a>
 
                 @auth
     @if(Auth::user()->is_admin)
