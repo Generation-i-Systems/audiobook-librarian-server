@@ -15,10 +15,21 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 # Change to project directory
 cd "$PROJECT_ROOT" || exit 1
 
-# If no arguments provided, use the saved original working directory
-if [ $# -eq 0 ]; then
-    php artisan books:show "$ORIGINAL_DIR"
+# Separate directory arguments from options
+DIRS=()
+OPTS=()
+for arg in "$@"; do
+    if [[ "$arg" == -* ]]; then
+        OPTS+=("$arg")
+    else
+        DIRS+=("$arg")
+    fi
+done
+
+# If no directory arguments provided, use the saved original working directory
+if [ ${#DIRS[@]} -eq 0 ]; then
+    php artisan books:show "$ORIGINAL_DIR" "${OPTS[@]}"
 else
-    # Pass all arguments to the artisan command
-    php artisan books:show "$@"
+    # Pass directory arguments and options to the artisan command
+    php artisan books:show "${DIRS[@]}" "${OPTS[@]}"
 fi

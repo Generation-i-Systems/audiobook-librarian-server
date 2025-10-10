@@ -8,7 +8,7 @@ use Illuminate\Console\Command;
 
 class ShowBookInfo extends Command
 {
-    protected $signature = 'books:show {directories?*}';
+    protected $signature = 'books:show {directories?*} {--compact : Use compact view instead of table}';
 
     protected $description = 'Display book information from database with terminal graphics';
 
@@ -106,6 +106,15 @@ class ShowBookInfo extends Command
 
     protected function displayBookInfo(Book $book): void
     {
+        if ($this->option('compact')) {
+            $this->displayCompactInfo($book);
+        } else {
+            $this->displayTableInfo($book);
+        }
+    }
+
+    protected function displayTableInfo(Book $book): void
+    {
         $this->info("═══════════════════════════════════════════════════════════════");
         $this->info("  BOOK INFORMATION");
         $this->info("═══════════════════════════════════════════════════════════════");
@@ -197,6 +206,111 @@ class ShowBookInfo extends Command
                     fn($msg) => $this->line($msg)
                 );
             }
+        }
+    }
+
+    protected function displayCompactInfo(Book $book): void
+    {
+        $maxWidth = $this->getTerminalWidth() + 20;
+
+        $this->line("<fg=cyan>━━━ BOOK INFO ━━━</>");
+        $this->newLine();
+
+        $this->printField('ID', $book->id, $maxWidth);
+        $this->printField('Title', $book->title ?? 'N/A', $maxWidth);
+
+        if ($book->authors()->count() > 0) {
+            $authors = $book->authors()->pluck('name')->join(', ');
+            $this->printField('Authors', $authors, $maxWidth);
+        }
+
+        if ($book->narrators()->count() > 0) {
+            $narrators = $book->narrators()->pluck('name')->join(', ');
+            $this->printField('Narrators', $narrators, $maxWidth);
+        }
+
+        if ($book->series()->count() > 0) {
+            $seriesInfo = $book->series()->get()->map(function ($series) {
+                $number = $series->pivot->series_number;
+                return "{$series->name}" . ($number ? " #{$number}" : '');
+            })->join(', ');
+            $this->printField('Series', $seriesInfo, $maxWidth);
+        }
+
+        if ($book->genres()->count() > 0) {
+            $genres = $book->genres()->pluck('name')->join(', ');
+            $this->printField('Genres', $genres, $maxWidth);
+        }
+
+        $this->printField('Publisher', $book->publisher ?? 'N/A', $maxWidth);
+        $this->printField('Release Date', $book->releaseDate?->format('Y-m-d') ?? 'N/A', $maxWidth);
+        $this->printField('Language', $book->language ?? 'N/A', $maxWidth);
+
+        if ($book->duration) {
+            $hours = floor($book->duration / 3600);
+            $minutes = floor(($book->duration % 3600) / 60);
+            $durationStr = "{$hours}h {$minutes}m";
+            $this->printField('Duration', $durationStr, $maxWidth);
+        }
+
+        $this->printField('Audio Files', $book->audioFileCount ?? 0, $maxWidth);
+        $this->printField('Source', $book->source ?? 'N/A', $maxWidth);
+        $this->printField('Directory', $book->directoryPath ?? 'N/A', $maxWidth);
+
+        if ($book->needsReview) {
+            $reasons = $book->needsReviewReasons ? implode(', ', $book->needsReviewReasons) : 'Unknown';
+            $this->printField('Needs Review', "Yes ({$reasons})", $maxWidth);
+        }
+
+        if ($book->description) {
+            $description = strip_tags($book->description);
+            $description = preg_replace('/\s+/', ' ', $description);
+            $this->printField('Description', trim($description), $maxWidth);
+        }
+
+        if ($book->audibleInfo) {
+            $this->printField('Audible ASIN', $book->audibleInfo['asin'] ?? 'N/A', $maxWidth);
+        }
+
+        if ($book->googleBooksInfo) {
+            $this->printField('Google Books ID', $book->googleBooksInfo['id'] ?? 'N/A', $maxWidth);
+        }
+
+        if ($book->hardcoverInfo) {
+            $this->printField('Hardcover ID', $book->hardcoverInfo['id'] ?? 'N/A', $maxWidth);
+        }
+
+        $this->printField('Created', $book->createdAt?->format('Y-m-d H:i:s') ?? 'N/A', $maxWidth);
+        $this->printField('Updated', $book->updatedAt?->format('Y-m-d H:i:s') ?? 'N/A', $maxWidth);
+
+        if ($book->coverImage) {
+            $coverPath = $book->coverImage;
+
+            if (!str_starts_with($coverPath, 'http')) {
+                $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
+                $coverPath = $bookRoot . '/' . ltrim($coverPath, '/');
+            }
+
+            if (file_exists($coverPath) || str_starts_with($book->coverImage, 'http')) {
+                $this->newLine();
+                $this->terminalImageService->displayImage(
+                    $coverPath,
+                    fn($msg) => $this->line($msg)
+                );
+            }
+        }
+    }
+
+    protected function printField(string $label, mixed $value, int $maxWidth): void
+    {
+        $wrappedValue = $this->wrapText((string) $value, $maxWidth);
+        $lines = explode("\n", $wrappedValue);
+
+        $this->line("<fg=yellow>{$label}:</> {$lines[0]}");
+
+        for ($i = 1; $i < count($lines); $i++) {
+            $padding = str_repeat(' ', mb_strlen($label) + 2);
+            $this->line("{$padding}{$lines[$i]}");
         }
     }
 
