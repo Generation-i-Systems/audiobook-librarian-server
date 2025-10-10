@@ -2,7 +2,10 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Author;
 use App\Models\Book;
+use App\Models\Genre;
+use App\Models\Series;
 use App\Services\TerminalImageService;
 use Illuminate\Console\Command;
 
@@ -12,6 +15,9 @@ class ShowBookInfo extends Command
                             {--compact : Use compact view instead of table}
                             {--cover= : Update cover image (filename or path)}
                             {--title= : Update book title}
+                            {--author=* : Update authors (+add, -remove, or replace all)}
+                            {--series=* : Update series (+add, -remove, or replace all)}
+                            {--genre=* : Update genres (+add, -remove, or replace all)}
                             {--publisher= : Update publisher name}
                             {--language= : Update language code}
                             {--release-date= : Update release date (YYYY-MM-DD)}
@@ -172,9 +178,10 @@ class ShowBookInfo extends Command
         $maxWidth = $this->getTerminalWidth();
 
         // If we have a cover image, reduce width for fields that will be covered
-        // Assume image takes about 15-20 lines vertically and 30 columns horizontally
+        // Image takes about 30 columns horizontally
         $shortWidth = $coverPath ? max($maxWidth - 35, 30) : $maxWidth;
-        $imageHeightLines = 15; // Approximate number of table rows the image will cover
+        // Calculate image height: ~200px thumbnail / ~15px per line = ~13 lines
+        $imageHeightLines = 13; // Number of table data rows the image will cover
 
         $tableData = [];
         $currentRow = 0;
@@ -479,6 +486,9 @@ class ShowBookInfo extends Command
     {
         return $this->option('cover')
             || $this->option('title')
+            || !empty($this->option('author'))
+            || !empty($this->option('series'))
+            || !empty($this->option('genre'))
             || $this->option('publisher')
             || $this->option('language')
             || $this->option('release-date')
@@ -610,9 +620,107 @@ class ShowBookInfo extends Command
             $updated = true;
         }
 
+        // Update authors
+        if (!empty($this->option('author'))) {
+            $this->updateRelationship($book, 'authors', Author::class, $this->option('author'));
+            $updated = true;
+        }
+
+        // Update series
+        if (!empty($this->option('series'))) {
+            $this->updateRelationship($book, 'series', Series::class, $this->option('series'), true);
+            $updated = true;
+        }
+
+        // Update genres
+        if (!empty($this->option('genre'))) {
+            $this->updateRelationship($book, 'genres', Genre::class, $this->option('genre'));
+            $updated = true;
+        }
+
         if ($updated) {
             $book->save();
             $this->newLine();
+        }
+    }
+
+    protected function updateRelationship(
+        Book $book,
+        string $relation,
+        string $modelClass,
+        array $values,
+        bool $hasPivotNumber = false
+    ): void {
+        $adding = [];
+        $removing = [];
+        $replacing = [];
+
+        foreach ($values as $value) {
+            // Split comma-separated values
+            $items = array_map('trim', explode(',', $value));
+
+            foreach ($items as $item) {
+                if (str_starts_with($item, '+')) {
+                    $adding[] = ltrim($item, '+');
+                } elseif (str_starts_with($item, '-')) {
+                    $removing[] = ltrim($item, '-');
+                } else {
+                    $replacing[] = $item;
+                }
+            }
+        }
+
+        // If we have replacement values, detach all and attach new ones
+        if (!empty($replacing)) {
+            $book->$relation()->detach();
+            foreach ($replacing as $name) {
+                $this->attachRelation($book, $relation, $modelClass, $name, $hasPivotNumber);
+            }
+            $this->info("✓ Replaced " . ucfirst($relation) . ": " . implode(', ', $replacing));
+            return;
+        }
+
+        // Handle additions
+        foreach ($adding as $name) {
+            $this->attachRelation($book, $relation, $modelClass, $name, $hasPivotNumber);
+        }
+        if (!empty($adding)) {
+            $this->info("✓ Added " . ucfirst($relation) . ": " . implode(', ', $adding));
+        }
+
+        // Handle removals
+        foreach ($removing as $name) {
+            $model = $modelClass::where('name', $name)->first();
+            if ($model) {
+                $book->$relation()->detach($model->id);
+                $this->info("✓ Removed from " . ucfirst($relation) . ": {$name}");
+            } else {
+                $this->warn("  {$name} not found in " . $relation);
+            }
+        }
+    }
+
+    protected function attachRelation(
+        Book $book,
+        string $relation,
+        string $modelClass,
+        string $name,
+        bool $hasPivotNumber = false
+    ): void {
+        // Parse series number if present (e.g., "Series Name #1")
+        $seriesNumber = null;
+        if ($hasPivotNumber && str_contains($name, '#')) {
+            [$name, $numberPart] = explode('#', $name, 2);
+            $name = trim($name);
+            $seriesNumber = (float) trim($numberPart);
+        }
+
+        $model = $modelClass::firstOrCreate(['name' => $name]);
+
+        if ($hasPivotNumber && $seriesNumber !== null) {
+            $book->$relation()->syncWithoutDetaching([$model->id => ['series_number' => $seriesNumber]]);
+        } else {
+            $book->$relation()->syncWithoutDetaching([$model->id]);
         }
     }
 }
