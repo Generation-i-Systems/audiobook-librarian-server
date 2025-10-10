@@ -177,39 +177,48 @@ class ShowBookInfo extends Command
 
         $maxWidth = $this->getTerminalWidth();
 
+        // Account for table structure: borders (4 chars: | | | |), padding (4 chars), field label column (~20 chars)
+        // This gives us the actual text wrapping width that the table helper will use
+        $tableOverhead = 28; // Approximate overhead for table structure
+        $actualTextWidth = max($maxWidth - $tableOverhead, 40);
+
         // If we have a cover image, reduce width for fields that will be covered
         // Image takes about 30 columns horizontally
-        $shortWidth = $coverPath ? max($maxWidth - 35, 30) : $maxWidth;
+        $shortWidth = $coverPath ? max($actualTextWidth - 30, 30) : $actualTextWidth;
         // Calculate image height: ~200px thumbnail / ~15px per line = ~13 lines
         $imageHeightLines = 13; // Number of table data rows the image will cover
 
         $tableData = [];
         $tableRows = 0; // Count actual table rows for cursor positioning
-        $displayRow = 0; // Count display lines including wrapped text for determining short/full width
+        $displayRow = 0; // Count display lines including wrapped text for width decisions
 
         $tableData[] = ['ID', $book->id];
         $tableRows++;
         $displayRow++;
 
+        // Use displayRow to decide width (display lines), but track tableRows for cursor movement
         $titleWidth = $displayRow < $imageHeightLines ? $shortWidth : $maxWidth;
-        $tableData[] = ['Title', $this->wrapText($book->title ?? 'N/A', $titleWidth)];
+        $wrappedTitle = $this->wrapText($book->title ?? 'N/A', $titleWidth);
+        $tableData[] = ['Title', $wrappedTitle];
         $tableRows++;
-        $displayRow += $this->countWrappedLines($book->title ?? 'N/A', $titleWidth);
+        $displayRow += $this->countWrappedLines($wrappedTitle, $titleWidth); // Count total lines for this field
 
         if ($book->authors()->count() > 0) {
             $authors = $book->authors()->pluck('name')->join(', ');
             $authorsWidth = $displayRow < $imageHeightLines ? $shortWidth : $maxWidth;
-            $tableData[] = ['Authors', $this->wrapText($authors, $authorsWidth)];
+            $wrappedAuthors = $this->wrapText($authors, $authorsWidth);
+            $tableData[] = ['Authors', $wrappedAuthors];
             $tableRows++;
-            $displayRow += $this->countWrappedLines($authors, $authorsWidth);
+            $displayRow += $this->countWrappedLines($wrappedAuthors, $authorsWidth);
         }
 
         if ($book->narrators()->count() > 0) {
             $narrators = $book->narrators()->pluck('name')->join(', ');
             $narratorsWidth = $displayRow < $imageHeightLines ? $shortWidth : $maxWidth;
-            $tableData[] = ['Narrators', $this->wrapText($narrators, $narratorsWidth)];
+            $wrappedNarrators = $this->wrapText($narrators, $narratorsWidth);
+            $tableData[] = ['Narrators', $wrappedNarrators];
             $tableRows++;
-            $displayRow += $this->countWrappedLines($narrators, $narratorsWidth);
+            $displayRow += $this->countWrappedLines($wrappedNarrators, $narratorsWidth);
         }
 
         if ($book->series()->count() > 0) {
@@ -218,23 +227,26 @@ class ShowBookInfo extends Command
                 return "{$series->name}" . ($number ? " #{$number}" : '');
             })->join(', ');
             $seriesWidth = $displayRow < $imageHeightLines ? $shortWidth : $maxWidth;
-            $tableData[] = ['Series', $this->wrapText($seriesInfo, $seriesWidth)];
+            $wrappedSeries = $this->wrapText($seriesInfo, $seriesWidth);
+            $tableData[] = ['Series', $wrappedSeries];
             $tableRows++;
-            $displayRow += $this->countWrappedLines($seriesInfo, $seriesWidth);
+            $displayRow += $this->countWrappedLines($wrappedSeries, $seriesWidth);
         }
 
         if ($book->genres()->count() > 0) {
             $genres = $book->genres()->pluck('name')->join(', ');
             $genresWidth = $displayRow < $imageHeightLines ? $shortWidth : $maxWidth;
-            $tableData[] = ['Genres', $this->wrapText($genres, $genresWidth)];
+            $wrappedGenres = $this->wrapText($genres, $genresWidth);
+            $tableData[] = ['Genres', $wrappedGenres];
             $tableRows++;
-            $displayRow += $this->countWrappedLines($genres, $genresWidth);
+            $displayRow += $this->countWrappedLines($wrappedGenres, $genresWidth);
         }
 
         $publisherWidth = $displayRow < $imageHeightLines ? $shortWidth : $maxWidth;
-        $tableData[] = ['Publisher', $this->wrapText($book->publisher ?? 'N/A', $publisherWidth)];
+        $wrappedPublisher = $this->wrapText($book->publisher ?? 'N/A', $publisherWidth);
+        $tableData[] = ['Publisher', $wrappedPublisher];
         $tableRows++;
-        $displayRow += $this->countWrappedLines($book->publisher ?? 'N/A', $publisherWidth);
+        $displayRow += $this->countWrappedLines($wrappedPublisher, $publisherWidth);
 
         $tableData[] = ['Release Date', $book->releaseDate?->format('Y-m-d') ?? 'N/A'];
         $tableRows++;
@@ -262,17 +274,19 @@ class ShowBookInfo extends Command
         $displayRow++;
 
         $directoryWidth = $displayRow < $imageHeightLines ? $shortWidth : $maxWidth;
-        $tableData[] = ['Directory', $this->wrapText($book->directoryPath ?? 'N/A', $directoryWidth)];
+        $wrappedDirectory = $this->wrapText($book->directoryPath ?? 'N/A', $directoryWidth);
+        $tableData[] = ['Directory', $wrappedDirectory];
         $tableRows++;
-        $displayRow += $this->countWrappedLines($book->directoryPath ?? 'N/A', $directoryWidth);
+        $displayRow += $this->countWrappedLines($wrappedDirectory, $directoryWidth);
 
         if ($book->needsReview) {
             $reasons = $book->needsReviewReasons ? implode(', ', $book->needsReviewReasons) : 'Unknown';
             $needsReviewText = "Yes ({$reasons})";
             $needsReviewWidth = $displayRow < $imageHeightLines ? $shortWidth : $maxWidth;
-            $tableData[] = ['Needs Review', $this->wrapText($needsReviewText, $needsReviewWidth)];
+            $wrappedNeedsReview = $this->wrapText($needsReviewText, $needsReviewWidth);
+            $tableData[] = ['Needs Review', $wrappedNeedsReview];
             $tableRows++;
-            $displayRow += $this->countWrappedLines($needsReviewText, $needsReviewWidth);
+            $displayRow += $this->countWrappedLines($wrappedNeedsReview, $needsReviewWidth);
         }
 
         if ($book->description) {
@@ -280,9 +294,10 @@ class ShowBookInfo extends Command
             $description = preg_replace('/\s+/', ' ', $description);
             $description = trim($description);
             $descriptionWidth = $displayRow < $imageHeightLines ? $shortWidth : $maxWidth;
-            $tableData[] = ['Description', $this->wrapText($description, $descriptionWidth)];
+            $wrappedDescription = $this->wrapText($description, $descriptionWidth);
+            $tableData[] = ['Description', $wrappedDescription];
             $tableRows++;
-            $displayRow += $this->countWrappedLines($description, $descriptionWidth);
+            $displayRow += $this->countWrappedLines($wrappedDescription, $descriptionWidth);
         }
 
         if ($book->audibleInfo) {
@@ -319,8 +334,13 @@ class ShowBookInfo extends Command
             echo "\033[u"; // Restore cursor position
 
             // Move cursor up to top of table
-            // Use actual table rows (not display lines) + borders
-            $totalTableLines = $tableRows + 2; // +2 for top/bottom borders only
+            // Just use tableRows since wrapped lines aren't rendering the way we expect
+            // +2 for borders, +1 for debug line
+            $totalTableLines = $tableRows + 3;
+
+            // Debug: output the line count
+            echo "DEBUG: displayRow=$displayRow, tableRows=$tableRows, moving up $totalTableLines lines\n";
+
             echo "\033[{$totalTableLines}A"; // Move cursor up to top of table
 
             $this->terminalImageService->displayImage($coverPath, function ($msg) {

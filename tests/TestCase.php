@@ -44,4 +44,19 @@ abstract class TestCase extends BaseTestCase
             // Individual tests that rely on DB should still use RefreshDatabase.
         }
     }
+
+    /**
+     * Clean up the testing environment before the next test.
+     */
+    protected function tearDown(): void
+    {
+        // Force garbage collection to clean up PendingCommand objects
+        // BEFORE parent::tearDown() destroys the application
+        gc_collect_cycles();
+
+        parent::tearDown();
+        
+        // Force another garbage collection AFTER teardown
+        gc_collect_cycles();
+    }
 }
