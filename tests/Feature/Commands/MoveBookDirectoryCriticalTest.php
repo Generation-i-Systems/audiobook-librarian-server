@@ -59,7 +59,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         DB::statement('DROP TABLE books_backup');
         
         // Assert - source should still exist
-        $this->assertDirectoryExists($this->testBookRoot . '/' . $sourcePath);
+        $this->assertDirExists($this->testBookRoot . '/' . $sourcePath);
     }
 
     /** @test */
@@ -111,7 +111,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         chmod($readOnlyDir, 0755);
         
         // Assert - move should fail, source should still exist
-        $this->assertDirectoryExists($this->testBookRoot . '/' . $sourcePath);
+        $this->assertDirExists($this->testBookRoot . '/' . $sourcePath);
         $book->refresh();
         $this->assertEquals($sourcePath, $book->directory_path);
     }
@@ -135,8 +135,8 @@ class MoveBookDirectoryCriticalTest extends TestCase
         ]);
         
         // Assert - both books still exist
-        $this->assertDirectoryExists($this->testBookRoot . '/' . $sourcePath);
-        $this->assertDirectoryExists($this->testBookRoot . '/' . $destPath);
+        $this->assertDirExists($this->testBookRoot . '/' . $sourcePath);
+        $this->assertDirExists($this->testBookRoot . '/' . $destPath);
         
         $sourceBook->refresh();
         $destBook->refresh();
@@ -166,7 +166,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         ]);
         
         // Assert - source unchanged, database unchanged
-        $this->assertDirectoryExists($this->testBookRoot . '/' . $sourcePath);
+        $this->assertDirExists($this->testBookRoot . '/' . $sourcePath);
         $book->refresh();
         $this->assertEquals($sourcePath, $book->directory_path);
     }
@@ -187,7 +187,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         ]);
         
         // Assert - move should fail or be contained
-        $this->assertDirectoryExists($this->testBookRoot . '/' . $sourcePath);
+        $this->assertDirExists($this->testBookRoot . '/' . $sourcePath);
         $this->assertFileDoesNotExist('/etc/passwd/Book1');
     }
 
@@ -216,8 +216,8 @@ class MoveBookDirectoryCriticalTest extends TestCase
         @rmdir('/tmp/attack-target');
         
         // Assert - should not follow symlink outside book root
-        $this->assertDirectoryExists($this->testBookRoot . '/' . $sourcePath);
-        $this->assertDirectoryDoesNotExist('/tmp/attack-target/Book1');
+        $this->assertDirExists($this->testBookRoot . '/' . $sourcePath);
+        $this->assertDirDoesNotExist('/tmp/attack-target/Book1');
     }
 
     /** @test */
@@ -332,7 +332,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         // Assert - book only in one location
         $book->refresh();
         $this->assertEquals($destPath1, $book->directory_path);
-        $this->assertDirectoryDoesNotExist($this->testBookRoot . '/' . $destPath2);
+        $this->assertDirDoesNotExist($this->testBookRoot . '/' . $destPath2);
     }
 
     /** @test */
@@ -444,7 +444,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         ]);
         
         // Assert - should not escape book root
-        $this->assertDirectoryDoesNotExist('/tmp/evil');
+        $this->assertDirDoesNotExist('/tmp/evil');
         $book->refresh();
         $this->assertStringStartsWith('Fantasy/', $book->directory_path);
     }
@@ -513,7 +513,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         
         // Assert - should fail
         $this->assertNotEquals(0, $result);
-        $this->assertDirectoryExists($this->testBookRoot);
+        $this->assertDirExists($this->testBookRoot);
     }
 
     /** @test */
@@ -559,7 +559,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         ], $attributes));
     }
 
-    private function assertDirectoryExists(string $path): void
+    private function assertDirExists(string $path): void
     {
         $this->assertTrue(
             File::isDirectory($path),
@@ -567,7 +567,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         );
     }
 
-    private function assertDirectoryDoesNotExist(string $path): void
+    private function assertDirDoesNotExist(string $path): void
     {
         $this->assertFalse(
             File::isDirectory($path),

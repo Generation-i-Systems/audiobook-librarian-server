@@ -1499,4 +1499,70 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
 
         return true;
     }
+
+    /**
+     * Count books that need review, optionally filtered by reason
+     *
+     * @param string|null $reason
+     * @return int
+     */
+    public function countNeedsReviewBooks(?string $reason = null): int
+    {
+        $count = 0;
+        foreach ($this->books as $book) {
+            $needsReview = (bool) ($book['needs_review'] ?? false);
+            if (!$needsReview) {
+                continue;
+            }
+
+            if ($reason !== null) {
+                $reasons = $book['needs_review_reasons'] ?? [];
+                if (!is_array($reasons) || !in_array($reason, $reasons, true)) {
+                    continue;
+                }
+            }
+
+            $count++;
+        }
+
+        return $count;
+    }
+
+    /**
+     * Rename a series across all books
+     *
+     * @param string $oldName
+     * @param string $newName
+     * @return int Number of books updated
+     */
+    public function renameSeries(string $oldName, string $newName): int
+    {
+        $updated = 0;
+
+        foreach ($this->books as $id => $book) {
+            if (!isset($book['series']) || !is_array($book['series'])) {
+                continue;
+            }
+
+            $changed = false;
+            foreach ($book['series'] as $key => $series) {
+                $seriesName = is_array($series) ? ($series['seriesName'] ?? '') : $series;
+                if ($seriesName === $oldName) {
+                    if (is_array($book['series'][$key])) {
+                        $book['series'][$key]['seriesName'] = $newName;
+                    } else {
+                        $book['series'][$key] = $newName;
+                    }
+                    $changed = true;
+                }
+            }
+
+            if ($changed) {
+                $this->books[$id] = $book;
+                $updated++;
+            }
+        }
+
+        return $updated;
+    }
 }

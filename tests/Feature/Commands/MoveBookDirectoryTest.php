@@ -60,8 +60,8 @@ class MoveBookDirectoryTest extends TestCase
         ])->assertExitCode(0);
         
         // Assert
-        $this->assertDirectoryDoesNotExist($this->testBookRoot . '/' . $sourcePath);
-        $this->assertDirectoryExists($this->testBookRoot . '/' . $destPath);
+        $this->assertDirDoesNotExist($this->testBookRoot . '/' . $sourcePath);
+        $this->assertDirExists($this->testBookRoot . '/' . $destPath);
         
         $book->refresh();
         $this->assertEquals($destPath, $book->directory_path);
@@ -88,8 +88,8 @@ class MoveBookDirectoryTest extends TestCase
         ])->assertExitCode(0);
         
         // Assert
-        $this->assertDirectoryExists($this->testBookRoot . '/Sci-Fi/Book1');
-        $this->assertDirectoryExists($this->testBookRoot . '/Sci-Fi/Book2');
+        $this->assertDirExists($this->testBookRoot . '/Sci-Fi/Book1');
+        $this->assertDirExists($this->testBookRoot . '/Sci-Fi/Book2');
         
         $book1->refresh();
         $book2->refresh();
@@ -141,7 +141,7 @@ class MoveBookDirectoryTest extends TestCase
         ])->assertExitCode(0);
         
         // Assert
-        $this->assertDirectoryExists($this->testBookRoot . '/New/Genre/Sub/Author/Book1');
+        $this->assertDirExists($this->testBookRoot . '/New/Genre/Sub/Author/Book1');
         
         $book->refresh();
         $this->assertEquals($destPath, $book->directory_path);
@@ -164,7 +164,7 @@ class MoveBookDirectoryTest extends TestCase
         ])->assertExitCode(0);
         
         // Assert
-        $this->assertDirectoryExists($this->testBookRoot . '/Sci-Fi/Book1');
+        $this->assertDirExists($this->testBookRoot . '/Sci-Fi/Book1');
         
         $book->refresh();
         $this->assertEquals('Sci-Fi/Book1', $book->directory_path);
@@ -203,8 +203,8 @@ class MoveBookDirectoryTest extends TestCase
         ])->assertExitCode(0);
         
         // Assert - nothing should have changed
-        $this->assertDirectoryExists($this->testBookRoot . '/' . $sourcePath);
-        $this->assertDirectoryDoesNotExist($this->testBookRoot . '/' . $destPath);
+        $this->assertDirExists($this->testBookRoot . '/' . $sourcePath);
+        $this->assertDirDoesNotExist($this->testBookRoot . '/' . $destPath);
         
         $book->refresh();
         $this->assertEquals($sourcePath, $book->directory_path);
@@ -228,8 +228,8 @@ class MoveBookDirectoryTest extends TestCase
         ])->assertExitCode(0);
         
         // Assert - files moved but DB not updated
-        $this->assertDirectoryDoesNotExist($this->testBookRoot . '/' . $sourcePath);
-        $this->assertDirectoryExists($this->testBookRoot . '/' . $destPath);
+        $this->assertDirDoesNotExist($this->testBookRoot . '/' . $sourcePath);
+        $this->assertDirExists($this->testBookRoot . '/' . $destPath);
         
         $book->refresh();
         $this->assertEquals($originalPath, $book->directory_path);
@@ -578,7 +578,7 @@ class MoveBookDirectoryTest extends TestCase
         ], $attributes));
     }
 
-    private function assertDirectoryExists(string $path): void
+    private function assertDirExists(string $path): void
     {
         $this->assertTrue(
             File::isDirectory($path),
@@ -586,7 +586,7 @@ class MoveBookDirectoryTest extends TestCase
         );
     }
 
-    private function assertDirectoryDoesNotExist(string $path): void
+    private function assertDirDoesNotExist(string $path): void
     {
         $this->assertFalse(
             File::isDirectory($path),
