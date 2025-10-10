@@ -211,7 +211,16 @@ class ShowBookInfo extends Command
 
     protected function displayCompactInfo(Book $book): void
     {
-        $maxWidth = $this->getTerminalWidth() + 20;
+        $termWidth = 80;
+        if (function_exists('exec')) {
+            $output = [];
+            @exec('tput cols 2>/dev/null', $output);
+            if (!empty($output[0]) && is_numeric($output[0])) {
+                $termWidth = (int) $output[0];
+            }
+        }
+
+        $maxWidth = max($termWidth - 5, 40);
 
         $this->line("<fg=cyan>━━━ BOOK INFO ━━━</>");
         $this->newLine();
@@ -303,13 +312,16 @@ class ShowBookInfo extends Command
 
     protected function printField(string $label, mixed $value, int $maxWidth): void
     {
-        $wrappedValue = $this->wrapText((string) $value, $maxWidth);
+        $labelLength = mb_strlen($label) + 2;
+        $valueWidth = max($maxWidth - $labelLength, 20);
+
+        $wrappedValue = $this->wrapText((string) $value, $valueWidth);
         $lines = explode("\n", $wrappedValue);
 
         $this->line("<fg=yellow>{$label}:</> {$lines[0]}");
 
         for ($i = 1; $i < count($lines); $i++) {
-            $padding = str_repeat(' ', mb_strlen($label) + 2);
+            $padding = str_repeat(' ', $labelLength);
             $this->line("{$padding}{$lines[$i]}");
         }
     }
@@ -326,7 +338,7 @@ class ShowBookInfo extends Command
             }
         }
 
-        return max($width - 20, 60);
+        return max($width - 20, 40);
     }
 
     protected function wrapText(string $text, int $maxWidth): string
