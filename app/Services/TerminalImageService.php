@@ -7,7 +7,7 @@ class TerminalImageService
     /**
      * Display cover image if terminal supports it (like Ghostty with Kitty protocol)
      */
-    public function displayImage(string $imageUrl, ?callable $outputCallback = null): void
+    public function displayImage(string $imageUrl, ?callable $outputCallback = null, string $align = 'left'): void
     {
         $output = $outputCallback ?? function ($message) {
             echo $message . "\n";
@@ -30,7 +30,7 @@ class TerminalImageService
                     $output("\n📸 Cover Preview: {$imageUrl}");
 
                     if ($kittySupport) {
-                        $this->displayKittyImage($imageData);
+                        $this->displayKittyImage($imageData, $align);
                     } elseif ($term === 'iTerm.app') {
                         $base64Image = base64_encode($imageData);
                         echo "\033]1337;File=inline=1;width=200px;height=150px:{$base64Image}\007";
@@ -51,7 +51,7 @@ class TerminalImageService
     /**
      * Display image using Kitty graphics protocol or kitten icat
      */
-    protected function displayKittyImage(string $imageData): void
+    protected function displayKittyImage(string $imageData, string $align = 'left'): void
     {
         $tempFile = tempnam(sys_get_temp_dir(), 'cover_') . '.png';
 
@@ -78,7 +78,7 @@ class TerminalImageService
                 imagedestroy($thumb);
 
                 if (file_exists('/usr/bin/kitten') && is_executable('/usr/bin/kitten')) {
-                    system("kitten icat --align=left '$tempFile'");
+                    system("kitten icat --align={$align} '$tempFile'");
                 } else {
                     $base64Image = base64_encode(file_get_contents($tempFile));
                     fwrite(STDOUT, "\033_Ga=T,f=100;{$base64Image}\033\\");

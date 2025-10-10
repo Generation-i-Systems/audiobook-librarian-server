@@ -216,7 +216,7 @@ class ShowBookInfo extends Command
             echo "\033[A"; // Move cursor up one line to align with table
             $this->terminalImageService->displayImage($coverPath, function ($msg) {
                 // Silent - image will overlay the table
-            });
+            }, 'right');
         }
     }
 
