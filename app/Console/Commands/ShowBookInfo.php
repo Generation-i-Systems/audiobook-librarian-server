@@ -214,7 +214,7 @@ class ShowBookInfo extends Command
         if ($coverPath && $this->terminalImageService->supportsImages()) {
             echo "\033[u"; // Restore cursor position
             echo "\033[A"; // Move cursor up one line to align with table
-            $this->terminalImageService->displayImage($coverPath, function($msg) {
+            $this->terminalImageService->displayImage($coverPath, function ($msg) {
                 // Silent - image will overlay the table
             });
         }
@@ -343,16 +343,6 @@ class ShowBookInfo extends Command
             $padding = str_repeat(' ', $labelLength);
             $this->line("{$padding}{$lines[$i]}");
         }
-    }
-
-    protected function displayImageInline(string $coverPath): void
-    {
-        $this->newLine();
-        $this->terminalImageService->displayImage(
-            $coverPath,
-            fn($msg) => $this->line($msg)
-        );
-        $this->newLine();
     }
 
     protected function getTerminalWidth(): int
