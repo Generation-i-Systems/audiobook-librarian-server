@@ -3,6 +3,9 @@
 # Book Info - Quick wrapper for books:show command
 # This script can be symlinked to a common bin directory for easy access
 
+# Save the original working directory before any cd commands
+ORIGINAL_DIR="$(pwd)"
+
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -12,10 +15,8 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 # Change to project directory
 cd "$PROJECT_ROOT" || exit 1
 
-# If no arguments provided, use current working directory
+# If no arguments provided, use the saved original working directory
 if [ $# -eq 0 ]; then
-    # Get the original working directory before we changed to project root
-    ORIGINAL_DIR="$OLDPWD"
     php artisan books:show "$ORIGINAL_DIR" --current
 else
     # Pass all arguments to the artisan command
