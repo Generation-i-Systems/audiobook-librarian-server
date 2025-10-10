@@ -8,9 +8,19 @@ use Illuminate\Console\Command;
 
 class ShowBookInfo extends Command
 {
-    protected $signature = 'books:show {directories?*} {--compact : Use compact view instead of table}';
+    protected $signature = 'books:info {directories?*}
+                            {--compact : Use compact view instead of table}
+                            {--cover= : Update cover image (filename or path)}
+                            {--title= : Update book title}
+                            {--publisher= : Update publisher name}
+                            {--language= : Update language code}
+                            {--release-date= : Update release date (YYYY-MM-DD)}
+                            {--description= : Update book description}
+                            {--source= : Update source of the book data}';
 
-    protected $description = 'Display book information from database with terminal graphics';
+    protected $description = 'Display and optionally update book information from database';
+
+    protected $aliases = ['books:show'];
 
     public function __construct(
         protected TerminalImageService $terminalImageService
@@ -58,6 +68,10 @@ class ShowBookInfo extends Command
         }
 
         if ($book) {
+            // Update book if any options were provided
+            if ($this->hasUpdateOptions()) {
+                $this->updateBookFields($book, $directory);
+            }
             $this->displayBookInfo($book);
             $this->newLine();
             return;
@@ -74,7 +88,29 @@ class ShowBookInfo extends Command
         }
 
         if ($books->isEmpty()) {
-            $this->error("No books found in database for directory: {$directory}");
+            // Check if directory is under book root and has audio files
+            if (str_starts_with($directory, $bookRoot) && $this->hasAudioFiles($directory)) {
+                $this->warn("No book found in database for directory: {$directory}");
+                $this->newLine();
+
+                if ($this->confirm('This directory contains audio files. Would you like to import it?', true)) {
+                    $this->info("Running import command...");
+                    $this->call('books:import-downloads', ['path' => $directory]);
+                    $this->newLine();
+
+                    // Try to find the book again
+                    $book = Book::where('directory_path', $searchPath)->first();
+                    if ($book) {
+                        $this->info("Book imported successfully!");
+                        $this->newLine();
+                        $this->displayBookInfo($book);
+                        $this->newLine();
+                        return;
+                    }
+                }
+            } else {
+                $this->error("No books found in database for directory: {$directory}");
+            }
             $this->newLine();
             return;
         }
@@ -400,5 +436,146 @@ class ShowBookInfo extends Command
         }
 
         return implode("\n", $lines);
+    }
+
+    protected function hasUpdateOptions(): bool
+    {
+        return $this->option('cover')
+            || $this->option('title')
+            || $this->option('publisher')
+            || $this->option('language')
+            || $this->option('release-date')
+            || $this->option('description')
+            || $this->option('source');
+    }
+
+    protected function hasAudioFiles(string $directory): bool
+    {
+        $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'opus', 'wav'];
+        $files = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($directory, \RecursiveDirectoryIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::SELF_FIRST
+        );
+
+        foreach ($files as $file) {
+            if ($file->isFile()) {
+                $extension = strtolower($file->getExtension());
+                if (in_array($extension, $audioExtensions)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    protected function updateBookFields(Book $book, string $directory): void
+    {
+        $updated = false;
+        $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
+
+        // Update cover image
+        if ($this->option('cover')) {
+            $coverInput = $this->option('cover');
+
+            // If it's just a filename, search for it in the book directory
+            if (basename($coverInput) === $coverInput) {
+                $searchPath = $directory;
+                $foundCover = null;
+
+                // Search for the file in the directory
+                $files = new \RecursiveIteratorIterator(
+                    new \RecursiveDirectoryIterator($searchPath, \RecursiveDirectoryIterator::SKIP_DOTS)
+                );
+
+                foreach ($files as $file) {
+                    if ($file->isFile() && $file->getFilename() === $coverInput) {
+                        $foundCover = $file->getPathname();
+                        break;
+                    }
+                }
+
+                if ($foundCover) {
+                    $coverInput = $foundCover;
+                } else {
+                    $this->error("Cover image file not found: {$coverInput}");
+                    return;
+                }
+            }
+
+            if (filter_var($coverInput, FILTER_VALIDATE_URL)) {
+                $book->coverImage = $coverInput;
+                $this->info("✓ Updated cover image URL: {$coverInput}");
+                $updated = true;
+            } elseif (file_exists($coverInput)) {
+                $realCoverPath = realpath($coverInput);
+
+                if (str_starts_with($realCoverPath, $bookRoot)) {
+                    $relativePath = ltrim(substr($realCoverPath, strlen($bookRoot)), '/');
+                    $book->coverImage = $relativePath;
+                    $this->info("✓ Updated cover image: {$relativePath}");
+                } else {
+                    $book->coverImage = $realCoverPath;
+                    $this->info("✓ Updated cover image (absolute): {$realCoverPath}");
+                }
+                $updated = true;
+            } else {
+                $this->error("Cover image file not found: {$coverInput}");
+                return;
+            }
+        }
+
+        // Update title
+        if ($this->option('title')) {
+            $book->title = $this->option('title');
+            $this->info("✓ Updated title: {$book->title}");
+            $updated = true;
+        }
+
+        // Update publisher
+        if ($this->option('publisher')) {
+            $book->publisher = $this->option('publisher');
+            $this->info("✓ Updated publisher: {$book->publisher}");
+            $updated = true;
+        }
+
+        // Update language
+        if ($this->option('language')) {
+            $book->language = $this->option('language');
+            $this->info("✓ Updated language: {$book->language}");
+            $updated = true;
+        }
+
+        // Update release date
+        if ($this->option('release-date')) {
+            $date = $this->option('release-date');
+            try {
+                $book->releaseDate = new \DateTime($date);
+                $this->info("✓ Updated release date: {$book->releaseDate->format('Y-m-d')}");
+                $updated = true;
+            } catch (\Exception $e) {
+                $this->error("Invalid date format: {$date}");
+                return;
+            }
+        }
+
+        // Update description
+        if ($this->option('description')) {
+            $book->description = $this->option('description');
+            $this->info("✓ Updated description");
+            $updated = true;
+        }
+
+        // Update source
+        if ($this->option('source')) {
+            $book->source = $this->option('source');
+            $this->info("✓ Updated source: {$book->source}");
+            $updated = true;
+        }
+
+        if ($updated) {
+            $book->save();
+            $this->newLine();
+        }
     }
 }

@@ -40,8 +40,8 @@ cd "$PROJECT_ROOT" || exit 1
 
 # If no directory arguments provided, use the saved original working directory
 if [ ${#DIRS[@]} -eq 0 ]; then
-    php artisan books:show "$ORIGINAL_DIR" "${OPTS[@]}"
+    php artisan books:info "$ORIGINAL_DIR" "${OPTS[@]}"
 else
     # Pass resolved directory arguments and options to the artisan command
-    php artisan books:show "${DIRS[@]}" "${OPTS[@]}"
+    php artisan books:info "${DIRS[@]}" "${OPTS[@]}"
 fi
