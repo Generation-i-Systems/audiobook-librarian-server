@@ -42,7 +42,18 @@ class ShowBookInfo extends Command
 
     protected function showBookFromDirectory(string $directory): void
     {
-        $book = Book::where('directory_path', $directory)->first();
+        $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
+        $searchPath = $directory;
+
+        if (str_starts_with($directory, $bookRoot)) {
+            $searchPath = ltrim(substr($directory, strlen($bookRoot)), '/');
+        }
+
+        $book = Book::where('directory_path', $searchPath)->first();
+
+        if (!$book) {
+            $book = Book::where('directory_path', $directory)->first();
+        }
 
         if ($book) {
             $this->displayBookInfo($book);
@@ -50,7 +61,13 @@ class ShowBookInfo extends Command
             return;
         }
 
-        $books = Book::where('directory_path', 'LIKE', $directory . '/%')->get();
+        $books = Book::where('directory_path', 'LIKE', $searchPath . '%')->get();
+
+        if ($books->isEmpty()) {
+            $books = Book::where('directory_path', 'LIKE', '%' . basename($searchPath) . '%')
+                ->where('directory_path', 'LIKE', dirname($searchPath) . '%')
+                ->get();
+        }
 
         if ($books->isEmpty()) {
             $this->error("No books found in database for directory: {$directory}");
@@ -58,7 +75,7 @@ class ShowBookInfo extends Command
             return;
         }
 
-        $this->info("Found {$books->count()} book(s) in subdirectories of: {$directory}");
+        $this->info("Found {$books->count()} book(s) matching: {$directory}");
         $this->newLine();
 
         foreach ($books as $book) {
