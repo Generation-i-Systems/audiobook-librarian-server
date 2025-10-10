@@ -19,6 +19,7 @@ use App\Services\MetadataProcessingService;
 use App\Services\ExternalCoverService;
 use App\Services\GoogleBooksApiService;
 use App\Services\ImportCacheService;
+use App\Services\TerminalImageService;
 use App\Traits\GenreMapping;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
@@ -60,6 +61,7 @@ class ImportBooksFromDownloads extends Command
     protected ?AudibleService $audibleService = null;
     protected ?ExternalCoverService $coverService = null;
     protected ?GoogleBooksApiService $googleBooksService = null;
+    protected ?TerminalImageService $terminalImageService = null;
 
     // New services
     protected ?BookDirectoryParser $directoryParser = null;
@@ -2035,163 +2037,10 @@ class ImportBooksFromDownloads extends Command
      */
     protected function displayCoverImage(string $imageUrl): void
     {
-        // Check if we're in a terminal that supports image display
-        $term = getenv('TERM_PROGRAM') ?: getenv('TERM');
-        $termEnv = getenv('TERM') ?? '';
-        $termProgram = getenv('TERM_PROGRAM') ?? '';
-
-        $kittySupport = $termEnv === 'xterm-kitty' ||
-            $termEnv === 'xterm-ghostty' ||
-            strpos($termEnv, 'kitty') !== false ||
-            $termProgram === 'ghostty';
-
-        if ($kittySupport || in_array($term, ['Ghostty', 'iTerm.app', 'WezTerm'])) {
-            try {
-                // Download and process image
-                $imageData = @file_get_contents($imageUrl);
-
-                if ($imageData) {
-                    $this->line("\n📸 Cover Preview: {$imageUrl}");
-
-                    if ($kittySupport) {
-                        // Use Kitty graphics protocol (supported by Ghostty)
-                        $this->displayKittyImage($imageData);
-                    } elseif ($term === 'iTerm.app') {
-                        // iTerm2 inline image protocol
-                        $base64Image = base64_encode($imageData);
-                        $this->line("\033]1337;File=inline=1;width=200px;height=150px:{$base64Image}\007");
-                    }
-
-                    $this->line(""); // Add spacing after image
-                } else {
-                    $this->line("📸 Cover available: {$imageUrl}");
-                }
-            } catch (\Exception $e) {
-                $this->line("📸 Cover available: {$imageUrl} (display error: {$e->getMessage()})");
-            }
-        } else {
-            $this->line("📸 Cover available: {$imageUrl}");
-        }
-    }
-
-    /**
-     * Display image using Kitty graphics protocol or kitten icat
-     */
-    protected function displayKittyImage(string $imageData): void
-    {
-        // Create temporary file for thumbnail
-        $tempFile = tempnam(sys_get_temp_dir(), 'cover_') . '.png';
-
-        try {
-            // Get image info from original data
-            $tempOriginal = tempnam(sys_get_temp_dir(), 'orig_') . '.jpg';
-            file_put_contents($tempOriginal, $imageData);
-
-            $imageInfo = getimagesize($tempOriginal);
-            if ($imageInfo === false) {
-                $this->line("  (Could not read image dimensions)");
-                return;
-            }
-            $width = $imageInfo[0] ?? 200;
-            $height = $imageInfo[1] ?? 300;
-
-            // Calculate thumbnail size (max 200px wide, maintain aspect ratio)
-            $maxWidth = 200;
-            $scale = min($maxWidth / $width, $maxWidth / $height);
-            $thumbWidth = (int) ($width * $scale);
-            $thumbHeight = (int) ($height * $scale);
-
-            // Create thumbnail
-            $thumb = $this->createThumbnail($tempOriginal, $thumbWidth, $thumbHeight);
-            if ($thumb) {
-                // Save thumbnail as PNG
-                imagepng($thumb, $tempFile);
-                imagedestroy($thumb);
-
-                // Use kitten icat directly since it works
-                if (file_exists('/usr/bin/kitten') && is_executable('/usr/bin/kitten')) {
-                    system("kitten icat --align=left '$tempFile' 2>/dev/null");
-                } else {
-                    // Fallback to protocol if kitten not available
-                    $base64Image = base64_encode(file_get_contents($tempFile));
-                    fwrite(STDOUT, "\033_Ga=T,f=100;{$base64Image}\033\\");
-                    echo "\n";
-                }
-            } else {
-                $this->line("  (Could not create thumbnail)");
-            }
-
-            @unlink($tempOriginal);
-        } catch (\Exception $e) {
-            $this->line("  (Image display error: " . $e->getMessage() . ")");
-        } finally {
-            @unlink($tempFile);
-        }
-    }
-
-    /**
-     * Create thumbnail image
-     */
-    protected function createThumbnail(string $imagePath, int $width, int $height)
-    {
-        // Check if GD extension is available
-        if (!extension_loaded('gd')) {
-            return null;
-        }
-
-        $imageInfo = getimagesize($imagePath);
-        if (!$imageInfo) {
-            return null;
-        }
-
-        $mime = $imageInfo['mime'];
-
-        // Create source image
-        switch ($mime) {
-            case 'image/jpeg':
-                $source = imagecreatefromjpeg($imagePath);
-                break;
-            case 'image/png':
-                $source = imagecreatefrompng($imagePath);
-                break;
-            case 'image/gif':
-                $source = imagecreatefromgif($imagePath);
-                break;
-            default:
-                return null;
-        }
-
-        if (!$source) {
-            return null;
-        }
-
-        // Create thumbnail
-        $thumb = imagecreatetruecolor($width, $height);
-
-        // Preserve transparency for PNG
-        if ($mime === 'image/png') {
-            imagealphablending($thumb, false);
-            imagesavealpha($thumb, true);
-            $transparent = imagecolorallocatealpha($thumb, 0, 0, 0, 127);
-            imagefill($thumb, 0, 0, $transparent);
-        }
-
-        // Resize
-        imagecopyresampled(
-            $thumb,
-            $source,
-            0,
-            0,
-            0,
-            0,
-            $width,
-            $height,
-            $imageInfo[0],
-            $imageInfo[1]
+        $this->getTerminalImageService()->displayImage(
+            $imageUrl,
+            fn($msg) => $this->line($msg)
         );
-
-        imagedestroy($source);
-        return $thumb;
     }
 
     /**
@@ -2557,6 +2406,17 @@ class ImportBooksFromDownloads extends Command
             $this->fileSystemService = app(FileSystemService::class);
         }
         return $this->fileSystemService;
+    }
+
+    /**
+     * Get terminal image service instance
+     */
+    protected function getTerminalImageService(): TerminalImageService
+    {
+        if (!$this->terminalImageService) {
+            $this->terminalImageService = app(TerminalImageService::class);
+        }
+        return $this->terminalImageService;
     }
 
     /**
