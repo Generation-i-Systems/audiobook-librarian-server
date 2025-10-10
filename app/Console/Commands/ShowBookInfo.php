@@ -111,19 +111,20 @@ class ShowBookInfo extends Command
         $this->info("═══════════════════════════════════════════════════════════════");
         $this->newLine();
 
+        $maxWidth = $this->getTerminalWidth();
         $tableData = [];
 
         $tableData[] = ['ID', $book->id];
-        $tableData[] = ['Title', $book->title ?? 'N/A'];
+        $tableData[] = ['Title', $this->wrapText($book->title ?? 'N/A', $maxWidth)];
 
         if ($book->authors()->count() > 0) {
             $authors = $book->authors()->pluck('name')->join(', ');
-            $tableData[] = ['Authors', $authors];
+            $tableData[] = ['Authors', $this->wrapText($authors, $maxWidth)];
         }
 
         if ($book->narrators()->count() > 0) {
             $narrators = $book->narrators()->pluck('name')->join(', ');
-            $tableData[] = ['Narrators', $narrators];
+            $tableData[] = ['Narrators', $this->wrapText($narrators, $maxWidth)];
         }
 
         if ($book->series()->count() > 0) {
@@ -131,15 +132,15 @@ class ShowBookInfo extends Command
                 $number = $series->pivot->series_number;
                 return "{$series->name}" . ($number ? " #{$number}" : '');
             })->join(', ');
-            $tableData[] = ['Series', $seriesInfo];
+            $tableData[] = ['Series', $this->wrapText($seriesInfo, $maxWidth)];
         }
 
         if ($book->genres()->count() > 0) {
             $genres = $book->genres()->pluck('name')->join(', ');
-            $tableData[] = ['Genres', $genres];
+            $tableData[] = ['Genres', $this->wrapText($genres, $maxWidth)];
         }
 
-        $tableData[] = ['Publisher', $book->publisher ?? 'N/A'];
+        $tableData[] = ['Publisher', $this->wrapText($book->publisher ?? 'N/A', $maxWidth)];
         $tableData[] = ['Release Date', $book->releaseDate?->format('Y-m-d') ?? 'N/A'];
         $tableData[] = ['Language', $book->language ?? 'N/A'];
 
@@ -152,15 +153,17 @@ class ShowBookInfo extends Command
 
         $tableData[] = ['Audio Files', $book->audioFileCount ?? 0];
         $tableData[] = ['Source', $book->source ?? 'N/A'];
-        $tableData[] = ['Directory', $book->directoryPath ?? 'N/A'];
+        $tableData[] = ['Directory', $this->wrapText($book->directoryPath ?? 'N/A', $maxWidth)];
 
         if ($book->needsReview) {
             $reasons = $book->needsReviewReasons ? implode(', ', $book->needsReviewReasons) : 'Unknown';
-            $tableData[] = ['Needs Review', "Yes ({$reasons})"];
+            $tableData[] = ['Needs Review', $this->wrapText("Yes ({$reasons})", $maxWidth)];
         }
 
         if ($book->description) {
-            $tableData[] = ['Description', $this->truncateText($book->description, 200)];
+            $description = strip_tags($book->description);
+            $description = preg_replace('/\s+/', ' ', $description);
+            $tableData[] = ['Description', $this->wrapText(trim($description), $maxWidth)];
         }
 
         if ($book->audibleInfo) {
@@ -197,15 +200,46 @@ class ShowBookInfo extends Command
         }
     }
 
-    protected function truncateText(string $text, int $maxLength): string
+    protected function getTerminalWidth(): int
     {
-        $text = strip_tags($text);
-        $text = preg_replace('/\s+/', ' ', $text);
+        $width = 80;
 
-        if (mb_strlen($text) <= $maxLength) {
-            return trim($text);
+        if (function_exists('exec')) {
+            $output = [];
+            @exec('tput cols 2>/dev/null', $output);
+            if (!empty($output[0]) && is_numeric($output[0])) {
+                $width = (int) $output[0];
+            }
         }
 
-        return trim(mb_substr($text, 0, $maxLength)) . '...';
+        return max($width - 20, 60);
+    }
+
+    protected function wrapText(string $text, int $maxWidth): string
+    {
+        if (empty($text)) {
+            return $text;
+        }
+
+        $lines = [];
+        $words = explode(' ', $text);
+        $currentLine = '';
+
+        foreach ($words as $word) {
+            if (mb_strlen($currentLine . ' ' . $word) <= $maxWidth) {
+                $currentLine .= ($currentLine ? ' ' : '') . $word;
+            } else {
+                if ($currentLine) {
+                    $lines[] = $currentLine;
+                }
+                $currentLine = $word;
+            }
+        }
+
+        if ($currentLine) {
+            $lines[] = $currentLine;
+        }
+
+        return implode("\n", $lines);
     }
 }
