@@ -12,24 +12,36 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Find the Laravel project root (parent of bin directory)
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-# Change to project directory
-cd "$PROJECT_ROOT" || exit 1
-
-# Separate directory arguments from options
+# Separate directory arguments from options and resolve paths
 DIRS=()
 OPTS=()
 for arg in "$@"; do
     if [[ "$arg" == -* ]]; then
         OPTS+=("$arg")
     else
-        DIRS+=("$arg")
+        # Resolve relative paths to absolute paths before cd
+        if [[ "$arg" == /* ]]; then
+            # Already absolute
+            DIRS+=("$arg")
+        else
+            # Relative path - resolve it now
+            RESOLVED_PATH="$(cd "$ORIGINAL_DIR" && cd "$arg" 2>/dev/null && pwd)"
+            if [ -n "$RESOLVED_PATH" ]; then
+                DIRS+=("$RESOLVED_PATH")
+            else
+                DIRS+=("$arg")
+            fi
+        fi
     fi
 done
+
+# Change to project directory
+cd "$PROJECT_ROOT" || exit 1
 
 # If no directory arguments provided, use the saved original working directory
 if [ ${#DIRS[@]} -eq 0 ]; then
     php artisan books:show "$ORIGINAL_DIR" "${OPTS[@]}"
 else
-    # Pass directory arguments and options to the artisan command
+    # Pass resolved directory arguments and options to the artisan command
     php artisan books:show "${DIRS[@]}" "${OPTS[@]}"
 fi
