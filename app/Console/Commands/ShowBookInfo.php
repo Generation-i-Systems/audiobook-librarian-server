@@ -230,7 +230,6 @@ class ShowBookInfo extends Command
 
         $hasCoverImage = false;
         $coverPath = null;
-        $imageHeight = 0;
 
         if ($book->coverImage) {
             $coverPath = $book->coverImage;
@@ -242,7 +241,6 @@ class ShowBookInfo extends Command
 
             if (file_exists($coverPath) || str_starts_with($book->coverImage, 'http')) {
                 $hasCoverImage = true;
-                $imageHeight = 15;
             }
         }
 
@@ -253,24 +251,17 @@ class ShowBookInfo extends Command
         $this->line("<fg=cyan>═══════════════════════════════════════════════════════════════</>");
         $this->newLine();
 
-        $fieldsCount = 0;
-
         $this->printField('ID', $book->id, $leftWidth);
-        $fieldsCount++;
-
         $this->printField('Title', $book->title ?? 'N/A', $leftWidth);
-        $fieldsCount++;
 
         if ($book->authors()->count() > 0) {
             $authors = $book->authors()->pluck('name')->join(', ');
             $this->printField('Authors', $authors, $leftWidth);
-            $fieldsCount++;
         }
 
         if ($book->narrators()->count() > 0) {
             $narrators = $book->narrators()->pluck('name')->join(', ');
             $this->printField('Narrators', $narrators, $leftWidth);
-            $fieldsCount++;
         }
 
         if ($book->series()->count() > 0) {
@@ -279,39 +270,29 @@ class ShowBookInfo extends Command
                 return "{$series->name}" . ($number ? " #{$number}" : '');
             })->join(', ');
             $this->printField('Series', $seriesInfo, $leftWidth);
-            $fieldsCount++;
         }
 
         if ($book->genres()->count() > 0) {
             $genres = $book->genres()->pluck('name')->join(', ');
             $this->printField('Genres', $genres, $leftWidth);
-            $fieldsCount++;
         }
 
         $this->printField('Publisher', $book->publisher ?? 'N/A', $leftWidth);
-        $fieldsCount++;
-
         $this->printField('Release Date', $book->releaseDate?->format('Y-m-d') ?? 'N/A', $leftWidth);
-        $fieldsCount++;
-
         $this->printField('Language', $book->language ?? 'N/A', $leftWidth);
-        $fieldsCount++;
 
         if ($book->duration) {
             $hours = floor($book->duration / 3600);
             $minutes = floor(($book->duration % 3600) / 60);
             $durationStr = "{$hours}h {$minutes}m";
             $this->printField('Duration', $durationStr, $leftWidth);
-            $fieldsCount++;
         }
 
         $this->printField('Audio Files', $book->audioFileCount ?? 0, $leftWidth);
-        $fieldsCount++;
-
         $this->printField('Source', $book->source ?? 'N/A', $leftWidth);
-        $fieldsCount++;
 
-        if ($hasCoverImage && $fieldsCount >= $imageHeight) {
+        // Display image after first set of fields if present
+        if ($hasCoverImage) {
             $this->displayImageInline($coverPath);
         }
 
@@ -342,10 +323,6 @@ class ShowBookInfo extends Command
 
         $this->printField('Created', $book->createdAt?->format('Y-m-d H:i:s') ?? 'N/A', $leftWidth);
         $this->printField('Updated', $book->updatedAt?->format('Y-m-d H:i:s') ?? 'N/A', $leftWidth);
-
-        if ($hasCoverImage && $fieldsCount < $imageHeight) {
-            $this->displayImageInline($coverPath);
-        }
     }
 
     protected function printField(string $label, mixed $value, int $maxWidth): void
