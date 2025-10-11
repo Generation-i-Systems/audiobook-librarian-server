@@ -154,38 +154,16 @@ class ImportBook extends Command
             return;
         }
 
-        // When importing a single audio file, treat the file itself as a single-book directory
-        // Create a temporary directory with just this file, then import it
+        // When importing a single audio file, just process the parent directory
+        // The parser will handle the single file correctly
         $directory = dirname($filePath);
         $filename = basename($filePath);
 
-        $this->line("Processing file: {$filename}");
+        $this->line("Processing single file: {$filename}");
+        $this->line("From directory: {$directory}");
 
-        // Create a unique temporary directory for this single file
-        $tempDir = sys_get_temp_dir() . '/librarian-import-' . uniqid();
-        try {
-            mkdir($tempDir, 0755, true);
-
-            // Create a symlink to the file in the temp directory
-            $tempFilePath = $tempDir . '/' . $filename;
-            symlink($filePath, $tempFilePath);
-
-            // Also symlink the metadata file if it exists
-            $metadataFile = $directory . '/metadata.abs';
-            if (file_exists($metadataFile)) {
-                symlink($metadataFile, $tempDir . '/metadata.abs');
-            }
-
-            // Process this temporary directory as a book directory
-            $this->processDirectory($tempDir, $dryRun, $force);
-
-        } finally {
-            // Clean up temporary directory
-            if (is_dir($tempDir)) {
-                array_map('unlink', glob("$tempDir/*"));
-                rmdir($tempDir);
-            }
-        }
+        // Process the parent directory - the parser will detect it's a single-file book
+        $this->processDirectory($directory, $dryRun, $force);
     }
 
     private function processDirectory(string $dirPath, bool $dryRun, bool $force): void
