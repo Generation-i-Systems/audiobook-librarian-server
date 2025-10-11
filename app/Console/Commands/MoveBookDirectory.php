@@ -343,20 +343,35 @@ class MoveBookDirectory extends Command
             $needsValidation = false;
         }
         
-        // If already absolute, return as-is
+        // If already absolute, use as-is, otherwise make relative to book root
         if (str_starts_with($path, '/')) {
             $normalized = rtrim($path, '/');
         } else {
-            // If relative, make it relative to book root
             $normalized = rtrim($this->bookRoot . '/' . ltrim($path, '/'), '/');
         }
         
-        // CRITICAL SAFETY: Ensure path stays within book root
-        $realPath = realpath(dirname($normalized)) ?: dirname($normalized);
+        // Resolve .. and . in the path
+        $parts = explode('/', $normalized);
+        $resolved = [];
+        
+        foreach ($parts as $part) {
+            if ($part === '' || $part === '.') {
+                continue;
+            }
+            if ($part === '..') {
+                array_pop($resolved);
+            } else {
+                $resolved[] = $part;
+            }
+        }
+        
+        $normalized = '/' . implode('/', $resolved);
+        
+        // CRITICAL SAFETY: Ensure resolved path stays within book root
         $realBookRoot = realpath($this->bookRoot);
         
-        if ($realBookRoot && !str_starts_with($realPath, $realBookRoot)) {
-            throw new \Exception("Path escapes book root: {$path}");
+        if ($realBookRoot && !str_starts_with($normalized, $realBookRoot)) {
+            throw new \Exception("Path escapes book root: {$normalized} (from: {$path})");
         }
         
         return $normalized;
