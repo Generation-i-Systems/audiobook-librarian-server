@@ -1,4 +1,13 @@
 ## [Unreleased]
+### Added
+- Implemented cover image priority system for imports
+  - Priority 1: Existing files in directory (cover.jpg, folder.jpg, *.jpg)
+  - Priority 2: Embedded cover from M4B file
+  - Priority 3: Cover from enrichment sources (Audible, Google Books)
+  - Added `findExistingCoverImage()` method to scan for cover files
+  - Existing and M4B covers are preserved during enrichment merge
+  - Clear logging shows which cover source was used
+
 ### Fixed
 - Fixed directory path display in import confirmation prompts
   - Manual path confirmation now shows full path including book title
