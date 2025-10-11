@@ -2388,7 +2388,7 @@ class ImportBooksFromDownloads extends Command
         }
 
         // Edit directory path
-        $currentPath = $this->getImportService()->generateDirectoryPath($metadata);
+        $currentPath = $this->getImportService()->generateDirectoryPath($metadata, ['include_title' => true]);
         $newPath = $this->askWithImmediateInterrupt("Directory Path (relative to library root)", $currentPath);
         if ($this->inputInterrupted) {
             return $metadata;
@@ -3091,7 +3091,7 @@ class ImportBooksFromDownloads extends Command
         $this->info("📁 Edit Directory Path");
 
         // Generate current path
-        $currentPath = $this->getImportService()->generateDirectoryPath($metadata);
+        $currentPath = $this->getImportService()->generateDirectoryPath($metadata, ['include_title' => true]);
         $this->line("Current path: {$currentPath}");
 
         // Allow user to edit the path
