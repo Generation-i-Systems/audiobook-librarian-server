@@ -2,7 +2,7 @@
 
 # Enhanced mv command for book directories (bkmv replacement)
 # Automatically updates database when moving directories in book root
-# Falls back to regular mv if not in book root
+# Falls back to mkdmv (auto-creates parent directories) if not in book root
 # Supports all standard mv options and multiple sources
 
 # Save the original working directory FIRST before any cd commands
@@ -28,6 +28,36 @@ debug() {
     if [[ $DEBUG -eq 1 ]]; then
         echo -e "${BLUE}[DEBUG]${NC} $*" >&2
     fi
+}
+
+# Enhanced mv that auto-creates parent directories (mkdmv behavior)
+mkdmv() {
+    local n=0 endofargs= dest=
+
+    # Parse arguments to find destination (last non-option arg)
+    for arg in "$@"; do
+        if [ -n "$endofargs" ] || [ "${arg#-}" = "$arg" ]; then
+            n=$((n+1))
+            dest=$arg
+        elif [ "$arg" = '--' ]; then
+            endofargs=1
+        fi
+    done
+
+    debug "mkdmv: found $n non-option args, dest=$dest"
+
+    # dest is a dir to be created if there are multiple src files or if target ends with "/"
+    if [ "$n" -gt 2 ] || [ "${dest%/}" != "$dest" ]; then
+        # append `.` to prevent `dirname` from returning parent dir
+        dest="$dest/."
+        debug "mkdmv: multiple sources or trailing slash, adjusted dest=$dest"
+    fi
+
+    local dest_dir
+    dest_dir=$(dirname -- "$dest")
+    debug "mkdmv: creating parent directory: $dest_dir"
+
+    mkdir -p -- "$dest_dir" && mv "$@"
 }
 
 # Separate mv options and positional args (like bkmv does)
@@ -83,12 +113,12 @@ fi
 
 # If less than 2 positional args, fallback to mv
 if [[ ${#args[@]} -lt 2 ]]; then
-    debug "Less than 2 arguments, falling back to regular mv"
+    debug "Less than 2 arguments, falling back to mkdmv"
     if [[ $DRY_RUN -eq 1 ]]; then
-        echo -e "${YELLOW}Would execute: mv ${opts[*]} ${args[*]}${NC}"
+        echo -e "${YELLOW}Would execute: mkdmv ${opts[*]} ${args[*]}${NC}"
         exit 0
     fi
-    mv "${opts[@]}" "${args[@]}"
+    mkdmv "${opts[@]}" "${args[@]}"
     exit $?
 fi
 
@@ -109,12 +139,12 @@ debug "BOOK_STORAGE_PATH: $BOOK_STORAGE_PATH"
 
 # Check if BOOK_STORAGE_PATH is set
 if [ -z "$BOOK_STORAGE_PATH" ]; then
-    debug "BOOK_STORAGE_PATH not set, falling back to regular mv"
+    debug "BOOK_STORAGE_PATH not set, falling back to mkdmv"
     if [[ $DRY_RUN -eq 1 ]]; then
-        echo -e "${YELLOW}Would execute: mv ${opts[*]} ${args[*]}${NC}"
+        echo -e "${YELLOW}Would execute: mkdmv ${opts[*]} ${args[*]}${NC}"
         exit 0
     fi
-    mv "${opts[@]}" "${args[@]}"
+    mkdmv "${opts[@]}" "${args[@]}"
     exit $?
 fi
 
@@ -167,14 +197,14 @@ for src in "${sources[@]}"; do
     debug "  ✗ Source is not under book root"
 done
 
-# If no sources are in book root, use regular mv with original working directory
+# If no sources are in book root, use mkdmv with original working directory
 if [[ $is_book -eq 0 ]]; then
-    debug "No sources in book root, falling back to regular mv"
+    debug "No sources in book root, falling back to mkdmv"
     if [[ $DRY_RUN -eq 1 ]]; then
-        echo -e "${YELLOW}Would execute: mv ${opts[*]} ${args[*]}${NC}"
+        echo -e "${YELLOW}Would execute: mkdmv ${opts[*]} ${args[*]}${NC}"
         exit 0
     fi
-    mv "${opts[@]}" "${args[@]}"
+    mkdmv "${opts[@]}" "${args[@]}"
     exit $?
 fi
 
@@ -224,9 +254,10 @@ cd "$PROJECT_ROOT" || exit 1
 
 # Check if artisan exists
 if [ ! -f "artisan" ]; then
-    echo -e "${RED}Laravel artisan not found, falling back to mv${NC}" >&2
+    echo -e "${RED}Laravel artisan not found, falling back to mkdmv${NC}" >&2
     debug "artisan file not found in $PROJECT_ROOT"
-    mv "${opts[@]}" "${args[@]}"
+    cd "$ORIGINAL_DIR" || exit 1
+    mkdmv "${opts[@]}" "${args[@]}"
     exit $?
 fi
 
@@ -246,15 +277,15 @@ EXIT_CODE=$?
 
 debug "Laravel command exit code: $EXIT_CODE"
 
-# Exit code 2 means "not a book move, use regular mv"
+# Exit code 2 means "not a book move, use mkdmv"
 if [ $EXIT_CODE -eq 2 ]; then
-    debug "Exit code 2: Not a book move, falling back to regular mv"
+    debug "Exit code 2: Not a book move, falling back to mkdmv"
     if [[ $DRY_RUN -eq 1 ]]; then
-        echo -e "${YELLOW}No books found in database - would execute: mv ${opts[*]} ${args[*]}${NC}"
+        echo -e "${YELLOW}No books found in database - would execute: mkdmv ${opts[*]} ${args[*]}${NC}"
         exit 0
     fi
     cd "$ORIGINAL_DIR" || exit 1
-    mv "${opts[@]}" "${args[@]}"
+    mkdmv "${opts[@]}" "${args[@]}"
     exit $?
 fi
 
