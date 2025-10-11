@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Author;
 use App\Traits\GenreMapping;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class MetadataProcessingService
@@ -128,6 +129,15 @@ class MetadataProcessingService
                 $mappedGenres[] = $this->mapToValidGenre(trim($genre));
             }
             $metadata['genre'] = $mappedGenres;
+        }
+
+        // If genre is empty, invalid, or "Other", try to use author's preferred genre
+        if (empty($metadata['genre']) ||
+            (count($metadata['genre']) === 1 && in_array($metadata['genre'][0], ['Other', 'Unknown', 'Audiobook', null]))) {
+            $preferredGenre = $this->getAuthorPreferredGenre($metadata['author'] ?? null);
+            if ($preferredGenre) {
+                $metadata['genre'] = [$preferredGenre];
+            }
         }
 
         return $metadata;
@@ -261,7 +271,19 @@ class MetadataProcessingService
         // Handle both string and array author data
         $authorNames = is_array($authorData) ? $authorData : [$authorData];
 
+        // Split comma-separated author strings
+        $splitAuthors = [];
         foreach ($authorNames as $authorName) {
+            if (strpos($authorName, ',') !== false) {
+                // This is a comma-separated list of authors, split it
+                $split = array_map('trim', explode(',', $authorName));
+                $splitAuthors = array_merge($splitAuthors, $split);
+            } else {
+                $splitAuthors[] = $authorName;
+            }
+        }
+
+        foreach ($splitAuthors as $authorName) {
             $authorName = trim($authorName);
             if (empty($authorName)) {
                 continue;
@@ -274,12 +296,12 @@ class MetadataProcessingService
             }
 
             // Get genre distribution for this author's books
-            $genreStats = \DB::table('books')
+            $genreStats = DB::table('books')
                 ->join('author_book', 'books.id', '=', 'author_book.book_id')
                 ->join('book_genre', 'books.id', '=', 'book_genre.book_id')
                 ->join('genres', 'book_genre.genre_id', '=', 'genres.id')
                 ->where('author_book.author_id', $author->id)
-                ->select('genres.name', \DB::raw('COUNT(*) as count'))
+                ->select('genres.name', DB::raw('COUNT(*) as count'))
                 ->groupBy('genres.name')
                 ->orderByDesc('count')
                 ->first();
