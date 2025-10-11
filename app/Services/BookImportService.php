@@ -848,7 +848,19 @@ class BookImportService
         // Handle both string and array author data
         $authorNames = is_array($authorData) ? $authorData : [$authorData];
 
+        // Split comma-separated author strings
+        $splitAuthors = [];
         foreach ($authorNames as $authorName) {
+            if (strpos($authorName, ',') !== false) {
+                // This is a comma-separated list of authors, split it
+                $split = array_map('trim', explode(',', $authorName));
+                $splitAuthors = array_merge($splitAuthors, $split);
+            } else {
+                $splitAuthors[] = $authorName;
+            }
+        }
+
+        foreach ($splitAuthors as $authorName) {
             $authorName = trim($authorName);
             if (empty($authorName)) {
                 continue;
