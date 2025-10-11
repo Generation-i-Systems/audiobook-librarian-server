@@ -38,12 +38,10 @@ class FixBookDirectoryPaths extends Command
         $this->line("Book root: {$realBookRoot}");
         $this->newLine();
 
-        // Get all books
-        $books = $this->documentStore->getAllBooks();
-        
-        if ($limit) {
-            $books = array_slice($books, 0, (int)$limit);
-        }
+        // Get all books (use a high page size to get all books)
+        $perPage = $limit ? (int)$limit : 10000;
+        $result = $this->documentStore->listBooks(1, $perPage, [], true);
+        $books = $result['data'] ?? [];
 
         $stats = [
             'total' => count($books),

@@ -1,5 +1,11 @@
 ## [Unreleased]
 ### Fixed
+- Fixed directory_path in database not matching actual filesystem location
+  - Changed `BookImportService` to store full path including title directory
+  - Database now stores: "Genre/Author/Series/02 Book Title"
+  - Previously stored: "Genre/Author/Series" (missing title directory)
+  - This fixes move operations failing with path mismatches
+  - Added `books:fix-directory-paths` command to repair existing books
 - Fixed `BackgroundProcessingService` to properly handle completed processes
   - Changed `maintainConcurrentTasks()` to call `wait()` on `InvokedProcess` before accessing result methods
   - Resolves "Call to undefined method Illuminate\Process\InvokedProcess::exitCode()" error
