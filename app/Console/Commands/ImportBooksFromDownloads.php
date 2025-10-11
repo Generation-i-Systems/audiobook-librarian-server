@@ -115,11 +115,18 @@ class ImportBooksFromDownloads extends Command
             $this->info('✅ Background processing enabled');
         }
 
-        // Create a database backup unless --no-backup is specified
-        if (!$this->option('no-backup')) {
+        // Create a database backup unless --no-backup is specified or in dry-run mode
+        if (!$this->option('no-backup') && !$this->option('dry-run')) {
+            $backupStartTime = microtime(true);
             $this->info('Creating a database backup before importing books...');
             $this->call('backup:database', ['--suffix' => 'import-books']);
+            $backupDuration = round((microtime(true) - $backupStartTime) * 1000);
             $this->info('Database backup created.');
+            if ($this->isOptionEnabled('verbose')) {
+                $this->line("⏱️  Database backup took: {$backupDuration}ms");
+            }
+        } elseif ($this->option('dry-run')) {
+            $this->line('⏩ Skipping database backup (dry-run mode)');
         }
 
         $this->info("🚀 Starting automated audiobook import from download directories...");
@@ -2023,7 +2030,12 @@ class ImportBooksFromDownloads extends Command
         }
 
         // Calculate and add expected directory path (including book title with series number)
+        $dirPathStartTime = microtime(true);
         $basePath = $this->getImportService()->generateDirectoryPath($metadata);
+        $dirPathDuration = round((microtime(true) - $dirPathStartTime) * 1000);
+        if ($this->isOptionEnabled('verbose') && $dirPathDuration > 100) {
+            $this->line("  ⏱️  Directory path generation took: {$dirPathDuration}ms");
+        }
         $title = $metadata['title'] ?? 'Unknown Title';
 
         // If we have a series number, prefix it to the title
@@ -2061,7 +2073,8 @@ class ImportBooksFromDownloads extends Command
         }
 
         // Display cover image if terminal supports it and cover is available
-        if (!empty($metadata['cover_url'])) {
+        // Skip image display in auto/dry-run mode to avoid hanging on terminal access
+        if (!empty($metadata['cover_url']) && !$this->option('auto') && !$this->option('dry-run')) {
             $coverStartTime = microtime(true);
             $this->displayCoverImage($metadata['cover_url']);
             $coverDuration = round((microtime(true) - $coverStartTime) * 1000);
@@ -2069,6 +2082,9 @@ class ImportBooksFromDownloads extends Command
             if ($this->isOptionEnabled('verbose')) {
                 $this->line("  ⏱️  Cover image display took: {$coverDuration}ms");
             }
+        } elseif (!empty($metadata['cover_url'])) {
+            // Just show the URL in auto/dry-run mode
+            $this->line("\n📸 Cover available: {$metadata['cover_url']}");
         }
     }
 
