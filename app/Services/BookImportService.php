@@ -411,6 +411,23 @@ class BookImportService
      */
     protected function copyDirectoryContents(string $source, string $target): void
     {
+        // Handle single file source
+        if (File::isFile($source)) {
+            $filename = basename($source);
+            $targetFile = "{$target}/{$filename}";
+            
+            if (!File::isDirectory($target)) {
+                File::makeDirectory($target, 0775, true);
+            }
+            
+            if (!File::copy($source, $targetFile)) {
+                throw new \Exception("Failed to copy file: {$source} to {$targetFile}");
+            }
+            
+            chmod($targetFile, 0664);
+            return;
+        }
+        
         if (!File::isDirectory($source)) {
             throw new \Exception("Source directory does not exist: {$source}");
         }
@@ -438,6 +455,26 @@ class BookImportService
      */
     protected function moveDirectoryContents(string $source, string $target): void
     {
+        // Handle single file source
+        if (File::isFile($source)) {
+            $filename = basename($source);
+            $targetFile = "{$target}/{$filename}";
+            
+            if (!File::isDirectory($target)) {
+                File::makeDirectory($target, 0775, true);
+            }
+            
+            if (!File::copy($source, $targetFile)) {
+                throw new \Exception("Failed to copy file: {$source} to {$targetFile}");
+            }
+            
+            chmod($targetFile, 0664);
+            
+            // Delete source file after successful copy
+            File::delete($source);
+            return;
+        }
+        
         if (!File::isDirectory($source)) {
             throw new \Exception("Source directory does not exist: {$source}");
         }
