@@ -24,16 +24,27 @@ class TerminalImageService
 
         if ($kittySupport || in_array($term, ['Ghostty', 'iTerm.app', 'WezTerm'])) {
             try {
+                $downloadStartTime = microtime(true);
                 $imageData = @file_get_contents($imageUrl);
+                $downloadDuration = round((microtime(true) - $downloadStartTime) * 1000);
 
                 if ($imageData) {
                     $output("\n📸 Cover Preview: {$imageUrl}");
+                    if (getenv('VERBOSE_TIMING')) {
+                        $output("  ⏱️  Cover download took: {$downloadDuration}ms");
+                    }
 
+                    $processStartTime = microtime(true);
                     if ($kittySupport) {
                         $this->displayKittyImage($imageData, $align, $place);
                     } elseif ($term === 'iTerm.app') {
                         $base64Image = base64_encode($imageData);
                         echo "\033]1337;File=inline=1;width=200px;height=150px:{$base64Image}\007";
+                    }
+                    $processDuration = round((microtime(true) - $processStartTime) * 1000);
+
+                    if (getenv('VERBOSE_TIMING')) {
+                        $output("  ⏱️  Image processing took: {$processDuration}ms");
                     }
 
                     $output("");

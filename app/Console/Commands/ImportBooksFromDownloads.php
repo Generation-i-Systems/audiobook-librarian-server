@@ -1371,12 +1371,23 @@ class ImportBooksFromDownloads extends Command
         }
 
         // Validate audiobook files before processing
+        $validateStartTime = microtime(true);
         if (!$this->validateAudiobookFiles($audiobook)) {
             return; // Skip if validation fails
         }
+        $validateDuration = round((microtime(true) - $validateStartTime) * 1000);
+        if ($this->isOptionEnabled('verbose')) {
+            $this->line("  ⏱️  File validation took: {$validateDuration}ms");
+        }
 
         // Process metadata with AI
+        $metadataStartTime = microtime(true);
         $aiMetadata = $this->processAudiobookMetadata($audiobook);
+        $metadataDuration = round((microtime(true) - $metadataStartTime) * 1000);
+        if ($this->isOptionEnabled('verbose')) {
+            $this->line("  ⏱️  Metadata processing took: {$metadataDuration}ms");
+        }
+
         if (!$aiMetadata) {
             return; // Skip if metadata processing failed
         }
@@ -1460,21 +1471,36 @@ class ImportBooksFromDownloads extends Command
         }
 
         // Check for duplicates with AI-extracted metadata (more accurate than path-based check)
+        $duplicateStartTime = microtime(true);
         if (!$this->handleDuplicateDetection($audiobook, $aiMetadata)) {
             return; // Skip if duplicate handling indicated to stop processing
+        }
+        $duplicateDuration = round((microtime(true) - $duplicateStartTime) * 1000);
+        if ($this->isOptionEnabled('verbose')) {
+            $this->line("  ⏱️  Duplicate detection took: {$duplicateDuration}ms");
         }
 
         // Step 2: External data enrichment (before manual review)
         $this->performExternalDataEnrichment($aiMetadata);
 
         // Fix Graphic Audio metadata AFTER enrichment (so it overrides external data)
+        $gaStartTime = microtime(true);
         $this->fixGraphicAudioMetadata($aiMetadata, $audiobook);
+        $gaDuration = round((microtime(true) - $gaStartTime) * 1000);
+        if ($this->isOptionEnabled('verbose')) {
+            $this->line("  ⏱️  GraphicAudio metadata fix took: {$gaDuration}ms");
+        }
 
         $this->newLine();
 
         // Add source path for display and processing
         $aiMetadata['source_path'] = $audiobook['path'];
+        $displayStartTime = microtime(true);
         $this->displayEnrichedMetadata($aiMetadata);
+        $displayDuration = round((microtime(true) - $displayStartTime) * 1000);
+        if ($this->isOptionEnabled('verbose')) {
+            $this->line("  ⏱️  Metadata display took: {$displayDuration}ms");
+        }
         $this->newLine();
 
         // Show expected directory path
@@ -1746,8 +1772,16 @@ class ImportBooksFromDownloads extends Command
             return;
         }
 
+        $startTime = microtime(true);
         $this->info("🔍 Attempting to enrich with external data...");
+
+        $enrichStartTime = microtime(true);
         $enrichedData = $this->getEnrichmentService()->enrichWithExternalData($aiMetadata);
+        $enrichDuration = round((microtime(true) - $enrichStartTime) * 1000);
+
+        if ($this->isOptionEnabled('verbose')) {
+            $this->line("  ⏱️  Enrichment API call took: {$enrichDuration}ms");
+        }
 
         if (!$enrichedData) {
             $this->warn("⚠️  No enrichment data found");
@@ -1770,7 +1804,11 @@ class ImportBooksFromDownloads extends Command
                 $aiMetadata['cover_source'] = 'Embedded in M4B';
             }
 
+            $totalDuration = round((microtime(true) - $startTime) * 1000);
             $this->info("✅ Found enrichment data!");
+            if ($this->isOptionEnabled('verbose')) {
+                $this->line("  ⏱️  Total enrichment took: {$totalDuration}ms");
+            }
         } else {
             $this->warn("⚠️  Invalid enrichment data - skipping merge.");
         }
@@ -2014,10 +2052,23 @@ class ImportBooksFromDownloads extends Command
             $tableData[] = ['Cover Source', $source];
         }
 
+        $tableStartTime = microtime(true);
         $this->table(['Field', 'Value'], $tableData);
+        $tableDuration = round((microtime(true) - $tableStartTime) * 1000);
+
+        if ($this->isOptionEnabled('verbose')) {
+            $this->line("  ⏱️  Table rendering took: {$tableDuration}ms");
+        }
+
         // Display cover image if terminal supports it and cover is available
         if (!empty($metadata['cover_url'])) {
+            $coverStartTime = microtime(true);
             $this->displayCoverImage($metadata['cover_url']);
+            $coverDuration = round((microtime(true) - $coverStartTime) * 1000);
+
+            if ($this->isOptionEnabled('verbose')) {
+                $this->line("  ⏱️  Cover image display took: {$coverDuration}ms");
+            }
         }
     }
 
