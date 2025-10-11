@@ -9,6 +9,15 @@
   - Clear logging shows which cover source was used
 
 ### Fixed
+- Fixed books:move command path security check with symlinks
+  - bookRoot is resolved to real path for consistency
+  - Now resolves user-provided paths to real paths before comparison
+  - Works with both symlink paths and real paths
+  - Example: `/media/audiobooks` (symlink) → `/media/lyra_data1/audiobooks/books` (real)
+- Fixed books:move command with `..` in relative paths
+  - Now resolves `..` and `.` before security check
+  - Example: `../Author/Series/Book` works correctly
+  - Security still enforced on final resolved path
 - Fixed directory path display in import confirmation prompts
   - Manual path confirmation now shows full path including book title
   - Before: "Fantasy/Author/Series"
