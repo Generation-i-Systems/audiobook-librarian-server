@@ -583,6 +583,14 @@ class ImportBooksFromDownloads extends Command
             $this->line("🔍 Checking for multi-book series in: " . basename($directory));
         }
 
+        // Handle case where $directory is actually a file path
+        if (is_file($directory)) {
+            if ($this->isOptionEnabled('verbose')) {
+                $this->line("  Path is a single file, not a multi-book series");
+            }
+            return null;
+        }
+
         // Find all audio files directly in this directory (not subdirectories)
         $files = File::files($directory);
 

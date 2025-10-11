@@ -1,7 +1,25 @@
 #!/usr/bin/env bash
 
-# Import Book - Quick wrapper for books:import command
+# Import Book - Quick wrapper for books:import-downloads command
+# Uses AI processing and external data enrichment (Audible, Google Books)
 # This script can be symlinked to a common bin directory for easy access
+
+# Save the original working directory FIRST before any cd commands
+ORIGINAL_DIR="$(pwd)"
+
+# Colors for output
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Debug mode flag
+DEBUG=0
+
+# Debug function
+debug() {
+    if [[ $DEBUG -eq 1 ]]; then
+        echo -e "${BLUE}[DEBUG]${NC} $*" >&2
+    fi
+}
 
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -9,15 +27,84 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Find the Laravel project root (parent of bin directory)
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-# Change to project directory
-cd "$PROJECT_ROOT" || exit 1
+# Parse options and arguments
+opts=()
+args=()
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -v|--verbose)
+            DEBUG=1
+            opts+=("$1")
+            shift
+            ;;
+        -n|--dry-run)
+            opts+=("$1")
+            shift
+            ;;
+        -nv|-vn)
+            DEBUG=1
+            opts+=("--dry-run" "--verbose")
+            shift
+            ;;
+        --*)
+            opts+=("$1")
+            shift
+            ;;
+        -*)
+            # Check if this is a combined flag containing n or v
+            if [[ "$1" =~ v ]]; then
+                DEBUG=1
+            fi
+            opts+=("$1")
+            shift
+            ;;
+        *)
+            args+=("$1")
+            shift
+            ;;
+    esac
+done
+
+debug "Script started"
+debug "Original directory: $ORIGINAL_DIR"
+debug "Project root: $PROJECT_ROOT"
+debug "Options: ${opts[*]}"
+debug "Arguments: ${args[*]}"
 
 # If no arguments provided, use current working directory
-if [ $# -eq 0 ]; then
-    # Get the original working directory before we changed to project root
-    ORIGINAL_DIR="$OLDPWD"
-    php artisan books:import "$ORIGINAL_DIR" "${@:1}"
+if [ ${#args[@]} -eq 0 ]; then
+    debug "No arguments, using current directory: $ORIGINAL_DIR"
+    # Change to project directory and use original working directory
+    cd "$PROJECT_ROOT" || exit 1
+    php artisan books:import-downloads "$ORIGINAL_DIR" "${opts[@]}"
 else
-    # Pass all arguments to the artisan command
-    php artisan books:import "$@"
+    # Resolve all arguments to absolute paths before changing directory
+    resolved_args=()
+    for arg in "${args[@]}"; do
+        debug "Processing argument: $arg"
+        # If argument is a file or directory path that exists, resolve to absolute
+        if [ -e "$arg" ] || [ -e "$ORIGINAL_DIR/$arg" ]; then
+            # Try to resolve as absolute path from original directory
+            abs_path=$(cd "$ORIGINAL_DIR" && realpath "$arg" 2>/dev/null)
+            if [ -n "$abs_path" ]; then
+                debug "  Resolved to: $abs_path"
+                resolved_args+=("$abs_path")
+            else
+                # If realpath fails, pass the argument as-is (might be an option)
+                debug "  Could not resolve, passing as-is"
+                resolved_args+=("$arg")
+            fi
+        else
+            # Not a path, pass as-is (probably an option/flag)
+            debug "  Not a path, passing as-is"
+            resolved_args+=("$arg")
+        fi
+    done
+
+    debug "Resolved arguments: ${resolved_args[*]}"
+    debug "Running: php artisan books:import-downloads ${resolved_args[*]} ${opts[*]}"
+
+    # Change to project directory and pass resolved paths
+    cd "$PROJECT_ROOT" || exit 1
+    php artisan books:import-downloads "${resolved_args[@]}" "${opts[@]}"
 fi

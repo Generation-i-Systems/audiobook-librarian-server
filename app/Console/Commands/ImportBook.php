@@ -154,8 +154,38 @@ class ImportBook extends Command
             return;
         }
 
+        // When importing a single audio file, treat the file itself as a single-book directory
+        // Create a temporary directory with just this file, then import it
         $directory = dirname($filePath);
-        $this->processDirectory($directory, $dryRun, $force);
+        $filename = basename($filePath);
+
+        $this->line("Processing file: {$filename}");
+
+        // Create a unique temporary directory for this single file
+        $tempDir = sys_get_temp_dir() . '/librarian-import-' . uniqid();
+        try {
+            mkdir($tempDir, 0755, true);
+
+            // Create a symlink to the file in the temp directory
+            $tempFilePath = $tempDir . '/' . $filename;
+            symlink($filePath, $tempFilePath);
+
+            // Also symlink the metadata file if it exists
+            $metadataFile = $directory . '/metadata.abs';
+            if (file_exists($metadataFile)) {
+                symlink($metadataFile, $tempDir . '/metadata.abs');
+            }
+
+            // Process this temporary directory as a book directory
+            $this->processDirectory($tempDir, $dryRun, $force);
+
+        } finally {
+            // Clean up temporary directory
+            if (is_dir($tempDir)) {
+                array_map('unlink', glob("$tempDir/*"));
+                rmdir($tempDir);
+            }
+        }
     }
 
     private function processDirectory(string $dirPath, bool $dryRun, bool $force): void
