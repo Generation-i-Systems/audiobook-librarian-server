@@ -10,7 +10,8 @@ class FixBookDirectoryPaths extends Command
 {
     protected $signature = 'books:fix-directory-paths
                             {--dry-run : Show what would be fixed without making changes}
-                            {--limit= : Limit number of books to process}';
+                            {--limit= : Limit number of books to process}
+                            {--debug : Show debug information}';
 
     protected $description = 'Fix directory_path in database to match actual filesystem locations';
 
@@ -26,6 +27,7 @@ class FixBookDirectoryPaths extends Command
     {
         $dryRun = $this->option('dry-run');
         $limit = $this->option('limit');
+        $debug = $this->option('debug');
 
         $this->info('Checking books for directory path mismatches...');
         if ($dryRun) {
@@ -43,6 +45,12 @@ class FixBookDirectoryPaths extends Command
         $result = $this->documentStore->listBooks(1, $perPage, [], true);
         $books = $result['data'] ?? [];
 
+        if ($debug && !empty($books)) {
+            $this->line("Sample book structure:");
+            $this->line(json_encode(array_slice($books[0], 0, 10), JSON_PRETTY_PRINT));
+            $this->newLine();
+        }
+
         $stats = [
             'total' => count($books),
             'fixed' => 0,
@@ -59,6 +67,12 @@ class FixBookDirectoryPaths extends Command
 
             $currentPath = $book['directory_path'] ?? null;
             if (!$currentPath) {
+                if ($debug) {
+                    $progressBar->clear();
+                    $this->error("Book missing directory_path: " . ($book['title'] ?? 'Unknown'));
+                    $this->line("Book keys: " . implode(', ', array_keys($book)));
+                    $progressBar->display();
+                }
                 $stats['errors']++;
                 continue;
             }
