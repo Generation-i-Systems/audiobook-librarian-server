@@ -368,10 +368,17 @@ class MoveBookDirectory extends Command
         $normalized = '/' . implode('/', $resolved);
         
         // CRITICAL SAFETY: Ensure resolved path stays within book root
-        $realBookRoot = realpath($this->bookRoot);
+        // We need to resolve the normalized path to its real path for comparison
+        // since bookRoot is already resolved to real path
+        $parentDir = dirname($normalized);
+        $basename = basename($normalized);
         
-        if ($realBookRoot && !str_starts_with($normalized, $realBookRoot)) {
-            throw new \Exception("Path escapes book root: {$normalized} (from: {$path})");
+        // Get real path of parent directory (or use as-is if doesn't exist yet)
+        $realParent = realpath($parentDir) ?: $parentDir;
+        $realNormalized = rtrim($realParent . '/' . $basename, '/');
+        
+        if (!str_starts_with($realNormalized, $this->bookRoot)) {
+            throw new \Exception("Path escapes book root: {$realNormalized} (from: {$path}, bookRoot: {$this->bookRoot})");
         }
         
         return $normalized;
