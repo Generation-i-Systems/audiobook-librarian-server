@@ -1968,11 +1968,11 @@ class ImportBooksFromDownloads extends Command
         $tableData = [
             ['Title', $arrayToString($metadata['title'])],
             ['Author', $formatAuthors($metadata['author'])],
-            ['Narrator', $arrayToString($metadata['narrator'])],
+            ['Narrator', $arrayToString($metadata['narrator'] ?? null)],
             ['Series', $displaySeries],
             ['Genre', $arrayToString($metadata['genre'])],
             ['Year', $metadata['year'] ?? 'N/A'],
-            ['Publisher', $arrayToString($metadata['publisher'])],
+            ['Publisher', $arrayToString($metadata['publisher'] ?? null)],
             ['Language', $metadata['language'] ?? 'N/A'],
             ['ISBN', $metadata['isbn'] ?? 'N/A'],
             ['Confidence', $metadata['confidence'] . '%'],

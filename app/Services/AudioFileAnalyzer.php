@@ -126,27 +126,35 @@ class AudioFileAnalyzer
      */
     public function analyzeDirectory(string $directory): ?array
     {
-        if (!is_dir($directory)) {
-            return null;
-        }
+        // Handle single file path
+        if (is_file($directory)) {
+            $extension = strtolower(pathinfo($directory, PATHINFO_EXTENSION));
+            if (in_array($extension, $this->supportedExtensions)) {
+                $audioFile = $directory;
+            } else {
+                return null;
+            }
+        } elseif (is_dir($directory)) {
+            // Find first audio file to extract metadata from
+            $files = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($directory, \RecursiveDirectoryIterator::SKIP_DOTS)
+            );
 
-        // Find first audio file to extract metadata from
-        $files = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($directory, \RecursiveDirectoryIterator::SKIP_DOTS)
-        );
-
-        $audioFile = null;
-        foreach ($files as $file) {
-            if ($file->isFile()) {
-                $extension = strtolower($file->getExtension());
-                if (in_array($extension, $this->supportedExtensions)) {
-                    $audioFile = $file->getPathname();
-                    break;
+            $audioFile = null;
+            foreach ($files as $file) {
+                if ($file->isFile()) {
+                    $extension = strtolower($file->getExtension());
+                    if (in_array($extension, $this->supportedExtensions)) {
+                        $audioFile = $file->getPathname();
+                        break;
+                    }
                 }
             }
-        }
 
-        if (!$audioFile) {
+            if (!$audioFile) {
+                return null;
+            }
+        } else {
             return null;
         }
 
@@ -155,7 +163,7 @@ class AudioFileAnalyzer
             getid3_lib::CopyTagsToComments($fileInfo);
 
             $metadata = [
-                'confidence' => 75, // Audio file metadata has medium confidence
+                'confidence' => 75, // Default: Audio file metadata has medium confidence
             ];
 
             // For M4B/M4A files, check quicktime tags first
@@ -199,14 +207,40 @@ class AudioFileAnalyzer
                 }
             }
 
-            // Get duration from directory
-            $durationInfo = $this->getDirectoryAudioDuration($directory);
-            if ($durationInfo['total_seconds'] > 0) {
-                $metadata['duration'] = (int) $durationInfo['total_seconds'];
+            // Get duration
+            if (is_file($directory)) {
+                // Single file - get its duration directly
+                $duration = $this->getAudioDuration($audioFile);
+                if ($duration !== null && $duration > 0) {
+                    $metadata['duration'] = (int) $duration;
+                }
+            } else {
+                // Directory - sum all audio file durations
+                $durationInfo = $this->getDirectoryAudioDuration($directory);
+                if ($durationInfo['total_seconds'] > 0) {
+                    $metadata['duration'] = (int) $durationInfo['total_seconds'];
+                }
             }
 
             // Only return metadata if we found at least title or author
             if (isset($metadata['title']) || isset($metadata['author'])) {
+                // Adjust confidence based on metadata completeness
+                $fieldsFound = 0;
+                $criticalFields = ['title', 'author', 'series', 'genre', 'year'];
+                foreach ($criticalFields as $field) {
+                    if (isset($metadata[$field]) && !empty($metadata[$field])) {
+                        $fieldsFound++;
+                    }
+                }
+
+                // Increase confidence if we have most metadata fields
+                // 5/5 fields = 95%, 4/5 = 90%, 3/5 = 85%, 2/5 = 80%, 1/5 = 75%
+                if ($fieldsFound >= 4) {
+                    $metadata['confidence'] = 90 + ($fieldsFound - 4) * 5;
+                } elseif ($fieldsFound >= 2) {
+                    $metadata['confidence'] = 75 + ($fieldsFound - 2) * 5;
+                }
+
                 return $metadata;
             }
 
