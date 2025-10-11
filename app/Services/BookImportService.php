@@ -625,30 +625,28 @@ class BookImportService
         }
 
         try {
-            $iterator = new \RecursiveIteratorIterator(
-                new \RecursiveDirectoryIterator($bookStoragePath, \RecursiveDirectoryIterator::SKIP_DOTS),
-                \RecursiveIteratorIterator::SELF_FIRST
-            );
+            // Only scan 2 levels deep: [genre]/[author]
+            // No need for recursive scanning since all authors are at this depth
+            $genreDirs = File::directories($bookStoragePath);
 
-            foreach ($iterator as $dir) {
-                if (!$dir->isDir()) {
-                    continue;
-                }
+            foreach ($genreDirs as $genreDir) {
+                $authorDirs = File::directories($genreDir);
 
-                $dirPath = $dir->getPathname();
-                $pathParts = explode('/', str_replace($bookStoragePath . '/', '', $dirPath));
-
-                if (count($pathParts) >= 2) {
-                    $authorDirName = $pathParts[1];
+                foreach ($authorDirs as $authorDir) {
+                    $authorDirName = basename($authorDir);
 
                     foreach ($authorCombinations as $combination) {
                         $expectedDirName = $this->formatAuthorsForDirectory($combination);
 
                         if ($authorDirName === $expectedDirName) {
-                            if ($seriesName && count($pathParts) >= 3) {
-                                $seriesDirName = $pathParts[2];
-                                if (stripos($seriesDirName, $seriesName) !== false) {
-                                    return $authorDirName;
+                            // If series name is specified, check if this author has that series
+                            if ($seriesName) {
+                                $seriesDirs = File::directories($authorDir);
+                                foreach ($seriesDirs as $seriesDir) {
+                                    $seriesDirName = basename($seriesDir);
+                                    if (stripos($seriesDirName, $seriesName) !== false) {
+                                        return $authorDirName;
+                                    }
                                 }
                             } else {
                                 return $authorDirName;
