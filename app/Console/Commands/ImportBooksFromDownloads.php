@@ -1399,6 +1399,14 @@ class ImportBooksFromDownloads extends Command
             return; // Skip if metadata processing failed
         }
 
+        // Check for existing cover image files first (highest priority)
+        $existingCover = $this->findExistingCoverImage($audiobook['path']);
+        if ($existingCover) {
+            $aiMetadata['cover_url'] = $existingCover;
+            $aiMetadata['cover_source'] = 'Existing file in directory';
+            $this->info("  ✓ Found existing cover image: " . basename($existingCover));
+        }
+
         // If this is a split book, preserve the pre-set series number and other metadata
         if (!empty($audiobook['metadata'])) {
             // Merge pre-set metadata, giving priority to split book metadata for series info
@@ -1414,7 +1422,8 @@ class ImportBooksFromDownloads extends Command
             }
 
             // Extract cover image and additional metadata from the M4B file if this is a split book
-            if (!empty($audiobook['is_split_book']) && !empty($audiobook['files'][0])) {
+            // Only extract if no existing cover was found
+            if (!empty($audiobook['is_split_book']) && !empty($audiobook['files'][0]) && !$existingCover) {
                 $audioFilePath = $audiobook['files'][0];
 
                 // Extract file tags using existing AIBookProcessor method (cached)
@@ -1796,19 +1805,28 @@ class ImportBooksFromDownloads extends Command
         }
 
         if ($this->getEnrichmentService()->isValidEnrichment($aiMetadata, $enrichedData)) {
-            // Preserve M4B-extracted cover if it exists
-            $m4bCover = null;
-            if (isset($aiMetadata['cover_source']) && $aiMetadata['cover_source'] === 'Embedded in M4B') {
-                $m4bCover = $aiMetadata['cover_url'];
-                $this->line("  Preserving M4B cover (priority over external sources)");
+            // Preserve existing cover or M4B-extracted cover (priority over enrichment sources)
+            $preservedCover = null;
+            $preservedSource = null;
+            
+            if (isset($aiMetadata['cover_source'])) {
+                if ($aiMetadata['cover_source'] === 'Existing file in directory') {
+                    $preservedCover = $aiMetadata['cover_url'];
+                    $preservedSource = $aiMetadata['cover_source'];
+                    $this->line("  Preserving existing cover file (priority over all sources)");
+                } elseif ($aiMetadata['cover_source'] === 'Embedded in M4B') {
+                    $preservedCover = $aiMetadata['cover_url'];
+                    $preservedSource = $aiMetadata['cover_source'];
+                    $this->line("  Preserving M4B cover (priority over enrichment sources)");
+                }
             }
 
             $aiMetadata = array_merge($aiMetadata, $enrichedData);
 
-            // Restore M4B cover if it was set
-            if ($m4bCover) {
-                $aiMetadata['cover_url'] = $m4bCover;
-                $aiMetadata['cover_source'] = 'Embedded in M4B';
+            // Restore preserved cover if it was set
+            if ($preservedCover) {
+                $aiMetadata['cover_url'] = $preservedCover;
+                $aiMetadata['cover_source'] = $preservedSource;
             }
 
             $totalDuration = round((microtime(true) - $startTime) * 1000);
@@ -3379,5 +3397,35 @@ class ImportBooksFromDownloads extends Command
         }
 
         return false;
+    }
+
+    /**
+     * Find existing cover image in directory
+     * Priority: cover.jpg, cover.jpeg, folder.jpg, *.jpg (first found)
+     */
+    protected function findExistingCoverImage(string $directory): ?string
+    {
+        $coverPatterns = [
+            'cover.jpg',
+            'cover.jpeg',
+            'folder.jpg',
+            'folder.jpeg',
+        ];
+
+        // Check for specific cover files first
+        foreach ($coverPatterns as $pattern) {
+            $coverPath = $directory . '/' . $pattern;
+            if (File::exists($coverPath)) {
+                return $coverPath;
+            }
+        }
+
+        // Fall back to any JPG/JPEG file in the directory
+        $imageFiles = glob($directory . '/*.{jpg,jpeg,JPG,JPEG}', GLOB_BRACE);
+        if (!empty($imageFiles)) {
+            return $imageFiles[0];
+        }
+
+        return null;
     }
 }
