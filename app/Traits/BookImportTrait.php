@@ -105,7 +105,7 @@ trait BookImportTrait
      * Extract cover image from m4b file using ffmpeg.
      * Returns filename (relative, e.g. 'cover.jpg') or null.
      */
-    private function extractCoverFromM4B($m4bPath, $outputDir)
+    protected function extractCoverFromM4B($m4bPath, $outputDir)
     {
         $outputImage = rtrim($outputDir, '/') . '/cover.jpg';
         $process = new Process([

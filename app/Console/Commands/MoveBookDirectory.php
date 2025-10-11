@@ -30,7 +30,13 @@ class MoveBookDirectory extends Command
     {
         parent::__construct();
         $this->documentStore = $documentStore;
-        $this->bookRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
+
+        // Resolve book root to real path (handles symlinks and bind mounts)
+        $bookStoragePath = env('BOOK_STORAGE_PATH');
+        $realPath = realpath($bookStoragePath);
+
+        // Use the real path if it exists, otherwise fall back to configured path
+        $this->bookRoot = rtrim($realPath ?: $bookStoragePath, '/');
     }
 
     /**
@@ -41,10 +47,20 @@ class MoveBookDirectory extends Command
         $sources = $this->argument('sources');
         $dryRun = $this->option('dry-run');
         $noDb = $this->option('no-db');
+        $verbose = $this->option('verbose');
+
+        if ($verbose) {
+            $this->line("<fg=blue>[DEBUG]</> Received sources: " . json_encode($sources));
+        }
 
         // Last argument is destination
         $destination = array_pop($sources);
-        
+
+        if ($verbose) {
+            $this->line("<fg=blue>[DEBUG]</> Destination: {$destination}");
+            $this->line("<fg=blue>[DEBUG]</> Remaining sources: " . json_encode($sources));
+        }
+
         if (empty($sources)) {
             $this->error("No source files specified");
             return 1;
@@ -54,6 +70,10 @@ class MoveBookDirectory extends Command
         if (empty($this->bookRoot)) {
             $this->error("BOOK_STORAGE_PATH not configured");
             return 1;
+        }
+
+        if ($verbose) {
+            $this->line("<fg=blue>[DEBUG]</> Book root: {$this->bookRoot}");
         }
 
         if (!is_dir($this->bookRoot)) {
@@ -120,16 +140,34 @@ class MoveBookDirectory extends Command
 
         $allAffectedBooks = [];
         $bookSources = [];
-        
+
         // Process each source
         foreach ($sources as $source) {
             $sourcePath = $this->normalizePath($source);
-            
+
+            if ($verbose) {
+                $this->line("<fg=blue>[DEBUG]</> Processing source: {$source}");
+                $this->line("<fg=blue>[DEBUG]</> Normalized to: {$sourcePath}");
+            }
+
             // Check if this source is in book root
             if ($this->isInBookRoot($sourcePath)) {
+                if ($verbose) {
+                    $this->line("<fg=blue>[DEBUG]</> Source is in book root");
+                }
+
                 $sourceRelative = $this->getRelativePath($sourcePath);
+
+                if ($verbose) {
+                    $this->line("<fg=blue>[DEBUG]</> Relative path: {$sourceRelative}");
+                }
+
                 $affectedBooks = $this->findAffectedBooks($sourceRelative);
-                
+
+                if ($verbose) {
+                    $this->line("<fg=blue>[DEBUG]</> Found " . count($affectedBooks) . " affected books");
+                }
+
                 if (!empty($affectedBooks)) {
                     $bookSources[] = [
                         'path' => $sourcePath,
@@ -138,11 +176,18 @@ class MoveBookDirectory extends Command
                     ];
                     $allAffectedBooks = array_merge($allAffectedBooks, $affectedBooks);
                 }
+            } else {
+                if ($verbose) {
+                    $this->line("<fg=blue>[DEBUG]</> Source is NOT in book root");
+                }
             }
         }
 
         // If no book sources found, this is not a book move
         if (empty($bookSources)) {
+            if ($verbose) {
+                $this->line("<fg=blue>[DEBUG]</> No book sources found, returning exit code 2");
+            }
             return 2; // Signal to fall back to regular mv
         }
 

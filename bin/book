@@ -15,10 +15,23 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 # Separate directory arguments from options and resolve paths
 DIRS=()
 OPTS=()
+EXPECTING_VALUE=false
 for arg in "$@"; do
-    if [[ "$arg" == -* ]]; then
+    if [[ "$EXPECTING_VALUE" == true ]]; then
+        # This is a value for the previous option
         OPTS+=("$arg")
+        EXPECTING_VALUE=false
+    elif [[ "$arg" == -* ]]; then
+        OPTS+=("$arg")
+        # Check if this option expects a value (has = or is a short flag without =)
+        if [[ "$arg" == --*=* ]] || [[ "$arg" == -[a-zA-Z] ]]; then
+            # Long option with = has value inline, or short option might have separate value
+            if [[ "$arg" == -[a-zA-Z] ]]; then
+                EXPECTING_VALUE=true
+            fi
+        fi
     else
+        # This is a directory argument (not preceded by an option flag)
         # Resolve relative paths to absolute paths before cd
         if [[ "$arg" == /* ]]; then
             # Already absolute

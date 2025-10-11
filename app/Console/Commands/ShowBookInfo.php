@@ -7,22 +7,24 @@ use App\Models\Book;
 use App\Models\Genre;
 use App\Models\Series;
 use App\Services\TerminalImageService;
+use App\Traits\BookImportTrait;
 use Illuminate\Console\Command;
 
 class ShowBookInfo extends Command
 {
+    use BookImportTrait;
     protected $signature = 'books:info {directories?*}
                             {--compact : Use compact view instead of table}
-                            {--cover= : Update cover image (filename or path)}
-                            {--title= : Update book title}
-                            {--author=* : Update authors (+add, -remove, or replace all)}
-                            {--series=* : Update series (+add, -remove, or replace all)}
-                            {--genre=* : Update genres (+add, -remove, or replace all)}
-                            {--publisher= : Update publisher name}
-                            {--language= : Update language code}
-                            {--release-date= : Update release date (YYYY-MM-DD)}
-                            {--description= : Update book description}
-                            {--source= : Update source of the book data}';
+                            {--c|cover= : Update cover image (filename or path)}
+                            {--t|title= : Update book title}
+                            {--a|author=* : Update authors (+add, -remove, or replace all)}
+                            {--s|series=* : Update series (+add, -remove, or replace all)}
+                            {--g|genre=* : Update genres (+add, -remove, or replace all)}
+                            {--p|publisher= : Update publisher name}
+                            {--l|language= : Update language code}
+                            {--r|release-date= : Update release date (YYYY-MM-DD)}
+                            {--d|description= : Update book description}
+                            {--S|source= : Update source of the book data}';
 
     protected $description = 'Display and optionally update book information from database';
 
@@ -135,12 +137,26 @@ class ShowBookInfo extends Command
                 $this->info("✓ Updated directory path from '{$oldPath}' to '{$searchPath}'");
                 $this->newLine();
             }
+
+            // Update book if any options were provided
+            if ($this->hasUpdateOptions()) {
+                $this->updateBookFields($book, $directory);
+            }
+
+            $this->displayBookInfo($book);
+            $this->newLine();
+            return;
         } else {
             $this->info("Found {$books->count()} book(s) matching: {$directory}");
             $this->newLine();
         }
 
         foreach ($books as $book) {
+            // Update book if any options were provided (only if there's exactly one book)
+            if ($books->count() === 1 && $this->hasUpdateOptions()) {
+                $this->updateBookFields($book, $directory);
+            }
+
             $this->displayBookInfo($book);
             $this->newLine();
         }
@@ -604,6 +620,19 @@ class ShowBookInfo extends Command
                 $updated = true;
             } elseif (file_exists($coverInput)) {
                 $realCoverPath = realpath($coverInput);
+
+                // Check if this is an m4b file - extract cover from it
+                if (strtolower(pathinfo($realCoverPath, PATHINFO_EXTENSION)) === 'm4b') {
+                    $extractedCoverFilename = $this->extractCoverFromM4B($realCoverPath, $directory);
+                    if ($extractedCoverFilename) {
+                        // The trait method returns just the filename, so construct the full path
+                        $realCoverPath = $directory . '/' . $extractedCoverFilename;
+                        $this->info("✓ Extracted cover from m4b file");
+                    } else {
+                        $this->error("Failed to extract cover from m4b file");
+                        return;
+                    }
+                }
 
                 if (str_starts_with($realCoverPath, $bookRoot)) {
                     $relativePath = ltrim(substr($realCoverPath, strlen($bookRoot)), '/');
