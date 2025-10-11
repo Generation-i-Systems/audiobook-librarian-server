@@ -36,8 +36,9 @@ class BookImportService
             $book->language = $metadata['language'] ?? 'en';
             $book->source = 'import';
 
-            // Store directory path for the audiobook files
-            $book->directory_path = $this->generateDirectoryPath($metadata);
+            // Store directory path for the audiobook files (including title)
+            // This must match the actual filesystem path where files will be moved
+            $book->directory_path = $this->generateDirectoryPath($metadata, ['include_title' => true]);
 
             // Handle duration (should be in seconds as integer)
             if (isset($metadata['duration'])) {
