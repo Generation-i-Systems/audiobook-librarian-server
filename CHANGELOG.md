@@ -1,5 +1,10 @@
 ## [Unreleased]
 ### Fixed
+- Fixed single audio file imports failing with "Source directory does not exist"
+  - Removed temporary directory creation with symlinks
+  - Now processes parent directory directly
+  - Files moved from actual location instead of temp directory
+  - Fixes import of single M4B/M4A/MP3 files from download folder
 - Fixed directory_path in database not matching actual filesystem location
   - Changed `BookImportService` to store full path including title directory
   - Database now stores: "Genre/Author/Series/02 Book Title"
