@@ -1,3 +1,34 @@
+## CODING STANDARDS & RULES
+
+### Command & Script Standards
+**All commands and scripts MUST follow these rules:**
+
+1. **Verbose/Debug Options**
+   - All commands MUST have a `--verbose` or `--debug` option
+   - Verbose output should show detailed progress and decisions
+   - Debug output should include data structures and internal state
+   - Example: `--verbose`, `--debug`, `-v`, `-vv`
+
+2. **Dry-Run for Data Modifications**
+   - All commands that modify data MUST have a `--dry-run` option
+   - Dry-run mode MUST show what would be changed without making changes
+   - Dry-run output should clearly indicate it's a preview
+   - Example: `--dry-run`, `-n`
+
+3. **Required Options for All Commands**
+   - Data-modifying commands: `--dry-run`, `--verbose`
+   - Read-only commands: `--verbose` or `--debug`
+   - Batch operations: `--limit` to process subset
+   - Destructive operations: Confirmation prompts unless `--force`
+
+4. **Output Standards**
+   - Progress bars for long-running operations
+   - Clear summary at the end (counts, errors, warnings)
+   - Color coding: green=success, yellow=warning, red=error, blue=info
+   - Structured output with clear sections
+
+---
+
 2025-10-08: Audiobook Web Player Implementation Plan
 - Created comprehensive implementation plan for web-based audiobook player
 - Phase 1: Core Infrastructure
