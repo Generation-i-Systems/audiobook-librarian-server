@@ -211,7 +211,9 @@ class MoveBookDirectory extends Command
             $sourcePath = $bookSource['path'];
             $finalDest = $destPath;
             
-            if (count($sources) > 1 || str_ends_with($destination, '/')) {
+            // If multiple sources, trailing slash, OR destination is an existing directory,
+            // treat as "move into directory" operation
+            if (count($sources) > 1 || str_ends_with($destination, '/') || is_dir($destPath)) {
                 $finalDest = $destPath . '/' . basename($sourcePath);
             }
             
@@ -219,6 +221,7 @@ class MoveBookDirectory extends Command
                 $this->line("<fg=blue>[DEBUG]</> Checking destination: {$finalDest}");
                 $this->line("<fg=blue>[DEBUG]</> Source basename: " . basename($sourcePath));
                 $this->line("<fg=blue>[DEBUG]</> Destination ends with /: " . (str_ends_with($destination, '/') ? 'yes' : 'no'));
+                $this->line("<fg=blue>[DEBUG]</> Destination is directory: " . (is_dir($destPath) ? 'yes' : 'no'));
             }
             
             if (file_exists($finalDest)) {
@@ -241,7 +244,7 @@ class MoveBookDirectory extends Command
                 
                 // Calculate final destination for this source
                 $finalDest = $destPath;
-                if (count($sources) > 1 || str_ends_with($destination, '/')) {
+                if (count($sources) > 1 || str_ends_with($destination, '/') || is_dir($destPath)) {
                     $finalDest = $destPath . '/' . basename($sourcePath);
                 }
                 
