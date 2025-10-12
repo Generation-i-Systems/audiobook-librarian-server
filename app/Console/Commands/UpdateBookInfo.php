@@ -62,9 +62,30 @@ class UpdateBookInfo extends Command
                 $this->info("Downloading cover image from URL...");
                 
                 try {
-                    $imageData = file_get_contents($coverPath);
+                    // Use stream context to follow redirects
+                    $context = stream_context_create([
+                        'http' => [
+                            'follow_location' => true,
+                            'max_redirects' => 10,
+                            'timeout' => 30,
+                            'user_agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                        ],
+                        'ssl' => [
+                            'verify_peer' => false,
+                            'verify_peer_name' => false
+                        ]
+                    ]);
+                    
+                    $imageData = file_get_contents($coverPath, false, $context);
                     if ($imageData === false) {
                         throw new \Exception("Failed to download image");
+                    }
+                    
+                    // Validate it's actually an image
+                    $finfo = new \finfo(FILEINFO_MIME_TYPE);
+                    $mimeType = $finfo->buffer($imageData);
+                    if (!str_starts_with($mimeType, 'image/')) {
+                        throw new \Exception("Downloaded content is not an image (got: {$mimeType})");
                     }
                     
                     // Determine file extension from URL or content type
