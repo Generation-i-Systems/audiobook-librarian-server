@@ -1,5 +1,13 @@
 ## [Unreleased]
 ### Added
+- Added `books:resolve-duplicate-paths` command to find and resolve duplicate directory paths
+  - Scans all books for duplicate `directory_path` values
+  - Displays detailed side-by-side comparison of duplicate books
+  - Calculates completeness score (% of fields populated)
+  - Interactive resolution: keep as is, merge auto, merge manual, or ignore
+  - Options: `--dry-run`, `--auto`, `--limit=N`
+  - Automatically keeps most complete book when merging
+  - Safe deletion with logging and confirmation
 - Enhanced `books:update` and `books:info` commands to download cover images from URLs
   - Automatically downloads and saves cover images when URL is provided
   - Follows HTTP redirects (up to 10 hops) for Google Images, Goodreads, etc.
