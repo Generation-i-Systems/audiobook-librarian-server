@@ -1,5 +1,11 @@
 ## [Unreleased]
 ### Added
+- Enhanced `books:update` command to download cover images from URLs
+  - Automatically downloads and saves cover images when URL is provided
+  - Saves as `cover.{ext}` in book directory
+  - Supports jpg, jpeg, png, gif, webp formats
+  - Stores relative path in database instead of external URL
+  - Example: `books:update /path/to/book --cover=https://example.com/image.jpg`
 - Implemented cover image priority system for imports
   - Priority 1: Existing files in directory (cover.jpg, folder.jpg, *.jpg)
   - Priority 2: Embedded cover from M4B file
