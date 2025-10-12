@@ -15,6 +15,7 @@ class ShowBookInfo extends Command
     use BookImportTrait;
     protected $signature = 'books:info {directories?*}
                             {--compact : Use compact view instead of table}
+                            {--v|verbose : Show verbose output including full paths}
                             {--c|cover= : Update cover image (filename or path)}
                             {--t|title= : Update book title}
                             {--a|author=* : Update authors (+add, -remove, or replace all)}
@@ -309,6 +310,12 @@ class ShowBookInfo extends Command
         // Color red if directory doesn't exist
         if (!$directoryExists && $directoryPath !== 'N/A') {
             $wrappedDirectory = "<fg=red>{$wrappedDirectory}</>";
+            // Add note about missing directory
+            if ($this->option('verbose')) {
+                $wrappedDirectory .= "\n<fg=gray>  (Checked: {$fullPath})</>";
+            }
+        } elseif ($this->option('verbose') && $directoryPath !== 'N/A') {
+            $wrappedDirectory .= "\n<fg=gray>  (Exists: {$fullPath})</>";
         }
         
         $tableData[] = ['Directory', $wrappedDirectory];
