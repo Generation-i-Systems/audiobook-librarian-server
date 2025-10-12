@@ -53,14 +53,38 @@ class ShowBookInfo extends Command
             $directories = [getcwd()];
         }
 
+        // Validate directories - if any don't exist and we have update options, assume current directory
+        $validDirectories = [];
+        $hasInvalidDirectories = false;
+        
         foreach ($directories as $directory) {
-            $directory = realpath($directory);
-
-            if (!$directory || !is_dir($directory)) {
-                $this->error("Directory not found: {$directory}");
-                continue;
+            $realPath = realpath($directory);
+            if ($realPath && is_dir($realPath)) {
+                $validDirectories[] = $realPath;
+            } else {
+                $hasInvalidDirectories = true;
             }
+        }
+        
+        // If we have invalid directories and update options are provided, use current directory
+        if ($hasInvalidDirectories && $this->hasUpdateOptions() && empty($validDirectories)) {
+            $this->warn("Note: Using current directory (arguments don't appear to be valid paths)");
+            $validDirectories = [getcwd()];
+        } elseif ($hasInvalidDirectories) {
+            // Show error for invalid directories only if we're not using update options
+            foreach ($directories as $directory) {
+                if (!realpath($directory) || !is_dir(realpath($directory))) {
+                    $this->error("Directory not found: {$directory}");
+                }
+            }
+        }
+        
+        // If no valid directories, use current directory
+        if (empty($validDirectories)) {
+            $validDirectories = [getcwd()];
+        }
 
+        foreach ($validDirectories as $directory) {
             $this->showBookFromDirectory($directory);
         }
 
@@ -273,7 +297,20 @@ class ShowBookInfo extends Command
         $rowCount++;
 
         $directoryWidth = $rowCount <= $imageCoverageRows ? $shortWidth : $maxWidth;
-        $wrappedDirectory = $this->wrapText($book->directoryPath ?? 'N/A', $directoryWidth);
+        $directoryPath = $book->directoryPath ?? 'N/A';
+        
+        // Check if directory exists on disk
+        $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
+        $fullPath = $bookRoot . '/' . ltrim($directoryPath, '/');
+        $directoryExists = is_dir($fullPath);
+        
+        $wrappedDirectory = $this->wrapText($directoryPath, $directoryWidth);
+        
+        // Color red if directory doesn't exist
+        if (!$directoryExists && $directoryPath !== 'N/A') {
+            $wrappedDirectory = "<fg=red>{$wrappedDirectory}</>";
+        }
+        
         $tableData[] = ['Directory', $wrappedDirectory];
         $rowCount++;
 
@@ -450,7 +487,19 @@ class ShowBookInfo extends Command
 
         $this->printField('Audio Files', $book->audioFileCount ?? 0, $leftWidth);
         $this->printField('Source', $book->source ?? 'N/A', $leftWidth);
-        $this->printField('Directory', $book->directoryPath ?? 'N/A', $leftWidth);
+        
+        // Check if directory exists on disk
+        $directoryPath = $book->directoryPath ?? 'N/A';
+        $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
+        $fullPath = $bookRoot . '/' . ltrim($directoryPath, '/');
+        $directoryExists = is_dir($fullPath);
+        
+        // Color red if directory doesn't exist
+        if (!$directoryExists && $directoryPath !== 'N/A') {
+            $this->printField('Directory', "<fg=red>{$directoryPath}</>", $leftWidth);
+        } else {
+            $this->printField('Directory', $directoryPath, $leftWidth);
+        }
 
         if ($book->needsReview) {
             $reasons = $book->needsReviewReasons ? implode(', ', $book->needsReviewReasons) : 'Unknown';
