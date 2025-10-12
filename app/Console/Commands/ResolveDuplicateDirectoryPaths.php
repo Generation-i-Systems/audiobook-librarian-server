@@ -33,7 +33,25 @@ class ResolveDuplicateDirectoryPaths extends Command
 
         // Get all books directly from database to include directory_path field
         // The listBooks() method doesn't return directory_path, so we query directly
-        $allBooks = \App\Models\Book::all()->toArray();
+        $allBooks = \App\Models\Book::all()->map(function ($book) {
+            $bookArray = $book->toArray();
+            
+            // Ensure JSON fields are decoded
+            if (isset($bookArray['author']) && is_string($bookArray['author'])) {
+                $bookArray['author'] = json_decode($bookArray['author'], true) ?? $bookArray['author'];
+            }
+            if (isset($bookArray['series']) && is_string($bookArray['series'])) {
+                $bookArray['series'] = json_decode($bookArray['series'], true) ?? $bookArray['series'];
+            }
+            if (isset($bookArray['narrator']) && is_string($bookArray['narrator'])) {
+                $bookArray['narrator'] = json_decode($bookArray['narrator'], true) ?? $bookArray['narrator'];
+            }
+            if (isset($bookArray['genre']) && is_string($bookArray['genre'])) {
+                $bookArray['genre'] = json_decode($bookArray['genre'], true) ?? $bookArray['genre'];
+            }
+            
+            return $bookArray;
+        })->toArray();
         
         if ($verbose) {
             $this->line("Total books retrieved: " . count($allBooks));
