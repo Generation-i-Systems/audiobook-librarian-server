@@ -3301,10 +3301,16 @@ class ImportBooksFromDownloads extends Command
         $spinner->setMessage("🤖 Analyzing metadata with AI...");
         $spinner->start();
 
+        $aiStartTime = microtime(true);
         $aiMetadata = $this->getMetadataService()->processWithAI($cleanedAudiobook);
+        $aiDuration = round((microtime(true) - $aiStartTime) * 1000);
 
         $spinner->finish();
         $this->output->write("\r\033[K");
+
+        if ($this->isOptionEnabled('verbose')) {
+            $this->line("  ⏱️  AI processing took: {$aiDuration}ms");
+        }
 
         // Check if we should try audio analysis (low confidence OR forced)
         $shouldTryAudio = !$aiMetadata ||
@@ -3322,7 +3328,14 @@ class ImportBooksFromDownloads extends Command
             }
 
             // Try audio analysis fallback
+            $audioStartTime = microtime(true);
             $audioMetadata = $this->getMetadataService()->processWithAudioAnalysis($audiobook);
+            $audioDuration = round((microtime(true) - $audioStartTime) * 1000);
+
+            if ($this->isOptionEnabled('verbose')) {
+                $this->line("  ⏱️  Audio analysis took: {$audioDuration}ms");
+            }
+
             if ($audioMetadata && $audioMetadata['confidence'] >= $this->option('min-confidence')) {
                 $this->info("✅ Audio analysis successful with " . $audioMetadata['confidence'] . "% confidence");
                 $aiMetadata = $audioMetadata;

@@ -180,6 +180,13 @@ class BookEnrichmentService
                     $enrichedData['series'] = $bookData['series'];
                 }
 
+                // Extract genre/categories if available
+                if (!empty($bookData['genre'])) {
+                    $enrichedData['genre'] = is_array($bookData['genre']) ? $bookData['genre'] : [$bookData['genre']];
+                } elseif (!empty($bookData['categories'])) {
+                    $enrichedData['genre'] = is_array($bookData['categories']) ? $bookData['categories'] : [$bookData['categories']];
+                }
+
                 return $enrichedData;
             }
         } catch (\Exception $e) {
@@ -235,6 +242,11 @@ class BookEnrichmentService
 
             if (!empty($volumeInfo['publisher'])) {
                 $enrichedData['publisher'] = $volumeInfo['publisher'];
+            }
+
+            // Extract genre/categories if available
+            if (!empty($volumeInfo['categories'])) {
+                $enrichedData['genre'] = is_array($volumeInfo['categories']) ? $volumeInfo['categories'] : [$volumeInfo['categories']];
             }
 
             return $enrichedData;

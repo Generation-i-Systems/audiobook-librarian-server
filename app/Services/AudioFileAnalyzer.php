@@ -159,8 +159,18 @@ class AudioFileAnalyzer
         }
 
         try {
+            $analyzeStartTime = microtime(true);
             $fileInfo = $this->getID3->analyze($audioFile);
+            $analyzeDuration = round((microtime(true) - $analyzeStartTime) * 1000);
+
+            $copyStartTime = microtime(true);
             getid3_lib::CopyTagsToComments($fileInfo);
+            $copyDuration = round((microtime(true) - $copyStartTime) * 1000);
+
+            if (getenv('VERBOSE_TIMING')) {
+                echo "    ⏱️  getID3->analyze() took: {$analyzeDuration}ms\n";
+                echo "    ⏱️  CopyTagsToComments() took: {$copyDuration}ms\n";
+            }
 
             $metadata = [
                 'confidence' => 75, // Default: Audio file metadata has medium confidence
@@ -208,6 +218,7 @@ class AudioFileAnalyzer
             }
 
             // Get duration
+            $durationStartTime = microtime(true);
             if (is_file($directory)) {
                 // Single file - get its duration directly
                 $duration = $this->getAudioDuration($audioFile);
@@ -220,6 +231,11 @@ class AudioFileAnalyzer
                 if ($durationInfo['total_seconds'] > 0) {
                     $metadata['duration'] = (int) $durationInfo['total_seconds'];
                 }
+            }
+            $durationDuration = round((microtime(true) - $durationStartTime) * 1000);
+
+            if (getenv('VERBOSE_TIMING') && $durationDuration > 10) {
+                echo "    ⏱️  Duration calculation took: {$durationDuration}ms\n";
             }
 
             // Only return metadata if we found at least title or author

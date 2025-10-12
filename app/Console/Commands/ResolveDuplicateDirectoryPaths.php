@@ -85,8 +85,7 @@ class ResolveDuplicateDirectoryPaths extends Command
 
         $processed = 0;
         $stats = [
-            'kept_as_is' => 0,
-            'merged_auto' => 0,
+            'resolved' => 0,
             'merged_manual' => 0,
             'ignored' => 0,
             'errors' => 0,
@@ -100,9 +99,10 @@ class ResolveDuplicateDirectoryPaths extends Command
             $this->displayDuplicateBooks($path, $books);
 
             if ($auto) {
-                $action = 'merge_auto';
+                // Auto mode: keep first book
+                $action = 'keep_0';
             } else {
-                $action = $this->askForAction();
+                $action = $this->askForAction($books);
             }
 
             if ($action === 'ignore') {
@@ -114,19 +114,13 @@ class ResolveDuplicateDirectoryPaths extends Command
             }
 
             try {
-                switch ($action) {
-                    case 'keep_as_is':
-                        $this->handleKeepAsIs($books, $dryRun);
-                        $stats['kept_as_is']++;
-                        break;
-                    case 'merge_auto':
-                        $this->handleMergeAuto($books, $dryRun);
-                        $stats['merged_auto']++;
-                        break;
-                    case 'merge_manual':
-                        $this->handleMergeManual($books, $dryRun);
-                        $stats['merged_manual']++;
-                        break;
+                if (str_starts_with($action, 'keep_')) {
+                    $keepIndex = (int) substr($action, 5);
+                    $this->handleKeepSpecific($books, $keepIndex, $dryRun);
+                    $stats['resolved']++;
+                } elseif ($action === 'merge_manual') {
+                    $this->handleMergeManual($books, $dryRun);
+                    $stats['merged_manual']++;
                 }
             } catch (\Exception $e) {
                 $this->error("Error processing: " . $e->getMessage());
@@ -281,63 +275,67 @@ class ResolveDuplicateDirectoryPaths extends Command
         return $total > 0 ? (int) round(($present / $total) * 100) : 0;
     }
 
-    protected function askForAction(): string
+    protected function askForAction(array $books): string
     {
         $this->newLine();
-        $this->line('<fg=bright-white>What would you like to do?</>');
-        $this->line('  1. <fg=green>Keep as is</> - Keep both books unchanged');
-        $this->line('  2. <fg=cyan>Merge automatically</> - Keep most complete book, delete others');
-        $this->line('  3. <fg=yellow>Merge manually</> - Choose which book to keep');
-        $this->line('  4. <fg=gray>Ignore</> - Skip for now');
-        $this->newLine();
-
-        $choice = $this->ask('Enter your choice (1-4)', '2');
-
-        return match ($choice) {
-            '1' => 'keep_as_is',
-            '2' => 'merge_auto',
-            '3' => 'merge_manual',
-            '4' => 'ignore',
-            default => 'merge_auto',
-        };
-    }
-
-    protected function handleKeepAsIs(array $books, bool $dryRun): void
-    {
-        $this->info('✓ Keeping both books as is');
-        if (!$dryRun) {
-            Log::info('Kept duplicate books as is', [
-                'book_ids' => array_map(fn($b) => $b['id'] ?? $b['_id'], $books)
-            ]);
-        }
-    }
-
-    protected function handleMergeAuto(array $books, bool $dryRun): void
-    {
-        // Find the most complete book
-        $bestBook = null;
-        $bestScore = -1;
-
-        foreach ($books as $book) {
+        $this->line('<fg=bright-white>Which book would you like to keep?</>');
+        
+        foreach ($books as $index => $book) {
+            $bookNum = $index + 1;
+            $id = $book['id'] ?? $book['_id'];
+            $title = $book['title'] ?? 'N/A';
             $score = $this->calculateCompletenessScore($book);
-            if ($score > $bestScore) {
-                $bestScore = $score;
-                $bestBook = $book;
-            }
+            $this->line("  {$bookNum}. <fg=cyan>Keep Book #{$bookNum}</> (ID: {$id}, completeness: {$score}%)");
+        }
+        
+        $this->line('  ' . (count($books) + 1) . '. <fg=yellow>Merge manually</> - Choose specific fields from each');
+        $this->line('  ' . (count($books) + 2) . '. <fg=gray>Ignore</> - Skip for now');
+        $this->newLine();
+
+        $maxChoice = count($books) + 2;
+        $choice = $this->ask("Enter your choice (1-{$maxChoice})", '1');
+        $choiceNum = (int) $choice;
+
+        if ($choiceNum >= 1 && $choiceNum <= count($books)) {
+            return 'keep_' . ($choiceNum - 1);
+        } elseif ($choiceNum === count($books) + 1) {
+            return 'merge_manual';
+        } elseif ($choiceNum === count($books) + 2) {
+            return 'ignore';
         }
 
-        $keepId = $bestBook['id'] ?? $bestBook['_id'];
-        $this->info("✓ Keeping book ID: {$keepId} (completeness: {$bestScore}%)");
+        return 'keep_0'; // Default to keeping first book
+    }
+
+    protected function handleKeepSpecific(array $books, int $keepIndex, bool $dryRun): void
+    {
+        if ($keepIndex < 0 || $keepIndex >= count($books)) {
+            throw new \Exception('Invalid book index');
+        }
+
+        $keepBook = $books[$keepIndex];
+        $keepId = $keepBook['id'] ?? $keepBook['_id'];
+        $keepTitle = $keepBook['title'] ?? 'N/A';
+        
+        $this->info("✓ Keeping book ID: {$keepId} - {$keepTitle}");
 
         // Delete the others
-        foreach ($books as $book) {
-            $bookId = $book['id'] ?? $book['_id'];
-            if ($bookId !== $keepId) {
+        foreach ($books as $index => $book) {
+            if ($index !== $keepIndex) {
+                $bookId = $book['id'] ?? $book['_id'];
+                $bookTitle = $book['title'] ?? 'N/A';
+                
                 if ($dryRun) {
-                    $this->line("  Would delete book ID: {$bookId}");
+                    $this->line("  Would delete book ID: {$bookId} - {$bookTitle}");
                 } else {
                     $this->documentStore->deleteBook($bookId);
-                    $this->line("  <fg=red>Deleted</> book ID: {$bookId}");
+                    $this->line("  <fg=red>Deleted</> book ID: {$bookId} - {$bookTitle}");
+                    
+                    Log::info('Deleted duplicate book', [
+                        'deleted_id' => $bookId,
+                        'kept_id' => $keepId,
+                        'directory_path' => $keepBook['directory_path'] ?? 'N/A'
+                    ]);
                 }
             }
         }
@@ -387,8 +385,7 @@ class ResolveDuplicateDirectoryPaths extends Command
         $this->line('═══════════════════════════════════════════════════════════════');
         $this->line('  Summary' . ($dryRun ? ' (DRY RUN)' : ''));
         $this->line('═══════════════════════════════════════════════════════════════');
-        $this->line("  <fg=green>Kept as is:</>        {$stats['kept_as_is']}");
-        $this->line("  <fg=cyan>Merged auto:</>       {$stats['merged_auto']}");
+        $this->line("  <fg=green>Resolved:</>          {$stats['resolved']}");
         $this->line("  <fg=yellow>Merged manual:</>     {$stats['merged_manual']}");
         $this->line("  <fg=gray>Ignored:</>           {$stats['ignored']}");
         $this->line("  <fg=red>Errors:</>            {$stats['errors']}");
