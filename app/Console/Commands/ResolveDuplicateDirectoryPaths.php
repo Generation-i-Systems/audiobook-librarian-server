@@ -33,11 +33,7 @@ class ResolveDuplicateDirectoryPaths extends Command
 
         // Get all books directly from database to include directory_path field
         // The listBooks() method doesn't return directory_path, so we query directly
-        $allBooks = \App\Models\Book::select([
-            'id', 'title', 'directory_path', 'author', 'narrator', 'series', 
-            'genre', 'year', 'publisher', 'isbn', 'description', 'coverImage',
-            'source', 'created_at', 'updated_at'
-        ])->get()->toArray();
+        $allBooks = \App\Models\Book::all()->toArray();
         
         if ($verbose) {
             $this->line("Total books retrieved: " . count($allBooks));
