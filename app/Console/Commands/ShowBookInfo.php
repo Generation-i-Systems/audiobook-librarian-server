@@ -303,7 +303,8 @@ class ShowBookInfo extends Command
         // Check if directory exists on disk
         $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
         $fullPath = $bookRoot . '/' . ltrim($directoryPath, '/');
-        $directoryExists = is_dir($fullPath);
+        // Use file_exists and is_dir together, and check that it's readable
+        $directoryExists = file_exists($fullPath) && is_dir($fullPath) && is_readable($fullPath);
         
         $wrappedDirectory = $this->wrapText($directoryPath, $directoryWidth);
         
@@ -312,7 +313,7 @@ class ShowBookInfo extends Command
             $wrappedDirectory = "<fg=red>{$wrappedDirectory}</>";
             // Add note about missing directory
             if ($this->option('show-paths')) {
-                $wrappedDirectory .= "\n<fg=gray>  (Checked: {$fullPath})</>";
+                $wrappedDirectory .= "\n<fg=gray>  (Missing: {$fullPath})</>";
             }
         } elseif ($this->option('show-paths') && $directoryPath !== 'N/A') {
             $wrappedDirectory .= "\n<fg=gray>  (Exists: {$fullPath})</>";
@@ -499,7 +500,8 @@ class ShowBookInfo extends Command
         $directoryPath = $book->directoryPath ?? 'N/A';
         $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
         $fullPath = $bookRoot . '/' . ltrim($directoryPath, '/');
-        $directoryExists = is_dir($fullPath);
+        // Use file_exists and is_dir together, and check that it's readable
+        $directoryExists = file_exists($fullPath) && is_dir($fullPath) && is_readable($fullPath);
         
         // Color red if directory doesn't exist
         if (!$directoryExists && $directoryPath !== 'N/A') {
