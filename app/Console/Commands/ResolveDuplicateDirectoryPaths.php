@@ -209,7 +209,6 @@ class ResolveDuplicateDirectoryPaths extends Command
         }
         $this->line("  Publisher: {$publisher}");
         $this->line("  Year:      {$year}");
-        $this->line("  ISBN:      {$isbn}");
         $this->line("  Source:    {$source}");
         $this->line("  Cover:     {$coverImage}");
 
@@ -406,7 +405,6 @@ class ResolveDuplicateDirectoryPaths extends Command
             'publisher' => 'Publisher',
             'year' => 'Year',
             'releaseDate' => 'Release Date',
-            'isbn' => 'ISBN',
             'description' => 'Description',
             'coverImage' => 'Cover Image',
             'source' => 'Source',
@@ -417,18 +415,41 @@ class ResolveDuplicateDirectoryPaths extends Command
             $this->line("<fg=cyan>{$label}:</>");
             $hasMultipleValues = false;
             $values = [];
+            $displayValues = [];
             
             foreach ($books as $index => $book) {
                 $bookNum = $index + 1;
                 $value = $book[$field] ?? null;
                 
                 if ($value !== null && $value !== '' && $value !== 'N/A') {
-                    $displayValue = is_array($value) ? json_encode($value) : $value;
-                    if (strlen($displayValue) > 100) {
-                        $displayValue = substr($displayValue, 0, 100) . '...';
+                    // Format display value based on field type
+                    if ($field === 'author' && is_array($value)) {
+                        $displayValue = $this->formatAuthors($value);
+                        // Add IDs in parentheses
+                        $ids = array_map(fn($a) => $a['id'] ?? '?', $value);
+                        $displayValue .= ' (IDs: ' . implode(', ', $ids) . ')';
+                    } elseif ($field === 'series' && is_array($value)) {
+                        $displayValue = $this->formatSeries($value);
+                        // Add IDs in parentheses
+                        $ids = array_map(fn($s) => $s['id'] ?? '?', $value);
+                        $displayValue .= ' (IDs: ' . implode(', ', $ids) . ')';
+                    } elseif ($field === 'narrator' && is_array($value)) {
+                        $displayValue = $this->formatNarrators($value);
+                        // Add IDs in parentheses
+                        $ids = array_map(fn($n) => $n['id'] ?? '?', $value);
+                        $displayValue .= ' (IDs: ' . implode(', ', $ids) . ')';
+                    } elseif (is_array($value)) {
+                        $displayValue = json_encode($value);
+                    } else {
+                        $displayValue = (string) $value;
                     }
-                    $this->line("  {$bookNum}. {$displayValue}");
+                    
+                    if (strlen($displayValue) > 150) {
+                        $displayValue = substr($displayValue, 0, 150) . '...';
+                    }
+                    
                     $values[$bookNum] = $value;
+                    $displayValues[$bookNum] = $displayValue;
                     $hasMultipleValues = true;
                 }
             }
@@ -441,16 +462,30 @@ class ResolveDuplicateDirectoryPaths extends Command
             if (count($values) === 1) {
                 // Only one book has this field, use it automatically
                 $mergedBook[$field] = array_values($values)[0];
+                $this->line("  " . array_values($displayValues)[0]);
                 $this->line("  <fg=green>→ Using only available value</>");
             } else {
-                // Multiple values, ask user to choose
-                $choice = $this->ask("  Choose which to use (1-" . count($books) . ", or 'skip')");
-                
-                if (strtolower(trim($choice)) !== 'skip' && isset($values[(int)$choice])) {
-                    $mergedBook[$field] = $values[(int)$choice];
-                    $this->line("  <fg=green>→ Selected option {$choice}</>");
+                // Check if all values are identical
+                $uniqueDisplayValues = array_unique($displayValues);
+                if (count($uniqueDisplayValues) === 1) {
+                    // All values are the same, use automatically
+                    $mergedBook[$field] = array_values($values)[0];
+                    $this->line("  " . array_values($displayValues)[0]);
+                    $this->line("  <fg=green>→ All values identical, using automatically</>");
                 } else {
-                    $this->line("  <fg=gray>→ Skipped</>");
+                    // Multiple different values, ask user to choose
+                    foreach ($displayValues as $num => $display) {
+                        $this->line("  {$num}. {$display}");
+                    }
+                    
+                    $choice = $this->ask("  Choose which to use (1-" . count($books) . ", or 'skip')");
+                    
+                    if (strtolower(trim($choice)) !== 'skip' && isset($values[(int)$choice])) {
+                        $mergedBook[$field] = $values[(int)$choice];
+                        $this->line("  <fg=green>→ Selected option {$choice}</>");
+                    } else {
+                        $this->line("  <fg=gray>→ Skipped</>");
+                    }
                 }
             }
             
