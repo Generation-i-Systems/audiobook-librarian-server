@@ -245,8 +245,9 @@ class ResolveDuplicateDirectoryPaths extends Command
                 if (is_string($s)) {
                     $formatted[] = $s;
                 } elseif (is_array($s)) {
-                    $name = $s['name'] ?? $s['series'] ?? 'Unknown';
-                    $number = $s['series_number'] ?? $s['number'] ?? null;
+                    $name = $s['name'] ?? $s['series'] ?? $s['seriesName'] ?? 'Unknown';
+                    // Check multiple possible field names for the series number
+                    $number = $s['series_number'] ?? $s['seriesNumber'] ?? $s['number'] ?? $s['bookNumber'] ?? $s['pivot']['bookNumber'] ?? null;
                     $formatted[] = $number ? "{$name} #{$number}" : $name;
                 }
             }
