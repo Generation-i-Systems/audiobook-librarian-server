@@ -512,14 +512,49 @@ class ResolveDuplicateDirectoryPaths extends Command
             }
         } else {
             // Update the first book with merged data
+            // Separate relationship fields from regular fields
             $updateData = [];
+            $relationshipFields = ['author', 'series', 'narrator', 'genre'];
+            
             foreach ($mergeableFields as $field => $label) {
-                if (isset($mergedBook[$field])) {
+                if (isset($mergedBook[$field]) && !in_array($field, $relationshipFields)) {
                     $updateData[$field] = $mergedBook[$field];
                 }
             }
             
-            $this->documentStore->updateBook($baseId, $updateData);
+            // Update basic fields
+            if (!empty($updateData)) {
+                $this->documentStore->updateBook($baseId, $updateData);
+            }
+            
+            // Update relationships using the Book model
+            $bookModel = \App\Models\Book::find($baseId);
+            if ($bookModel) {
+                // Sync authors
+                if (isset($mergedBook['author']) && is_array($mergedBook['author'])) {
+                    $authorIds = array_map(fn($a) => $a['id'], $mergedBook['author']);
+                    $bookModel->authors()->sync($authorIds);
+                }
+                
+                // Sync narrators
+                if (isset($mergedBook['narrator']) && is_array($mergedBook['narrator'])) {
+                    $narratorIds = array_map(fn($n) => $n['id'], $mergedBook['narrator']);
+                    $bookModel->narrators()->sync($narratorIds);
+                }
+                
+                // Sync series
+                if (isset($mergedBook['series']) && is_array($mergedBook['series'])) {
+                    $seriesIds = array_map(fn($s) => $s['id'], $mergedBook['series']);
+                    $bookModel->series()->sync($seriesIds);
+                }
+                
+                // Sync genres
+                if (isset($mergedBook['genre']) && is_array($mergedBook['genre'])) {
+                    $genreIds = array_map(fn($g) => $g['id'], $mergedBook['genre']);
+                    $bookModel->genres()->sync($genreIds);
+                }
+            }
+            
             $this->info("✓ Updated book ID: {$baseId} with merged data");
             
             // Delete the other books
