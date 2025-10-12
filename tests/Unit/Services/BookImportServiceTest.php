@@ -125,4 +125,72 @@ class BookImportServiceTest extends TestCase
         $this->assertStringContainsString('Standalone Book', $targetPath);
         $this->assertStringNotContainsString('01', $targetPath);
     }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function getAuthorPreferredGenreHandlesCommaSeparatedAuthorString(): void
+    {
+        $author1 = Author::create(['name' => 'First Author']);
+        $author2 = Author::create(['name' => 'Second Author']);
+        $genre = Genre::create(['name' => 'Fantasy']);
+
+        // Create 2 Fantasy books for First Author
+        for ($i = 1; $i <= 2; $i++) {
+            $book = Book::create([
+                'title' => "Fantasy Book {$i}",
+                'directory_path' => "Fantasy/First Author/Book {$i}",
+                'language' => 'en',
+            ]);
+            $book->authors()->attach($author1);
+            $book->genres()->attach($genre);
+        }
+
+        // Test with comma-separated string (as it comes from audio file metadata)
+        $result = $this->service->getAuthorPreferredGenre(['First Author, Second Author']);
+
+        $this->assertEquals('Fantasy', $result);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function getAuthorPreferredGenreReturnsNullForAuthorWithOnlyOneBook(): void
+    {
+        $author = Author::create(['name' => 'New Author']);
+        $genre = Genre::create(['name' => 'Mystery']);
+
+        $book = Book::create([
+            'title' => 'Single Book',
+            'directory_path' => 'Mystery/New Author/Single Book',
+            'language' => 'en',
+        ]);
+        $book->authors()->attach($author);
+        $book->genres()->attach($genre);
+
+        $result = $this->service->getAuthorPreferredGenre('New Author');
+
+        // Should return null because author needs at least 2 books in same genre
+        $this->assertNull($result);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function getAuthorPreferredGenreFindsSecondAuthorInCommaSeparatedList(): void
+    {
+        $author1 = Author::create(['name' => 'Unknown Author']);
+        $author2 = Author::create(['name' => 'Famous Author']);
+        $genre = Genre::create(['name' => 'Thriller']);
+
+        // Create 2 Thriller books for Famous Author (second in list)
+        for ($i = 1; $i <= 2; $i++) {
+            $book = Book::create([
+                'title' => "Thriller Book {$i}",
+                'directory_path' => "Thriller/Famous Author/Book {$i}",
+                'language' => 'en',
+            ]);
+            $book->authors()->attach($author2);
+            $book->genres()->attach($genre);
+        }
+
+        // Test with comma-separated string where second author has the history
+        $result = $this->service->getAuthorPreferredGenre(['Unknown Author, Famous Author']);
+
+        $this->assertEquals('Thriller', $result);
+    }
 }
