@@ -360,7 +360,11 @@ class ShowBookInfo extends Command
         $tableData[] = ['Updated', $book->updatedAt?->format('Y-m-d H:i:s') ?? 'N/A'];
 
         // Capture table output to count lines using Symfony's BufferedOutput
-        $bufferedOutput = new \Symfony\Component\Console\Output\BufferedOutput();
+        // Enable decoration to preserve color tags
+        $bufferedOutput = new \Symfony\Component\Console\Output\BufferedOutput(
+            \Symfony\Component\Console\Output\OutputInterface::VERBOSITY_NORMAL,
+            true // decorated
+        );
         $table = new \Symfony\Component\Console\Helper\Table($bufferedOutput);
         $table->setRows($tableData);
         $table->render();
