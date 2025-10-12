@@ -589,7 +589,12 @@ class ShowBookInfo extends Command
         $currentLine = '';
 
         foreach ($words as $word) {
-            if (mb_strlen($currentLine . ' ' . $word) <= $maxWidth) {
+            // Calculate visible length by stripping color tags
+            $visibleCurrentLine = preg_replace('/<[^>]+>/', '', $currentLine);
+            $visibleWord = preg_replace('/<[^>]+>/', '', $word);
+            $visibleLength = mb_strlen($visibleCurrentLine . ' ' . $visibleWord);
+            
+            if ($visibleLength <= $maxWidth) {
                 $currentLine .= ($currentLine ? ' ' : '') . $word;
             } else {
                 if ($currentLine) {
