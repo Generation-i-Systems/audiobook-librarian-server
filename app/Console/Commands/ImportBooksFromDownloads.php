@@ -3435,6 +3435,14 @@ class ImportBooksFromDownloads extends Command
      */
     protected function findExistingCoverImage(string $directory): ?string
     {
+        $storagePath = $this->getStoragePath();
+        
+        // Only look for covers if directory is already in storage path
+        // Don't return covers from download/source directories
+        if (!str_starts_with($directory, $storagePath)) {
+            return null;
+        }
+        
         $coverPatterns = [
             'cover.jpg',
             'cover.jpeg',
@@ -3447,11 +3455,7 @@ class ImportBooksFromDownloads extends Command
             $coverPath = $directory . '/' . $pattern;
             if (File::exists($coverPath)) {
                 // Return relative path from storage base
-                $storagePath = $this->getStoragePath();
-                if (str_starts_with($coverPath, $storagePath)) {
-                    return substr($coverPath, strlen($storagePath) + 1);
-                }
-                return $coverPath;
+                return substr($coverPath, strlen($storagePath) + 1);
             }
         }
 
@@ -3459,11 +3463,7 @@ class ImportBooksFromDownloads extends Command
         $imageFiles = glob($directory . '/*.{jpg,jpeg,JPG,JPEG}', GLOB_BRACE);
         if (!empty($imageFiles)) {
             // Return relative path from storage base
-            $storagePath = $this->getStoragePath();
-            if (str_starts_with($imageFiles[0], $storagePath)) {
-                return substr($imageFiles[0], strlen($storagePath) + 1);
-            }
-            return $imageFiles[0];
+            return substr($imageFiles[0], strlen($storagePath) + 1);
         }
 
         return null;
