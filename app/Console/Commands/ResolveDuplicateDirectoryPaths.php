@@ -325,7 +325,7 @@ class ResolveDuplicateDirectoryPaths extends Command
         $this->newLine();
 
         $maxChoice = count($books) + 2;
-        $choice = $this->ask("Enter your choice (1-{$maxChoice}, q to quit)");
+        $choice = $this->ask("Enter your choice (1-{$maxChoice}, q to quit) [1]");
         
         // If empty input (just pressed Enter), default to option 1
         if (empty(trim($choice))) {
