@@ -1453,20 +1453,10 @@ class ImportBooksFromDownloads extends Command
                     // Extract embedded cover image if available
                     if (!empty($fileTags['picture']['data'])) {
                         $this->line("  Found embedded cover image in M4B file");
-                        $coverFile = $audiobook['path'] . '/cover.jpg';
-                        $bytesWritten = file_put_contents($coverFile, $fileTags['picture']['data']);
-                        $this->line("  Wrote {$bytesWritten} bytes to: {$coverFile}");
-                        
-                        // Convert to relative path
-                        $storagePath = $this->getStoragePath();
-                        if (str_starts_with($coverFile, $storagePath)) {
-                            $aiMetadata['cover_url'] = substr($coverFile, strlen($storagePath) + 1);
-                        } else {
-                            $aiMetadata['cover_url'] = $coverFile;
-                        }
-                        
+                        // Store the cover data temporarily, don't write to source directory
+                        $aiMetadata['cover_data'] = $fileTags['picture']['data'];
                         $aiMetadata['cover_source'] = 'Embedded in M4B';
-                        $this->info("  ✓ Extracted cover from M4B file: {$coverFile}");
+                        $this->info("  ✓ Found embedded cover in M4B file (will be saved to final directory)");
                     } else {
                         $this->warn("  ✗ No embedded cover image found in M4B file");
                         if (isset($fileTags['picture'])) {
@@ -2781,8 +2771,19 @@ class ImportBooksFromDownloads extends Command
                 }
             }
 
-            // Copy the extracted cover image if it exists
-            if (!empty($aiMetadata['cover_url']) && File::exists($aiMetadata['cover_url'])) {
+            // Save cover image to target directory
+            $coverSaved = false;
+            
+            // First check if we have embedded cover data
+            if (!empty($aiMetadata['cover_data'])) {
+                $coverTarget = $targetDir . '/cover.jpg';
+                $this->line("  Saving embedded cover image");
+                file_put_contents($coverTarget, $aiMetadata['cover_data']);
+                $book->coverImage = $relativePath . '/' . $bookSubdir . '/cover.jpg';
+                $coverSaved = true;
+            }
+            // Otherwise copy existing cover file if it exists
+            elseif (!empty($aiMetadata['cover_url']) && File::exists($aiMetadata['cover_url'])) {
                 $coverTarget = $targetDir . '/cover.jpg';
                 $this->line("  Copying cover image");
                 File::copy($aiMetadata['cover_url'], $coverTarget);
@@ -2792,6 +2793,14 @@ class ImportBooksFromDownloads extends Command
                     File::delete($aiMetadata['cover_url']);
                     $this->line("  Deleted source cover image");
                 }
+                
+                // Update book's cover path to the new location (relative path)
+                $book->coverImage = $relativePath . '/' . $bookSubdir . '/cover.jpg';
+                $coverSaved = true;
+            }
+            
+            if ($coverSaved) {
+                $this->line("  ✓ Cover image saved to final directory");
             }
 
             // Update book directory path (relative to storage path)
