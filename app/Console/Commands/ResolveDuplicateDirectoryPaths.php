@@ -123,6 +123,12 @@ class ResolveDuplicateDirectoryPaths extends Command
                 $action = $this->askForAction($books);
             }
 
+            if ($action === 'quit') {
+                $this->newLine();
+                $this->info('🛑 Exiting command...');
+                break;
+            }
+            
             if ($action === 'ignore') {
                 $stats['ignored']++;
                 $this->info('⏭️  Skipped');
@@ -308,10 +314,17 @@ class ResolveDuplicateDirectoryPaths extends Command
         
         $this->line('  ' . (count($books) + 1) . '. <fg=yellow>Merge manually</> - Choose specific fields from each');
         $this->line('  ' . (count($books) + 2) . '. <fg=gray>Ignore</> - Skip for now');
+        $this->line('  <fg=red>q</> or <fg=red>quit</> - Exit command');
         $this->newLine();
 
         $maxChoice = count($books) + 2;
-        $choice = $this->ask("Enter your choice (1-{$maxChoice})", '1');
+        $choice = $this->ask("Enter your choice (1-{$maxChoice}, q to quit)", '1');
+        
+        // Check for quit commands
+        if (strtolower(trim($choice)) === 'q' || strtolower(trim($choice)) === 'quit') {
+            return 'quit';
+        }
+        
         $choiceNum = (int) $choice;
 
         if ($choiceNum >= 1 && $choiceNum <= count($books)) {
