@@ -58,10 +58,47 @@ class UpdateBookInfo extends Command
             $coverPath = $this->option('cover');
 
             if (filter_var($coverPath, FILTER_VALIDATE_URL)) {
-                // URL - store as-is
-                $book->coverImage = $coverPath;
-                $this->info("✓ Updated cover image URL: {$coverPath}");
-                $updated = true;
+                // URL - download it and save to book directory
+                $this->info("Downloading cover image from URL...");
+                
+                try {
+                    $imageData = file_get_contents($coverPath);
+                    if ($imageData === false) {
+                        throw new \Exception("Failed to download image");
+                    }
+                    
+                    // Determine file extension from URL or content type
+                    $extension = 'jpg';
+                    $urlPath = parse_url($coverPath, PHP_URL_PATH);
+                    if ($urlPath && preg_match('/\.(jpg|jpeg|png|gif|webp)$/i', $urlPath, $matches)) {
+                        $extension = strtolower($matches[1]);
+                    }
+                    
+                    // Save to book directory
+                    $bookDirectory = $bookRoot . '/' . $book->directory_path;
+                    $coverFilename = 'cover.' . $extension;
+                    $coverFullPath = $bookDirectory . '/' . $coverFilename;
+                    
+                    if (!is_dir($bookDirectory)) {
+                        $this->error("Book directory not found: {$bookDirectory}");
+                        return Command::FAILURE;
+                    }
+                    
+                    if (file_put_contents($coverFullPath, $imageData) === false) {
+                        throw new \Exception("Failed to save image file");
+                    }
+                    
+                    chmod($coverFullPath, 0664);
+                    
+                    // Store relative path
+                    $relativePath = $book->directory_path . '/' . $coverFilename;
+                    $book->coverImage = $relativePath;
+                    $this->info("✓ Downloaded and saved cover image: {$relativePath}");
+                    $updated = true;
+                } catch (\Exception $e) {
+                    $this->error("Failed to download cover image: " . $e->getMessage());
+                    return Command::FAILURE;
+                }
             } elseif (file_exists($coverPath)) {
                 // Local file - make path relative to book root
                 $realCoverPath = realpath($coverPath);
