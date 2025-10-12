@@ -322,7 +322,12 @@ class ResolveDuplicateDirectoryPaths extends Command
         $this->newLine();
 
         $maxChoice = count($books) + 2;
-        $choice = $this->ask("Enter your choice (1-{$maxChoice}, q to quit)", '1');
+        $choice = $this->ask("Enter your choice (1-{$maxChoice}, q to quit)");
+        
+        // If empty input (just pressed Enter), default to option 1
+        if (empty(trim($choice))) {
+            return 'keep_0';
+        }
         
         // Check for quit commands
         if (strtolower(trim($choice)) === 'q' || strtolower(trim($choice)) === 'quit') {
@@ -339,7 +344,9 @@ class ResolveDuplicateDirectoryPaths extends Command
             return 'ignore';
         }
 
-        return 'keep_0'; // Default to keeping first book
+        // Invalid input - ask again
+        $this->error("Invalid choice. Please enter a number between 1 and {$maxChoice}, or 'q' to quit.");
+        return $this->askForAction($books);
     }
 
     protected function handleKeepSpecific(array $books, int $keepIndex, bool $dryRun): void
