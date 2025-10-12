@@ -1456,7 +1456,15 @@ class ImportBooksFromDownloads extends Command
                         $coverFile = $audiobook['path'] . '/cover.jpg';
                         $bytesWritten = file_put_contents($coverFile, $fileTags['picture']['data']);
                         $this->line("  Wrote {$bytesWritten} bytes to: {$coverFile}");
-                        $aiMetadata['cover_url'] = $coverFile;
+                        
+                        // Convert to relative path
+                        $storagePath = $this->getStoragePath();
+                        if (str_starts_with($coverFile, $storagePath)) {
+                            $aiMetadata['cover_url'] = substr($coverFile, strlen($storagePath) + 1);
+                        } else {
+                            $aiMetadata['cover_url'] = $coverFile;
+                        }
+                        
                         $aiMetadata['cover_source'] = 'Embedded in M4B';
                         $this->info("  ✓ Extracted cover from M4B file: {$coverFile}");
                     } else {
@@ -3429,6 +3437,11 @@ class ImportBooksFromDownloads extends Command
         foreach ($coverPatterns as $pattern) {
             $coverPath = $directory . '/' . $pattern;
             if (File::exists($coverPath)) {
+                // Return relative path from storage base
+                $storagePath = $this->getStoragePath();
+                if (str_starts_with($coverPath, $storagePath)) {
+                    return substr($coverPath, strlen($storagePath) + 1);
+                }
                 return $coverPath;
             }
         }
@@ -3436,6 +3449,11 @@ class ImportBooksFromDownloads extends Command
         // Fall back to any JPG/JPEG file in the directory
         $imageFiles = glob($directory . '/*.{jpg,jpeg,JPG,JPEG}', GLOB_BRACE);
         if (!empty($imageFiles)) {
+            // Return relative path from storage base
+            $storagePath = $this->getStoragePath();
+            if (str_starts_with($imageFiles[0], $storagePath)) {
+                return substr($imageFiles[0], strlen($storagePath) + 1);
+            }
             return $imageFiles[0];
         }
 
