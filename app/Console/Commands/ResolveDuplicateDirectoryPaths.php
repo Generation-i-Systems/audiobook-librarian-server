@@ -390,35 +390,107 @@ class ResolveDuplicateDirectoryPaths extends Command
     protected function handleMergeManual(array $books, bool $dryRun): void
     {
         $this->newLine();
-        $this->line('<fg=bright-white>Which book would you like to keep?</>');
-        
-        foreach ($books as $index => $book) {
-            $bookNum = $index + 1;
-            $id = $book['id'] ?? $book['_id'];
-            $title = $book['title'] ?? 'N/A';
-            $score = $this->calculateCompletenessScore($book);
-            $this->line("  {$bookNum}. ID: {$id} - {$title} (completeness: {$score}%)");
-        }
-
+        $this->line('<fg=bright-white>Manual Merge: Choose fields from each book</>');
         $this->newLine();
-        $choice = $this->ask('Enter book number to keep (1-' . count($books) . ')', '1');
-        $keepIndex = ((int) $choice) - 1;
-
-        if ($keepIndex < 0 || $keepIndex >= count($books)) {
-            throw new \Exception('Invalid book number');
-        }
-
-        $keepBook = $books[$keepIndex];
-        $keepId = $keepBook['id'] ?? $keepBook['_id'];
-        $this->info("✓ Keeping book ID: {$keepId}");
-
-        // Delete the others
-        foreach ($books as $index => $book) {
-            if ($index !== $keepIndex) {
-                $bookId = $book['id'] ?? $book['_id'];
-                if ($dryRun) {
-                    $this->line("  Would delete book ID: {$bookId}");
+        
+        // Start with first book as base
+        $mergedBook = $books[0];
+        $baseId = $mergedBook['id'] ?? $mergedBook['_id'];
+        
+        // Fields to potentially merge
+        $mergeableFields = [
+            'title' => 'Title',
+            'author' => 'Author(s)',
+            'series' => 'Series',
+            'narrator' => 'Narrator(s)',
+            'publisher' => 'Publisher',
+            'year' => 'Year',
+            'releaseDate' => 'Release Date',
+            'isbn' => 'ISBN',
+            'description' => 'Description',
+            'coverImage' => 'Cover Image',
+            'source' => 'Source',
+        ];
+        
+        foreach ($mergeableFields as $field => $label) {
+            // Show values from each book
+            $this->line("<fg=cyan>{$label}:</>");
+            $hasMultipleValues = false;
+            $values = [];
+            
+            foreach ($books as $index => $book) {
+                $bookNum = $index + 1;
+                $value = $book[$field] ?? null;
+                
+                if ($value !== null && $value !== '' && $value !== 'N/A') {
+                    $displayValue = is_array($value) ? json_encode($value) : $value;
+                    if (strlen($displayValue) > 100) {
+                        $displayValue = substr($displayValue, 0, 100) . '...';
+                    }
+                    $this->line("  {$bookNum}. {$displayValue}");
+                    $values[$bookNum] = $value;
+                    $hasMultipleValues = true;
+                }
+            }
+            
+            if (!$hasMultipleValues) {
+                $this->line("  <fg=gray>(No values available)</>"); 
+                continue;
+            }
+            
+            if (count($values) === 1) {
+                // Only one book has this field, use it automatically
+                $mergedBook[$field] = array_values($values)[0];
+                $this->line("  <fg=green>→ Using only available value</>");
+            } else {
+                // Multiple values, ask user to choose
+                $choice = $this->ask("  Choose which to use (1-" . count($books) . ", or 'skip')");
+                
+                if (strtolower(trim($choice)) !== 'skip' && isset($values[(int)$choice])) {
+                    $mergedBook[$field] = $values[(int)$choice];
+                    $this->line("  <fg=green>→ Selected option {$choice}</>");
                 } else {
+                    $this->line("  <fg=gray>→ Skipped</>");
+                }
+            }
+            
+            $this->newLine();
+        }
+        
+        // Confirm merge
+        $this->line('<fg=bright-white>Merged book will have:</>');
+        $this->displayBookInfo($mergedBook);
+        $this->newLine();
+        
+        if (!$this->confirm('Save this merged book?', true)) {
+            $this->warn('Merge cancelled');
+            return;
+        }
+        
+        if ($dryRun) {
+            $this->info("Would update book ID: {$baseId} with merged data");
+            foreach ($books as $index => $book) {
+                if ($index > 0) {
+                    $bookId = $book['id'] ?? $book['_id'];
+                    $this->line("  Would delete book ID: {$bookId}");
+                }
+            }
+        } else {
+            // Update the first book with merged data
+            $updateData = [];
+            foreach ($mergeableFields as $field => $label) {
+                if (isset($mergedBook[$field])) {
+                    $updateData[$field] = $mergedBook[$field];
+                }
+            }
+            
+            $this->documentStore->updateBook($baseId, $updateData);
+            $this->info("✓ Updated book ID: {$baseId} with merged data");
+            
+            // Delete the other books
+            foreach ($books as $index => $book) {
+                if ($index > 0) {
+                    $bookId = $book['id'] ?? $book['_id'];
                     $this->documentStore->deleteBook($bookId);
                     $this->line("  <fg=red>Deleted</> book ID: {$bookId}");
                 }
