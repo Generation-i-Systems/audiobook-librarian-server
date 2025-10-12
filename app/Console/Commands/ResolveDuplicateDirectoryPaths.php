@@ -32,22 +32,26 @@ class ResolveDuplicateDirectoryPaths extends Command
         $this->newLine();
 
         // Get all books directly from database to include directory_path field
-        // The listBooks() method doesn't return directory_path, so we query directly
-        $allBooks = \App\Models\Book::all()->map(function ($book) {
+        // Load relationships for authors, series, narrators, and genres
+        $allBooks = \App\Models\Book::with(['authors', 'series', 'narrators', 'genres'])->get()->map(function ($book) {
             $bookArray = $book->toArray();
             
-            // Ensure JSON fields are decoded
-            if (isset($bookArray['author']) && is_string($bookArray['author'])) {
-                $bookArray['author'] = json_decode($bookArray['author'], true) ?? $bookArray['author'];
+            // Map relationship data to expected format
+            if (isset($bookArray['authors']) && is_array($bookArray['authors'])) {
+                $bookArray['author'] = $bookArray['authors'];
             }
-            if (isset($bookArray['series']) && is_string($bookArray['series'])) {
-                $bookArray['series'] = json_decode($bookArray['series'], true) ?? $bookArray['series'];
+            
+            if (isset($bookArray['narrators']) && is_array($bookArray['narrators'])) {
+                $bookArray['narrator'] = $bookArray['narrators'];
             }
-            if (isset($bookArray['narrator']) && is_string($bookArray['narrator'])) {
-                $bookArray['narrator'] = json_decode($bookArray['narrator'], true) ?? $bookArray['narrator'];
+            
+            if (isset($bookArray['genres']) && is_array($bookArray['genres'])) {
+                $bookArray['genre'] = $bookArray['genres'];
             }
-            if (isset($bookArray['genre']) && is_string($bookArray['genre'])) {
-                $bookArray['genre'] = json_decode($bookArray['genre'], true) ?? $bookArray['genre'];
+            
+            // Use directoryPath field (camelCase from database)
+            if (isset($bookArray['directoryPath'])) {
+                $bookArray['directory_path'] = $bookArray['directoryPath'];
             }
             
             return $bookArray;
