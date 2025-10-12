@@ -9,6 +9,11 @@
   - Clear logging shows which cover source was used
 
 ### Fixed
+- Fixed books:move command failing when moving book into existing series directory
+  - Now checks if destination is an existing directory
+  - Treats existing directories as "move into" targets
+  - Works even when shell script removes trailing `/`
+  - Example: `mv Book Series/` works correctly
 - Fixed books:move command path security check with symlinks
   - bookRoot is resolved to real path for consistency
   - Now resolves user-provided paths to real paths before comparison
