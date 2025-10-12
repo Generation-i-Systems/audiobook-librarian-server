@@ -306,20 +306,20 @@ class ShowBookInfo extends Command
         // Use file_exists and is_dir together, and check that it's readable
         $directoryExists = file_exists($fullPath) && is_dir($fullPath) && is_readable($fullPath);
         
-        // Color red if directory doesn't exist (before wrapping)
-        if (!$directoryExists && $directoryPath !== 'N/A') {
-            $directoryPath = "<fg=red>{$directoryPath}</>";
-        }
-        
         $wrappedDirectory = $this->wrapText($directoryPath, $directoryWidth);
         
         // Add debug info if requested
-        if ($this->option('show-paths') && $directoryPath !== 'N/A') {
-            if (!$directoryExists) {
-                $wrappedDirectory .= "\n<fg=gray>  (Missing: {$fullPath})</>";
-            } else {
-                $wrappedDirectory .= "\n<fg=gray>  (Exists: {$fullPath})</>";
+        if ($this->option('show-paths')) {
+            if (!$directoryExists && $directoryPath !== 'N/A') {
+                $wrappedDirectory .= "\n  (Missing: {$fullPath})";
+            } elseif ($directoryPath !== 'N/A') {
+                $wrappedDirectory .= "\n  (Exists: {$fullPath})";
             }
+        }
+        
+        // Apply color styling using OutputFormatterStyle
+        if (!$directoryExists && $directoryPath !== 'N/A') {
+            $wrappedDirectory = "<fg=red>{$wrappedDirectory}</>";
         }
         
         $tableData[] = ['Directory', $wrappedDirectory];
