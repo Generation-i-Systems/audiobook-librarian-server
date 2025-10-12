@@ -615,9 +615,51 @@ class ShowBookInfo extends Command
             }
 
             if (filter_var($coverInput, FILTER_VALIDATE_URL)) {
-                $book->coverImage = $coverInput;
-                $this->info("✓ Updated cover image URL: {$coverInput}");
-                $updated = true;
+                // URL - download it and save to book directory
+                $this->info("Downloading cover image from URL...");
+                
+                try {
+                    $imageData = file_get_contents($coverInput);
+                    if ($imageData === false) {
+                        throw new \Exception("Failed to download image");
+                    }
+                    
+                    // Determine file extension from URL or content type
+                    $extension = 'jpg';
+                    $urlPath = parse_url($coverInput, PHP_URL_PATH);
+                    if ($urlPath && preg_match('/\.(jpg|jpeg|png|gif|webp)$/i', $urlPath, $matches)) {
+                        $extension = strtolower($matches[1]);
+                    }
+                    
+                    // Save to book directory
+                    $coverFilename = 'cover.' . $extension;
+                    $coverFullPath = $directory . '/' . $coverFilename;
+                    
+                    if (!is_dir($directory)) {
+                        $this->error("Book directory not found: {$directory}");
+                        return;
+                    }
+                    
+                    if (file_put_contents($coverFullPath, $imageData) === false) {
+                        throw new \Exception("Failed to save image file");
+                    }
+                    
+                    chmod($coverFullPath, 0664);
+                    
+                    // Store relative path
+                    if (str_starts_with($directory, $bookRoot)) {
+                        $relativePath = ltrim(substr($directory, strlen($bookRoot)), '/') . '/' . $coverFilename;
+                        $book->coverImage = $relativePath;
+                        $this->info("✓ Downloaded and saved cover image: {$relativePath}");
+                    } else {
+                        $book->coverImage = $coverFullPath;
+                        $this->info("✓ Downloaded and saved cover image: {$coverFullPath}");
+                    }
+                    $updated = true;
+                } catch (\Exception $e) {
+                    $this->error("Failed to download cover image: " . $e->getMessage());
+                    return;
+                }
             } elseif (file_exists($coverInput)) {
                 $realCoverPath = realpath($coverInput);
 
