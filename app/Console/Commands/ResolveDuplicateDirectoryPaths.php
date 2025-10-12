@@ -26,6 +26,7 @@ class ResolveDuplicateDirectoryPaths extends Command
         $dryRun = $this->option('dry-run');
         $auto = $this->option('auto');
         $limit = $this->option('limit');
+        $verbose = $this->option('verbose');
 
         $this->info('🔍 Searching for duplicate directory paths...');
         $this->newLine();
@@ -33,15 +34,41 @@ class ResolveDuplicateDirectoryPaths extends Command
         // Get all books and group by directory_path
         $allBooks = $this->documentStore->listBooks(1, 100000, [], true)['data'] ?? [];
         
+        if ($verbose) {
+            $this->line("Total books retrieved: " . count($allBooks));
+            if (!empty($allBooks)) {
+                $sampleBook = $allBooks[0];
+                $this->line("Sample book keys: " . implode(', ', array_keys($sampleBook)));
+                $this->newLine();
+            }
+        }
+        
         $booksByPath = [];
+        $booksWithoutPath = 0;
+        
         foreach ($allBooks as $book) {
-            $path = $book['directory_path'] ?? $book['directoryPath'] ?? null;
+            // Try multiple field name variations
+            $path = $book['directory_path'] ?? $book['directoryPath'] ?? $book['directory'] ?? null;
+            
             if ($path) {
                 if (!isset($booksByPath[$path])) {
                     $booksByPath[$path] = [];
                 }
                 $booksByPath[$path][] = $book;
+            } else {
+                $booksWithoutPath++;
+                if ($verbose) {
+                    $id = $book['id'] ?? $book['_id'] ?? 'unknown';
+                    $title = $book['title'] ?? 'unknown';
+                    $this->line("Book without path: ID={$id}, Title={$title}");
+                }
             }
+        }
+        
+        if ($verbose) {
+            $this->line("Books without directory_path: {$booksWithoutPath}");
+            $this->line("Unique paths found: " . count($booksByPath));
+            $this->newLine();
         }
 
         // Filter to only duplicates
