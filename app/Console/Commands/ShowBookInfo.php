@@ -40,15 +40,24 @@ class ShowBookInfo extends Command
     {
         $directories = $this->argument('directories');
 
+        // If no directories provided, default to current directory
         if (empty($directories)) {
             $directories = [getcwd()];
         }
 
         foreach ($directories as $directory) {
+            // Skip if this looks like an option value that was misinterpreted as a directory
+            if (str_starts_with($directory, '-')) {
+                continue;
+            }
+            
             $directory = realpath($directory);
 
             if (!$directory || !is_dir($directory)) {
                 $this->error("Directory not found: {$directory}");
+                $this->line("Hint: If you're updating book info, make sure to specify the directory first:");
+                $this->line("  php artisan books:info . --series='Series Name#1'");
+                $this->line("  php artisan books:info /path/to/book --series='Series Name#1'");
                 continue;
             }
 
