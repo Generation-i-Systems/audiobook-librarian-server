@@ -58,6 +58,10 @@ class ResolveDuplicateDirectoryPaths extends Command
             if (!empty($allBooks)) {
                 $sampleBook = $allBooks[0];
                 $this->line("Sample book keys: " . implode(', ', array_keys($sampleBook)));
+                $this->line("Sample author field type: " . gettype($sampleBook['author'] ?? null));
+                $this->line("Sample author value: " . json_encode($sampleBook['author'] ?? null));
+                $this->line("Sample series field type: " . gettype($sampleBook['series'] ?? null));
+                $this->line("Sample series value: " . json_encode($sampleBook['series'] ?? null));
                 $this->newLine();
             }
         }
