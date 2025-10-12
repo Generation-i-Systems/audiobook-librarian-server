@@ -2,11 +2,18 @@
 ### Added
 - Added `books:resolve-duplicate-paths` command to find and resolve duplicate directory paths
   - Scans all books for duplicate `directory_path` values
-  - Displays detailed side-by-side comparison of duplicate books
+  - Displays detailed side-by-side comparison with authors, series, narrators
   - Calculates completeness score (% of fields populated)
-  - Interactive resolution: keep as is, merge auto, merge manual, or ignore
-  - Options: `--dry-run`, `--auto`, `--limit=N`
-  - Automatically keeps most complete book when merging
+  - Interactive resolution options:
+    - Keep Book #1 or #2 - Choose which book to keep, delete the other
+    - Merge manually - Field-by-field merge, choose best value for each field
+    - Ignore - Skip this duplicate for now
+    - Quit (q) - Exit command safely
+  - Options: `--dry-run`, `--auto`, `--limit=N`, `-v` for verbose
+  - Field-by-field merge with readable formatting
+  - Auto-skips fields when values are identical
+  - Shows relationship IDs for reference
+  - Syncs authors, series, narrators, genres via pivot tables
   - Safe deletion with logging and confirmation
 - Enhanced `books:update` and `books:info` commands to download cover images from URLs
   - Automatically downloads and saves cover images when URL is provided
