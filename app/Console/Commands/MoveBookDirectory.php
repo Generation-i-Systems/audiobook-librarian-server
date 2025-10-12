@@ -215,6 +215,12 @@ class MoveBookDirectory extends Command
                 $finalDest = $destPath . '/' . basename($sourcePath);
             }
             
+            if ($verbose) {
+                $this->line("<fg=blue>[DEBUG]</> Checking destination: {$finalDest}");
+                $this->line("<fg=blue>[DEBUG]</> Source basename: " . basename($sourcePath));
+                $this->line("<fg=blue>[DEBUG]</> Destination ends with /: " . (str_ends_with($destination, '/') ? 'yes' : 'no'));
+            }
+            
             if (file_exists($finalDest)) {
                 $this->error("Destination already exists: {$finalDest}");
                 $this->error("Aborting to prevent data loss");
