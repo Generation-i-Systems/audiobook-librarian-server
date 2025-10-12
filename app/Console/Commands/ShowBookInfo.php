@@ -15,7 +15,7 @@ class ShowBookInfo extends Command
     use BookImportTrait;
     protected $signature = 'books:info {directories?*}
                             {--compact : Use compact view instead of table}
-                            {--v|verbose : Show verbose output including full paths}
+                            {--show-paths : Show full paths being checked}
                             {--c|cover= : Update cover image (filename or path)}
                             {--t|title= : Update book title}
                             {--a|author=* : Update authors (+add, -remove, or replace all)}
@@ -311,10 +311,10 @@ class ShowBookInfo extends Command
         if (!$directoryExists && $directoryPath !== 'N/A') {
             $wrappedDirectory = "<fg=red>{$wrappedDirectory}</>";
             // Add note about missing directory
-            if ($this->option('verbose')) {
+            if ($this->option('show-paths')) {
                 $wrappedDirectory .= "\n<fg=gray>  (Checked: {$fullPath})</>";
             }
-        } elseif ($this->option('verbose') && $directoryPath !== 'N/A') {
+        } elseif ($this->option('show-paths') && $directoryPath !== 'N/A') {
             $wrappedDirectory .= "\n<fg=gray>  (Exists: {$fullPath})</>";
         }
         
