@@ -2,6 +2,8 @@
 ### Added
 - Enhanced `books:update` and `books:info` commands to download cover images from URLs
   - Automatically downloads and saves cover images when URL is provided
+  - Follows HTTP redirects (up to 10 hops) for Google Images, Goodreads, etc.
+  - Validates downloaded content is actually an image
   - Saves as `cover.{ext}` in book directory
   - Supports jpg, jpeg, png, gif, webp formats
   - Stores relative path in database instead of external URL
