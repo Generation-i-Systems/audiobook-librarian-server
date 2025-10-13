@@ -13,9 +13,10 @@ class MoveBookDirectory extends Command
      * The name and signature of the console command.
      */
     protected $signature = 'books:move 
-                            {sources* : Source path(s) to move}
+                            {sources* : Source path(s) to move OR regex pattern if using --regex}
                             {--dry-run : Show what would be done without making changes}
                             {--no-db : Only move files, do not update database}
+                            {--regex= : Use regex rename (format: s/pattern/replacement/flags)}
                             {--mv-options=* : Options to pass to mv command}';
 
     /**
@@ -48,9 +49,15 @@ class MoveBookDirectory extends Command
         $dryRun = $this->option('dry-run');
         $noDb = $this->option('no-db');
         $verbose = $this->option('verbose');
+        $regexPattern = $this->option('regex');
 
         if ($verbose) {
             $this->line("<fg=blue>[DEBUG]</> Received sources: " . json_encode($sources));
+        }
+
+        // Handle regex mode
+        if ($regexPattern) {
+            return $this->handleRegexRename($sources, $regexPattern, $dryRun, $noDb, $verbose);
         }
 
         // Last argument is destination
@@ -486,5 +493,239 @@ class MoveBookDirectory extends Command
         }
 
         return $updated;
+    }
+
+    /**
+     * Handle regex-based renaming
+     */
+    private function handleRegexRename(array $sources, string $regexPattern, bool $dryRun, bool $noDb, bool $verbose): int
+    {
+        // Parse regex pattern (format: s/pattern/replacement/flags)
+        $parsed = $this->parseRegexPattern($regexPattern);
+        if (!$parsed) {
+            $this->error("Invalid regex pattern. Use format: s/pattern/replacement/flags");
+            $this->line("Example: s/Book/Novel/g or s/(\d+)/Book $1/");
+            return 1;
+        }
+
+        [$pattern, $replacement, $flags] = $parsed;
+
+        if ($verbose) {
+            $this->line("<fg=blue>[DEBUG]</> Pattern: {$pattern}");
+            $this->line("<fg=blue>[DEBUG]</> Replacement: {$replacement}");
+            $this->line("<fg=blue>[DEBUG]</> Flags: {$flags}");
+        }
+
+        // CRITICAL SAFETY: Validate book root
+        if (empty($this->bookRoot) || !is_dir($this->bookRoot)) {
+            $this->error("Book root not configured or doesn't exist");
+            return 1;
+        }
+
+        // CRITICAL SAFETY: Validate database connection (unless --no-db)
+        if (!$noDb) {
+            try {
+                DB::connection()->getPdo();
+            } catch (\Exception $e) {
+                $this->error("Database connection failed: " . $e->getMessage());
+                return 1;
+            }
+        }
+
+        // Normalize and validate all source paths
+        $normalizedSources = [];
+        foreach ($sources as $source) {
+            try {
+                $sourcePath = $this->normalizePath($source);
+                if (!file_exists($sourcePath)) {
+                    $this->error("Source does not exist: {$source}");
+                    return 1;
+                }
+                if (!$this->isInBookRoot($sourcePath)) {
+                    $this->error("Source is not in book root: {$source}");
+                    return 1;
+                }
+                $normalizedSources[] = $sourcePath;
+            } catch (\Exception $e) {
+                $this->error("Invalid source path '{$source}': " . $e->getMessage());
+                return 1;
+            }
+        }
+
+        // Process each source
+        $renames = [];
+        foreach ($normalizedSources as $sourcePath) {
+            $basename = basename($sourcePath);
+            $dirname = dirname($sourcePath);
+            
+            // Apply regex to basename
+            $newBasename = $this->applyRegex($basename, $pattern, $replacement, $flags);
+            
+            if ($newBasename === $basename) {
+                if ($verbose) {
+                    $this->line("<fg=gray>No change:</> {$basename}");
+                }
+                continue;
+            }
+
+            $destPath = $dirname . '/' . $newBasename;
+
+            // Check if destination already exists
+            if (file_exists($destPath)) {
+                $this->error("Destination already exists: {$destPath}");
+                $this->error("Skipping: {$basename}");
+                continue;
+            }
+
+            $renames[] = [
+                'source' => $sourcePath,
+                'dest' => $destPath,
+                'oldBasename' => $basename,
+                'newBasename' => $newBasename,
+            ];
+        }
+
+        if (empty($renames)) {
+            $this->info("No files matched the pattern");
+            return 0;
+        }
+
+        // Show what will be renamed
+        $this->info("Found " . count($renames) . " file(s) to rename:");
+        foreach ($renames as $rename) {
+            $this->line("  {$rename['oldBasename']} → {$rename['newBasename']}");
+        }
+
+        if ($dryRun) {
+            $this->info("\n=== DRY RUN MODE ===");
+            return 0;
+        }
+
+        // Confirm before proceeding
+        if (!$this->confirm("\nProceed with rename?", true)) {
+            $this->info("Cancelled");
+            return 0;
+        }
+
+        // CRITICAL SAFETY: Use database transaction
+        DB::beginTransaction();
+        
+        try {
+            $totalUpdated = 0;
+            $movedPaths = [];
+            
+            foreach ($renames as $rename) {
+                $sourcePath = $rename['source'];
+                $destPath = $rename['dest'];
+                
+                // CRITICAL SAFETY: Verify source still exists
+                if (!file_exists($sourcePath)) {
+                    throw new \Exception("Source disappeared: {$sourcePath}");
+                }
+                
+                // CRITICAL SAFETY: Verify destination still doesn't exist
+                if (file_exists($destPath)) {
+                    throw new \Exception("Destination appeared: {$destPath}");
+                }
+                
+                // Move the directory/file
+                if (!rename($sourcePath, $destPath)) {
+                    throw new \Exception("Failed to rename: {$sourcePath}");
+                }
+                
+                $movedPaths[] = ['from' => $sourcePath, 'to' => $destPath];
+                $this->info("✓ Renamed: {$rename['oldBasename']} → {$rename['newBasename']}");
+
+                // Update database records
+                if (!$noDb) {
+                    $sourceRelative = $this->getRelativePath($sourcePath);
+                    $destRelative = $this->getRelativePath($destPath);
+                    
+                    $affectedBooks = $this->findAffectedBooks($sourceRelative);
+                    if (!empty($affectedBooks)) {
+                        $updated = $this->updateBookRecords($affectedBooks, $sourceRelative, $destRelative);
+                        $totalUpdated += $updated;
+                    }
+                }
+            }
+
+            // CRITICAL SAFETY: Commit transaction
+            DB::commit();
+            
+            if (!$noDb && $totalUpdated > 0) {
+                $this->info("✓ Updated {$totalUpdated} book record(s)");
+            }
+
+            $this->info("\n✓ Rename completed successfully!");
+            return 0;
+            
+        } catch (\Exception $e) {
+            // CRITICAL SAFETY: Rollback
+            DB::rollBack();
+            
+            $this->error("Error during rename: " . $e->getMessage());
+            $this->error("Rolling back filesystem changes...");
+            
+            foreach (array_reverse($movedPaths) as $move) {
+                if (file_exists($move['to']) && !file_exists($move['from'])) {
+                    if (@rename($move['to'], $move['from'])) {
+                        $this->info("✓ Rolled back: " . basename($move['from']));
+                    } else {
+                        $this->error("✗ Failed to rollback: " . basename($move['from']));
+                    }
+                }
+            }
+            
+            return 1;
+        }
+    }
+
+    /**
+     * Parse regex pattern in s/pattern/replacement/flags format
+     */
+    private function parseRegexPattern(string $pattern): ?array
+    {
+        // Support s/pattern/replacement/flags format
+        if (!preg_match('#^s([/#])(.+?)\1(.*?)\1([gimsx]*)$#', $pattern, $matches)) {
+            return null;
+        }
+
+        return [
+            $matches[2], // pattern
+            $matches[3], // replacement
+            $matches[4], // flags
+        ];
+    }
+
+    /**
+     * Apply regex transformation
+     */
+    private function applyRegex(string $text, string $pattern, string $replacement, string $flags): string
+    {
+        // Build regex with flags
+        $modifiers = '';
+        if (str_contains($flags, 'i')) {
+            $modifiers .= 'i';
+        }
+        if (str_contains($flags, 'm')) {
+            $modifiers .= 'm';
+        }
+        if (str_contains($flags, 's')) {
+            $modifiers .= 's';
+        }
+        if (str_contains($flags, 'x')) {
+            $modifiers .= 'x';
+        }
+
+        $regex = '#' . $pattern . '#' . $modifiers;
+
+        // Check if global flag is set
+        if (str_contains($flags, 'g')) {
+            // Replace all occurrences
+            return preg_replace($regex, $replacement, $text);
+        } else {
+            // Replace first occurrence only
+            return preg_replace($regex, $replacement, $text, 1);
+        }
     }
 }
