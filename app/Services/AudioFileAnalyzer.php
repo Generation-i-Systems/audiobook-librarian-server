@@ -186,15 +186,50 @@ class AudioFileAnalyzer
 
             if ($comments) {
                 // Extract common metadata fields
-                if (isset($comments['title'][0])) {
-                    $metadata['title'] = $comments['title'][0];
+                // Prefer 'album' tag for title as it's more likely to be the book title
+                // The 'title' tag often contains chapter titles
+                if (isset($comments['album'][0]) && !empty(trim($comments['album'][0]))) {
+                    $metadata['title'] = $comments['album'][0];
+                } elseif (isset($comments['title'][0])) {
+                    $title = $comments['title'][0];
+                    
+                    // Skip common chapter titles that are not book titles
+                    $invalidTitles = [
+                        'opening credits',
+                        'closing credits',
+                        'end credits',
+                        'credits',
+                        'prologue',
+                        'epilogue',
+                        'chapter 1',
+                        'chapter one',
+                        'chapter 01',
+                        'introduction',
+                        'intro',
+                        'part 1',
+                        'part one',
+                        'part 01',
+                        'track 1',
+                        'track one',
+                        'track 01',
+                        'untitled',
+                        'audiobook',
+                    ];
+                    
+                    if (!in_array(strtolower(trim($title)), $invalidTitles)) {
+                        $metadata['title'] = $title;
+                    }
                 }
 
                 if (isset($comments['artist'][0])) {
                     $metadata['author'] = [$comments['artist'][0]];
                 }
 
-                if (isset($comments['album'][0])) {
+                // Use 'album_artist' for series if available, otherwise use 'album' only if we didn't use it for title
+                if (isset($comments['album_artist'][0])) {
+                    $metadata['series'] = $comments['album_artist'][0];
+                } elseif (isset($comments['album'][0]) && !isset($metadata['title'])) {
+                    // Only use album for series if we didn't already use it for title
                     $metadata['series'] = $comments['album'][0];
                 }
 
