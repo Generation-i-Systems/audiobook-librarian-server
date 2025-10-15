@@ -36,6 +36,12 @@ OPTIONS
     -h, --help
         Show this help message
         
+    --regex=PATTERN
+        Use regex-based renaming (format: s/pattern/replacement/flags)
+        Applies the regex to each matching book directory basename
+        Supports Perl-style regex with flags: g (global), i (case-insensitive),
+        m (multiline), s (dotall), x (extended)
+        
     Standard mv options are also supported (e.g., -i, -f, -u)
 
 BEHAVIOR
@@ -63,6 +69,18 @@ EXAMPLES
     
     # Move multiple books to a directory
     book-mv "Action/Author/Book 1" "Action/Author/Book 2" "SciFi/Author/"
+    
+    # Regex rename: swap parts of directory name
+    book-mv --regex='s#fry (.)/(.*)#$1-$2#' Action/Author/*
+    
+    # Regex rename: reorder chapter numbers in filenames
+    book-mv --regex='s/(..)( The Way of .* - Chapter )(..)/$3$2$1/' "Series/Book"/*
+    
+    # Regex rename: add prefix to all matching directories
+    book-mv --regex='s/^/Book /' Action/Author/[0-9]*
+    
+    # Regex rename with dry-run to preview
+    book-mv -n --regex='s/Book/Novel/g' Action/Author/*
     
     # Move non-book files (auto-creates parent dirs)
     book-mv ~/file.txt /path/to/new/location/file.txt
