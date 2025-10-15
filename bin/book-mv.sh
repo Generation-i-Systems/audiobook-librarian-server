@@ -80,7 +80,14 @@ EXIT CODES
 SEE ALSO
     mv(1), php artisan books:move --help
 
+STANDARD MV OPTIONS
+    The following standard mv options are supported when falling back to mkdmv:
+
 EOF
+    
+    # Include standard mv help
+    mv --help 2>&1 | sed 's/^/    /'
+    
     exit 0
 fi
 
