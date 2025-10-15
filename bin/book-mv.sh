@@ -220,10 +220,76 @@ debug "Original directory: $ORIGINAL_DIR"
 debug "Project root: $PROJECT_ROOT"
 debug "Options: ${opts[*]}"
 debug "Arguments: ${args[*]}"
+debug "Regex pattern: $REGEX_PATTERN"
 
 if [[ $DRY_RUN -eq 1 ]]; then
     echo -e "${YELLOW}=== DRY RUN MODE ===${NC}"
     DEBUG=1  # Enable debug output for dry-run
+fi
+
+# Handle regex mode directly in bash
+if [[ -n "$REGEX_PATTERN" ]]; then
+    debug "Regex mode enabled"
+    
+    # Parse the regex pattern (format: s/pattern/replacement/flags)
+    if [[ ! "$REGEX_PATTERN" =~ ^s([/#])(.+)\1(.*)\1([gimsx]*)$ ]]; then
+        echo -e "${RED}Invalid regex pattern. Use format: s/pattern/replacement/flags${NC}" >&2
+        echo "Example: s/Book/Novel/g or s/(\d+)/Book \$1/" >&2
+        exit 1
+    fi
+    
+    DELIMITER="${BASH_REMATCH[1]}"
+    PATTERN="${BASH_REMATCH[2]}"
+    REPLACEMENT="${BASH_REMATCH[3]}"
+    FLAGS="${BASH_REMATCH[4]}"
+    
+    debug "Delimiter: $DELIMITER"
+    debug "Pattern: $PATTERN"
+    debug "Replacement: $REPLACEMENT"
+    debug "Flags: $FLAGS"
+    
+    # Process each source file/directory
+    for src in "${args[@]}"; do
+        if [[ ! -e "$src" ]]; then
+            echo -e "${YELLOW}Skipping non-existent: $src${NC}"
+            continue
+        fi
+        
+        basename=$(basename "$src")
+        dirname=$(dirname "$src")
+        
+        # Apply regex using Perl (more compatible with s/// syntax)
+        if command -v perl >/dev/null 2>&1; then
+            newbasename=$(echo "$basename" | perl -pe "s${DELIMITER}${PATTERN}${DELIMITER}${REPLACEMENT}${DELIMITER}${FLAGS}")
+        else
+            # Fallback to sed (limited flags support)
+            if [[ "$FLAGS" == *g* ]]; then
+                newbasename=$(echo "$basename" | sed "s${DELIMITER}${PATTERN}${DELIMITER}${REPLACEMENT}${DELIMITER}g")
+            else
+                newbasename=$(echo "$basename" | sed "s${DELIMITER}${PATTERN}${DELIMITER}${REPLACEMENT}${DELIMITER}")
+            fi
+        fi
+        
+        if [[ "$basename" == "$newbasename" ]]; then
+            debug "No change for: $src"
+            continue
+        fi
+        
+        newsrc="${dirname}/${newbasename}"
+        
+        if [[ $DRY_RUN -eq 1 ]]; then
+            echo -e "${GREEN}Would rename:${NC} $src ${BLUE}→${NC} $newsrc"
+        else
+            debug "Renaming: $src → $newsrc"
+            if mv "${opts[@]}" "$src" "$newsrc"; then
+                echo -e "${GREEN}Renamed:${NC} $basename ${BLUE}→${NC} $newbasename"
+            else
+                echo -e "${RED}Failed to rename: $src${NC}" >&2
+            fi
+        fi
+    done
+    
+    exit 0
 fi
 
 # If less than 2 positional args, fallback to mv
@@ -384,19 +450,10 @@ fi
 if [[ $DRY_RUN -eq 1 ]]; then
     LARAVEL_OPTS+=("--dry-run")
 fi
-if [[ -n "$REGEX_PATTERN" ]]; then
-    LARAVEL_OPTS+=("--regex=$REGEX_PATTERN")
-fi
 
 # Run the Laravel command with resolved absolute paths
-if [[ -n "$REGEX_PATTERN" ]]; then
-    # For regex mode, don't pass destination
-    debug "Running Laravel command: php artisan books:move ${resolved_sources[*]} ${LARAVEL_OPTS[*]}"
-    php artisan books:move "${resolved_sources[@]}" "${LARAVEL_OPTS[@]}"
-else
-    debug "Running Laravel command: php artisan books:move ${resolved_sources[*]} $abs_dest ${LARAVEL_OPTS[*]}"
-    php artisan books:move "${resolved_sources[@]}" "$abs_dest" "${LARAVEL_OPTS[@]}"
-fi
+debug "Running Laravel command: php artisan books:move ${resolved_sources[*]} $abs_dest ${LARAVEL_OPTS[*]}"
+php artisan books:move "${resolved_sources[@]}" "$abs_dest" "${LARAVEL_OPTS[@]}"
 EXIT_CODE=$?
 
 debug "Laravel command exit code: $EXIT_CODE"
