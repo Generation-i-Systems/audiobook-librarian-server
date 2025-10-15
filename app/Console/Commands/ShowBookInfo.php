@@ -47,6 +47,20 @@ class ShowBookInfo extends Command
 
         $directories = $this->argument('directories');
         
+        // Clean up directories - trim whitespace and split on newlines
+        $cleanedDirectories = [];
+        foreach ($directories as $directory) {
+            // Split on newlines in case multiple paths were concatenated
+            $parts = preg_split('/[\r\n]+/', $directory);
+            foreach ($parts as $part) {
+                $trimmed = trim($part);
+                if (!empty($trimmed)) {
+                    $cleanedDirectories[] = $trimmed;
+                }
+            }
+        }
+        $directories = $cleanedDirectories;
+        
         // Debug: Show what we received
         if ($this->option('verbose')) {
             $this->line("<fg=blue>[DEBUG]</> Received directories: " . json_encode($directories));
