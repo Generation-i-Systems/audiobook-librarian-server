@@ -63,9 +63,17 @@ class ShowBookInfo extends Command
         // Validate directories - if any don't exist and we have update options, assume current directory
         $validDirectories = [];
         $hasInvalidDirectories = false;
+        $bookRoot = env('BOOK_STORAGE_PATH', config('app.book_root', '/media/audiobooks/books'));
         
         foreach ($directories as $directory) {
             $realPath = realpath($directory);
+            
+            // If not found as absolute path, try relative to book root
+            if (!$realPath || !is_dir($realPath)) {
+                $bookRootPath = rtrim($bookRoot, '/') . '/' . ltrim($directory, '/');
+                $realPath = realpath($bookRootPath);
+            }
+            
             if ($realPath && is_dir($realPath)) {
                 $validDirectories[] = $realPath;
             } else {
@@ -80,8 +88,16 @@ class ShowBookInfo extends Command
         } elseif ($hasInvalidDirectories) {
             // Show error for invalid directories only if we're not using update options
             foreach ($directories as $directory) {
-                if (!realpath($directory) || !is_dir(realpath($directory))) {
+                $realPath = realpath($directory);
+                if (!$realPath || !is_dir($realPath)) {
+                    $bookRootPath = rtrim($bookRoot, '/') . '/' . ltrim($directory, '/');
+                    $realPath = realpath($bookRootPath);
+                }
+                
+                if (!$realPath || !is_dir($realPath)) {
                     $this->error("Directory not found: {$directory}");
+                    $this->line("  Tried: {$directory}");
+                    $this->line("  Tried: {$bookRootPath}");
                 }
             }
         }
