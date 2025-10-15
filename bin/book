@@ -37,11 +37,13 @@ for arg in "$@"; do
             # Already absolute
             DIRS+=("$arg")
         else
-            # Relative path - resolve it now
+            # Try to resolve as relative to current directory first
             RESOLVED_PATH="$(cd "$ORIGINAL_DIR" && cd "$arg" 2>/dev/null && pwd)"
             if [ -n "$RESOLVED_PATH" ]; then
                 DIRS+=("$RESOLVED_PATH")
             else
+                # Can't resolve from current dir - pass as-is and let PHP handle it
+                # (might be relative to book root)
                 DIRS+=("$arg")
             fi
         fi
