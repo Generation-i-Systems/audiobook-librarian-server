@@ -167,6 +167,7 @@ mkdmv() {
 # Separate mv options and positional args (like bkmv does)
 opts=()
 args=()
+REGEX_PATTERN=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -v|--verbose)
@@ -182,6 +183,16 @@ while [[ $# -gt 0 ]]; do
             DRY_RUN=1
             DEBUG=1
             shift
+            ;;
+        --regex=*)
+            # Extract regex pattern
+            REGEX_PATTERN="${1#*=}"
+            shift
+            ;;
+        --regex)
+            # Regex pattern in next argument
+            REGEX_PATTERN="$2"
+            shift 2
             ;;
         -*)
             # Check if this is a combined flag containing n or v
@@ -373,10 +384,19 @@ fi
 if [[ $DRY_RUN -eq 1 ]]; then
     LARAVEL_OPTS+=("--dry-run")
 fi
+if [[ -n "$REGEX_PATTERN" ]]; then
+    LARAVEL_OPTS+=("--regex=$REGEX_PATTERN")
+fi
 
 # Run the Laravel command with resolved absolute paths
-debug "Running Laravel command: php artisan books:move ${resolved_sources[*]} $abs_dest ${LARAVEL_OPTS[*]}"
-php artisan books:move "${resolved_sources[@]}" "$abs_dest" "${LARAVEL_OPTS[@]}"
+if [[ -n "$REGEX_PATTERN" ]]; then
+    # For regex mode, don't pass destination
+    debug "Running Laravel command: php artisan books:move ${resolved_sources[*]} ${LARAVEL_OPTS[*]}"
+    php artisan books:move "${resolved_sources[@]}" "${LARAVEL_OPTS[@]}"
+else
+    debug "Running Laravel command: php artisan books:move ${resolved_sources[*]} $abs_dest ${LARAVEL_OPTS[*]}"
+    php artisan books:move "${resolved_sources[@]}" "$abs_dest" "${LARAVEL_OPTS[@]}"
+fi
 EXIT_CODE=$?
 
 debug "Laravel command exit code: $EXIT_CODE"
