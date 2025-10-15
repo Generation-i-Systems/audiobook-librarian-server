@@ -231,18 +231,19 @@ fi
 if [[ -n "$REGEX_PATTERN" ]]; then
     debug "Regex mode enabled"
     
-    # Parse the regex pattern (format: s<delim>pattern<delim>replacement<delim>flags)
+    # Parse the regex pattern (format: s<delim>pattern<delim>replacement<delim>[flags])
     # The delimiter can be any character (commonly / or # but any special char works)
-    if [[ ! "$REGEX_PATTERN" =~ ^s(.)(.*)\1(.*)\1([gimsx]*)$ ]]; then
-        echo -e "${RED}Invalid regex pattern. Use format: s<delim>pattern<delim>replacement<delim>flags${NC}" >&2
-        echo "Example: s/Book/Novel/g or s#^0[123] ## or s|old|new| or s:a:b:" >&2
+    # The trailing delimiter and flags are optional: s/a/b/ or s/a/b/g or s/a/b
+    if [[ ! "$REGEX_PATTERN" =~ ^s(.)(.*)\1(.*)(\1([gimsx]*))?$ ]]; then
+        echo -e "${RED}Invalid regex pattern. Use format: s<delim>pattern<delim>replacement[<delim>flags]${NC}" >&2
+        echo "Example: s/Book/Novel/g or s#^0[123] ## or s/^0[123] // or s:a:b" >&2
         exit 1
     fi
     
     DELIMITER="${BASH_REMATCH[1]}"
     PATTERN="${BASH_REMATCH[2]}"
     REPLACEMENT="${BASH_REMATCH[3]}"
-    FLAGS="${BASH_REMATCH[4]}"
+    FLAGS="${BASH_REMATCH[5]}"  # Note: BASH_REMATCH[4] is the entire optional group
     
     debug "Delimiter: $DELIMITER"
     debug "Pattern: $PATTERN"
