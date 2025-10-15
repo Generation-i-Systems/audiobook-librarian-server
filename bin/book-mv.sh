@@ -262,13 +262,14 @@ if [[ -n "$REGEX_PATTERN" ]]; then
         
         # Apply regex using Perl (more compatible with s/// syntax)
         if command -v perl >/dev/null 2>&1; then
-            newbasename=$(echo "$basename" | perl -pe "s${DELIMITER}${PATTERN}${DELIMITER}${REPLACEMENT}${DELIMITER}${FLAGS}")
+            # Use printf to avoid shell interpretation of special chars
+            newbasename=$(printf '%s\n' "$basename" | perl -pe 's'"${DELIMITER}${PATTERN}${DELIMITER}${REPLACEMENT}${DELIMITER}${FLAGS}")
         else
             # Fallback to sed (limited flags support)
             if [[ "$FLAGS" == *g* ]]; then
-                newbasename=$(echo "$basename" | sed "s${DELIMITER}${PATTERN}${DELIMITER}${REPLACEMENT}${DELIMITER}g")
+                newbasename=$(printf '%s\n' "$basename" | sed 's'"${DELIMITER}${PATTERN}${DELIMITER}${REPLACEMENT}${DELIMITER}g")
             else
-                newbasename=$(echo "$basename" | sed "s${DELIMITER}${PATTERN}${DELIMITER}${REPLACEMENT}${DELIMITER}")
+                newbasename=$(printf '%s\n' "$basename" | sed 's'"${DELIMITER}${PATTERN}${DELIMITER}${REPLACEMENT}${DELIMITER}")
             fi
         fi
         
