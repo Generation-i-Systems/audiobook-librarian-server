@@ -101,7 +101,11 @@ class MetadataProcessingService
 
             return null;
         } catch (\Exception $e) {
-            Log::error("Audio analysis failed: " . $e->getMessage());
+            Log::error("MetadataProcessingService: Audio analysis failed", [
+                'path' => $audiobook['path'] ?? 'unknown',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return null;
         }
     }

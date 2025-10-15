@@ -348,7 +348,15 @@ class AudibleApiService
     protected function signedRequest(string $path, array $params = []): ?array
     {
         if (empty($this->audibleAccessKey) || empty($this->audibleSecretKey) || empty($this->audibleAssociateTag)) {
-            Log::error('AudibleApiService: Attempted to make a signed request without complete API credentials.');
+            Log::error('AudibleApiService: Incomplete API credentials', [
+                'message' => 'Missing required Audible API credentials',
+                'missing' => array_filter([
+                    'AUDIBLE_ACCESS_KEY' => empty($this->audibleAccessKey),
+                    'AUDIBLE_SECRET_KEY' => empty($this->audibleSecretKey),
+                    'AUDIBLE_ASSOCIATE_TAG' => empty($this->audibleAssociateTag),
+                ]),
+                'hint' => 'Add missing credentials to your .env file',
+            ]);
 
             return null;
         }

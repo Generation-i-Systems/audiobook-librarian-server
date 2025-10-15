@@ -84,7 +84,10 @@ class HardcoverApiService
     protected function makeGraphQlRequest(string $query, array $variables = []): ?array
     {
         if (empty($this->apiKey)) {
-            Log::error('Hardcover API key not set');
+            Log::error('HardcoverApiService: API key not configured', [
+                'message' => 'HARDCOVER_API_KEY environment variable is not set',
+                'hint' => 'Add HARDCOVER_API_KEY to your .env file',
+            ]);
 
             return null;
         }
@@ -107,8 +110,10 @@ class HardcoverApiService
 
             return $response->json();
         } catch (\Exception $e) {
-            Log::error('Hardcover API request exception', [
+            Log::error('HardcoverApiService: API request exception', [
+                'query' => substr($query, 0, 200), // Truncate query for logging
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return null;

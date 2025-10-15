@@ -4,6 +4,7 @@ namespace App\Services;
 
 use getID3;
 use getid3_lib;
+use Illuminate\Support\Facades\Log;
 
 class AudioFileAnalyzer
 {
@@ -68,8 +69,10 @@ class AudioFileAnalyzer
                 return (float) $fileInfo['playtime_seconds'];
             }
         } catch (\Exception $e) {
-            // Log error if needed
-            // logger()->error('Error analyzing audio file: ' . $e->getMessage());
+            Log::warning('AudioFileAnalyzer: Failed to get audio duration', [
+                'file' => $filePath,
+                'error' => $e->getMessage(),
+            ]);
             return null;
         }
 
@@ -297,6 +300,11 @@ class AudioFileAnalyzer
 
             return null;
         } catch (\Exception $e) {
+            \Log::error('AudioFileAnalyzer: Failed to analyze audio file', [
+                'file' => $audioFile ?? $directory,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return null;
         }
     }
