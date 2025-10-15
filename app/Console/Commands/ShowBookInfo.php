@@ -16,6 +16,7 @@ class ShowBookInfo extends Command
     protected $signature = 'books:info {directories?*}
                             {--compact : Use compact view instead of table}
                             {--show-paths : Show full paths being checked}
+                            {--delete= : Delete book by ID (with confirmation)}
                             {--c|cover= : Update cover image (filename or path)}
                             {--t|title= : Update book title}
                             {--a|author=* : Update authors (+add, -remove, or replace all)}
@@ -39,6 +40,11 @@ class ShowBookInfo extends Command
 
     public function handle(): int
     {
+        // Handle delete option first
+        if ($deleteId = $this->option('delete')) {
+            return $this->handleDelete($deleteId);
+        }
+
         $directories = $this->argument('directories');
 
         // If no directories provided, default to current directory
@@ -982,5 +988,130 @@ class ShowBookInfo extends Command
         }
 
         return null;
+    }
+
+    /**
+     * Handle book deletion
+     */
+    protected function handleDelete(string $bookId): int
+    {
+        // Find the book
+        $book = Book::find($bookId);
+        
+        if (!$book) {
+            $this->error("Book not found with ID: {$bookId}");
+            return 1;
+        }
+
+        // Display book information
+        $this->info("Book to delete:");
+        $this->line("  ID: {$book->id}");
+        $this->line("  Title: {$book->title}");
+        $this->line("  Author: " . ($book->authors()->count() > 0 ? $book->authors()->pluck('name')->join(', ') : 'N/A'));
+        $this->line("  Directory: {$book->directoryPath}");
+
+        // Check if directory exists
+        $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
+        $fullPath = $bookRoot . '/' . ltrim($book->directoryPath, '/');
+        $directoryExists = file_exists($fullPath) && is_dir($fullPath);
+
+        if ($directoryExists) {
+            $this->line("  Directory exists: <fg=green>Yes</>");
+            
+            // Check if any other books use this directory
+            $otherBooks = Book::where('directory_path', $book->directoryPath)
+                ->where('id', '!=', $book->id)
+                ->get();
+
+            if ($otherBooks->count() > 0) {
+                $this->error("\n⚠️  WARNING: This directory is used by " . $otherBooks->count() . " other book(s):");
+                foreach ($otherBooks as $otherBook) {
+                    $this->line("  - ID {$otherBook->id}: {$otherBook->title}");
+                }
+                $this->error("\nCannot delete directory that is shared with other books!");
+                $this->line("The book record will be deleted, but the directory will be preserved.");
+                
+                if (!$this->confirm("\nDelete only the book record (preserve directory)?", false)) {
+                    $this->info("Cancelled");
+                    return 0;
+                }
+                
+                $deleteDirectory = false;
+            } else {
+                $this->line("  No other books use this directory");
+                
+                if (!$this->confirm("\nDelete book record AND directory?", false)) {
+                    $this->info("Cancelled");
+                    return 0;
+                }
+                
+                $deleteDirectory = true;
+            }
+        } else {
+            $this->line("  Directory exists: <fg=red>No</>");
+            
+            if (!$this->confirm("\nDelete book record?", false)) {
+                $this->info("Cancelled");
+                return 0;
+            }
+            
+            $deleteDirectory = false;
+        }
+
+        // Delete the book record
+        try {
+            $book->delete();
+            $this->info("✓ Book record deleted");
+        } catch (\Exception $e) {
+            $this->error("Failed to delete book record: " . $e->getMessage());
+            return 1;
+        }
+
+        // Delete the directory if requested and safe
+        if ($deleteDirectory && $directoryExists) {
+            try {
+                // Use recursive directory deletion
+                $this->deleteDirectory($fullPath);
+                $this->info("✓ Directory deleted: {$fullPath}");
+            } catch (\Exception $e) {
+                $this->error("Failed to delete directory: " . $e->getMessage());
+                $this->warn("Book record was deleted, but directory remains at: {$fullPath}");
+                return 1;
+            }
+        }
+
+        $this->info("\n✓ Deletion completed successfully!");
+        return 0;
+    }
+
+    /**
+     * Recursively delete a directory
+     */
+    protected function deleteDirectory(string $path): void
+    {
+        if (!is_dir($path)) {
+            throw new \Exception("Not a directory: {$path}");
+        }
+
+        $items = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($path, \RecursiveDirectoryIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::CHILD_FIRST
+        );
+
+        foreach ($items as $item) {
+            if ($item->isDir()) {
+                if (!rmdir($item->getRealPath())) {
+                    throw new \Exception("Failed to delete directory: " . $item->getRealPath());
+                }
+            } else {
+                if (!unlink($item->getRealPath())) {
+                    throw new \Exception("Failed to delete file: " . $item->getRealPath());
+                }
+            }
+        }
+
+        if (!rmdir($path)) {
+            throw new \Exception("Failed to delete directory: {$path}");
+        }
     }
 }
