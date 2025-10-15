@@ -59,7 +59,8 @@ class ShowBookInfo extends Command
                 }
             }
         }
-        $directories = $cleanedDirectories;
+        // Remove duplicates
+        $directories = array_unique($cleanedDirectories);
         
         // Debug: Show what we received
         if ($this->option('verbose')) {
