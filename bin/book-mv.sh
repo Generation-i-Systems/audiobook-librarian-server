@@ -5,6 +5,85 @@
 # Falls back to mkdmv (auto-creates parent directories) if not in book root
 # Supports all standard mv options and multiple sources
 
+# Show help if requested
+if [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]]; then
+    cat << 'EOF'
+book-mv - Enhanced mv for audiobook directories with database sync
+
+SYNOPSIS
+    book-mv [OPTIONS] SOURCE... DEST
+
+DESCRIPTION
+    Intelligent move command that automatically updates the database when moving
+    audiobook directories. Falls back to standard mv with auto-created parent
+    directories when not moving books.
+
+    Features:
+    - Detects if moving directories in BOOK_STORAGE_PATH
+    - Updates database records automatically for book moves
+    - Auto-creates parent directories (mkdmv behavior)
+    - Supports bind mounts and symlinks
+    - Dry-run mode to preview changes
+    - Verbose output for debugging
+
+OPTIONS
+    -n, --dry-run
+        Show what would be done without making changes
+        
+    -v, --verbose
+        Enable verbose debug output
+        
+    -h, --help
+        Show this help message
+        
+    Standard mv options are also supported (e.g., -i, -f, -u)
+
+BEHAVIOR
+    1. If moving directories in BOOK_STORAGE_PATH:
+       - Uses Laravel command: php artisan books:move
+       - Updates database records automatically
+       - Preserves book metadata and relationships
+       
+    2. If moving files/dirs outside book root:
+       - Uses mkdmv (mv with auto-created parent dirs)
+       - No database interaction
+       
+    3. If database update not needed:
+       - Falls back to mkdmv automatically
+
+EXAMPLES
+    # Move book directory (updates database)
+    book-mv "Action/Author/Book 1" "SciFi/Author/Book 1"
+    
+    # Dry-run to preview changes
+    book-mv -n "Action/Author/Book 1" "SciFi/Author/Book 1"
+    
+    # Verbose mode to see what's happening
+    book-mv -v "Action/Author/Book 1" "SciFi/Author/Book 1"
+    
+    # Move multiple books to a directory
+    book-mv "Action/Author/Book 1" "Action/Author/Book 2" "SciFi/Author/"
+    
+    # Move non-book files (auto-creates parent dirs)
+    book-mv ~/file.txt /path/to/new/location/file.txt
+
+ENVIRONMENT
+    BOOK_STORAGE_PATH
+        Root directory for audiobook storage
+        Loaded from .env file in project root
+
+EXIT CODES
+    0   Success
+    1   Error occurred
+    2   Not a book move (internal - triggers mkdmv fallback)
+
+SEE ALSO
+    mv(1), php artisan books:move --help
+
+EOF
+    exit 0
+fi
+
 # Save the original working directory FIRST before any cd commands
 ORIGINAL_DIR="$(pwd)"
 
