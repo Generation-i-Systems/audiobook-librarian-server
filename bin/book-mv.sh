@@ -232,9 +232,9 @@ if [[ -n "$REGEX_PATTERN" ]]; then
     debug "Regex mode enabled"
     
     # Parse the regex pattern (format: s/pattern/replacement/flags)
-    if [[ ! "$REGEX_PATTERN" =~ ^s([/#])(.+)\1(.*)\1([gimsx]*)$ ]]; then
+    if [[ ! "$REGEX_PATTERN" =~ ^s([/#])(.*)\1(.*)\1([gimsx]*)$ ]]; then
         echo -e "${RED}Invalid regex pattern. Use format: s/pattern/replacement/flags${NC}" >&2
-        echo "Example: s/Book/Novel/g or s/(\d+)/Book \$1/" >&2
+        echo "Example: s/Book/Novel/g or s/^0[123] // or s#(.*)#\$1#" >&2
         exit 1
     fi
     
