@@ -46,6 +46,11 @@ class ShowBookInfo extends Command
         }
 
         $directories = $this->argument('directories');
+        
+        // Debug: Show what we received
+        if ($this->option('verbose')) {
+            $this->line("<fg=blue>[DEBUG]</> Received directories: " . json_encode($directories));
+        }
 
         // If no directories provided, default to current directory
         if (empty($directories)) {
@@ -66,18 +71,38 @@ class ShowBookInfo extends Command
         $bookRoot = env('BOOK_STORAGE_PATH', config('app.book_root', '/media/audiobooks/books'));
         
         foreach ($directories as $directory) {
+            if ($this->option('verbose')) {
+                $this->line("<fg=blue>[DEBUG]</> Processing: {$directory}");
+            }
+            
             $realPath = realpath($directory);
             
-            // If not found as absolute path, try relative to book root
-            if (!$realPath || !is_dir($realPath)) {
+            if ($this->option('verbose')) {
+                $this->line("<fg=blue>[DEBUG]</> realpath() returned: " . ($realPath ?: 'false'));
+                $this->line("<fg=blue>[DEBUG]</> is_dir() returned: " . (is_dir($realPath ?: $directory) ? 'true' : 'false'));
+            }
+            
+            // If not found as absolute path, try relative to book root (only if not already absolute)
+            if ((!$realPath || !is_dir($realPath)) && !str_starts_with($directory, '/')) {
                 $bookRootPath = rtrim($bookRoot, '/') . '/' . ltrim($directory, '/');
                 $realPath = realpath($bookRootPath);
+                
+                if ($this->option('verbose')) {
+                    $this->line("<fg=blue>[DEBUG]</> Tried book root path: {$bookRootPath}");
+                    $this->line("<fg=blue>[DEBUG]</> realpath() returned: " . ($realPath ?: 'false'));
+                }
             }
             
             if ($realPath && is_dir($realPath)) {
                 $validDirectories[] = $realPath;
+                if ($this->option('verbose')) {
+                    $this->line("<fg=green>[DEBUG]</> Added to valid directories");
+                }
             } else {
                 $hasInvalidDirectories = true;
+                if ($this->option('verbose')) {
+                    $this->line("<fg=red>[DEBUG]</> Marked as invalid");
+                }
             }
         }
         
@@ -89,20 +114,29 @@ class ShowBookInfo extends Command
             // Show error for invalid directories only if we're not using update options
             foreach ($directories as $directory) {
                 $realPath = realpath($directory);
-                if (!$realPath || !is_dir($realPath)) {
+                $triedPaths = [$directory];
+                
+                if ((!$realPath || !is_dir($realPath)) && !str_starts_with($directory, '/')) {
                     $bookRootPath = rtrim($bookRoot, '/') . '/' . ltrim($directory, '/');
                     $realPath = realpath($bookRootPath);
+                    $triedPaths[] = $bookRootPath;
                 }
                 
                 if (!$realPath || !is_dir($realPath)) {
                     $this->error("Directory not found: {$directory}");
-                    $this->line("  Tried: {$directory}");
-                    $this->line("  Tried: {$bookRootPath}");
+                    foreach ($triedPaths as $tried) {
+                        $this->line("  Tried: {$tried}");
+                    }
                 }
+            }
+            
+            // If we have invalid directories and no valid ones, fail
+            if (empty($validDirectories)) {
+                return Command::FAILURE;
             }
         }
         
-        // If no valid directories, use current directory
+        // If no valid directories at this point, use current directory ONLY if no arguments were provided
         if (empty($validDirectories)) {
             $validDirectories = [getcwd()];
         }
