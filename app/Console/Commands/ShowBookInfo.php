@@ -80,6 +80,33 @@ class ShowBookInfo extends Command
             $directories = [getcwd()];
         }
 
+        // Check if arguments are book IDs (numeric) or directories
+        $bookIds = [];
+        $directoryPaths = [];
+        
+        foreach ($directories as $directory) {
+            if (ctype_digit($directory)) {
+                // It's a numeric ID
+                $bookIds[] = $directory;
+            } else {
+                // It's a directory path
+                $directoryPaths[] = $directory;
+            }
+        }
+        
+        // Handle book IDs first
+        foreach ($bookIds as $bookId) {
+            $this->showBookById($bookId);
+        }
+        
+        // If we only had book IDs, we're done
+        if (!empty($bookIds) && empty($directoryPaths)) {
+            return Command::SUCCESS;
+        }
+        
+        // Continue with directory processing
+        $directories = $directoryPaths;
+        
         // Validate directories - if any don't exist and we have update options, assume current directory
         $validDirectories = [];
         $hasInvalidDirectories = false;
@@ -161,6 +188,24 @@ class ShowBookInfo extends Command
         }
 
         return Command::SUCCESS;
+    }
+
+    protected function showBookById(string $bookId): void
+    {
+        $book = Book::find($bookId);
+        
+        if (!$book) {
+            $this->error("Book not found with ID: {$bookId}");
+            return;
+        }
+
+        // Update book if any options were provided
+        if ($this->hasUpdateOptions()) {
+            $this->updateBookFields($book, null);
+        }
+        
+        $this->displayBookInfo($book);
+        $this->newLine();
     }
 
     protected function showBookFromDirectory(string $directory): void
@@ -730,7 +775,7 @@ class ShowBookInfo extends Command
         return false;
     }
 
-    protected function updateBookFields(Book $book, string $directory): void
+    protected function updateBookFields(Book $book, ?string $directory): void
     {
         $updated = false;
         $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
