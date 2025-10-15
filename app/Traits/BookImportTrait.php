@@ -332,10 +332,36 @@ trait BookImportTrait
                 throw new InvalidArgumentException("Path too short: {$directoryPath}");
             }
 
-            // First part is always genre
-            $genre = array_shift($parts);
-            $book['genre'] = [$genre];  // Return as array for test compatibility
-            $book['genres'] = [$genre];  // Keep array version for other uses
+            // First part is POTENTIALLY genre - validate it
+            $potentialGenre = array_shift($parts);
+            
+            // List of valid genres (should match database enum)
+            $validGenres = [
+                'Kids', 'Religion', 'General Fiction', 'Church', 'Science', 'Historical Fiction',
+                'Computer', 'Classic', 'History', 'Non Fiction', 'Action', 'LitRPG',
+                'Romance', 'Science Fiction', 'Other', 'Fantasy'
+            ];
+            
+            // Check if the first directory component is actually a valid genre
+            $isValidGenre = false;
+            foreach ($validGenres as $validGenre) {
+                if (strcasecmp($potentialGenre, $validGenre) === 0) {
+                    $isValidGenre = true;
+                    $genre = $validGenre; // Use the properly-cased version
+                    break;
+                }
+            }
+            
+            // If not a valid genre, don't use it as genre - let metadata extraction handle it
+            if ($isValidGenre) {
+                $book['genre'] = [$genre];  // Return as array for test compatibility
+                $book['genres'] = [$genre];  // Keep array version for other uses
+            } else {
+                // Not a valid genre - put it back and treat as part of author/path
+                array_unshift($parts, $potentialGenre);
+                $book['genre'] = [];  // Will be filled from metadata later
+                $book['genres'] = [];
+            }
 
             // Second part is author(s)
             $author = array_shift($parts);
