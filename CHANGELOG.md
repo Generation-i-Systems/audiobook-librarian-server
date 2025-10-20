@@ -1,5 +1,32 @@
 ## [Unreleased]
+### Fixed
+- Fixed admin books index view error when coverImage is stored as array
+  - Added array handling to extract path from coverImage field
+  - Handles coverImage as string, array with 'path' key, or indexed array
+  - Prevents "Missing required parameter" error in cover.proxy route
+  - Added comprehensive test coverage for all coverImage formats
+
 ### Added
+- Enhanced OpenAudible import to automatically include PDF files
+  - Automatically detects and imports PDF files with the same name as audio files
+  - Works with both copy and move operations
+  - Searches for PDFs in the same directory as the audio file
+  - Applies proper file permissions (0664) to imported PDFs
+  - Logs PDF import operations for tracking
+- Added `books:fix-james-axler-deathlands` command to fix James Axler Deathlands series books
+  - Standardizes all books to series 'Deathlands (GraphicAudio)'
+  - Extracts series number from directory path or title
+  - Handles double-number pattern (e.g., "03 008" extracts "8")
+  - Ignores failed import numbers (01, 02, 03)
+  - Removes number prefix from titles
+  - Sets genre to 'Science Fiction' for all books
+  - Merges duplicate books with same series number AND same normalized title
+  - Books with same number but different titles are NOT merged (e.g., sub-series)
+  - Moves files from duplicate directories
+  - Fixes directory paths to standard format with 3-digit zero padding
+  - Uses correct book storage path from config
+  - Options: `--dry-run`, `--no-backup`
+  - Comprehensive test coverage (12 tests)
 - Added `books:resolve-duplicate-paths` command to find and resolve duplicate directory paths
   - Scans all books for duplicate `directory_path` values
   - Displays detailed side-by-side comparison with authors, series, narrators

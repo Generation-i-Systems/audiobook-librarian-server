@@ -11,7 +11,6 @@ use App\Models\Series;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 
 class BookImportService
 {
@@ -140,26 +139,52 @@ class BookImportService
 
 
             // Handle series with multi-book support
+            $seriesToAttach = [];
+
             if (!empty($metadata['series'])) {
-                $series = Series::firstOrCreate(['name' => trim($metadata['series'])]);
+                $isCollection = !empty($metadata['is_collection']) || !empty($metadata['isCollection']);
+
+                $series = Series::firstOrCreate(
+                    ['name' => trim($metadata['series'])],
+                    ['is_collection' => $isCollection]
+                );
+
+                // Update existing series to mark as collection if needed
+                if ($isCollection && !$series->is_collection) {
+                    $series->is_collection = true;
+                    $series->save();
+                }
 
                 // Handle multi-book entries (e.g., books 2-3 combined)
                 if (!empty($metadata['multi_book_numbers'])) {
                     $firstNumber = $metadata['multi_book_numbers'][0];
-                    $lastNumber = end($metadata['multi_book_numbers']);
-
-                    $book->series()->sync([
-                        $series->id => [
-                            'series_number' => $firstNumber,
-                            // Note: series_end_number field may need to be added to pivot table
-                        ]
-                    ]);
+                    $seriesToAttach[$series->id] = ['series_number' => $firstNumber];
                 } else {
                     $seriesNumber = $metadata['series_number'] ?? 1;
-                    $book->series()->sync([
-                        $series->id => ['series_number' => $seriesNumber]
-                    ]);
+                    $seriesToAttach[$series->id] = ['series_number' => $seriesNumber];
                 }
+            }
+
+            // Handle collection as a separate series (if present)
+            if (!empty($metadata['collection'])) {
+                $collectionSeries = Series::firstOrCreate(
+                    ['name' => trim($metadata['collection'])],
+                    ['is_collection' => true]
+                );
+
+                // Update existing series to mark as collection if needed
+                if (!$collectionSeries->is_collection) {
+                    $collectionSeries->is_collection = true;
+                    $collectionSeries->save();
+                }
+
+                $collectionNumber = $metadata['collection_number'] ?? null;
+                $seriesToAttach[$collectionSeries->id] = ['series_number' => $collectionNumber];
+            }
+
+            // Attach all series (primary + collection) at once
+            if (!empty($seriesToAttach)) {
+                $book->series()->sync($seriesToAttach);
             }
 
             // Handle genres
@@ -305,23 +330,22 @@ class BookImportService
             $targetDir = $options['target_directory'] ?? $this->generateTargetDirectory($book, $bookStoragePath, $options);
             $operation = $options['operation'] ?? 'copy'; // 'copy', 'move', or 'in_place'
 
-            // Check if source is already within book storage path (in-place import)
-            $realBookStoragePath = realpath($bookStoragePath);
+            // Check if source is already at the target location (true in-place import)
             $realSourcePath = realpath($sourcePath);
+            $realTargetDir = realpath($targetDir);
 
-            if (
-                $realBookStoragePath && $realSourcePath &&
-                strpos($realSourcePath, $realBookStoragePath) === 0
-            ) {
-                // Files are already in the book storage path - use in-place import
-                $book->directory_path = $sourcePath;
+            // Only skip move if source and target are exactly the same
+            if ($realSourcePath && $realTargetDir && $realSourcePath === $realTargetDir) {
+                // Files are already in the correct location - true in-place import
+                $book->directory_path = str_replace($bookStoragePath . '/', '', $targetDir);
                 $book->save();
 
                 // Just flatten CD directories if needed, but don't move files
                 $this->flattenCdDirectories($sourcePath);
 
-                Log::info("In-place import: Files already in book storage", [
+                Log::info("In-place import: Files already at target location", [
                     'source' => $sourcePath,
+                    'target' => $targetDir,
                     'book_id' => $book->id
                 ]);
 
@@ -369,20 +393,28 @@ class BookImportService
      */
     protected function generateTargetDirectory(Book $book, string $basePath, array $options = []): string
     {
+        // Refresh the book's series relationship to ensure we have latest data with is_collection flag
+        $book->load('series');
+
         $authors = $book->authors->pluck('name')->toArray();
         $genre = $book->genres->first()?->name ?? 'Unknown';
         $authorDir = $this->formatAuthorsForDirectory($authors);
 
-        // Get series number from pivot table if book has a series
+        // Get primary series (non-collection) for directory structure
+        // Collections should NEVER be used for directory paths
+        $primarySeries = $book->series->where('is_collection', false)->first();
         $seriesNumber = null;
-        if ($book->series->isNotEmpty()) {
-            $seriesNumber = $book->series->first()->pivot->series_number ?? null;
+        $seriesName = null;
+
+        if ($primarySeries) {
+            $seriesName = $primarySeries->name;
+            $seriesNumber = $primarySeries->pivot->series_number ?? null;
         }
 
         $metadata = [
             'author' => $authors,
             'genre' => $genre,
-            'series' => $book->series->first()?->name,
+            'series' => $seriesName,
             'series_number' => $seriesNumber,
             'title' => $book->title
         ];
@@ -415,19 +447,21 @@ class BookImportService
         if (File::isFile($source)) {
             $filename = basename($source);
             $targetFile = "{$target}/{$filename}";
-            
+
             if (!File::isDirectory($target)) {
                 File::makeDirectory($target, 0775, true);
             }
-            
+
             if (!File::copy($source, $targetFile)) {
                 throw new \Exception("Failed to copy file: {$source} to {$targetFile}");
             }
-            
+
             chmod($targetFile, 0664);
+
+            $this->copyMatchingPdfFile($source, $target);
             return;
         }
-        
+
         if (!File::isDirectory($source)) {
             throw new \Exception("Source directory does not exist: {$source}");
         }
@@ -459,22 +493,24 @@ class BookImportService
         if (File::isFile($source)) {
             $filename = basename($source);
             $targetFile = "{$target}/{$filename}";
-            
+
             if (!File::isDirectory($target)) {
                 File::makeDirectory($target, 0775, true);
             }
-            
+
             if (!File::copy($source, $targetFile)) {
                 throw new \Exception("Failed to copy file: {$source} to {$targetFile}");
             }
-            
+
             chmod($targetFile, 0664);
-            
+
+            $this->moveMatchingPdfFile($source, $target);
+
             // Delete source file after successful copy
             File::delete($source);
             return;
         }
-        
+
         if (!File::isDirectory($source)) {
             throw new \Exception("Source directory does not exist: {$source}");
         }
@@ -504,6 +540,81 @@ class BookImportService
 
         // Remove empty directories from source
         $this->removeEmptyDirectories($source);
+    }
+
+    /**
+     * Find and copy matching PDF file for an audio file
+     */
+    protected function copyMatchingPdfFile(string $audioFilePath, string $targetDir): void
+    {
+        $pdfPath = $this->findMatchingPdfFile($audioFilePath);
+
+        if ($pdfPath && File::exists($pdfPath)) {
+            $pdfFilename = basename($pdfPath);
+            $targetPdfPath = "{$targetDir}/{$pdfFilename}";
+
+            try {
+                if (File::copy($pdfPath, $targetPdfPath)) {
+                    chmod($targetPdfPath, 0664);
+                    Log::info("Copied matching PDF file", [
+                        'pdf' => $pdfPath,
+                        'target' => $targetPdfPath
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::warning("Failed to copy matching PDF file: " . $e->getMessage(), [
+                    'pdf' => $pdfPath,
+                    'target' => $targetPdfPath
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Find and move matching PDF file for an audio file
+     */
+    protected function moveMatchingPdfFile(string $audioFilePath, string $targetDir): void
+    {
+        $pdfPath = $this->findMatchingPdfFile($audioFilePath);
+
+        if ($pdfPath && File::exists($pdfPath)) {
+            $pdfFilename = basename($pdfPath);
+            $targetPdfPath = "{$targetDir}/{$pdfFilename}";
+
+            try {
+                if (File::copy($pdfPath, $targetPdfPath)) {
+                    chmod($targetPdfPath, 0664);
+                    File::delete($pdfPath);
+                    Log::info("Moved matching PDF file", [
+                        'pdf' => $pdfPath,
+                        'target' => $targetPdfPath
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::warning("Failed to move matching PDF file: " . $e->getMessage(), [
+                    'pdf' => $pdfPath,
+                    'target' => $targetPdfPath
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Find a PDF file with the same basename as an audio file
+     */
+    protected function findMatchingPdfFile(string $audioFilePath): ?string
+    {
+        $pathInfo = pathinfo($audioFilePath);
+        $directory = $pathInfo['dirname'];
+        $basename = $pathInfo['filename'];
+
+        $pdfPath = "{$directory}/{$basename}.pdf";
+
+        if (File::exists($pdfPath) && File::isFile($pdfPath)) {
+            return $pdfPath;
+        }
+
+        return null;
     }
 
     /**

@@ -193,4 +193,73 @@ class BookImportServiceTest extends TestCase
 
         $this->assertEquals('Thriller', $result);
     }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function findMatchingPdfFileReturnsNullWhenNoPdfExists(): void
+    {
+        $tempDir = sys_get_temp_dir() . '/test_' . uniqid();
+        mkdir($tempDir);
+
+        $audioFile = $tempDir . '/audiobook.m4b';
+        touch($audioFile);
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('findMatchingPdfFile');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->service, $audioFile);
+
+        $this->assertNull($result);
+
+        unlink($audioFile);
+        rmdir($tempDir);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function findMatchingPdfFileReturnsPdfPathWhenExists(): void
+    {
+        $tempDir = sys_get_temp_dir() . '/test_' . uniqid();
+        mkdir($tempDir);
+
+        $audioFile = $tempDir . '/audiobook.m4b';
+        $pdfFile = $tempDir . '/audiobook.pdf';
+        touch($audioFile);
+        touch($pdfFile);
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('findMatchingPdfFile');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->service, $audioFile);
+
+        $this->assertEquals($pdfFile, $result);
+
+        unlink($audioFile);
+        unlink($pdfFile);
+        rmdir($tempDir);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function findMatchingPdfFileHandlesDifferentAudioExtensions(): void
+    {
+        $tempDir = sys_get_temp_dir() . '/test_' . uniqid();
+        mkdir($tempDir);
+
+        $audioFile = $tempDir . '/book.mp3';
+        $pdfFile = $tempDir . '/book.pdf';
+        touch($audioFile);
+        touch($pdfFile);
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('findMatchingPdfFile');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->service, $audioFile);
+
+        $this->assertEquals($pdfFile, $result);
+
+        unlink($audioFile);
+        unlink($pdfFile);
+        rmdir($tempDir);
+    }
 }
