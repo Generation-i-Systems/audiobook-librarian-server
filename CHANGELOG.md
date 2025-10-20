@@ -10,6 +10,8 @@
   - Automatically detects books.json in scan directories (up to 5 levels deep)
   - Injects genre and other metadata from books.json into import process
   - Prioritizes OpenAudible genre data over AI-detected genres (when confidence < 90%)
+  - Properly handles hierarchical genre formats (e.g., "Science Fiction & Fantasy:Science Fiction")
+  - Extracts most specific genre from colon-separated hierarchy
   - Also imports series, narrator, publisher, release date, and description from books.json
   - Improves accuracy for OpenAudible book imports
 

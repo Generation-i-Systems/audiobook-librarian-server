@@ -122,7 +122,12 @@ class MetadataProcessingService
             $oaMeta = $audiobook['openaudible_metadata'];
 
             if (!empty($oaMeta['genre']) && (empty($metadata['genre']) || $metadata['confidence'] < 90)) {
-                $metadata['genre'] = is_array($oaMeta['genre']) ? $oaMeta['genre'] : [$oaMeta['genre']];
+                // OpenAudible uses hierarchical genres like "Science Fiction & Fantasy:Science Fiction"
+                // Extract the most specific genre (last part after colon)
+                $genreStr = is_array($oaMeta['genre']) ? $oaMeta['genre'][0] : $oaMeta['genre'];
+                $genreParts = explode(':', $genreStr);
+                $specificGenre = trim(end($genreParts));
+                $metadata['genre'] = [$specificGenre];
             }
 
             if (!empty($oaMeta['series']) && empty($metadata['series'])) {
