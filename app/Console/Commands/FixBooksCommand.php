@@ -286,7 +286,7 @@ class FixBooksCommand extends Command
             $coverUrl = $book['coverImageUrl'] ?? $book['googleBooksCoverImageUrl'] ?? null;
             $hasLocal = false;
             if ($dir) {
-                $storageRoot = rtrim(config('bookparser.book_storage_path', '/mnt/books'), '/');
+                $storageRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
                 $coverGlob = glob($storageRoot . '/' . ltrim($dir, '/') . '/cover*.*');
                 $hasLocal = !empty($coverGlob);
             }

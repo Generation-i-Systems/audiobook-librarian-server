@@ -44,6 +44,11 @@ return Application::configure(basePath: dirname(__DIR__))
         //$schedule->command('storage:fix-permissions')
         //         ->hourly()
         //         ->appendOutputTo(storage_path('logs/permissions-fix.log'));
+
+        // Validate book directories daily at 3:00 AM
+        $schedule->command('books:validate-directories')
+                 ->dailyAt('03:00')
+                 ->appendOutputTo(storage_path('logs/directory-validation.log'));
     })
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->api([

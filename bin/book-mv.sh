@@ -230,25 +230,14 @@ fi
 # Handle regex mode directly in bash
 if [[ -n "$REGEX_PATTERN" ]]; then
     debug "Regex mode enabled"
+    debug "Regex pattern: $REGEX_PATTERN"
     
-    # Parse the regex pattern (format: s<delim>pattern<delim>replacement<delim>[flags])
-    # The delimiter can be any character (commonly / or # but any special char works)
-    # The trailing delimiter and flags are optional: s/a/b/ or s/a/b/g or s/a/b
-    if [[ ! "$REGEX_PATTERN" =~ ^s(.)(.*)\1(.*)(\1([gimsx]*))?$ ]]; then
-        echo -e "${RED}Invalid regex pattern. Use format: s<delim>pattern<delim>replacement[<delim>flags]${NC}" >&2
+    # Basic validation - just check it starts with 's' and has a delimiter
+    if [[ ! "$REGEX_PATTERN" =~ ^s. ]]; then
+        echo -e "${RED}Invalid regex pattern. Must start with 's' followed by delimiter${NC}" >&2
         echo "Example: s/Book/Novel/g or s#^0[123] ## or s/^0[123] // or s:a:b" >&2
         exit 1
     fi
-    
-    DELIMITER="${BASH_REMATCH[1]}"
-    PATTERN="${BASH_REMATCH[2]}"
-    REPLACEMENT="${BASH_REMATCH[3]}"
-    FLAGS="${BASH_REMATCH[5]}"  # Note: BASH_REMATCH[4] is the entire optional group
-    
-    debug "Delimiter: $DELIMITER"
-    debug "Pattern: $PATTERN"
-    debug "Replacement: $REPLACEMENT"
-    debug "Flags: $FLAGS"
     
     # Process each source file/directory
     for src in "${args[@]}"; do
@@ -261,16 +250,12 @@ if [[ -n "$REGEX_PATTERN" ]]; then
         dirname=$(dirname "$src")
         
         # Apply regex using Perl (more compatible with s/// syntax)
+        # Just pass the entire pattern to Perl/sed - they know how to parse it!
         if command -v perl >/dev/null 2>&1; then
-            # Use printf to avoid shell interpretation of special chars
-            newbasename=$(printf '%s\n' "$basename" | perl -pe 's'"${DELIMITER}${PATTERN}${DELIMITER}${REPLACEMENT}${DELIMITER}${FLAGS}")
+            newbasename=$(printf '%s\n' "$basename" | perl -pe "$REGEX_PATTERN")
         else
-            # Fallback to sed (limited flags support)
-            if [[ "$FLAGS" == *g* ]]; then
-                newbasename=$(printf '%s\n' "$basename" | sed 's'"${DELIMITER}${PATTERN}${DELIMITER}${REPLACEMENT}${DELIMITER}g")
-            else
-                newbasename=$(printf '%s\n' "$basename" | sed 's'"${DELIMITER}${PATTERN}${DELIMITER}${REPLACEMENT}${DELIMITER}")
-            fi
+            # Fallback to sed
+            newbasename=$(printf '%s\n' "$basename" | sed "$REGEX_PATTERN")
         fi
         
         if [[ "$basename" == "$newbasename" ]]; then

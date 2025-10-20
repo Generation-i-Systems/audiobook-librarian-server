@@ -257,6 +257,22 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::post('/books/resync-from-path', [Admin\BookController::class, 'resyncFromPath'])
         ->name('books.resyncFromPath');
 
+    // Directory validation routes
+    Route::get('/directory-validation', [Admin\DirectoryValidationController::class, 'index'])
+        ->name('directory-validation');
+    Route::post('/directory-validation/rescan', [Admin\DirectoryValidationController::class, 'rescan'])
+        ->name('directory-validation.rescan');
+    Route::post('/directory-validation/rename', [Admin\DirectoryValidationController::class, 'renameDirectory'])
+        ->name('directory-validation.rename');
+    Route::delete('/directory-validation/delete-book', [Admin\DirectoryValidationController::class, 'deleteBook'])
+        ->name('directory-validation.delete-book');
+    Route::post('/directory-validation/import', [Admin\DirectoryValidationController::class, 'importOrphanedDirectory'])
+        ->name('directory-validation.import');
+    Route::delete('/directory-validation/delete-orphan', [Admin\DirectoryValidationController::class, 'deleteOrphanedDirectory'])
+        ->name('directory-validation.delete-orphan');
+    Route::post('/directory-validation/rename-orphan', [Admin\DirectoryValidationController::class, 'renameOrphanedDirectory'])
+        ->name('directory-validation.rename-orphan');
+
     Route::post(
         '/users/{user}/update-role',
         [Admin\AdminController::class, 'updateRole']

@@ -54,9 +54,27 @@ class Book extends Model
         'google_books_info' => 'array',
         'hardcover_info' => 'array',
         'audiobook_bay_info' => 'array',
+        'directory_exists' => 'boolean',
+        'directory_last_checked' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
+
+    /**
+     * Scope to filter books with existing directories only
+     */
+    public function scopeWithExistingDirectories($query)
+    {
+        return $query->where('directory_exists', true);
+    }
+
+    /**
+     * Scope to filter books with missing directories
+     */
+    public function scopeWithMissingDirectories($query)
+    {
+        return $query->where('directory_exists', false);
+    }
 
     public function users(): BelongsToMany
     {

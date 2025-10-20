@@ -14,7 +14,11 @@ class Series extends Model
     use CamelCaseAttributeAccess;
     use Auditable;
 
-    protected $fillable = ['name'];
+    protected $fillable = ['name', 'is_collection'];
+
+    protected $casts = [
+        'is_collection' => 'boolean',
+    ];
 
     /**
      * Create a new factory instance for the model.

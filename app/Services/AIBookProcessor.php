@@ -672,6 +672,29 @@ class AIBookProcessor
         if (isset($metadata['series']) && is_array($metadata['series'])) {
             $normalized['series'] = $metadata['series']['name'] ?? null;
             $normalized['series_number'] = isset($metadata['series']['number']) ? (int)$metadata['series']['number'] : null;
+            $normalized['is_collection'] = $metadata['series']['is_collection'] ?? false;
+        }
+
+        // Detect collection patterns in series name
+        if (!empty($normalized['series'])) {
+            $seriesName = $normalized['series'];
+            $collectionPatterns = [
+                '/top\s+\d+/i',                    // "Top 100", "Top 50"
+                '/best\s+of/i',                    // "Best of"
+                '/greatest/i',                     // "Greatest"
+                '/collection/i',                   // "Collection"
+                '/anthology/i',                    // "Anthology"
+                '/\d+\s*essential/i',              // "100 Essential"
+                '/must\s*read/i',                  // "Must Read"
+                '/classics/i',                     // "Classics"
+            ];
+
+            foreach ($collectionPatterns as $pattern) {
+                if (preg_match($pattern, $seriesName)) {
+                    $normalized['is_collection'] = true;
+                    break;
+                }
+            }
         }
 
         return $normalized;

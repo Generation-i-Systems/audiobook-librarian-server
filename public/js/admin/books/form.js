@@ -155,11 +155,21 @@ window.addGenreRow = addGenreRow;
 $(function () {
     var $rawJsonBtn = $("#raw-json-edit-btn");
     if ($rawJsonBtn.length) {
-        var bookId = $rawJsonBtn
-            .closest("form")
-            .attr("action")
-            .match(/books\/(\w+)/);
-        bookId = bookId ? bookId[1] : null;
+        // Button is outside form, so get book ID from form action or page URL
+        var bookId = null;
+        var $form = $("#book-form");
+        if ($form.length) {
+            var formAction = $form.attr("action");
+            if (formAction) {
+                var match = formAction.match(/books\/(\w+)/);
+                bookId = match ? match[1] : null;
+            }
+        }
+        // Fallback: try to get from URL
+        if (!bookId) {
+            var urlMatch = window.location.pathname.match(/books\/(\w+)/);
+            bookId = urlMatch ? urlMatch[1] : null;
+        }
         $rawJsonBtn.on("click", function () {
             if (!bookId) return;
             $("#raw-json-error").hide();
@@ -809,39 +819,38 @@ window.initBookForm = function (formContainerSelector) {
         }
     });
 
-    // Attach event handler for Autofill Modal button
-    $container
-        .off("click", "#autofill-modal-btn")
-        .on("click", "#autofill-modal-btn", function (e) {
-            e.preventDefault();
-            console.log("[DEBUG] Autofill modal button clicked");
-            let bootstrapRef = null;
-            if (typeof bootstrap !== "undefined") {
-                bootstrapRef = bootstrap;
-            } else if (
-                typeof window !== "undefined" &&
-                typeof window.bootstrap !== "undefined"
-            ) {
-                bootstrapRef = window.bootstrap;
-            } else {
-                try {
-                    bootstrapRef = require("bootstrap");
-                } catch (e) {
-                    bootstrapRef = null;
-                }
-            }
-            if (bootstrapRef && typeof bootstrapRef.Modal !== "undefined") {
-                var modalEl = document.getElementById("autofillModal");
-                if (modalEl) {
-                    var bsModal =
-                        bootstrapRef.Modal.getOrCreateInstance(modalEl);
-                    bsModal.show();
-                } else {
-                    console.error("[DEBUG] #autofillModal element not found");
-                }
-            }
-        });
 };
+
+// Attach event handler for Autofill Modal button (globally, outside form)
+$(document).on("click", "#autofill-modal-btn", function (e) {
+    e.preventDefault();
+    console.log("[DEBUG] Autofill modal button clicked");
+    let bootstrapRef = null;
+    if (typeof bootstrap !== "undefined") {
+        bootstrapRef = bootstrap;
+    } else if (
+        typeof window !== "undefined" &&
+        typeof window.bootstrap !== "undefined"
+    ) {
+        bootstrapRef = window.bootstrap;
+    } else {
+        try {
+            bootstrapRef = require("bootstrap");
+        } catch (e) {
+            bootstrapRef = null;
+        }
+    }
+    if (bootstrapRef && typeof bootstrapRef.Modal !== "undefined") {
+        var modalEl = document.getElementById("autofillModal");
+        if (modalEl) {
+            var bsModal =
+                bootstrapRef.Modal.getOrCreateInstance(modalEl);
+            bsModal.show();
+        } else {
+            console.error("[DEBUG] #autofillModal element not found");
+        }
+    }
+});
 
 document.addEventListener("DOMContentLoaded", function () {
     console.log("[DEBUG] DOM ready event fired");
@@ -888,6 +897,19 @@ document.addEventListener("DOMContentLoaded", function () {
             if (coverImageSourceField) {
                 coverImageSourceField.value = this.dataset.source || '';
                 console.log("Set coverImageSource to: " + coverImageSourceField.value);
+            }
+            
+            // Update the corner preview image to show the selected cover
+            const $cornerPreview = $("#cover-preview-trigger img");
+            if ($cornerPreview.length) {
+                // Find the image associated with this radio button
+                const $radioLabel = $(this).closest('label');
+                const $coverImg = $radioLabel.find('img');
+                if ($coverImg.length) {
+                    const newSrc = $coverImg.attr('src');
+                    $cornerPreview.attr('src', newSrc);
+                    console.log("[DEBUG] Updated corner preview to show selected cover:", newSrc);
+                }
             }
         });
     });
@@ -1256,144 +1278,226 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 });
 
+// Autofill search function
+function performAutofillSearch(sources, autoApplyFirst) {
+    autoApplyFirst = autoApplyFirst || false;
+    var $modal = $("#autofillModal");
+    var $resultsTable = $modal.find("#autofill-results-table tbody");
+    var $applyBtn = $modal.find("#autofill-apply-btn");
+    $applyBtn.prop("disabled", true);
+
+    // Show loading state
+    $resultsTable.html(
+        '<tr><td colspan="7" class="text-center text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Searching...</td></tr>',
+    );
+
+    // Gather search fields
+    var title = $("#autofill-title").val();
+    var author = $("#autofill-author").val();
+    var series = $("#autofill-series").val();
+    var apiId = $("#autofill-api-id").val();
+
+    // Show results wrapper
+    $("#autofill-results-wrapper").show();
+
+    // Use the unified search endpoint
+    var endpoint = window.BOOK_FORM_ROUTES.search || "/admin/books/search";
+
+    // If searching all sources, we'll make multiple requests
+    var sourcesToSearch = Array.isArray(sources) ? sources : [sources];
+    var allResults = [];
+    var completedRequests = 0;
+
+    sourcesToSearch.forEach(function(source) {
+        // Map the source value to the API source parameter
+        var apiSource = "";
+        if (source === "google") {
+            apiSource = "googlebooks";
+        } else if (source === "audible") {
+            apiSource = "audible";
+        } else if (source === "audiobookbay") {
+            apiSource = "audiobookbay";
+        } else if (source === "hardcover") {
+            apiSource = "hardcover";
+        } else {
+            completedRequests++;
+            return;
+        }
+
+        // Build query params
+        var params = {
+            source: apiSource,
+            title: title,
+            author: author,
+            series: series,
+            api_id: apiId,
+        };
+
+        console.log("[DEBUG] Autofill search parameters:", params);
+
+        $.get(endpoint, params)
+            .done(function (response) {
+                var results = Array.isArray(response) ? response : [];
+                // Add source to each result
+                results.forEach(function(item) {
+                    item.source = source.charAt(0).toUpperCase() + source.slice(1);
+                });
+                allResults = allResults.concat(results);
+            })
+            .fail(function (xhr) {
+                console.error("[DEBUG] Search failed for " + source + ":", xhr);
+            })
+            .always(function() {
+                completedRequests++;
+                if (completedRequests === sourcesToSearch.length) {
+                    displayAutofillResults(allResults, autoApplyFirst);
+                }
+            });
+    });
+}
+
+function displayAutofillResults(results, autoApplyFirst) {
+    var $modal = $("#autofillModal");
+    var $resultsTable = $modal.find("#autofill-results-table tbody");
+    var $applyBtn = $modal.find("#autofill-apply-btn");
+
+    if (results.length > 0) {
+        var rows = "";
+        results.forEach(function (item, idx) {
+            var authors = Array.isArray(item.author)
+                ? item.author.join(", ")
+                : item.author || "";
+            var coverUrl =
+                item.coverImageUrl ||
+                item.cover_image_url ||
+                "";
+            var publishedYear =
+                item.publishedYear ||
+                (item.published_date
+                    ? item.published_date.substring(0, 4)
+                    : "");
+
+            rows +=
+                "<tr>" +
+                '<td><input type="radio" name="autofill_result_select" value="' +
+                idx +
+                '" ' + (idx === 0 ? 'checked' : '') + '></td>' +
+                "<td>" +
+                (coverUrl
+                    ? '<img src="' +
+                      coverUrl +
+                      '" alt="Cover" style="height:48px;max-width:40px;">'
+                    : "") +
+                "</td>" +
+                "<td>" +
+                (item.title || "") +
+                "</td>" +
+                "<td>" +
+                authors +
+                "</td>" +
+                "<td>" +
+                (item.series || "") +
+                "</td>" +
+                "<td>" +
+                publishedYear +
+                "</td>" +
+                "<td>" +
+                (item.source || "") +
+                "</td>" +
+                "</tr>";
+        });
+        $resultsTable.html(rows);
+        
+        // Store results for later use
+        window.autofillMatches = results;
+        
+        // Enable the apply button for first result
+        $applyBtn.prop("disabled", false);
+        $applyBtn.data("selectedIdx", 0);
+        
+        // Enable selection logic
+        $(document)
+            .off("change.autofillResult")
+            .on(
+                "change.autofillResult",
+                'input[name="autofill_result_select"]',
+                function () {
+                    var idx = $(this).val();
+                    var item = window.autofillMatches[idx];
+                    if (!item) return;
+                    $("#autofill-apply-btn").prop(
+                        "disabled",
+                        false,
+                    );
+                    $("#autofill-apply-btn").data(
+                        "selectedIdx",
+                        idx,
+                    );
+                },
+            );
+
+        // Auto-apply first result if requested
+        if (autoApplyFirst && results.length > 0) {
+            console.log("[DEBUG] Auto-applying first result");
+            applyAutofillResult(0);
+            $modal.modal('hide');
+        }
+    } else {
+        $resultsTable.html(
+            '<tr><td colspan="7" class="text-center text-muted">No results found</td></tr>',
+        );
+    }
+}
+
 // Autofill Modal Search Intercept
 $(function () {
     var $autofillForm = $("#autofill-search-form");
     if ($autofillForm.length) {
-        $autofillForm.on("submit", function (e) {
+        // Remove old submit handler
+        $autofillForm.off("submit");
+        
+        // Handle individual source buttons
+        $("#search-audible-btn").on("click", function(e) {
             e.preventDefault();
-            e.stopPropagation();
-            var $modal = $("#autofillModal");
-            var $resultsTable = $modal.find("#autofill-results-table tbody");
-            var $applyBtn = $modal.find("#autofill-apply-btn");
-            $applyBtn.prop("disabled", true);
+            performAutofillSearch("audible", false);
+        });
+        
+        $("#search-google-btn").on("click", function(e) {
+            e.preventDefault();
+            performAutofillSearch("google", false);
+        });
+        
+        $("#search-audiobookbay-btn").on("click", function(e) {
+            e.preventDefault();
+            performAutofillSearch("audiobookbay", false);
+        });
+        
+        $("#search-hardcover-btn").on("click", function(e) {
+            e.preventDefault();
+            performAutofillSearch("hardcover", false);
+        });
+        
+        // Handle search all button
+        $("#search-all-btn").on("click", function(e) {
+            e.preventDefault();
+            performAutofillSearch(["audible", "google", "audiobookbay", "hardcover"], false);
+        });
+        
+        // Handle the apply button click
+        $("#autofill-apply-btn")
+            .off("click.autofillApply")
+            .on("click.autofillApply", function () {
+                var idx = $(this).data("selectedIdx");
+                applyAutofillResult(idx);
+                $("#autofillModal").modal("hide");
+            });
+    }
+});
 
-            // Show loading state
-            $resultsTable.html(
-                '<tr><td colspan="7" class="text-center text-muted">Searching...</td></tr>',
-            );
-
-            // Gather search fields
-            var source = $autofillForm.find('[name="source"]').val();
-            var title = $autofillForm.find('[name="title"]').val();
-            var author = $autofillForm.find('[name="author"]').val();
-            var series = $autofillForm.find('[name="series"]').val();
-            var apiId = $autofillForm.find('[name="api_id"]').val();
-
-            // Show results wrapper
-            $("#autofill-results-wrapper").show();
-
-            // Use the unified search endpoint
-            var endpoint =
-                window.BOOK_FORM_ROUTES.search || "/admin/books/search";
-
-            // Map the source value to the API source parameter
-            var apiSource = "";
-            if (source === "google") {
-                apiSource = "googlebooks";
-            } else if (source === "audible") {
-                apiSource = "audible";
-            } else {
-                $resultsTable.html(
-                    '<tr><td colspan="7" class="text-center text-danger">Source not implemented: ' +
-                        source +
-                        "</td></tr>",
-                );
-                return false;
-            }
-
-            // Build query params
-            var params = {
-                source: apiSource,
-                title: title,
-                author: author,
-                series: series,
-                api_id: apiId,
-            };
-
-            // Debug log the search parameters
-            console.log("[DEBUG] Autofill search parameters:", params);
-
-            $.get(endpoint, params)
-                .done(function (response) {
-                    var results = Array.isArray(response) ? response : [];
-                    if (results.length > 0) {
-                        var rows = "";
-                        results.forEach(function (item, idx) {
-                            var authors = Array.isArray(item.author)
-                                ? item.author.join(", ")
-                                : item.author || "";
-                            // Handle both camelCase and snake_case properties
-                            var coverUrl =
-                                item.coverImageUrl ||
-                                item.cover_image_url ||
-                                "";
-                            var publishedYear =
-                                item.publishedYear ||
-                                (item.published_date
-                                    ? item.published_date.substring(0, 4)
-                                    : "");
-
-                            rows +=
-                                "<tr>" +
-                                '<td><input type="radio" name="autofill_result_select" value="' +
-                                idx +
-                                '"></td>' +
-                                "<td>" +
-                                (coverUrl
-                                    ? '<img src="' +
-                                      coverUrl +
-                                      '" alt="Cover" style="height:48px;max-width:40px;">'
-                                    : "") +
-                                "</td>" +
-                                "<td>" +
-                                (item.title || "") +
-                                "</td>" +
-                                "<td>" +
-                                authors +
-                                "</td>" +
-                                "<td>" +
-                                (item.series || "") +
-                                "</td>" +
-                                "<td>" +
-                                (publishedYear || "") +
-                                "</td>" +
-                                "<td>" +
-                                (item.source || "Google Books") +
-                                "</td>" +
-                                "</tr>";
-                        });
-                        $resultsTable.html(rows);
-                        // Store results for later use based on source
-                        window.autofillMatches = results;
-                        // Enable selection and apply autofill logic
-                        $(document)
-                            .off("change.autofillResult")
-                            .on(
-                                "change.autofillResult",
-                                'input[name="autofill_result_select"]',
-                                function () {
-                                    var idx = $(this).val();
-                                    var item = window.autofillMatches[idx];
-                                    if (!item) return;
-                                    $("#autofill-apply-btn").prop(
-                                        "disabled",
-                                        false,
-                                    );
-                                    $("#autofill-apply-btn").data(
-                                        "selectedIdx",
-                                        idx,
-                                    );
-                                },
-                            );
-
-                        // Handle the apply button click
-                        $("#autofill-apply-btn")
-                            .off("click.autofillApply")
-                            .on("click.autofillApply", function () {
-                                var idx = $(this).data("selectedIdx");
-                                var item = window.autofillMatches[idx];
-                                if (!item) return;
+// Function to apply autofill result to form
+function applyAutofillResult(idx) {
+    var item = window.autofillMatches[idx];
+    if (!item) return;
 
                                 // Set title
                                 $("#title").val(item.title || "");
@@ -1513,6 +1617,20 @@ $(function () {
 
                                         // Ensure the cover candidates group is visible
                                         $("#cover-candidates-group").show();
+                                        
+                                        // Update the corner preview image to show the newly selected cover
+                                        var $cornerPreview = $("#cover-preview-trigger img");
+                                        if ($cornerPreview.length) {
+                                            $cornerPreview.attr("src", coverUrl);
+                                            console.log("[DEBUG] Updated corner preview to show autofilled cover");
+                                        }
+                                    } else {
+                                        // If no cover candidates list, still update corner preview
+                                        var $cornerPreview = $("#cover-preview-trigger img");
+                                        if ($cornerPreview.length && coverUrl) {
+                                            $cornerPreview.attr("src", coverUrl);
+                                            console.log("[DEBUG] Updated corner preview to show autofilled cover");
+                                        }
                                     }
                                 }
 
@@ -1629,28 +1747,27 @@ $(function () {
                                         addNarratorRow($("#book-form"), "");
                                     }
                                 }
-                                $("#autofillModal").modal("hide");
-                            });
-                    } else {
-                        $resultsTable.html(
-                            '<tr><td colspan="7" class="text-center text-warning">No results found.</td></tr>'
-                        );
-                        window.autofillMatches = [];
-                    }
-                })
-                .fail(function (xhr) {
-                    $resultsTable.html(
-                        '<tr><td colspan="7" class="text-center text-danger">Search failed: ' +
-                            (xhr.responseJSON && xhr.responseJSON.error
-                                ? xhr.responseJSON.error
-                                : "Unknown error") +
-                            "</td></tr>"
-                        );
-                });
+}
 
-            return false;
-        });
+// Magic Autofill Button - Auto-search Audible and apply first result
+$(document).on("click", "#magic-autofill-btn", function(e) {
+    e.preventDefault();
+    console.log("[DEBUG] Magic autofill button clicked");
+    
+    // Get current form values
+    var title = $('input[name="title"]').val() || '';
+    var author = '';
+    var authorInputs = $('input[name="authors[]"]');
+    if (authorInputs.length > 0) {
+        author = $(authorInputs[0]).val() || '';
     }
+    
+    // Set autofill modal fields
+    $("#autofill-title").val(title);
+    $("#autofill-author").val(author);
+    
+    // Perform Audible search and auto-apply first result
+    performAutofillSearch("audible", true);
 });
 
 // Function to ensure a cover image radio button is always selected if any are available

@@ -66,9 +66,45 @@
                         <td style="vertical-align: middle; text-align: center;">
                             @php
                                 $coverImage = $book['coverImage'] ?? null;
-                                $coverProxyUrl = (is_string($coverImage) && !empty(trim($coverImage)))
-                                    ? route('cover.proxy', ['path' => $coverImage])
-                                    : asset('images/placeholder.png');
+                                
+                                // Debug logging for problematic data
+                                if (is_array($coverImage) && isset($coverImage['83mb'])) {
+                                    \Illuminate\Support\Facades\Log::error('Found problematic coverImage', [
+                                        'book_id' => $book['id'] ?? 'unknown',
+                                        'book_title' => $book['title'] ?? 'unknown',
+                                        'coverImage_type' => gettype($coverImage),
+                                        'coverImage_keys' => array_keys($coverImage),
+                                        'coverImage_data' => $coverImage,
+                                    ]);
+                                }
+                                
+                                // Handle array coverImage (extract path if it's an array)
+                                if (is_array($coverImage)) {
+                                    $coverImage = $coverImage['path'] ?? $coverImage[0] ?? null;
+                                }
+                                // Extra safety: ensure it's a string or null, not still an array
+                                if (is_array($coverImage)) {
+                                    $coverImage = null;
+                                }
+                                
+                                try {
+                                    if (is_string($coverImage) && !empty(trim($coverImage))) {
+                                        // URL encode the path to handle special characters like {, }, etc.
+                                        $encodedPath = str_replace(['%2F'], ['/'], rawurlencode($coverImage));
+                                        $coverProxyUrl = url('/cover/' . $encodedPath);
+                                    } else {
+                                        $coverProxyUrl = asset('images/placeholder.png');
+                                    }
+                                } catch (\Exception $e) {
+                                    \Illuminate\Support\Facades\Log::error('Route generation failed', [
+                                        'book_id' => $book['id'] ?? 'unknown',
+                                        'book_title' => $book['title'] ?? 'unknown',
+                                        'coverImage_type' => gettype($coverImage),
+                                        'coverImage_value' => $coverImage,
+                                        'error' => $e->getMessage(),
+                                    ]);
+                                    $coverProxyUrl = asset('images/placeholder.png');
+                                }
                             @endphp
                             <img src="{{ $coverProxyUrl }}" alt="cover"
                                 style="height: 48px; width: auto; object-fit: contain; border-radius: 3px; box-shadow: 0 1px 2px rgba(0,0,0,.07); background: #f8f8f8;"

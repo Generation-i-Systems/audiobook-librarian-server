@@ -1003,17 +1003,23 @@ class BookController extends Controller
                             return null;
                         }
 
+                        $isCollection = !empty($seriesEntry['isCollection']) || !empty($seriesEntry['is_collection']);
+
                         $existingSeries = $this->documentStoreService->getSeriesByName($seriesName);
                         $seriesId = $existingSeries['id'] ?? null;
 
                         if (!$seriesId) {
-                            $seriesId = $this->documentStoreService->createSeries($seriesName);
+                            $seriesId = $this->documentStoreService->createSeries($seriesName, $isCollection);
+                        } elseif ($isCollection && !($existingSeries['is_collection'] ?? false)) {
+                            // Update existing series to mark as collection
+                            $this->documentStoreService->updateSeries($seriesId, ['is_collection' => true]);
                         }
 
                         return [
                             'id' => $seriesId,
                             'name' => $seriesName,
                             'number' => $seriesEntry['number'] ?? null,
+                            'is_collection' => $isCollection,
                         ];
                     })->filter()->values();
 
@@ -2116,13 +2122,13 @@ class BookController extends Controller
         try {
             // Check if new series name already exists using Series model
             $newSeriesExists = \App\Models\Series::where('name', $newName)->exists();
-            
+
             // If new series exists and merge not confirmed, return warning
             if ($newSeriesExists && !$merge) {
                 // Get count of books in old series
                 $oldSeries = \App\Models\Series::where('name', $oldName)->first();
                 $bookCount = $oldSeries ? $oldSeries->books()->count() : 0;
-                
+
                 return response()->json([
                     'success' => false,
                     'warning' => "A series named '{$newName}' already exists with other books.",
@@ -2131,7 +2137,7 @@ class BookController extends Controller
                     'book_count' => $bookCount,
                 ]);
             }
-            
+
             // Perform the rename/merge using the service method
             $count = $this->documentStoreService->renameSeries($oldName, $newName);
 
@@ -2139,7 +2145,7 @@ class BookController extends Controller
                 'success' => true,
                 'merged' => $newSeriesExists,
                 'count' => $count,
-                'message' => $newSeriesExists 
+                'message' => $newSeriesExists
                     ? "Successfully merged series '{$oldName}' into '{$newName}' for {$count} book(s)."
                     : "Successfully renamed series from '{$oldName}' to '{$newName}' for {$count} book(s)."
             ]);

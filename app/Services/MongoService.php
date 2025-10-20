@@ -1005,11 +1005,25 @@ class MongoService implements DocumentStoreServiceInterface
 
     // SERIES
     /** @inheritDoc */
-    public function createSeries(string $name): string
+    public function createSeries(string $name, bool $isCollection = false): string
     {
-        $data = ['seriesName' => $name];
+        $data = [
+            'seriesName' => $name,
+            'isCollection' => $isCollection,
+        ];
         $result = $this->getCollection('series')->insertOne($data);
         return (string) $result->getInsertedId();
+    }
+
+    /** @inheritDoc */
+    public function updateSeries(int $id, array $data)
+    {
+        // MongoDB uses string IDs, convert if needed
+        $result = $this->getCollection('series')->updateOne(
+            ['_id' => new \MongoDB\BSON\ObjectId((string) $id)],
+            ['$set' => $data]
+        );
+        return $result->getModifiedCount() > 0;
     }
 
     /** @inheritDoc */

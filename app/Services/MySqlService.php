@@ -56,6 +56,7 @@ class MySqlService implements DocumentStoreServiceInterface
                 return [
                     'seriesName' => $series['name'] ?? null,
                     'number' => $series['pivot']['series_number'] ?? null,
+                    'isCollection' => $series['is_collection'] ?? false,
                 ];
             })->all();
         }
@@ -148,10 +149,15 @@ class MySqlService implements DocumentStoreServiceInterface
             $whereClause = '';
             $params = [];
 
+            // Build WHERE clause
+            $conditions = ['directory_exists = 1']; // Only books with existing directories
+
             if (!empty($filters['search'])) {
-                $whereClause = 'WHERE title LIKE ?';
+                $conditions[] = 'title LIKE ?';
                 $params[] = '%' . $filters['search'] . '%';
             }
+
+            $whereClause = 'WHERE ' . implode(' AND ', $conditions);
 
             $books = DB::select("
                 SELECT id, title, cover_image, directory_path
@@ -212,6 +218,9 @@ class MySqlService implements DocumentStoreServiceInterface
 
         $query = Book::query();
 
+        // Exclude books with missing directories from API listings
+        $query->withExistingDirectories();
+
         // Exclude books flagged for review from API listings by default
         // Allow override via filters['include_needs_review'] === true
         $includeNeedsReview = (bool)($filters['include_needs_review'] ?? false);
@@ -231,7 +240,7 @@ class MySqlService implements DocumentStoreServiceInterface
                 $q->select('genres.id', 'genres.name');
             },
             'series' => function ($q) {
-                $q->select('series.id', 'series.name')->withPivot('series_number');
+                $q->select('series.id', 'series.name', 'series.is_collection')->withPivot('series_number');
             },
         ]);
 
@@ -348,13 +357,14 @@ class MySqlService implements DocumentStoreServiceInterface
                 $durationFormatted = gmdate('H:i:s', $book->duration);
             }
 
-            // Format series data as an array of objects with name and series_number
+            // Format series data as an array of objects with name, series_number, and is_collection
             $seriesData = [];
             if ($book->series->isNotEmpty()) {
                 foreach ($book->series as $series) {
                     $seriesData[] = [
                         'name' => $series->name,
                         'series_number' => $series->pivot->series_number,
+                        'is_collection' => $series->is_collection ?? false,
                     ];
                 }
             }
@@ -391,15 +401,15 @@ class MySqlService implements DocumentStoreServiceInterface
     public function getAllBooks($limit = null, $offset = 0)
     {
         $query = Book::with(['authors', 'narrators', 'genres', 'series', 'chapters']);
-        
+
         if ($limit !== null) {
             $query->limit($limit)->offset($offset);
         }
-        
+
         return $query->get()->map(function ($book) {
             $bookArray = $book->toArray();
             $bookArray['_id'] = (string) $book->id;
-            
+
             // Transform series to match MongoDB format
             if (!empty($bookArray['series'])) {
                 $series = [];
@@ -408,7 +418,7 @@ class MySqlService implements DocumentStoreServiceInterface
                 }
                 $bookArray['series'] = $series;
             }
-            
+
             return $bookArray;
         })->toArray();
     }
@@ -600,19 +610,19 @@ class MySqlService implements DocumentStoreServiceInterface
         try {
             // Find the old series by name
             $oldSeries = Series::where('name', $oldName)->first();
-            
+
             if (!$oldSeries) {
                 return 0;
             }
-            
+
             // Check if new series already exists
             $newSeries = Series::where('name', $newName)->first();
-            
+
             if ($newSeries) {
                 // Merge: move all books from old series to new series
                 $books = $oldSeries->books;
                 $count = 0;
-                
+
                 foreach ($books as $book) {
                     // Get the series number from the old series
                     $seriesNumber = $book->series()
@@ -620,10 +630,10 @@ class MySqlService implements DocumentStoreServiceInterface
                         ->first()
                         ->pivot
                         ->series_number ?? null;
-                    
+
                     // Detach from old series
                     $book->series()->detach($oldSeries->id);
-                    
+
                     // Attach to new series (if not already attached)
                     if (!$book->series()->where('series.id', $newSeries->id)->exists()) {
                         $book->series()->attach($newSeries->id, [
@@ -632,21 +642,21 @@ class MySqlService implements DocumentStoreServiceInterface
                             'updated_at' => now(),
                         ]);
                     }
-                    
+
                     $count++;
                 }
-                
+
                 // Delete the old series if it has no more books
                 if ($oldSeries->books()->count() === 0) {
                     $oldSeries->delete();
                 }
-                
+
                 return $count;
             } else {
                 // Rename: just update the series name
                 $oldSeries->name = $newName;
                 $oldSeries->save();
-                
+
                 return $oldSeries->books()->count();
             }
         } catch (\Exception $e) {
@@ -1805,16 +1815,32 @@ class MySqlService implements DocumentStoreServiceInterface
         return Narrator::create($data);
     }
 
-    public function createSeries(string $name)
+    public function createSeries(string $name, bool $isCollection = false)
     {
         try {
             $series = Series::create([
                 'name' => $name,
+                'is_collection' => $isCollection,
             ]);
             return $series->id;
         } catch (\Exception $e) {
             Log::error('MySqlService createSeries failed: ' . $e->getMessage());
             return null;
+        }
+    }
+
+    public function updateSeries(int $id, array $data)
+    {
+        try {
+            $series = Series::find($id);
+            if (!$series) {
+                return false;
+            }
+            $series->update($data);
+            return true;
+        } catch (\Exception $e) {
+            Log::error('MySqlService updateSeries failed: ' . $e->getMessage());
+            return false;
         }
     }
 

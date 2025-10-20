@@ -108,7 +108,7 @@ foreach ($allBooks as $book) {
         $coverUrl = $book['coverImageUrl'] ?? $book['googleBooksCoverImageUrl'] ?? null;
         $hasLocal = false;
         if ($dir) {
-            $storageRoot = rtrim(getenv('BOOK_STORAGE_PATH') ?: '/mnt/books', '/');
+            $storageRoot = rtrim(getenv('BOOK_STORAGE_PATH') ?: '/media/lyra_data1/audiobooks/books', '/');
             $coverGlob = glob($storageRoot . '/' . ltrim($dir, '/') . '/cover*.*');
             $hasLocal = !empty($coverGlob);
         }

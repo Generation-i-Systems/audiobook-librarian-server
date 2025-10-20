@@ -201,7 +201,9 @@ interface DocumentStoreServiceInterface
     public function updateGenre(string $id, array $data): bool;
 
     // SERIES
-    public function createSeries(string $name);
+    public function createSeries(string $name, bool $isCollection = false);
+
+    public function updateSeries(int $id, array $data);
 
     public function getSeriesByName(string $name): ?array;
 

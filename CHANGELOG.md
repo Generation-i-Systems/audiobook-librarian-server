@@ -14,6 +14,18 @@
   - Improves accuracy for OpenAudible book imports
 
 ### Added
+- Added `books:fix-titles-year-narrator` command to clean up book titles
+  - Removes year prefix from titles (e.g., "2005 - The Colorado Kid" → "The Colorado Kid")
+  - Removes year suffix in parentheses (e.g., "Book Title (2008)" → "Book Title")
+  - Extracts and sets release_date from year (validates 1700 to current year)
+  - Skips books with invalid years (future years or before 1700) - leaves title unchanged
+  - Extracts narrator information from title parentheses
+  - Supports multiple narrator patterns: "read by", "narrated by", "performed by"
+  - Handles complex patterns like "(Nonfiction - read by Name)"
+  - Handles multiple narrators separated by "and", commas, or "&"
+  - Merges with existing narrator data without duplicates
+  - Options: `--dry-run`, `--limit=N`
+  - Comprehensive test coverage (13 tests)
 - Enhanced OpenAudible import to automatically include PDF files
   - Automatically detects and imports PDF files with the same name as audio files
   - Works with both copy and move operations

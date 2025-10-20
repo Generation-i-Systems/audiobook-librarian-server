@@ -66,7 +66,9 @@
         if ($currentCover && is_string($currentCover)) {
             $bookDir = isset($book) && !empty($book['directoryPath']) ? $book['directoryPath'] : ($directoryPath ?? ($initial['directoryPath'] ?? null));
             if ($bookDir) {
-                $coverUrl = route('cover.proxy', ['path' => $bookDir . '/' . basename($currentCover)]);
+                $coverPath = $bookDir . '/' . basename($currentCover);
+                $encodedPath = str_replace(['%2F'], ['/'], rawurlencode($coverPath));
+                $coverUrl = url('/cover/' . $encodedPath);
             }
         }
     @endphp
@@ -76,6 +78,7 @@
                 <h1 style="margin-bottom: 30px;">{{ isset($book) ? 'Edit Book' : 'Create New Book' }}</h1>
                 <div class="mb-3">
                     <button type="button" class="btn btn-info" id="autofill-modal-btn"><i class="fas fa-magic me-2"></i>Autofill Book Metadata</button>
+                    <button type="button" class="btn btn-success ms-2" id="magic-autofill-btn" title="Auto-search and apply first result from Audible"><i class="fas fa-magic"></i></button>
                     @if(isset($book))
                     <button type="button" class="btn btn-secondary ms-2" id="raw-json-edit-btn"><i class="fas fa-code me-2"></i>Raw JSON Edit</button>
                     @endif
@@ -200,6 +203,12 @@
                                         style="width:60px; height:32px; flex-shrink:0;" placeholder="#" value="{{ $series['number'] ?? '' }}" step="any">
                                     <input type="text" name="series[{{ $idx }}][seriesName]" class="form-control series-autocomplete ms-2" style="height:32px; flex:1;"
                                          placeholder="Series Name" value="{{ $series['seriesName'] ?? '' }}">
+                                    <div class="form-check ms-2 d-flex align-items-center" style="height:32px;" title="Collection (not a primary series)">
+                                        <input type="checkbox" name="series[{{ $idx }}][isCollection]" class="form-check-input" 
+                                               value="1" {{ ($series['isCollection'] ?? false) ? 'checked' : '' }}
+                                               style="margin-top:0;">
+                                        <label class="form-check-label ms-1 small">Collection</label>
+                                    </div>
                                     <datalist id="series-list"></datalist>
                                     @if(!empty($series['seriesName']))
                                         <button type="button" class="btn btn-sm btn-outline-primary ms-2 rename-series-btn" 
@@ -402,7 +411,8 @@
                     <div class="col-md-3">
                         <label for="release_date" class="form-label">Release Date <span class="text-muted">(Optional)</span></label>
                         @php
-                            $rawRelease = old('release_date', isset($book) && !empty($book['release_date']) ? $book['release_date'] : ($initial['release_date'] ?? null));
+                            // Check both snake_case and camelCase versions
+                            $rawRelease = old('release_date', isset($book) && !empty($book['release_date']) ? $book['release_date'] : (isset($book) && !empty($book['releaseDate']) ? $book['releaseDate'] : ($initial['release_date'] ?? $initial['releaseDate'] ?? null)));
                             $releaseDisplayValue = '';
                             if (is_string($rawRelease) && $rawRelease !== '') {
                                 // If stored as YYYY-01-01, display as YYYY only; otherwise show the stored value
@@ -432,8 +442,10 @@
             // Helper function to create a safe cover URL
             $createCoverUrl = function($dir, $file) {
                 if (is_string($dir) && !empty(trim($dir)) && is_string($file) && !empty(trim($file))) {
-                    // Don't encode - Laravel route handles the path parameter correctly
-                    return route('cover.proxy', ['path' => $dir . '/' . $file]);
+                    // URL encode to handle special characters like curly braces
+                    $coverPath = $dir . '/' . $file;
+                    $encodedPath = str_replace(['%2F'], ['/'], rawurlencode($coverPath));
+                    return url('/cover/' . $encodedPath);
                 }
                 return asset('images/placeholder.png');
             };
@@ -759,12 +771,17 @@ function initBookFormUI() {
             const group = document.getElementById('series-group');
             const idx = group.children.length;
             const row = document.createElement('div');
-            row.className = 'input-group series-row align-items-start mb-3';
-            row.innerHTML = `<input type="text" name="series[${idx}][name]" class="form-control w-auto series-autocomplete" style="max-width:200px; height:32px;" placeholder="Series Name">
-                <input type="text" name="series[${idx}][number]" class="form-control w-auto ms-2" style="max-width:100px; height:32px;" placeholder="Number">
-                <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
-                    <button type="button" class="btn btn-outline-danger btn-sm remove-series p-0 mb-0" style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
-                    <button type="button" class="btn btn-primary btn-sm add-series-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
+            row.className = 'd-flex align-items-start mb-2 series-row';
+            row.innerHTML = `<input type="number" name="series[${idx}][number]" class="form-control" style="width:60px; height:32px; flex-shrink:0;" placeholder="#" step="any">
+                <input type="text" name="series[${idx}][seriesName]" class="form-control series-autocomplete ms-2" style="height:32px; flex:1;" placeholder="Series Name">
+                <div class="form-check ms-2 d-flex align-items-center" style="height:32px;" title="Collection (not a primary series)">
+                    <input type="checkbox" name="series[${idx}][isCollection]" class="form-check-input" value="1" style="margin-top:0;">
+                    <label class="form-check-label ms-1 small">Collection</label>
+                </div>
+                <div style="width:32px; height:32px; margin-left:0.5rem; flex-shrink:0;"></div>
+                <div class="d-flex flex-column ms-2" style="gap:2px;">
+                    <button type="button" class="btn btn-outline-danger btn-sm remove-series" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">&times;</button>
+                    <button type="button" class="btn btn-primary btn-sm add-series-row" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">+</button>
                 </div>`;
             group.appendChild(row);
             initBookFormUI();
@@ -1112,16 +1129,7 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
       <div class="modal-body">
         <form id="autofill-search-form" class="mb-3">
-          <div class="row g-2 mb-2 align-items-end">
-            <div class="col-md-3">
-              <label for="autofill-source" class="form-label">Source</label>
-              <select class="form-select" id="autofill-source" name="source" required>
-                <option value="google">Google Books</option>
-                <option value="audible">Audible</option>
-                <option value="audiobookbay">AudiobookBay</option>
-                <option value="hardcover">Hardcover</option>
-              </select>
-            </div>
+          <div class="row g-2 mb-2">
             <div class="col-md-3">
               <label for="autofill-title" class="form-label">Title</label>
               <input type="text" class="form-control" id="autofill-title" name="title" maxlength="120" autocomplete="off">
@@ -1134,16 +1142,35 @@ document.addEventListener('DOMContentLoaded', function() {
               <label for="autofill-series" class="form-label">Series</label>
               <input type="text" class="form-control" id="autofill-series" name="series" maxlength="120" autocomplete="off">
             </div>
+            <div class="col-md-3">
+              <label for="autofill-api-id" class="form-label">API ID (Optional)</label>
+              <input type="text" class="form-control" id="autofill-api-id" name="api_id" placeholder="ASIN, Google ID, etc" autocomplete="off">
+            </div>
           </div>
-          <div class="row g-2 mb-2 align-items-end">
-            <div class="col-md-6">
-              <label for="autofill-api-id" class="form-label">API ID (ASIN, Google ID, etc)</label>
-              <input type="text" class="form-control" id="autofill-api-id" name="api_id" placeholder="e.g. B00XXXXXXX, google:zyTCAlFPjgYC, ..." autocomplete="off">
+          <div class="row g-2 mb-2">
+            <div class="col-12">
+              <label class="form-label">Search Sources</label>
+              <div class="btn-group w-100" role="group">
+                <button type="button" class="btn btn-outline-primary" data-source="audible" id="search-audible-btn">
+                  <i class="fas fa-headphones me-1"></i> Audible
+                </button>
+                <button type="button" class="btn btn-outline-primary" data-source="google" id="search-google-btn">
+                  <i class="fas fa-book me-1"></i> Google Books
+                </button>
+                <button type="button" class="btn btn-outline-primary" data-source="audiobookbay" id="search-audiobookbay-btn">
+                  <i class="fas fa-ship me-1"></i> AudiobookBay
+                </button>
+                <button type="button" class="btn btn-outline-primary" data-source="hardcover" id="search-hardcover-btn">
+                  <i class="fas fa-book-open me-1"></i> Hardcover
+                </button>
+                <button type="button" class="btn btn-outline-success" id="search-all-btn" title="Search all sources">
+                  <i class="fas fa-search"></i>
+                </button>
+              </div>
             </div>
-            <div class="col-md-2 d-flex align-items-end">
-              <button type="submit" class="btn btn-primary w-100" id="autofill-search-btn">Search</button>
-            </div>
-            <div class="col-md-4">
+          </div>
+          <div class="row g-2">
+            <div class="col-12">
               <div id="autofill-modal-feedback" class="alert alert-danger d-none" style="display:none;"></div>
             </div>
           </div>
