@@ -236,7 +236,7 @@ class BookImportService
 
         // Handle genre - convert array to string
         $genreData = $metadata['genre'] ?? 'Unknown';
-        $genre = is_array($genreData) ? $genreData[0] : $genreData;
+        $genre = is_array($genreData) ? ($genreData[0] ?? 'Unknown') : $genreData;
         if (empty($genre)) {
             $genre = 'Unknown';
         }
