@@ -1771,7 +1771,9 @@ class ImportBooksFromDownloads extends Command
 
         if ($comparison['identical']) {
             $this->info("🔍 Source and existing directories are identical - cleaning up source");
-            $this->cleanupSourceDirectory($audiobook, true);
+            // In auto mode or when forced, delete automatically without confirmation
+            $forceDelete = $this->option('auto') || $this->option('force');
+            $this->cleanupSourceDirectory($audiobook, $forceDelete);
             $this->skippedBooks[] = [
                 'path' => $audiobook['path'],
                 'reason' => 'Duplicate - source cleaned up (identical to existing)',
@@ -1804,6 +1806,55 @@ class ImportBooksFromDownloads extends Command
             'source_files' => $sourceFileNames,
             'target_files' => $targetFileNames,
         ];
+    }
+
+    /**
+     * Clean up source directory after determining it's a duplicate
+     *
+     * @param array $audiobook Audiobook data with path
+     * @param bool $force Force deletion without prompting
+     */
+    protected function cleanupSourceDirectory(array $audiobook, bool $force = false): void
+    {
+        $sourcePath = $audiobook['path'];
+
+        // Safety check: ensure we're not trying to delete important directories
+        $protectedPaths = [
+            '/media/download',
+            '/media/download/audiobooks',
+            '/media/lyra_data',
+            '/media/lyra_data/download',
+            config('filesystems.disks.books.root'),
+            env('BOOK_STORAGE_PATH'),
+        ];
+
+        foreach ($protectedPaths as $protectedPath) {
+            if ($protectedPath && rtrim($sourcePath, '/') === rtrim($protectedPath, '/')) {
+                $this->warn("  ⚠️  Cannot delete protected directory: {$sourcePath}");
+                return;
+            }
+        }
+
+        // Check if it's a directory or single file
+        if (is_dir($sourcePath)) {
+            if ($force || $this->confirm("Delete source directory: {$sourcePath}?", true)) {
+                try {
+                    File::deleteDirectory($sourcePath);
+                    $this->info("  ✓ Deleted source directory");
+                } catch (\Exception $e) {
+                    $this->error("  ✗ Failed to delete source directory: " . $e->getMessage());
+                }
+            }
+        } elseif (is_file($sourcePath)) {
+            if ($force || $this->confirm("Delete source file: {$sourcePath}?", true)) {
+                try {
+                    File::delete($sourcePath);
+                    $this->info("  ✓ Deleted source file");
+                } catch (\Exception $e) {
+                    $this->error("  ✗ Failed to delete source file: " . $e->getMessage());
+                }
+            }
+        }
     }
 
     /**
