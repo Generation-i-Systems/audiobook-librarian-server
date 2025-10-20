@@ -57,9 +57,8 @@ class BookImportService
                 $coverPath = $this->downloadCoverImage($metadata['cover_url'], $book->directory_path, $source);
                 if ($coverPath) {
                     $book->cover_image = $coverPath;
-                } else {
-                    $book->cover_image = $metadata['cover_url'];
                 }
+                // Do NOT fall back to storing the URL - leave cover_image null if download fails
             }
 
             // Handle publisher

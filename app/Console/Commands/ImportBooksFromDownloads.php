@@ -693,10 +693,21 @@ class ImportBooksFromDownloads extends Command
         $hasMetadata = false;
 
         foreach ($largeFiles as $fileData) {
-            // Try metadata first
-            if (! empty($fileData['metadata']['title'])) {
-                $uniqueTitles[$fileData['metadata']['title']] = true;
+            // Try metadata first - prefer album over title for M4B files (title often contains chapter info)
+            $bookTitle = null;
+            if (! empty($fileData['metadata']['album'])) {
+                // Remove "(Unabridged)" and similar suffixes from album
+                $bookTitle = preg_replace('/\s*\((Unabridged|Abridged)\)\s*$/i', '', $fileData['metadata']['album']);
                 $hasMetadata = true;
+            } elseif (! empty($fileData['metadata']['title']) &&
+                      !preg_match('/^(Chapter|Part|Track|Section)\s+\d+/i', $fileData['metadata']['title'])) {
+                // Use title only if it doesn't look like a chapter title
+                $bookTitle = $fileData['metadata']['title'];
+                $hasMetadata = true;
+            }
+
+            if ($bookTitle) {
+                $uniqueTitles[$bookTitle] = true;
             } else {
                 // Fall back to filename (without extension and series number prefix)
                 $filename = pathinfo($fileData['filename'], PATHINFO_FILENAME);
@@ -739,24 +750,65 @@ class ImportBooksFromDownloads extends Command
         $books = [];
         $seriesName = basename($directory);
 
-        // Extract series info from directory name (e.g., "Author - Series Name")
-        if (preg_match('/^(.+?)\s*-\s*(.+)$/', $seriesName, $matches)) {
-            $author = trim($matches[1]);
-            $series = trim($matches[2]);
+        // Try to get series name from metadata first
+        $seriesFromMetadata = null;
+        $authorFromMetadata = null;
+        foreach ($largeFiles as $fileData) {
+            if (!empty($fileData['metadata']['series'])) {
+                $seriesFromMetadata = $fileData['metadata']['series'];
+            }
+            if (!empty($fileData['metadata']['author'])) {
+                $authorFromMetadata = is_array($fileData['metadata']['author'])
+                    ? $fileData['metadata']['author'][0]
+                    : $fileData['metadata']['author'];
+            }
+            if ($seriesFromMetadata && $authorFromMetadata) {
+                break; // Found both, no need to continue
+            }
+        }
+
+        // Use metadata if available, otherwise extract from directory name
+        if ($seriesFromMetadata) {
+            $series = $seriesFromMetadata;
+            $author = $authorFromMetadata ?? '';
         } else {
-            $author = '';
-            $series = $seriesName;
+            // Extract series info from directory name (e.g., "Author - Series Name")
+            if (preg_match('/^(.+?)\s*-\s*(.+)$/', $seriesName, $matches)) {
+                $author = trim($matches[1]);
+                $series = trim($matches[2]);
+            } else {
+                $author = '';
+                $series = $seriesName;
+            }
         }
 
         foreach ($largeFiles as $fileData) {
             $filename = $fileData['filename'];
             $metadata = $fileData['metadata'];
 
-            // Extract series number from filename (look for patterns like "01", "1", "Book 1", etc.)
-            $seriesNumber = $this->extractSeriesNumber($filename);
+            // Extract series number - prefer metadata 'part' field, then filename
+            $seriesNumber = null;
+            if (!empty($metadata['part'])) {
+                // Part field might be a number or a string like "1" or "Book 1"
+                if (is_numeric($metadata['part'])) {
+                    $seriesNumber = (int) $metadata['part'];
+                } elseif (preg_match('/(\d+)/', $metadata['part'], $matches)) {
+                    $seriesNumber = (int) $matches[1];
+                }
+            }
 
-            // Use metadata title or extract from filename
-            if (! empty($metadata['title'])) {
+            // Fall back to extracting from filename if not in metadata
+            if ($seriesNumber === null) {
+                $seriesNumber = $this->extractSeriesNumber($filename);
+            }
+
+            // Use metadata album (preferred for M4B) or title, or extract from filename
+            if (! empty($metadata['album'])) {
+                // Remove "(Unabridged)" and similar suffixes
+                $bookTitle = preg_replace('/\s*\((Unabridged|Abridged)\)\s*$/i', '', $metadata['album']);
+            } elseif (! empty($metadata['title']) &&
+                      !preg_match('/^(Chapter|Part|Track|Section)\s+\d+/i', $metadata['title'])) {
+                // Use title only if it doesn't look like a chapter title
                 $bookTitle = $metadata['title'];
             } else {
                 // Extract title from filename (get the last part after the last " - ")
@@ -859,6 +911,16 @@ class ImportBooksFromDownloads extends Command
                 if (isset($qtComments['creation_date'][0])) {
                     $metadata['year'] = substr($qtComments['creation_date'][0], 0, 4);
                 }
+
+                // Extract series information
+                if (isset($qtComments['series'][0])) {
+                    $metadata['series'] = $qtComments['series'][0];
+                }
+
+                // Extract part/book number
+                if (isset($qtComments['part'][0])) {
+                    $metadata['part'] = $qtComments['part'][0];
+                }
             }
 
             // Fall back to standard comments (for MP3 and other formats)
@@ -881,6 +943,16 @@ class ImportBooksFromDownloads extends Command
 
                 if (isset($fileInfo['comments']['year'][0])) {
                     $metadata['year'] = $fileInfo['comments']['year'][0];
+                }
+
+                // Extract series information
+                if (isset($fileInfo['comments']['series'][0])) {
+                    $metadata['series'] = $fileInfo['comments']['series'][0];
+                }
+
+                // Extract part/book number
+                if (isset($fileInfo['comments']['part'][0])) {
+                    $metadata['part'] = $fileInfo['comments']['part'][0];
                 }
             }
 
@@ -2477,7 +2549,15 @@ class ImportBooksFromDownloads extends Command
             return $metadata;
         }
         if ($newPath !== $currentPath) {
-            $metadata['custom_directory_path'] = trim($newPath);
+            // Ensure path is relative, not absolute
+            $newPath = trim($newPath);
+            $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+            if (str_starts_with($newPath, $bookRoot . '/')) {
+                $newPath = substr($newPath, strlen($bookRoot) + 1);
+            } elseif (str_starts_with($newPath, $bookRoot)) {
+                $newPath = substr($newPath, strlen($bookRoot) + 1);
+            }
+            $metadata['custom_directory_path'] = $newPath;
         }
 
         // Extract series number from edited title if present
@@ -3270,8 +3350,17 @@ class ImportBooksFromDownloads extends Command
             return $metadata;
         }
 
+        // Ensure path is relative, not absolute
+        $newPath = trim($newPath);
+        $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        if (str_starts_with($newPath, $bookRoot . '/')) {
+            $newPath = substr($newPath, strlen($bookRoot) + 1);
+        } elseif (str_starts_with($newPath, $bookRoot)) {
+            $newPath = substr($newPath, strlen($bookRoot) + 1);
+        }
+
         // Store the custom path in metadata
-        $metadata['custom_directory_path'] = trim($newPath);
+        $metadata['custom_directory_path'] = $newPath;
 
         $this->newLine();
         $this->info("📁 Updated directory path: {$newPath}");

@@ -1,5 +1,14 @@
 ## [Unreleased]
 ### Fixed
+- Fixed multi-book series detection to use actual book titles instead of chapter titles
+  - Now extracts SERIES and PART metadata fields from M4B files
+  - Prefers 'album' metadata field over 'title' field for book titles (avoids "Chapter 1" issues)
+  - Filters out chapter/part/track patterns from title field (e.g., "^Chapter \d+")
+  - Uses SERIES metadata field for series name when available
+  - Falls back to directory name for series when metadata missing
+  - Extracts series number from PART metadata field before filename parsing
+  - Properly handles "(Unabridged)" and "(Abridged)" suffixes in album names
+  - Fixes issue where multi-book archives showed random series like "3 #4"
 - Fixed admin books index view error when coverImage is stored as array
   - Added array handling to extract path from coverImage field
   - Handles coverImage as string, array with 'path' key, or indexed array
@@ -23,6 +32,22 @@
     * And 15+ more category mappings
   - Also imports series, narrator, publisher, release date, and description from books.json
   - Improves accuracy for OpenAudible book imports
+- Fixed directory paths storing absolute paths instead of relative paths
+  - ImportBooksFromDownloads now strips book root from custom directory paths
+  - Prevents doubling of root directory in file operations
+  - Added `books:fix-absolute-paths` command to fix existing books
+  - Successfully fixed 918 books with absolute paths
+- Fixed cover image import to download images instead of storing URLs
+  - BookImportService no longer falls back to storing URL when download fails
+  - Cover images are now properly downloaded to book directories during import
+  - Added `books:fix-url-covers` command to fix existing books with URL covers
+  - Command scans all books, downloads images from external URLs, updates database
+  - Uses curl for reliable HTTPS downloads with proper headers
+  - Automatically detects source (Audible, Google Books) from URL
+  - Skips internal API URLs (books.saturn.generation-i.com)
+  - Supports --dry-run and --limit options
+  - Comprehensive test coverage for cover download functionality
+  - Successfully processing 1700+ books with URL covers
 
 ### Added
 - Added `books:fix-titles-year-narrator` command to clean up book titles
