@@ -52,6 +52,14 @@
   - Successfully processing 1700+ books with URL covers
 
 ### Added
+- Added automatic cover image detection for individual audio files
+  - When importing individual audio files (not directories), searches for cover images
+  - Priority 1: Image with same basename as audio file (e.g., "Book.m4b" → "Book.jpg")
+  - Priority 2: Common cover names (cover.jpg, folder.jpg, albumart.jpg, front.jpg)
+  - Supports jpg, jpeg, png, webp, and gif formats
+  - BookImportService now handles local file paths in cover_url field
+  - Automatically copies cover images from source directory to book directory
+  - Files are saved as "cover_local.{ext}" in the book directory
 - Added `--skip-ai` option to import command
   - Skips all AI processing for faster imports when metadata is already complete
   - Uses only file metadata (ID3/M4B tags) and OpenAudible data

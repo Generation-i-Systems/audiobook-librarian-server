@@ -516,12 +516,48 @@ class ImportBooksFromDownloads extends Command
             return null;
         }
 
+        // Look for cover image in same directory
+        $coverImagePath = $this->findCoverImageForAudioFile($filePath);
+
         return [
             'path' => $filePath,
             'name' => pathinfo($filePath, PATHINFO_FILENAME),
             'files' => [$filePath],
             'total_size' => $fileSize,
+            'cover_image_path' => $coverImagePath,
         ];
+    }
+
+    /**
+     * Find cover image for an individual audio file
+     * Looks for image with same basename or common cover names in same directory
+     */
+    protected function findCoverImageForAudioFile(string $audioFilePath): ?string
+    {
+        $directory = dirname($audioFilePath);
+        $basename = pathinfo($audioFilePath, PATHINFO_FILENAME);
+        $imageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+
+        // Priority 1: Image with same basename as audio file
+        foreach ($imageExtensions as $ext) {
+            $imagePath = "{$directory}/{$basename}.{$ext}";
+            if (File::exists($imagePath)) {
+                return $imagePath;
+            }
+        }
+
+        // Priority 2: Common cover image names
+        $commonCoverNames = ['cover', 'folder', 'albumart', 'front'];
+        foreach ($commonCoverNames as $name) {
+            foreach ($imageExtensions as $ext) {
+                $imagePath = "{$directory}/{$name}.{$ext}";
+                if (File::exists($imagePath)) {
+                    return $imagePath;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -1487,6 +1523,14 @@ class ImportBooksFromDownloads extends Command
         }
 
         // Collection info is already injected in processAudiobookMetadata()
+
+        // Check for cover image in source directory (for individual audio files)
+        if (!empty($audiobook['cover_image_path']) && empty($aiMetadata['cover_url'])) {
+            $aiMetadata['cover_url'] = $audiobook['cover_image_path'];
+            // Mark as local file so BookImportService knows to copy instead of download
+            $aiMetadata['cover_is_local_file'] = true;
+            $this->info("  ✓ Found cover image: " . basename($audiobook['cover_image_path']));
+        }
 
         // Note: We'll check for existing cover images in the DESTINATION directory
         // after the book is created and files are moved, not in the source directory

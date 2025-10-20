@@ -53,7 +53,15 @@ class BookImportService
             if (!empty($metadata['cover_path'])) {
                 $book->cover_image = $metadata['cover_path'];
             } elseif (!empty($metadata['cover_url'])) {
-                $source = isset($metadata['audible_raw']) ? 'audible' : 'googlebooks';
+                // Determine source for filename
+                if (!empty($metadata['cover_is_local_file'])) {
+                    $source = 'local';
+                } elseif (isset($metadata['audible_raw'])) {
+                    $source = 'audible';
+                } else {
+                    $source = 'googlebooks';
+                }
+
                 $coverPath = $this->downloadCoverImage($metadata['cover_url'], $book->directory_path, $source);
                 if ($coverPath) {
                     $book->cover_image = $coverPath;
@@ -702,6 +710,21 @@ class BookImportService
     public function downloadCoverImage(string $imageUrl, string $directoryPath, string $source = 'unknown'): ?string
     {
         try {
+            // Check if this is a local file path instead of a URL
+            if (file_exists($imageUrl) && is_file($imageUrl)) {
+                // It's a local file - copy it instead of downloading
+                $extension = strtolower(pathinfo($imageUrl, PATHINFO_EXTENSION));
+                $filename = "cover_{$source}.{$extension}";
+                $destPath = "{$directoryPath}/{$filename}";
+
+                if (File::copy($imageUrl, $destPath)) {
+                    chmod($destPath, 0664);
+                    return $filename;
+                }
+                return null;
+            }
+
+            // It's a URL - download it
             $imageData = file_get_contents($imageUrl);
             if (!$imageData) {
                 return null;
