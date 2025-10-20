@@ -123,11 +123,32 @@ class MetadataProcessingService
 
             if (!empty($oaMeta['genre']) && (empty($metadata['genre']) || $metadata['confidence'] < 90)) {
                 // OpenAudible uses hierarchical genres like "Science Fiction & Fantasy:Science Fiction"
-                // Extract the most specific genre (last part after colon)
+                // We need to extract and map genres appropriately
                 $genreStr = is_array($oaMeta['genre']) ? $oaMeta['genre'][0] : $oaMeta['genre'];
                 $genreParts = explode(':', $genreStr);
+                $rootCategory = trim($genreParts[0]);
                 $specificGenre = trim(end($genreParts));
-                $metadata['genre'] = [$specificGenre];
+
+                // Build genre list
+                $genres = [];
+
+                // Add the specific subcategory as primary genre
+                $genres[] = $specificGenre;
+
+                // Add root category as secondary genre UNLESS:
+                // 1. Root and specific are the same (no hierarchy)
+                // 2. Specific genre perfectly maps to a main category (SF&F:Science Fiction or SF&F:Fantasy)
+                $skipSecondary = (
+                    $rootCategory === $specificGenre ||
+                    ($rootCategory === 'Science Fiction & Fantasy' &&
+                     ($specificGenre === 'Science Fiction' || $specificGenre === 'Fantasy'))
+                );
+
+                if (!$skipSecondary && count($genreParts) > 1) {
+                    $genres[] = $rootCategory;
+                }
+
+                $metadata['genre'] = $genres;
             }
 
             if (!empty($oaMeta['series']) && empty($metadata['series'])) {

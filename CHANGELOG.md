@@ -11,7 +11,15 @@
   - Injects genre and other metadata from books.json into import process
   - Prioritizes OpenAudible genre data over AI-detected genres (when confidence < 90%)
   - Properly handles hierarchical genre formats (e.g., "Science Fiction & Fantasy:Science Fiction")
-  - Extracts most specific genre from colon-separated hierarchy
+  - Books receive dual genres: mapped primary + OpenAudible category as secondary
+  - Exception: "Science Fiction & Fantasy:Science Fiction/Fantasy" only get single genre
+  - Added comprehensive OpenAudible category mappings:
+    * Biographies & Memoirs → History
+    * Business & Careers → Non Fiction
+    * Children's Audiobooks → Kids
+    * Computers & Technology → Computer
+    * Mystery, Thriller & Suspense → Action
+    * And 15+ more category mappings
   - Also imports series, narrator, publisher, release date, and description from books.json
   - Improves accuracy for OpenAudible book imports
 

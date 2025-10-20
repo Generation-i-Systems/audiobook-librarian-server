@@ -24,6 +24,29 @@ trait GenreMapping
 
         // Genre mapping rules
         $genreMap = [
+            // OpenAudible root categories
+            'arts & entertainment' => 'Non Fiction',
+            'biographies & memoirs' => 'History',
+            'biography & autobiography' => 'History',
+            'business & careers' => 'Non Fiction',
+            'children\'s audiobooks' => 'Kids',
+            'comedy & humor' => 'General Fiction',
+            'computers & technology' => 'Computer',
+            'education & learning' => 'Non Fiction',
+            'erotica' => 'Romance',
+            'health & wellness' => 'Non Fiction',
+            'home & garden' => 'Non Fiction',
+            'literature & fiction' => 'General Fiction',
+            'money & finance' => 'Non Fiction',
+            'mystery, thriller & suspense' => 'Action',
+            'politics & social sciences' => 'Non Fiction',
+            'relationships, parenting & personal development' => 'Non Fiction',
+            'religion & spirituality' => 'Religion',
+            'science & engineering' => 'Science',
+            'science fiction & fantasy' => 'Science Fiction',
+            'sports & outdoors' => 'Non Fiction',
+            'teen & young adult' => 'Kids',
+
             // Science Fiction variations
             'sci-fi' => 'Science Fiction',
             'scifi' => 'Science Fiction',
