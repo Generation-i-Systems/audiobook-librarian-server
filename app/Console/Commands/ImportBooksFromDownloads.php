@@ -1783,6 +1783,11 @@ class ImportBooksFromDownloads extends Command
         // Compare directories to see if they're identical
         $comparison = $this->compareDirectories($audiobook['path'], $existingDir);
 
+        $this->line("📊 Comparing source and existing directories:");
+        $this->line("  Source files: {$comparison['source_count']}");
+        $this->line("  Existing files: {$comparison['target_count']}");
+        $this->line("  Identical: " . ($comparison['identical'] ? 'Yes' : 'No'));
+
         if ($comparison['identical']) {
             $this->info("🔍 Source and existing directories are identical - cleaning up source");
             // In auto mode or when forced, delete automatically without confirmation
