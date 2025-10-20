@@ -2767,7 +2767,10 @@ class ImportBooksFromDownloads extends Command
         // Check if this is a Graphic Audio book by:
         // 1. Author field contains "Graphic Audio"
         // 2. Directory/filename contains "GraphicAudio" or "(GraphicAudio)"
-        $author = is_array($aiMetadata['author']) ? $aiMetadata['author'][0] : $aiMetadata['author'];
+        $author = '';
+        if (!empty($aiMetadata['author'])) {
+            $author = is_array($aiMetadata['author']) ? ($aiMetadata['author'][0] ?? '') : $aiMetadata['author'];
+        }
         $path = $audiobook['path'] ?? '';
 
         $isGraphicAudio = stripos($author, 'Graphic Audio') !== false ||
