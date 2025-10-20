@@ -1399,13 +1399,10 @@ class ImportBooksFromDownloads extends Command
             return; // Skip if metadata processing failed
         }
 
-        // Check for existing cover image files first (highest priority)
-        $existingCover = $this->findExistingCoverImage($audiobook['path']);
-        if ($existingCover) {
-            $aiMetadata['cover_url'] = $existingCover;
-            $aiMetadata['cover_source'] = 'Existing file in directory';
-            $this->info("  ✓ Found existing cover image: " . basename($existingCover));
-        }
+        // Collection info is already injected in processAudiobookMetadata()
+
+        // Note: We'll check for existing cover images in the DESTINATION directory
+        // after the book is created and files are moved, not in the source directory
 
         // If this is a split book, preserve the pre-set series number and other metadata
         if (!empty($audiobook['metadata'])) {
@@ -1422,8 +1419,8 @@ class ImportBooksFromDownloads extends Command
             }
 
             // Extract cover image and additional metadata from the M4B file if this is a split book
-            // Only extract if no existing cover was found
-            if (!empty($audiobook['is_split_book']) && !empty($audiobook['files'][0]) && !$existingCover) {
+            // Only extract if no cover URL was set yet
+            if (!empty($audiobook['is_split_book']) && !empty($audiobook['files'][0]) && empty($aiMetadata['cover_url'])) {
                 $audioFilePath = $audiobook['files'][0];
 
                 // Extract file tags using existing AIBookProcessor method (cached)
@@ -1806,7 +1803,7 @@ class ImportBooksFromDownloads extends Command
             // Preserve existing cover or M4B-extracted cover (priority over enrichment sources)
             $preservedCover = null;
             $preservedSource = null;
-            
+
             if (isset($aiMetadata['cover_source'])) {
                 if ($aiMetadata['cover_source'] === 'Existing file in directory') {
                     $preservedCover = $aiMetadata['cover_url'];
@@ -1950,22 +1947,68 @@ class ImportBooksFromDownloads extends Command
         $this->info("✅ Book imported successfully: {$book->title} (ID: {$book->id})");
 
         // Step 5: Move/copy files
+        // CRITICAL: Use the directory path from the APPROVED metadata, not recalculated from book
+        // This ensures files go exactly where the user approved
+        $bookStoragePath = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        $approvedBasePath = $this->getImportService()->generateDirectoryPath($aiMetadata);
+        $title = $aiMetadata['title'];
+
+        // Add series number prefix to title if present
+        if (!empty($aiMetadata['series_number'])) {
+            $formattedNumber = str_pad($aiMetadata['series_number'], 2, '0', STR_PAD_LEFT);
+            $title = $formattedNumber . ' ' . $title;
+        }
+
+        $approvedTargetDir = $bookStoragePath . '/' . $approvedBasePath . '/' . $title;
+
         // For split books, we need special handling since we only want to move one file
         if (!empty($audiobook['is_split_book'])) {
-            $this->info("📦 Using split book file handling");
+            $this->info("📦 Moving split book files...");
             $this->line("  Source file: " . ($audiobook['files'][0] ?? 'NONE'));
             $this->line("  Is split book: " . ($audiobook['is_split_book'] ? 'YES' : 'NO'));
+
+            $moveStartTime = microtime(true);
             $success = $this->moveSplitBookFiles($audiobook, $book, $aiMetadata);
+            $moveDuration = round((microtime(true) - $moveStartTime) * 1000);
+
+            if ($this->isOptionEnabled('verbose')) {
+                $this->line("  ⏱️  File move took: {$moveDuration}ms");
+            }
         } else {
-            $this->info("📦 Using standard file handling");
+            $fileCount = count($audiobook['files'] ?? []);
+            $totalSize = $this->getFileSystemService()->formatBytes($audiobook['total_size'] ?? 0);
+            $operation = $this->option('copy-files') ? 'Copying' : 'Moving';
+
+            $this->info("📦 {$operation} {$fileCount} files ({$totalSize})...");
+
+            $moveStartTime = microtime(true);
             $options = [
-                'operation' => $this->option('copy-files') ? 'copy' : 'move'
+                'operation' => $this->option('copy-files') ? 'copy' : 'move',
+                'target_directory' => $approvedTargetDir  // Use approved path, not recalculated
             ];
             $success = $this->getImportService()->moveFilesToLibrary($audiobook, $book, $options);
+            $moveDuration = round((microtime(true) - $moveStartTime) * 1000);
+
+            if ($this->isOptionEnabled('verbose')) {
+                $this->line("  ⏱️  File move took: {$moveDuration}ms");
+            }
         }
 
         if ($success) {
             $this->info("📁 Files " . ($this->option('copy-files') ? 'copied' : 'moved') . " to library successfully");
+
+            // Check for cover image in the destination directory and update book if found
+            $bookStoragePath = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+            $destinationDir = $bookStoragePath . '/' . $book->directory_path;
+            $coverImage = $this->findExistingCoverImage($destinationDir);
+
+            if ($coverImage && empty($book->cover_image)) {
+                // Convert absolute path to relative path for database storage
+                $relativeCoverPath = str_replace($bookStoragePath . '/', '', $coverImage);
+                $book->cover_image = $relativeCoverPath;
+                $book->save();
+                $this->info("  ✓ Found and set cover image: " . basename($coverImage));
+            }
 
             $this->processedBooks[] = [
                 'path' => $audiobook['path'],
@@ -2019,10 +2062,19 @@ class ImportBooksFromDownloads extends Command
 
         // Clean series name for display
         $displaySeries = '';
+        $displayCollection = 'No';
         if (!empty($metadata['series'])) {
             $authors = is_array($metadata['author']) ? $metadata['author'] : [$metadata['author']];
             $cleanedSeriesName = $this->getEnrichmentService()->cleanSeriesName($metadata['series'], $authors);
-            $displaySeries = $cleanedSeriesName . ($metadata['series_number'] ? " #{$metadata['series_number']}" : '');
+            $displaySeries = $cleanedSeriesName . (!empty($metadata['series_number']) ? " #{$metadata['series_number']}" : '');
+        }
+
+        // Check for collection (stored separately from primary series)
+        if (!empty($metadata['collection'])) {
+            $displayCollection = $metadata['collection'];
+            if (!empty($metadata['collection_number'])) {
+                $displayCollection .= " #{$metadata['collection_number']}";
+            }
         }
 
         // Build the basic metadata table
@@ -2031,6 +2083,7 @@ class ImportBooksFromDownloads extends Command
             ['Author', $formatAuthors($metadata['author'])],
             ['Narrator', $arrayToString($metadata['narrator'] ?? null)],
             ['Series', $displaySeries],
+            ['Collection', $displayCollection],
             ['Genre', $arrayToString($metadata['genre'])],
             ['Year', $metadata['year'] ?? 'N/A'],
             ['Publisher', $arrayToString($metadata['publisher'] ?? null)],
@@ -2130,7 +2183,7 @@ class ImportBooksFromDownloads extends Command
     {
         $this->getTerminalImageService()->displayImage(
             $imageUrl,
-            fn($msg) => $this->line($msg)
+            fn ($msg) => $this->line($msg)
         );
     }
 
@@ -2773,7 +2826,7 @@ class ImportBooksFromDownloads extends Command
 
             // Save cover image to target directory
             $coverSaved = false;
-            
+
             // First check if we have embedded cover data
             if (!empty($aiMetadata['cover_data'])) {
                 $coverTarget = $targetDir . '/cover.jpg';
@@ -2793,12 +2846,12 @@ class ImportBooksFromDownloads extends Command
                     File::delete($aiMetadata['cover_url']);
                     $this->line("  Deleted source cover image");
                 }
-                
+
                 // Update book's cover path to the new location (relative path)
                 $book->coverImage = $relativePath . '/' . $bookSubdir . '/cover.jpg';
                 $coverSaved = true;
             }
-            
+
             if ($coverSaved) {
                 $this->line("  ✓ Cover image saved to final directory");
             }
@@ -3312,6 +3365,15 @@ class ImportBooksFromDownloads extends Command
             $cleanedAudiobook['name'] = preg_replace('/\s*\(GA\)\s*/i', '', $cleanedAudiobook['name']);
         }
 
+        // Detect collection from directory path
+        // Check if path contains known collection patterns
+        $collectionInfo = $this->detectCollectionFromPath($audiobook['path']);
+        if ($collectionInfo) {
+            $this->line("  📚 Detected collection: {$collectionInfo['name']} #{$collectionInfo['number']}");
+            // Store for later use after AI processing
+            $cleanedAudiobook['detected_collection'] = $collectionInfo;
+        }
+
         // Step 1: AI Processing
         $spinner = $this->output->createProgressBar();
         $spinner->setFormat(" %message%");
@@ -3381,6 +3443,14 @@ class ImportBooksFromDownloads extends Command
         }
 
         $this->info("✅ AI processing successful (confidence: {$aiMetadata['confidence']}%)");
+
+        // Inject detected collection information into metadata before returning
+        if (!empty($cleanedAudiobook['detected_collection'])) {
+            $collection = $cleanedAudiobook['detected_collection'];
+            $aiMetadata['collection'] = $collection['name'];
+            $aiMetadata['collection_number'] = $collection['number'];
+        }
+
         return $aiMetadata;
     }
 
@@ -3435,14 +3505,14 @@ class ImportBooksFromDownloads extends Command
      */
     protected function findExistingCoverImage(string $directory): ?string
     {
-        $storagePath = $this->getStoragePath();
-        
+        $storagePath = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+
         // Only look for covers if directory is already in storage path
         // Don't return covers from download/source directories
         if (!str_starts_with($directory, $storagePath)) {
             return null;
         }
-        
+
         $coverPatterns = [
             'cover.jpg',
             'cover.jpeg',
@@ -3464,6 +3534,58 @@ class ImportBooksFromDownloads extends Command
         if (!empty($imageFiles)) {
             // Return relative path from storage base
             return substr($imageFiles[0], strlen($storagePath) + 1);
+        }
+
+        return null;
+    }
+
+    /**
+     * Detect collection information from directory path
+     * Looks for patterns like: "Top 100-ish Sci-Fi Books/24 - Snow Crash - Neal Stephenson - 1992"
+     *
+     * @param string $path Full path to the book directory
+     * @return array|null Array with 'name' and 'number' keys, or null if not a collection
+     */
+    protected function detectCollectionFromPath(string $path): ?array
+    {
+        // Collection patterns to detect in parent directory names
+        $collectionPatterns = [
+            '/top\s+\d+/i',                    // "Top 100", "Top 50"
+            '/best\s+of/i',                    // "Best of"
+            '/greatest/i',                     // "Greatest"
+            '/collection/i',                   // "Collection"
+            '/anthology/i',                    // "Anthology"
+            '/\d+\s*essential/i',              // "100 Essential"
+            '/must\s*read/i',                  // "Must Read"
+            '/classics/i',                     // "Classics"
+        ];
+
+        // Split path into parts
+        $pathParts = explode('/', trim($path, '/'));
+
+        // Check each directory level for collection patterns
+        for ($i = count($pathParts) - 2; $i >= 0; $i--) {
+            $dirName = $pathParts[$i];
+
+            // Check if this directory matches a collection pattern
+            foreach ($collectionPatterns as $pattern) {
+                if (preg_match($pattern, $dirName)) {
+                    // Found a collection directory
+                    // Try to extract number from the book directory name (last part)
+                    $bookDirName = end($pathParts);
+                    $number = null;
+
+                    // Pattern: "24 - Snow Crash - Neal Stephenson - 1992"
+                    if (preg_match('/^(\d+)\s*-/', $bookDirName, $matches)) {
+                        $number = (int) $matches[1];
+                    }
+
+                    return [
+                        'name' => $dirName,
+                        'number' => $number,
+                    ];
+                }
+            }
         }
 
         return null;
