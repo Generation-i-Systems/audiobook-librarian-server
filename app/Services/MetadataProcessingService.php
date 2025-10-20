@@ -329,6 +329,13 @@ class MetadataProcessingService
         $title = trim($metadata['title']);
 
         $patterns = [
+            // Patterns with series name: "Title - Series Name, Book N"
+            '/^(.+?)\s*[-–—]\s*(.+?),\s*Book\s+(\d+)$/i',     // "Title - Series, Book 1"
+            '/^(.+?)\s*[-–—]\s*(.+?),\s*Volume\s+(\d+)$/i',   // "Title - Series, Volume 1"
+            '/^(.+?)\s*[-–—]\s*(.+?),\s*Part\s+(\d+)$/i',     // "Title - Series, Part 1"
+            '/^(.+?)\s*[-–—]\s*(.+?),\s*#(\d+)$/i',           // "Title - Series, #1"
+
+            // Simple patterns: "Title, Book N"
             '/^(.+?),\s*Book\s+(\d+)$/i',            // "Title, Book 1"
             '/^(.+?)\s+Book\s+(\d+)$/i',             // "Title Book 1"
             '/^(.+?),\s*Volume\s+(\d+)$/i',          // "Title, Volume 1"
@@ -343,10 +350,25 @@ class MetadataProcessingService
         foreach ($patterns as $pattern) {
             if (preg_match($pattern, $title, $matches)) {
                 $cleanTitle = trim($matches[1]);
-                $bookNumber = (int)$matches[2];
 
-                $metadata['title'] = $cleanTitle;
-                $metadata['series_number'] = $bookNumber;
+                // Check if this pattern includes series name (3 groups) or not (2 groups)
+                if (count($matches) === 4) {
+                    // Pattern with series name: "Title - Series, Book N"
+                    $seriesName = trim($matches[2]);
+                    $bookNumber = (int)$matches[3];
+
+                    $metadata['title'] = $cleanTitle;
+                    if (empty($metadata['series'])) {
+                        $metadata['series'] = $seriesName;
+                    }
+                    $metadata['series_number'] = $bookNumber;
+                } else {
+                    // Pattern without series name: "Title, Book N"
+                    $bookNumber = (int)$matches[2];
+
+                    $metadata['title'] = $cleanTitle;
+                    $metadata['series_number'] = $bookNumber;
+                }
 
                 return;
             }
