@@ -896,13 +896,14 @@ class ImportBooksFromDownloads extends Command
      */
     protected function extractSeriesNumber(string $filename): ?int
     {
-        // Try various patterns
+        // Try various patterns (ordered by specificity - most specific first)
         $patterns = [
-            '/(?:book|vol|volume|part|#)\s*(\d+)/i', // "Book 1", "Vol 1", "Part 1", "#1"
-            '/^(\d+)\s*-/', // "01 - Title"
-            '/\s(\d+)\s*-/', // "Title 1 - Subtitle"
-            '/\s(\d+)\./', // "Title 1.m4b"
-            '/[^\d](\d+)[^\d]*$/', // Number at end
+            '/(?:book|vol|volume|part|#)\s*(\d+)/i',  // "Book 1", "Vol 1", "Part 1", "#1"
+            '/^(\d+)\s*[-–—]/',                        // "01 - Title" or "01 – Title"
+            '/^(\d+)\s+/',                             // "01 Title" (leading number with space)
+            '/\s(\d+)\s*[-–—]/',                       // "Title 1 - Subtitle"
+            '/[-–—]\s*(\d+)\s*[-–—]/',                 // "Series - 01 - Title"
+            '/\s(\d+)\s*\.\w{3,4}$/',                  // "Title 1.m4b" (number before extension)
         ];
 
         foreach ($patterns as $pattern) {
