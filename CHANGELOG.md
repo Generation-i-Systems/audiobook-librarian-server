@@ -34,11 +34,12 @@
   - Improves accuracy for OpenAudible book imports
 - Fixed directory paths storing absolute paths instead of relative paths
   - ImportBooksFromDownloads now strips book root from custom directory paths
+  - ImportBooksFromDownloads now handles absolute paths in duplicate detection (4 locations)
   - BookImportService now uses makePathRelative() helper for consistent path conversion
   - Handles edge cases with trailing slashes and different path formats
   - Prevents doubling of root directory in file operations
   - Added `books:fix-absolute-paths` command to fix existing books
-  - Successfully fixed 921 books with absolute paths (918 initial + 3 new imports)
+  - Successfully fixed 990 books with absolute paths (921 + 69 MySQL-only records)
 - Fixed cover image import to download images instead of storing URLs
   - BookImportService no longer falls back to storing URL when download fails
   - Cover images are now properly downloaded to book directories during import
@@ -47,7 +48,7 @@
   - Uses curl for reliable HTTPS downloads with proper headers
   - Automatically detects source (Audible, Google Books) from URL
   - Skips internal API URLs (books.saturn.generation-i.com)
-  - Supports --dry-run and --limit options
+  - Supports -n/--dry-run and --limit options
   - Comprehensive test coverage for cover download functionality
   - Successfully processing 1700+ books with URL covers
 

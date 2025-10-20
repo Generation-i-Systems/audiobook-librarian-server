@@ -8,7 +8,7 @@ use Illuminate\Console\Command;
 class FixAbsoluteDirectoryPaths extends Command
 {
     protected $signature = 'books:fix-absolute-paths
-                            {--dry-run : Show what would be changed without making changes}';
+                            {-n|--dry-run : Show what would be changed without making changes}';
 
     protected $description = 'Fix books with absolute directory paths to use relative paths';
 

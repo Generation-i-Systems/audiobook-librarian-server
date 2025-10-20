@@ -4,7 +4,6 @@ namespace App\Console\Commands;
 
 use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Storage;
 
 class FixBookDirectoryPaths extends Command
 {
@@ -66,7 +65,7 @@ class FixBookDirectoryPaths extends Command
             $progressBar->advance();
 
             $currentPath = $book['directory_path'] ?? null;
-            
+
             // If no directory_path, try to extract from coverImage
             if (!$currentPath && !empty($book['coverImage'])) {
                 // Extract directory from cover image path
@@ -74,13 +73,13 @@ class FixBookDirectoryPaths extends Command
                 // Should give us: "History/Stephen Fry/The Ode Less Travelled/fry 3"
                 $coverPath = $book['coverImage'];
                 $pathParts = explode('/', $coverPath);
-                
+
                 // Remove the filename (last part)
                 array_pop($pathParts);
-                
+
                 if (!empty($pathParts)) {
                     $currentPath = implode('/', $pathParts);
-                    
+
                     if ($debug) {
                         $progressBar->clear();
                         $this->line("<fg=blue>Extracted path from coverImage:</>");
@@ -91,7 +90,7 @@ class FixBookDirectoryPaths extends Command
                     }
                 }
             }
-            
+
             if (!$currentPath) {
                 if ($debug) {
                     $progressBar->clear();
@@ -105,10 +104,10 @@ class FixBookDirectoryPaths extends Command
 
             // Check if files exist at current path
             $currentFullPath = "{$realBookRoot}/{$currentPath}";
-            
+
             // If book doesn't have directory_path field but path exists, add it
             $needsDirectoryPathField = !isset($book['directory_path']);
-            
+
             if (is_dir($currentFullPath)) {
                 // Path exists on filesystem
                 if ($needsDirectoryPathField) {
@@ -117,7 +116,7 @@ class FixBookDirectoryPaths extends Command
                     $this->line("\n<fg=cyan>Adding directory_path field:</>");
                     $this->line("  Book: " . ($book['title'] ?? 'Unknown'));
                     $this->line("  Path: {$currentPath}");
-                    
+
                     if (!$dryRun) {
                         try {
                             $bookId = $book['id'] ?? $book['_id'] ?? null;

@@ -1705,7 +1705,13 @@ class ImportBooksFromDownloads extends Command
             }
         }
 
-        $existingDir = $bookStoragePath . '/' . $existingBook->directory_path;
+        // Handle both absolute and relative paths in directory_path
+        if (str_starts_with($existingBook->directory_path, '/')) {
+            $existingDir = $existingBook->directory_path;
+        } else {
+            $existingDir = $bookStoragePath . '/' . $existingBook->directory_path;
+        }
+
         if (!File::isDirectory($existingDir)) {
             $this->warn("📁 Existing directory not found - files may have been deleted");
             $this->line("  Expected path: {$existingDir}");
@@ -1873,7 +1879,12 @@ class ImportBooksFromDownloads extends Command
             case '2':
                 // Replace existing - remove existing and continue with import
                 $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
-                $existingDir = $bookStoragePath . '/' . $existingBook->directory_path;
+                // Handle both absolute and relative paths
+                if (str_starts_with($existingBook->directory_path, '/')) {
+                    $existingDir = $existingBook->directory_path;
+                } else {
+                    $existingDir = $bookStoragePath . '/' . $existingBook->directory_path;
+                }
                 $this->info("🗑️ Removing existing directory to replace with source");
                 File::deleteDirectory($existingDir);
                 return true; // Continue with import
@@ -2057,7 +2068,12 @@ class ImportBooksFromDownloads extends Command
 
                 // Check if files exist
                 $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
-                $existingDir = $bookStoragePath . '/' . $existingBook->directory_path;
+                // Handle both absolute and relative paths
+                if (str_starts_with($existingBook->directory_path, '/')) {
+                    $existingDir = $existingBook->directory_path;
+                } else {
+                    $existingDir = $bookStoragePath . '/' . $existingBook->directory_path;
+                }
 
                 if (!File::isDirectory($existingDir) || $this->isDirectoryEmpty($existingDir)) {
                     $this->warn("📁 Existing book has missing or empty directory");
@@ -2137,7 +2153,12 @@ class ImportBooksFromDownloads extends Command
 
             // Check for cover image in the destination directory and update book if found
             $bookStoragePath = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
-            $destinationDir = $bookStoragePath . '/' . $book->directory_path;
+            // Handle both absolute and relative paths
+            if (str_starts_with($book->directory_path, '/')) {
+                $destinationDir = $book->directory_path;
+            } else {
+                $destinationDir = $bookStoragePath . '/' . $book->directory_path;
+            }
             $coverImage = $this->findExistingCoverImage($destinationDir);
 
             if ($coverImage && empty($book->cover_image)) {
@@ -2251,7 +2272,12 @@ class ImportBooksFromDownloads extends Command
             $title = $formattedNumber . ' ' . $title;
         }
 
-        $expectedPath = $basePath . '/' . $title;
+        // Check if custom directory path already includes the title
+        // If it does, don't append it again to avoid duplication
+        $expectedPath = $basePath;
+        if (!str_ends_with($basePath, $title) && !str_ends_with($basePath, '/' . $title)) {
+            $expectedPath = $basePath . '/' . $title;
+        }
         $tableData[] = ['Directory Path', $expectedPath];
 
         // Add description if available (truncated for display)

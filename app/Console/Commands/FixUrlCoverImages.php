@@ -9,8 +9,8 @@ use Illuminate\Support\Facades\Log;
 class FixUrlCoverImages extends Command
 {
     protected $signature = 'books:fix-url-covers
-                            {--dry-run : Show what would be changed without making changes}
-                            {--limit= : Limit the number of books to process}';
+                            {-n|--dry-run : Show what would be changed without making changes}
+                            {--limit= : Maximum number of books to process}';
 
     protected $description = 'Download cover images for books that have URLs instead of local files';
 

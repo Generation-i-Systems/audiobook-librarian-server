@@ -8,7 +8,6 @@ use App\Services\OpenAudibleParser;
 use App\Traits\GenreMapping;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Log;
 
 class FixGeneralFictionBooksCommand extends Command
 {
