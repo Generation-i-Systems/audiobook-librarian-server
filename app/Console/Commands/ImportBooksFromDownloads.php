@@ -44,6 +44,7 @@ class ImportBooksFromDownloads extends Command
                             {--limit=0 : Maximum number of books to process per run (0 = no limit)}
                             {--force : Skip confirmation prompts}
                             {--skip-enrichment : Skip external data enrichment (Audible, Google Books)}
+                            {--skip-ai : Skip AI processing - use only file metadata and OpenAudible data}
                             {--copy-files : Copy files after successful import instead of moving (default is move)}
                             {--no-backup : Skip automatic database backup}
                             {--background : Enable background processing for enrichment (disabled by default)}
@@ -3553,27 +3554,34 @@ class ImportBooksFromDownloads extends Command
             $cleanedAudiobook['detected_collection'] = $collectionInfo;
         }
 
-        // Step 1: AI Processing
-        $spinner = $this->output->createProgressBar();
-        $spinner->setFormat(" %message%");
-        $spinner->setMessage("🤖 Analyzing metadata with AI...");
-        $spinner->start();
+        // Step 1: AI Processing (skip if --skip-ai is set)
+        if ($this->option('skip-ai')) {
+            $this->info("⏩ Skipping AI processing (--skip-ai enabled)");
+            $aiMetadata = $this->getMetadataService()->processWithoutAI($cleanedAudiobook);
+        } else {
+            $spinner = $this->output->createProgressBar();
+            $spinner->setFormat(" %message%");
+            $spinner->setMessage("🤖 Analyzing metadata with AI...");
+            $spinner->start();
 
-        $aiStartTime = microtime(true);
-        $aiMetadata = $this->getMetadataService()->processWithAI($cleanedAudiobook);
-        $aiDuration = round((microtime(true) - $aiStartTime) * 1000);
+            $aiStartTime = microtime(true);
+            $aiMetadata = $this->getMetadataService()->processWithAI($cleanedAudiobook);
+            $aiDuration = round((microtime(true) - $aiStartTime) * 1000);
 
-        $spinner->finish();
-        $this->output->write("\r\033[K");
+            $spinner->finish();
+            $this->output->write("\r\033[K");
 
-        if ($this->isOptionEnabled('verbose')) {
-            $this->line("  ⏱️  AI processing took: {$aiDuration}ms");
+            if ($this->isOptionEnabled('verbose')) {
+                $this->line("  ⏱️  AI processing took: {$aiDuration}ms");
+            }
         }
 
-        // Check if we should try audio analysis (low confidence OR forced)
-        $shouldTryAudio = !$aiMetadata ||
+        // Check if we should try audio analysis (low confidence OR forced) - skip if --skip-ai is set
+        $shouldTryAudio = !$this->option('skip-ai') && (
+            !$aiMetadata ||
             $aiMetadata['confidence'] < $this->option('min-confidence') ||
-            $this->option('force-audio');
+            $this->option('force-audio')
+        );
 
         if ($shouldTryAudio) {
             if ($this->option('force-audio')) {

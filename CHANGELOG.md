@@ -34,9 +34,11 @@
   - Improves accuracy for OpenAudible book imports
 - Fixed directory paths storing absolute paths instead of relative paths
   - ImportBooksFromDownloads now strips book root from custom directory paths
+  - BookImportService now uses makePathRelative() helper for consistent path conversion
+  - Handles edge cases with trailing slashes and different path formats
   - Prevents doubling of root directory in file operations
   - Added `books:fix-absolute-paths` command to fix existing books
-  - Successfully fixed 918 books with absolute paths
+  - Successfully fixed 921 books with absolute paths (918 initial + 3 new imports)
 - Fixed cover image import to download images instead of storing URLs
   - BookImportService no longer falls back to storing URL when download fails
   - Cover images are now properly downloaded to book directories during import
@@ -50,6 +52,12 @@
   - Successfully processing 1700+ books with URL covers
 
 ### Added
+- Added `--skip-ai` option to import command
+  - Skips all AI processing for faster imports when metadata is already complete
+  - Uses only file metadata (ID3/M4B tags) and OpenAudible data
+  - Useful for re-importing books with correct metadata already embedded
+  - Works with existing --auto, --dry-run, and other import options
+  - Sets confidence to 50% since no AI validation is performed
 - Added `books:fix-titles-year-narrator` command to clean up book titles
   - Removes year prefix from titles (e.g., "2005 - The Colorado Kid" → "The Colorado Kid")
   - Removes year suffix in parentheses (e.g., "Book Title (2008)" → "Book Title")

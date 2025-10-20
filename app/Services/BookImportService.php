@@ -336,7 +336,7 @@ class BookImportService
             // Only skip move if source and target are exactly the same
             if ($realSourcePath && $realTargetDir && $realSourcePath === $realTargetDir) {
                 // Files are already in the correct location - true in-place import
-                $book->directory_path = str_replace($bookStoragePath . '/', '', $targetDir);
+                $book->directory_path = $this->makePathRelative($targetDir, $bookStoragePath);
                 $book->save();
 
                 // Just flatten CD directories if needed, but don't move files
@@ -373,7 +373,7 @@ class BookImportService
 
             // Update book directory path to target location (only for move/copy operations)
             // Store as relative path, not absolute
-            $book->directory_path = str_replace($bookStoragePath . '/', '', $targetDir);
+            $book->directory_path = $this->makePathRelative($targetDir, $bookStoragePath);
             $book->save();
 
             return true;
@@ -1113,5 +1113,32 @@ class BookImportService
         }
 
         return $title;
+    }
+
+    /**
+     * Convert absolute path to relative path by removing book root
+     */
+    protected function makePathRelative(string $absolutePath, string $bookRoot): string
+    {
+        $bookRoot = rtrim($bookRoot, '/');
+        $absolutePath = rtrim($absolutePath, '/');
+
+        // Try with trailing slash first
+        if (str_starts_with($absolutePath, $bookRoot . '/')) {
+            return substr($absolutePath, strlen($bookRoot) + 1);
+        }
+
+        // Try exact match
+        if (str_starts_with($absolutePath, $bookRoot)) {
+            return ltrim(substr($absolutePath, strlen($bookRoot)), '/');
+        }
+
+        // If path is already relative, return as-is
+        if (!str_starts_with($absolutePath, '/')) {
+            return $absolutePath;
+        }
+
+        // Last resort: return the path as-is (might be a different root)
+        return $absolutePath;
     }
 }

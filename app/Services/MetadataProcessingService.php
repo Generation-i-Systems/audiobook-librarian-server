@@ -84,6 +84,82 @@ class MetadataProcessingService
     }
 
     /**
+     * Process audiobook without AI - use only file metadata and OpenAudible data
+     */
+    public function processWithoutAI(array $audiobook): ?array
+    {
+        if (!$this->aiProcessor) {
+            $this->aiProcessor = app(AIBookProcessor::class);
+        }
+
+        try {
+            $metadata = [
+                'title' => $audiobook['name'] ?? basename($audiobook['path']),
+                'author' => [],
+                'narrator' => [],
+                'genre' => [],
+                'year' => null,
+                'publisher' => null,
+                'description' => null,
+                'series' => null,
+                'series_number' => null,
+                'confidence' => 50, // Low confidence since no AI validation
+            ];
+
+            // Extract file tags if available
+            if (!empty($audiobook['files'])) {
+                foreach ($audiobook['files'] as $file) {
+                    $ext = pathinfo($file, PATHINFO_EXTENSION);
+                    if ($ext === 'm4b' || $ext === 'mp3') {
+                        $tags = $this->aiProcessor->extractFileTags($file);
+                        if (!empty($tags)) {
+                            // Extract metadata from tags
+                            if (!empty($tags['title']) && empty($metadata['title'])) {
+                                $metadata['title'] = $tags['title'];
+                            }
+                            if (!empty($tags['album'])) {
+                                $metadata['title'] = preg_replace('/\s*\((Unabridged|Abridged)\)\s*$/i', '', $tags['album']);
+                            }
+                            if (!empty($tags['artist']) && empty($metadata['author'])) {
+                                $metadata['author'] = is_array($tags['artist']) ? $tags['artist'] : [$tags['artist']];
+                            }
+                            if (!empty($tags['narrator']) && empty($metadata['narrator'])) {
+                                $metadata['narrator'] = is_array($tags['narrator']) ? $tags['narrator'] : [$tags['narrator']];
+                            }
+                            if (!empty($tags['genre']) && empty($metadata['genre'])) {
+                                $metadata['genre'] = is_array($tags['genre']) ? $tags['genre'] : [$tags['genre']];
+                            }
+                            if (!empty($tags['year']) && empty($metadata['year'])) {
+                                $metadata['year'] = $tags['year'];
+                            }
+                            if (!empty($tags['publisher']) && empty($metadata['publisher'])) {
+                                $metadata['publisher'] = $tags['publisher'];
+                            }
+                            if (!empty($tags['series']) && empty($metadata['series'])) {
+                                $metadata['series'] = $tags['series'];
+                            }
+                            if (!empty($tags['part']) && empty($metadata['series_number'])) {
+                                $metadata['series_number'] = is_numeric($tags['part']) ? (int) $tags['part'] : null;
+                            }
+                        }
+                        break; // Only process first audio file
+                    }
+                }
+            }
+
+            // Post-process to merge OpenAudible data
+            return $this->postProcessAIResult($metadata, $audiobook);
+        } catch (\Exception $e) {
+            Log::error("MetadataProcessingService: processWithoutAI failed", [
+                'path' => $audiobook['path'] ?? 'unknown',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
      * Process audiobook with audio file analysis
      */
     public function processWithAudioAnalysis(array $audiobook): ?array
