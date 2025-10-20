@@ -1529,6 +1529,7 @@ class ImportBooksFromDownloads extends Command
             $aiMetadata['cover_url'] = $audiobook['cover_image_path'];
             // Mark as local file so BookImportService knows to copy instead of download
             $aiMetadata['cover_is_local_file'] = true;
+            $aiMetadata['cover_source'] = 'Local file in directory';
             $this->info("  ✓ Found cover image: " . basename($audiobook['cover_image_path']));
         }
 
@@ -1934,12 +1935,15 @@ class ImportBooksFromDownloads extends Command
             // Preserve existing cover or M4B-extracted cover (priority over enrichment sources)
             $preservedCover = null;
             $preservedSource = null;
+            $preservedIsLocalFile = false;
 
             if (isset($aiMetadata['cover_source'])) {
-                if ($aiMetadata['cover_source'] === 'Existing file in directory') {
+                if ($aiMetadata['cover_source'] === 'Existing file in directory' ||
+                    $aiMetadata['cover_source'] === 'Local file in directory') {
                     $preservedCover = $aiMetadata['cover_url'];
                     $preservedSource = $aiMetadata['cover_source'];
-                    $this->line("  Preserving existing cover file (priority over all sources)");
+                    $preservedIsLocalFile = !empty($aiMetadata['cover_is_local_file']);
+                    $this->line("  Preserving local cover file (priority over all sources)");
                 } elseif ($aiMetadata['cover_source'] === 'Embedded in M4B') {
                     $preservedCover = $aiMetadata['cover_url'];
                     $preservedSource = $aiMetadata['cover_source'];
@@ -1953,6 +1957,9 @@ class ImportBooksFromDownloads extends Command
             if ($preservedCover) {
                 $aiMetadata['cover_url'] = $preservedCover;
                 $aiMetadata['cover_source'] = $preservedSource;
+                if ($preservedIsLocalFile) {
+                    $aiMetadata['cover_is_local_file'] = true;
+                }
             }
 
             $totalDuration = round((microtime(true) - $startTime) * 1000);
