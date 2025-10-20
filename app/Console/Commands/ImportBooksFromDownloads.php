@@ -19,6 +19,7 @@ use App\Services\MetadataProcessingService;
 use App\Services\ExternalCoverService;
 use App\Services\GoogleBooksApiService;
 use App\Services\ImportCacheService;
+use App\Services\OpenAudibleParser;
 use App\Services\TerminalImageService;
 use App\Traits\GenreMapping;
 use Illuminate\Console\Command;
@@ -71,9 +72,14 @@ class ImportBooksFromDownloads extends Command
     protected ?ImportCacheService $cacheService = null;
     protected ?MetadataProcessingService $metadataService = null;
     protected ?FileSystemService $fileSystemService = null;
+    protected ?OpenAudibleParser $openAudibleParser = null;
 
     // Cache for file tags to avoid re-extracting
     protected array $fileTagsCache = [];
+
+    // OpenAudible books.json data cache
+    protected ?array $openAudibleBooksData = null;
+    protected ?string $openAudibleRootPath = null;
 
     // Background processing
     protected array $backgroundTasks = [];
@@ -160,6 +166,14 @@ class ImportBooksFromDownloads extends Command
             }
 
             $this->info("📁 Scanning directories: " . implode(', ', $directories));
+
+            // Try to load OpenAudible books.json if present in any directory
+            foreach ($directories as $directory) {
+                $this->loadOpenAudibleData($directory);
+                if ($this->openAudibleBooksData !== null) {
+                    break;
+                }
+            }
 
             // Scan for audiobooks using existing parser
             $audiobooks = $this->scanForAudiobooks($directories);
@@ -2598,6 +2612,73 @@ class ImportBooksFromDownloads extends Command
     }
 
     /**
+     * Get OpenAudibleParser instance
+     */
+    protected function getOpenAudibleParser(): OpenAudibleParser
+    {
+        if (!$this->openAudibleParser) {
+            $this->openAudibleParser = app(OpenAudibleParser::class);
+        }
+        return $this->openAudibleParser;
+    }
+
+    /**
+     * Try to load OpenAudible books.json if present
+     */
+    protected function loadOpenAudibleData(string $path): void
+    {
+        $checkPath = $path;
+        $maxDepth = 5;
+        $depth = 0;
+
+        while ($depth < $maxDepth) {
+            $booksJsonPath = $checkPath . '/books.json';
+
+            if (File::exists($booksJsonPath)) {
+                try {
+                    $this->openAudibleRootPath = $checkPath;
+                    $this->openAudibleBooksData = $this->getOpenAudibleParser()->loadBooksJson($checkPath);
+                    $this->line("  📚 Loaded OpenAudible books.json with " . count($this->openAudibleBooksData) . " books");
+                    return;
+                } catch (\Exception $e) {
+                    Log::warning("Failed to load OpenAudible books.json: " . $e->getMessage());
+                }
+            }
+
+            $parent = dirname($checkPath);
+            if ($parent === $checkPath) {
+                break;
+            }
+            $checkPath = $parent;
+            $depth++;
+        }
+    }
+
+    /**
+     * Find OpenAudible metadata for a specific book path
+     */
+    protected function findOpenAudibleMetadata(string $bookPath): ?array
+    {
+        if (empty($this->openAudibleBooksData)) {
+            return null;
+        }
+
+        $bookName = basename($bookPath);
+
+        foreach ($this->openAudibleBooksData as $bookData) {
+            $expectedName = $this->getOpenAudibleParser()->getBookDirectoryName($bookData);
+
+            if ($expectedName === $bookName || $bookData['title'] === $bookName) {
+                $normalized = $this->getOpenAudibleParser()->normalizeBookData($bookData);
+                $this->line("  📖 Found OpenAudible metadata for: {$bookName}");
+                return $normalized;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Fix Graphic Audio metadata by extracting real author from M4B copyright field
      */
     protected function fixGraphicAudioMetadata(array &$aiMetadata, array $audiobook): void
@@ -3355,6 +3436,15 @@ class ImportBooksFromDownloads extends Command
             "📄 Files: " . count($audiobook['files']) .
             " (" . $this->getFileSystemService()->formatBytes($audiobook['total_size']) . ")"
         );
+
+        // Try to inject OpenAudible metadata if available
+        $openAudibleMeta = $this->findOpenAudibleMetadata($audiobook['path']);
+        if ($openAudibleMeta) {
+            $audiobook['openaudible_metadata'] = $openAudibleMeta;
+            if (!empty($openAudibleMeta['genre'])) {
+                $this->line("  🏷️  Genre from OpenAudible: {$openAudibleMeta['genre']}");
+            }
+        }
 
         // Pre-process Graphic Audio titles to improve AI recognition
         $cleanedAudiobook = $audiobook;

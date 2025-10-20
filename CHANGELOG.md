@@ -5,6 +5,13 @@
   - Handles coverImage as string, array with 'path' key, or indexed array
   - Prevents "Missing required parameter" error in cover.proxy route
   - Added comprehensive test coverage for all coverImage formats
+- Fixed genre detection for OpenAudible imports
+  - Now reads OpenAudible's books.json file when present
+  - Automatically detects books.json in scan directories (up to 5 levels deep)
+  - Injects genre and other metadata from books.json into import process
+  - Prioritizes OpenAudible genre data over AI-detected genres (when confidence < 90%)
+  - Also imports series, narrator, publisher, release date, and description from books.json
+  - Improves accuracy for OpenAudible book imports
 
 ### Added
 - Enhanced OpenAudible import to automatically include PDF files

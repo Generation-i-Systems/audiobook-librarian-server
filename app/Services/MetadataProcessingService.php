@@ -117,6 +117,42 @@ class MetadataProcessingService
     {
         $metadata = $aiResult;
 
+        // Merge OpenAudible metadata if available (with priority to OpenAudible data)
+        if (!empty($audiobook['openaudible_metadata'])) {
+            $oaMeta = $audiobook['openaudible_metadata'];
+
+            if (!empty($oaMeta['genre']) && (empty($metadata['genre']) || $metadata['confidence'] < 90)) {
+                $metadata['genre'] = is_array($oaMeta['genre']) ? $oaMeta['genre'] : [$oaMeta['genre']];
+            }
+
+            if (!empty($oaMeta['series']) && empty($metadata['series'])) {
+                $metadata['series'] = $oaMeta['series'];
+            }
+
+            if (!empty($oaMeta['series_number']) && empty($metadata['series_number'])) {
+                $metadata['series_number'] = $oaMeta['series_number'];
+            }
+
+            if (!empty($oaMeta['narrator']) && empty($metadata['narrator'])) {
+                $metadata['narrator'] = is_array($oaMeta['narrator']) ? $oaMeta['narrator'] : [$oaMeta['narrator']];
+            }
+
+            if (!empty($oaMeta['publisher']) && empty($metadata['publisher'])) {
+                $metadata['publisher'] = $oaMeta['publisher'];
+            }
+
+            if (!empty($oaMeta['release_date']) && empty($metadata['year'])) {
+                $year = substr($oaMeta['release_date'], 0, 4);
+                if (is_numeric($year)) {
+                    $metadata['year'] = $year;
+                }
+            }
+
+            if (!empty($oaMeta['description']) && empty($metadata['description'])) {
+                $metadata['description'] = $oaMeta['description'];
+            }
+        }
+
         // Add source path for GraphicAudio detection
         $metadata['source_path'] = $audiobook['path'];
 
@@ -136,8 +172,10 @@ class MetadataProcessingService
         }
 
         // If genre is empty, invalid, or "Other", try to use author's preferred genre
-        if (empty($metadata['genre']) ||
-            (count($metadata['genre']) === 1 && in_array($metadata['genre'][0], ['Other', 'Unknown', 'Audiobook', null]))) {
+        if (
+            empty($metadata['genre']) ||
+            (count($metadata['genre']) === 1 && in_array($metadata['genre'][0], ['Other', 'Unknown', 'Audiobook', null]))
+        ) {
             $preferredGenre = $this->getAuthorPreferredGenre($metadata['author'] ?? null);
             if ($preferredGenre) {
                 $metadata['genre'] = [$preferredGenre];
