@@ -19,6 +19,7 @@
     * Children's Audiobooks → Kids
     * Computers & Technology → Computer
     * Mystery, Thriller & Suspense → Action
+    * Teen & Young Adult → General Fiction
     * And 15+ more category mappings
   - Also imports series, narrator, publisher, release date, and description from books.json
   - Improves accuracy for OpenAudible book imports

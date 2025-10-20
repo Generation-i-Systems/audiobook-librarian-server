@@ -45,7 +45,7 @@ trait GenreMapping
             'science & engineering' => 'Science',
             'science fiction & fantasy' => 'Science Fiction',
             'sports & outdoors' => 'Non Fiction',
-            'teen & young adult' => 'Kids',
+            'teen & young adult' => 'General Fiction',
 
             // Science Fiction variations
             'sci-fi' => 'Science Fiction',
