@@ -796,7 +796,7 @@ class ImportBooksFromDownloads extends Command
             }
             if (!empty($fileData['metadata']['author'])) {
                 $authorFromMetadata = is_array($fileData['metadata']['author'])
-                    ? $fileData['metadata']['author'][0]
+                    ? ($fileData['metadata']['author'][0] ?? '')
                     : $fileData['metadata']['author'];
             }
             if ($seriesFromMetadata && $authorFromMetadata) {
@@ -1361,7 +1361,7 @@ class ImportBooksFromDownloads extends Command
         // Then check by exact title and author combination (if available)
         if (!empty($metadata['title']) && !empty($metadata['author'])) {
             $title = $metadata['title'];
-            $author = is_array($metadata['author']) ? $metadata['author'][0] : $metadata['author'];
+            $author = is_array($metadata['author']) ? ($metadata['author'][0] ?? '') : $metadata['author'];
 
             $existingBook = Book::where('title', '=', $title)
                 ->whereHas('authors', function ($query) use ($author) {
@@ -1426,7 +1426,7 @@ class ImportBooksFromDownloads extends Command
         // Only consider exact title matches to avoid false positives between series books
         if (!empty($metadata['title']) && !empty($metadata['author'])) {
             $title = $metadata['title'];
-            $author = is_array($metadata['author']) ? $metadata['author'][0] : $metadata['author'];
+            $author = is_array($metadata['author']) ? ($metadata['author'][0] ?? '') : $metadata['author'];
 
             // Use exact title match only - no partial matching to avoid series conflicts
             $existingBook = Book::where('title', '=', $title)
@@ -2959,7 +2959,7 @@ class ImportBooksFromDownloads extends Command
     protected function findExistingBookForRestore(array $aiMetadata): ?Book
     {
         $title = $aiMetadata['title'] ?? null;
-        $author = is_array($aiMetadata['author']) ? $aiMetadata['author'][0] : ($aiMetadata['author'] ?? null);
+        $author = is_array($aiMetadata['author']) ? ($aiMetadata['author'][0] ?? null) : ($aiMetadata['author'] ?? null);
 
         if (!$title || !$author) {
             $this->line("  Cannot search: title='" . ($title ?: 'EMPTY') . "', author='" . ($author ?: 'EMPTY') . "'");
