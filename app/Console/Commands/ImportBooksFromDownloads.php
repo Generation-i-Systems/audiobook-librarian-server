@@ -565,6 +565,15 @@ class ImportBooksFromDownloads extends Command
      */
     protected function processAudiobookDirectory(string $directory): ?array
     {
+        // Handle case where a file path was passed instead of directory
+        if (is_file($directory)) {
+            return $this->processSingleAudioFile($directory);
+        }
+
+        if (!is_dir($directory)) {
+            return null;
+        }
+
         $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
         $files = [];
         $totalSize = 0;
@@ -1015,6 +1024,11 @@ class ImportBooksFromDownloads extends Command
      */
     protected function findAudiobookDirectories(string $parentPath): array
     {
+        // If this is a file, not a directory, return empty array
+        if (!is_dir($parentPath)) {
+            return [];
+        }
+
         $audiobookDirs = [];
         $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
 
