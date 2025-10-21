@@ -49,8 +49,15 @@ class MetadataProcessingService
                             if (!empty($tags['title'])) {
                                 $tags['title'] = preg_replace('/\s*\[Dramatized Adaptation\]\s*/i', '', $tags['title']);
                                 $tags['title'] = preg_replace('/\s*\(Dramatized Adaptation\)\s*/i', '', $tags['title']);
-                                $tags['title'] = preg_replace('/\s*-\s*Dramatized Adaptation\s*/i', '', $tags['title']);
                             }
+
+                            // Extract author from comment field if present (e.g., "Written by Steven L. Kent")
+                            if (!empty($tags['comment']) && empty($tags['author'])) {
+                                if (preg_match('/Written by\s+([^.]+)/i', $tags['comment'], $matches)) {
+                                    $tags['author'] = trim($matches[1]);
+                                }
+                            }
+
                             $fileTags = array_merge($fileTags, $tags);
                         }
                     }
@@ -139,7 +146,7 @@ class MetadataProcessingService
                                 $metadata['series'] = $tags['series'];
                             }
                             if (!empty($tags['part']) && empty($metadata['series_number'])) {
-                                $metadata['series_number'] = is_numeric($tags['part']) ? (int) $tags['part'] : null;
+                                $metadata['series_number'] = is_numeric($tags['part']) ? (float) $tags['part'] : null;
                             }
                         }
                         break; // Only process first audio file
@@ -289,31 +296,113 @@ class MetadataProcessingService
 
     /**
      * Apply ID3 tag mappings to the result metadata
+     * CRITICAL: File tags are AUTHORITATIVE - they override AI results
      */
     protected function applyId3TagMappings(array &$result, array $fileTags): void
     {
-        // Map artist to author if author is missing or empty
-        if (!empty($fileTags['artist']) && (empty($result['author']) || (is_array($result['author']) && empty($result['author'])))) {
-            $result['author'] = [$fileTags['artist']];
-        }
+        // AUTHOR from artist/album_artist (raw, do NOT normalize here; tests expect raw value)
+        if (!empty($fileTags['artist']) || !empty($fileTags['album_artist'])) {
+            $artist = !empty($fileTags['artist'])
+                ? (is_array($fileTags['artist']) ? (string) $fileTags['artist'][0] : (string) $fileTags['artist'])
+                : (is_array($fileTags['album_artist']) ? (string) $fileTags['album_artist'][0] : (string) $fileTags['album_artist']);
 
-        // Map composer to narrator if narrator is missing or empty
-        if (!empty($fileTags['composer']) && empty($result['narrator'])) {
-            $result['narrator'] = $fileTags['composer'];
-        }
+            $artistLower = strtolower($artist);
+            $hasGraphicAudio = str_contains($artistLower, 'graphic') && str_contains($artistLower, 'audio');
+            $hasBracketedAuthor = (bool) preg_match('/\[[^\]]+\]/', $artist);
 
-        // Map date to published_year if published_year is missing or empty
-        if (!empty($fileTags['date']) && empty($result['published_year'])) {
-            // Extract year from date (e.g., "2025-06-17" -> "2025")
-            $year = substr($fileTags['date'], 0, 4);
-            if (is_numeric($year) && $year >= 1000 && $year <= date('Y')) {
-                $result['published_year'] = (int)$year;
+            // Skip setting author if it's just "Graphic Audio" (no bracketed actual author)
+            if (!($hasGraphicAudio && !$hasBracketedAuthor)) {
+                $result['author'] = [$artist];
             }
         }
 
-        // Also check for album_artist as alternative to artist
-        if (!empty($fileTags['album_artist']) && (empty($result['author']) || (is_array($result['author']) && empty($result['author'])))) {
-            $result['author'] = [$fileTags['album_artist']];
+        // NARRATOR from composer (tests expect a string here)
+        if (!empty($fileTags['composer'])) {
+            $composer = is_array($fileTags['composer']) ? (string) $fileTags['composer'][0] : (string) $fileTags['composer'];
+            $result['narrator'] = $composer;
+        }
+
+        // YEAR from date (first 4 digits)
+        if (!empty($fileTags['date']) && is_string($fileTags['date'])) {
+            if (preg_match('/^(\d{4})/', $fileTags['date'], $m)) {
+                $result['year'] = $m[1];
+            }
+        }
+
+        // PUBLISHER from explicit tag or copyright (P)
+        if (!empty($fileTags['publisher'])) {
+            $result['publisher'] = is_array($fileTags['publisher']) ? $fileTags['publisher'][0] : $fileTags['publisher'];
+        } elseif (!empty($fileTags['PUBLISHER'])) {
+            $result['publisher'] = is_array($fileTags['PUBLISHER']) ? $fileTags['PUBLISHER'][0] : $fileTags['PUBLISHER'];
+        } elseif (!empty($fileTags['copyright']) && is_string($fileTags['copyright'])) {
+            if (preg_match('/\(P\)\d+\s+([^;]+)/i', $fileTags['copyright'], $matches)) {
+                $result['publisher'] = trim($matches[1]);
+            }
+        }
+
+        // GENRE (tests expect a string here)
+        if (!empty($fileTags['genre'])) {
+            $result['genre'] = is_array($fileTags['genre']) ? (string) $fileTags['genre'][0] : (string) $fileTags['genre'];
+        }
+
+        // SERIES and NUMBER from tags if present (authoritative: override AI values)
+        $seriesTag = $fileTags['series'] ?? ($fileTags['SERIES'] ?? null);
+        if (!empty($seriesTag)) {
+            $result['series'] = is_array($seriesTag) ? $seriesTag[0] : $seriesTag;
+        }
+        $partTag = $fileTags['part'] ?? ($fileTags['PART'] ?? null);
+        if (!empty($partTag)) {
+            $partVal = is_array($partTag) ? $partTag[0] : $partTag;
+            $result['series_number'] = is_numeric($partVal) ? (float) $partVal : null;
+        }
+
+        // TITLE parsing: extract series and number if encoded in title
+        if (!empty($fileTags['title'])) {
+            $title = is_array($fileTags['title']) ? (string) end($fileTags['title']) : (string) $fileTags['title'];
+            // Remove "(Dramatized Adaptation)"
+            $title = preg_replace('/\s*\(Dramatized Adaptation\)\s*/i', '', $title);
+            // Remove narrator in parentheses at end
+            $title = preg_replace('/\s*\([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\)\s*$/i', '', $title);
+            // Remove leading "Series [N]" block if present
+            $title = preg_replace('/^(.+?)\s*\[[\d.]+\]\s*/', '', $title);
+
+            $patterns = [
+                '/^(.+?):\s*(.+?),\s*Book\s+([\d.]+)$/i',     // "Series: Title, Book N"
+                '/^(.+?)\s+([\d.]+):\s*(.+)$/i',              // Series N: Title
+                '/^(.+?)\s*[-–]\s*(.+?),\s*Book\s+([\d.]+)$/i',  // Title - Series, Book N
+                '/^(.+?)\s*[-–]\s*(.+?)\s+Book\s+([\d.]+)$/i',   // Title - Series Book N
+                '/^(.+?)\s*[-–]\s*(.+?)\s+([\d.]+)$/i',          // Title - Series N
+            ];
+
+            $matched = false;
+            foreach ($patterns as $idx => $pattern) {
+                if (preg_match($pattern, $title, $matches)) {
+                    if ($idx === 0) {
+                        // Series N: Title
+                        $result['series'] = trim($matches[1]);
+                        $result['series_number'] = (is_numeric($matches[2]) ? (float) $matches[2] : null);
+                        $result['title'] = trim($matches[3]);
+                    } else {
+                        // Title - Series N variants
+                        $result['title'] = trim($matches[1]);
+                        $result['series'] = trim($matches[2]);
+                        $result['series_number'] = (is_numeric($matches[3]) ? (float) $matches[3] : null);
+                    }
+                    $matched = true;
+                    break;
+                }
+            }
+
+            if (!$matched) {
+                $result['title'] = $title;
+            }
+        }
+
+        // DESCRIPTION
+        if (!empty($fileTags['description']) && is_string($fileTags['description'])) {
+            $result['description'] = strip_tags($fileTags['description']);
+        } elseif (!empty($fileTags['comment']) && is_string($fileTags['comment'])) {
+            $result['description'] = strip_tags($fileTags['comment']);
         }
     }
 
@@ -479,5 +568,39 @@ class MetadataProcessingService
         }
 
         return null;
+    }
+
+    /**
+     * Normalize author name - extract from brackets and remove invalid patterns
+     *
+     * CRITICAL: Author will NEVER contain "Graphic" AND "Audio" - this is always invalid
+     */
+    protected function normalizeAuthorName(string $authorName): string
+    {
+        $name = trim($authorName);
+
+        // Pattern: "Publisher/Narrator [Actual Author]"
+        if (preg_match('/^.+?\s*\[([^\]]+)\]$/', $name, $matches)) {
+            $name = trim($matches[1]);
+        }
+
+        // CRITICAL: If author contains both "Graphic" and "Audio", it's INVALID
+        // This should NEVER be an author - it's a narrator/publisher
+        if (stripos($name, 'graphic') !== false && stripos($name, 'audio') !== false) {
+            return '';
+        }
+
+        // If it's just "Full Cast", return empty (narrator, not author)
+        if (preg_match('/^Full\s*Cast$/i', $name)) {
+            return '';
+        }
+
+        // Normalize initials
+        $name = preg_replace('/\b([A-Z])\s+/', '$1. ', $name);
+        $name = preg_replace('/\s+([A-Z])$/', ' $1.', $name);
+        $name = preg_replace('/\b([A-Z]\.)\s+([A-Z]\.)/', '$1$2', $name);
+        $name = preg_replace('/\b([A-Z]\.)\s+([A-Z]\.)/', '$1$2', $name);
+
+        return trim($name);
     }
 }

@@ -773,11 +773,33 @@ class AIBookProcessor
             $tags = [];
 
             if (isset($fileInfo['tags'])) {
-                // Merge all tag formats (ID3v2, ID3v1, etc.)
+                // CRITICAL: For M4B files, prefer 'quicktime' tags (container level) over 'id3v2' (chapter level)
+                // This prevents chapter titles like "Opening Credits" from overriding the book title
+                $preferredFormats = ['quicktime', 'id3v2', 'id3v1'];
+
+                foreach ($preferredFormats as $format) {
+                    if (isset($fileInfo['tags'][$format])) {
+                        foreach ($fileInfo['tags'][$format] as $key => $values) {
+                            if (!isset($tags[$key]) && !empty($values)) {
+                                // CRITICAL: For 'title' in M4B files, use LAST value (book title) not first (chapter title)
+                                // M4B files list all chapter titles first, then the book title last
+                                if ($key === 'title' && is_array($values) && count($values) > 1) {
+                                    $tags[$key] = end($values);
+                                } else {
+                                    $tags[$key] = $values[0];
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Merge any remaining tag formats not in preferred list
                 foreach ($fileInfo['tags'] as $tagFormat => $tagData) {
-                    foreach ($tagData as $key => $values) {
-                        if (!isset($tags[$key]) && !empty($values[0])) {
-                            $tags[$key] = $values[0];
+                    if (!in_array($tagFormat, $preferredFormats)) {
+                        foreach ($tagData as $key => $values) {
+                            if (!isset($tags[$key]) && !empty($values[0])) {
+                                $tags[$key] = $values[0];
+                            }
                         }
                     }
                 }

@@ -48,6 +48,7 @@ class ImportBooksFromDownloads extends Command
                             {--copy-files : Copy files after successful import instead of moving (default is move)}
                             {--no-backup : Skip automatic database backup}
                             {--background : Enable background processing for enrichment (disabled by default)}
+                            {--batch-id= : Batch ID to tag all imports in this run for group operations}
                             {--no-cache : Disable background processing cache}
                             {--clear-cache : Clear background processing cache before starting}
                             {--force-audio : Force audio transcription even when AI confidence is high}
@@ -60,6 +61,7 @@ class ImportBooksFromDownloads extends Command
 
     protected ?AIBookProcessor $aiProcessor = null;
     protected ?AudioFileAnalyzer $audioAnalyzer = null;
+    protected string $batchId;
     protected ?AudibleService $audibleService = null;
     protected ?ExternalCoverService $coverService = null;
     protected ?GoogleBooksApiService $googleBooksService = null;
@@ -115,6 +117,17 @@ class ImportBooksFromDownloads extends Command
 
         // Initialize persistent cache system
         $this->getCacheService()->initializeCache();
+
+        // Auto-generate batch-id if not provided
+        $batchId = $this->option('batch-id');
+        if (empty($batchId)) {
+            $batchId = 'import_' . date('Ymd_His');
+            $this->info("📦 Auto-generated batch ID: {$batchId}");
+        } else {
+            $this->info("📦 Using batch ID: {$batchId}");
+        }
+        // Store batch-id for use during import
+        $this->batchId = $batchId;
 
         // Check if background processing should be enabled
         if ($this->option('background')) {
@@ -595,11 +608,14 @@ class ImportBooksFromDownloads extends Command
 
         // Require at least 1 audio file and 10MB total size
         if (count($files) >= 1 && $totalSize > 10 * 1024 * 1024) {
+            $coverImagePath = $this->findCoverImageInDirectory($directory);
+
             return [
                 'path' => $directory,
                 'name' => basename($directory),
                 'files' => $files,
                 'total_size' => $totalSize,
+                'cover_image_path' => $coverImagePath,
             ];
         }
 
@@ -619,6 +635,105 @@ class ImportBooksFromDownloads extends Command
             return $this->option($option) ?? false;
         } catch (\Exception $e) {
             return false;
+        }
+    }
+
+    protected function findCoverImageInDirectory(string $directory): ?string
+    {
+        if (!is_dir($directory)) {
+            return null;
+        }
+
+        $imageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+        $commonCoverNames = ['cover', 'folder', 'albumart', 'front'];
+
+        $bestCandidate = null;
+        $bestScore = PHP_INT_MAX;
+
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::LEAVES_ONLY
+        );
+
+        foreach ($iterator as $fileInfo) {
+            if (!$fileInfo->isFile()) {
+                continue;
+            }
+
+            $extension = strtolower($fileInfo->getExtension());
+            if (!in_array($extension, $imageExtensions, true)) {
+                continue;
+            }
+
+            $relativePath = ltrim(str_replace($directory, '', $fileInfo->getPathname()), DIRECTORY_SEPARATOR);
+            $depth = substr_count($relativePath, DIRECTORY_SEPARATOR);
+            $filename = strtolower(pathinfo($fileInfo->getFilename(), PATHINFO_FILENAME));
+
+            $score = 100;
+
+            if ($depth === 0) {
+                $score -= 40; // Prefer root images
+            } else {
+                $score += $depth;
+            }
+
+            if (in_array($filename, $commonCoverNames, true)) {
+                $score -= 50; // Strong preference for known cover names
+            }
+
+            if ($score < $bestScore) {
+                $bestScore = $score;
+                $bestCandidate = $fileInfo->getPathname();
+            }
+        }
+
+        return $bestCandidate;
+    }
+
+    protected function normalizeCoverPriority(array &$metadata): void
+    {
+        $hasLocalCover = (!empty($metadata['cover_is_local_file']) && !empty($metadata['cover_url']))
+            || (!empty($metadata['cover_source']) && in_array($metadata['cover_source'], ['Local file in directory', 'Existing file in directory'], true));
+
+        if ($hasLocalCover) {
+            $metadata['cover_source'] = $metadata['cover_source'] ?? 'Local file in directory';
+            return;
+        }
+
+        if (!empty($metadata['cover_data'])) {
+            $metadata['cover_source'] = 'Embedded in M4B';
+            return;
+        }
+
+        $audibleCoverUrl = $metadata['audible_raw']['coverImageUrl'] ?? null;
+        $googleCoverUrl = $metadata['google_books_raw']['volumeInfo']['imageLinks']['thumbnail'] ?? null;
+
+        if ($audibleCoverUrl) {
+            if (empty($metadata['cover_url']) || $metadata['cover_url'] !== $audibleCoverUrl) {
+                if (!empty($metadata['cover_url'])) {
+                    $metadata['fallback_cover_url'] = $metadata['cover_url'];
+                    $metadata['fallback_cover_source'] = $metadata['cover_source'] ?? 'Unknown';
+                } elseif (!empty($googleCoverUrl)) {
+                    $metadata['fallback_cover_url'] = $googleCoverUrl;
+                    $metadata['fallback_cover_source'] = 'Google Books';
+                }
+
+                $metadata['cover_url'] = $audibleCoverUrl;
+            }
+
+            $metadata['cover_source'] = 'Audible';
+            unset($metadata['cover_is_local_file']);
+            return;
+        }
+
+        if ($googleCoverUrl) {
+            if (empty($metadata['cover_url'])) {
+                $metadata['cover_url'] = $googleCoverUrl;
+            }
+
+            if (empty($metadata['cover_source'])) {
+                $metadata['cover_source'] = 'Google Books';
+            }
         }
     }
 
@@ -658,11 +773,26 @@ class ImportBooksFromDownloads extends Command
             return null;
         }
 
-        // Find all audio files directly in this directory (not subdirectories)
+        // Find all files directly in this directory (not subdirectories)
         $files = File::files($directory);
 
+        // Fast-path: if fewer than 2 audio files, it's not a multi-book directory
+        $audioFileCount = 0;
+        foreach ($files as $file) {
+            $extension = strtolower($file->getExtension());
+            if (in_array($extension, $audioExtensions)) {
+                $audioFileCount++;
+            }
+        }
         if ($this->isOptionEnabled('verbose')) {
             $this->line("  Found " . count($files) . " files in directory");
+            $this->line("  Audio files: {$audioFileCount}");
+        }
+        if ($audioFileCount < 2) {
+            if ($this->isOptionEnabled('verbose')) {
+                $this->line("  Not a multi-book series (need at least 2 audio files)");
+            }
+            return null;
         }
 
         foreach ($files as $file) {
@@ -1539,13 +1669,33 @@ class ImportBooksFromDownloads extends Command
 
         // Collection info is already injected in processAudiobookMetadata()
 
-        // Check for cover image in source directory (for individual audio files)
-        if (!empty($audiobook['cover_image_path']) && empty($aiMetadata['cover_url'])) {
+        // Check for cover image in source directory (prefer local files over remote sources)
+        if (!empty($audiobook['cover_image_path'])) {
+            if (!empty($aiMetadata['cover_url']) && empty($aiMetadata['cover_is_local_file']) && empty($aiMetadata['cover_data'])) {
+                // Preserve remote cover as fallback
+                $aiMetadata['fallback_cover_url'] = $aiMetadata['cover_url'];
+                $aiMetadata['fallback_cover_source'] = $aiMetadata['cover_source'] ?? null;
+            }
+
             $aiMetadata['cover_url'] = $audiobook['cover_image_path'];
             // Mark as local file so BookImportService knows to copy instead of download
             $aiMetadata['cover_is_local_file'] = true;
             $aiMetadata['cover_source'] = 'Local file in directory';
-            $this->info("  ✓ Found cover image: " . basename($audiobook['cover_image_path']));
+            $this->info("  ✓ Using local cover image: " . basename($audiobook['cover_image_path']));
+        }
+
+        // If enrichment provided both Audible and Google cover URLs, prefer Audible
+        if (!empty($aiMetadata['google_books_raw']['volumeInfo']['imageLinks']['thumbnail']) &&
+            !empty($aiMetadata['audible_raw']['coverImageUrl']) &&
+            empty($aiMetadata['cover_is_local_file']) &&
+            empty($aiMetadata['cover_data'])
+        ) {
+            $this->info("  ℹ️  Audible cover preferred over Google Books thumbnail");
+            // Preserve Google Books as fallback
+            $aiMetadata['fallback_cover_url'] = $aiMetadata['google_books_raw']['volumeInfo']['imageLinks']['thumbnail'];
+            $aiMetadata['fallback_cover_source'] = 'Google Books';
+            $aiMetadata['cover_url'] = $aiMetadata['audible_raw']['coverImageUrl'];
+            $aiMetadata['cover_source'] = 'Audible';
         }
 
         // Note: We'll check for existing cover images in the DESTINATION directory
@@ -1564,52 +1714,66 @@ class ImportBooksFromDownloads extends Command
             if (isset($audiobook['metadata']['title'])) {
                 $aiMetadata['title'] = $audiobook['metadata']['title'];
             }
+        }
 
-            // Extract cover image and additional metadata from the M4B file if this is a split book
-            // Only extract if no cover URL was set yet
-            if (!empty($audiobook['is_split_book']) && !empty($audiobook['files'][0]) && empty($aiMetadata['cover_url'])) {
-                $audioFilePath = $audiobook['files'][0];
+        // CRITICAL: Extract cover image and additional metadata from M4B file
+        // This should ALWAYS run for M4B files to extract embedded covers
+        // Embedded covers have priority over downloaded covers
+        if (!empty($audiobook['files'][0])) {
+            $audioFilePath = $audiobook['files'][0];
 
-                // Extract file tags using existing AIBookProcessor method (cached)
-                $this->line("  Extracting metadata from M4B file: " . basename($audioFilePath));
-                $fileTags = $this->getCachedFileTags($audioFilePath);
+            // Extract file tags using existing AIBookProcessor method (cached)
+            $this->line("  Extracting metadata from M4B file: " . basename($audioFilePath));
+            $this->line("  Full path: " . $audioFilePath);
+            $this->line("  File exists: " . (file_exists($audioFilePath) ? 'YES' : 'NO'));
 
-                $this->line("  File tags extracted: " . (empty($fileTags) ? 'NONE' : count($fileTags) . ' fields'));
-                if (!empty($fileTags)) {
-                    $this->line("  Available fields: " . implode(', ', array_keys($fileTags)));
+            $fileTags = $this->getCachedFileTags($audioFilePath);
+
+            $this->line("  File tags extracted: " . (empty($fileTags) ? 'NONE' : count($fileTags) . ' fields'));
+            if (!empty($fileTags)) {
+                $this->line("  Available fields: " . implode(', ', array_keys($fileTags)));
+            } else {
+                $this->warn("  ✗ No tags extracted - check if getID3 is installed and file is readable");
+            }
+
+            // Use metadata from file tags if available and not already set
+            if (!empty($fileTags)) {
+                if (empty($aiMetadata['narrator']) && !empty($fileTags['narrator'])) {
+                    $aiMetadata['narrator'] = is_array($fileTags['narrator']) ? $fileTags['narrator'] : [$fileTags['narrator']];
+                    $this->line("  ✓ Using narrator from M4B: " . (is_array($aiMetadata['narrator']) ? implode(', ', $aiMetadata['narrator']) : $aiMetadata['narrator']));
+                }
+                if (empty($aiMetadata['year']) && !empty($fileTags['year'])) {
+                    $aiMetadata['year'] = $fileTags['year'];
+                    $this->line("  ✓ Using year from M4B: {$aiMetadata['year']}");
+                }
+                if (empty($aiMetadata['publisher']) && !empty($fileTags['publisher'])) {
+                    $aiMetadata['publisher'] = $fileTags['publisher'];
+                    $this->line("  ✓ Using publisher from M4B: {$aiMetadata['publisher']}");
                 }
 
-                // Use metadata from file tags if available and not already set
-                if (!empty($fileTags)) {
-                    if (empty($aiMetadata['narrator']) && !empty($fileTags['narrator'])) {
-                        $aiMetadata['narrator'] = is_array($fileTags['narrator']) ? $fileTags['narrator'] : [$fileTags['narrator']];
-                        $this->line("  ✓ Using narrator from M4B: " . (is_array($aiMetadata['narrator']) ? implode(', ', $aiMetadata['narrator']) : $aiMetadata['narrator']));
-                    }
-                    if (empty($aiMetadata['year']) && !empty($fileTags['year'])) {
-                        $aiMetadata['year'] = $fileTags['year'];
-                        $this->line("  ✓ Using year from M4B: {$aiMetadata['year']}");
-                    }
-                    if (empty($aiMetadata['publisher']) && !empty($fileTags['publisher'])) {
-                        $aiMetadata['publisher'] = $fileTags['publisher'];
-                        $this->line("  ✓ Using publisher from M4B: {$aiMetadata['publisher']}");
+                // Extract embedded cover image if available
+                if (!empty($fileTags['picture']['data'])) {
+                    $this->line("  Found embedded cover image in M4B file");
+                    // Store the cover data temporarily, don't write to source directory
+                    $aiMetadata['cover_data'] = $fileTags['picture']['data'];
+                    $aiMetadata['cover_source'] = 'Embedded in M4B';
+
+                    // CRITICAL: Clear cover_url so we don't download when we have embedded cover
+                    // Embedded covers have priority over downloaded covers
+                    if (!empty($aiMetadata['cover_url'])) {
+                        $this->line("  Ignoring cover URL in favor of embedded cover");
+                        unset($aiMetadata['cover_url']);
                     }
 
-                    // Extract embedded cover image if available
-                    if (!empty($fileTags['picture']['data'])) {
-                        $this->line("  Found embedded cover image in M4B file");
-                        // Store the cover data temporarily, don't write to source directory
-                        $aiMetadata['cover_data'] = $fileTags['picture']['data'];
-                        $aiMetadata['cover_source'] = 'Embedded in M4B';
-                        $this->info("  ✓ Found embedded cover in M4B file (will be saved to final directory)");
-                    } else {
-                        $this->warn("  ✗ No embedded cover image found in M4B file");
-                        if (isset($fileTags['picture'])) {
-                            $this->line("  Picture field exists but no data: " . json_encode(array_keys($fileTags['picture'])));
-                        }
-                    }
+                    $this->info("  ✓ Found embedded cover in M4B file (will be saved to final directory)");
                 } else {
-                    $this->warn("  ✗ No file tags extracted from M4B");
+                    $this->warn("  ✗ No embedded cover image found in M4B file");
+                    if (isset($fileTags['picture'])) {
+                        $this->line("  Picture field exists but no data: " . json_encode(array_keys($fileTags['picture'])));
+                    }
                 }
+            } else {
+                $this->warn("  ✗ No file tags extracted from M4B");
             }
         }
 
@@ -1619,7 +1783,8 @@ class ImportBooksFromDownloads extends Command
         }
 
         // Handle multi-book patterns (simplified) - skip if already a split book
-        if (empty($audiobook['is_split_book'])) {
+        // CRITICAL: Only use if series is NOT already set from file tags
+        if (empty($audiobook['is_split_book']) && empty($aiMetadata['series'])) {
             $multiBookInfo = $this->getMetadataService()->detectMultiBookPattern($audiobook['name']);
             if ($multiBookInfo) {
                 $this->info("📚 Detected multi-book directory: {$multiBookInfo['series_name']} [{$multiBookInfo['start_number']}-{$multiBookInfo['end_number']}]");
@@ -1640,6 +1805,7 @@ class ImportBooksFromDownloads extends Command
 
         // Step 2: External data enrichment (before manual review)
         $this->performExternalDataEnrichment($aiMetadata);
+        $this->normalizeCoverPriority($aiMetadata);
 
         // Fix Graphic Audio metadata AFTER enrichment (so it overrides external data)
         $gaStartTime = microtime(true);
@@ -1649,10 +1815,14 @@ class ImportBooksFromDownloads extends Command
             $this->line("  ⏱️  GraphicAudio metadata fix took: {$gaDuration}ms");
         }
 
+        // Inherit genre from existing series books by same author
+        $this->inheritGenreFromSeries($aiMetadata);
+
         $this->newLine();
 
         // Add source path for display and processing
         $aiMetadata['source_path'] = $audiobook['path'];
+
         $displayStartTime = microtime(true);
         $this->displayEnrichedMetadata($aiMetadata);
         $displayDuration = round((microtime(true) - $displayStartTime) * 1000);
@@ -1661,14 +1831,17 @@ class ImportBooksFromDownloads extends Command
         }
         $this->newLine();
 
-        // Show expected directory path
-        $expectedPath = $this->getImportService()->generateDirectoryPath($aiMetadata);
-        $this->info("📁 Expected directory path: {$expectedPath}");
+        // REMOVED: "Expected directory path" line - confusing and shows incomplete path
+        // The full path with title is already shown in the "Directory Path" field in the table above
 
         // Step 3: Manual review (unless in auto mode)
         if (!$this->handleManualReview($aiMetadata, $audiobook)) {
             return; // User rejected or auto mode skipped
         }
+
+        // CRITICAL: After this point, $aiMetadata contains user-approved data
+        // DO NOT modify title, author, series, or custom_directory_path
+        // These values must be preserved exactly as approved by the user
 
         // Step 4: Import to database
         $this->performDatabaseImport($aiMetadata, $audiobook);
@@ -2022,18 +2195,35 @@ class ImportBooksFromDownloads extends Command
             if (isset($aiMetadata['cover_source'])) {
                 if ($aiMetadata['cover_source'] === 'Existing file in directory' ||
                     $aiMetadata['cover_source'] === 'Local file in directory') {
-                    $preservedCover = $aiMetadata['cover_url'];
+                    $preservedCover = $aiMetadata['cover_url'] ?? null;
                     $preservedSource = $aiMetadata['cover_source'];
                     $preservedIsLocalFile = !empty($aiMetadata['cover_is_local_file']);
                     $this->line("  Preserving local cover file (priority over all sources)");
                 } elseif ($aiMetadata['cover_source'] === 'Embedded in M4B') {
-                    $preservedCover = $aiMetadata['cover_url'];
+                    // For embedded covers, we have cover_data, not cover_url
+                    // Don't try to preserve cover_url, just preserve the source flag
                     $preservedSource = $aiMetadata['cover_source'];
-                    $this->line("  Preserving M4B cover (priority over enrichment sources)");
+                    $this->line("  Preserving M4B embedded cover (priority over enrichment sources)");
                 }
             }
 
-            $aiMetadata = array_merge($aiMetadata, $enrichedData);
+            // CRITICAL: Only use enrichment to FILL IN missing fields, never override existing data
+            // File tags and AI extraction are authoritative
+            foreach ($enrichedData as $key => $value) {
+                // Skip cover_url if we have embedded cover data or preserved cover
+                if ($key === 'cover_url' && ($preservedSource || !empty($aiMetadata['cover_data']))) {
+                    continue; // Don't overwrite embedded or preserved covers
+                }
+
+                // Special handling for year/published_year - check both
+                if ($key === 'year' || $key === 'published_year') {
+                    if (empty($aiMetadata['year']) && empty($aiMetadata['published_year'])) {
+                        $aiMetadata[$key] = $value;
+                    }
+                } elseif (empty($aiMetadata[$key])) {
+                    $aiMetadata[$key] = $value;
+                }
+            }
 
             // Restore preserved cover if it was set
             if ($preservedCover) {
@@ -2042,6 +2232,29 @@ class ImportBooksFromDownloads extends Command
                 if ($preservedIsLocalFile) {
                     $aiMetadata['cover_is_local_file'] = true;
                 }
+            } elseif ($preservedSource === 'Embedded in M4B') {
+                // For embedded covers, just restore the source flag
+                // The cover_data is already in $aiMetadata
+                $aiMetadata['cover_source'] = $preservedSource;
+            }
+
+            // Prefer Audible cover over Google Books when no local/embedded cover exists
+            $hasLocalCover = !empty($aiMetadata['cover_is_local_file']) || !empty($aiMetadata['cover_data']);
+            $audibleCoverUrl = $aiMetadata['audible_raw']['coverImageUrl'] ?? null;
+            $googleCoverUrl = $aiMetadata['google_books_raw']['volumeInfo']['imageLinks']['thumbnail'] ?? null;
+
+            if (!$hasLocalCover && $audibleCoverUrl) {
+                if (!empty($aiMetadata['cover_url']) && $aiMetadata['cover_url'] !== $audibleCoverUrl) {
+                    $aiMetadata['fallback_cover_url'] = $aiMetadata['cover_url'];
+                    $aiMetadata['fallback_cover_source'] = $aiMetadata['cover_source'] ?? 'Unknown';
+                }
+
+                $aiMetadata['cover_url'] = $audibleCoverUrl;
+                $aiMetadata['cover_source'] = 'Audible';
+                unset($aiMetadata['cover_is_local_file']);
+            } elseif (!$hasLocalCover && !$audibleCoverUrl && $googleCoverUrl && empty($aiMetadata['cover_url'])) {
+                $aiMetadata['cover_url'] = $googleCoverUrl;
+                $aiMetadata['cover_source'] = 'Google Books';
             }
 
             $totalDuration = round((microtime(true) - $startTime) * 1000);
@@ -2055,9 +2268,61 @@ class ImportBooksFromDownloads extends Command
     }
 
     /**
+     * Inherit primary genre from existing books in the same series by the same author
+     */
+    protected function inheritGenreFromSeries(array &$metadata): void
+    {
+        // Only proceed if we have series and author
+        if (empty($metadata['series']) || empty($metadata['author'])) {
+            return;
+        }
+
+        $authors = is_array($metadata['author']) ? $metadata['author'] : [$metadata['author']];
+        $seriesName = $metadata['series'];
+
+        // DEBUG: Show what we're searching for
+        $this->line("  DEBUG: Looking for series '{$seriesName}' by " . implode(', ', $authors));
+
+        // Find existing books in this series by this author
+        $existingBook = Book::whereHas('series', function ($query) use ($seriesName) {
+            $query->where('name', $seriesName);
+        })->whereHas('authors', function ($query) use ($authors) {
+            $query->whereIn('name', $authors);
+        })->with('genres')->first();
+
+        if ($existingBook) {
+            $this->line("  DEBUG: Found book ID {$existingBook->id}: {$existingBook->title}");
+            if ($existingBook->genres->isNotEmpty()) {
+                // Get primary genre, or first genre if no primary is set
+                $primaryGenre = $existingBook->genres->where('pivot.is_primary', true)->first();
+                if (!$primaryGenre) {
+                    // If no primary genre, use the first one (if there's only one, it's implicitly primary)
+                    $primaryGenre = $existingBook->genres->first();
+                }
+
+                if ($primaryGenre) {
+                    $primaryGenreName = $primaryGenre->name;
+                    $oldGenre = is_array($metadata['genre']) ? $metadata['genre'][0] : $metadata['genre'];
+
+                    $this->line("  DEBUG: Primary genre: {$primaryGenreName}, Current genre: {$oldGenre}");
+
+                    if ($oldGenre !== $primaryGenreName) {
+                        $metadata['genre'] = $primaryGenreName;
+                        $this->line("  ℹ️  Inherited genre '{$primaryGenreName}' from existing series books (was: '{$oldGenre}')");
+                    }
+                }
+            } else {
+                $this->line("  DEBUG: Book has no genres");
+            }
+        } else {
+            $this->line("  DEBUG: No existing books found in this series");
+        }
+    }
+
+    /**
      * Handle manual review process or auto mode validation
      */
-    protected function handleManualReview(array $aiMetadata, array $audiobook): bool
+    protected function handleManualReview(array &$aiMetadata, array $audiobook): bool
     {
         if (!$this->option('auto') && !$this->option('dry-run')) {
             if (!$this->reviewAndApprove($aiMetadata, $audiobook)) {
@@ -2101,16 +2366,64 @@ class ImportBooksFromDownloads extends Command
         $spinner->setMessage("💾 Creating database record...");
         $spinner->start();
 
+        // Add batch_id to metadata
+        $aiMetadata['batch_id'] = $this->batchId;
+
+        // CRITICAL: Check if a book already exists at TARGET path (destination)
+        // If so, update it instead of creating a duplicate
+        $targetPath = $aiMetadata['custom_directory_path'] ?? null;
+        $existingBookAtPath = null;
+
+        // Check target path only - this is where the book will be moved to
+        if ($targetPath) {
+            $existingBookAtPath = Book::where('directory_path', $targetPath)->first();
+        }
+
+        if ($existingBookAtPath) {
+            $this->warn("⚠️  Book already exists: ID {$existingBookAtPath->id} - \"{$existingBookAtPath->title}\"");
+            $this->warn("   Current path: {$existingBookAtPath->directory_path}");
+            $this->warn("   New data: \"{$aiMetadata['title']}\"");
+
+            $choice = $this->choice(
+                'A book already exists. What would you like to do?',
+                [
+                    '1' => 'Update existing book with new metadata',
+                    '2' => 'Skip this import',
+                    '3' => 'Create new book anyway (will have duplicate!)',
+                ],
+                '1'
+            );
+
+            if ($choice === '2') {
+                $this->info("⏭️  Skipping import");
+                return;
+            } elseif ($choice === '3') {
+                $existingBookAtPath = null; // Create new book
+            }
+        }
+
         try {
-            $book = $this->getImportService()->createBookFromMetadata($aiMetadata, $audiobook);
+            if ($existingBookAtPath) {
+                // Update existing book
+                $book = $this->getImportService()->updateBookFromMetadata($existingBookAtPath, $aiMetadata, $audiobook);
+                $this->info("✓ Updated existing book record");
+            } else {
+                // Create new book
+                $book = $this->getImportService()->createBookFromMetadata($aiMetadata, $audiobook);
+            }
         } catch (\Exception $e) {
             $book = null;
             $spinner->finish();
             $this->output->write("\r\033[K");
-            $this->error("Exception during book creation: " . $e->getMessage());
-            if ($this->isOptionEnabled('verbose')) {
-                $this->line("DEBUG: Exception trace: " . $e->getTraceAsString());
-            }
+            $this->error("❌ Exception during book creation: " . $e->getMessage());
+            $this->error("   File: " . $e->getFile() . ":" . $e->getLine());
+            $this->error("   Trace: " . $e->getTraceAsString());
+
+            // Show metadata that was being used
+            $this->error("   Metadata being used:");
+            $this->error("   - Title: " . ($aiMetadata['title'] ?? 'NULL'));
+            $this->error("   - Author: " . (is_array($aiMetadata['author'] ?? null) ? implode(', ', $aiMetadata['author']) : ($aiMetadata['author'] ?? 'NULL')));
+            $this->error("   - Directory: " . ($aiMetadata['custom_directory_path'] ?? 'NULL'));
         }
 
         if (!isset($book)) {
@@ -2265,7 +2578,7 @@ class ImportBooksFromDownloads extends Command
     /**
      * Process audiobook with AI
      */
-    protected function displayEnrichedMetadata(array $metadata): void
+    protected function displayEnrichedMetadata(array &$metadata): void
     {
         // Helper function to convert arrays to strings
         $arrayToString = function ($value) {
@@ -2328,7 +2641,8 @@ class ImportBooksFromDownloads extends Command
             $tableData[] = ['Source Path', $displayPath];
         }
 
-        // Calculate and add expected directory path (including book title with series number)
+        // CRITICAL: Calculate and store the target directory path FIRST
+        // This is THE ONLY target path - what's stored is what's displayed
         $dirPathStartTime = microtime(true);
         $basePath = $this->getImportService()->generateDirectoryPath($metadata);
         $dirPathDuration = round((microtime(true) - $dirPathStartTime) * 1000);
@@ -2349,7 +2663,12 @@ class ImportBooksFromDownloads extends Command
         if (!str_ends_with($basePath, $title) && !str_ends_with($basePath, '/' . $title)) {
             $expectedPath = $basePath . '/' . $title;
         }
-        $tableData[] = ['Directory Path', $expectedPath];
+
+        // Store in metadata BEFORE displaying
+        $metadata['custom_directory_path'] = $expectedPath;
+
+        // Display exactly what will be used
+        $tableData[] = ['Directory Path', $metadata['custom_directory_path']];
 
         // Add description if available (truncated for display)
         if (!empty($metadata['description'])) {
@@ -2357,15 +2676,36 @@ class ImportBooksFromDownloads extends Command
             $tableData[] = ['Description', $description];
         }
 
-        // Add cover source if available
-        if (!empty($metadata['cover_url'])) {
-            $source = 'Unknown';
-            if (isset($metadata['audible_raw'])) {
-                $source = 'Audible';
-            } elseif (isset($metadata['google_books_raw'])) {
-                $source = 'Google Books';
+        // Determine cover display preference: local/embedded first, fallback second
+        $coverDisplayUrl = null;
+        $coverDisplaySource = null;
+
+        if (!empty($metadata['cover_data'])) {
+            $coverDisplaySource = $metadata['cover_source'] ?? 'Embedded in M4B';
+            $coverDisplayUrl = '(embedded cover)';
+        } elseif (!empty($metadata['cover_is_local_file']) && !empty($metadata['cover_url'])) {
+            $coverDisplaySource = $metadata['cover_source'] ?? 'Local file in directory';
+            $coverDisplayUrl = $metadata['cover_url'];
+        } elseif (!empty($metadata['cover_url'])) {
+            $coverDisplaySource = $metadata['cover_source'] ?? 'Unknown';
+            if (empty($metadata['cover_source'])) {
+                if (isset($metadata['audible_raw'])) {
+                    $coverDisplaySource = 'Audible';
+                } elseif (isset($metadata['google_books_raw'])) {
+                    $coverDisplaySource = 'Google Books';
+                }
             }
-            $tableData[] = ['Cover Source', $source];
+            $coverDisplayUrl = $metadata['cover_url'];
+        } elseif (!empty($metadata['fallback_cover_url'])) {
+            $coverDisplaySource = $metadata['fallback_cover_source'] ?? 'Fallback source';
+            $coverDisplayUrl = $metadata['fallback_cover_url'];
+        }
+
+        if ($coverDisplaySource !== null) {
+            $tableData[] = ['Cover Source', $coverDisplaySource];
+            if ($coverDisplayUrl && $coverDisplayUrl !== '(embedded cover)') {
+                $tableData[] = ['Cover Path/URL', $coverDisplayUrl];
+            }
         }
 
         $tableStartTime = microtime(true);
@@ -2378,17 +2718,31 @@ class ImportBooksFromDownloads extends Command
 
         // Display cover image if terminal supports it and cover is available
         // Skip image display in auto/dry-run mode to avoid hanging on terminal access
-        if (!empty($metadata['cover_url']) && !$this->option('auto') && !$this->option('dry-run')) {
+        if ((!empty($metadata['cover_url']) || !empty($metadata['cover_data'])) && !$this->option('auto') && !$this->option('dry-run')) {
             $coverStartTime = microtime(true);
-            $this->displayCoverImage($metadata['cover_url']);
+
+            // For embedded covers, save to temp file first
+            if (!empty($metadata['cover_data']) && empty($metadata['cover_url'])) {
+                $tempFile = tempnam(sys_get_temp_dir(), 'cover_') . '.jpg';
+                file_put_contents($tempFile, $metadata['cover_data']);
+                $this->displayCoverImage($tempFile, true); // true = embedded cover
+                unlink($tempFile); // Clean up temp file
+            } else {
+                $this->displayCoverImage($metadata['cover_url'], false);
+            }
+
             $coverDuration = round((microtime(true) - $coverStartTime) * 1000);
 
             if ($this->isOptionEnabled('verbose')) {
                 $this->line("  ⏱️  Cover image display took: {$coverDuration}ms");
             }
-        } elseif (!empty($metadata['cover_url'])) {
-            // Just show the URL in auto/dry-run mode
-            $this->line("\n📸 Cover available: {$metadata['cover_url']}");
+        } elseif (!empty($metadata['cover_url']) || !empty($metadata['cover_data'])) {
+            // Just show the URL in auto/dry-run mode (or indicate embedded cover)
+            if (!empty($metadata['cover_data'])) {
+                $this->line("\n📸 Cover available: Embedded in M4B");
+            } else {
+                $this->line("\n📸 Cover available: {$metadata['cover_url']}");
+            }
         }
     }
 
@@ -2414,11 +2768,13 @@ class ImportBooksFromDownloads extends Command
     /**
      * Display cover image if terminal supports it (like Ghostty with Kitty protocol)
      */
-    protected function displayCoverImage(string $imageUrl): void
+    protected function displayCoverImage(string $imageUrl, bool $isEmbedded = false): void
     {
         $this->getTerminalImageService()->displayImage(
             $imageUrl,
-            fn ($msg) => $this->line($msg)
+            fn ($msg) => $this->line($msg),
+            'left', // align
+            $isEmbedded ? 'Embedded' : null // displayName
         );
     }
 
@@ -2427,9 +2783,10 @@ class ImportBooksFromDownloads extends Command
      */
     protected function reviewAndApprove(array &$metadata, array $audiobook = []): bool
     {
-        // If no enrichment data found, assume detected fields are wrong and skip auto-approval
+        // If no enrichment data found, skip auto-approval and go straight to manual review
         if (!$this->getEnrichmentService()->hasEnrichmentData($metadata)) {
-            $this->warn("⚠️  No external enrichment data found - detected fields may be incorrect");
+            // REMOVED: Useless warning about no enrichment data
+            // File tags are authoritative - enrichment is optional, not required
             $this->info("📝 Please review and edit the metadata:");
         } else {
             // Ask if user wants to accept all fields as shown
@@ -2471,21 +2828,38 @@ class ImportBooksFromDownloads extends Command
                 $choice = '5';
             }
 
+            $validChoices = ['1', '2', '3', '4', '5'];
+            while (!in_array($choice, $validChoices, true)) {
+                $choice = strtolower(trim($this->ask("Invalid option. Please choose 1-5 (or press Enter for default {$defaultChoice}{$confidenceNote}):")));
+                if ($choice === '') {
+                    $choice = $defaultChoice;
+                    break;
+                }
+                if (in_array($choice, ['a', 'accept'], true)) {
+                    $choice = '1';
+                } elseif (in_array($choice, ['e', 'edit'], true)) {
+                    $choice = '2';
+                } elseif (in_array($choice, ['p', 'path'], true)) {
+                    $choice = '3';
+                } elseif (in_array($choice, ['c', 'cover'], true)) {
+                    $choice = '4';
+                } elseif (in_array($choice, ['s', 'skip'], true)) {
+                    $choice = '5';
+                }
+            }
+
             switch ($choice) {
                 case '1':
                     return true;
                 case '2':
-                    // Continue to field editing below
                     break;
                 case '3':
-                    // Edit directory path only
                     $metadata = $this->editDirectoryPathOnly($metadata, $audiobook);
                     if ($this->inputInterrupted) {
                         return false;
                     }
                     return true;
                 case '4':
-                    // Edit cover image URL only
                     $metadata = $this->editCoverImageOnly($metadata, $audiobook);
                     if ($this->inputInterrupted) {
                         return false;
@@ -2493,12 +2867,6 @@ class ImportBooksFromDownloads extends Command
                     return true;
                 case '5':
                     return false;
-                default:
-                    // Use the determined default behavior
-                    if ($defaultChoice === '1') {
-                        return true;
-                    }
-                    break;
             }
         }
 
@@ -2517,24 +2885,8 @@ class ImportBooksFromDownloads extends Command
         $this->displayEnrichedMetadata($metadata);
         $this->newLine();
 
-        // If we started with no enrichment data, automatically try to enrich with the edited metadata
-        if (!$this->getEnrichmentService()->hasEnrichmentData($metadata) && !$this->option('skip-enrichment')) {
-            $this->info("🔍 Attempting to enrich with edited metadata...");
-            $enrichedData = $this->getEnrichmentService()->enrichWithExternalData($metadata);
-            if ($enrichedData) {
-                if ($this->getEnrichmentService()->isValidEnrichment($metadata, $enrichedData)) {
-                    $metadata = array_merge($metadata, $enrichedData);
-                    $this->info("✅ Found enrichment data with edited metadata!");
-                    $this->newLine();
-                    $this->displayEnrichedMetadata($metadata);
-                    $this->newLine();
-                } else {
-                    $this->warn("⚠️  Invalid enrichment data - skipping merge.");
-                }
-            } else {
-                $this->warn("⚠️  Still no enrichment data found");
-            }
-        }
+        // REMOVED: Do NOT attempt enrichment after user has edited metadata
+        // User edits are final - enrichment should only happen BEFORE user interaction
 
         // Ask for final confirmation with option to re-edit
         while (true) {
@@ -2567,6 +2919,24 @@ class ImportBooksFromDownloads extends Command
                 $choice = '4';
             }
 
+            $validFinalChoices = ['1', '2', '3', '4'];
+            while (!in_array($choice, $validFinalChoices, true)) {
+                $choice = strtolower(trim($this->ask("Invalid option. Please choose 1-4 (or press Enter for default 1):")));
+                if ($choice === '') {
+                    $choice = '1';
+                    break;
+                }
+                if ($choice === 'a' || $choice === 'accept') {
+                    $choice = '1';
+                } elseif ($choice === 'e' || $choice === 'edit') {
+                    $choice = '2';
+                } elseif ($choice === 'p' || $choice === 'path') {
+                    $choice = '3';
+                } elseif ($choice === 's' || $choice === 'skip') {
+                    $choice = '4';
+                }
+            }
+
             switch ($choice) {
                 case '1':
                     return true;
@@ -2583,22 +2953,8 @@ class ImportBooksFromDownloads extends Command
                     $this->displayEnrichedMetadata($metadata);
                     $this->newLine();
 
-                    // Re-enrich after editing
-                    if (!$this->option('skip-enrichment')) {
-                        $this->info("🔍 Attempting to enrich with re-edited metadata...");
-                        $enrichedData = $this->getEnrichmentService()->enrichWithExternalData($metadata);
-                        if ($enrichedData) {
-                            if ($this->getEnrichmentService()->isValidEnrichment($metadata, $enrichedData)) {
-                                $metadata = array_merge($metadata, $enrichedData);
-                                $this->info("✅ Found enrichment data with re-edited metadata!");
-                                $this->displayEnrichedMetadata($metadata);
-                            } else {
-                                $this->warn("⚠️  Invalid enrichment data - skipping merge.");
-                            }
-                        } else {
-                            $this->warn("⚠️  Still no enrichment data found");
-                        }
-                    }
+                    // REMOVED: Do NOT attempt enrichment after user has re-edited metadata
+                    // User edits are final - enrichment should only happen BEFORE user interaction
                     // Continue the loop to ask again
                     break;
                 case '3':
@@ -2626,10 +2982,8 @@ class ImportBooksFromDownloads extends Command
         if ($this->inputInterrupted) {
             return $metadata;
         }
-        if ($newTitle !== ($metadata['title'] ?? '')) {
-            // Only trim whitespace for user-entered titles
-            $metadata['title'] = trim($newTitle);
-        }
+        // Always update title, even if it appears unchanged (trim might differ)
+        $metadata['title'] = trim($newTitle);
 
         // Edit author
         $currentAuthor = is_array($metadata['author']) ? implode(', ', $metadata['author']) : ($metadata['author'] ?? '');
@@ -2637,17 +2991,20 @@ class ImportBooksFromDownloads extends Command
         if ($this->inputInterrupted) {
             return $metadata;
         }
-        if ($newAuthor !== $currentAuthor) {
-            $metadata['author'] = array_map('trim', explode(',', $newAuthor));
-        }
+        // Always update author
+        $metadata['author'] = array_map('trim', explode(',', $newAuthor));
 
         // Edit narrator
-        $currentNarrator = is_array($metadata['narrator']) ? implode(', ', $metadata['narrator']) : ($metadata['narrator'] ?? '');
+        $currentNarrator = '';
+        if (isset($metadata['narrator'])) {
+            $currentNarrator = is_array($metadata['narrator']) ? implode(', ', $metadata['narrator']) : $metadata['narrator'];
+        }
         $newNarrator = $this->askWithImmediateInterrupt("Narrator(s) (comma-separated)", $currentNarrator);
         if ($this->inputInterrupted) {
             return $metadata;
         }
-        if ($newNarrator !== $currentNarrator) {
+        // Always update narrator
+        if (!empty($newNarrator)) {
             $metadata['narrator'] = array_map('trim', explode(',', $newNarrator));
         }
 
@@ -2657,9 +3014,8 @@ class ImportBooksFromDownloads extends Command
         if ($this->inputInterrupted) {
             return $metadata;
         }
-        if ($newGenre !== $currentGenre) {
-            $metadata['genre'] = $newGenre;
-        }
+        // Always update genre
+        $metadata['genre'] = $newGenre;
 
         // Edit series
         $currentSeries = $metadata['series'] ?? '';
@@ -2667,9 +3023,8 @@ class ImportBooksFromDownloads extends Command
         if ($this->inputInterrupted) {
             return $metadata;
         }
-        if ($newSeries !== $currentSeries) {
-            $metadata['series'] = $newSeries;
-        }
+        // Always update series
+        $metadata['series'] = $newSeries;
 
         // Edit series number
         $currentSeriesNumber = $metadata['series_number'] ?? '';
@@ -2677,9 +3032,8 @@ class ImportBooksFromDownloads extends Command
         if ($this->inputInterrupted) {
             return $metadata;
         }
-        if ($newSeriesNumber !== $currentSeriesNumber) {
-            $metadata['series_number'] = $newSeriesNumber;
-        }
+        // Always update series number
+        $metadata['series_number'] = $newSeriesNumber;
 
         // Edit year
         $currentYear = $metadata['year'] ?? '';
@@ -2687,30 +3041,37 @@ class ImportBooksFromDownloads extends Command
         if ($this->inputInterrupted) {
             return $metadata;
         }
-        if ($newYear !== $currentYear) {
-            $metadata['year'] = $newYear;
-        }
+        // Always update year
+        $metadata['year'] = $newYear;
 
-        // Edit directory path
+        // CRITICAL: Clear custom_directory_path so it regenerates from edited metadata
+        // Otherwise it will just return the old cached path
+        unset($metadata['custom_directory_path']);
+
+        // Regenerate directory path using the NEWLY EDITED metadata
+        // This ensures the path reflects all the changes the user just made
         $currentPath = $this->getImportService()->generateDirectoryPath($metadata, ['include_title' => true]);
+
+        // Edit directory path (user can override the generated path if needed)
         $newPath = $this->askWithImmediateInterrupt("Directory Path (relative to library root)", $currentPath);
         if ($this->inputInterrupted) {
             return $metadata;
         }
-        if ($newPath !== $currentPath) {
-            // Ensure path is relative, not absolute
-            $newPath = trim($newPath);
-            $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
-            if (str_starts_with($newPath, $bookRoot . '/')) {
-                $newPath = substr($newPath, strlen($bookRoot) + 1);
-            } elseif (str_starts_with($newPath, $bookRoot)) {
-                $newPath = substr($newPath, strlen($bookRoot) + 1);
-            }
-            $metadata['custom_directory_path'] = $newPath;
-        }
 
-        // Extract series number from edited title if present
-        $this->getEnrichmentService()->extractSeriesNumberFromTitle($metadata);
+        // Always set custom_directory_path if any metadata was edited
+        // This ensures the path with edited title/author/series is preserved
+        $newPath = trim($newPath);
+        $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        if (str_starts_with($newPath, $bookRoot . '/')) {
+            $newPath = substr($newPath, strlen($bookRoot) + 1);
+        } elseif (str_starts_with($newPath, $bookRoot)) {
+            $newPath = substr($newPath, strlen($bookRoot) + 1);
+        }
+        $metadata['custom_directory_path'] = $newPath;
+
+        // CRITICAL: Do NOT extract series number from title after user has manually edited
+        // The user's approved title should be preserved exactly as entered
+        // If they wanted "Spacers Part 5" as the title, that's what it should be
 
         return $metadata;
     }
@@ -3759,20 +4120,40 @@ class ImportBooksFromDownloads extends Command
             } else {
                 // Only skip if we tried due to low confidence, not if forced
                 if (!$this->option('force-audio')) {
-                    $this->warn("⚠️  Audio analysis also failed - skipping");
-                    $currentProvider = config('services.ai.default_provider', 'gemini');
-                    if ($currentProvider === 'gemini' && empty(config('services.gemini.api_key'))) {
-                        $this->warn("   💡 Tip: Add GEMINI_API_KEY to your .env file to enable audio transcription");
-                    } elseif ($currentProvider === 'claude' && empty(config('services.openai.api_key'))) {
-                        $this->warn(
-                            "   💡 Tip: Claude doesn't support audio transcription. Add OPENAI_API_KEY for fallback"
-                        );
+                    if ($this->option('auto')) {
+                        // Auto mode: skip to avoid bad metadata
+                        $this->warn("⚠️  Audio analysis also failed - skipping (auto mode)");
+                        $currentProvider = config('services.ai.default_provider', 'gemini');
+                        if ($currentProvider === 'gemini' && empty(config('services.gemini.api_key'))) {
+                            $this->warn("   💡 Tip: Add GEMINI_API_KEY to your .env file to enable audio transcription");
+                        } elseif ($currentProvider === 'claude' && empty(config('services.openai.api_key'))) {
+                            $this->warn(
+                                "   💡 Tip: Claude doesn't support audio transcription. Add OPENAI_API_KEY for fallback"
+                            );
+                        }
+                        $this->skippedBooks[] = [
+                            'path' => $audiobook['path'],
+                            'reason' => 'Low AI confidence (tried audio analysis)',
+                        ];
+                        return null;
                     }
-                    $this->skippedBooks[] = [
-                        'path' => $audiobook['path'],
-                        'reason' => 'Low AI confidence (tried audio analysis)',
-                    ];
-                    return null;
+                    // Non-auto mode: continue with best-effort metadata (file tags), then manual review
+                    $this->warn("⚠️  Audio analysis failed; continuing with file tag metadata for manual review");
+                    if (!$aiMetadata) {
+                        $fallback = $this->getMetadataService()->processWithoutAI($cleanedAudiobook);
+                        if ($fallback) {
+                            $aiMetadata = $fallback;
+                        } else {
+                            // Minimal placeholder to allow manual review
+                            $aiMetadata = [
+                                'title' => $audiobook['name'] ?? basename($audiobook['path']),
+                                'author' => [],
+                                'narrator' => [],
+                                'genre' => [],
+                                'confidence' => 50,
+                            ];
+                        }
+                    }
                 } else {
                     $this->warn("⚠️  Audio analysis failed but continuing due to --force-audio flag");
                     // Continue with original metadata if forced

@@ -195,7 +195,7 @@ class AudioFileAnalyzer
                     $metadata['title'] = $comments['album'][0];
                 } elseif (isset($comments['title'][0])) {
                     $title = $comments['title'][0];
-                    
+
                     // Skip common chapter titles that are not book titles
                     $invalidTitles = [
                         'opening credits',
@@ -218,7 +218,7 @@ class AudioFileAnalyzer
                         'untitled',
                         'audiobook',
                     ];
-                    
+
                     if (!in_array(strtolower(trim($title)), $invalidTitles)) {
                         $metadata['title'] = $title;
                     }
