@@ -35,9 +35,13 @@
 - Fixed directory paths storing absolute paths instead of relative paths
   - ImportBooksFromDownloads now strips book root from custom directory paths
   - ImportBooksFromDownloads now handles absolute paths in duplicate detection (4 locations)
+  - ImportBooksFromDownloads.handleManualReview() now passes metadata by reference to preserve edits
+  - ImportBooksFromDownloads.editMetadataFields() always sets custom_directory_path to preserve edited titles
   - BookImportService now uses makePathRelative() helper for consistent path conversion
+  - BookImportService.generateTargetDirectory() now honors custom paths and converts absolute to relative
   - Handles edge cases with trailing slashes and different path formats
   - Prevents doubling of root directory in file operations
+  - Custom directory paths and edited titles set during import are now properly preserved
   - Added `books:fix-absolute-paths` command to fix existing books
   - Successfully fixed 990 books with absolute paths (921 + 69 MySQL-only records)
 - Fixed cover image import to download images instead of storing URLs
@@ -48,11 +52,48 @@
   - Uses curl for reliable HTTPS downloads with proper headers
   - Automatically detects source (Audible, Google Books) from URL
   - Skips internal API URLs (books.saturn.generation-i.com)
-  - Supports -n/--dry-run and --limit options
+  - Supports --dry-run and --limit options
   - Comprehensive test coverage for cover download functionality
   - Successfully processing 1700+ books with URL covers
 
+### Fixed
+- Fixed admin book list to show books with missing directories
+  - Added `includeAllBooks` parameter to MySqlService.listBooks() and MongoService.listBooks()
+  - Admin panel now passes `includeAllBooks=true` to show all books
+  - Admin panel now passes `include_needs_review=true` to show books flagged for review
+  - Books with missing directories are marked with red background and "⚠️ Missing Files" badge
+  - API calls still filter out books with missing directories and needs_review (for normal users)
+  - Allows admins to find and fix broken book records
+  - Fixed issue where books with `needs_review=true` were hidden from admin panel
+
 ### Added
+- Added `books:fix-invalid-genres` command to fix books with invalid primary genres
+  - Maps invalid genres to valid primary genres using GenreMappingService
+  - Flags garbage genres (Copyright, locations, etc.) for manual review
+  - Updates book genre relationships in database
+  - Optionally moves book directories to correct genre folders with `--move-files`
+  - Supports `--dry-run` to preview changes
+  - Automatically cleans up empty invalid genres after fixing
+  - Valid genres: Science Fiction, Fantasy, LitRPG, Romance, History, Historical Fiction, Non Fiction, Religion, Church, Kids, Action, Classic, General Fiction, Computer, Western, Horror, Mystery, Other, Science
+  - Found 41 invalid genres affecting hundreds of books
+- Added `books:update-genres-from-json` command to update genres from JSON metadata
+  - Loads OpenAudible books.json files (1,746 books from multiple sources)
+  - Matches books by ASIN to OpenAudible data
+  - Falls back to librarian.json for non-OpenAudible books
+  - Updates genres based on actual genre data in JSON files
+  - Supports `--only-invalid` to target books with invalid genres
+  - Supports `--dry-run` to preview changes
+  - Maps genres through GenreMappingService for consistency
+  - Successfully updated 1,107 books with missing or incorrect genres
+- Added genre validation to BookImportService to prevent future invalid genres
+  - All genres are now validated and mapped before creation
+  - Invalid genres automatically map to valid ones:
+    - "Fiction" → "General Fiction"
+    - "Biography & Autobiography" → "History"
+    - "Science Fiction & Fantasy" → "Science Fiction"
+  - First genre is marked as primary, subsequent genres as secondary
+  - Comprehensive test coverage ensures no invalid genres can be created
+  - Prevents creation of invalid genre directories during import
 - Added automatic cover image detection for individual audio files
   - When importing individual audio files (not directories), searches for cover images
   - Priority 1: Image with same basename as audio file (e.g., "Book.m4b" → "Book.jpg")
