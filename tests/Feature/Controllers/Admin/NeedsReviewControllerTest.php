@@ -74,6 +74,10 @@ class NeedsReviewControllerTest extends TestCase
         ];
 
         $this->documentStoreServiceMock->shouldReceive('listNeedsReviewReasons')->once()->andReturn($reasons);
+        $this->documentStoreServiceMock->shouldReceive('countNeedsReviewBooks')
+            ->once()
+            ->with(null)
+            ->andReturn(2);
         $this->documentStoreServiceMock->shouldReceive('listNeedsReviewBooks')
             ->once()
             ->with(null, 20, 1)
@@ -107,6 +111,10 @@ class NeedsReviewControllerTest extends TestCase
         ];
 
         $this->documentStoreServiceMock->shouldReceive('listNeedsReviewReasons')->once()->andReturn($reasons);
+        $this->documentStoreServiceMock->shouldReceive('countNeedsReviewBooks')
+            ->once()
+            ->with('missing_author')
+            ->andReturn(1);
         $this->documentStoreServiceMock->shouldReceive('listNeedsReviewBooks')
             ->once()
             ->with('missing_author', 20, 1)
