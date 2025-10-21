@@ -660,11 +660,6 @@ class ImportBooksFromDownloads extends Command
                 continue;
             }
 
-            $extension = strtolower($fileInfo->getExtension());
-            if (!in_array($extension, $imageExtensions, true)) {
-                continue;
-            }
-
             $relativePath = ltrim(str_replace($directory, '', $fileInfo->getPathname()), DIRECTORY_SEPARATOR);
             $depth = substr_count($relativePath, DIRECTORY_SEPARATOR);
             $filename = strtolower(pathinfo($fileInfo->getFilename(), PATHINFO_FILENAME));
@@ -3023,8 +3018,7 @@ class ImportBooksFromDownloads extends Command
         if ($this->inputInterrupted) {
             return $metadata;
         }
-        // Always update series
-        $metadata['series'] = $newSeries;
+        $newSeries = trim($newSeries);
 
         // Edit series number
         $currentSeriesNumber = $metadata['series_number'] ?? '';
@@ -3032,8 +3026,16 @@ class ImportBooksFromDownloads extends Command
         if ($this->inputInterrupted) {
             return $metadata;
         }
-        // Always update series number
-        $metadata['series_number'] = $newSeriesNumber;
+        $newSeriesNumber = trim($newSeriesNumber);
+
+        // Handle whitespace-only series input
+        if ($newSeries === '') {
+            $metadata['series'] = null;
+            $metadata['series_number'] = null;
+        } else {
+            $metadata['series'] = $newSeries;
+            $metadata['series_number'] = $newSeriesNumber === '' ? null : $newSeriesNumber;
+        }
 
         // Edit year
         $currentYear = $metadata['year'] ?? '';
@@ -3297,7 +3299,7 @@ class ImportBooksFromDownloads extends Command
             try {
                 $fileTags = $this->getCachedFileTags($audiobook['files'][0]);
 
-                // Check copyright field (e.g., "© 2024 by Brandon Sanderson")
+                // Check copyright field (e.g., " 2024 by Brandon Sanderson")
                 if (!empty($fileTags['copyright'])) {
                     $copyright = is_array($fileTags['copyright']) ? $fileTags['copyright'][0] : $fileTags['copyright'];
                     if (preg_match('/\bby\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/i', $copyright, $matches)) {
@@ -3598,7 +3600,7 @@ class ImportBooksFromDownloads extends Command
             }
 
             // Check if there are any audio files remaining
-            $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac', 'wav'];
+            $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
             $hasAudioFiles = false;
 
             foreach ($files as $file) {
