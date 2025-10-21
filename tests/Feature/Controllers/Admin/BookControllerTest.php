@@ -113,7 +113,7 @@ class BookControllerTest extends TestCase
 
         $this->documentStoreServiceMock
             ->shouldReceive('createSeries')
-            ->with('New Series')
+            ->with('New Series', false)
             ->andReturn('new-series-id');
 
         $this->documentStoreServiceMock
