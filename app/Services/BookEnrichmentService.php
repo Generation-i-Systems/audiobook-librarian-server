@@ -60,6 +60,15 @@ class BookEnrichmentService
 
         $enrichedData = [];
         $authorName = is_array($metadata['author']) ? $metadata['author'][0] : $metadata['author'];
+
+        // CRITICAL: Normalize author before sending to enrichment services
+        // Extract actual author from patterns like "Graphic Audio [Alex Archer]"
+        $authorName = $this->normalizeAuthorForEnrichment($authorName);
+
+        // If author is invalid (e.g., just "Graphic Audio"), skip enrichment
+        if (empty($authorName)) {
+            return [];
+        }
         $sources = $options['sources'] ?? ['audible', 'google_books'];
         $maxRetries = $options['max_retries'] ?? 3;
 
@@ -450,5 +459,36 @@ class BookEnrichmentService
         }
 
         return $title;
+    }
+
+    /**
+     * Normalize author name for enrichment - extract actual author from patterns
+     * Examples:
+     *   "Graphic Audio [Alex Archer]" -> "Alex Archer"
+     *   "GraphicAudio [John Smith]" -> "John Smith"
+     *
+     * CRITICAL: Author will NEVER contain "Graphic" AND "Audio" - this is always invalid
+     */
+    protected function normalizeAuthorForEnrichment(string $authorName): string
+    {
+        $name = trim($authorName);
+
+        // Pattern: "Publisher/Narrator [Actual Author]"
+        if (preg_match('/^.+?\s*\[([^\]]+)\]$/', $name, $matches)) {
+            $name = trim($matches[1]);
+        }
+
+        // CRITICAL: If author contains both "Graphic" and "Audio", it's INVALID
+        // This should NEVER be sent to enrichment - it's a narrator/publisher
+        if (stripos($name, 'graphic') !== false && stripos($name, 'audio') !== false) {
+            return '';
+        }
+
+        // If it's just "Full Cast", return empty (narrator, not author)
+        if (preg_match('/^Full\s*Cast$/i', $name)) {
+            return '';
+        }
+
+        return trim($name);
     }
 }

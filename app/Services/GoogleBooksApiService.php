@@ -16,6 +16,7 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
 
     /**
      * Attempt to look up the book in Google Books and return additional metadata.
+     * CRITICAL: Duration must match within 15% or match is rejected
      */
     public function searchAndMerge(array $book): ?array
     {
@@ -33,9 +34,17 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
             $inputAuthor = trim($book['author']);
         }
 
+        // CRITICAL: Reject if author contains "Graphic" AND "Audio"
+        if (stripos($inputAuthor, 'graphic') !== false && stripos($inputAuthor, 'audio') !== false) {
+            return null;
+        }
+
         if (!$inputTitle) {
             return null;
         }
+
+        // Get actual duration from files (in seconds)
+        $actualDuration = $book['duration'] ?? null;
         $query = $inputTitle;
         $options = ['limit' => 10];
         if ($inputAuthor) {
@@ -49,30 +58,50 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
         $bestMatch = null;
         foreach ($results as $result) {
             $score = 0;
-            if (!empty($result['title']) && stripos($result['title'], $inputTitle) !== false) {
-                $score += 3;
-            } elseif (
-                !empty($result['title'])
-                && similar_text(strtolower($result['title']), strtolower($inputTitle), $pct)
-                && $pct > 80
-            ) {
-                $score += 2;
+
+            // Title matching - require at least 80% similarity
+            $titleSimilarity = 0;
+            if (!empty($result['title'])) {
+                similar_text(strtolower($result['title']), strtolower($inputTitle), $titleSimilarity);
+
+                if ($titleSimilarity < 80) {
+                    // Skip this result - title doesn't match well enough
+                    continue;
+                }
+
+                if (stripos($result['title'], $inputTitle) !== false) {
+                    $score += 3;
+                } else {
+                    $score += 2;
+                }
             }
+
+            // Author matching - REQUIRE author match if we have an author
+            $authorMatched = false;
             if (!empty($inputAuthor) && !empty($result['authors'])) {
                 foreach ($result['authors'] as $authorObj) {
                     $authorName = is_array($authorObj['author'] ?? null) ? $authorObj['author']['name'] ?? '' : ($authorObj['author'] ?? '');
                     if ($authorName && stripos($authorName, $inputAuthor) !== false) {
                         $score += 2;
+                        $authorMatched = true;
                         break;
                     }
                 }
+
+                // If we have an author but no match, skip this result
+                if (!$authorMatched) {
+                    continue;
+                }
             }
+
             if ($score > $bestScore) {
                 $bestScore = $score;
                 $bestMatch = $result;
             }
         }
-        if (!$bestMatch) {
+
+        // Require minimum score of 3 (title match + author match)
+        if (!$bestMatch || $bestScore < 3) {
             return null;
         }
         $details = null;
