@@ -7,7 +7,7 @@ class TerminalImageService
     /**
      * Display cover image if terminal supports it (like Ghostty with Kitty protocol)
      */
-    public function displayImage(string $imageUrl, ?callable $outputCallback = null, string $align = 'left', ?string $place = null): void
+    public function displayImage(string $imageUrl, ?callable $outputCallback = null, string $align = 'left', ?string $displayName = null, ?string $place = null): void
     {
         $output = $outputCallback ?? function ($message) {
             echo $message . "\n";
@@ -29,7 +29,8 @@ class TerminalImageService
                 $downloadDuration = round((microtime(true) - $downloadStartTime) * 1000);
 
                 if ($imageData) {
-                    $output("\n📸 Cover Preview: {$imageUrl}");
+                    $displayText = $displayName ?? $imageUrl;
+                    $output("\n📸 Cover Preview: {$displayText}");
                     if (getenv('VERBOSE_TIMING')) {
                         $output("  ⏱️  Cover download took: {$downloadDuration}ms");
                     }

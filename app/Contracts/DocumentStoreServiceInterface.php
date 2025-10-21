@@ -37,7 +37,7 @@ interface DocumentStoreServiceInterface
      *     'last_page' => int,    // Last available page number
      * ]
      */
-    public function listBooks(int $page = 1, int $perPage = 24, array $filters = [], bool $withRelated = true, string $sort = 'title', string $order = 'asc'): array;
+    public function listBooks(int $page = 1, int $perPage = 24, array $filters = [], bool $withRelated = true, string $sort = 'title', string $order = 'asc', bool $includeAllBooks = false): array;
 
     /**
      * Return books flagged as needs_review. Optional reason filter narrows results to books whose

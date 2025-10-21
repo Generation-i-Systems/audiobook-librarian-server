@@ -110,7 +110,12 @@
                                 style="height: 48px; width: auto; object-fit: contain; border-radius: 3px; box-shadow: 0 1px 2px rgba(0,0,0,.07); background: #f8f8f8;"
                                 loading="lazy">
                         </td>
-                        <td>{{ $book['title'] ?? 'Untitled' }}</td>
+                        <td>
+                            {{ $book['title'] ?? 'Untitled' }}
+                            @if(!empty($book['directoryExists']) && $book['directoryExists'] === false)
+                                <span class="badge bg-danger ms-2" title="Directory not found: {{ $book['directoryPath'] ?? 'unknown' }}">⚠️ Missing Files</span>
+                            @endif
+                        </td>
                         <td>
                             @if(!empty($book['author']))
                                 @if(is_array($book['author']))

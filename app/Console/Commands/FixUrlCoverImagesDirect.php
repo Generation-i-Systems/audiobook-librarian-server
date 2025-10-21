@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\File;
 class FixUrlCoverImagesDirect extends Command
 {
     protected $signature = 'books:fix-url-covers-direct
-                            {-n|--dry-run : Show what would be changed without making changes}
+                            {--dry-run : Show what would be changed without making changes}
                             {--limit= : Maximum number of books to process}';
 
     protected $description = 'Fix books with URL covers by downloading images (direct MySQL access)';

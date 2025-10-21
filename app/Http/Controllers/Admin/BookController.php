@@ -152,6 +152,8 @@ class BookController extends Controller
             if ($request->filled('genre_id')) {
                 $filters['genre'] = $request->input('genre_id');
             }
+            // Admin panel should see books that need review
+            $filters['include_needs_review'] = true;
 
             // Get sorting parameters
             $sort = $request->input('sort', 'title');
@@ -198,7 +200,8 @@ class BookController extends Controller
             }
 
             // Get paginated and filtered books from the document store service
-            $result = $this->documentStoreService->listBooks($page, $perPage, $filters, true, $sort, $order);
+            // Include all books (even with missing directories) for admin panel
+            $result = $this->documentStoreService->listBooks($page, $perPage, $filters, true, $sort, $order, true);
 
             $books = $result['data'];
 

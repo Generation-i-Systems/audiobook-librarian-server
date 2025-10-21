@@ -208,7 +208,8 @@ class MySqlService implements DocumentStoreServiceInterface
         array $filters = [],
         bool $withRelated = true,
         string $sort = 'title',
-        string $order = 'asc'
+        string $order = 'asc',
+        bool $includeAllBooks = false
     ): array {
         // Limit perPage to a reasonable maximum to prevent memory issues
         $perPage = min($perPage, 100);
@@ -218,8 +219,10 @@ class MySqlService implements DocumentStoreServiceInterface
 
         $query = Book::query();
 
-        // Exclude books with missing directories from API listings
-        $query->withExistingDirectories();
+        // Exclude books with missing directories from API listings (unless admin override)
+        if (!$includeAllBooks) {
+            $query->withExistingDirectories();
+        }
 
         // Exclude books flagged for review from API listings by default
         // Allow override via filters['include_needs_review'] === true
