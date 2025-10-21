@@ -259,7 +259,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     /**
      * @inheritdoc
      */
-    public function listBooks(int $page = 1, int $perPage = 24, array $filters = [], bool $withRelated = true, string $sort = 'title', string $order = 'asc'): array
+    public function listBooks(int $page = 1, int $perPage = 24, array $filters = [], bool $withRelated = true, string $sort = 'title', string $order = 'asc', bool $includeAllBooks = false): array
     {
         // Validate order direction
         $order = in_array(strtolower($order), ['asc', 'desc']) ? strtolower($order) : 'asc';
@@ -718,13 +718,24 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         return true;
     }
 
-    public function createSeries(string $name): string
+    public function createSeries(string $name, bool $isCollection = false): string
     {
         $id = 'series_' . uniqid();
-        $newSeries = ['id' => $id, 'seriesName' => $name];
+        $newSeries = ['id' => $id, 'seriesName' => $name, 'is_collection' => $isCollection];
         $this->series[] = $newSeries;
 
         return $id;
+    }
+
+    public function updateSeries(int $id, array $data)
+    {
+        foreach ($this->series as $key => $series) {
+            if ($series['id'] === $id || $series['id'] === 'series_' . $id) {
+                $this->series[$key] = array_merge($series, $data);
+                return true;
+            }
+        }
+        return false;
     }
 
     public function getSeriesByName(string $name): ?array
