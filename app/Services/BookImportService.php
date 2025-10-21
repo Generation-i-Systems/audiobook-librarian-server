@@ -14,6 +14,12 @@ use Illuminate\Support\Facades\Log;
 
 class BookImportService
 {
+    protected GenreMappingService $genreMappingService;
+
+    public function __construct(GenreMappingService $genreMappingService)
+    {
+        $this->genreMappingService = $genreMappingService;
+    }
     /**
      * Create book from metadata with comprehensive handling
      */
@@ -39,8 +45,17 @@ class BookImportService
             // This must match the actual filesystem path where files will be moved
             $book->directory_path = $this->generateDirectoryPath($metadata, ['include_title' => true]);
 
-            // Handle duration (should be in seconds as integer)
-            if (isset($metadata['duration'])) {
+            // CRITICAL: Duration MUST come from actual audio files, NEVER from enrichment
+            // Calculate from audio files if available
+            if (!empty($audiobook['files'])) {
+                $audioInfo = $this->calculateAudioInfo($audiobook['files']);
+                if ($audioInfo['duration'] > 0) {
+                    $book->duration = $audioInfo['duration'];
+                }
+            }
+
+            // Fallback to metadata duration only if no audio files analyzed
+            if (empty($book->duration) && isset($metadata['duration'])) {
                 if (is_string($metadata['duration']) && preg_match('/(\d{2}):(\d{2}):(\d{2})/', $metadata['duration'], $matches)) {
                     // Convert HH:MM:SS to seconds
                     $book->duration = ($matches[1] * 3600) + ($matches[2] * 60) + $matches[3];
@@ -50,7 +65,25 @@ class BookImportService
             }
 
             // Handle cover image with download support
-            if (!empty($metadata['cover_path'])) {
+            // CRITICAL: Priority order:
+            // 1. Existing cover in directory
+            // 2. Embedded cover data from M4B
+            // 3. Cover path (local file)
+            // 4. Cover URL (download)
+
+            $existingCover = $this->findExistingCover($book->directory_path);
+
+            if ($existingCover) {
+                // Use existing cover - don't download
+                $book->cover_image = $existingCover;
+            } elseif (!empty($metadata['cover_data'])) {
+                // CRITICAL: Save embedded cover from M4B file
+                // This is extracted from the M4B file tags and stored in metadata['cover_data']
+                $coverPath = $this->saveEmbeddedCover($metadata['cover_data'], $book->directory_path);
+                if ($coverPath) {
+                    $book->cover_image = $coverPath;
+                }
+            } elseif (!empty($metadata['cover_path'])) {
                 $book->cover_image = $metadata['cover_path'];
             } elseif (!empty($metadata['cover_url'])) {
                 // Determine source for filename
@@ -95,24 +128,23 @@ class BookImportService
                 $book->audiobook_bay_info = $metadata['audiobook_bay_raw'];
             }
 
-            // Calculate and store audio file information if available
+            // Store audio file count and tags (duration already calculated above)
             if (!empty($audiobook['files'])) {
-                // Only calculate if we don't already have duration from metadata
-                if (empty($book->duration)) {
+                $book->audio_file_count = count($audiobook['files']);
+                // Get tags if available (without recalculating duration)
+                if (!empty($audiobook['files'])) {
                     $audioInfo = $this->calculateAudioInfo($audiobook['files']);
-                    $book->audio_file_count = $audioInfo['count'];
-                    if ($audioInfo['duration'] > 0) {
-                        $book->duration = $audioInfo['duration'];
-                    }
                     $book->file_tags = $audioInfo['tags'];
-                } else {
-                    // Just count the files without analyzing them
-                    $book->audio_file_count = count($audiobook['files']);
                 }
             }
 
             // Set data source
             $book->source = $options['data_source'] ?? 'import';
+
+            // Set batch_id if provided
+            if (!empty($metadata['batch_id'])) {
+                $book->batch_id = $metadata['batch_id'];
+            }
 
             $book->save();
 
@@ -121,8 +153,12 @@ class BookImportService
                 $authors = is_array($metadata['author']) ? $metadata['author'] : [$metadata['author']];
                 $authorIds = [];
                 foreach ($authors as $authorName) {
-                    $author = Author::firstOrCreate(['name' => trim($authorName)]);
-                    $authorIds[] = $author->id;
+                    // Normalize author name (extract from patterns like "Graphic Audio [Alex Archer]")
+                    $authorName = $this->normalizeAuthorName($authorName);
+                    if (!empty($authorName)) {
+                        $author = Author::firstOrCreate(['name' => trim($authorName)]);
+                        $authorIds[] = $author->id;
+                    }
                 }
                 $book->authors()->sync($authorIds);
             }
@@ -197,9 +233,13 @@ class BookImportService
             // Handle genres
             if (!empty($metadata['genre'])) {
                 $genres = is_array($metadata['genre']) ? $metadata['genre'] : [$metadata['genre']];
+                $isPrimary = true; // First genre is primary
                 foreach ($genres as $genreName) {
-                    $genre = Genre::firstOrCreate(['name' => trim($genreName)]);
-                    $book->genres()->attach($genre->id);
+                    // Validate and map to valid primary genre
+                    $validGenreName = $this->validateAndMapGenre(trim($genreName));
+                    $genre = Genre::firstOrCreate(['name' => $validGenreName]);
+                    $book->genres()->attach($genre->id, ['is_primary' => $isPrimary]);
+                    $isPrimary = false; // Subsequent genres are not primary
                 }
             }
 
@@ -212,7 +252,132 @@ class BookImportService
                 'audiobook' => $audiobook,
                 'trace' => $e->getTraceAsString()
             ]);
-            return null;
+
+            // CRITICAL: Re-throw the exception so the caller can see what went wrong
+            // Returning null silently hides the error from the user
+            throw $e;
+        }
+    }
+
+    /**
+     * Update existing book from metadata
+     */
+    public function updateBookFromMetadata(Book $book, array $metadata, array $audiobook, array $options = []): Book
+    {
+        try {
+            DB::beginTransaction();
+
+            // Update basic fields
+            $book->title = $metadata['title'] ?? $book->title;
+            $book->description = $metadata['description'] ?? $book->description;
+
+            // Handle year/release_date
+            if (isset($metadata['year']) && $metadata['year']) {
+                $book->release_date = $metadata['year'] . '-01-01';
+            }
+
+            $book->isbn = $metadata['isbn'] ?? $book->isbn;
+            $book->language = $metadata['language'] ?? $book->language;
+
+            // Update directory path if provided
+            if (!empty($metadata['custom_directory_path'])) {
+                $book->directory_path = $this->generateDirectoryPath($metadata, ['include_title' => true]);
+            }
+
+            // Update duration from audio files
+            if (!empty($audiobook['files'])) {
+                $audioInfo = $this->calculateAudioInfo($audiobook['files']);
+                if ($audioInfo['duration'] > 0) {
+                    $book->duration = $audioInfo['duration'];
+                }
+            }
+
+            // Update cover if new one provided
+            if (!empty($metadata['cover_data'])) {
+                $coverPath = $this->saveEmbeddedCover($metadata['cover_data'], $book->directory_path);
+                if ($coverPath) {
+                    $book->cover_image = $coverPath;
+                }
+            } elseif (!empty($metadata['cover_url'])) {
+                $source = !empty($metadata['cover_is_local_file']) ? 'local' : (isset($metadata['audible_raw']) ? 'audible' : 'googlebooks');
+                $coverPath = $this->downloadCoverImage($metadata['cover_url'], $book->directory_path, $source);
+                if ($coverPath) {
+                    $book->cover_image = $coverPath;
+                }
+            }
+
+            // Update publisher
+            if (!empty($metadata['publisher'])) {
+                if (is_array($metadata['publisher'])) {
+                    $publisher = $metadata['publisher']['name'] ?? $metadata['publisher'][0] ?? null;
+                } elseif (is_object($metadata['publisher'])) {
+                    $publisher = $metadata['publisher']->name ?? null;
+                } else {
+                    $publisher = $metadata['publisher'];
+                }
+                $book->publisher = $publisher;
+            }
+
+            // Update batch_id if provided
+            if (!empty($metadata['batch_id'])) {
+                $book->batch_id = $metadata['batch_id'];
+            }
+
+            $book->save();
+
+            // Update authors (detach old, attach new)
+            if (!empty($metadata['author'])) {
+                $authors = is_array($metadata['author']) ? $metadata['author'] : [$metadata['author']];
+                $book->authors()->detach();
+                foreach ($authors as $authorName) {
+                    $author = Author::firstOrCreate(['name' => trim($authorName)]);
+                    $book->authors()->attach($author->id);
+                }
+            }
+
+            // Update narrators
+            if (!empty($metadata['narrator'])) {
+                $narrators = is_array($metadata['narrator']) ? $metadata['narrator'] : [$metadata['narrator']];
+                $book->narrators()->detach();
+                foreach ($narrators as $narratorName) {
+                    $narrator = Narrator::firstOrCreate(['name' => trim($narratorName)]);
+                    $book->narrators()->attach($narrator->id);
+                }
+            }
+
+            // Update series
+            if (!empty($metadata['series'])) {
+                $book->series()->detach();
+                $series = Series::firstOrCreate(['name' => $metadata['series']]);
+                $seriesNumber = $metadata['series_number'] ?? null;
+                $book->series()->attach($series->id, [
+                    'series_number' => $seriesNumber
+                ]);
+            }
+
+            // Update genres
+            if (!empty($metadata['genre'])) {
+                $genres = is_array($metadata['genre']) ? $metadata['genre'] : [$metadata['genre']];
+                $book->genres()->detach();
+                $isPrimary = true;
+                foreach ($genres as $genreName) {
+                    $validGenreName = $this->validateAndMapGenre(trim($genreName));
+                    $genre = Genre::firstOrCreate(['name' => $validGenreName]);
+                    $book->genres()->attach($genre->id, ['is_primary' => $isPrimary]);
+                    $isPrimary = false;
+                }
+            }
+
+            DB::commit();
+            return $book;
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Failed to update book from metadata: " . $e->getMessage(), [
+                'book_id' => $book->id,
+                'metadata' => $metadata,
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
         }
     }
 
@@ -223,7 +388,18 @@ class BookImportService
     {
         // If custom directory path is set, use it
         if (!empty($metadata['custom_directory_path'])) {
-            return trim($metadata['custom_directory_path']);
+            $path = trim($metadata['custom_directory_path']);
+
+            // CRITICAL: Always strip book_root prefix if present
+            // Directory paths must ALWAYS be relative, never absolute
+            $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+            if (str_starts_with($path, $bookRoot . '/')) {
+                $path = substr($path, strlen($bookRoot) + 1);
+            } elseif (str_starts_with($path, $bookRoot)) {
+                $path = substr($path, strlen($bookRoot) + 1);
+            }
+
+            return $path;
         }
 
         $structure = $options['directory_structure'] ?? 'genre/author/series';
@@ -344,7 +520,7 @@ class BookImportService
             // Only skip move if source and target are exactly the same
             if ($realSourcePath && $realTargetDir && $realSourcePath === $realTargetDir) {
                 // Files are already in the correct location - true in-place import
-                $book->directory_path = $this->makePathRelative($targetDir, $bookStoragePath);
+                // CRITICAL: Don't overwrite directory_path - it's already set from user-approved metadata
                 $book->save();
 
                 // Just flatten CD directories if needed, but don't move files
@@ -379,9 +555,11 @@ class BookImportService
                 $this->copyDirectoryContents($sourcePath, $targetDir);
             }
 
-            // Update book directory path to target location (only for move/copy operations)
-            // Store as relative path, not absolute
-            $book->directory_path = $this->makePathRelative($targetDir, $bookStoragePath);
+            // CRITICAL: Only update directory_path if it wasn't already set by user approval
+            // If book->directory_path is already set, it came from user-approved metadata
+            // DO NOT OVERWRITE USER-APPROVED DATA
+            // The directory_path should already be correct from createBookFromMetadata
+            // We only need to save if there were other changes (like cover image)
             $book->save();
 
             return true;
@@ -400,6 +578,17 @@ class BookImportService
      */
     protected function generateTargetDirectory(Book $book, string $basePath, array $options = []): string
     {
+        // If book already has a directory_path set (from custom path), use it
+        if (!empty($book->directory_path)) {
+            // Check if it's already an absolute path - convert to relative first
+            $relativePath = $book->directory_path;
+            if (str_starts_with($relativePath, '/')) {
+                $relativePath = $this->makePathRelative($relativePath, $basePath);
+            }
+            // Now make it absolute for file operations
+            return $basePath . '/' . $relativePath;
+        }
+
         // Refresh the book's series relationship to ensure we have latest data with is_collection flag
         $book->load('series');
 
@@ -690,12 +879,34 @@ class BookImportService
     }
 
     /**
-     * Normalize author names for directory use
+     * Normalize author names - extract actual author from patterns
+     * Examples:
+     *   "Graphic Audio [Alex Archer]" -> "Alex Archer"
+     *   "GraphicAudio [John Smith]" -> "John Smith"
+     *
+     * CRITICAL: Author will NEVER contain "Graphic" AND "Audio" - this is always invalid
      */
     protected function normalizeAuthorName(string $authorName): string
     {
         $name = trim($authorName);
 
+        // Pattern: "Publisher/Narrator [Actual Author]"
+        if (preg_match('/^.+?\s*\[([^\]]+)\]$/', $name, $matches)) {
+            $name = trim($matches[1]);
+        }
+
+        // CRITICAL: If author contains both "Graphic" and "Audio", it's INVALID
+        // This should NEVER be an author - it's a narrator/publisher
+        if (stripos($name, 'graphic') !== false && stripos($name, 'audio') !== false) {
+            return '';
+        }
+
+        // If it's just "Full Cast", return empty (narrator, not author)
+        if (preg_match('/^Full\s*Cast$/i', $name)) {
+            return '';
+        }
+
+        // Normalize initials
         $name = preg_replace('/\b([A-Z])\s+/', '$1. ', $name);
         $name = preg_replace('/\s+([A-Z])$/', ' $1.', $name);
         $name = preg_replace('/\b([A-Z]\.)\s+([A-Z]\.)/', '$1$2', $name);
@@ -705,17 +916,82 @@ class BookImportService
     }
 
     /**
+     * Find existing cover image in directory
+     */
+    protected function findExistingCover(string $directoryPath): ?string
+    {
+        $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        $fullPath = $bookRoot . '/' . $directoryPath;
+
+        if (!is_dir($fullPath)) {
+            return null;
+        }
+
+        // Check for common cover image filenames
+        $coverNames = ['cover.jpg', 'cover.jpeg', 'cover.png', 'folder.jpg', 'folder.jpeg', 'folder.png'];
+
+        foreach ($coverNames as $coverName) {
+            $coverPath = $fullPath . '/' . $coverName;
+            if (file_exists($coverPath)) {
+                return $directoryPath . '/' . $coverName;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Save embedded cover image from M4B file
+     */
+    protected function saveEmbeddedCover(string $coverData, string $directoryPath): ?string
+    {
+        try {
+            // CRITICAL: directoryPath is RELATIVE - convert to absolute
+            $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+            $absoluteDir = $bookRoot . '/' . ltrim($directoryPath, '/');
+
+            // Create directory if it doesn't exist
+            if (!is_dir($absoluteDir)) {
+                mkdir($absoluteDir, 0775, true);
+            }
+
+            $filename = 'cover.jpg';
+            $filePath = "{$absoluteDir}/{$filename}";
+
+            if (file_put_contents($filePath, $coverData)) {
+                chmod($filePath, 0664);
+                return $filename;
+            }
+        } catch (\Exception $e) {
+            Log::warning("Failed to save embedded cover image: " . $e->getMessage(), [
+                'directory' => $directoryPath
+            ]);
+        }
+
+        return null;
+    }
+
+    /**
      * Download cover image
      */
     public function downloadCoverImage(string $imageUrl, string $directoryPath, string $source = 'unknown'): ?string
     {
         try {
+            // CRITICAL: directoryPath is RELATIVE - convert to absolute
+            $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+            $absoluteDir = $bookRoot . '/' . ltrim($directoryPath, '/');
+
+            // Create directory if it doesn't exist
+            if (!is_dir($absoluteDir)) {
+                mkdir($absoluteDir, 0775, true);
+            }
+
             // Check if this is a local file path instead of a URL
             if (file_exists($imageUrl) && is_file($imageUrl)) {
                 // It's a local file - copy it instead of downloading
                 $extension = strtolower(pathinfo($imageUrl, PATHINFO_EXTENSION));
                 $filename = "cover_{$source}.{$extension}";
-                $destPath = "{$directoryPath}/{$filename}";
+                $destPath = "{$absoluteDir}/{$filename}";
 
                 if (File::copy($imageUrl, $destPath)) {
                     chmod($destPath, 0664);
@@ -732,7 +1008,7 @@ class BookImportService
 
             $extension = $this->getImageExtensionFromUrl($imageUrl);
             $filename = "cover_{$source}.{$extension}";
-            $filePath = "{$directoryPath}/{$filename}";
+            $filePath = "{$absoluteDir}/{$filename}";
 
             if (file_put_contents($filePath, $imageData)) {
                 // Set file permissions for cover image
@@ -1161,7 +1437,51 @@ class BookImportService
             return $absolutePath;
         }
 
-        // Last resort: return the path as-is (might be a different root)
-        return $absolutePath;
+        // CRITICAL: Try alternative book root paths
+        // config('app.book_root') and config('filesystems.disks.books.root') might differ
+        $alternativeRoots = [
+            config('app.book_root'),
+            config('filesystems.disks.books.root'),
+            env('BOOK_STORAGE_PATH'),
+        ];
+
+        foreach ($alternativeRoots as $altRoot) {
+            if (!$altRoot) {
+                continue;
+            }
+            $altRoot = rtrim($altRoot, '/');
+            if (str_starts_with($absolutePath, $altRoot . '/')) {
+                return substr($absolutePath, strlen($altRoot) + 1);
+            }
+            if (str_starts_with($absolutePath, $altRoot)) {
+                return ltrim(substr($absolutePath, strlen($altRoot)), '/');
+            }
+        }
+
+        // CRITICAL: If we still have an absolute path, throw an error instead of storing it
+        // This prevents database corruption with absolute paths
+        throw new \Exception("Cannot convert absolute path to relative: {$absolutePath} (book root: {$bookRoot})");
+    }
+
+    /**
+     * Validate and map genre to valid primary genre
+     * Prevents creation of invalid genre directories
+     */
+    protected function validateAndMapGenre(string $genreName): string
+    {
+        $validGenres = [
+            'Science Fiction', 'Fantasy', 'LitRPG', 'Romance', 'History',
+            'Historical Fiction', 'Non Fiction', 'Religion', 'Church',
+            'Kids', 'Action', 'Classic', 'General Fiction', 'Computer',
+            'Western', 'Horror', 'Mystery', 'Other', 'Science',
+        ];
+
+        // If already a valid genre, return as-is
+        if (in_array($genreName, $validGenres)) {
+            return $genreName;
+        }
+
+        // Map to valid primary genre using GenreMappingService
+        return $this->genreMappingService->mapToPrimaryGenre($genreName);
     }
 }
