@@ -82,6 +82,18 @@
         "test": [
             "@php artisan config:clear --ansi",
             "@php artisan test"
+        ],
+        "test:import": [
+            "@php artisan config:clear --ansi",
+            "@php artisan test --filter=MetadataExtractionTest",
+            "@php artisan test --filter=AuthorNormalizationTest",
+            "@php artisan test --filter=EnrichmentMergeTest"
+        ],
+        "test:import-coverage": [
+            "@php artisan config:clear --ansi",
+            "@php artisan test --filter=MetadataExtractionTest --coverage",
+            "@php artisan test --filter=AuthorNormalizationTest --coverage",
+            "@php artisan test --filter=EnrichmentMergeTest --coverage"
         ]
     },
     "extra": {
