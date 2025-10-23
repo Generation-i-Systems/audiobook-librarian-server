@@ -206,13 +206,24 @@ class BookController extends Controller
             $books = $result['data'];
 
             // Check directory existence for each book
-            $storagePath = env('BOOK_STORAGE_PATH');
+            $storagePath = rtrim(env('BOOK_STORAGE_PATH', '/media/audiobooks/books'), '/');
+
+            // Get all book IDs with their directory paths and existence status
+            $bookIds = collect($books)->pluck('id')->filter()->toArray();
+            $booksWithDirs = \App\Models\Book::whereIn('id', $bookIds)
+                ->select(['id', 'directory_path', 'directory_exists'])
+                ->get()
+                ->keyBy('id');
+
             foreach ($books as &$book) {
-                if (!empty($book['directoryPath'])) {
-                    $fullPath = rtrim($storagePath, '/') . '/' . ltrim($book['directoryPath'], '/');
-                    $book['directoryExists'] = is_dir($fullPath);
+                $bookId = $book['id'] ?? null;
+
+                if ($bookId && $bookData = $booksWithDirs->get($bookId)) {
+                    $book['directoryExists'] = (bool) $bookData->directory_exists;
+                    $book['directoryPath'] = $bookData->directory_path;
                 } else {
                     $book['directoryExists'] = false;
+                    $book['directoryPath'] = null;
                 }
             }
 
