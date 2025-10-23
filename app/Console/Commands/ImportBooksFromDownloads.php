@@ -22,6 +22,8 @@ use App\Services\ImportCacheService;
 use App\Services\OpenAudibleParser;
 use App\Services\TerminalImageService;
 use App\Traits\GenreMapping;
+use getID3;
+use getid3_lib;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\File;
@@ -29,6 +31,10 @@ use Illuminate\Support\Facades\App;
 
 class ImportBooksFromDownloads extends Command
 {
+    /**
+     * @var getID3
+     */
+    protected $getID3;
     use GenreMapping;
 
     /**
@@ -550,8 +556,19 @@ class ImportBooksFromDownloads extends Command
         $directory = dirname($audioFilePath);
         $basename = pathinfo($audioFilePath, PATHINFO_FILENAME);
         $imageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+        $commonCoverNames = ['cover', 'folder', 'albumart', 'front'];
 
-        // Priority 1: Image with same basename as audio file
+        // Priority 1: Exact match with -Cover, -Folder, etc.
+        foreach ($commonCoverNames as $suffix) {
+            foreach ($imageExtensions as $ext) {
+                $imagePath = "{$directory}/{$basename}-{$suffix}.{$ext}";
+                if (File::exists($imagePath)) {
+                    return $imagePath;
+                }
+            }
+        }
+
+        // Priority 2: Image with same basename as audio file
         foreach ($imageExtensions as $ext) {
             $imagePath = "{$directory}/{$basename}.{$ext}";
             if (File::exists($imagePath)) {
@@ -559,8 +576,7 @@ class ImportBooksFromDownloads extends Command
             }
         }
 
-        // Priority 2: Common cover image names
-        $commonCoverNames = ['cover', 'folder', 'albumart', 'front'];
+        // Priority 3: Common cover image names
         foreach ($commonCoverNames as $name) {
             foreach ($imageExtensions as $ext) {
                 $imagePath = "{$directory}/{$name}.{$ext}";
@@ -638,6 +654,18 @@ class ImportBooksFromDownloads extends Command
         }
     }
 
+    /**
+     * Find the best cover image in a directory
+     *
+     * This method searches for cover images in the following order of priority:
+     * 1. Files with 'cover', 'front', 'folder', or 'albumart' in the filename
+     * 2. Files that match the book title
+     * 3. Common cover image names (cover.jpg, folder.jpg, etc.)
+     * 4. Any other image files
+     *
+     * @param string $directory Directory to search for cover images
+     * @return string|null Path to the best cover image, or null if none found
+     */
     protected function findCoverImageInDirectory(string $directory): ?string
     {
         if (!is_dir($directory)) {
@@ -646,10 +674,10 @@ class ImportBooksFromDownloads extends Command
 
         $imageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
         $commonCoverNames = ['cover', 'folder', 'albumart', 'front'];
+        $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
+        $bookTitle = strtolower(basename($directory));
 
-        $bestCandidate = null;
-        $bestScore = PHP_INT_MAX;
-
+        $candidates = [];
         $iterator = new \RecursiveIteratorIterator(
             new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS),
             \RecursiveIteratorIterator::LEAVES_ONLY
@@ -660,29 +688,88 @@ class ImportBooksFromDownloads extends Command
                 continue;
             }
 
+            $extension = strtolower($fileInfo->getExtension());
+
+            // Skip audio files
+            if (in_array($extension, $audioExtensions)) {
+                continue;
+            }
+
+            // Only process image files
+            if (!in_array($extension, $imageExtensions)) {
+                continue;
+            }
+
+            $filename = strtolower($fileInfo->getFilename());
+            $basename = strtolower($fileInfo->getBasename('.' . $extension));
             $relativePath = ltrim(str_replace($directory, '', $fileInfo->getPathname()), DIRECTORY_SEPARATOR);
             $depth = substr_count($relativePath, DIRECTORY_SEPARATOR);
-            $filename = strtolower(pathinfo($fileInfo->getFilename(), PATHINFO_FILENAME));
 
-            $score = 100;
+            $score = 1000; // Start with a high score (lower is better)
+            $reasons = [];
 
+            // Priority 1: Files with cover/front/folder in name (highest priority)
+            if (preg_match('/(cover|front|folder|albumart)/i', $basename)) {
+                $score -= 500;
+                $reasons[] = 'contains cover/front/folder in name';
+            }
+
+            // Priority 2: Files that match the book title
+            if (strpos($basename, $bookTitle) !== false) {
+                $score -= 400;
+                $reasons[] = 'matches book title';
+            }
+
+            // Priority 3: Common cover image names
+            if (in_array($basename, $commonCoverNames)) {
+                $score -= 300;
+                $reasons[] = 'common cover name';
+            }
+
+            // Priority 4: Files in root directory
             if ($depth === 0) {
-                $score -= 40; // Prefer root images
-            } else {
-                $score += $depth;
+                $score -= 200;
+                $reasons[] = 'in root directory';
             }
 
-            if (in_array($filename, $commonCoverNames, true)) {
-                $score -= 50; // Strong preference for known cover names
-            }
+            // Priority 5: File extension (prefer jpg over png, etc.)
+            $extensionScores = ['jpg' => 50, 'jpeg' => 50, 'png' => 40, 'webp' => 30, 'gif' => 20];
+            $score -= $extensionScores[$extension] ?? 0;
 
-            if ($score < $bestScore) {
-                $bestScore = $score;
-                $bestCandidate = $fileInfo->getPathname();
+            // Add penalty for depth (deeper paths get higher scores)
+            $score += $depth * 10;
+
+            $candidates[] = [
+                'path' => $fileInfo->getPathname(),
+                'score' => $score,
+                'reasons' => $reasons,
+                'depth' => $depth,
+                'filename' => $fileInfo->getFilename()
+            ];
+        }
+
+        // Sort candidates by score (lowest score first)
+        usort($candidates, function($a, $b) {
+            return $a['score'] <=> $b['score'];
+        });
+
+        // Log the top candidates for debugging
+        if (count($candidates) > 0 && $this->isOptionEnabled('verbose')) {
+            $this->line("Cover image candidates for {$directory}:");
+            foreach (array_slice($candidates, 0, 5) as $i => $candidate) {
+                $this->line(sprintf(
+                    "  %d. %s (score: %d, depth: %d, reasons: %s)",
+                    $i + 1,
+                    $candidate['filename'],
+                    $candidate['score'],
+                    $candidate['depth'],
+                    implode(', ', $candidate['reasons'])
+                ));
             }
         }
 
-        return $bestCandidate;
+        // Return the best candidate, or null if none found
+        return $candidates[0]['path'] ?? null;
     }
 
     protected function normalizeCoverPriority(array &$metadata): void
@@ -1019,6 +1106,122 @@ class ImportBooksFromDownloads extends Command
      * @param  string  $filename  Filename to parse
      * @return int|null Series number or null if not found
      */
+    /**
+     * Extract metadata from audio file
+     *
+     * @param string $filePath Path to the audio file
+     * @return array Extracted metadata
+     */
+    /**
+     * Clean up a title by removing common patterns
+     */
+    protected function cleanTitle(string $title): string
+    {
+        // Remove track numbers and other common patterns
+        $patterns = [
+            '/^\d+[.\s-]+/i',          // Leading numbers with dot/space/dash
+            '/\s*[-–—]\s*\d+\s*$/',    // Trailing dash and numbers
+            '/\(?:(?:Part|Book|Vol|Volume|Chapter|Ch)\.?\s*\d+\)/i', // (Part 1), (Vol. 2), etc.
+            '/\[\d+\]/',               // [1], [2], etc.
+            '/\(\d+\)/',              // (1), (2), etc.
+            '/\s+/',                    // Multiple spaces
+            '/^[\s\p{P}]+|[\s\p{P}]+$/u', // Trim punctuation and whitespace
+        ];
+
+        $title = preg_replace($patterns, ' ', $title);
+        return trim($title);
+    }
+
+    protected function extractFileMetadata(string $filePath): array
+    {
+        $metadata = [
+            'title' => pathinfo($filePath, PATHINFO_FILENAME), // Default to filename
+            'artist' => null,
+            'album' => null,
+            'track_number' => null,
+            'duration' => null,
+        ];
+
+        try {
+            // Get duration using the audio analyzer
+            $duration = $this->audioAnalyzer->getAudioDuration($filePath);
+            if ($duration !== null) {
+                $metadata['duration'] = $duration;
+            }
+
+            // Get ID3 tags if available
+            $fileInfo = $this->getID3->analyze($filePath);
+            getid3_lib::CopyTagsToComments($fileInfo);
+
+            if (!empty($fileInfo['tags'])) {
+                $tags = $fileInfo['tags'];
+
+                // Try to get title from various possible tag formats
+                $title = null;
+                foreach (['title', 'TIT2', 'TIT1', 'TALB'] as $tag) {
+                    if (!empty($tags[$tag][0])) {
+                        $title = $tags[$tag][0];
+                        break;
+                    }
+                }
+
+                // Try to get artist from various possible tag formats
+                $artist = null;
+                foreach (['artist', 'TPE1', 'TPE2', 'TPE1/1'] as $tag) {
+                    if (!empty($tags[$tag][0])) {
+                        $artist = $tags[$tag][0];
+                        break;
+                    }
+                }
+
+                // Try to get album from various possible tag formats
+                $album = null;
+                foreach (['album', 'TALB', 'TAL'] as $tag) {
+                    if (!empty($tags[$tag][0])) {
+                        $album = $tags[$tag][0];
+                        break;
+                    }
+                }
+
+                // Try to get track number from various possible tag formats
+                $trackNumber = null;
+                foreach (['track_number', 'TRCK', 'TRK', 'track'] as $tag) {
+                    if (!empty($tags[$tag][0])) {
+                        $trackNumber = $tags[$tag][0];
+                        // Sometimes track numbers are in format "1/10" - just take the first part
+                        if (is_string($trackNumber) && strpos($trackNumber, '/') !== false) {
+                            $trackNumber = explode('/', $trackNumber)[0];
+                        }
+                        $trackNumber = (int)$trackNumber;
+                        break;
+                    }
+                }
+
+                // Update metadata with found values
+                if ($title) $metadata['title'] = $title;
+                if ($artist) $metadata['artist'] = $artist;
+                if ($album) $metadata['album'] = $album;
+                if ($trackNumber) $metadata['track_number'] = $trackNumber;
+            }
+
+            // Clean up the title (remove any track numbers or other common patterns)
+            $metadata['title'] = $this->cleanTitle($metadata['title']);
+
+        } catch (\Exception $e) {
+            if ($this->isOptionEnabled('verbose')) {
+                $this->warn("Error extracting metadata from {$filePath}: " . $e->getMessage());
+            }
+        }
+
+        return $metadata;
+    }
+
+    /**
+     * Extract series number from filename
+     *
+     * @param string $filename Filename to parse
+     * @return int|null Series number or null if not found
+     */
     protected function extractSeriesNumber(string $filename): ?int
     {
         // Try various patterns (ordered by specificity - most specific first)
@@ -1044,52 +1247,6 @@ class ImportBooksFromDownloads extends Command
      * Extract metadata from a single audio file
      * Handles both ID3 tags (MP3) and MP4/M4A/M4B metadata atoms
      *
-     * @param  string  $filePath  Path to audio file
-     * @return array Metadata array
-     */
-    protected function extractFileMetadata(string $filePath): array
-    {
-        if (! class_exists('getID3')) {
-            return [];
-        }
-
-        try {
-            $getID3 = new \getID3();
-            $fileInfo = $getID3->analyze($filePath);
-            \getid3_lib::CopyTagsToComments($fileInfo);
-
-            $metadata = [];
-
-            // For M4B/M4A files, check quicktime tags first
-            if (isset($fileInfo['quicktime']['comments'])) {
-                $qtComments = $fileInfo['quicktime']['comments'];
-
-                if (isset($qtComments['title'][0])) {
-                    $metadata['title'] = $qtComments['title'][0];
-                }
-
-                if (isset($qtComments['artist'][0])) {
-                    $metadata['author'] = [$qtComments['artist'][0]];
-                }
-
-                if (isset($qtComments['album'][0])) {
-                    $metadata['album'] = $qtComments['album'][0];
-                }
-
-                if (isset($qtComments['genre'][0])) {
-                    $metadata['genre'] = [$qtComments['genre'][0]];
-                }
-
-                if (isset($qtComments['creation_date'][0])) {
-                    $metadata['year'] = substr($qtComments['creation_date'][0], 0, 4);
-                }
-
-                // Extract series information
-                if (isset($qtComments['series'][0])) {
-                    $metadata['series'] = $qtComments['series'][0];
-                }
-
-                // Extract part/book number
                 if (isset($qtComments['part'][0])) {
                     $metadata['part'] = $qtComments['part'][0];
                 }
