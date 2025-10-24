@@ -31,11 +31,11 @@ use Illuminate\Support\Facades\App;
 
 class ImportBooksFromDownloads extends Command
 {
+    use GenreMapping;
     /**
      * @var getID3
      */
     protected $getID3;
-    use GenreMapping;
 
     /**
      * The name and signature of the console command.
@@ -98,6 +98,18 @@ class ImportBooksFromDownloads extends Command
     protected int $maxConcurrentTasks = 3;
     protected int $runningTaskCount = 0;
     protected bool $inputInterrupted = false;
+
+    public function __construct()
+    {
+        parent::__construct();
+
+        $this->getID3 = new getID3();
+        // Disable writing tags to files
+        $this->getID3->option_tag_id3v1 = false;
+        $this->getID3->option_tag_id3v2 = false;
+        $this->getID3->option_tag_lyrics3 = false;
+        $this->getID3->option_tags_process = false;
+    }
 
     // Persistent cache
     protected string $cacheDirectory;
@@ -749,7 +761,7 @@ class ImportBooksFromDownloads extends Command
         }
 
         // Sort candidates by score (lowest score first)
-        usort($candidates, function($a, $b) {
+        usort($candidates, function ($a, $b) {
             return $a['score'] <=> $b['score'];
         });
 
@@ -1198,15 +1210,22 @@ class ImportBooksFromDownloads extends Command
                 }
 
                 // Update metadata with found values
-                if ($title) $metadata['title'] = $title;
-                if ($artist) $metadata['artist'] = $artist;
-                if ($album) $metadata['album'] = $album;
-                if ($trackNumber) $metadata['track_number'] = $trackNumber;
+                if ($title) {
+                    $metadata['title'] = $title;
+                }
+                if ($artist) {
+                    $metadata['artist'] = $artist;
+                }
+                if ($album) {
+                    $metadata['album'] = $album;
+                }
+                if ($trackNumber) {
+                    $metadata['track_number'] = $trackNumber;
+                }
             }
 
             // Clean up the title (remove any track numbers or other common patterns)
             $metadata['title'] = $this->cleanTitle($metadata['title']);
-
         } catch (\Exception $e) {
             if ($this->isOptionEnabled('verbose')) {
                 $this->warn("Error extracting metadata from {$filePath}: " . $e->getMessage());
@@ -1373,18 +1392,6 @@ class ImportBooksFromDownloads extends Command
 
     /**
      * Get directory modification time
-     */
-
-    /**
-     * Save cache before application exit
-     */
-    public function __destruct()
-    {
-        // Only save cache if running in console and not in a testing environment
-        // This prevents issues during testing where the app might not be fully bootstrapped
-        if (function_exists('app') && app()->bound('files') && app()->runningInConsole() && !app()->runningUnitTests()) {
-            $this->getCacheService()->saveCache();
-        }
     }
 
     /**
@@ -1541,6 +1548,25 @@ class ImportBooksFromDownloads extends Command
 
         // Quit directly without asking for options
         $this->handleUserQuit();
+    }
+
+    /**
+     * Get raw input from the user without any trimming
+     */
+    protected function getRawInput(string $prompt): string
+    {
+        if (extension_loaded('readline')) {
+            $input = readline($prompt);
+            if ($input === false) { // Readline returns false on Ctrl+D (EOF)
+                $this->inputInterrupted = true;
+                return '';
+            }
+            return $input;
+        } else {
+            $this->output->write($prompt);
+            $input = fgets(STDIN);
+            return $input === false ? '' : rtrim($input, "\n");
+        }
     }
 
     /**
@@ -2750,9 +2776,30 @@ class ImportBooksFromDownloads extends Command
                 $filtered = array_filter($authors, function ($v) {
                     return !is_array($v) && !is_object($v) && $v !== null && $v !== '';
                 });
-                return implode(' & ', $filtered);
+
+                // Process each author name to handle GraphicAudio format
+                $processedAuthors = array_map(function ($author) {
+                    // Check for GraphicAudio [Author1 / Author2] format
+                    if (preg_match('/^Graphic\s*Audio\s*\[([^\]]+)\]$/i', $author, $matches)) {
+                        $authors = array_map('trim', explode('/', $matches[1]));
+                        return implode(', ', $authors);
+                    }
+                    return $author;
+                }, $filtered);
+
+                return implode(' & ', $processedAuthors);
             }
-            return $authors ?? 'N/A';
+
+            // Handle case where $authors is a string
+            if (is_string($authors)) {
+                if (preg_match('/^Graphic\s*Audio\s*\[([^\]]+)\]$/i', $authors, $matches)) {
+                    $authors = array_map('trim', explode('/', $matches[1]));
+                    return implode(' & ', $authors);
+                }
+                return $authors;
+            }
+
+            return 'N/A';
         };
 
         // Clean series name for display
@@ -3137,14 +3184,39 @@ class ImportBooksFromDownloads extends Command
         // Always update title, even if it appears unchanged (trim might differ)
         $metadata['title'] = trim($newTitle);
 
-        // Edit author
-        $currentAuthor = is_array($metadata['author']) ? implode(', ', $metadata['author']) : ($metadata['author'] ?? '');
-        $newAuthor = $this->askWithImmediateInterrupt("Author(s) (comma-separated)", $currentAuthor);
+        // Get the author display value from the summary formatting
+        $formatAuthors = function ($authors) {
+            if (is_array($authors)) {
+                $filtered = array_filter($authors, function ($v) {
+                    return !is_array($v) && !is_object($v) && $v !== null && $v !== '';
+                });
+
+                // Process each author name to handle GraphicAudio format
+                $processedAuthors = array_map(function ($author) {
+                    // Check for GraphicAudio [Author1 / Author2] format
+                    if (preg_match('/^Graphic\s*Audio\s*\[([^\]]+)\]$/i', $author, $matches)) {
+                        $authors = array_map('trim', explode('/', $matches[1]));
+                        return implode(', ', $authors);
+                    }
+                    return $author;
+                }, $filtered);
+
+                return implode(' & ', $processedAuthors);
+            }
+            return $authors ?? '';
+        };
+
+        $currentAuthor = $formatAuthors($metadata['author'] ?? '');
+        $newAuthor = $this->askWithImmediateInterrupt("Author(s)", $currentAuthor);
         if ($this->inputInterrupted) {
             return $metadata;
         }
-        // Always update author
-        $metadata['author'] = array_map('trim', explode(',', $newAuthor));
+        // Update author, converting back from display format if needed
+        if (str_contains($newAuthor, ' & ')) {
+            $metadata['author'] = array_map('trim', explode(' & ', $newAuthor));
+        } else {
+            $metadata['author'] = [$newAuthor];
+        }
 
         // Edit narrator
         $currentNarrator = '';
@@ -3169,29 +3241,24 @@ class ImportBooksFromDownloads extends Command
         // Always update genre
         $metadata['genre'] = $newGenre;
 
-        // Edit series
+        // Edit series name
         $currentSeries = $metadata['series'] ?? '';
         $newSeries = $this->askWithImmediateInterrupt("Series", $currentSeries);
         if ($this->inputInterrupted) {
             return $metadata;
         }
-        $newSeries = trim($newSeries);
+        $metadata['series'] = trim($newSeries) === '' ? null : trim($newSeries);
 
-        // Edit series number
-        $currentSeriesNumber = $metadata['series_number'] ?? '';
-        $newSeriesNumber = $this->askWithImmediateInterrupt("Series Number", $currentSeriesNumber);
-        if ($this->inputInterrupted) {
-            return $metadata;
-        }
-        $newSeriesNumber = trim($newSeriesNumber);
-
-        // Handle whitespace-only series input
-        if ($newSeries === '') {
-            $metadata['series'] = null;
-            $metadata['series_number'] = null;
+        // Edit series number if series is set
+        if (!empty($metadata['series'])) {
+            $currentSeriesNumber = $metadata['series_number'] ?? '';
+            $newSeriesNumber = $this->askWithImmediateInterrupt("Series Number", $currentSeriesNumber);
+            if ($this->inputInterrupted) {
+                return $metadata;
+            }
+            $metadata['series_number'] = trim($newSeriesNumber) === '' ? null : trim($newSeriesNumber);
         } else {
-            $metadata['series'] = $newSeries;
-            $metadata['series_number'] = $newSeriesNumber === '' ? null : $newSeriesNumber;
+            $metadata['series_number'] = null;
         }
 
         // Edit year
