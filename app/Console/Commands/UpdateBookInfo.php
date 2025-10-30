@@ -3,11 +3,12 @@
 namespace App\Console\Commands;
 
 use App\Models\Book;
+use App\Traits\HandlesLibraryJson;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Storage;
 
 class UpdateBookInfo extends Command
 {
+    use HandlesLibraryJson;
     protected $signature = 'books:update {directory}
                             {--cover= : Path to cover image file or URL}
                             {--title= : Book title}
@@ -60,7 +61,7 @@ class UpdateBookInfo extends Command
             if (filter_var($coverPath, FILTER_VALIDATE_URL)) {
                 // URL - download it and save to book directory
                 $this->info("Downloading cover image from URL...");
-                
+
                 try {
                     // Use stream context to follow redirects
                     $context = stream_context_create([
@@ -75,42 +76,42 @@ class UpdateBookInfo extends Command
                             'verify_peer_name' => false
                         ]
                     ]);
-                    
+
                     $imageData = file_get_contents($coverPath, false, $context);
                     if ($imageData === false) {
                         throw new \Exception("Failed to download image");
                     }
-                    
+
                     // Validate it's actually an image
                     $finfo = new \finfo(FILEINFO_MIME_TYPE);
                     $mimeType = $finfo->buffer($imageData);
                     if (!str_starts_with($mimeType, 'image/')) {
                         throw new \Exception("Downloaded content is not an image (got: {$mimeType})");
                     }
-                    
+
                     // Determine file extension from URL or content type
                     $extension = 'jpg';
                     $urlPath = parse_url($coverPath, PHP_URL_PATH);
                     if ($urlPath && preg_match('/\.(jpg|jpeg|png|gif|webp)$/i', $urlPath, $matches)) {
                         $extension = strtolower($matches[1]);
                     }
-                    
+
                     // Save to book directory
                     $bookDirectory = $bookRoot . '/' . $book->directory_path;
                     $coverFilename = 'cover.' . $extension;
                     $coverFullPath = $bookDirectory . '/' . $coverFilename;
-                    
+
                     if (!is_dir($bookDirectory)) {
                         $this->error("Book directory not found: {$bookDirectory}");
                         return Command::FAILURE;
                     }
-                    
+
                     if (file_put_contents($coverFullPath, $imageData) === false) {
                         throw new \Exception("Failed to save image file");
                     }
-                    
+
                     chmod($coverFullPath, 0664);
-                    
+
                     // Store relative path
                     $relativePath = $book->directory_path . '/' . $coverFilename;
                     $book->coverImage = $relativePath;
@@ -195,6 +196,16 @@ class UpdateBookInfo extends Command
         }
 
         $book->save();
+
+        // Update library.json with the new information
+        try {
+            $book->load(['authors', 'narrators', 'genres', 'series', 'publisher']);
+            $this->updateLibraryJson($book);
+            $this->info("✓ Updated library.json");
+        } catch (\Exception $e) {
+            $this->warn("Failed to update library.json: " . $e->getMessage());
+        }
+
         $this->newLine();
         $this->info("Book information updated successfully!");
 

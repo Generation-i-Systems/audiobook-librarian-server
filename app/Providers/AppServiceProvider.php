@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Models\Book;
+use App\Observers\BookObserver;
 use App\Services\AudibleApiService;
 // FirestoreService has been archived
 use Google\Cloud\Firestore\FirestoreClient;
@@ -41,6 +43,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Register Book observer for automatic library.json updates
+        Book::observe(BookObserver::class);
+
         // Register custom Documentstore user provider
         Auth::provider('documentstore', function ($app, array $config) {
             return new \App\Auth\DocumentUserProvider(
