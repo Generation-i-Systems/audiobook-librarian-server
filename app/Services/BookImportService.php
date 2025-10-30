@@ -8,12 +8,15 @@ use App\Models\Genre;
 use App\Models\Narrator;
 use App\Models\Publisher;
 use App\Models\Series;
+use App\Traits\HandlesLibraryJson;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 
 class BookImportService
 {
+    use HandlesLibraryJson;
+
     protected GenreMappingService $genreMappingService;
 
     public function __construct(GenreMappingService $genreMappingService)
@@ -243,6 +246,9 @@ class BookImportService
                 }
             }
 
+            // Generate library.json after all relationships are set
+            $this->updateLibraryJson($book);
+
             DB::commit();
             return $book;
         } catch (\Exception $e) {
@@ -367,6 +373,9 @@ class BookImportService
                     $isPrimary = false;
                 }
             }
+
+            // Generate library.json after all relationships are updated
+            $this->updateLibraryJson($book);
 
             DB::commit();
             return $book;

@@ -3,19 +3,28 @@
 namespace App\Console\Commands;
 
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Models\Author;
+use App\Models\Book;
+use App\Models\Genre;
+use App\Models\Series;
+use App\Services\BookDirectoryParser;
+use App\Traits\HandlesLibraryJson;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class MoveBookDirectory extends Command
 {
+    use HandlesLibraryJson;
+
     /**
      * The name and signature of the console command.
      */
-    protected $signature = 'books:move 
+    protected $signature = 'books:move
                             {sources* : Source path(s) to move OR regex pattern if using --regex}
                             {--dry-run : Show what would be done without making changes}
                             {--no-db : Only move files, do not update database}
+                            {--no-parse : Do not parse and update metadata from new path}
                             {--regex= : Use regex rename (format: s/pattern/replacement/flags)}
                             {--mv-options=* : Options to pass to mv command}';
 
@@ -26,11 +35,13 @@ class MoveBookDirectory extends Command
 
     private string $bookRoot;
     private DocumentStoreServiceInterface $documentStore;
+    private BookDirectoryParser $directoryParser;
 
-    public function __construct(DocumentStoreServiceInterface $documentStore)
+    public function __construct(DocumentStoreServiceInterface $documentStore, BookDirectoryParser $directoryParser)
     {
         parent::__construct();
         $this->documentStore = $documentStore;
+        $this->directoryParser = $directoryParser;
 
         // Resolve book root to real path (handles symlinks and bind mounts)
         $bookStoragePath = env('BOOK_STORAGE_PATH');
@@ -109,7 +120,7 @@ class MoveBookDirectory extends Command
         foreach ($sources as $source) {
             $absSource = realpath($source) ?: $source;
             $absBookRoot = realpath($this->bookRoot);
-            
+
             if ($absSource === $absBookRoot) {
                 $this->error("Cannot move the book root directory itself");
                 return 1;
@@ -127,7 +138,7 @@ class MoveBookDirectory extends Command
 
         // Normalize destination path
         $destPath = $this->normalizePath($destination);
-        
+
         // Auto-create parent directories (mkdmv behavior)
         $destDir = $destPath;
         if (count($sources) > 1 || str_ends_with($destination, '/')) {
@@ -137,7 +148,7 @@ class MoveBookDirectory extends Command
             // Single source, dest might be a file
             $destDir = dirname($destPath);
         }
-        
+
         if (!$dryRun && !is_dir($destDir)) {
             if (!mkdir($destDir, 0755, true)) {
                 $this->error("Failed to create destination directory: {$destDir}");
@@ -205,7 +216,7 @@ class MoveBookDirectory extends Command
             foreach ($bookSources as $bookSource) {
                 $this->info("Would move: {$bookSource['path']}");
                 $this->info("        to: {$destPath}");
-                
+
                 if (!$noDb) {
                     $this->info("  Would update " . count($bookSource['books']) . " book(s)");
                 }
@@ -217,20 +228,20 @@ class MoveBookDirectory extends Command
         foreach ($bookSources as $bookSource) {
             $sourcePath = $bookSource['path'];
             $finalDest = $destPath;
-            
+
             // If multiple sources, trailing slash, OR destination is an existing directory,
             // treat as "move into directory" operation
             if (count($sources) > 1 || str_ends_with($destination, '/') || is_dir($destPath)) {
                 $finalDest = $destPath . '/' . basename($sourcePath);
             }
-            
+
             if ($verbose) {
                 $this->line("<fg=blue>[DEBUG]</> Checking destination: {$finalDest}");
                 $this->line("<fg=blue>[DEBUG]</> Source basename: " . basename($sourcePath));
                 $this->line("<fg=blue>[DEBUG]</> Destination ends with /: " . (str_ends_with($destination, '/') ? 'yes' : 'no'));
                 $this->line("<fg=blue>[DEBUG]</> Destination is directory: " . (is_dir($destPath) ? 'yes' : 'no'));
             }
-            
+
             if (file_exists($finalDest)) {
                 $this->error("Destination already exists: {$finalDest}");
                 $this->error("Aborting to prevent data loss");
@@ -240,36 +251,36 @@ class MoveBookDirectory extends Command
 
         // CRITICAL SAFETY: Use database transaction for atomicity
         DB::beginTransaction();
-        
+
         try {
             $totalUpdated = 0;
             $movedPaths = []; // Track what we've moved for rollback
-            
+
             foreach ($bookSources as $bookSource) {
                 $sourcePath = $bookSource['path'];
                 $sourceRelative = $bookSource['relative'];
-                
+
                 // Calculate final destination for this source
                 $finalDest = $destPath;
                 if (count($sources) > 1 || str_ends_with($destination, '/') || is_dir($destPath)) {
                     $finalDest = $destPath . '/' . basename($sourcePath);
                 }
-                
+
                 // CRITICAL SAFETY: Verify source still exists (race condition check)
                 if (!file_exists($sourcePath)) {
                     throw new \Exception("Source disappeared during operation: {$sourcePath}");
                 }
-                
+
                 // CRITICAL SAFETY: Verify destination still doesn't exist
                 if (file_exists($finalDest)) {
                     throw new \Exception("Destination appeared during operation: {$finalDest}");
                 }
-                
+
                 // Move the directory/file
                 if (!rename($sourcePath, $finalDest)) {
                     throw new \Exception("Failed to move: {$sourcePath}");
                 }
-                
+
                 $movedPaths[] = ['from' => $sourcePath, 'to' => $finalDest];
                 $this->info("✓ Moved: " . basename($sourcePath));
 
@@ -277,8 +288,8 @@ class MoveBookDirectory extends Command
                 if (!$noDb && !empty($bookSource['books'])) {
                     $destRelative = $this->getRelativePath($finalDest);
                     $updated = $this->updateBookRecords(
-                        $bookSource['books'], 
-                        $sourceRelative, 
+                        $bookSource['books'],
+                        $sourceRelative,
                         $destRelative
                     );
                     $totalUpdated += $updated;
@@ -287,21 +298,20 @@ class MoveBookDirectory extends Command
 
             // CRITICAL SAFETY: Commit transaction only if everything succeeded
             DB::commit();
-            
+
             if (!$noDb && $totalUpdated > 0) {
                 $this->info("✓ Updated {$totalUpdated} book record(s)");
             }
 
             $this->info("\n✓ Move completed successfully!");
             return 0;
-            
         } catch (\Exception $e) {
             // CRITICAL SAFETY: Rollback database changes
             DB::rollBack();
-            
+
             $this->error("Error during move: " . $e->getMessage());
             $this->error("Rolling back filesystem changes...");
-            
+
             // CRITICAL SAFETY: Attempt to rollback filesystem changes
             foreach (array_reverse($movedPaths) as $move) {
                 if (file_exists($move['to']) && !file_exists($move['from'])) {
@@ -313,7 +323,7 @@ class MoveBookDirectory extends Command
                     }
                 }
             }
-            
+
             return 1;
         }
     }
@@ -327,30 +337,30 @@ class MoveBookDirectory extends Command
         if (empty(trim($path))) {
             throw new \Exception("Path cannot be empty");
         }
-        
+
         // MINOR EDGE CASE: Trim whitespace
         $path = trim($path);
-        
+
         // CRITICAL SAFETY: Remove null bytes (security)
         $path = str_replace("\0", '', $path);
-        
+
         // MINOR EDGE CASE: Remove control characters
         $path = preg_replace('/[\x00-\x1F\x7F]/', '', $path);
-        
+
         // MINOR EDGE CASE: Normalize backslashes to forward slashes
         $path = str_replace('\\', '/', $path);
-        
+
         // MINOR EDGE CASE: Remove multiple consecutive slashes
         $path = preg_replace('#/+#', '/', $path);
-        
+
         // MINOR EDGE CASE: Remove trailing dots (Windows compatibility)
         $path = rtrim($path, '.');
-        
+
         // MINOR EDGE CASE: Reject paths that are just dots
         if ($path === '.' || $path === '..') {
             throw new \Exception("Invalid path: {$path}");
         }
-        
+
         // CRITICAL SAFETY: Detect directory traversal attempts
         if (strpos($path, '..') !== false) {
             // Allow it but validate the result stays in book root
@@ -358,18 +368,18 @@ class MoveBookDirectory extends Command
         } else {
             $needsValidation = false;
         }
-        
+
         // If already absolute, use as-is, otherwise make relative to book root
         if (str_starts_with($path, '/')) {
             $normalized = rtrim($path, '/');
         } else {
             $normalized = rtrim($this->bookRoot . '/' . ltrim($path, '/'), '/');
         }
-        
+
         // Resolve .. and . in the path
         $parts = explode('/', $normalized);
         $resolved = [];
-        
+
         foreach ($parts as $part) {
             if ($part === '' || $part === '.') {
                 continue;
@@ -380,23 +390,23 @@ class MoveBookDirectory extends Command
                 $resolved[] = $part;
             }
         }
-        
+
         $normalized = '/' . implode('/', $resolved);
-        
+
         // CRITICAL SAFETY: Ensure resolved path stays within book root
         // We need to resolve the normalized path to its real path for comparison
         // since bookRoot is already resolved to real path
         $parentDir = dirname($normalized);
         $basename = basename($normalized);
-        
+
         // Get real path of parent directory (or use as-is if doesn't exist yet)
         $realParent = realpath($parentDir) ?: $parentDir;
         $realNormalized = rtrim($realParent . '/' . $basename, '/');
-        
+
         if (!str_starts_with($realNormalized, $this->bookRoot)) {
             throw new \Exception("Path escapes book root: {$realNormalized} (from: {$path}, bookRoot: {$this->bookRoot})");
         }
-        
+
         return $normalized;
     }
 
@@ -407,7 +417,7 @@ class MoveBookDirectory extends Command
     {
         $realPath = realpath($path) ?: $path;
         $realBookRoot = realpath($this->bookRoot);
-        
+
         return str_starts_with($realPath, $realBookRoot);
     }
 
@@ -469,6 +479,7 @@ class MoveBookDirectory extends Command
     private function updateBookRecords(array $books, string $sourceRelative, string $destRelative): int
     {
         $updated = 0;
+        $noParse = $this->option('no-parse');
 
         foreach ($books as $book) {
             try {
@@ -476,19 +487,125 @@ class MoveBookDirectory extends Command
                 $newPath = $this->calculateNewPath($oldPath, $sourceRelative, $destRelative);
 
                 if ($oldPath !== $newPath) {
-                    // Update using raw query for speed
-                    DB::table('books')
-                        ->where('id', $book['_id'])
-                        ->update([
-                            'directory_path' => $newPath,
-                            'updated_at' => now(),
-                        ]);
+                    // Get the Book model to update relationships
+                    $bookModel = Book::with(['authors', 'narrators', 'genres', 'series', 'publisher'])
+                        ->find($book['_id']);
+
+                    if (!$bookModel) {
+                        $this->error("  ✗ Book model not found for ID {$book['_id']}");
+                        continue;
+                    }
+
+                    // Update directory path
+                    $bookModel->directory_path = $newPath;
+
+                    // Parse the new path and update metadata if enabled
+                    if (!$noParse) {
+                        try {
+                            // Check if directory exists and has audio files before parsing
+                            $fullPath = $this->bookRoot . '/' . $newPath;
+                            if (!is_dir($fullPath)) {
+                                throw new \Exception("Directory does not exist: {$fullPath}");
+                            }
+
+                            $parsedData = $this->directoryParser->parseDirectory($fullPath);
+
+                            if (!empty($parsedData) && isset($parsedData[0])) {
+                                $metadata = $parsedData[0];
+                                $metadataUpdated = false;
+
+                                // Update title if different
+                                if (!empty($metadata['title']) && $metadata['title'] !== $bookModel->title) {
+                                    $this->line("    • Title: {$bookModel->title} → {$metadata['title']}");
+                                    $bookModel->title = $metadata['title'];
+                                    $metadataUpdated = true;
+                                }
+
+                                // Update genre if different
+                                if (!empty($metadata['genre'])) {
+                                    $genres = is_array($metadata['genre']) ? $metadata['genre'] : [$metadata['genre']];
+                                    $currentGenres = $bookModel->genres->pluck('name')->toArray();
+
+                                    if ($genres !== $currentGenres) {
+                                        $this->line("    • Genre: " . implode(', ', $currentGenres) . " → " . implode(', ', $genres));
+                                        $bookModel->genres()->detach();
+                                        $isPrimary = true;
+                                        foreach ($genres as $genreName) {
+                                            $genre = Genre::firstOrCreate(['name' => trim($genreName)]);
+                                            $bookModel->genres()->attach($genre->id, ['is_primary' => $isPrimary]);
+                                            $isPrimary = false;
+                                        }
+                                        $metadataUpdated = true;
+                                    }
+                                }
+
+                                // Update authors if different
+                                if (!empty($metadata['author'])) {
+                                    $authors = is_array($metadata['author']) ? $metadata['author'] : [$metadata['author']];
+                                    $currentAuthors = $bookModel->authors->pluck('name')->toArray();
+
+                                    if ($authors !== $currentAuthors) {
+                                        $this->line("    • Author: " . implode(', ', $currentAuthors) . " → " . implode(', ', $authors));
+                                        $bookModel->authors()->detach();
+                                        foreach ($authors as $authorName) {
+                                            $author = Author::firstOrCreate(['name' => trim($authorName)]);
+                                            $bookModel->authors()->attach($author->id);
+                                        }
+                                        $metadataUpdated = true;
+                                    }
+                                }
+
+                                // Update series if different
+                                if (!empty($metadata['series'])) {
+                                    $currentSeries = $bookModel->series ? $bookModel->series->name : null;
+                                    $newSeriesName = is_array($metadata['series']) ? array_key_first($metadata['series']) : $metadata['series'];
+                                    $newSeriesNumber = is_array($metadata['series']) ? $metadata['series'][$newSeriesName] : ($metadata['seriesNumber'] ?? null);
+
+                                    if ($newSeriesName !== $currentSeries) {
+                                        $this->line("    • Series: " . ($currentSeries ?: '(none)') . " → {$newSeriesName}");
+                                        $bookModel->series()->detach();
+                                        $series = Series::firstOrCreate(['name' => trim($newSeriesName)]);
+                                        $bookModel->series()->attach($series->id, [
+                                            'series_number' => $newSeriesNumber
+                                        ]);
+                                        $metadataUpdated = true;
+                                    }
+                                }
+                            }
+                        } catch (\Exception $e) {
+                            $this->warn("    ⚠ Could not parse new path metadata: " . $e->getMessage());
+                            Log::debug("Failed to parse directory path", [
+                                'path' => $fullPath ?? $newPath,
+                                'error' => $e->getMessage()
+                            ]);
+                        }
+                    }
+
+                    $bookModel->save();
+
+                    // Update library.json with new metadata (only if directory exists)
+                    if (is_dir($bookModel->directory_path)) {
+                        try {
+                            $this->updateLibraryJson($bookModel);
+                        } catch (\Exception $e) {
+                            $this->warn("    ⚠ Could not update library.json: " . $e->getMessage());
+                            Log::debug("Failed to update library.json", [
+                                'book_id' => $bookModel->id,
+                                'error' => $e->getMessage()
+                            ]);
+                        }
+                    }
 
                     $updated++;
                     $this->line("  ✓ Updated: {$book['title']}");
                 }
             } catch (\Exception $e) {
                 $this->error("  ✗ Failed to update book {$book['_id']}: " . $e->getMessage());
+                Log::error("Failed to update book record", [
+                    'book_id' => $book['_id'],
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString()
+                ]);
             }
         }
 
@@ -557,10 +674,10 @@ class MoveBookDirectory extends Command
         foreach ($normalizedSources as $sourcePath) {
             $basename = basename($sourcePath);
             $dirname = dirname($sourcePath);
-            
+
             // Apply regex to basename
             $newBasename = $this->applyRegex($basename, $pattern, $replacement, $flags);
-            
+
             if ($newBasename === $basename) {
                 if ($verbose) {
                     $this->line("<fg=gray>No change:</> {$basename}");
@@ -609,30 +726,30 @@ class MoveBookDirectory extends Command
 
         // CRITICAL SAFETY: Use database transaction
         DB::beginTransaction();
-        
+
         try {
             $totalUpdated = 0;
             $movedPaths = [];
-            
+
             foreach ($renames as $rename) {
                 $sourcePath = $rename['source'];
                 $destPath = $rename['dest'];
-                
+
                 // CRITICAL SAFETY: Verify source still exists
                 if (!file_exists($sourcePath)) {
                     throw new \Exception("Source disappeared: {$sourcePath}");
                 }
-                
+
                 // CRITICAL SAFETY: Verify destination still doesn't exist
                 if (file_exists($destPath)) {
                     throw new \Exception("Destination appeared: {$destPath}");
                 }
-                
+
                 // Move the directory/file
                 if (!rename($sourcePath, $destPath)) {
                     throw new \Exception("Failed to rename: {$sourcePath}");
                 }
-                
+
                 $movedPaths[] = ['from' => $sourcePath, 'to' => $destPath];
                 $this->info("✓ Renamed: {$rename['oldBasename']} → {$rename['newBasename']}");
 
@@ -640,7 +757,7 @@ class MoveBookDirectory extends Command
                 if (!$noDb) {
                     $sourceRelative = $this->getRelativePath($sourcePath);
                     $destRelative = $this->getRelativePath($destPath);
-                    
+
                     $affectedBooks = $this->findAffectedBooks($sourceRelative);
                     if (!empty($affectedBooks)) {
                         $updated = $this->updateBookRecords($affectedBooks, $sourceRelative, $destRelative);
@@ -651,21 +768,20 @@ class MoveBookDirectory extends Command
 
             // CRITICAL SAFETY: Commit transaction
             DB::commit();
-            
+
             if (!$noDb && $totalUpdated > 0) {
                 $this->info("✓ Updated {$totalUpdated} book record(s)");
             }
 
             $this->info("\n✓ Rename completed successfully!");
             return 0;
-            
         } catch (\Exception $e) {
             // CRITICAL SAFETY: Rollback
             DB::rollBack();
-            
+
             $this->error("Error during rename: " . $e->getMessage());
             $this->error("Rolling back filesystem changes...");
-            
+
             foreach (array_reverse($movedPaths) as $move) {
                 if (file_exists($move['to']) && !file_exists($move['from'])) {
                     if (@rename($move['to'], $move['from'])) {
@@ -675,7 +791,7 @@ class MoveBookDirectory extends Command
                     }
                 }
             }
-            
+
             return 1;
         }
     }
