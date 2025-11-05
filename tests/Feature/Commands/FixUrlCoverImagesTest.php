@@ -62,6 +62,11 @@ class FixUrlCoverImagesTest extends TestCase
             ->andReturn(['data' => [], 'total' => 0]);
 
         $this->documentStoreMock
+            ->shouldReceive('getBook')
+            ->with('1')
+            ->andReturn($books[0]);
+
+        $this->documentStoreMock
             ->shouldNotReceive('updateBook');
 
         $this->artisan('books:fix-url-covers --dry-run')
@@ -96,6 +101,11 @@ class FixUrlCoverImagesTest extends TestCase
             ->shouldReceive('listBooks')
             ->with(2, 100, [], false)
             ->andReturn(['data' => [], 'total' => 0]);
+
+        $this->documentStoreMock
+            ->shouldReceive('getBook')
+            ->with('1')
+            ->andReturn($books[0]);
 
         $this->documentStoreMock
             ->shouldReceive('updateBook')
@@ -165,6 +175,11 @@ class FixUrlCoverImagesTest extends TestCase
             ->andReturn(['data' => [], 'total' => 0]);
 
         $this->documentStoreMock
+            ->shouldReceive('getBook')
+            ->with('1')
+            ->andReturn($books[0]);
+
+        $this->documentStoreMock
             ->shouldNotReceive('updateBook');
 
         $this->artisan('books:fix-url-covers')
@@ -184,6 +199,12 @@ class FixUrlCoverImagesTest extends TestCase
             ->shouldReceive('listBooks')
             ->with(1, 100, [], false)
             ->andReturn(['data' => $books, 'total' => 2]);
+
+        $this->documentStoreMock
+            ->shouldReceive('getBook')
+            ->with('1')
+            ->once()
+            ->andReturn($books[0]);
 
         $this->documentStoreMock
             ->shouldNotReceive('updateBook');
@@ -219,6 +240,11 @@ class FixUrlCoverImagesTest extends TestCase
             ->shouldReceive('listBooks')
             ->with(2, 100, [], false)
             ->andReturn(['data' => [], 'total' => 0]);
+
+        $this->documentStoreMock
+            ->shouldReceive('getBook')
+            ->with('1')
+            ->andReturn($books[0]);
 
         $this->documentStoreMock
             ->shouldReceive('updateBook')
