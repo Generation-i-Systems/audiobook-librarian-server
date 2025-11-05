@@ -105,4 +105,30 @@ class UserController extends Controller
 
         return redirect()->route('admin.users.index')->with('success', 'User deleted successfully.');
     }
+
+    /**
+     * Verify a user account
+     *
+     * @param string $id The user ID to verify
+     * @return \Illuminate\Http\RedirectResponse
+     */
+    public function verify($id)
+    {
+        $user = $this->documentStoreService->getUserById($id);
+        
+        if (!$user) {
+            return back()->with('error', 'User not found.');
+        }
+
+        if (($user['role'] ?? '') !== 'unverified') {
+            return back()->with('info', 'User is already verified.');
+        }
+
+        $this->documentStoreService->updateUser($id, [
+            'role' => 'user',
+            'email_verified_at' => now()
+        ]);
+
+        return back()->with('success', 'User verified successfully.');
+    }
 }

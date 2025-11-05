@@ -63,6 +63,12 @@ class User extends Authenticatable
         return $this->belongsToMany(Book::class, 'user_book_queues')->withPivot('order')->orderBy('order');
     }
 
+    /**
+     * Get the user's photo URL with fallback to last completed book's cover
+     *
+     * @param mixed $value
+     * @return string|null
+     */
     public function getPhotoUrlAttribute($value)
     {
         if ($value) {
