@@ -16,6 +16,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class MySqlService implements DocumentStoreServiceInterface
@@ -922,8 +923,52 @@ class MySqlService implements DocumentStoreServiceInterface
 
     public function getUserById($identifier)
     {
-        $user = User::find($identifier);
-        return $user ? $user->toArray() : null;
+        // Start with base columns that definitely exist
+        $columns = [
+            'id', 'name', 'username', 'email', 'role',
+            'email_verified_at', 'created_at', 'updated_at'
+        ];
+        
+        // Add photo_url if the column exists
+        if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'photo_url')) {
+            $columns[] = 'photo_url';
+        }
+        
+        // Add google_id if the column exists
+        if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'google_id')) {
+            $columns[] = 'google_id';
+        }
+        
+        $user = User::select($columns)->find($identifier);
+        
+        if (!$user) {
+            return null;
+        }
+        
+        // Convert to array and ensure consistent attribute naming
+        $result = [
+            'id' => $user->id,
+            'name' => $user->name,
+            'username' => $user->username,
+            'email' => $user->email,
+            'role' => $user->role,
+            'email_verified_at' => $user->email_verified_at,
+            'created_at' => $user->created_at,
+            'updated_at' => $user->updated_at,
+        ];
+        
+        // Handle camelCase attribute naming from CamelCaseAttributeAccess trait
+        $photoUrl = $user->photo_url ?? $user->photoUrl ?? null;
+        if ($photoUrl) {
+            $result['photo_url'] = $photoUrl;
+        }
+        
+        $googleId = $user->google_id ?? $user->googleId ?? null;
+        if ($googleId) {
+            $result['google_id'] = $googleId;
+        }
+        
+        return $result;
     }
 
     public function getUserByCredentials($credentials)
@@ -1258,7 +1303,25 @@ class MySqlService implements DocumentStoreServiceInterface
     public function getAllUsers(): array
     {
         try {
-            return User::all()->toArray();
+            // Get all users with necessary fields
+            $users = User::all(['id', 'name', 'username', 'email', 'photo_url', 'role', 'email_verified_at', 'created_at', 'updated_at']);
+            
+            // Convert to array and ensure consistent attribute naming
+            return $users->map(function($user) {
+                return [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'username' => $user->username,
+                    'email' => $user->email,
+                    'photo_url' => $user->photo_url, // This will use the accessor
+                    'role' => $user->role,
+                    'email_verified_at' => $user->email_verified_at,
+                    'created_at' => $user->created_at,
+                    'updated_at' => $user->updated_at,
+                    // Add google_id if it exists
+                    'google_id' => $user->google_id ?? null,
+                ];
+            })->toArray();
         } catch (\Exception $e) {
             Log::error('MySqlService getAllUsers failed: ' . $e->getMessage());
             return [];

@@ -334,14 +334,14 @@ trait BookImportTrait
 
             // First part is POTENTIALLY genre - validate it
             $potentialGenre = array_shift($parts);
-            
+
             // List of valid genres (should match database enum)
             $validGenres = [
-                'Kids', 'Religion', 'General Fiction', 'Church', 'Science', 'Historical Fiction',
+                'Kids', 'Religion', 'General Fiction', 'Fiction', 'Church', 'Science', 'Historical Fiction',
                 'Computer', 'Classic', 'History', 'Non Fiction', 'Action', 'LitRPG',
                 'Romance', 'Science Fiction', 'Other', 'Fantasy'
             ];
-            
+
             // Check if the first directory component is actually a valid genre
             $isValidGenre = false;
             foreach ($validGenres as $validGenre) {
@@ -351,7 +351,7 @@ trait BookImportTrait
                     break;
                 }
             }
-            
+
             // If not a valid genre, don't use it as genre - let metadata extraction handle it
             if ($isValidGenre) {
                 $book['genre'] = [$genre];  // Return as array for test compatibility

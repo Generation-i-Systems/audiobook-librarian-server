@@ -17,14 +17,14 @@ class MoveBookDirectoryTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Create temporary test directory
         $this->testBookRoot = storage_path('testing/books');
         $this->originalBookRoot = env('BOOK_STORAGE_PATH');
-        
+
         // Set test book root
         putenv("BOOK_STORAGE_PATH={$this->testBookRoot}");
-        
+
         // Create test directory structure
         File::makeDirectory($this->testBookRoot, 0755, true, true);
     }
@@ -35,12 +35,12 @@ class MoveBookDirectoryTest extends TestCase
         if (File::exists($this->testBookRoot)) {
             File::deleteDirectory($this->testBookRoot);
         }
-        
+
         // Restore original book root
         if ($this->originalBookRoot) {
             putenv("BOOK_STORAGE_PATH={$this->originalBookRoot}");
         }
-        
+
         parent::tearDown();
     }
 
@@ -50,19 +50,19 @@ class MoveBookDirectoryTest extends TestCase
         // Arrange
         $sourcePath = 'Fantasy/Author/Book1';
         $destPath = 'Sci-Fi/Author/Book1';
-        
+
         $this->createTestDirectory($sourcePath);
         $book = $this->createTestBook($sourcePath);
-        
+
         // Act
         $this->artisan('books:move', [
             'sources' => [$sourcePath, $destPath]
         ])->assertExitCode(0);
-        
+
         // Assert
         $this->assertDirDoesNotExist($this->testBookRoot . '/' . $sourcePath);
         $this->assertDirExists($this->testBookRoot . '/' . $destPath);
-        
+
         $book->refresh();
         $this->assertEquals($destPath, $book->directory_path);
     }
@@ -74,26 +74,26 @@ class MoveBookDirectoryTest extends TestCase
         $source1 = 'Fantasy/Author1/Book1';
         $source2 = 'Fantasy/Author2/Book2';
         $dest = 'Sci-Fi/';
-        
+
         $this->createTestDirectory($source1);
         $this->createTestDirectory($source2);
         $this->createTestDirectory('Sci-Fi');
-        
+
         $book1 = $this->createTestBook($source1);
         $book2 = $this->createTestBook($source2);
-        
+
         // Act
         $this->artisan('books:move', [
             'sources' => [$source1, $source2, $dest]
         ])->assertExitCode(0);
-        
+
         // Assert
         $this->assertDirExists($this->testBookRoot . '/Sci-Fi/Book1');
         $this->assertDirExists($this->testBookRoot . '/Sci-Fi/Book2');
-        
+
         $book1->refresh();
         $book2->refresh();
-        
+
         $this->assertEquals('Sci-Fi/Book1', $book1->directory_path);
         $this->assertEquals('Sci-Fi/Book2', $book2->directory_path);
     }
@@ -105,22 +105,22 @@ class MoveBookDirectoryTest extends TestCase
         $parentPath = 'Fantasy/Author';
         $book1Path = 'Fantasy/Author/Book1';
         $book2Path = 'Fantasy/Author/Series/Book2';
-        
+
         $this->createTestDirectory($book1Path);
         $this->createTestDirectory($book2Path);
-        
+
         $book1 = $this->createTestBook($book1Path);
         $book2 = $this->createTestBook($book2Path);
-        
+
         // Act
         $this->artisan('books:move', [
             'sources' => [$parentPath, 'Sci-Fi/Author']
         ])->assertExitCode(0);
-        
+
         // Assert
         $book1->refresh();
         $book2->refresh();
-        
+
         $this->assertEquals('Sci-Fi/Author/Book1', $book1->directory_path);
         $this->assertEquals('Sci-Fi/Author/Series/Book2', $book2->directory_path);
     }
@@ -131,18 +131,18 @@ class MoveBookDirectoryTest extends TestCase
         // Arrange
         $sourcePath = 'Fantasy/Author/Book1';
         $destPath = 'New/Genre/Sub/Author/Book1';
-        
+
         $this->createTestDirectory($sourcePath);
         $book = $this->createTestBook($sourcePath);
-        
+
         // Act
         $this->artisan('books:move', [
             'sources' => [$sourcePath, $destPath]
         ])->assertExitCode(0);
-        
+
         // Assert
         $this->assertDirExists($this->testBookRoot . '/New/Genre/Sub/Author/Book1');
-        
+
         $book->refresh();
         $this->assertEquals($destPath, $book->directory_path);
     }
@@ -153,19 +153,19 @@ class MoveBookDirectoryTest extends TestCase
         // Arrange
         $sourcePath = 'Fantasy/Author/Book1';
         $destPath = 'Sci-Fi/';
-        
+
         $this->createTestDirectory($sourcePath);
         $this->createTestDirectory('Sci-Fi');
         $book = $this->createTestBook($sourcePath);
-        
+
         // Act
         $this->artisan('books:move', [
             'sources' => [$sourcePath, $destPath]
         ])->assertExitCode(0);
-        
+
         // Assert
         $this->assertDirExists($this->testBookRoot . '/Sci-Fi/Book1');
-        
+
         $book->refresh();
         $this->assertEquals('Sci-Fi/Book1', $book->directory_path);
     }
@@ -176,10 +176,10 @@ class MoveBookDirectoryTest extends TestCase
         // Arrange
         $sourcePath = 'Fantasy/EmptyDir';
         $destPath = 'Sci-Fi/EmptyDir';
-        
+
         $this->createTestDirectory($sourcePath);
         // No book created
-        
+
         // Act & Assert
         $this->artisan('books:move', [
             'sources' => [$sourcePath, $destPath]
@@ -192,20 +192,20 @@ class MoveBookDirectoryTest extends TestCase
         // Arrange
         $sourcePath = 'Fantasy/Author/Book1';
         $destPath = 'Sci-Fi/Author/Book1';
-        
+
         $this->createTestDirectory($sourcePath);
         $book = $this->createTestBook($sourcePath);
-        
+
         // Act
         $this->artisan('books:move', [
             'sources' => [$sourcePath, $destPath],
             '--dry-run' => true
         ])->assertExitCode(0);
-        
+
         // Assert - nothing should have changed
         $this->assertDirExists($this->testBookRoot . '/' . $sourcePath);
         $this->assertDirDoesNotExist($this->testBookRoot . '/' . $destPath);
-        
+
         $book->refresh();
         $this->assertEquals($sourcePath, $book->directory_path);
     }
@@ -216,21 +216,21 @@ class MoveBookDirectoryTest extends TestCase
         // Arrange
         $sourcePath = 'Fantasy/Author/Book1';
         $destPath = 'Sci-Fi/Author/Book1';
-        
+
         $this->createTestDirectory($sourcePath);
         $book = $this->createTestBook($sourcePath);
         $originalPath = $book->directory_path;
-        
+
         // Act
         $this->artisan('books:move', [
             'sources' => [$sourcePath, $destPath],
             '--no-db' => true
         ])->assertExitCode(0);
-        
+
         // Assert - files moved but DB not updated
         $this->assertDirDoesNotExist($this->testBookRoot . '/' . $sourcePath);
         $this->assertDirExists($this->testBookRoot . '/' . $destPath);
-        
+
         $book->refresh();
         $this->assertEquals($originalPath, $book->directory_path);
     }
@@ -241,18 +241,18 @@ class MoveBookDirectoryTest extends TestCase
         // Arrange
         $sourcePath = 'Fantasy/Author/Book1';
         $destPath = 'Sci-Fi/Author/Book1';
-        
+
         $this->createTestDirectory($sourcePath);
         $book = $this->createTestBook($sourcePath);
-        
+
         $absoluteSource = $this->testBookRoot . '/' . $sourcePath;
         $absoluteDest = $this->testBookRoot . '/' . $destPath;
-        
+
         // Act
         $this->artisan('books:move', [
             'sources' => [$absoluteSource, $absoluteDest]
         ])->assertExitCode(0);
-        
+
         // Assert
         $book->refresh();
         $this->assertEquals($destPath, $book->directory_path);
@@ -264,15 +264,15 @@ class MoveBookDirectoryTest extends TestCase
         // Arrange
         $sourcePath = 'Fantasy/Author/Book1';
         $destPath = 'Sci-Fi/Author/Book1';
-        
+
         $this->createTestDirectory($sourcePath);
         $book = $this->createTestBook($sourcePath);
-        
+
         // Act
         $this->artisan('books:move', [
             'sources' => [$sourcePath, $destPath]
         ])->assertExitCode(0);
-        
+
         // Assert
         $book->refresh();
         $this->assertEquals($destPath, $book->directory_path);
@@ -296,18 +296,18 @@ class MoveBookDirectoryTest extends TestCase
             'Fantasy/Author1/Book2',
             'Fantasy/Author2/Book3',
         ];
-        
+
         $books = [];
         foreach ($paths as $path) {
             $this->createTestDirectory($path);
             $books[] = $this->createTestBook($path);
         }
-        
+
         // Act - Move entire genre
         $this->artisan('books:move', [
             'sources' => ['Fantasy', 'Epic-Fantasy']
         ])->assertExitCode(0);
-        
+
         // Assert - All books updated
         foreach ($books as $index => $book) {
             $book->refresh();
@@ -322,15 +322,15 @@ class MoveBookDirectoryTest extends TestCase
         // Arrange
         $wrongPath = 'Fantasy/Steven Erikson/Book1';
         $correctPath = 'Fantasy/Stephen Erikson/Book1';
-        
+
         $this->createTestDirectory($wrongPath);
         $book = $this->createTestBook($wrongPath);
-        
+
         // Act
         $this->artisan('books:move', [
             'sources' => [$wrongPath, $correctPath]
         ])->assertExitCode(0);
-        
+
         // Assert
         $book->refresh();
         $this->assertEquals($correctPath, $book->directory_path);
@@ -345,18 +345,18 @@ class MoveBookDirectoryTest extends TestCase
             'Fantasy/Author/Series/02-Book2',
             'Fantasy/Author/Series/03-Book3',
         ];
-        
+
         $books = [];
         foreach ($paths as $path) {
             $this->createTestDirectory($path);
             $books[] = $this->createTestBook($path);
         }
-        
+
         // Act - Move entire series
         $this->artisan('books:move', [
             'sources' => ['Fantasy/Author/Series', 'Sci-Fi/Author/Series']
         ])->assertExitCode(0);
-        
+
         // Assert
         foreach ($books as $index => $book) {
             $book->refresh();
@@ -371,7 +371,7 @@ class MoveBookDirectoryTest extends TestCase
         // Arrange
         $sourcePath = 'Fantasy/Author/Book1';
         $destPath = 'Sci-Fi/Author/Book1';
-        
+
         $this->createTestDirectory($sourcePath);
         $book = $this->createTestBook($sourcePath, [
             'title' => 'Test Book',
@@ -379,12 +379,12 @@ class MoveBookDirectoryTest extends TestCase
             'duration' => 3600,
             'audio_file_count' => 5,
         ]);
-        
+
         // Act
         $this->artisan('books:move', [
             'sources' => [$sourcePath, $destPath]
         ])->assertExitCode(0);
-        
+
         // Assert - Only path changed
         $book->refresh();
         $this->assertEquals($destPath, $book->directory_path);
@@ -400,15 +400,15 @@ class MoveBookDirectoryTest extends TestCase
         // Arrange
         $sourcePath = "Fantasy/Author's Name/Book (2023)";
         $destPath = "Sci-Fi/Author's Name/Book (2023)";
-        
+
         $this->createTestDirectory($sourcePath);
         $book = $this->createTestBook($sourcePath);
-        
+
         // Act
         $this->artisan('books:move', [
             'sources' => [$sourcePath, $destPath]
         ])->assertExitCode(0);
-        
+
         // Assert
         $book->refresh();
         $this->assertEquals($destPath, $book->directory_path);
@@ -420,15 +420,15 @@ class MoveBookDirectoryTest extends TestCase
         // Arrange
         $sourcePath = 'Fantasy/Autör/Bøøk';
         $destPath = 'Sci-Fi/Autör/Bøøk';
-        
+
         $this->createTestDirectory($sourcePath);
         $book = $this->createTestBook($sourcePath);
-        
+
         // Act
         $this->artisan('books:move', [
             'sources' => [$sourcePath, $destPath]
         ])->assertExitCode(0);
-        
+
         // Assert
         $book->refresh();
         $this->assertEquals($destPath, $book->directory_path);
@@ -440,19 +440,19 @@ class MoveBookDirectoryTest extends TestCase
         // Arrange
         $sourcePath = 'Fantasy/Author/Book1';
         $destPath = 'Sci-Fi/Author/Book1';
-        
+
         $this->createTestDirectory($sourcePath);
         $book = $this->createTestBook($sourcePath);
         $originalUpdatedAt = $book->updated_at;
-        
+
         // Wait a moment to ensure timestamp difference
         sleep(1);
-        
+
         // Act
         $this->artisan('books:move', [
             'sources' => [$sourcePath, $destPath]
         ])->assertExitCode(0);
-        
+
         // Assert
         $book->refresh();
         $this->assertNotEquals($originalUpdatedAt, $book->updated_at);
@@ -474,15 +474,15 @@ class MoveBookDirectoryTest extends TestCase
         // Arrange
         $sourcePath = 'A/B/C/D/E/F/G/H/Book';
         $destPath = 'X/Y/Z/Book';
-        
+
         $this->createTestDirectory($sourcePath);
         $book = $this->createTestBook($sourcePath);
-        
+
         // Act
         $this->artisan('books:move', [
             'sources' => [$sourcePath, $destPath]
         ])->assertExitCode(0);
-        
+
         // Assert
         $book->refresh();
         $this->assertEquals($destPath, $book->directory_path);
@@ -493,15 +493,15 @@ class MoveBookDirectoryTest extends TestCase
     {
         // Arrange
         $path = 'Fantasy/Author/Book1';
-        
+
         $this->createTestDirectory($path);
         $book = $this->createTestBook($path);
-        
+
         // Act - Move to same location should fail at filesystem level
         $result = $this->artisan('books:move', [
             'sources' => [$path, $path]
         ]);
-        
+
         // Assert - Should fail or handle gracefully
         $this->assertNotEquals(0, $result);
     }
@@ -512,19 +512,19 @@ class MoveBookDirectoryTest extends TestCase
         // Arrange
         $sourcePath = 'Fantasy/Author/Book1';
         $destPath = 'Sci-Fi/Author/Book1';
-        
+
         $this->createTestDirectory($sourcePath);
         $book = $this->createTestBook($sourcePath);
-        
+
         // Simulate concurrent update
         $book->title = 'Updated Title';
         $book->save();
-        
+
         // Act
         $this->artisan('books:move', [
             'sources' => [$sourcePath, $destPath]
         ])->assertExitCode(0);
-        
+
         // Assert - Path updated, title preserved
         $book->refresh();
         $this->assertEquals($destPath, $book->directory_path);
@@ -537,19 +537,19 @@ class MoveBookDirectoryTest extends TestCase
         // Arrange
         $sourcePath = 'Fantasy/Author/Book1';
         $destPath = 'Sci-Fi/Author/Book1';
-        
+
         $this->createTestDirectory($sourcePath);
         $book = $this->createTestBook($sourcePath);
-        
+
         // Add relationships (authors, series, etc.)
         $author = \App\Models\Author::create(['name' => 'Test Author']);
         $book->authors()->attach($author);
-        
+
         // Act
         $this->artisan('books:move', [
             'sources' => [$sourcePath, $destPath]
         ])->assertExitCode(0);
-        
+
         // Assert - Relationships preserved
         $book->refresh();
         $this->assertEquals($destPath, $book->directory_path);
@@ -562,7 +562,7 @@ class MoveBookDirectoryTest extends TestCase
     {
         $fullPath = $this->testBookRoot . '/' . $path;
         File::makeDirectory($fullPath, 0755, true, true);
-        
+
         // Create a dummy audio file
         file_put_contents($fullPath . '/test.m4b', 'dummy content');
     }

@@ -3,7 +3,6 @@
 namespace Tests\Unit\Services;
 
 use App\Services\BookEnrichmentService;
-use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 class BookEnrichmentServiceTest extends TestCase

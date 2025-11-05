@@ -414,7 +414,10 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         'bulkImportBooksFromDir',
     ])->name('books.bulkImportDir');
 
+    // User management
     Route::resource('users', Admin\UserController::class);
+    Route::post('users/{id}/verify', [Admin\UserController::class, 'verify'])
+        ->name('users.verify');
 
     // Queue management (admin only)
     Route::middleware(['auth', 'admin'])->group(function () {

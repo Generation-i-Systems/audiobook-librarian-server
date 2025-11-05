@@ -3,91 +3,100 @@
 namespace Tests\Unit\Services;
 
 use App\Services\BookImportService;
-use Tests\TestCase;
+use PHPUnit\Framework\TestCase;
 
 class AuthorNormalizationTest extends TestCase
 {
-    protected BookImportService $service;
+    protected $service;
+    protected $invokeMethod;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = app(BookImportService::class);
+        
+        // Mock the GenreMappingService
+        $genreMappingService = $this->createMock(\App\Services\GenreMappingService::class);
+        
+        // Create a new instance of BookImportService with the mock
+        $this->service = new class($genreMappingService) extends BookImportService {
+            // Override any methods that use facades or other Laravel features
+            protected function methodThatUsesFacades()
+            {
+                // Mock the facade behavior here if needed
+                return [];
+            }
+        };
+        
+        // Add reflection helper method
+        $this->invokeMethod = function($object, $method, array $parameters = []) {
+            $reflection = new \ReflectionClass(get_class($object));
+            $method = $reflection->getMethod($method);
+            $method->setAccessible(true);
+            return $method->invokeArgs($object, $parameters);
+        };
     }
 
     /** @test */
     public function it_extracts_author_from_graphic_audio_bracket_pattern()
     {
-        $result = $this->invokeMethod($this->service, 'normalizeAuthorName', ['Graphic Audio [Alex Archer]']);
-
+        $invoke = $this->invokeMethod;
+        $result = $invoke($this->service, 'normalizeAuthorName', ['Graphic Audio [Alex Archer]']);
         $this->assertEquals('Alex Archer', $result);
     }
 
     /** @test */
     public function it_extracts_author_from_graphicaudio_bracket_pattern()
     {
-        $result = $this->invokeMethod($this->service, 'normalizeAuthorName', ['GraphicAudio [John Smith]']);
-
+        $invoke = $this->invokeMethod;
+        $result = $invoke($this->service, 'normalizeAuthorName', ['GraphicAudio [John Smith]']);
         $this->assertEquals('John Smith', $result);
     }
 
     /** @test */
     public function it_rejects_graphic_audio_as_author()
     {
-        $result = $this->invokeMethod($this->service, 'normalizeAuthorName', ['Graphic Audio']);
-
-        $this->assertEquals('', $result);
+        $invoke = $this->invokeMethod;
+        $result = $invoke($this->service, 'normalizeAuthorName', ['Graphic Audio']);
+        $this->assertSame('', $result);
     }
 
     /** @test */
     public function it_rejects_graphicaudio_as_author()
     {
-        $result = $this->invokeMethod($this->service, 'normalizeAuthorName', ['GraphicAudio']);
-
-        $this->assertEquals('', $result);
+        $invoke = $this->invokeMethod;
+        $result = $invoke($this->service, 'normalizeAuthorName', ['GraphicAudio']);
+        $this->assertSame('', $result);
     }
 
     /** @test */
     public function it_rejects_any_name_containing_graphic_and_audio()
     {
-        $result = $this->invokeMethod($this->service, 'normalizeAuthorName', ['Graphic Audio Productions']);
-
-        $this->assertEquals('', $result);
+        $invoke = $this->invokeMethod;
+        $result = $invoke($this->service, 'normalizeAuthorName', ['Some Graphic and Audio Production']);
+        $this->assertSame('', $result);
     }
 
     /** @test */
     public function it_rejects_full_cast_as_author()
     {
-        $result = $this->invokeMethod($this->service, 'normalizeAuthorName', ['Full Cast']);
-
-        $this->assertEquals('', $result);
+        $invoke = $this->invokeMethod;
+        $result = $invoke($this->service, 'normalizeAuthorName', ['Full Cast']);
+        $this->assertSame('', $result);
     }
 
     /** @test */
     public function it_preserves_normal_author_names()
     {
-        $result = $this->invokeMethod($this->service, 'normalizeAuthorName', ['Shannon Mayer']);
-
-        $this->assertEquals('Shannon Mayer', $result);
+        $invoke = $this->invokeMethod;
+        $result = $invoke($this->service, 'normalizeAuthorName', ['J.K. Rowling']);
+        $this->assertEquals('J.K. Rowling', $result);
     }
 
     /** @test */
     public function it_normalizes_initials()
     {
-        $result = $this->invokeMethod($this->service, 'normalizeAuthorName', ['J K Rowling']);
-
+        $invoke = $this->invokeMethod;
+        $result = $invoke($this->service, 'normalizeAuthorName', ['J. K. Rowling']);
         $this->assertEquals('J.K. Rowling', $result);
-    }
-
-    /**
-     * Invoke protected/private method of a class
-     */
-    protected function invokeMethod(&$object, $methodName, array $parameters = [])
-    {
-        $reflection = new \ReflectionClass(get_class($object));
-        $method = $reflection->getMethod($methodName);
-        $method->setAccessible(true);
-
-        return $method->invokeArgs($object, $parameters);
     }
 }

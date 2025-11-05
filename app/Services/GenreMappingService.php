@@ -14,7 +14,7 @@ class GenreMappingService
         // We need to map to existing library directories
 
         $genreParts = explode(':', $openAudibleGenre);
-        
+
         // Use the second part if it exists (more specific), otherwise use first
         $genreToMap = count($genreParts) > 1 ? trim($genreParts[1]) : trim($genreParts[0]);
         $firstGenre = strtolower($genreToMap);

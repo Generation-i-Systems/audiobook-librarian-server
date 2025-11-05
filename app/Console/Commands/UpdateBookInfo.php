@@ -197,13 +197,13 @@ class UpdateBookInfo extends Command
 
         $book->save();
 
-        // Update library.json with the new information
+        // Update librarian.json with the new information
         try {
             $book->load(['authors', 'narrators', 'genres', 'series', 'publisher']);
             $this->updateLibraryJson($book);
-            $this->info("✓ Updated library.json");
+            $this->info("✓ Updated librarian.json");
         } catch (\Exception $e) {
-            $this->warn("Failed to update library.json: " . $e->getMessage());
+            $this->warn("Failed to update librarian.json: " . $e->getMessage());
         }
 
         $this->newLine();

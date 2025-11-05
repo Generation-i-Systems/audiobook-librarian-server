@@ -16,7 +16,7 @@ class ParsePathController extends Controller
     public function parsePath(Request $request)
     {
         $path = $request->input('path');
-        
+
         if (empty($path)) {
             return response()->json(['error' => 'Path is required'], 400);
         }
@@ -25,18 +25,18 @@ class ParsePathController extends Controller
         $reflection = new \ReflectionClass($this->parser);
         $method = $reflection->getMethod('processDirPath');
         $method->setAccessible(true);
-        
+
         // Remove storage root if present and normalize path
         $storageRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
         $normalizedPath = trim(str_replace($storageRoot, '', $path), '/');
-        
+
         $bookPathInfo = $method->invoke($this->parser, $normalizedPath);
-        
+
         // Check if parsing failed
         if (!empty($bookPathInfo['skipped']) || !empty($bookPathInfo['error'])) {
             return response()->json(['error' => 'Could not parse path'], 400);
         }
-        
+
         // Extract series info
         $seriesName = '';
         $seriesNumber = '';
@@ -49,7 +49,7 @@ class ParsePathController extends Controller
                 $seriesNumber = $bookPathInfo['seriesNumber'] ?? '';
             }
         }
-        
+
         // Format author as string
         $author = '';
         if (!empty($bookPathInfo['author'])) {
@@ -59,7 +59,7 @@ class ParsePathController extends Controller
                 $author = $bookPathInfo['author'];
             }
         }
-        
+
         // Format genre as string
         $genre = '';
         if (!empty($bookPathInfo['genre'])) {
@@ -69,7 +69,7 @@ class ParsePathController extends Controller
                 $genre = $bookPathInfo['genre'];
             }
         }
-        
+
         $result = [
             'author' => $author !== 'Unknown Author' ? $author : '',
             'title' => $bookPathInfo['title'] ?? '',
@@ -77,7 +77,7 @@ class ParsePathController extends Controller
             'series' => $seriesName,
             'seriesNumber' => $seriesNumber,
         ];
-        
+
         return response()->json($result);
     }
 }

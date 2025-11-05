@@ -583,13 +583,13 @@ class MoveBookDirectory extends Command
 
                     $bookModel->save();
 
-                    // Update library.json with new metadata (only if directory exists)
+                    // Update librarian.json with new metadata (only if directory exists)
                     if (is_dir($bookModel->directory_path)) {
                         try {
                             $this->updateLibraryJson($bookModel);
                         } catch (\Exception $e) {
-                            $this->warn("    ⚠ Could not update library.json: " . $e->getMessage());
-                            Log::debug("Failed to update library.json", [
+                            $this->warn("    ⚠ Could not update librarian.json: " . $e->getMessage());
+                            Log::debug("Failed to update librarian.json", [
                                 'book_id' => $bookModel->id,
                                 'error' => $e->getMessage()
                             ]);

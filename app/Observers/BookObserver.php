@@ -16,7 +16,7 @@ class BookObserver
      */
     public function saved(Book $book): void
     {
-        // Only update library.json if the book has a directory path
+        // Only update librarian.json if the book has a directory path
         if (empty($book->directory_path)) {
             return;
         }
@@ -32,14 +32,14 @@ class BookObserver
 
                 $this->updateLibraryJson($book);
 
-                Log::debug('Updated library.json for book', [
+                Log::debug('Updated librarian.json for book', [
                     'book_id' => $book->id,
                     'title' => $book->title,
                     'directory_path' => $book->directory_path
                 ]);
             } catch (\Exception $e) {
-                // Don't fail the save operation if library.json update fails
-                Log::warning('Failed to update library.json', [
+                // Don't fail the save operation if librarian.json update fails
+                Log::warning('Failed to update librarian.json', [
                     'book_id' => $book->id,
                     'title' => $book->title,
                     'error' => $e->getMessage()
@@ -50,7 +50,7 @@ class BookObserver
 
     /**
      * Handle the Book "deleted" event.
-     * Clean up library.json when a book is deleted.
+     * Clean up librarian.json when a book is deleted.
      */
     public function deleted(Book $book): void
     {
@@ -59,18 +59,18 @@ class BookObserver
         }
 
         try {
-            $jsonPath = rtrim($book->directory_path, '/') . '/library.json';
+            $jsonPath = rtrim($book->directory_path, '/') . '/librarian.json';
 
             if (file_exists($jsonPath)) {
                 unlink($jsonPath);
-                Log::debug('Deleted library.json for book', [
+                Log::debug('Deleted librarian.json for book', [
                     'book_id' => $book->id,
                     'title' => $book->title,
                     'path' => $jsonPath
                 ]);
             }
         } catch (\Exception $e) {
-            Log::warning('Failed to delete library.json', [
+            Log::warning('Failed to delete librarian.json', [
                 'book_id' => $book->id,
                 'title' => $book->title,
                 'error' => $e->getMessage()

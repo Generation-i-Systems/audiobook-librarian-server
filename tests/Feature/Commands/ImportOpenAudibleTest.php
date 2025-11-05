@@ -2,11 +2,8 @@
 
 namespace Tests\Feature\Commands;
 
-use App\Models\Author;
 use App\Models\Book;
 use App\Models\Genre;
-use App\Models\Narrator;
-use App\Models\Series;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Tests\TestCase;
@@ -21,12 +18,12 @@ class ImportOpenAudibleTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         $this->testOpenAudibleDir = storage_path('testing/openaudible');
         $this->testBookRoot = storage_path('testing/books');
-        
+
         putenv("BOOK_STORAGE_PATH={$this->testBookRoot}");
-        
+
         File::makeDirectory($this->testOpenAudibleDir, 0755, true, true);
         File::makeDirectory($this->testOpenAudibleDir . '/books', 0755, true);
         File::makeDirectory($this->testOpenAudibleDir . '/books_old', 0755, true);
@@ -38,11 +35,11 @@ class ImportOpenAudibleTest extends TestCase
         if (File::exists($this->testOpenAudibleDir)) {
             File::deleteDirectory($this->testOpenAudibleDir);
         }
-        
+
         if (File::exists($this->testBookRoot)) {
             File::deleteDirectory($this->testBookRoot);
         }
-        
+
         parent::tearDown();
     }
 
@@ -174,12 +171,12 @@ class ImportOpenAudibleTest extends TestCase
 
         // Assert
         $book = Book::where('asin', $bookData['asin'])->first();
-        
+
         // First genre should be primary
         $primaryGenre = $book->genres()->wherePivot('is_primary', true)->first();
         $this->assertNotNull($primaryGenre);
         $this->assertEquals('Science Fiction', $primaryGenre->name);
-        
+
         // Other genres should be secondary
         $secondaryGenres = $book->genres()->wherePivot('is_primary', false)->get();
         $this->assertCount(2, $secondaryGenres);
@@ -202,7 +199,7 @@ class ImportOpenAudibleTest extends TestCase
 
         // Assert
         $book = Book::where('asin', $bookData['asin'])->first();
-        
+
         // Should map to Science Fiction directory (not Fantasy)
         $this->assertStringStartsWith('Science Fiction/', $book->directory_path);
     }
@@ -242,7 +239,7 @@ class ImportOpenAudibleTest extends TestCase
             'kind' => 'image',
             'type' => 'ART',
         ];
-        
+
         $this->createBooksJson([$bookData]);
         $this->createTestAudioFile($bookData['files'][0]['path']);
         $this->createTestImageFile('Test Book.jpg');
@@ -309,7 +306,7 @@ class ImportOpenAudibleTest extends TestCase
     public function it_updates_existing_books_with_force_flag()
     {
         $this->markTestSkipped('Test needs investigation - force flag not updating existing books');
-        
+
         // Arrange
         $bookData = $this->createTestBookData();
         $this->createBooksJson([$bookData]);
@@ -343,7 +340,7 @@ class ImportOpenAudibleTest extends TestCase
         // Arrange
         $bookData = $this->createTestBookData();
         $this->createBooksJson([$bookData]);
-        
+
         // Create file in books_old instead of books
         $oldPath = $this->testOpenAudibleDir . '/books_old/' . $bookData['files'][0]['path'];
         File::put($oldPath, 'fake audio data');
@@ -367,7 +364,7 @@ class ImportOpenAudibleTest extends TestCase
             $this->createTestBookData(['asin' => 'ASIN002', 'title' => 'Book 2']),
             $this->createTestBookData(['asin' => 'ASIN003', 'title' => 'Book 3']),
         ];
-        
+
         $this->createBooksJson($books);
         foreach ($books as $book) {
             $this->createTestAudioFile($book['files'][0]['path']);
@@ -510,7 +507,7 @@ class ImportOpenAudibleTest extends TestCase
             'seconds' => null,
         ]);
         unset($bookData['seconds']);
-        
+
         $this->createBooksJson([$bookData]);
         $this->createTestAudioFile($bookData['files'][0]['path']);
 

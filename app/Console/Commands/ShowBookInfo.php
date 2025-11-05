@@ -46,7 +46,7 @@ class ShowBookInfo extends Command
         }
 
         $directories = $this->argument('directories');
-        
+
         // Clean up directories - trim whitespace and split on newlines
         $cleanedDirectories = [];
         foreach ($directories as $directory) {
@@ -61,7 +61,7 @@ class ShowBookInfo extends Command
         }
         // Remove duplicates
         $directories = array_unique($cleanedDirectories);
-        
+
         // Debug: Show what we received
         if ($this->option('verbose')) {
             $this->line("<fg=blue>[DEBUG]</> Received directories: " . json_encode($directories));
@@ -73,8 +73,8 @@ class ShowBookInfo extends Command
         }
 
         // Filter out any arguments that look like option values
-        $directories = array_filter($directories, fn($dir) => !str_starts_with($dir, '-'));
-        
+        $directories = array_filter($directories, fn ($dir) => !str_starts_with($dir, '-'));
+
         // If all arguments were filtered out (they were option values), use current directory
         if (empty($directories)) {
             $directories = [getcwd()];
@@ -83,7 +83,7 @@ class ShowBookInfo extends Command
         // Check if arguments are book IDs (numeric) or directories
         $bookIds = [];
         $directoryPaths = [];
-        
+
         foreach ($directories as $directory) {
             if (ctype_digit($directory)) {
                 // It's a numeric ID
@@ -93,48 +93,48 @@ class ShowBookInfo extends Command
                 $directoryPaths[] = $directory;
             }
         }
-        
+
         // Handle book IDs first
         foreach ($bookIds as $bookId) {
             $this->showBookById($bookId);
         }
-        
+
         // If we only had book IDs, we're done
         if (!empty($bookIds) && empty($directoryPaths)) {
             return Command::SUCCESS;
         }
-        
+
         // Continue with directory processing
         $directories = $directoryPaths;
-        
+
         // Validate directories - if any don't exist and we have update options, assume current directory
         $validDirectories = [];
         $hasInvalidDirectories = false;
         $bookRoot = env('BOOK_STORAGE_PATH', config('app.book_root', '/media/audiobooks/books'));
-        
+
         foreach ($directories as $directory) {
             if ($this->option('verbose')) {
                 $this->line("<fg=blue>[DEBUG]</> Processing: {$directory}");
             }
-            
+
             $realPath = realpath($directory);
-            
+
             if ($this->option('verbose')) {
                 $this->line("<fg=blue>[DEBUG]</> realpath() returned: " . ($realPath ?: 'false'));
                 $this->line("<fg=blue>[DEBUG]</> is_dir() returned: " . (is_dir($realPath ?: $directory) ? 'true' : 'false'));
             }
-            
+
             // If not found as absolute path, try relative to book root (only if not already absolute)
             if ((!$realPath || !is_dir($realPath)) && !str_starts_with($directory, '/')) {
                 $bookRootPath = rtrim($bookRoot, '/') . '/' . ltrim($directory, '/');
                 $realPath = realpath($bookRootPath);
-                
+
                 if ($this->option('verbose')) {
                     $this->line("<fg=blue>[DEBUG]</> Tried book root path: {$bookRootPath}");
                     $this->line("<fg=blue>[DEBUG]</> realpath() returned: " . ($realPath ?: 'false'));
                 }
             }
-            
+
             if ($realPath && is_dir($realPath)) {
                 $validDirectories[] = $realPath;
                 if ($this->option('verbose')) {
@@ -147,7 +147,7 @@ class ShowBookInfo extends Command
                 }
             }
         }
-        
+
         // If we have invalid directories and update options are provided, use current directory
         if ($hasInvalidDirectories && $this->hasUpdateOptions() && empty($validDirectories)) {
             $this->warn("Note: Using current directory (arguments don't appear to be valid paths)");
@@ -157,13 +157,13 @@ class ShowBookInfo extends Command
             foreach ($directories as $directory) {
                 $realPath = realpath($directory);
                 $triedPaths = [$directory];
-                
+
                 if ((!$realPath || !is_dir($realPath)) && !str_starts_with($directory, '/')) {
                     $bookRootPath = rtrim($bookRoot, '/') . '/' . ltrim($directory, '/');
                     $realPath = realpath($bookRootPath);
                     $triedPaths[] = $bookRootPath;
                 }
-                
+
                 if (!$realPath || !is_dir($realPath)) {
                     $this->error("Directory not found: {$directory}");
                     foreach ($triedPaths as $tried) {
@@ -171,13 +171,13 @@ class ShowBookInfo extends Command
                     }
                 }
             }
-            
+
             // If we have invalid directories and no valid ones, fail
             if (empty($validDirectories)) {
                 return Command::FAILURE;
             }
         }
-        
+
         // If no valid directories at this point, use current directory ONLY if no arguments were provided
         if (empty($validDirectories)) {
             $validDirectories = [getcwd()];
@@ -193,7 +193,7 @@ class ShowBookInfo extends Command
     protected function showBookById(string $bookId): void
     {
         $book = Book::find($bookId);
-        
+
         if (!$book) {
             $this->error("Book not found with ID: {$bookId}");
             return;
@@ -203,7 +203,7 @@ class ShowBookInfo extends Command
         if ($this->hasUpdateOptions()) {
             $this->updateBookFields($book, null);
         }
-        
+
         $this->displayBookInfo($book);
         $this->newLine();
     }
@@ -415,15 +415,15 @@ class ShowBookInfo extends Command
 
         $directoryWidth = $rowCount <= $imageCoverageRows ? $shortWidth : $maxWidth;
         $directoryPath = $book->directoryPath ?? 'N/A';
-        
+
         // Check if directory exists on disk
         $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
         $fullPath = $bookRoot . '/' . ltrim($directoryPath, '/');
         // Use file_exists and is_dir together, and check that it's readable
         $directoryExists = file_exists($fullPath) && is_dir($fullPath) && is_readable($fullPath);
-        
+
         $wrappedDirectory = $this->wrapText($directoryPath, $directoryWidth);
-        
+
         // Add debug info if requested
         if ($this->option('show-paths')) {
             if (!$directoryExists && $directoryPath !== 'N/A') {
@@ -432,12 +432,12 @@ class ShowBookInfo extends Command
                 $wrappedDirectory .= "\n  (Exists: {$fullPath})";
             }
         }
-        
+
         // Apply color styling using OutputFormatterStyle
         if (!$directoryExists && $directoryPath !== 'N/A') {
             $wrappedDirectory = "<fg=red>{$wrappedDirectory}</>";
         }
-        
+
         $tableData[] = ['Directory', $wrappedDirectory];
         $rowCount++;
 
@@ -573,7 +573,7 @@ class ShowBookInfo extends Command
             if (file_exists($coverPath) || str_starts_with($book->coverImage, 'http')) {
                 $this->terminalImageService->displayImage(
                     $coverPath,
-                    fn($msg) => $this->line($msg)
+                    fn ($msg) => $this->line($msg)
                 );
                 $this->newLine();
             }
@@ -618,14 +618,14 @@ class ShowBookInfo extends Command
 
         $this->printField('Audio Files', $book->audioFileCount ?? 0, $leftWidth);
         $this->printField('Source', $book->source ?? 'N/A', $leftWidth);
-        
+
         // Check if directory exists on disk
         $directoryPath = $book->directoryPath ?? 'N/A';
         $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
         $fullPath = $bookRoot . '/' . ltrim($directoryPath, '/');
         // Use file_exists and is_dir together, and check that it's readable
         $directoryExists = file_exists($fullPath) && is_dir($fullPath) && is_readable($fullPath);
-        
+
         // Color red if directory doesn't exist
         if (!$directoryExists && $directoryPath !== 'N/A') {
             $this->printField('Directory', "<fg=red>{$directoryPath}</>", $leftWidth);
@@ -713,7 +713,7 @@ class ShowBookInfo extends Command
             $visibleCurrentLine = preg_replace('/<[^>]+>/', '', $currentLine);
             $visibleWord = preg_replace('/<[^>]+>/', '', $word);
             $visibleLength = mb_strlen($visibleCurrentLine . ' ' . $visibleWord);
-            
+
             if ($visibleLength <= $maxWidth) {
                 $currentLine .= ($currentLine ? ' ' : '') . $word;
             } else {
@@ -812,7 +812,7 @@ class ShowBookInfo extends Command
             if (filter_var($coverInput, FILTER_VALIDATE_URL)) {
                 // URL - download it and save to book directory
                 $this->info("Downloading cover image from URL...");
-                
+
                 try {
                     // Use stream context to follow redirects
                     $context = stream_context_create([
@@ -827,41 +827,41 @@ class ShowBookInfo extends Command
                             'verify_peer_name' => false
                         ]
                     ]);
-                    
+
                     $imageData = file_get_contents($coverInput, false, $context);
                     if ($imageData === false) {
                         throw new \Exception("Failed to download image");
                     }
-                    
+
                     // Validate it's actually an image
                     $finfo = new \finfo(FILEINFO_MIME_TYPE);
                     $mimeType = $finfo->buffer($imageData);
                     if (!str_starts_with($mimeType, 'image/')) {
                         throw new \Exception("Downloaded content is not an image (got: {$mimeType})");
                     }
-                    
+
                     // Determine file extension from URL or content type
                     $extension = 'jpg';
                     $urlPath = parse_url($coverInput, PHP_URL_PATH);
                     if ($urlPath && preg_match('/\.(jpg|jpeg|png|gif|webp)$/i', $urlPath, $matches)) {
                         $extension = strtolower($matches[1]);
                     }
-                    
+
                     // Save to book directory
                     $coverFilename = 'cover.' . $extension;
                     $coverFullPath = $directory . '/' . $coverFilename;
-                    
+
                     if (!is_dir($directory)) {
                         $this->error("Book directory not found: {$directory}");
                         return;
                     }
-                    
+
                     if (file_put_contents($coverFullPath, $imageData) === false) {
                         throw new \Exception("Failed to save image file");
                     }
-                    
+
                     chmod($coverFullPath, 0664);
-                    
+
                     // Store relative path
                     if (str_starts_with($directory, $bookRoot)) {
                         $relativePath = ltrim(substr($directory, strlen($bookRoot)), '/') . '/' . $coverFilename;
@@ -1107,7 +1107,7 @@ class ShowBookInfo extends Command
     {
         // Find the book
         $book = Book::find($bookId);
-        
+
         if (!$book) {
             $this->error("Book not found with ID: {$bookId}");
             return 1;
@@ -1127,7 +1127,7 @@ class ShowBookInfo extends Command
 
         if ($directoryExists) {
             $this->line("  Directory exists: <fg=green>Yes</>");
-            
+
             // Check if any other books use this directory
             $otherBooks = Book::where('directory_path', $book->directoryPath)
                 ->where('id', '!=', $book->id)
@@ -1140,31 +1140,31 @@ class ShowBookInfo extends Command
                 }
                 $this->error("\nCannot delete directory that is shared with other books!");
                 $this->line("The book record will be deleted, but the directory will be preserved.");
-                
+
                 if (!$this->confirm("\nDelete only the book record (preserve directory)?", false)) {
                     $this->info("Cancelled");
                     return 0;
                 }
-                
+
                 $deleteDirectory = false;
             } else {
                 $this->line("  No other books use this directory");
-                
+
                 if (!$this->confirm("\nDelete book record AND directory?", false)) {
                     $this->info("Cancelled");
                     return 0;
                 }
-                
+
                 $deleteDirectory = true;
             }
         } else {
             $this->line("  Directory exists: <fg=red>No</>");
-            
+
             if (!$this->confirm("\nDelete book record?", false)) {
                 $this->info("Cancelled");
                 return 0;
             }
-            
+
             $deleteDirectory = false;
         }
 

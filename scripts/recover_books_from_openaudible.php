@@ -409,7 +409,8 @@ function audio_has_embedded_cover(getID3 $getID3, string $sourcePath): bool
     }
 }
 
-function first_or_null($v) {
+function first_or_null($v)
+{
     if (is_array($v)) {
         return $v[0] ?? null;
     }

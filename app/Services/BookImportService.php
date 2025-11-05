@@ -246,7 +246,7 @@ class BookImportService
                 }
             }
 
-            // Generate library.json after all relationships are set
+            // Generate librarian.json after all relationships are set
             $this->updateLibraryJson($book);
 
             DB::commit();
@@ -374,7 +374,7 @@ class BookImportService
                 }
             }
 
-            // Generate library.json after all relationships are updated
+            // Generate librarian.json after all relationships are updated
             $this->updateLibraryJson($book);
 
             DB::commit();

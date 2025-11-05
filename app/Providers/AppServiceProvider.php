@@ -43,7 +43,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Register Book observer for automatic library.json updates
+        // Register Book observer for automatic librarian.json updates
         Book::observe(BookObserver::class);
 
         // Register custom Documentstore user provider

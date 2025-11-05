@@ -2,7 +2,7 @@
 
 namespace Tests\Unit\Import;
 
-use Tests\TestCase;
+use PHPUnit\Framework\TestCase;
 
 class EnrichmentMergeTest extends TestCase
 {

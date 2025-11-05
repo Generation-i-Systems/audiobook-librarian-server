@@ -35,28 +35,28 @@ class ResolveDuplicateDirectoryPaths extends Command
         // Load relationships for authors, series, narrators, and genres
         $allBooks = \App\Models\Book::with(['authors', 'series', 'narrators', 'genres'])->get()->map(function ($book) {
             $bookArray = $book->toArray();
-            
+
             // Map relationship data to expected format
             if (isset($bookArray['authors']) && is_array($bookArray['authors'])) {
                 $bookArray['author'] = $bookArray['authors'];
             }
-            
+
             if (isset($bookArray['narrators']) && is_array($bookArray['narrators'])) {
                 $bookArray['narrator'] = $bookArray['narrators'];
             }
-            
+
             if (isset($bookArray['genres']) && is_array($bookArray['genres'])) {
                 $bookArray['genre'] = $bookArray['genres'];
             }
-            
+
             // Use directoryPath field (camelCase from database)
             if (isset($bookArray['directoryPath'])) {
                 $bookArray['directory_path'] = $bookArray['directoryPath'];
             }
-            
+
             return $bookArray;
         })->toArray();
-        
+
         if ($verbose) {
             $this->line("Total books retrieved: " . count($allBooks));
             if (!empty($allBooks)) {
@@ -69,14 +69,14 @@ class ResolveDuplicateDirectoryPaths extends Command
                 $this->newLine();
             }
         }
-        
+
         $booksByPath = [];
         $booksWithoutPath = 0;
-        
+
         foreach ($allBooks as $book) {
             // Try multiple field name variations
             $path = $book['directory_path'] ?? $book['directoryPath'] ?? $book['directory'] ?? null;
-            
+
             if ($path) {
                 if (!isset($booksByPath[$path])) {
                     $booksByPath[$path] = [];
@@ -91,7 +91,7 @@ class ResolveDuplicateDirectoryPaths extends Command
                 }
             }
         }
-        
+
         if ($verbose) {
             $this->line("Books without directory_path: {$booksWithoutPath}");
             $this->line("Unique paths found: " . count($booksByPath));
@@ -99,7 +99,7 @@ class ResolveDuplicateDirectoryPaths extends Command
         }
 
         // Filter to only duplicates
-        $duplicates = array_filter($booksByPath, fn($books) => count($books) > 1);
+        $duplicates = array_filter($booksByPath, fn ($books) => count($books) > 1);
 
         if (empty($duplicates)) {
             $this->info('✓ No duplicate directory paths found!');
@@ -136,7 +136,7 @@ class ResolveDuplicateDirectoryPaths extends Command
                 $this->info('🛑 Exiting command...');
                 break;
             }
-            
+
             if ($action === 'ignore') {
                 $stats['ignored']++;
                 $this->info('⏭️  Skipped');
@@ -226,7 +226,7 @@ class ResolveDuplicateDirectoryPaths extends Command
             return $authors;
         }
         if (is_array($authors)) {
-            return implode(', ', array_map(fn($a) => is_string($a) ? $a : ($a['name'] ?? 'Unknown'), $authors));
+            return implode(', ', array_map(fn ($a) => is_string($a) ? $a : ($a['name'] ?? 'Unknown'), $authors));
         }
         return 'N/A';
     }
@@ -265,7 +265,7 @@ class ResolveDuplicateDirectoryPaths extends Command
             return $narrators;
         }
         if (is_array($narrators)) {
-            return implode(', ', array_map(fn($n) => is_string($n) ? $n : ($n['name'] ?? 'Unknown'), $narrators));
+            return implode(', ', array_map(fn ($n) => is_string($n) ? $n : ($n['name'] ?? 'Unknown'), $narrators));
         }
         return 'N/A';
     }
@@ -311,7 +311,7 @@ class ResolveDuplicateDirectoryPaths extends Command
     {
         $this->newLine();
         $this->line('<fg=bright-white>Which book would you like to keep?</>');
-        
+
         foreach ($books as $index => $book) {
             $bookNum = $index + 1;
             $id = $book['id'] ?? $book['_id'];
@@ -319,7 +319,7 @@ class ResolveDuplicateDirectoryPaths extends Command
             $score = $this->calculateCompletenessScore($book);
             $this->line("  {$bookNum}. <fg=cyan>Keep Book #{$bookNum}</> (ID: {$id}, completeness: {$score}%)");
         }
-        
+
         $this->line('  ' . (count($books) + 1) . '. <fg=yellow>Merge manually</> - Choose specific fields from each');
         $this->line('  ' . (count($books) + 2) . '. <fg=gray>Ignore</> - Skip for now');
         $this->line('  <fg=red>q</> or <fg=red>quit</> - Exit command');
@@ -327,17 +327,17 @@ class ResolveDuplicateDirectoryPaths extends Command
 
         $maxChoice = count($books) + 2;
         $choice = $this->ask("Enter your choice (1-{$maxChoice}, q to quit) [1]");
-        
+
         // If empty input (just pressed Enter), default to option 1
         if (empty(trim($choice))) {
             return 'keep_0';
         }
-        
+
         // Check for quit commands
         if (strtolower(trim($choice)) === 'q' || strtolower(trim($choice)) === 'quit') {
             return 'quit';
         }
-        
+
         $choiceNum = (int) $choice;
 
         if ($choiceNum >= 1 && $choiceNum <= count($books)) {
@@ -362,7 +362,7 @@ class ResolveDuplicateDirectoryPaths extends Command
         $keepBook = $books[$keepIndex];
         $keepId = $keepBook['id'] ?? $keepBook['_id'];
         $keepTitle = $keepBook['title'] ?? 'N/A';
-        
+
         $this->info("✓ Keeping book ID: {$keepId} - {$keepTitle}");
 
         // Delete the others
@@ -370,13 +370,13 @@ class ResolveDuplicateDirectoryPaths extends Command
             if ($index !== $keepIndex) {
                 $bookId = $book['id'] ?? $book['_id'];
                 $bookTitle = $book['title'] ?? 'N/A';
-                
+
                 if ($dryRun) {
                     $this->line("  Would delete book ID: {$bookId} - {$bookTitle}");
                 } else {
                     $this->documentStore->deleteBook($bookId);
                     $this->line("  <fg=red>Deleted</> book ID: {$bookId} - {$bookTitle}");
-                    
+
                     Log::info('Deleted duplicate book', [
                         'deleted_id' => $bookId,
                         'kept_id' => $keepId,
@@ -392,11 +392,11 @@ class ResolveDuplicateDirectoryPaths extends Command
         $this->newLine();
         $this->line('<fg=bright-white>Manual Merge: Choose fields from each book</>');
         $this->newLine();
-        
+
         // Start with first book as base
         $mergedBook = $books[0];
         $baseId = $mergedBook['id'] ?? $mergedBook['_id'];
-        
+
         // Fields to potentially merge
         $mergeableFields = [
             'title' => 'Title',
@@ -410,56 +410,56 @@ class ResolveDuplicateDirectoryPaths extends Command
             'coverImage' => 'Cover Image',
             'source' => 'Source',
         ];
-        
+
         foreach ($mergeableFields as $field => $label) {
             // Show values from each book
             $this->line("<fg=cyan>{$label}:</>");
             $hasMultipleValues = false;
             $values = [];
             $displayValues = [];
-            
+
             foreach ($books as $index => $book) {
                 $bookNum = $index + 1;
                 $value = $book[$field] ?? null;
-                
+
                 if ($value !== null && $value !== '' && $value !== 'N/A') {
                     // Format display value based on field type
                     if ($field === 'author' && is_array($value)) {
                         $displayValue = $this->formatAuthors($value);
                         // Add IDs in parentheses
-                        $ids = array_map(fn($a) => $a['id'] ?? '?', $value);
+                        $ids = array_map(fn ($a) => $a['id'] ?? '?', $value);
                         $displayValue .= ' (IDs: ' . implode(', ', $ids) . ')';
                     } elseif ($field === 'series' && is_array($value)) {
                         $displayValue = $this->formatSeries($value);
                         // Add IDs in parentheses
-                        $ids = array_map(fn($s) => $s['id'] ?? '?', $value);
+                        $ids = array_map(fn ($s) => $s['id'] ?? '?', $value);
                         $displayValue .= ' (IDs: ' . implode(', ', $ids) . ')';
                     } elseif ($field === 'narrator' && is_array($value)) {
                         $displayValue = $this->formatNarrators($value);
                         // Add IDs in parentheses
-                        $ids = array_map(fn($n) => $n['id'] ?? '?', $value);
+                        $ids = array_map(fn ($n) => $n['id'] ?? '?', $value);
                         $displayValue .= ' (IDs: ' . implode(', ', $ids) . ')';
                     } elseif (is_array($value)) {
                         $displayValue = json_encode($value);
                     } else {
                         $displayValue = (string) $value;
                     }
-                    
+
                     if (strlen($displayValue) > 150) {
                         $displayValue = substr($displayValue, 0, 150) . '...';
                     }
-                    
+
                     $values[$bookNum] = $value;
                     $displayValues[$bookNum] = $displayValue;
                     $hasMultipleValues = true;
                 }
             }
-            
+
             if (!$hasMultipleValues) {
-                $this->line("  <fg=gray>(No values available)</>"); 
+                $this->line("  <fg=gray>(No values available)</>");
                 continue;
             }
-            
+
             if (count($values) === 1) {
                 // Only one book has this field, use it automatically
                 $mergedBook[$field] = array_values($values)[0];
@@ -478,9 +478,9 @@ class ResolveDuplicateDirectoryPaths extends Command
                     foreach ($displayValues as $num => $display) {
                         $this->line("  {$num}. {$display}");
                     }
-                    
+
                     $choice = $this->ask("  Choose which to use (1-" . count($books) . ", or 'skip')");
-                    
+
                     if (strtolower(trim($choice)) !== 'skip' && isset($values[(int)$choice])) {
                         $mergedBook[$field] = $values[(int)$choice];
                         $this->line("  <fg=green>→ Selected option {$choice}</>");
@@ -489,20 +489,20 @@ class ResolveDuplicateDirectoryPaths extends Command
                     }
                 }
             }
-            
+
             $this->newLine();
         }
-        
+
         // Confirm merge
         $this->line('<fg=bright-white>Merged book will have:</>');
         $this->displayBookInfo($mergedBook);
         $this->newLine();
-        
+
         if (!$this->confirm('Save this merged book?', true)) {
             $this->warn('Merge cancelled');
             return;
         }
-        
+
         if ($dryRun) {
             $this->info("Would update book ID: {$baseId} with merged data");
             foreach ($books as $index => $book) {
@@ -516,48 +516,48 @@ class ResolveDuplicateDirectoryPaths extends Command
             // Separate relationship fields from regular fields
             $updateData = [];
             $relationshipFields = ['author', 'series', 'narrator', 'genre'];
-            
+
             foreach ($mergeableFields as $field => $label) {
                 if (isset($mergedBook[$field]) && !in_array($field, $relationshipFields)) {
                     $updateData[$field] = $mergedBook[$field];
                 }
             }
-            
+
             // Update basic fields
             if (!empty($updateData)) {
                 $this->documentStore->updateBook($baseId, $updateData);
             }
-            
+
             // Update relationships using the Book model
             $bookModel = \App\Models\Book::find($baseId);
             if ($bookModel) {
                 // Sync authors
                 if (isset($mergedBook['author']) && is_array($mergedBook['author'])) {
-                    $authorIds = array_map(fn($a) => $a['id'], $mergedBook['author']);
+                    $authorIds = array_map(fn ($a) => $a['id'], $mergedBook['author']);
                     $bookModel->authors()->sync($authorIds);
                 }
-                
+
                 // Sync narrators
                 if (isset($mergedBook['narrator']) && is_array($mergedBook['narrator'])) {
-                    $narratorIds = array_map(fn($n) => $n['id'], $mergedBook['narrator']);
+                    $narratorIds = array_map(fn ($n) => $n['id'], $mergedBook['narrator']);
                     $bookModel->narrators()->sync($narratorIds);
                 }
-                
+
                 // Sync series
                 if (isset($mergedBook['series']) && is_array($mergedBook['series'])) {
-                    $seriesIds = array_map(fn($s) => $s['id'], $mergedBook['series']);
+                    $seriesIds = array_map(fn ($s) => $s['id'], $mergedBook['series']);
                     $bookModel->series()->sync($seriesIds);
                 }
-                
+
                 // Sync genres
                 if (isset($mergedBook['genre']) && is_array($mergedBook['genre'])) {
-                    $genreIds = array_map(fn($g) => $g['id'], $mergedBook['genre']);
+                    $genreIds = array_map(fn ($g) => $g['id'], $mergedBook['genre']);
                     $bookModel->genres()->sync($genreIds);
                 }
             }
-            
+
             $this->info("✓ Updated book ID: {$baseId} with merged data");
-            
+
             // Delete the other books
             foreach ($books as $index => $book) {
                 if ($index > 0) {
