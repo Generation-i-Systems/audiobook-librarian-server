@@ -25,7 +25,7 @@ class FixRemoteImageUrlsCommandTest extends TestCase
             [
                 'id' => 'book2',
                 'title' => 'Test Book 2',
-                'coverImage' => 'local/path/cover.jpg', // Already local
+                'coverImage' => 'cover.jpg', // Already local (just filename, no path)
                 'directoryPath' => 'Fiction/Author/Book2'
             ],
             [
