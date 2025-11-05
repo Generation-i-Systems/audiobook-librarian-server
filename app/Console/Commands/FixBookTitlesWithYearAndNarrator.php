@@ -120,15 +120,16 @@ class FixBookTitlesWithYearAndNarrator extends Command
             // If year is invalid, leave the title unchanged (don't remove the year)
         }
 
-        // Pattern 1b: Year suffix in parentheses - "Book Title (2008)"
-        if (!isset($changes['year']) && preg_match('/^(.+?)\s*\((\d{4})\)\s*$/', $workingTitle, $matches)) {
+        // Pattern 1b: Year suffix in parentheses - "Book Title (2008)" or "Book Title (2010) (read by...)"
+        if (!isset($changes['year']) && preg_match('/^(.+?)\s*\((\d{4})\)(.*)$/', $workingTitle, $matches)) {
             $year = (int) $matches[2];
             $titleWithoutYear = trim($matches[1]);
+            $remainingText = $matches[3];
 
             // Only extract year if it's reasonable (1700 to current year)
             $currentYear = (int) date('Y');
             if ($year >= 1700 && $year <= $currentYear) {
-                $workingTitle = $titleWithoutYear;
+                $workingTitle = trim($titleWithoutYear . $remainingText);
                 $changes['year'] = $year;
             }
             // If year is invalid, leave the title unchanged
