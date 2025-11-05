@@ -10,6 +10,8 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "ext-grpc": "*",
+        "ext-mongodb": "*",
         "doctrine/dbal": "^4.3",
         "google/apiclient": "^2.18",
         "google/cloud-firestore": "^1.50",
@@ -42,7 +44,7 @@
         "phpstan/phpstan": "^2.1",
         "phpunit/phpunit": "^11.5.3",
         "squizlabs/php_codesniffer": "^3.13",
-        "xdebug/xdebug": "^3.4"
+        "ext-xdebug": "*"
     },
     "autoload": {
         "psr-4": {
