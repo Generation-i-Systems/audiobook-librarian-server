@@ -1,4 +1,12 @@
 ## [Unreleased]
+### Added
+- Added GitHub Actions CI workflow to run tests on every commit
+  - Runs full test suite on PHP 8.2 and 8.3
+  - Includes MySQL database setup and migrations
+  - Runs code quality checks (PHP CS Fixer, PHPStan, PHP_CodeSniffer)
+  - Triggers on pushes to main, develop, and claude/** branches
+  - Triggers on pull requests to main and develop branches
+
 ### Fixed
 - Fixed multi-book series detection to use actual book titles instead of chapter titles
   - Now extracts SERIES and PART metadata fields from M4B files
