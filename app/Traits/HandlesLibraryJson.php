@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Log;
 trait HandlesLibraryJson
 {
     /**
-     * Generate or update library.json for a book
+     * Generate or update librarian.json for a book
      *
      * @param Book|array $book Book model or book data array
      * @return bool True on success, false on failure
@@ -29,7 +29,7 @@ trait HandlesLibraryJson
 
             // Ensure we have the required data
             if (empty($book['directory_path'])) {
-                Log::warning('Cannot generate library.json: Missing directory path', [
+                Log::warning('Cannot generate librarian.json: Missing directory path', [
                     'book_id' => $book['id'] ?? null
                 ]);
                 return false;
@@ -39,14 +39,14 @@ trait HandlesLibraryJson
 
             // Skip if directory doesn't exist
             if (!is_dir($bookDir)) {
-                Log::warning('Book directory does not exist for library.json', [
+                Log::warning('Book directory does not exist for librarian.json', [
                     'book_id' => $book['id'] ?? null,
                     'directory' => $bookDir
                 ]);
                 return false;
             }
 
-            $jsonPath = rtrim($bookDir, '/') . '/library.json';
+            $jsonPath = rtrim($bookDir, '/') . '/librarian.json';
 
             // Prepare book data for JSON
             $jsonData = $this->prepareBookDataForJson($book);
@@ -72,7 +72,7 @@ trait HandlesLibraryJson
 
             return true;
         } catch (\Exception $e) {
-            Log::error('Failed to generate library.json', [
+            Log::error('Failed to generate librarian.json', [
                 'book_id' => $book['id'] ?? null,
                 'path' => $jsonPath ?? null,
                 'error' => $e->getMessage(),

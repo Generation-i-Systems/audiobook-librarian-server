@@ -12,11 +12,11 @@ class EnsureLibraryJson extends Command
     use HandlesLibraryJson;
 
     protected $signature = 'books:ensure-library-json
-                            {--all : Process all books, not just those missing library.json}
+                            {--all : Process all books, not just those missing librarian.json}
                             {--book-id= : Process only the book with this ID}
                             {--dry-run : Show what would be done without making any changes}';
 
-    protected $description = 'Ensure all books have library.json files in their directories';
+    protected $description = 'Ensure all books have librarian.json files in their directories';
 
     public function handle(): int
     {
@@ -80,12 +80,12 @@ class EnsureLibraryJson extends Command
                     continue;
                 }
 
-                $jsonPath = rtrim($book->directory_path, '/') . '/library.json';
+                $jsonPath = rtrim($book->directory_path, '/') . '/librarian.json';
 
                 if ($dryRun) {
                     if (!file_exists($jsonPath) || $processAll) {
                         $this->line('');
-                        $this->line(sprintf('[DRY RUN] Would create/update library.json for: %s', $book->title));
+                        $this->line(sprintf('[DRY RUN] Would create/update librarian.json for: %s', $book->title));
                     }
                     $success++;
                 } else {
@@ -99,7 +99,7 @@ class EnsureLibraryJson extends Command
             } catch (\Exception $e) {
                 $this->line('');
                 $this->error(sprintf('Error processing book %d: %s', $book->id, $e->getMessage()));
-                Log::error('Failed to ensure library.json', [
+                Log::error('Failed to ensure librarian.json', [
                     'book_id' => $book->id,
                     'error' => $e->getMessage(),
                     'trace' => $e->getTraceAsString()
