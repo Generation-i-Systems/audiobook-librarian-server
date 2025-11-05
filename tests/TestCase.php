@@ -55,7 +55,7 @@ abstract class TestCase extends BaseTestCase
         gc_collect_cycles();
 
         parent::tearDown();
-        
+
         // Force another garbage collection AFTER teardown
         gc_collect_cycles();
     }

@@ -9,25 +9,47 @@ use Tests\TestCase;
 class MetadataExtractionTest extends TestCase
 {
     protected MetadataProcessingService $service;
+    protected $aiBookProcessorMock;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new MetadataProcessingService(app(AIBookProcessor::class));
+        
+        // Create a mock of AIBookProcessor using Laravel's mock helper
+        $this->aiBookProcessorMock = $this->mock(AIBookProcessor::class);
+        
+        // Create the service - it will use our mocked AIBookProcessor
+        $this->service = new MetadataProcessingService();
     }
 
     /** @test */
     public function it_extracts_author_from_artist_tag()
     {
-        $fileTags = [
-            'artist' => 'Shannon Mayer',
-            'title' => 'Tracker',
+        // Create a test audiobook with file tags
+        $audiobook = [
+            'path' => '/test/path',
+            'name' => 'Test Book',
+            'files' => [
+                '/test/path/test.mp3'
+            ],
+            'openaudible_metadata' => []
         ];
 
-        $result = [];
-        $this->invokeMethod($this->service, 'applyId3TagMappings', [&$result, $fileTags]);
+        // Mock the AIBookProcessor to return our test tags
+        $this->aiBookProcessorMock
+            ->shouldReceive('extractFileTags')
+            ->with('/test/path/test.mp3')
+            ->andReturn([
+                'artist' => 'Shannon Mayer',
+                'title' => 'Tracker'
+            ]);
 
+        // Process the audiobook
+        $result = $this->service->processWithoutAI($audiobook);
+
+        // Assert that the author was extracted from the artist tag
         $this->assertEquals(['Shannon Mayer'], $result['author']);
+        $this->assertEquals('Tracker', $result['title']);
     }
 
     /** @test */
