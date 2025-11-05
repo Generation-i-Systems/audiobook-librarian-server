@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class FixUrlCoverImages extends Command
@@ -151,21 +152,22 @@ class FixUrlCoverImages extends Command
                 $source = 'googlebooks';
             }
 
-            // Download the image using curl
-            $ch = curl_init($imageUrl);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-            curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
-            $imageData = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
+            // Download the image using Laravel HTTP client
+            $response = Http::withOptions([
+                'verify' => false,
+            ])
+                ->timeout(30)
+                ->withHeaders([
+                    'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                ])
+                ->get($imageUrl);
 
-            if (!$imageData || $httpCode !== 200) {
-                $result['error'] = 'Failed to download image from URL (HTTP ' . $httpCode . ')';
+            if (!$response->successful()) {
+                $result['error'] = 'Failed to download image from URL (HTTP ' . $response->status() . ')';
                 return $result;
             }
+
+            $imageData = $response->body();
 
             // Determine extension
             $extension = $this->getImageExtensionFromUrl($imageUrl);

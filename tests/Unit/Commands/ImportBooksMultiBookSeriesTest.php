@@ -145,11 +145,12 @@ class ImportBooksMultiBookSeriesTest extends TestCase
         $method = $reflection->getMethod('extractFileMetadata');
         $method->setAccessible(true);
 
-        // Test with non-existent file (should return empty array)
+        // Test with non-existent file (should return default metadata)
         $result = $method->invoke($this->command, '/non/existent/file.m4b');
 
         $this->assertIsArray($result);
-        $this->assertEmpty($result);
+        $this->assertArrayHasKey('title', $result);
+        $this->assertEquals('file', $result['title']); // Should be filename without extension
     }
 
     #[\PHPUnit\Framework\Attributes\Test]

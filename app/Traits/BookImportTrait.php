@@ -335,12 +335,26 @@ trait BookImportTrait
             // First part is POTENTIALLY genre - validate it
             $potentialGenre = array_shift($parts);
 
-            // List of valid genres (should match database enum)
-            $validGenres = [
-                'Kids', 'Religion', 'General Fiction', 'Fiction', 'Church', 'Science', 'Historical Fiction',
-                'Computer', 'Classic', 'History', 'Non Fiction', 'Action', 'LitRPG',
-                'Romance', 'Science Fiction', 'Other', 'Fantasy'
-            ];
+            // Get valid genres from document store if available, otherwise use fallback list
+            $validGenres = [];
+            if (property_exists($this, 'documentStore') && $this->documentStore) {
+                try {
+                    $genresList = $this->documentStore->listGenres();
+                    $validGenres = array_map(fn($g) => $g['name'], $genresList);
+                } catch (\Exception $e) {
+                    // Fall back to hardcoded list if documentStore is not available
+                    $validGenres = [];
+                }
+            }
+
+            // Fallback list of valid genres (should match database enum)
+            if (empty($validGenres)) {
+                $validGenres = [
+                    'Kids', 'Religion', 'General Fiction', 'Fiction', 'Church', 'Science', 'Historical Fiction',
+                    'Computer', 'Classic', 'History', 'Non Fiction', 'Action', 'LitRPG',
+                    'Romance', 'Science Fiction', 'Other', 'Fantasy'
+                ];
+            }
 
             // Check if the first directory component is actually a valid genre
             $isValidGenre = false;

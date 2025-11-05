@@ -47,46 +47,48 @@ class BookControllerTest extends TestCase
         $this->storedBooks = [];
         $this->documentStore = Mockery::mock(DocumentStoreServiceInterface::class);
 
-        $this->documentStore->shouldReceive('getAllBooks')->andReturnUsing(function () {
-            return $this->storedBooks;
+        $storedBooks = &$this->storedBooks;
+
+        $this->documentStore->shouldReceive('getAllBooks')->andReturnUsing(function () use (&$storedBooks) {
+            return $storedBooks;
         });
 
         // Mock the storeBook method
         $this->documentStore->shouldReceive('storeBook')
-            ->andReturnUsing(function ($bookData) {
+            ->andReturnUsing(function ($bookData) use (&$storedBooks) {
                 $id = 'book-' . uniqid();
                 $bookData['id'] = $id;
-                $this->storedBooks[$id] = $bookData;
+                $storedBooks[$id] = $bookData;
                 return $id;
             });
 
         // Mock the createBook method - this is what the controller actually calls
         $this->documentStore->shouldReceive('createBook')->byDefault()
-            ->andReturnUsing(function ($bookData) {
+            ->andReturnUsing(function ($bookData) use (&$storedBooks) {
                 $id = $bookData['id'] ?? ('book-' . uniqid());
                 $bookData['id'] = $id;
-                $this->storedBooks[$id] = $bookData;
+                $storedBooks[$id] = $bookData;
                 return $id;
             });
 
-        $this->documentStore->shouldReceive('updateBook')->byDefault()->andReturnUsing(function ($id, $book) {
-            if (isset($this->storedBooks[$id])) {
-                $this->storedBooks[$id] = array_merge($this->storedBooks[$id], $book);
+        $this->documentStore->shouldReceive('updateBook')->byDefault()->andReturnUsing(function ($id, $book) use (&$storedBooks) {
+            if (isset($storedBooks[$id])) {
+                $storedBooks[$id] = array_merge($storedBooks[$id], $book);
                 return ['success' => true];
             }
             return ['success' => false];
         });
 
-        $this->documentStore->shouldReceive('deleteBook')->andReturnUsing(function ($id) {
-            if (isset($this->storedBooks[$id])) {
-                unset($this->storedBooks[$id]);
+        $this->documentStore->shouldReceive('deleteBook')->andReturnUsing(function ($id) use (&$storedBooks) {
+            if (isset($storedBooks[$id])) {
+                unset($storedBooks[$id]);
                 return ['success' => true];
             }
             return ['success' => false];
         });
 
-        $this->documentStore->shouldReceive('getBook')->byDefault()->andReturnUsing(function ($id) {
-            return $this->storedBooks[$id] ?? null;
+        $this->documentStore->shouldReceive('getBook')->byDefault()->andReturnUsing(function ($id) use (&$storedBooks) {
+            return $storedBooks[$id] ?? null;
         });
 
         // Mock the Google Books API service
@@ -324,7 +326,7 @@ class BookControllerTest extends TestCase
             ->andReturn(null);
 
         $this->documentStore->shouldReceive('createSeries')
-            ->with('Test Series')
+            ->with('Test Series', false)
             ->once()
             ->andReturn('series-id-1');
 

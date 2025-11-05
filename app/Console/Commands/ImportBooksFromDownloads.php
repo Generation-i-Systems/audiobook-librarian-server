@@ -1156,7 +1156,7 @@ class ImportBooksFromDownloads extends Command
 
         try {
             // Get duration using the audio analyzer
-            $duration = $this->audioAnalyzer->getAudioDuration($filePath);
+            $duration = $this->getAudioAnalyzer()->getAudioDuration($filePath);
             if ($duration !== null) {
                 $metadata['duration'] = $duration;
             }
