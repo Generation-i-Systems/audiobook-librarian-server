@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\Author;
 use App\Models\Book;
 use App\Models\Genre;
+use App\Models\Publisher;
 use App\Models\Series;
 use App\Services\TerminalImageService;
 use App\Traits\BookImportTrait;
@@ -507,12 +508,12 @@ class ShowBookInfo extends Command
         echo $tableOutput;
 
         // Display image overlaid on upper right of table
-        if ($coverPath && $this->terminalImageService->supportsImages() && $rightBorderPos !== null) {
+        if ($coverPath && $this->terminalImageService->supportsImages()) {
             $imageWidth = 15;
             $imageHeight = 13;
 
-            // Calculate horizontal position: rightBorderPos - imageWidth + 1
-            $leftPos = max(0, $rightBorderPos - $imageWidth + 1);
+            $terminalColumns = $this->getTerminalColumns();
+            $leftColumn = max(1, $terminalColumns - $imageWidth - 1);
 
             // Move cursor up to the second line of the table (tableLines - 1 to get to top, then +1 for second line)
             // But we want to start one line higher, so tableLines instead of tableLines - 1
@@ -520,7 +521,7 @@ class ShowBookInfo extends Command
             echo "\033[{$linesToMoveUp}A"; // Move cursor up
 
             // Move cursor to the left position
-            echo "\033[{$leftPos}G"; // Move cursor to column (1-indexed)
+            echo "\033[{$leftColumn}G"; // Move cursor to column (1-indexed)
 
             // Get the current cursor position to calculate absolute coordinates for --place
             // We'll use stty to read cursor position
@@ -534,11 +535,15 @@ class ShowBookInfo extends Command
 
                 $this->terminalImageService->displayImage($coverPath, function ($msg) {
                     // Silent - image will overlay the table
-                }, 'left', $place);
+                }, 'right', $place);
 
                 // Move cursor back to bottom of table
                 echo "\033[{$linesToMoveUp}B"; // Move cursor down
                 echo "\r"; // Move to beginning of line
+            } else {
+                // If we cannot determine cursor position, at least move back to bottom of table
+                echo "\033[{$linesToMoveUp}B";
+                echo "\r";
             }
         }
     }
@@ -678,6 +683,11 @@ class ShowBookInfo extends Command
 
     protected function getTerminalWidth(): int
     {
+        return max($this->getTerminalColumns() - 20, 40);
+    }
+
+    protected function getTerminalColumns(): int
+    {
         $width = 80;
 
         if (function_exists('exec')) {
@@ -704,28 +714,85 @@ class ShowBookInfo extends Command
             return $text;
         }
 
+        if ($maxWidth <= 0) {
+            return $text;
+        }
+
+        $tokens = preg_split('/(<[^>]+>|\s+)/u', $text, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
         $lines = [];
-        $words = explode(' ', $text);
         $currentLine = '';
+        $visibleLength = 0;
 
-        foreach ($words as $word) {
-            // Calculate visible length by stripping color tags
-            $visibleCurrentLine = preg_replace('/<[^>]+>/', '', $currentLine);
-            $visibleWord = preg_replace('/<[^>]+>/', '', $word);
-            $visibleLength = mb_strlen($visibleCurrentLine . ' ' . $visibleWord);
+        $flushLine = static function () use (&$lines, &$currentLine, &$visibleLength): void {
+            if ($currentLine !== '') {
+                $lines[] = rtrim($currentLine);
+            }
+            $currentLine = '';
+            $visibleLength = 0;
+        };
 
-            if ($visibleLength <= $maxWidth) {
-                $currentLine .= ($currentLine ? ' ' : '') . $word;
-            } else {
-                if ($currentLine) {
-                    $lines[] = $currentLine;
+        foreach ($tokens as $token) {
+            if ($token === '') {
+                continue;
+            }
+
+            if ($token[0] === '<' && str_ends_with($token, '>')) {
+                $currentLine .= $token;
+                continue;
+            }
+
+            if (preg_match('/^\s+$/u', $token)) {
+                if (str_contains($token, "\n") || str_contains($token, "\r")) {
+                    $segments = preg_split("/(\r\n|\r|\n)/", $token, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
+                    foreach ($segments as $segment) {
+                        if (preg_match("/\r\n|\r|\n/", $segment)) {
+                            $flushLine();
+                        } elseif ($visibleLength > 0) {
+                            if ($visibleLength + 1 > $maxWidth) {
+                                $flushLine();
+                            }
+                            $currentLine .= ' ';
+                            $visibleLength += 1;
+                        }
+                    }
+                } elseif ($visibleLength > 0) {
+                    if ($visibleLength + 1 > $maxWidth) {
+                        $flushLine();
+                    }
+                    $currentLine .= ' ';
+                    $visibleLength += 1;
                 }
-                $currentLine = $word;
+
+                continue;
+            }
+
+            $remaining = $token;
+            while ($remaining !== '') {
+                $available = $maxWidth - $visibleLength;
+                if ($available <= 0) {
+                    $flushLine();
+                    $available = $maxWidth;
+                }
+
+                $chunk = mb_substr($remaining, 0, $available);
+                $chunkLength = mb_strlen($chunk);
+
+                if ($chunkLength === 0) {
+                    break;
+                }
+
+                $currentLine .= $chunk;
+                $visibleLength += $chunkLength;
+                $remaining = mb_substr($remaining, $chunkLength);
+
+                if ($remaining !== '') {
+                    $flushLine();
+                }
             }
         }
 
-        if ($currentLine) {
-            $lines[] = $currentLine;
+        if ($currentLine !== '') {
+            $lines[] = rtrim($currentLine);
         }
 
         return implode("\n", $lines);
@@ -916,8 +983,10 @@ class ShowBookInfo extends Command
 
         // Update publisher
         if ($this->option('publisher')) {
-            $book->publisher = $this->option('publisher');
-            $this->info("✓ Updated publisher: {$book->publisher}");
+            $publisherName = trim((string) $this->option('publisher'));
+            $publisher = Publisher::firstOrCreate(['name' => $publisherName]);
+            $book->publisher()->associate($publisher);
+            $this->info("✓ Updated publisher: {$publisher->name}");
             $updated = true;
         }
 

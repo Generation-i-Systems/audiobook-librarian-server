@@ -33,22 +33,16 @@ class MoveBookDirectory extends Command
      */
     protected $description = 'Move a book directory and update all database references';
 
-    private string $bookRoot;
+    private string $bookRoot = '';
     private DocumentStoreServiceInterface $documentStore;
     private BookDirectoryParser $directoryParser;
+    private bool $verboseOutput = false;
 
     public function __construct(DocumentStoreServiceInterface $documentStore, BookDirectoryParser $directoryParser)
     {
         parent::__construct();
         $this->documentStore = $documentStore;
         $this->directoryParser = $directoryParser;
-
-        // Resolve book root to real path (handles symlinks and bind mounts)
-        $bookStoragePath = env('BOOK_STORAGE_PATH');
-        $realPath = realpath($bookStoragePath);
-
-        // Use the real path if it exists, otherwise fall back to configured path
-        $this->bookRoot = rtrim($realPath ?: $bookStoragePath, '/');
     }
 
     /**
@@ -62,6 +56,25 @@ class MoveBookDirectory extends Command
         $verbose = $this->option('verbose');
         $regexPattern = $this->option('regex');
 
+        $this->verboseOutput = (bool) $verbose;
+
+        try {
+            $this->bookRoot = $this->resolveBookRoot();
+        } catch (\RuntimeException $exception) {
+            $this->logError('Unable to resolve book root', ['error' => $exception->getMessage()]);
+            $this->error($exception->getMessage());
+
+            return 1;
+        }
+
+        $this->logDebug('Command invoked', [
+            'sources' => $sources,
+            'dry_run' => (bool) $dryRun,
+            'no_db' => (bool) $noDb,
+            'regex' => (bool) $regexPattern,
+            'resolved_book_root' => $this->bookRoot,
+        ]);
+
         if ($verbose) {
             $this->line("<fg=blue>[DEBUG]</> Received sources: " . json_encode($sources));
         }
@@ -74,18 +87,25 @@ class MoveBookDirectory extends Command
         // Last argument is destination
         $destination = array_pop($sources);
 
+        $this->logDebug('Primary move request prepared', [
+            'destination' => $destination,
+            'source_count' => count($sources),
+        ]);
+
         if ($verbose) {
             $this->line("<fg=blue>[DEBUG]</> Destination: {$destination}");
             $this->line("<fg=blue>[DEBUG]</> Remaining sources: " . json_encode($sources));
         }
 
         if (empty($sources)) {
+            $this->logWarning('No source files specified for move operation');
             $this->error("No source files specified");
             return 1;
         }
 
         // CRITICAL SAFETY: Validate book root is set and exists
         if (empty($this->bookRoot)) {
+            $this->logError('Book root resolved to empty string');
             $this->error("BOOK_STORAGE_PATH not configured");
             return 1;
         }
@@ -95,6 +115,7 @@ class MoveBookDirectory extends Command
         }
 
         if (!is_dir($this->bookRoot)) {
+            $this->logError('Book root directory does not exist', ['book_root' => $this->bookRoot]);
             $this->error("Book root directory does not exist: {$this->bookRoot}");
             return 1;
         }
@@ -104,6 +125,7 @@ class MoveBookDirectory extends Command
             try {
                 DB::connection()->getPdo();
             } catch (\Exception $e) {
+                $this->logError('Database connection failed', ['message' => $e->getMessage()]);
                 $this->error("Database connection failed: " . $e->getMessage());
                 $this->error("Use --no-db to skip database updates");
                 return 1;
@@ -112,6 +134,7 @@ class MoveBookDirectory extends Command
 
         // MINOR EDGE CASE: Validate book root is writable
         if (!is_writable($this->bookRoot)) {
+            $this->logError('Book root is not writable', ['book_root' => $this->bookRoot]);
             $this->error("Book root is not writable: {$this->bookRoot}");
             return 1;
         }
@@ -122,6 +145,7 @@ class MoveBookDirectory extends Command
             $absBookRoot = realpath($this->bookRoot);
 
             if ($absSource === $absBookRoot) {
+                $this->logWarning('Attempted to move the book root directory', ['source' => $source]);
                 $this->error("Cannot move the book root directory itself");
                 return 1;
             }
@@ -131,6 +155,7 @@ class MoveBookDirectory extends Command
         foreach ($sources as $source) {
             $sourcePath = $this->normalizePath($source);
             if (!file_exists($sourcePath)) {
+                $this->logWarning('Source path does not exist', ['source' => $source, 'normalized' => $sourcePath]);
                 $this->error("Source does not exist: {$source}");
                 return 1;
             }
@@ -138,6 +163,11 @@ class MoveBookDirectory extends Command
 
         // Normalize destination path
         $destPath = $this->normalizePath($destination);
+
+        $this->logDebug('Destination path normalized', [
+            'input_destination' => $destination,
+            'normalized_destination' => $destPath,
+        ]);
 
         // Auto-create parent directories (mkdmv behavior)
         $destDir = $destPath;
@@ -151,6 +181,7 @@ class MoveBookDirectory extends Command
 
         if (!$dryRun && !is_dir($destDir)) {
             if (!mkdir($destDir, 0755, true)) {
+                $this->logError('Failed to create destination directory', ['destination_directory' => $destDir]);
                 $this->error("Failed to create destination directory: {$destDir}");
                 return 1;
             }
@@ -176,11 +207,22 @@ class MoveBookDirectory extends Command
 
                 $sourceRelative = $this->getRelativePath($sourcePath);
 
+                $this->logDebug('Computed relative path for source', [
+                    'source' => $sourcePath,
+                    'relative' => $sourceRelative,
+                ]);
+
                 if ($verbose) {
                     $this->line("<fg=blue>[DEBUG]</> Relative path: {$sourceRelative}");
                 }
 
                 $affectedBooks = $this->findAffectedBooks($sourceRelative);
+
+                $this->logDebug('Affected books located', [
+                    'source' => $sourcePath,
+                    'relative' => $sourceRelative,
+                    'count' => count($affectedBooks),
+                ]);
 
                 if ($verbose) {
                     $this->line("<fg=blue>[DEBUG]</> Found " . count($affectedBooks) . " affected books");
@@ -195,17 +237,24 @@ class MoveBookDirectory extends Command
                     $allAffectedBooks = array_merge($allAffectedBooks, $affectedBooks);
                 }
             } else {
-                if ($verbose) {
-                    $this->line("<fg=blue>[DEBUG]</> Source is NOT in book root");
-                }
+                $this->logDebug('Source lies outside configured book root; skipping', [
+                    'source' => $sourcePath,
+                    'book_root' => $this->bookRoot,
+                ]);
+
+                $this->warn("Skipping source outside book root: {$sourcePath}");
             }
         }
 
         // If no book sources found, this is not a book move
         if (empty($bookSources)) {
-            if ($verbose) {
-                $this->line("<fg=blue>[DEBUG]</> No book sources found, returning exit code 2");
-            }
+            $this->logWarning('No book sources detected; deferring to mv fallback', [
+                'sources' => $sources,
+                'destination' => $destPath,
+                'book_root' => $this->bookRoot,
+            ]);
+
+            $this->warn('No directories within the book root matched the provided sources. Falling back with exit code 2.');
             return 2; // Signal to fall back to regular mv
         }
 
@@ -243,6 +292,7 @@ class MoveBookDirectory extends Command
             }
 
             if (file_exists($finalDest)) {
+                $this->logError('Destination already exists', ['destination' => $finalDest]);
                 $this->error("Destination already exists: {$finalDest}");
                 $this->error("Aborting to prevent data loss");
                 return 1;
@@ -268,16 +318,19 @@ class MoveBookDirectory extends Command
 
                 // CRITICAL SAFETY: Verify source still exists (race condition check)
                 if (!file_exists($sourcePath)) {
+                    $this->logError('Source disappeared during operation', ['source' => $sourcePath]);
                     throw new \Exception("Source disappeared during operation: {$sourcePath}");
                 }
 
                 // CRITICAL SAFETY: Verify destination still doesn't exist
                 if (file_exists($finalDest)) {
+                    $this->logError('Destination appeared during operation', ['destination' => $finalDest]);
                     throw new \Exception("Destination appeared during operation: {$finalDest}");
                 }
 
                 // Move the directory/file
                 if (!rename($sourcePath, $finalDest)) {
+                    $this->logError('Filesystem rename failed', ['source' => $sourcePath, 'destination' => $finalDest]);
                     throw new \Exception("Failed to move: {$sourcePath}");
                 }
 
@@ -287,6 +340,11 @@ class MoveBookDirectory extends Command
                 // Update database records
                 if (!$noDb && !empty($bookSource['books'])) {
                     $destRelative = $this->getRelativePath($finalDest);
+                    $this->logDebug('Updating book records', [
+                        'source_relative' => $sourceRelative,
+                        'destination_relative' => $destRelative,
+                        'book_count' => count($bookSource['books']),
+                    ]);
                     $updated = $this->updateBookRecords(
                         $bookSource['books'],
                         $sourceRelative,
@@ -300,15 +358,20 @@ class MoveBookDirectory extends Command
             DB::commit();
 
             if (!$noDb && $totalUpdated > 0) {
+                $this->logDebug('Database records updated', ['count' => $totalUpdated]);
                 $this->info("✓ Updated {$totalUpdated} book record(s)");
             }
 
+            $this->logDebug('Move operation completed successfully');
             $this->info("\n✓ Move completed successfully!");
             return 0;
         } catch (\Exception $e) {
             // CRITICAL SAFETY: Rollback database changes
             DB::rollBack();
 
+            $this->logError('Move operation failed', [
+                'message' => $e->getMessage(),
+            ]);
             $this->error("Error during move: " . $e->getMessage());
             $this->error("Rolling back filesystem changes...");
 
@@ -316,8 +379,10 @@ class MoveBookDirectory extends Command
             foreach (array_reverse($movedPaths) as $move) {
                 if (file_exists($move['to']) && !file_exists($move['from'])) {
                     if (@rename($move['to'], $move['from'])) {
+                        $this->logDebug('Rolled back filesystem move', $move);
                         $this->info("✓ Rolled back: " . basename($move['from']));
                     } else {
+                        $this->logError('Failed to rollback filesystem move', $move);
                         $this->error("✗ Failed to rollback: " . basename($move['from']));
                         $this->error("  Manual intervention required!");
                     }
@@ -361,14 +426,6 @@ class MoveBookDirectory extends Command
             throw new \Exception("Invalid path: {$path}");
         }
 
-        // CRITICAL SAFETY: Detect directory traversal attempts
-        if (strpos($path, '..') !== false) {
-            // Allow it but validate the result stays in book root
-            $needsValidation = true;
-        } else {
-            $needsValidation = false;
-        }
-
         // If already absolute, use as-is, otherwise make relative to book root
         if (str_starts_with($path, '/')) {
             $normalized = rtrim($path, '/');
@@ -403,11 +460,63 @@ class MoveBookDirectory extends Command
         $realParent = realpath($parentDir) ?: $parentDir;
         $realNormalized = rtrim($realParent . '/' . $basename, '/');
 
-        if (!str_starts_with($realNormalized, $this->bookRoot)) {
-            throw new \Exception("Path escapes book root: {$realNormalized} (from: {$path}, bookRoot: {$this->bookRoot})");
+        $candidateRoots = array_values(array_filter([
+            $this->bookRoot,
+            realpath($this->bookRoot) ?: null,
+            config('app.book_root'),
+            config('filesystems.disks.books.root'),
+            env('BOOK_STORAGE_PATH'),
+        ]));
+
+        $normalizedTarget = $this->normalizePathString($realNormalized);
+        $isWithinRoot = false;
+
+        foreach ($candidateRoots as $candidateRoot) {
+            $normalizedRoot = $this->normalizePathString(realpath($candidateRoot) ?: $candidateRoot);
+
+            if ($normalizedRoot === '') {
+                continue;
+            }
+
+            $targetSegments = $this->splitPathSegments($normalizedTarget);
+            $rootSegments = $this->splitPathSegments($normalizedRoot);
+
+            if ($this->startsWithSegments($targetSegments, $rootSegments)) {
+                $isWithinRoot = true;
+                break;
+            }
         }
 
-        return $normalized;
+        if (!$isWithinRoot) {
+            throw new \Exception("Path escapes book root: {$normalizedTarget} (from: {$path}, bookRoot: {$this->bookRoot})");
+        }
+
+        return $normalizedTarget;
+    }
+
+    private function normalizePathString(string $path): string
+    {
+        $normalized = str_replace('\\', '/', $path);
+        $normalized = preg_replace('#/+#', '/', $normalized);
+
+        return rtrim($normalized, '/');
+    }
+
+    private function resolveBookRoot(): string
+    {
+        $configBookRoot = config('app.book_root');
+        $diskRoot = config('filesystems.disks.books.root');
+        $envRoot = env('BOOK_STORAGE_PATH');
+
+        $bookStoragePath = $envRoot ?: ($diskRoot ?: $configBookRoot);
+
+        if (empty($bookStoragePath)) {
+            throw new \RuntimeException('Book storage path is not configured. Set config("app.book_root") or filesystems.disks.books.root.');
+        }
+
+        $realPath = realpath($bookStoragePath) ?: $bookStoragePath;
+
+        return rtrim($realPath, '/');
     }
 
     /**
@@ -427,6 +536,39 @@ class MoveBookDirectory extends Command
     private function getRelativePath(string $absolutePath): string
     {
         return trim(str_replace($this->bookRoot, '', $absolutePath), '/');
+    }
+
+    private function splitPathSegments(string $path): array
+    {
+        $normalized = $this->normalizePathString($path);
+        $normalized = trim($normalized, '/');
+
+        if ($normalized === '' || $normalized === '.') {
+            return [];
+        }
+
+        return explode('/', $normalized);
+    }
+
+    private function startsWithSegments(array $segments, array $prefix): bool
+    {
+        $prefixCount = count($prefix);
+
+        if ($prefixCount === 0) {
+            return true;
+        }
+
+        if (count($segments) < $prefixCount) {
+            return false;
+        }
+
+        for ($i = 0; $i < $prefixCount; $i++) {
+            if (strcasecmp($segments[$i], $prefix[$i]) !== 0) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -450,7 +592,10 @@ class MoveBookDirectory extends Command
                 ];
             }, $books);
         } catch (\Exception $e) {
-            Log::error('Error finding affected books: ' . $e->getMessage());
+            $this->logError('Error finding affected books', [
+                'relative_path' => $relativePath,
+                'message' => $e->getMessage(),
+            ]);
             return [];
         }
     }
@@ -492,6 +637,7 @@ class MoveBookDirectory extends Command
                         ->find($book['_id']);
 
                     if (!$bookModel) {
+                        $this->logWarning('Book model not found during update', ['book_id' => $book['_id']]);
                         $this->error("  ✗ Book model not found for ID {$book['_id']}");
                         continue;
                     }
@@ -573,11 +719,11 @@ class MoveBookDirectory extends Command
                                 }
                             }
                         } catch (\Exception $e) {
-                            $this->warn("    ⚠ Could not parse new path metadata: " . $e->getMessage());
-                            Log::debug("Failed to parse directory path", [
+                            $this->logWarning('Could not parse new path metadata', [
                                 'path' => $fullPath ?? $newPath,
-                                'error' => $e->getMessage()
+                                'message' => $e->getMessage(),
                             ]);
+                            $this->warn("    ⚠ Could not parse new path metadata: " . $e->getMessage());
                         }
                     }
 
@@ -588,11 +734,11 @@ class MoveBookDirectory extends Command
                         try {
                             $this->updateLibraryJson($bookModel);
                         } catch (\Exception $e) {
-                            $this->warn("    ⚠ Could not update librarian.json: " . $e->getMessage());
-                            Log::debug("Failed to update librarian.json", [
+                            $this->logWarning('Could not update librarian.json', [
                                 'book_id' => $bookModel->id,
-                                'error' => $e->getMessage()
+                                'message' => $e->getMessage(),
                             ]);
+                            $this->warn("    ⚠ Could not update librarian.json: " . $e->getMessage());
                         }
                     }
 
@@ -600,16 +746,57 @@ class MoveBookDirectory extends Command
                     $this->line("  ✓ Updated: {$book['title']}");
                 }
             } catch (\Exception $e) {
-                $this->error("  ✗ Failed to update book {$book['_id']}: " . $e->getMessage());
-                Log::error("Failed to update book record", [
+                $this->logError('Failed to update book record', [
                     'book_id' => $book['_id'],
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString()
+                    'message' => $e->getMessage(),
                 ]);
+                $this->error("  ✗ Failed to update book {$book['_id']}: " . $e->getMessage());
             }
         }
 
         return $updated;
+    }
+
+    private function formatContext(array $context): string
+    {
+        if (empty($context)) {
+            return '';
+        }
+
+        $encoded = json_encode($context, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR);
+
+        if ($encoded === false) {
+            return ' ' . var_export($context, true);
+        }
+
+        return ' ' . $encoded;
+    }
+
+    private function logDebug(string $message, array $context = []): void
+    {
+        Log::debug('[MoveBookDirectory] ' . $message, $context);
+
+        if ($this->verboseOutput) {
+            $this->line('<fg=blue>[DEBUG]</> ' . $message . $this->formatContext($context));
+        }
+    }
+
+    private function logWarning(string $message, array $context = []): void
+    {
+        Log::warning('[MoveBookDirectory] ' . $message, $context);
+
+        if ($this->verboseOutput) {
+            $this->warn($message . $this->formatContext($context));
+        }
+    }
+
+    private function logError(string $message, array $context = []): void
+    {
+        Log::error('[MoveBookDirectory] ' . $message, $context);
+
+        if ($this->verboseOutput) {
+            $this->error($message . $this->formatContext($context));
+        }
     }
 
     /**

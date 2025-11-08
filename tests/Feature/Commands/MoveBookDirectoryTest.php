@@ -2,9 +2,12 @@
 
 namespace Tests\Feature\Commands;
 
+use App\Contracts\DocumentStoreServiceInterface;
 use App\Models\Book;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
+use Mockery;
 use Tests\TestCase;
 
 class MoveBookDirectoryTest extends TestCase
@@ -12,7 +15,8 @@ class MoveBookDirectoryTest extends TestCase
     use RefreshDatabase;
 
     private string $testBookRoot;
-    private string $originalBookRoot;
+    private $documentStoreMock;
+    private ?string $originalBookRoot = null;
 
     protected function setUp(): void
     {
@@ -20,10 +24,18 @@ class MoveBookDirectoryTest extends TestCase
 
         // Create temporary test directory
         $this->testBookRoot = storage_path('testing/books');
-        $this->originalBookRoot = env('BOOK_STORAGE_PATH');
+        Config::set('app.book_root', $this->testBookRoot);
+        Config::set('filesystems.disks.books.root', $this->testBookRoot);
 
-        // Set test book root
-        putenv("BOOK_STORAGE_PATH={$this->testBookRoot}");
+        $this->originalBookRoot = getenv('BOOK_STORAGE_PATH') ?: null;
+        putenv('BOOK_STORAGE_PATH=' . $this->testBookRoot);
+
+        $this->documentStoreMock = $this->mock(DocumentStoreServiceInterface::class, function ($mock): void {
+            $mock->shouldReceive('updateBookPath')->zeroOrMoreTimes();
+            $mock->shouldReceive('updateBook')->zeroOrMoreTimes();
+            $mock->shouldReceive('getUserById')->andReturn(['id' => 'test-user']);
+            $mock->shouldReceive('getBook')->andReturn(null);
+        });
 
         // Create test directory structure
         File::makeDirectory($this->testBookRoot, 0755, true, true);
@@ -37,9 +49,12 @@ class MoveBookDirectoryTest extends TestCase
         }
 
         // Restore original book root
-        if ($this->originalBookRoot) {
-            putenv("BOOK_STORAGE_PATH={$this->originalBookRoot}");
+        if ($this->originalBookRoot !== null) {
+            putenv('BOOK_STORAGE_PATH=' . $this->originalBookRoot);
+        } else {
+            putenv('BOOK_STORAGE_PATH');
         }
+        Mockery::close();
 
         parent::tearDown();
     }
@@ -569,13 +584,14 @@ class MoveBookDirectoryTest extends TestCase
 
     private function createTestBook(string $path, array $attributes = []): Book
     {
-        return Book::create(array_merge([
+        $book = Book::factory()->create(array_merge([
             'directory_path' => $path,
-            'title' => 'Test Book',
             'duration' => 3600,
             'audio_file_count' => 1,
             'needs_review' => false,
         ], $attributes));
+
+        return $book;
     }
 
     private function assertDirExists(string $path): void

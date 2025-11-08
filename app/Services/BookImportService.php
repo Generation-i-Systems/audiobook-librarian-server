@@ -12,6 +12,7 @@ use App\Traits\HandlesLibraryJson;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class BookImportService
 {
@@ -107,15 +108,10 @@ class BookImportService
 
             // Handle publisher
             if (!empty($metadata['publisher'])) {
-                if (is_array($metadata['publisher'])) {
-                    // If it's an array with 'name' key (from Audible)
-                    $publisher = $metadata['publisher']['name'] ?? $metadata['publisher'][0] ?? null;
-                } elseif (is_object($metadata['publisher'])) {
-                    $publisher = $metadata['publisher']->name ?? null;
-                } else {
-                    $publisher = $metadata['publisher'];
+                $publisherName = $this->resolvePublisherName($metadata['publisher']);
+                if ($publisherName) {
+                    $book->publisher_id = $this->findOrCreatePublisher($publisherName);
                 }
-                $book->publisher = $publisher;
             }
 
             // Store enrichment data in proper JSON columns
@@ -314,14 +310,10 @@ class BookImportService
 
             // Update publisher
             if (!empty($metadata['publisher'])) {
-                if (is_array($metadata['publisher'])) {
-                    $publisher = $metadata['publisher']['name'] ?? $metadata['publisher'][0] ?? null;
-                } elseif (is_object($metadata['publisher'])) {
-                    $publisher = $metadata['publisher']->name ?? null;
-                } else {
-                    $publisher = $metadata['publisher'];
+                $publisherName = $this->resolvePublisherName($metadata['publisher']);
+                if ($publisherName) {
+                    $book->publisher_id = $this->findOrCreatePublisher($publisherName);
                 }
-                $book->publisher = $publisher;
             }
 
             // Update batch_id if provided
@@ -507,6 +499,45 @@ class BookImportService
         return "Standalone/{$authorDir}";
     }
 
+    protected function resolvePublisherName(mixed $publisher): ?string
+    {
+        if (is_array($publisher)) {
+            if (isset($publisher['name']) && is_string($publisher['name'])) {
+                return trim($publisher['name']);
+            }
+
+            $first = reset($publisher);
+            if (is_string($first)) {
+                return trim($first);
+            }
+        }
+
+        if (is_object($publisher) && isset($publisher->name) && is_string($publisher->name)) {
+            return trim($publisher->name);
+        }
+
+        if (is_string($publisher)) {
+            return trim($publisher);
+        }
+
+        return null;
+    }
+
+    protected function findOrCreatePublisher(string $name): ?int
+    {
+        if ($name === '') {
+            return null;
+        }
+
+        $slug = Str::slug($name);
+        $publisher = Publisher::firstOrCreate(
+            ['slug' => $slug],
+            ['name' => $name, 'is_active' => true]
+        );
+
+        return $publisher->id;
+    }
+
     /**
      * Move files to library
      */
@@ -587,45 +618,41 @@ class BookImportService
      */
     protected function generateTargetDirectory(Book $book, string $basePath, array $options = []): string
     {
-        // If book already has a directory_path set (from custom path), use it
+        $authors = $book->authors->pluck('name')->toArray();
+        $genre = $book->genres->first()?->name ?? 'Unknown';
+
+        $relativePath = null;
         if (!empty($book->directory_path)) {
-            // Check if it's already an absolute path - convert to relative first
             $relativePath = $book->directory_path;
             if (str_starts_with($relativePath, '/')) {
                 $relativePath = $this->makePathRelative($relativePath, $basePath);
             }
-            // Now make it absolute for file operations
-            return $basePath . '/' . $relativePath;
         }
 
         // Refresh the book's series relationship to ensure we have latest data with is_collection flag
         $book->load('series');
 
-        $authors = $book->authors->pluck('name')->toArray();
-        $genre = $book->genres->first()?->name ?? 'Unknown';
-        $authorDir = $this->formatAuthorsForDirectory($authors);
-
         // Get primary series (non-collection) for directory structure
         // Collections should NEVER be used for directory paths
         $primarySeries = $book->series->where('is_collection', false)->first();
-        $seriesNumber = null;
-        $seriesName = null;
+        $seriesNumber = $primarySeries?->pivot->series_number ?? null;
+        $seriesName = $primarySeries?->name;
 
-        if ($primarySeries) {
-            $seriesName = $primarySeries->name;
-            $seriesNumber = $primarySeries->pivot->series_number ?? null;
+        if ($relativePath === null) {
+            $authorDir = $this->formatAuthorsForDirectory($authors);
+
+            $metadata = [
+                'author' => $authors,
+                'genre' => $genre,
+                'series' => $seriesName,
+                'series_number' => $seriesNumber,
+                'title' => $book->title
+            ];
+
+            $relativePath = $this->generateDirectoryPath($metadata, $options);
         }
 
-        $metadata = [
-            'author' => $authors,
-            'genre' => $genre,
-            'series' => $seriesName,
-            'series_number' => $seriesNumber,
-            'title' => $book->title
-        ];
-
-        $relativePath = $this->generateDirectoryPath($metadata, $options);
-        $path = "{$basePath}/{$relativePath}";
+        $path = rtrim($basePath, '/') . '/' . ltrim($relativePath, '/');
 
         // Always include title in path unless explicitly disabled
         if (!isset($options['include_title_in_path']) || $options['include_title_in_path'] !== false) {
@@ -637,7 +664,12 @@ class BookImportService
                 $title = $formattedNumber . ' ' . $title;
             }
 
-            $path .= "/{$title}";
+            $segments = explode('/', trim($path, '/'));
+            $lastSegment = end($segments) ?: '';
+
+            if (strcasecmp($lastSegment, $title) !== 0) {
+                $path .= "/{$title}";
+            }
         }
 
         return $path;

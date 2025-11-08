@@ -7,6 +7,7 @@ use App\Models\Book;
 use App\Models\Genre;
 use App\Models\Series;
 use App\Services\BookImportService;
+use App\Services\GenreMappingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -19,7 +20,9 @@ class BookImportServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = new BookImportService();
+
+        $genreMappingService = $this->app->make(GenreMappingService::class);
+        $this->service = new BookImportService($genreMappingService);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]

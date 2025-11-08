@@ -355,7 +355,13 @@ class ImportFileController extends Controller
 
             // Determine the appropriate genre path based on existing genres
             $genrePath = $this->determineGenrePath($meta);
-            Log::debug("[ImportFile] Determined genre path: {$genrePath}");
+            if ($genrePath === null) {
+                Log::debug('[ImportFile] Genre could not be determined automatically; user input required');
+            } else {
+                Log::debug("[ImportFile] Determined genre path: {$genrePath}");
+            }
+
+            $meta['needsGenreSelection'] = $genrePath === null;
 
             // Store source info for later use
             $meta['sourcePath'] = $absPath;
@@ -383,6 +389,7 @@ class ImportFileController extends Controller
                 'root' => $root,
                 'editable' => true, // Allow editing of metadata before moving
                 'formData' => $formData,
+                'needsGenreSelection' => $meta['needsGenreSelection'],
             ], $meta);
 
             $sanitizedData = $this->sanitizeArrayRecursive($responseData);
@@ -654,7 +661,9 @@ class ImportFileController extends Controller
 
         $parts = [];
         // Add the genre as the first part of the path
-        $parts[] = $genrePath;
+        if ($genrePath !== null) {
+            $parts[] = $genrePath;
+        }
 
         if ($meta['author']) {
             $parts[] = $meta['author'];
@@ -694,11 +703,8 @@ class ImportFileController extends Controller
      * @param  array  $meta  Metadata containing author, series, and genre information
      * @return string The appropriate genre path to use
      */
-    private function determineGenrePath(array $meta): string
+    private function determineGenrePath(array $meta): ?string
     {
-        // Default fallback genre
-        $defaultGenre = 'Other';
-
         // Get the library root directory from environment variable
         $libraryRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
         if (!is_dir($libraryRoot)) {
@@ -706,7 +712,7 @@ class ImportFileController extends Controller
                 'path' => $libraryRoot,
             ]);
 
-            return $defaultGenre;
+            return null;
         }
 
         // Get all existing genre directories
@@ -734,10 +740,10 @@ class ImportFileController extends Controller
         // If no author, we can't apply the other rules
         if (!$author) {
             Log::info('[ImportFile] No author provided, using default genre', [
-                'defaultGenre' => $defaultGenre,
+                'reason' => 'missing_author',
             ]);
 
-            return $defaultGenre;
+            return null;
         }
 
         // Track genre matches and book counts
@@ -830,10 +836,10 @@ class ImportFileController extends Controller
         Log::info('[ImportFile] No matching genres found, using default', [
             'author' => $author,
             'series' => $series,
-            'defaultGenre' => $defaultGenre,
+            'reason' => 'no_matches',
         ]);
 
-        return $defaultGenre;
+        return null;
     }
 
 

@@ -6,12 +6,15 @@ namespace Tests\Feature\Commands;
 
 use App\Models\Book;
 use App\Services\AIBookProcessor;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class ListMissingBookDirectoriesAiTest extends TestCase
 {
+    use RefreshDatabase;
+
     #[Test]
     public function testAiSuggestIncludesSuggestionsInJsonAndOptionalFile(): void
     {

@@ -30,7 +30,7 @@ class BookFactory extends Factory
             'source' => 'test',
             'directory_path' => $this->faker->word(),
             'duration' => $this->faker->numberBetween(3600, 36000),
-            'publisher' => $this->faker->company(),
+            'publisher_id' => null,
             'needs_review' => false,
             'audio_file_count' => $this->faker->numberBetween(1, 20),
             'isbn' => $this->faker->isbn13(),

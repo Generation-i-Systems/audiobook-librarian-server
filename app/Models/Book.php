@@ -25,7 +25,7 @@ class Book extends Model
         'batch_id',
         'series_id',
         'duration',
-        'publisher',
+        'publisher_id',
         'needs_review',
         'needs_review_reasons',
         'audio_file_count',
@@ -95,6 +95,11 @@ class Book extends Model
     public function narrators()
     {
         return $this->belongsToMany(Narrator::class);
+    }
+
+    public function publisher()
+    {
+        return $this->belongsTo(Publisher::class);
     }
 
     public function series()
