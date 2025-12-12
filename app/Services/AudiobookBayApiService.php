@@ -261,10 +261,6 @@ class AudiobookBayApiService
      */
     public function parseSearchResults(string $html): array
     {
-        // Log a snippet of the HTML to understand structure
-        $htmlSnippet = substr($html, 0, 2000);
-        Log::debug('[ABB-PARSE] HTML snippet', ['html' => $htmlSnippet]);
-
         $results = $this->parseSearchResultsDom($html);
         if (!empty($results)) {
             Log::debug('[ABB-PARSE] DOM parsing returned results', ['count' => count($results)]);
@@ -467,10 +463,10 @@ class AudiobookBayApiService
         if (preg_match('/Bitrate: ([^\n\r]+?)(?: Unabridged|$)/i', $bodyText, $m)) {
             $book['metadata']['bitrate'] = trim($m[1]);
         }
-        // Description: grab paragraph after format/bitrate line
+        // Description: grab paragraph after format/bitrate line, stop at torrent/tracker info
         if (
             preg_match(
-                '/Unabridged\s*\n(.+?)(?:Torrent Free Downloads|Start Direct Download|Download Files Now|Top|$)/is',
+                '/Unabridged\s*\n(.+?)(?:Announce URL:|Tracker:|Torrent Free Downloads|Start Direct Download|Download Files Now|Creation Date:|This is a Multifile|Top|$)/is',
                 $bodyText,
                 $m
             )
@@ -506,10 +502,28 @@ class AudiobookBayApiService
         }
         $imgNode = $xpath->query('//img[contains(@src,"wp-content/uploads") or contains(@src,"/uploads/") or contains(@src,"/covers/")]')->item(0);
         if (!$imgNode) {
-            $imgNode = $xpath->query('//img')->item(0);
+            // Try to find any image, but exclude common non-cover images
+            $allImages = $xpath->query('//img');
+            foreach ($allImages as $img) {
+                if ($img instanceof \DOMElement && $img->hasAttribute('src')) {
+                    $src = $img->getAttribute('src');
+                    // Skip search icons, logos, and other common non-cover images
+                    if (!str_contains($src, '/images/search.gif') &&
+                        !str_contains($src, 'logo') &&
+                        !str_contains($src, 'icon') &&
+                        !str_contains($src, 'banner')) {
+                        $imgNode = $img;
+                        break;
+                    }
+                }
+            }
         }
         if ($imgNode instanceof \DOMElement && $imgNode->hasAttribute('src')) {
-            $book['coverImageUrl'] = $imgNode->getAttribute('src');
+            $coverUrl = $imgNode->getAttribute('src');
+            // Don't use search.gif as cover
+            if (!str_contains($coverUrl, '/images/search.gif')) {
+                $book['coverImageUrl'] = $coverUrl;
+            }
         }
 
         return $book;
