@@ -2459,11 +2459,12 @@ class ImportBooksFromDownloads extends Command
      */
     protected function inheritGenreFromSeries(array &$metadata): void
     {
-        // Skip if genre is already set to something other than "General Fiction"
+        // Skip if genre is already set to something other than generic genres
         $currentGenre = is_array($metadata['genre']) ? ($metadata['genre'][0] ?? '') : ($metadata['genre'] ?? '');
         $normalizedGenre = $this->normalizeGenreName($currentGenre);
 
-        if (!empty($currentGenre) && $normalizedGenre !== 'General Fiction' && $normalizedGenre !== 'Fiction') {
+        $genericGenres = ['General Fiction', 'Fiction', 'Other'];
+        if (!empty($currentGenre) && !in_array($normalizedGenre, $genericGenres)) {
             if ($this->isOptionEnabled('verbose')) {
                 $this->line("  Skipping genre inheritance - already have specific genre: {$currentGenre}");
             }
@@ -2528,9 +2529,10 @@ class ImportBooksFromDownloads extends Command
                     $this->line("  Primary genre from existing book: {$primaryGenreName}, Current genre: {$oldGenre}");
                 }
 
-                // Only inherit if the old genre was "General Fiction" or empty
+                // Only inherit if the old genre was generic or empty
                 $normalizedOld = $this->normalizeGenreName($oldGenre);
-                if (empty($oldGenre) || $normalizedOld === 'General Fiction' || $normalizedOld === 'Fiction') {
+                $genericGenres = ['General Fiction', 'Fiction', 'Other'];
+                if (empty($oldGenre) || in_array($normalizedOld, $genericGenres)) {
                     $metadata['genre'] = $primaryGenreName;
                     $inheritSource = $seriesName ? "series" : "author's other books";
                     $this->info("  ✓ Inherited genre '{$primaryGenreName}' from {$inheritSource} (was: '{$oldGenre}')");
@@ -3064,7 +3066,8 @@ class ImportBooksFromDownloads extends Command
             $currentGenre = is_array($metadata['genre']) ? ($metadata['genre'][0] ?? '') : ($metadata['genre'] ?? '');
             $normalizedGenre = $this->normalizeGenreName($currentGenre);
 
-            if ($normalizedGenre === 'General Fiction' || $normalizedGenre === 'Fiction') {
+            $genericGenres = ['General Fiction', 'Fiction', 'Other'];
+            if (in_array($normalizedGenre, $genericGenres)) {
                 $defaultChoice = '5';  // Change genre
                 $confidenceNote = " (genre is generic - consider changing)";
             } elseif ($confidence > 80) {
