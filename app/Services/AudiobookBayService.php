@@ -256,7 +256,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
     /**
      * Format book details (from apiService) to a consistent format for BookServiceInterface.
      */
-    protected function formatBookDetails(array $details): array
+    protected function formatBookDetails(array $details, bool $skipDetailFetch = false): array
     {
         $formattedDetails = [
             'id' => $details['id'] ?? basename(parse_url($details['url'] ?? '', PHP_URL_PATH) ?? ''),
@@ -283,14 +283,18 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
         ];
 
         // If this is from search results (missing key data), fetch full details
-        if (empty($formattedDetails['authors']) && empty($formattedDetails['narrators']) && !empty($details['url'])) {
-            Log::debug('[ABB-FORMAT] Search result lacks metadata, fetching details', ['url' => $details['url']]);
+        if (!$skipDetailFetch && empty($formattedDetails['authors']) && empty($formattedDetails['narrators']) && !empty($details['url'])) {
+            Log::info('[ABB-FORMAT] Search result lacks metadata, fetching details', ['url' => $details['url']]);
             $slug = basename(parse_url($details['url'], PHP_URL_PATH) ?? '');
             if ($slug) {
                 $fullDetails = $this->apiService->getAudiobookDetails($slug);
-                if ($fullDetails) {
-                    // Merge full details, preferring fetched data
-                    $formattedDetails = array_merge($formattedDetails, $this->formatBookDetails($fullDetails));
+                Log::debug('[ABB-FORMAT] Fetched details', ['has_details' => !empty($fullDetails), 'authors' => $fullDetails['authors'] ?? 'none', 'narrators' => $fullDetails['narrators'] ?? 'none']);
+                if ($fullDetails && is_array($fullDetails)) {
+                    // Recursively format but skip further detail fetching
+                    $enrichedDetails = $this->formatBookDetails($fullDetails, true);
+                    // Merge, preferring enriched data over search result data
+                    $formattedDetails = array_merge($formattedDetails, array_filter($enrichedDetails, fn($v) => !empty($v)));
+                    Log::info('[ABB-FORMAT] Merged details', ['final_authors' => $formattedDetails['authors'], 'final_narrators' => $formattedDetails['narrators']]);
                 }
             }
         }
