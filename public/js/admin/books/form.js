@@ -892,9 +892,9 @@ window.initBookForm = function (formContainerSelector) {
 
                 // Only offer to split if we actually have multiple authors
                 if (authors.length > 1) {
-                    const authorList = authors.map(a => '"' + a + '"').join(', ');
+                    const authorList = authors.map((a, idx) => `${idx + 1}. ${a}`).join('\n');
 
-                    if (confirm(`Split "${value}" into ${authors.length} separate authors?\n\n${authorList}`)) {
+                    if (confirm(`Split into ${authors.length} separate authors?\n\n${authorList}\n\nClick OK to split, or Cancel to keep as-is.`)) {
                         // Clear the current input
                         $input.val('');
 
