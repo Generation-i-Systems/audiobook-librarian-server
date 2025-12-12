@@ -692,10 +692,27 @@ class MoveBookDirectory extends Command
                     // Update directory path
                     $bookModel->directory_path = $newPath;
 
-                    // Parse the new path and update metadata if enabled
-                    // IMPORTANT: Metadata parsing is DISABLED by default because directory renames
-                    // should only update the directory_path, not change author/genre/etc.
-                    // The parser often extracts incorrect data from absolute paths (e.g., "media" as author)
+                    // Extract genre from path structure if it changed
+                    // The first segment of the relative path is the genre directory
+                    $pathSegments = explode('/', trim($newPath, '/'));
+                    if (count($pathSegments) > 0) {
+                        $newGenre = $pathSegments[0];
+                        $currentGenres = $bookModel->genres->pluck('name')->toArray();
+                        $currentPrimaryGenre = $currentGenres[0] ?? null;
+
+                        // Only update genre if the directory genre is different from current primary genre
+                        if ($newGenre !== $currentPrimaryGenre && !empty($newGenre)) {
+                            $this->line("    • Genre: " . ($currentPrimaryGenre ?: '(none)') . " → {$newGenre}");
+                            $bookModel->genres()->detach();
+                            $genre = Genre::firstOrCreate(['name' => trim($newGenre)]);
+                            $bookModel->genres()->attach($genre->id, ['is_primary' => true]);
+                        }
+                    }
+
+                    // Parse the new path and update OTHER metadata if enabled
+                    // IMPORTANT: Full metadata parsing is DISABLED by default because the parser
+                    // extracts incorrect data from absolute paths (e.g., "media" as author)
+                    // We only update genre above, which comes from the directory structure
                     if (false && !$noParse) {
                         try {
                             // Check if directory exists and has audio files before parsing
