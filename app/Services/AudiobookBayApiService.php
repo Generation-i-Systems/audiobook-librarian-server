@@ -542,9 +542,19 @@ class AudiobookBayApiService
 
         // Cache miss or invalid data, fetch from source
         $this->checkRateLimit();
+
+        $fullUrl = $this->baseUrl . $endpoint;
+        Log::debug('[ABB-REQUEST] Making HTTP request', [
+            'base_url' => $this->baseUrl,
+            'endpoint' => $endpoint,
+            'params' => $params,
+            'full_url' => $fullUrl,
+            'query_string' => http_build_query($params),
+        ]);
+
         $response = Http::withHeaders($this->getDefaultHeaders())
             ->timeout(20)
-            ->get($this->baseUrl . $endpoint, $params);
+            ->get($fullUrl, $params);
 
         if ($response->successful()) {
             $responseBody = (string) $response->body();
