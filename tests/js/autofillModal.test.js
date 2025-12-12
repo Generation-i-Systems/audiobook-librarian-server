@@ -25,7 +25,7 @@ describe('Autofill Modal UI', () => {
             match_type: 'close',
             published_year: '2020',
             description: 'desc',
-            cover_image_url: 'http://books.google.com/cover.jpg',
+            cover_image_url: 'https://books.google.com/cover.jpg',
         };
         $container.find('#published_year').val('');
         $container.find('#description').val('');
