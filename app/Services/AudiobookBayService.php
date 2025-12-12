@@ -258,7 +258,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
      */
     protected function formatBookDetails(array $details): array
     {
-        return [
+        $formattedDetails = [
             'id' => $details['id'] ?? basename(parse_url($details['url'] ?? '', PHP_URL_PATH) ?? ''),
             'title' => $details['title'] ?? 'Unknown Title',
             'subtitle' => $details['subtitle'] ?? null,
@@ -281,6 +281,21 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
                 ]
             ),
         ];
+
+        // If this is from search results (missing key data), fetch full details
+        if (empty($formattedDetails['authors']) && empty($formattedDetails['narrators']) && !empty($details['url'])) {
+            Log::debug('[ABB-FORMAT] Search result lacks metadata, fetching details', ['url' => $details['url']]);
+            $slug = basename(parse_url($details['url'], PHP_URL_PATH) ?? '');
+            if ($slug) {
+                $fullDetails = $this->apiService->getAudiobookDetails($slug);
+                if ($fullDetails) {
+                    // Merge full details, preferring fetched data
+                    $formattedDetails = array_merge($formattedDetails, $this->formatBookDetails($fullDetails));
+                }
+            }
+        }
+
+        return $formattedDetails;
     }
 
     /**
