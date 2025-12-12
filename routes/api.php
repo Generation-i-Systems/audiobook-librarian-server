@@ -2,10 +2,12 @@
 
 use App\Http\Controllers\Api\ApiHealthController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BadgeController;
 use App\Http\Controllers\Api\BookApiController;
 use App\Http\Controllers\Api\BookmarkApiController;
 use App\Http\Controllers\Api\BookRequestApiController;
 use App\Http\Controllers\Api\ExternalReadApiController;
+use App\Http\Controllers\Api\FavoriteAuthorController;
 use App\Http\Controllers\Api\FollowApiController;
 use App\Http\Controllers\Api\MessageApiController;
 use App\Http\Controllers\Api\ProgressController;
@@ -13,7 +15,6 @@ use App\Http\Controllers\Api\ReadingProgressApiController;
 use App\Http\Controllers\Api\ReadingStatsApiController;
 use App\Http\Controllers\Api\StatisticsController;
 use App\Http\Controllers\Api\UserApiController;
-use App\Http\Controllers\Api\BadgeController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -150,6 +151,10 @@ Route::prefix('v1')->group(function () {
             Route::post('/mark-notified', [BadgeController::class, 'markNotified']);
             Route::get('/leaderboard', [BadgeController::class, 'leaderboard']);
         });
+
+        // Favorite Authors routes
+        Route::get('/favorites/new-books', [FavoriteAuthorController::class, 'getNewBooks']);
+        Route::apiResource('favorites', FavoriteAuthorController::class);
 
         // Message Route
         Route::post('/messages', [MessageApiController::class, 'store']);

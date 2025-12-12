@@ -99,26 +99,59 @@ class OpenAudibleParser
      */
     public function findAudioFile(array $bookData, string $source, bool $includeOld = false): ?string
     {
+        $source = rtrim($source, '/');
+
+        $candidateDirectories = [
+            $source . '/books',
+        ];
+
+        if ($includeOld) {
+            $candidateDirectories[] = $source . '/books_old';
+        }
+
         // Try to find audio file from metadata
-        if (!empty($bookData['files'])) {
-            foreach ($bookData['files'] as $file) {
-                $filePath = $source . '/' . $file;
+        if (!empty($bookData['files']) && is_array($bookData['files'])) {
+            foreach ($bookData['files'] as $fileEntry) {
+                $relativePath = null;
+                if (is_string($fileEntry)) {
+                    $relativePath = $fileEntry;
+                } elseif (is_array($fileEntry)) {
+                    $relativePath = $fileEntry['path'] ?? null;
+                }
+
+                if (!is_string($relativePath) || $relativePath === '') {
+                    continue;
+                }
+
+                $relativePath = ltrim(str_replace('\\', '/', $relativePath), '/');
+                $relativePath = preg_replace('#^books/#', '', $relativePath);
+                $relativePath = preg_replace('#^books_old/#', '', $relativePath);
+
+                foreach ($candidateDirectories as $candidateDir) {
+                    $filePath = $candidateDir . '/' . $relativePath;
+                    if (file_exists($filePath) && $this->isAudioFile($filePath)) {
+                        return $filePath;
+                    }
+                }
+            }
+        }
+
+        // Try filename field
+        if (!empty($bookData['filename']) && is_string($bookData['filename'])) {
+            $filename = ltrim(str_replace('\\', '/', $bookData['filename']), '/');
+            $filename = preg_replace('#^books/#', '', $filename);
+            $filename = preg_replace('#^books_old/#', '', $filename);
+
+            foreach ($candidateDirectories as $candidateDir) {
+                $filePath = $candidateDir . '/' . $filename;
                 if (file_exists($filePath) && $this->isAudioFile($filePath)) {
                     return $filePath;
                 }
             }
         }
 
-        // Try filename field
-        if (!empty($bookData['filename'])) {
-            $filePath = $source . '/' . $bookData['filename'];
-            if (file_exists($filePath) && $this->isAudioFile($filePath)) {
-                return $filePath;
-            }
-        }
-
         // Try to construct filename from title
-        if (!empty($bookData['title'])) {
+        if (!empty($bookData['title']) && is_string($bookData['title'])) {
             $possibleNames = [
                 $bookData['title'] . '.m4b',
                 $bookData['title'] . '.m4a',
@@ -126,25 +159,12 @@ class OpenAudibleParser
             ];
 
             foreach ($possibleNames as $name) {
-                $filePath = $source . '/' . $name;
-                if (file_exists($filePath)) {
-                    return $filePath;
+                foreach ($candidateDirectories as $candidateDir) {
+                    $filePath = $candidateDir . '/' . $name;
+                    if (file_exists($filePath)) {
+                        return $filePath;
+                    }
                 }
-            }
-        }
-
-        // Check books_old directory if requested
-        if ($includeOld) {
-            $oldSource = dirname($source) . '/books_old';
-            if (is_dir($oldSource)) {
-                // Recursively try the same logic in books_old
-                $oldBookData = $bookData;
-                $oldBookData['files'] = array_map(
-                    fn ($f) => '../books_old/' . basename($f),
-                    $bookData['files'] ?? []
-                );
-
-                return $this->findAudioFile($oldBookData, dirname($source), false);
             }
         }
 

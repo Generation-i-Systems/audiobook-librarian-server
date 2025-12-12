@@ -207,22 +207,16 @@ class BookController extends Controller
 
             $books = $result['data'];
 
-            // Check directory existence for each book
-            $storagePath = rtrim(env('BOOK_STORAGE_PATH', '/media/audiobooks/books'), '/');
-
-            // Get all book IDs with their directory paths and existence status
-            $bookIds = collect($books)->pluck('id')->filter()->toArray();
-            $booksWithDirs = \App\Models\Book::whereIn('id', $bookIds)
-                ->select(['id', 'directory_path', 'directory_exists'])
-                ->get()
-                ->keyBy('id');
+            $bookRoot = rtrim((string) config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
 
             foreach ($books as &$book) {
-                $bookId = $book['id'] ?? null;
+                $directoryPath = $book['directoryPath'] ?? ($book['directory_path'] ?? null);
+                if (is_string($directoryPath) && $directoryPath !== '') {
+                    $normalizedDirectoryPath = trim($directoryPath, '/');
+                    $absolutePath = $bookRoot . '/' . $normalizedDirectoryPath;
 
-                if ($bookId && $bookData = $booksWithDirs->get($bookId)) {
-                    $book['directoryExists'] = (bool) $bookData->directory_exists;
-                    $book['directoryPath'] = $bookData->directory_path;
+                    $book['directoryPath'] = $normalizedDirectoryPath;
+                    $book['directoryExists'] = is_dir($absolutePath);
                 } else {
                     $book['directoryExists'] = false;
                     $book['directoryPath'] = null;
@@ -1498,7 +1492,11 @@ class BookController extends Controller
         // Can be overridden with ?delete_files=false query parameter
         $deleteFiles = $request->query('delete_files', 'true') !== 'false';
 
-        $documentStore->deleteBook($book, $deleteFiles);
+        if ($deleteFiles) {
+            $documentStore->deleteBook($book);
+        } else {
+            $documentStore->deleteBook($book, false);
+        }
 
         $message = $deleteFiles
             ? 'Book and files deleted successfully.'
@@ -2079,7 +2077,7 @@ class BookController extends Controller
                         'name' => $file,
                         'size' => filesize($path),
                         'type' => is_dir($path) ? 'directory' : 'file',
-                        'extension' => pathinfo($file, PATHINFO_EXTENSION)
+                        'extension' => pathinfo($file, PATHINFO_EXTENSION),
                     ];
                 }
             }
@@ -2088,7 +2086,7 @@ class BookController extends Controller
         return response()->json([
             'files' => $files,
             'exists' => $exists,
-            'path' => $dir
+            'path' => $dir,
         ]);
     }
 
@@ -2132,14 +2130,14 @@ class BookController extends Controller
                         'name' => $item,
                         'path' => $relativePath,
                         'fullPath' => $fullPath,
-                        'type' => 'directory'
+                        'type' => 'directory',
                     ];
                 } elseif (is_file($fullPath)) {
                     $files[] = [
                         'name' => $item,
                         'type' => 'file',
                         'size' => filesize($fullPath),
-                        'extension' => pathinfo($item, PATHINFO_EXTENSION)
+                        'extension' => pathinfo($item, PATHINFO_EXTENSION),
                     ];
                 }
             }
@@ -2166,7 +2164,7 @@ class BookController extends Controller
         $validated = $request->validate([
             'oldName' => 'required|string',
             'newName' => 'required|string',
-            'merge' => 'boolean'
+            'merge' => 'boolean',
         ]);
 
         $oldName = $validated['oldName'];
@@ -2176,7 +2174,7 @@ class BookController extends Controller
         if ($oldName === $newName) {
             return response()->json([
                 'success' => false,
-                'message' => 'New name must be different from current name.'
+                'message' => 'New name must be different from current name.',
             ], 400);
         }
 

@@ -142,11 +142,15 @@ class MoveBookDirectory extends Command
         }
 
         // CRITICAL SAFETY: Prevent moving book root itself
+        $absBookRoot = $this->normalizePathString(realpath($this->bookRoot) ?: $this->bookRoot);
         foreach ($sources as $source) {
-            $absSource = realpath($source) ?: $source;
-            $absBookRoot = realpath($this->bookRoot);
+            try {
+                $absSource = $this->normalizePath($source, false);
+            } catch (\Throwable) {
+                $absSource = $this->normalizePathString(str_replace("\0", '', (string) $source));
+            }
 
-            if ($absSource === $absBookRoot) {
+            if ($this->normalizePathString($absSource) === $absBookRoot) {
                 $this->logWarning('Attempted to move the book root directory', ['source' => $source]);
                 $this->error("Cannot move the book root directory itself");
                 return 1;
@@ -155,7 +159,13 @@ class MoveBookDirectory extends Command
 
         // CRITICAL SAFETY: Validate ALL sources exist before ANY operations
         foreach ($sources as $source) {
-            $sourcePath = $this->normalizePath($source);
+            try {
+                $sourcePath = $this->normalizePath($source);
+            } catch (\Throwable $exception) {
+                $this->logWarning('Invalid source path', ['source' => $source, 'error' => $exception->getMessage()]);
+                $this->error($exception->getMessage());
+                return 1;
+            }
             if (!file_exists($sourcePath)) {
                 $this->logWarning('Source path does not exist', ['source' => $source, 'normalized' => $sourcePath]);
                 $this->error("Source does not exist: {$source}");
@@ -186,7 +196,8 @@ class MoveBookDirectory extends Command
         }
 
         if (!$dryRun && !is_dir($destDir)) {
-            if (!mkdir($destDir, 0755, true)) {
+            $mkdirOk = @mkdir($destDir, 0755, true);
+            if (!$mkdirOk && !is_dir($destDir)) {
                 $this->logError('Failed to create destination directory', ['destination_directory' => $destDir]);
                 $this->error("Failed to create destination directory: {$destDir}");
                 return 1;
@@ -273,6 +284,18 @@ class MoveBookDirectory extends Command
 
             $this->warn("Path escapes book root: {$destPath} (from: {$destination}, bookRoot: {$this->bookRoot})");
 
+            $isAbsoluteDestination = str_starts_with(trim((string) $destination), '/');
+            if (!$isAbsoluteDestination) {
+                $this->error('Destination is outside the configured book root. Aborting.');
+                return 1;
+            }
+
+            $isInteractive = isset($this->input) && $this->input->isInteractive();
+            if (!$isInteractive) {
+                $this->error('Destination is outside the configured book root. Aborting.');
+                return 1;
+            }
+
             if (!$this->confirm('Destination is outside the configured book root. Continue with filesystem move only (database will not be updated)?')) {
                 $this->info('Operation cancelled.');
                 return 0;
@@ -318,7 +341,7 @@ class MoveBookDirectory extends Command
 
             // If multiple sources, trailing slash, OR destination is an existing directory,
             // treat as "move into directory" operation
-            if (count($sources) > 1 || str_ends_with($destination, '/') || is_dir($destPath)) {
+            if (count($sources) > 1 || str_ends_with($destination, '/')) {
                 $finalDest = $destPath . '/' . basename($sourcePath);
             }
 
@@ -350,7 +373,7 @@ class MoveBookDirectory extends Command
 
                 // Calculate final destination for this source
                 $finalDest = $destPath;
-                if (count($sources) > 1 || str_ends_with($destination, '/') || is_dir($destPath)) {
+                if (count($sources) > 1 || str_ends_with($destination, '/')) {
                     $finalDest = $destPath . '/' . basename($sourcePath);
                 }
 
@@ -555,7 +578,7 @@ class MoveBookDirectory extends Command
         $diskRoot = config('filesystems.disks.books.root');
         $envRoot = env('BOOK_STORAGE_PATH');
 
-        $bookStoragePath = $envRoot ?: ($diskRoot ?: $configBookRoot);
+        $bookStoragePath = $diskRoot ?: ($configBookRoot ?: $envRoot);
 
         if (empty($bookStoragePath)) {
             throw new \RuntimeException('Book storage path is not configured. Set config("app.book_root") or filesystems.disks.books.root.');

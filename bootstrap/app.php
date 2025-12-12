@@ -53,6 +53,16 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('books:validate-directories')
                  ->dailyAt('03:00')
                  ->appendOutputTo(storage_path('logs/directory-validation.log'));
+
+        // Scrape AudiobookBay categories for favorite authors daily at 4:00 AM
+        $schedule->command('abb:scrape-categories')
+                 ->dailyAt('04:00')
+                 ->appendOutputTo(storage_path('logs/abb-scraping.log'));
+
+        // Send daily email notifications for new books by favorite authors at 8:00 AM
+        $schedule->command('favorites:send-notifications')
+                 ->dailyAt('08:00')
+                 ->appendOutputTo(storage_path('logs/favorite-notifications.log'));
     })
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->api([

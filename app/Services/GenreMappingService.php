@@ -15,8 +15,16 @@ class GenreMappingService
 
         $genreParts = explode(':', $openAudibleGenre);
 
-        // Use the second part if it exists (more specific), otherwise use first
-        $genreToMap = count($genreParts) > 1 ? trim($genreParts[1]) : trim($genreParts[0]);
+        $firstPart = trim($genreParts[0] ?? '');
+
+        // When the first segment is a combined category (e.g. "Science Fiction & Fantasy"),
+        // it is the best indicator of the top-level directory.
+        if (count($genreParts) > 1 && str_contains($firstPart, '&')) {
+            $genreToMap = $firstPart;
+        } else {
+            // Otherwise, prefer the second segment if available (more specific), else first.
+            $genreToMap = count($genreParts) > 1 ? trim($genreParts[1]) : $firstPart;
+        }
         $firstGenre = strtolower($genreToMap);
 
         // Map to existing library directories
@@ -150,9 +158,18 @@ class GenreMappingService
 
             // Skip utility directories
             $skipDirs = [
-                'OpenAudible', 'OpenAudibleKyler', 'misc', 'utils',
-                'otrr', 'parse', 'podcasts', 'other', 'app',
-                'sync', 'unsorted', 'books'
+                'OpenAudible',
+                'OpenAudibleKyler',
+                'misc',
+                'utils',
+                'otrr',
+                'parse',
+                'podcasts',
+                'other',
+                'app',
+                'sync',
+                'unsorted',
+                'books',
             ];
 
             if (!in_array($basename, $skipDirs)) {

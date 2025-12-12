@@ -190,6 +190,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/books/{book}/play', [\App\Http\Controllers\PlayerController::class, 'show'])->name('books.play');
     Route::post('/books/{book}/reviews', [ReviewController::class, 'store'])->name('reviews.store');
     Route::delete('/reviews/{review}', [ReviewController::class, 'destroy'])->name('reviews.destroy');
+
+    // Favorite Authors routes
+    Route::get('/favorites', [\App\Http\Controllers\FavoriteAuthorWebController::class, 'index'])->name('favorites.index');
+    Route::post('/favorites', [\App\Http\Controllers\FavoriteAuthorWebController::class, 'store'])->name('favorites.store');
+    Route::delete('/favorites/{favorite}', [\App\Http\Controllers\FavoriteAuthorWebController::class, 'destroy'])->name('favorites.destroy');
+    Route::patch('/favorites/{favorite}/toggle-notifications', [\App\Http\Controllers\FavoriteAuthorWebController::class, 'toggleNotifications'])->name('favorites.toggle-notifications');
     Route::post(
         '/follow/{followableType}/{followableId}',
         [FollowController::class, 'follow']

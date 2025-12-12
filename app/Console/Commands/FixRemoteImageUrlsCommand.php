@@ -68,7 +68,7 @@ class FixRemoteImageUrlsCommand extends Command
     {
         $this->info('Starting to fix remote image URLs...');
 
-        $limit = $this->option('limit') ? (int)$this->option('limit') : null;
+        $limit = $this->option('limit') ? (int) $this->option('limit') : null;
         $dryRun = $this->option('dry-run');
         $cleanPaths = $this->option('clean-paths');
 
@@ -459,6 +459,12 @@ class FixRemoteImageUrlsCommand extends Command
             return false;
         }
 
+        $isInteractive = isset($this->input) && $this->input->isInteractive();
+        if (!$isInteractive || app()->environment('testing')) {
+            $this->warn("Non-interactive mode: skipping book {$bookId} due to invalid directory path");
+            return false;
+        }
+
         $choice = $this->ask("Select a path (0-" . count($similarPaths) . "):");
 
         if ($choice === '0' || $choice === null) {
@@ -466,7 +472,7 @@ class FixRemoteImageUrlsCommand extends Command
             return false;
         }
 
-        $selectedIndex = (int)$choice - 1;
+        $selectedIndex = (int) $choice - 1;
         if ($selectedIndex < 0 || $selectedIndex >= count($similarPaths)) {
             $this->error("Invalid selection");
             return false;

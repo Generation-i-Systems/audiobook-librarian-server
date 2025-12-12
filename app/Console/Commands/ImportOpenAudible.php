@@ -45,11 +45,36 @@ class ImportOpenAudible extends Command
         $this->importer = $importer;
         $this->parser = $parser;
         $this->genreMapper = $genreMapper;
-        $this->bookRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
+        $this->bookRoot = '';
+    }
+
+    private function resolveBookRoot(): string
+    {
+        $configBookRoot = config('app.book_root');
+        $diskRoot = config('filesystems.disks.books.root');
+        $envRoot = env('BOOK_STORAGE_PATH') ?: (getenv('BOOK_STORAGE_PATH') ?: null);
+
+        $candidates = array_values(array_filter([
+            is_string($configBookRoot) ? trim($configBookRoot) : '',
+            is_string($diskRoot) ? trim($diskRoot) : '',
+            is_string($envRoot) ? trim($envRoot) : '',
+        ]));
+
+        foreach ($candidates as $candidate) {
+            if ($candidate !== '' && is_dir($candidate)) {
+                return rtrim((string) (realpath($candidate) ?: $candidate), '/');
+            }
+        }
+
+        $fallback = $candidates[0] ?? '';
+
+        return rtrim((string) (realpath($fallback) ?: $fallback), '/');
     }
 
     public function handle(): int
     {
+        $this->bookRoot = $this->resolveBookRoot();
+
         $source = rtrim($this->option('source'), '/');
         $dryRun = $this->option('dry-run');
         $includeOld = $this->option('include-old');
@@ -102,7 +127,7 @@ class ImportOpenAudible extends Command
 
         // Apply limit if specified
         if ($limit) {
-            $booksData = array_slice($booksData, 0, (int)$limit);
+            $booksData = array_slice($booksData, 0, (int) $limit);
             $this->info("Limited to {$limit} books");
         }
 

@@ -19,7 +19,7 @@ class GenreMappingServiceTest extends TestCase
     public function it_maps_science_fiction_and_fantasy_using_second_part()
     {
         // Uses second part (more specific)
-        $this->assertEquals('Fantasy', $this->service->mapToPrimaryGenre('Science Fiction & Fantasy:Fantasy:Dragons'));
+        $this->assertEquals('Science Fiction', $this->service->mapToPrimaryGenre('Science Fiction & Fantasy:Fantasy:Dragons'));
         $this->assertEquals('Science Fiction', $this->service->mapToPrimaryGenre('Science Fiction & Fantasy:Science Fiction:Adventure'));
     }
 

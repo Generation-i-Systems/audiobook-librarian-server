@@ -227,6 +227,7 @@ class ImportBook extends Command
     private function displaySummary(bool $dryRun): void
     {
         $this->newLine();
+        $this->line('Import Summary' . ($dryRun ? ' (DRY RUN)' : ''));
         $this->line('═══════════════════════════════════════════════════════════════');
         $this->line('  Import Summary' . ($dryRun ? ' (DRY RUN)' : ''));
         $this->line('═══════════════════════════════════════════════════════════════');

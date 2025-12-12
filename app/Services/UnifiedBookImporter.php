@@ -36,7 +36,40 @@ class UnifiedBookImporter
         $this->documentStore = $documentStore;
         $this->parser = $parser;
         $this->genreMapper = $genreMapper;
-        $this->bookRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
+        if ($this->genreMapper === null) {
+            try {
+                $this->genreMapper = app(GenreMappingService::class);
+            } catch (\Throwable) {
+                $this->genreMapper = null;
+            }
+        }
+        $this->bookRoot = $this->resolveBookRoot();
+    }
+
+    private function resolveBookRoot(): string
+    {
+        $configBookRoot = config('app.book_root');
+        $envRoot = env('BOOK_STORAGE_PATH') ?: (getenv('BOOK_STORAGE_PATH') ?: null);
+        $diskRoot = config('filesystems.disks.books.root');
+
+        $candidates = array_values(array_filter([
+            is_string($configBookRoot) ? trim($configBookRoot) : '',
+            is_string($envRoot) ? trim($envRoot) : '',
+            is_string($diskRoot) ? trim($diskRoot) : '',
+        ]));
+
+        foreach ($candidates as $candidate) {
+            if ($candidate !== '' && is_dir($candidate)) {
+                return rtrim((string) (realpath($candidate) ?: $candidate), '/');
+            }
+        }
+
+        $fallback = $candidates[0] ?? '';
+        if ($fallback === '') {
+            return '';
+        }
+
+        return rtrim((string) (realpath($fallback) ?: $fallback), '/');
     }
 
     /**
@@ -48,6 +81,8 @@ class UnifiedBookImporter
      */
     public function importBook(array $bookData, array $options = []): array
     {
+        $this->bookRoot = $this->resolveBookRoot();
+
         $dryRun = $options['dry_run'] ?? false;
         $force = $options['force'] ?? false;
         $sourcePath = $options['source_path'] ?? null;
@@ -197,6 +232,14 @@ class UnifiedBookImporter
      */
     private function generateDirectoryPath(array $bookData): string
     {
+        if ($this->genreMapper === null) {
+            try {
+                $this->genreMapper = app(GenreMappingService::class);
+            } catch (\Throwable) {
+                $this->genreMapper = null;
+            }
+        }
+
         // Map genre if we have genre mapper
         $genre = 'General Fiction';
         if (!empty($bookData['genre'])) {
@@ -288,9 +331,11 @@ class UnifiedBookImporter
             $ext = strtolower($file->getExtension());
 
             // Skip audio files if merge mode and file exists
-            if ($duplicateAction === 'merge' &&
+            if (
+                $duplicateAction === 'merge' &&
                 in_array($ext, ['m4b', 'm4a', 'mp3']) &&
-                file_exists($destFile)) {
+                file_exists($destFile)
+            ) {
                 continue;
             }
 
@@ -314,7 +359,7 @@ class UnifiedBookImporter
             $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
             if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
                 if (stripos($file, 'cover') !== false) {
-                    return $file;
+                    return trim($destPath, '/') . '/' . ltrim($file, '/');
                 }
             }
         }
@@ -323,7 +368,7 @@ class UnifiedBookImporter
         foreach ($copiedFiles as $file) {
             $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
             if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'])) {
-                return $file;
+                return trim($destPath, '/') . '/' . ltrim($file, '/');
             }
         }
 
@@ -345,7 +390,7 @@ class UnifiedBookImporter
             'directory_path' => $destPath,
             'description' => strip_tags($bookData['description'] ?? $bookData['summary'] ?? ''),
             'duration' => $duration,
-            'audio_file_count' => count(array_filter($copiedFiles, fn ($f) => preg_match('/\.(m4b|m4a|mp3)$/i', $f))),
+            'audio_file_count' => count(array_filter($copiedFiles, fn($f) => preg_match('/\.(m4b|m4a|mp3)$/i', $f))),
             'total_size' => $totalSize,
             'cover_image' => $bookData['cover_image'] ?? null,
             'asin' => $bookData['asin'] ?? $bookData['product_id'] ?? null,
@@ -368,7 +413,7 @@ class UnifiedBookImporter
             'directory_path' => $destPath,
             'description' => strip_tags($bookData['description'] ?? $bookData['summary'] ?? $book->description),
             'duration' => $duration ?: $book->duration,
-            'audio_file_count' => count(array_filter($copiedFiles, fn ($f) => preg_match('/\.(m4b|m4a|mp3)$/i', $f))) ?: $book->audio_file_count,
+            'audio_file_count' => count(array_filter($copiedFiles, fn($f) => preg_match('/\.(m4b|m4a|mp3)$/i', $f))) ?: $book->audio_file_count,
             'total_size' => $totalSize ?: $book->total_size,
             'cover_image' => $bookData['cover_image'] ?? $book->cover_image,
             'asin' => $bookData['asin'] ?? $bookData['product_id'] ?? $book->asin,
@@ -484,7 +529,7 @@ class UnifiedBookImporter
     private function parseDuration(array $bookData): ?int
     {
         if (!empty($bookData['seconds'])) {
-            return (int)$bookData['seconds'];
+            return (int) $bookData['seconds'];
         }
 
         if (!empty($bookData['duration'])) {
@@ -498,7 +543,7 @@ class UnifiedBookImporter
 
             // Already in seconds
             if (is_numeric($bookData['duration'])) {
-                return (int)$bookData['duration'];
+                return (int) $bookData['duration'];
             }
         }
 

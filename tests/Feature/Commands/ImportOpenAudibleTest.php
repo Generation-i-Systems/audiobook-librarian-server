@@ -5,6 +5,7 @@ namespace Tests\Feature\Commands;
 use App\Models\Book;
 use App\Models\Genre;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
@@ -21,6 +22,9 @@ class ImportOpenAudibleTest extends TestCase
 
         $this->testOpenAudibleDir = storage_path('testing/openaudible');
         $this->testBookRoot = storage_path('testing/books');
+
+        Config::set('app.book_root', $this->testBookRoot);
+        Config::set('filesystems.disks.books.root', $this->testBookRoot);
 
         putenv("BOOK_STORAGE_PATH={$this->testBookRoot}");
 
@@ -471,7 +475,7 @@ class ImportOpenAudibleTest extends TestCase
         // Act
         $result = $this->artisan('books:import-openaudible', [
             '--source' => $this->testOpenAudibleDir,
-        ]);
+        ])->run();
 
         // Cleanup
         chmod($this->testBookRoot, 0755);

@@ -21,6 +21,7 @@ class Book extends Model
         'release_date',
         'cover_image',
         'language',
+        'asin',
         'source',
         'batch_id',
         'series_id',

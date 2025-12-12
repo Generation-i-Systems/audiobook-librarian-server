@@ -4,6 +4,7 @@ namespace Tests\Feature\Commands;
 
 use App\Models\Book;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Tests\TestCase;
@@ -22,6 +23,10 @@ class MoveBookDirectoryCriticalTest extends TestCase
     {
         parent::setUp();
         $this->testBookRoot = storage_path('testing/books');
+
+        Config::set('app.book_root', $this->testBookRoot);
+        Config::set('filesystems.disks.books.root', $this->testBookRoot);
+
         putenv("BOOK_STORAGE_PATH={$this->testBookRoot}");
         File::makeDirectory($this->testBookRoot, 0755, true, true);
     }
@@ -51,8 +56,8 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act - should fail
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath]
-        ]);
+            'sources' => [$sourcePath, $destPath],
+        ])->run();
 
         // Restore table
         DB::statement('CREATE TABLE books AS SELECT * FROM books_backup');
@@ -81,7 +86,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Move all books
         $this->artisan('books:move', [
-            'sources' => array_merge($paths, ['Sci-Fi/'])
+            'sources' => array_merge($paths, ['Sci-Fi/']),
         ])->assertExitCode(0);
 
         // Assert - same number of books (no duplicates or deletions)
@@ -104,8 +109,8 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath]
-        ]);
+            'sources' => [$sourcePath, $destPath],
+        ])->run();
 
         // Cleanup
         chmod($readOnlyDir, 0755);
@@ -131,8 +136,8 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act - should fail
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath]
-        ]);
+            'sources' => [$sourcePath, $destPath],
+        ])->run();
 
         // Assert - both books still exist
         $this->assertDirExists($this->testBookRoot . '/' . $sourcePath);
@@ -162,8 +167,8 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath]
-        ]);
+            'sources' => [$sourcePath, $destPath],
+        ])->run();
 
         // Assert - source unchanged, database unchanged
         $this->assertDirExists($this->testBookRoot . '/' . $sourcePath);
@@ -183,8 +188,8 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath]
-        ]);
+            'sources' => [$sourcePath, $destPath],
+        ])->run();
 
         // Assert - move should fail or be contained
         $this->assertDirExists($this->testBookRoot . '/' . $sourcePath);
@@ -202,14 +207,16 @@ class MoveBookDirectoryCriticalTest extends TestCase
         $book = $this->createTestBook($sourcePath);
 
         // Create symlink attack
-        mkdir('/tmp/attack-target', 0755, true);
+        if (!is_dir($attackPath)) {
+            mkdir($attackPath, 0755, true);
+        }
         $symlinkPath = $this->testBookRoot . '/Sci-Fi';
         @symlink('/tmp/attack-target', $symlinkPath);
 
         // Act
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, 'Sci-Fi/Book1']
-        ]);
+            'sources' => [$sourcePath, 'Sci-Fi/Book1'],
+        ])->run();
 
         // Cleanup
         @unlink($symlinkPath);
@@ -236,8 +243,8 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath]
-        ]);
+            'sources' => [$sourcePath, $destPath],
+        ])->run();
 
         // Assert - should handle gracefully (exit code 2 for no books)
         $this->assertEquals(2, $result);
@@ -255,8 +262,8 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act - should not execute SQL injection
         $result = $this->artisan('books:move', [
-            'sources' => [$maliciousPath, $destPath]
-        ]);
+            'sources' => [$maliciousPath, $destPath],
+        ])->run();
 
         // Assert - books table still exists
         $this->assertTrue(DB::getSchemaBuilder()->hasTable('books'));
@@ -275,8 +282,8 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath]
-        ]);
+            'sources' => [$sourcePath, $destPath],
+        ])->run();
 
         // Assert - should handle safely
         $book->refresh();
@@ -299,8 +306,8 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act - move all
         $this->artisan('books:move', [
-            'sources' => array_merge($paths, ['Sci-Fi/'])
-        ]);
+            'sources' => array_merge($paths, ['Sci-Fi/']),
+        ])->run();
 
         // Assert - all books still exist in DB
         $this->assertEquals(count($initialBooks), Book::count());
@@ -321,13 +328,13 @@ class MoveBookDirectoryCriticalTest extends TestCase
         // But we can verify the book ends up in only ONE location
 
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath1]
+            'sources' => [$sourcePath, $destPath1],
         ])->assertExitCode(0);
 
         // Second move should fail (source doesn't exist)
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath2]
-        ]);
+            'sources' => [$sourcePath, $destPath2],
+        ])->run();
 
         // Assert - book only in one location
         $book->refresh();
@@ -344,8 +351,8 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // This should fail gracefully, not crash
         $result = $this->artisan('books:move', [
-            'sources' => [$longPath, $destPath]
-        ]);
+            'sources' => [$longPath, $destPath],
+        ])->run();
 
         // Assert - should handle gracefully
         $this->assertNotEquals(0, $result);
@@ -366,8 +373,8 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, 'Sci-Fi/Author/Book1']
-        ]);
+            'sources' => [$sourcePath, 'Sci-Fi/Author/Book1'],
+        ])->run();
 
         // Cleanup
         @unlink($linkPath);
@@ -395,8 +402,8 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act
         $this->artisan('books:move', [
-            'sources' => array_merge($paths, ['Sci-Fi/'])
-        ]);
+            'sources' => array_merge($paths, ['Sci-Fi/']),
+        ])->run();
 
         // Assert - if any move failed, check DB consistency
         $currentPaths = Book::pluck('directory_path')->toArray();
@@ -420,8 +427,8 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act - should handle both forms correctly
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath2, 'Sci-Fi/Café/Book1']
-        ]);
+            'sources' => [$sourcePath2, 'Sci-Fi/Café/Book1'],
+        ])->run();
 
         // Assert - should find the book regardless of normalization
         // (This might fail, which is OK - it documents the issue)
@@ -440,8 +447,8 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath]
-        ]);
+            'sources' => [$sourcePath, $destPath],
+        ])->run();
 
         // Assert - should not escape book root
         $this->assertDirDoesNotExist('/tmp/evil');
@@ -465,8 +472,8 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act in separate process (simulated)
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath]
-        ]);
+            'sources' => [$sourcePath, $destPath],
+        ])->run();
 
         DB::rollBack();
 
@@ -492,8 +499,8 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act
         $result = $this->artisan('books:move', [
-            'sources' => array_merge($paths, ['Sci-Fi/'])
-        ]);
+            'sources' => array_merge($paths, ['Sci-Fi/']),
+        ])->run();
 
         // Assert - NO books should have moved
         $book1->refresh();
@@ -508,8 +515,8 @@ class MoveBookDirectoryCriticalTest extends TestCase
     {
         // CRITICAL: Never allow moving the entire book root
         $result = $this->artisan('books:move', [
-            'sources' => [$this->testBookRoot, '/tmp/books']
-        ]);
+            'sources' => [$this->testBookRoot, '/tmp/books'],
+        ])->run();
 
         // Assert - should fail
         $this->assertNotEquals(0, $result);
@@ -521,7 +528,8 @@ class MoveBookDirectoryCriticalTest extends TestCase
     {
         // CRITICAL: Handle books with thousands of files
         $sourcePath = 'Fantasy/Author/LargeBook';
-        $this->createTestDirectory($sourcePath);
+        $fullPath = $this->testBookRoot . '/' . $sourcePath;
+        File::makeDirectory($fullPath, 0755, true, true);
 
         // Create 1000 files
         for ($i = 0; $i < 1000; $i++) {
@@ -532,8 +540,8 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, 'Sci-Fi/Author/LargeBook']
-        ]);
+            'sources' => [$sourcePath, 'Sci-Fi/Author/LargeBook'],
+        ])->run();
 
         // Assert - all files moved
         $movedFiles = glob($this->testBookRoot . '/Sci-Fi/Author/LargeBook/*.m4b');
