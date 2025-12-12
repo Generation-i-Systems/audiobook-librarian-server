@@ -785,6 +785,7 @@ class AudiobookBayApiService
 
         $params = [
             's' => $query,
+            'cat' => 'undefined,undefined', // Required by AudiobookBay
         ];
 
         if (isset($options['author'])) {
