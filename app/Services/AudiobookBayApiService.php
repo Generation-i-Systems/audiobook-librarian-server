@@ -779,13 +779,12 @@ class AudiobookBayApiService
 
     public function searchAudiobooks(string $query, array $options = []): ?array
     {
-        $endpoint = '/'; // Search is typically at the root with query parameters
+        // AudiobookBay uses /page/N/ in the path for pagination, not query params
+        $page = $options['page'] ?? 1;
+        $endpoint = $page > 1 ? "/page/$page/" : '/';
+
         $params = [
             's' => $query,
-            // AudiobookBay uses 'page_num' for pagination in search results, not 'page'
-            'page_num' => $options['page'] ?? 1,
-            // Common search parameters, adjust if ABB uses different ones
-            // 'sort' and 'order' might not be directly supported or have different names
         ];
 
         if (isset($options['author'])) {
