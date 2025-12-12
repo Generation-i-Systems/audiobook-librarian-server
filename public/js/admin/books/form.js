@@ -1498,13 +1498,44 @@ function displayAutofillResults(results, autoApplyFirst) {
     if (results.length > 0) {
         var rows = "";
         results.forEach(function (item, idx) {
-            var authors = Array.isArray(item.author)
-                ? item.author.join(", ")
-                : item.author || "";
+            // Handle authors - prefer narratorsList (simple array), fall back to author array or authors (nested)
+            var authors = "";
+            if (item.author && Array.isArray(item.author)) {
+                // Simple array: ["Eoin Colfer"]
+                authors = item.author.join(", ");
+            } else if (item.authors && Array.isArray(item.authors)) {
+                // Nested array: [{author: {name: "Eoin Colfer", id: "..."}}]
+                authors = item.authors
+                    .map(function(a) {
+                        if (a.author && a.author.name) {
+                            return a.author.name;
+                        }
+                        return a.name || a;
+                    })
+                    .filter(function(a) { return a; })
+                    .join(", ");
+            } else if (item.author) {
+                authors = item.author;
+            }
 
-            // Handle narrators - could be array or string
+            // Handle narrators - prefer narratorsList (simple array), fall back to narrator or narrators (nested)
             var narrators = "";
-            if (item.narratorList && Array.isArray(item.narratorList)) {
+            if (item.narratorsList && Array.isArray(item.narratorsList)) {
+                // Simple array: ["Nathaniel Parker"]
+                narrators = item.narratorsList.join(", ");
+            } else if (item.narrators && Array.isArray(item.narrators)) {
+                // Nested array: [{narrator: {name: "Nathaniel Parker", id: "..."}}]
+                narrators = item.narrators
+                    .map(function(n) {
+                        if (n.narrator && n.narrator.name) {
+                            return n.narrator.name;
+                        }
+                        return n.name || n;
+                    })
+                    .filter(function(n) { return n; })
+                    .join(", ");
+            } else if (item.narratorList && Array.isArray(item.narratorList)) {
+                // Alternative spelling
                 narrators = item.narratorList.join(", ");
             } else if (item.narrator) {
                 narrators = Array.isArray(item.narrator)
@@ -1655,36 +1686,51 @@ function applyAutofillResult(idx) {
                                     $("#description").val(item.description);
                                 }
 
-                                // Authors - handle both single string and array formats
-                                if (item.author) {
-                                    $("#authors-group").html("");
-                                    if (typeof item.author === "string") {
-                                        addAuthorRow(
-                                            $("#book-form"),
-                                            item.author,
-                                        );
-                                    } else if (Array.isArray(item.author)) {
-                                        item.author.forEach(function (author) {
-                                            addAuthorRow(
-                                                $("#book-form"),
-                                                author,
-                                            );
-                                        });
-                                    } else {
-                                        addAuthorRow(
-                                            $("#book-form"),
-                                            item.author,
-                                        );
-                                    }
+                                // Authors - handle multiple formats
+                                $("#authors-group").html("");
+                                if (item.author && Array.isArray(item.author)) {
+                                    // Simple array: ["Eoin Colfer"]
+                                    item.author.forEach(function (author) {
+                                        addAuthorRow($("#book-form"), author);
+                                    });
+                                } else if (item.authors && Array.isArray(item.authors)) {
+                                    // Nested array: [{author: {name: "Eoin Colfer", id: "..."}}]
+                                    item.authors.forEach(function (a) {
+                                        var authorName = a.author && a.author.name ? a.author.name : (a.name || a);
+                                        if (authorName) {
+                                            addAuthorRow($("#book-form"), authorName);
+                                        }
+                                    });
+                                } else if (item.author) {
+                                    // Single string
+                                    addAuthorRow($("#book-form"), item.author);
+                                } else {
+                                    // Add empty author row
+                                    addAuthorRow($("#book-form"), "");
                                 }
 
-                                // Narrators - handle both narratorList (Audible) and narrator field
+                                // Narrators - handle multiple formats
                                 $("#narrators-group").html("");
-                                if (item.narratorList && Array.isArray(item.narratorList) && item.narratorList.length > 0) {
+                                if (item.narratorsList && Array.isArray(item.narratorsList) && item.narratorsList.length > 0) {
+                                    // Simple array: ["Nathaniel Parker"]
+                                    item.narratorsList.forEach(function (narrator) {
+                                        addNarratorRow($("#book-form"), narrator);
+                                    });
+                                } else if (item.narrators && Array.isArray(item.narrators) && item.narrators.length > 0) {
+                                    // Nested array: [{narrator: {name: "Nathaniel Parker", id: "..."}}]
+                                    item.narrators.forEach(function (n) {
+                                        var narratorName = n.narrator && n.narrator.name ? n.narrator.name : (n.name || n);
+                                        if (narratorName) {
+                                            addNarratorRow($("#book-form"), narratorName);
+                                        }
+                                    });
+                                } else if (item.narratorList && Array.isArray(item.narratorList) && item.narratorList.length > 0) {
+                                    // Alternative spelling
                                     item.narratorList.forEach(function (narrator) {
                                         addNarratorRow($("#book-form"), narrator);
                                     });
                                 } else if (item.narrator) {
+                                    // Single narrator (string or array)
                                     if (typeof item.narrator === "string") {
                                         addNarratorRow($("#book-form"), item.narrator);
                                     } else if (Array.isArray(item.narrator)) {
