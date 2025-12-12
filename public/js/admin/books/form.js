@@ -982,7 +982,7 @@ $("#autofillModal").on("shown.bs.modal", function () {
     // Automatically trigger search for all sources if any search criteria exists
     if (currentTitle || currentAuthor || currentSeries) {
         console.log("[DEBUG] Auto-triggering search with criteria:", { title: currentTitle, author: currentAuthor, series: currentSeries });
-        performAutofillSearch(["audible", "google", "audiobookbay", "hardcover"], false);
+        performAutofillSearch(["audible", "google", "hardcover"], false);
     }
 });
 
@@ -1494,6 +1494,46 @@ function displayAutofillResults(results, autoApplyFirst) {
     var $modal = $("#autofillModal");
     var $resultsTable = $modal.find("#autofill-results-table tbody");
     var $applyBtn = $modal.find("#autofill-apply-btn");
+
+    // Sort results by relevance/quality
+    results.sort(function(a, b) {
+        // Source priority scoring (higher is better)
+        var sourcePriority = {
+            'Audible': 100,
+            'Hardcover': 80,
+            'Google': 60,
+            'Audiobookbay': 40
+        };
+
+        var aSourceScore = sourcePriority[a.source] || 0;
+        var bSourceScore = sourcePriority[b.source] || 0;
+
+        // Data completeness scoring
+        var aDataScore = 0;
+        var bDataScore = 0;
+
+        // Check for key fields
+        if (a.author || (a.authors && a.authors.length > 0)) aDataScore += 10;
+        if (b.author || (b.authors && b.authors.length > 0)) bDataScore += 10;
+
+        if (a.narrator || a.narrators || a.narratorsList) aDataScore += 5;
+        if (b.narrator || b.narrators || b.narratorsList) bDataScore += 5;
+
+        if (a.coverImageUrl || a.cover_image_url) aDataScore += 5;
+        if (b.coverImageUrl || b.cover_image_url) bDataScore += 5;
+
+        if (a.description) aDataScore += 3;
+        if (b.description) bDataScore += 3;
+
+        if (a.series) aDataScore += 2;
+        if (b.series) bDataScore += 2;
+
+        // Combine scores
+        var aTotal = aSourceScore + aDataScore;
+        var bTotal = bSourceScore + bDataScore;
+
+        return bTotal - aTotal; // Sort descending (best first)
+    });
 
     if (results.length > 0) {
         var rows = "";
