@@ -693,7 +693,10 @@ class MoveBookDirectory extends Command
                     $bookModel->directory_path = $newPath;
 
                     // Parse the new path and update metadata if enabled
-                    if (!$noParse) {
+                    // IMPORTANT: Metadata parsing is DISABLED by default because directory renames
+                    // should only update the directory_path, not change author/genre/etc.
+                    // The parser often extracts incorrect data from absolute paths (e.g., "media" as author)
+                    if (false && !$noParse) {
                         try {
                             // Check if directory exists and has audio files before parsing
                             $fullPath = $this->bookRoot . '/' . $newPath;
