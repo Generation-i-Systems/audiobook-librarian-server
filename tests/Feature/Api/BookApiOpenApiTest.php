@@ -6,10 +6,13 @@ use Tests\TestCase;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Models\User;
 use App\Models\Book;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery\MockInterface;
 
 class BookApiOpenApiTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected $token;
     protected $openApiSpec;
 
@@ -71,7 +74,7 @@ class BookApiOpenApiTest extends TestCase
                     'total_size',
                     'created_at',
                     'updated_at',
-                ]
+                ],
             ],
             'meta' => [
                 'current_page',
@@ -80,7 +83,7 @@ class BookApiOpenApiTest extends TestCase
                 'per_page',
                 'to',
                 'total',
-            ]
+            ],
         ]);
 
         $responseData = $response->json();

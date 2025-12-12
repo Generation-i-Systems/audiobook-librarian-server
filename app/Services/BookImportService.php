@@ -233,12 +233,18 @@ class BookImportService
             if (!empty($metadata['genre'])) {
                 $genres = is_array($metadata['genre']) ? $metadata['genre'] : [$metadata['genre']];
                 $isPrimary = true; // First genre is primary
+                $genresToAttach = [];
+
                 foreach ($genres as $genreName) {
-                    // Validate and map to valid primary genre
                     $validGenreName = $this->validateAndMapGenre(trim($genreName));
                     $genre = Genre::firstOrCreate(['name' => $validGenreName]);
-                    $book->genres()->attach($genre->id, ['is_primary' => $isPrimary]);
+                    $genresToAttach[$genre->id] = ['is_primary' => $isPrimary];
                     $isPrimary = false; // Subsequent genres are not primary
+                }
+
+                if (!empty($genresToAttach)) {
+                    $book->genres()->sync($genresToAttach);
+                    $book->unsetRelation('genres');
                 }
             }
 
@@ -356,13 +362,18 @@ class BookImportService
             // Update genres
             if (!empty($metadata['genre'])) {
                 $genres = is_array($metadata['genre']) ? $metadata['genre'] : [$metadata['genre']];
-                $book->genres()->detach();
                 $isPrimary = true;
+                $genresToAttach = [];
                 foreach ($genres as $genreName) {
                     $validGenreName = $this->validateAndMapGenre(trim($genreName));
                     $genre = Genre::firstOrCreate(['name' => $validGenreName]);
-                    $book->genres()->attach($genre->id, ['is_primary' => $isPrimary]);
+                    $genresToAttach[$genre->id] = ['is_primary' => $isPrimary];
                     $isPrimary = false;
+                }
+
+                if (!empty($genresToAttach)) {
+                    $book->genres()->sync($genresToAttach);
+                    $book->unsetRelation('genres');
                 }
             }
 

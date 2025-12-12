@@ -159,7 +159,7 @@ class MoveBookDirectory extends Command
             if (!file_exists($sourcePath)) {
                 $this->logWarning('Source path does not exist', ['source' => $source, 'normalized' => $sourcePath]);
                 $this->error("Source does not exist: {$source}");
-                return 1;
+                return 2;
             }
         }
 

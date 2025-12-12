@@ -102,7 +102,7 @@ class BookDirectoryParser
     ) {
         $this->audioAnalyzer = $audioAnalyzer ?? new AudioFileAnalyzer();
         $this->metadataService = $metadataService ?? app(BookMetadataService::class);
-        $this->storageRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
+        $this->storageRoot = rtrim(env('BOOK_STORAGE_PATH') ?? '', '/');
     }
 
     /**

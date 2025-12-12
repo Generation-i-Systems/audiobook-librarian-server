@@ -83,3 +83,9 @@ when doing autofill when results come back select the first option by default. a
 ## 2025-12-10
 
 The clients are getting api responses from `https://books.thelin.org/api/v1/books/10708` and similar urls containing things like "series":[{"name":null,"series_number":null}] this doesn't follow the spec listed at `api-docs/openapi.json`. Fix that and make a test suite that can be run independently of other tests that verifies the api output. Make an api endpoint that can be hit without auth by an uptime monitor that will show that each api endpoint is returning data that follows the spec
+
+---
+
+## 2025-12-11
+
+implement the metadata lookup for audiobookbay and hardcover. audiobookbay should not need auth credentials for any of the features currently implemented. validate the data with integration tests that hit the actual audiobookbay url. Do the same for hardcover. these tests should not be part of any existing test suite. They are only for developing the endpoint handlers or for verifying the handlers going forward so they  would need to be ran specifically and not even in global test suite runs. among other things this is an example url that should work https://books.thelin.org/admin/books/search?source=audiobookbay&title=The%20Last%20Guardian&author=Eoin%20Colfer&series=&api_id=

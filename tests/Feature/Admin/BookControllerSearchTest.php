@@ -147,7 +147,7 @@ class BookControllerSearchTest extends TestCase
         // Assert response
         $response->assertStatus(400)
             ->assertJson([
-                'error' => 'Invalid source specified. Supported sources: audible, googlebooks',
+                'error' => 'Invalid source specified. Supported sources: audible, googlebooks, audiobookbay, hardcover',
             ]);
     }
 

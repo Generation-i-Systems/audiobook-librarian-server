@@ -24,3 +24,5 @@ yarn-error.log
 .php-cs-fixer.cache
 /books
 tests/coverage
+*~
+tmp_old_form.js

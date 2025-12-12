@@ -261,11 +261,30 @@ class AudiobookBayApiService
      */
     public function parseSearchResults(string $html): array
     {
+        // Log a snippet of the HTML to understand structure
+        $htmlSnippet = substr($html, 0, 2000);
+        Log::debug('[ABB-PARSE] HTML snippet', ['html' => $htmlSnippet]);
+
+        $results = $this->parseSearchResultsDom($html);
+        if (!empty($results)) {
+            Log::debug('[ABB-PARSE] DOM parsing returned results', ['count' => count($results)]);
+            return $results;
+        }
+
+        Log::debug('[ABB-PARSE] DOM parsing failed, trying regex');
+        return $this->parseSearchResultsRegex($html);
+    }
+
+    private function parseSearchResultsDom(string $html): array
+    {
         $dom = new DOMDocument();
         @$dom->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'));
         $xpath = new DOMXPath($dom);
         $results = [];
         $items = $xpath->query('//div[contains(@class, "post")]');
+
+        Log::debug('[ABB-PARSE] Found post items', ['count' => $items->length]);
+
         foreach ($items as $item) {
             $result = [
                 'title' => '',
@@ -278,59 +297,60 @@ class AudiobookBayApiService
                     'source' => 'audiobookbay',
                 ],
             ];
-            // Extract title and URL
             $titleNode = $xpath->query('.//div[contains(@class, "postTitle")]//a', $item)->item(0);
             if ($titleNode instanceof \DOMElement && $titleNode->hasAttribute('href')) {
                 $result['title'] = trim($titleNode->textContent);
-                $result['url'] = 'https://audiobookbay.lu' . $titleNode->getAttribute('href');
+                $href = $titleNode->getAttribute('href');
+                $result['url'] = str_starts_with($href, 'http') ? $href : rtrim($this->baseUrl, '/') . '/' . ltrim($href, '/');
+                Log::debug('[ABB-PARSE] Found title', ['title' => $result['title'], 'url' => $result['url']]);
+            } else {
+                Log::debug('[ABB-PARSE] No title node found');
             }
-            // Extract cover image
             $imgNode = $xpath->query('.//div[contains(@class, "postImg")]//img', $item)->item(0);
             if ($imgNode instanceof \DOMElement && $imgNode->hasAttribute('src')) {
                 $result['coverImageUrl'] = $imgNode->getAttribute('src');
             }
-            // Extract author
             $authorNode = $xpath->query('.//div[contains(@class, "postAuthor")]//a', $item)->item(0);
             if ($authorNode instanceof \DOMNode) {
+                $authorName = trim($authorNode->textContent);
                 $result['authors'][] = [
-                    'name' => trim($authorNode->textContent),
+                    'name' => $authorName,
                 ];
+                Log::debug('[ABB-PARSE] Found author', ['author' => $authorName]);
+            } else {
+                Log::debug('[ABB-PARSE] No author node found');
             }
-            // Extract description
             $descNode = $xpath->query('.//div[contains(@class, "postContent")]', $item)->item(0);
             if ($descNode instanceof \DOMNode) {
                 $result['description'] = trim($descNode->textContent);
             }
-            // Extract metadata from info section
             $infoNodes = $xpath->query('.//div[contains(@class, "postInfo")]//li', $item);
+            Log::debug('[ABB-PARSE] Info nodes found', ['count' => $infoNodes->length]);
             foreach ($infoNodes as $infoNode) {
                 $text = trim($infoNode->textContent);
-                // Extract narrator
+                Log::debug('[ABB-PARSE] Info node text', ['text' => $text]);
                 if (Str::startsWith($text, 'Read by:')) {
+                    $narratorName = trim(Str::after($text, 'Read by:'));
                     $result['narrators'][] = [
-                        'name' => trim(Str::after($text, 'Read by:')),
+                        'name' => $narratorName,
                     ];
+                    Log::debug('[ABB-PARSE] Found narrator', ['narrator' => $narratorName]);
                 }
-                // Extract categories
                 if (Str::startsWith($text, 'Category:')) {
                     $result['metadata']['categories'] = array_map(
                         'trim',
                         explode(',', Str::after($text, 'Category:'))
                     );
                 }
-                // Extract language
                 if (Str::startsWith($text, 'Language:')) {
                     $result['language'] = trim(Str::after($text, 'Language:'));
                 }
-                // Extract format
                 if (Str::startsWith($text, 'Format:')) {
                     $result['metadata']['format'] = trim(Str::after($text, 'Format:'));
                 }
-                // Extract size
                 if (Str::startsWith($text, 'Size:')) {
                     $result['metadata']['size'] = trim(Str::after($text, 'Size:'));
                 }
-                // Extract bitrate
                 if (preg_match('/(\d+\s*kbps)/i', $text, $matches)) {
                     $result['metadata']['bitrate'] = $matches[1];
                 }
@@ -338,6 +358,53 @@ class AudiobookBayApiService
             if (!empty($result['title'])) {
                 $results[] = $result;
             }
+        }
+
+        return $results;
+    }
+
+    private function parseSearchResultsRegex(string $html): array
+    {
+        $results = [];
+        $seen = [];
+
+        if (!preg_match_all('~<a[^>]+href="([^"]+/abss/[^"]+)"[^>]*>([^<]+)</a>~i', $html, $matches, PREG_SET_ORDER)) {
+            return [];
+        }
+
+        foreach ($matches as $match) {
+            $url = html_entity_decode($match[1], ENT_QUOTES | ENT_HTML5);
+            if (!str_starts_with($url, 'http')) {
+                $url = rtrim($this->baseUrl, '/') . '/' . ltrim($url, '/');
+            }
+            if (isset($seen[$url])) {
+                continue;
+            }
+            $seen[$url] = true;
+
+            $rawTitle = trim(html_entity_decode(strip_tags($match[2]), ENT_QUOTES | ENT_HTML5));
+            $authors = [];
+
+            $title = $rawTitle;
+            if (str_contains($rawTitle, ' - ')) {
+                $parts = array_values(array_filter(array_map('trim', explode(' - ', $rawTitle))));
+                if (count($parts) >= 2) {
+                    $authors[] = ['name' => array_pop($parts)];
+                    $title = trim(implode(' - ', $parts));
+                }
+            }
+
+            $results[] = [
+                'title' => $title,
+                'authors' => $authors,
+                'narrators' => [],
+                'description' => '',
+                'coverImageUrl' => '',
+                'url' => $url,
+                'metadata' => [
+                    'source' => 'audiobookbay',
+                ],
+            ];
         }
 
         return $results;
@@ -385,8 +452,7 @@ class AudiobookBayApiService
         if ($bodyNodes && $bodyNodes->length > 0) {
             $bodyText = $bodyNodes->item(0)->textContent;
         }
-        // TEMP DEBUG: log $bodyText for diagnosis
-        \Log::debug('AudiobookBay parse: $bodyText', ['bodyText' => $bodyText]);
+        Log::debug('AudiobookBay parse: bodyText length', ['length' => strlen($bodyText)]);
         // Use regex to extract author, narrator, format, bitrate, description
         // Make regex tolerant of any whitespace, newlines, and missing intermediate words
         if (preg_match('/Written by\s*([\s\S]+?)(?:Read by|Format:|Bitrate:|Unabridged|\n|\r|$)/i', $bodyText, $m)) {
@@ -438,8 +504,10 @@ class AudiobookBayApiService
         if (empty($book['narrators']) && preg_match('/Read by ([^\n\r]+?)(?:\.|$)/i', $bodyText, $m)) {
             $book['narrators'][] = ['name' => trim($m[1])];
         }
-        // Extract cover image (if present in any img tag)
-        $imgNode = $xpath->query('//img[contains(@src,"we-hunt-monsters")]')->item(0);
+        $imgNode = $xpath->query('//img[contains(@src,"wp-content/uploads") or contains(@src,"/uploads/") or contains(@src,"/covers/")]')->item(0);
+        if (!$imgNode) {
+            $imgNode = $xpath->query('//img')->item(0);
+        }
         if ($imgNode instanceof \DOMElement && $imgNode->hasAttribute('src')) {
             $book['coverImageUrl'] = $imgNode->getAttribute('src');
         }
@@ -475,6 +543,7 @@ class AudiobookBayApiService
         // Cache miss or invalid data, fetch from source
         $this->checkRateLimit();
         $response = Http::withHeaders($this->getDefaultHeaders())
+            ->timeout(20)
             ->get($this->baseUrl . $endpoint, $params);
 
         if ($response->successful()) {
@@ -612,13 +681,6 @@ class AudiobookBayApiService
         // Initialize from BaseApiTrait or config
         $this->cacheTtl = $config['cache_ttl'] ?? $this->cacheTtl;
         $this->rateLimit = $config['rate_limit'] ?? $this->rateLimit;
-
-        if (empty($this->username) || empty($this->password)) {
-            // Only log warning if not in testing environment
-            if (!app()->environment('testing')) {
-                Log::warning('AudiobookBayApiService: Missing username or password. Authentication will likely fail.');
-            }
-        }
     }
 
     /**
@@ -626,11 +688,26 @@ class AudiobookBayApiService
      */
     protected function getDefaultHeaders(): array
     {
-        return [
+        $headers = [
             'User-Agent' => $this->userAgent,
-            'Cookie' => $this->getAuthCookie(),
             'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         ];
+
+        $cookie = $this->getAuthCookieIfConfigured();
+        if (!empty($cookie)) {
+            $headers['Cookie'] = $cookie;
+        }
+
+        return $headers;
+    }
+
+    protected function getAuthCookieIfConfigured(): string
+    {
+        if (empty($this->username) || empty($this->password)) {
+            return '';
+        }
+
+        return $this->getAuthCookie();
     }
 
     protected function getAuthCookie(): string
@@ -640,8 +717,6 @@ class AudiobookBayApiService
         }
 
         if (empty($this->username) || empty($this->password)) {
-            Log::error('AudiobookBayApiService: Cannot get auth cookie without username and password.');
-
             return ''; // Cannot authenticate
         }
 
@@ -678,7 +753,7 @@ class AudiobookBayApiService
                 }
 
                 return collect($cookies)
-                    ->map(fn ($cookie) => $cookie->getName() . '=' . $cookie->getValue())
+                    ->map(fn($cookie) => $cookie->getName() . '=' . $cookie->getValue())
                     ->implode('; ');
             } catch (\Exception $e) {
                 Log::error('AudiobookBayApiService: Exception during authentication.', [
@@ -750,16 +825,28 @@ class AudiobookBayApiService
                 return null; // Cannot make request to an arbitrary URL with current httpGet setup
             }
         } else {
-            // Assume it's an ID or slug that needs to be appended to a base path like /audio-books/slug or /ab/slug
-            // This needs to be verified with actual AudiobookBay URL structure for detail pages.
-            // For now, assuming the $idOrUrl is the direct path segment after base.
-            $endpoint = '/' . ltrim($idOrUrl, '/');
+            $candidate = '/' . ltrim($idOrUrl, '/');
+
+            // If user passes just a slug (what our search results expose as apiId), map to /abss/{slug}/
+            if (!str_contains($candidate, '/abss/') && !str_contains($candidate, '/audio-books/')) {
+                $candidate = '/abss/' . trim($idOrUrl, "/") . '/';
+            }
+
+            $endpoint = $candidate;
         }
 
         $responseBody = $this->httpGetResponse($endpoint);
 
         if (is_string($responseBody)) {
-            return $this->parseAudiobookDetails($responseBody); // From AudiobookBayParserTrait
+            $parsed = $this->parseAudiobookDetails($responseBody); // From AudiobookBayParserTrait
+            $fullUrl = rtrim($this->baseUrl, '/') . $endpoint;
+            $urlPath = (string) (parse_url($fullUrl, PHP_URL_PATH) ?? '');
+            $urlPath = rtrim($urlPath, '/');
+
+            $parsed['url'] = $parsed['url'] ?? $fullUrl;
+            $parsed['id'] = $parsed['id'] ?? basename($urlPath);
+
+            return $parsed;
         }
 
         Log::warning('AudiobookBayApiService:getAudiobookDetails - Failed to fetch or parse details.', [

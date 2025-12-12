@@ -96,6 +96,10 @@
             "@php artisan test --filter=MetadataExtractionTest --coverage",
             "@php artisan test --filter=AuthorNormalizationTest --coverage",
             "@php artisan test --filter=EnrichmentMergeTest --coverage"
+        ],
+        "test:external-metadata": [
+            "@php artisan config:clear --ansi",
+            "./vendor/bin/phpunit -c phpunit.external-metadata.xml"
         ]
     },
     "extra": {

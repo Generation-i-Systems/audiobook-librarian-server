@@ -32,6 +32,18 @@ See [Import Book Documentation](docs/import-book.md) for detailed usage.
 - Safety checks prevent tests from accidentally using production MySQL database
 - `PersistentDatabaseTestCase` available for tests that need persistent data
 
+### External Metadata Lookup Integration Tests
+These tests hit real external services (network required) and are excluded from the default PHPUnit suites.
+
+Run them explicitly:
+```bash
+composer test:external-metadata
+```
+
+Notes:
+- AudiobookBay tests do not require credentials.
+- Hardcover tests require `HARDCOVER_API_TOKEN` to be configured (otherwise they will be skipped).
+
 ## MongoDB to MySQL Migration
 
 ### Features
@@ -83,11 +95,11 @@ php artisan app:migrate-mongo-to-mysql
 ### Implementation
 - Uses MongoDB `$search` aggregation with `autocomplete` and `fuzzy` options.
 - Service: `MongoService::autocompleteSeries`
-- Controllers: 
+- Controllers:
   - `BookApiController@autocompleteSeries` (API endpoint)
   - `BookController@autocompleteSeries` (Admin endpoint)
 - Interface: `DocumentStoreServiceInterface::autocompleteSeries`
-- Tests: 
+- Tests:
   - `BookApiAutocompleteSeriesTest` (API endpoint)
   - `BookControllerSeriesAutocompleteTest` (Admin endpoint)
 
@@ -215,7 +227,7 @@ Authentication is handled by Laravel Sanctum. Obtain a Personal Access Token usi
     - `query` (required): Search string
   - **Response:** Array of matching author names
 
-- `GET /narrators/autocomplete` — Autocomplete for narrator names  
+- `GET /narrators/autocomplete` — Autocomplete for narrator names
   - **Query Parameters:**
     - `query` (required): Search string
   - **Response:** Array of matching narrator names
@@ -225,7 +237,7 @@ Authentication is handled by Laravel Sanctum. Obtain a Personal Access Token usi
     - `query` (required): Search string
   - **Response:** Array of matching genre names
 
-### Series  
+### Series
 - `GET /series/{series}/books` — List books in a series
   - **Query Parameters:**
     - `per_page` (default: 15): Results per page

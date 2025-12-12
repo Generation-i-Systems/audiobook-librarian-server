@@ -12,7 +12,7 @@ class FixDuplicatedTitleDirectoriesCommandTest extends TestCase
     public function test_command_merges_duplicated_title_directory_into_parent(): void
     {
         $tempRoot = sys_get_temp_dir() . '/books_fix_dup_' . uniqid();
-        File::makeDirectory($tempRoot, 0775, true);
+        File::makeDirectory($tempRoot, 0775, true, true);
 
         config(['app.book_root' => $tempRoot]);
 
@@ -20,11 +20,11 @@ class FixDuplicatedTitleDirectoriesCommandTest extends TestCase
         $title = 'Stick and Rudder - An Explanation of the Art of Flying';
 
         $duplicatedPath = $tempRoot . '/' . $relativePath . '/' . $title;
-        File::makeDirectory($duplicatedPath, 0775, true);
+        File::makeDirectory($duplicatedPath, 0775, true, true);
 
         // Existing file already in expected directory
         $expectedDir = $tempRoot . '/' . $relativePath;
-        File::makeDirectory($expectedDir, 0775, true);
+        File::makeDirectory($expectedDir, 0775, true, true);
         $existingFile = $expectedDir . '/existing.txt';
         File::put($existingFile, 'existing');
 

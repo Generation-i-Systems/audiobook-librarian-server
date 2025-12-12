@@ -56,15 +56,18 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
 
                 $formattedResults = [];
                 foreach ($results as $resultItem) {
+                    $urlPath = (string) (parse_url($resultItem['url'] ?? '', PHP_URL_PATH) ?? '');
+                    $urlPath = rtrim($urlPath, '/');
+
                     $formattedResults[] = [
-                        'id' => basename(parse_url($resultItem['url'] ?? '', PHP_URL_PATH) ?? ''),
+                        'id' => basename($urlPath),
                         'title' => $resultItem['title'] ?? '',
                         'author' => $resultItem['authors'][0]['name'] ?? '',
                         'narrator' => $resultItem['narrators'][0]['name'] ?? '',
                         'size' => $resultItem['metadata']['size'] ?? '',
                         'format' => $resultItem['metadata']['format'] ?? '',
                         'link' => $resultItem['url'] ?? '',
-                        'cover' => $resultItem['cover_image_url'] ?? '',
+                        'cover' => $resultItem['cover_image_url'] ?? $resultItem['coverImageUrl'] ?? '',
                         'description' => $resultItem['description'] ?? '',
                         'metadata' => $resultItem['metadata'] ?? [],
                     ];
@@ -247,7 +250,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
         }
 
         // Remove nulls from array
-        return array_filter($merged, fn ($v) => $v !== null);
+        return array_filter($merged, fn($v) => $v !== null);
     }
 
     /**

@@ -16,6 +16,7 @@ See `docs/requirements/reading-progress-and-stats.md`.
 ## 2. Core Features
 - Book CRUD (admin)
 - Book form: multiple authors/series (autocomplete), Google Books autofill, genre selection, file uploads
+- Book form metadata search/autofill supports Audible, Google Books, AudiobookBay, and Hardcover
 - Authors/series autocomplete via jQuery UI, server-side filtering
 - Google Books API integration for autofill
 - Admin/user management
@@ -85,6 +86,10 @@ See `docs/requirements/reading-progress-and-stats.md`.
 ## 5. Frontend Integration
 - **Blade:** Book form uses `.author-autocomplete`/`.series-autocomplete`, `window.BOOK_FORM_ROUTES`
 - **JS:** `public/js/admin/books/form.js` handles dynamic rows, autocomplete, Google Books autofill
+
+### External Integration Tests
+- Standalone external integration tests for metadata lookup live under `tests/External/MetadataLookup`
+- Run via `composer test:external-metadata`
 
 ## 6. Design Decisions
 - Server-side filtering for autocomplete

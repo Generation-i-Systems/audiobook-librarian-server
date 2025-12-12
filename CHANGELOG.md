@@ -1,4 +1,8 @@
 ## [Unreleased]
+### Added
+- Added `/admin/books/search` support for `source=audiobookbay` and `source=hardcover`
+- Added standalone external integration test suite for metadata lookup (real network calls; not part of default test run)
+
 ### Fixed
 - Fixed `books:move` command error "Property [name] does not exist on this collection instance"
   - The `series` relationship is `belongsToMany` (returns Collection), not a single model
