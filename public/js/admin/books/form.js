@@ -256,7 +256,28 @@ function initializeAutocomplete($container, selector, sourceUrl) {
                             async: true, // Explicitly ensure the request is asynchronous
                             success: function (data) {
                                 console.log("[DEBUG] Autocomplete response:", data);
-                                responseCallback(data); // Provide the data to jQuery UI
+
+                                // Transform data to ensure it's in the correct format for jQuery UI
+                                // jQuery UI expects either an array of strings or objects with {label, value}
+                                let transformedData = data;
+
+                                if (Array.isArray(data) && data.length > 0) {
+                                    // Check if first item is an object (not a string)
+                                    if (typeof data[0] === 'object' && data[0] !== null) {
+                                        console.log("[DEBUG] Transforming object response to strings");
+                                        // Extract the name/value from objects
+                                        transformedData = data.map(item => {
+                                            if (typeof item === 'string') {
+                                                return item;
+                                            }
+                                            // Try common property names
+                                            return item.name || item.value || item.label || item.title || JSON.stringify(item);
+                                        });
+                                        console.log("[DEBUG] Transformed data:", transformedData);
+                                    }
+                                }
+
+                                responseCallback(transformedData); // Provide the data to jQuery UI
                             },
                             error: function (jqXHR, textStatus, errorThrown) {
                                 console.error("[ERROR] Autocomplete AJAX failed:", textStatus, errorThrown);
