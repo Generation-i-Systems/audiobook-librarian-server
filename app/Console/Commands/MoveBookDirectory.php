@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Exceptions\PathEscapesBookRootException;
 use App\Models\Author;
 use App\Models\Book;
 use App\Models\Genre;
@@ -37,6 +38,7 @@ class MoveBookDirectory extends Command
     private DocumentStoreServiceInterface $documentStore;
     private BookDirectoryParser $directoryParser;
     private bool $verboseOutput = false;
+    private bool $forcedNoDb = false;
 
     public function __construct(DocumentStoreServiceInterface $documentStore, BookDirectoryParser $directoryParser)
     {
@@ -161,12 +163,43 @@ class MoveBookDirectory extends Command
             }
         }
 
-        // Normalize destination path
-        $destPath = $this->normalizePath($destination);
+        // Normalize destination path with escape handling
+        $destinationOutsideBookRoot = false;
+
+        try {
+            $destPath = $this->normalizePath($destination);
+        } catch (PathEscapesBookRootException $exception) {
+            $destinationOutsideBookRoot = true;
+
+            $this->logWarning('Destination path escapes book root', [
+                'destination' => $destination,
+                'book_root' => $this->bookRoot,
+            ]);
+
+            $this->warn($exception->getMessage());
+
+            if (!$this->confirm('Destination is outside the configured book root. Continue with filesystem move only (database will not be updated)?')) {
+                $this->info('Operation cancelled.');
+                return 0;
+            }
+
+            if (!$noDb) {
+                $this->warn('Skipping database updates because the destination is outside the book root.');
+            }
+
+            $noDb = true;
+            $this->forcedNoDb = true;
+            $destPath = $this->normalizePath($destination, false);
+
+            $this->logWarning('Continuing without database updates for destination outside book root', [
+                'destination' => $destPath,
+            ]);
+        }
 
         $this->logDebug('Destination path normalized', [
             'input_destination' => $destination,
             'normalized_destination' => $destPath,
+            'outside_book_root' => $destinationOutsideBookRoot,
         ]);
 
         // Auto-create parent directories (mkdmv behavior)
@@ -364,6 +397,10 @@ class MoveBookDirectory extends Command
 
             $this->logDebug('Move operation completed successfully');
             $this->info("\n✓ Move completed successfully!");
+
+            if ($this->forcedNoDb) {
+                $this->warn('Database updates were skipped because the destination is outside the book root. Remember to update or remove affected book records manually.');
+            }
             return 0;
         } catch (\Exception $e) {
             // CRITICAL SAFETY: Rollback database changes
@@ -396,7 +433,7 @@ class MoveBookDirectory extends Command
     /**
      * Normalize path to absolute path with security checks
      */
-    private function normalizePath(string $path): string
+    private function normalizePath(string $path, bool $enforceBookRoot = true): string
     {
         // MINOR EDGE CASE: Handle empty paths
         if (empty(trim($path))) {
@@ -460,6 +497,12 @@ class MoveBookDirectory extends Command
         $realParent = realpath($parentDir) ?: $parentDir;
         $realNormalized = rtrim($realParent . '/' . $basename, '/');
 
+        $normalizedTarget = $this->normalizePathString($realNormalized);
+
+        if (!$enforceBookRoot) {
+            return $normalizedTarget;
+        }
+
         $candidateRoots = array_values(array_filter([
             $this->bookRoot,
             realpath($this->bookRoot) ?: null,
@@ -468,7 +511,6 @@ class MoveBookDirectory extends Command
             env('BOOK_STORAGE_PATH'),
         ]));
 
-        $normalizedTarget = $this->normalizePathString($realNormalized);
         $isWithinRoot = false;
 
         foreach ($candidateRoots as $candidateRoot) {
@@ -488,7 +530,7 @@ class MoveBookDirectory extends Command
         }
 
         if (!$isWithinRoot) {
-            throw new \Exception("Path escapes book root: {$normalizedTarget} (from: {$path}, bookRoot: {$this->bookRoot})");
+            throw new PathEscapesBookRootException("Path escapes book root: {$normalizedTarget} (from: {$path}, bookRoot: {$this->bookRoot})");
         }
 
         return $normalizedTarget;
@@ -703,7 +745,8 @@ class MoveBookDirectory extends Command
 
                                 // Update series if different
                                 if (!empty($metadata['series'])) {
-                                    $currentSeries = $bookModel->series ? $bookModel->series->name : null;
+                                    $currentSeriesModel = $bookModel->series->first();
+                                    $currentSeries = $currentSeriesModel ? $currentSeriesModel->name : null;
                                     $newSeriesName = is_array($metadata['series']) ? array_key_first($metadata['series']) : $metadata['series'];
                                     $newSeriesNumber = is_array($metadata['series']) ? $metadata['series'][$newSeriesName] : ($metadata['seriesNumber'] ?? null);
 
@@ -712,7 +755,7 @@ class MoveBookDirectory extends Command
                                         $bookModel->series()->detach();
                                         $series = Series::firstOrCreate(['name' => trim($newSeriesName)]);
                                         $bookModel->series()->attach($series->id, [
-                                            'series_number' => $newSeriesNumber
+                                            'series_number' => $newSeriesNumber,
                                         ]);
                                         $metadataUpdated = true;
                                     }

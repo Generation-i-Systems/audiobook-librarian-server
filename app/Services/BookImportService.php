@@ -64,7 +64,7 @@ class BookImportService
                     // Convert HH:MM:SS to seconds
                     $book->duration = ($matches[1] * 3600) + ($matches[2] * 60) + $matches[3];
                 } elseif (is_numeric($metadata['duration'])) {
-                    $book->duration = (int)$metadata['duration'];
+                    $book->duration = (int) $metadata['duration'];
                 }
             }
 
@@ -252,7 +252,7 @@ class BookImportService
             Log::error("Failed to create book from metadata: " . $e->getMessage(), [
                 'metadata' => $metadata,
                 'audiobook' => $audiobook,
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             // CRITICAL: Re-throw the exception so the caller can see what went wrong
@@ -349,7 +349,7 @@ class BookImportService
                 $series = Series::firstOrCreate(['name' => $metadata['series']]);
                 $seriesNumber = $metadata['series_number'] ?? null;
                 $book->series()->attach($series->id, [
-                    'series_number' => $seriesNumber
+                    'series_number' => $seriesNumber,
                 ]);
             }
 
@@ -376,7 +376,7 @@ class BookImportService
             Log::error("Failed to update book from metadata: " . $e->getMessage(), [
                 'book_id' => $book->id,
                 'metadata' => $metadata,
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
             throw $e;
         }
@@ -551,6 +551,19 @@ class BookImportService
 
             $sourcePath = $audiobook['path'];
             $targetDir = $options['target_directory'] ?? $this->generateTargetDirectory($book, $bookStoragePath, $options);
+
+            // Normalize target directory to avoid duplicate trailing segments like "Title/Title"
+            $normalizedTargetDir = rtrim($targetDir, '/');
+            $segments = explode('/', $normalizedTargetDir);
+            if (count($segments) >= 2) {
+                $last = $segments[count($segments) - 1];
+                $prev = $segments[count($segments) - 2];
+                if (strcasecmp($last, $prev) === 0) {
+                    array_pop($segments);
+                    $normalizedTargetDir = implode('/', $segments);
+                }
+            }
+            $targetDir = $normalizedTargetDir;
             $operation = $options['operation'] ?? 'copy'; // 'copy', 'move', or 'in_place'
 
             // Check if source is already at the target location (true in-place import)
@@ -569,7 +582,7 @@ class BookImportService
                 Log::info("In-place import: Files already at target location", [
                     'source' => $sourcePath,
                     'target' => $targetDir,
-                    'book_id' => $book->id
+                    'book_id' => $book->id,
                 ]);
 
                 return true;
@@ -607,7 +620,7 @@ class BookImportService
             Log::error("Failed to move files to library: " . $e->getMessage(), [
                 'audiobook' => $audiobook,
                 'book_id' => $book->id,
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
             return false;
         }
@@ -646,7 +659,7 @@ class BookImportService
                 'genre' => $genre,
                 'series' => $seriesName,
                 'series_number' => $seriesNumber,
-                'title' => $book->title
+                'title' => $book->title,
             ];
 
             $relativePath = $this->generateDirectoryPath($metadata, $options);
@@ -795,13 +808,13 @@ class BookImportService
                     chmod($targetPdfPath, 0664);
                     Log::info("Copied matching PDF file", [
                         'pdf' => $pdfPath,
-                        'target' => $targetPdfPath
+                        'target' => $targetPdfPath,
                     ]);
                 }
             } catch (\Exception $e) {
                 Log::warning("Failed to copy matching PDF file: " . $e->getMessage(), [
                     'pdf' => $pdfPath,
-                    'target' => $targetPdfPath
+                    'target' => $targetPdfPath,
                 ]);
             }
         }
@@ -824,13 +837,13 @@ class BookImportService
                     File::delete($pdfPath);
                     Log::info("Moved matching PDF file", [
                         'pdf' => $pdfPath,
-                        'target' => $targetPdfPath
+                        'target' => $targetPdfPath,
                     ]);
                 }
             } catch (\Exception $e) {
                 Log::warning("Failed to move matching PDF file: " . $e->getMessage(), [
                     'pdf' => $pdfPath,
-                    'target' => $targetPdfPath
+                    'target' => $targetPdfPath,
                 ]);
             }
         }
@@ -886,7 +899,7 @@ class BookImportService
                 if (
                     is_string($narrator) &&
                     (stripos($narrator, 'Graphic Audio') !== false ||
-                     stripos($narrator, 'GraphicAudio') !== false)
+                        stripos($narrator, 'GraphicAudio') !== false)
                 ) {
                     return true;
                 }
@@ -900,7 +913,7 @@ class BookImportService
                 if (
                     is_string($publisher) &&
                     (stripos($publisher, 'Graphic Audio') !== false ||
-                     stripos($publisher, 'GraphicAudio') !== false)
+                        stripos($publisher, 'GraphicAudio') !== false)
                 ) {
                     return true;
                 }
@@ -1005,7 +1018,7 @@ class BookImportService
             }
         } catch (\Exception $e) {
             Log::warning("Failed to save embedded cover image: " . $e->getMessage(), [
-                'directory' => $directoryPath
+                'directory' => $directoryPath,
             ]);
         }
 
@@ -1059,7 +1072,7 @@ class BookImportService
         } catch (\Exception $e) {
             Log::warning("Failed to download cover image: " . $e->getMessage(), [
                 'url' => $imageUrl,
-                'directory' => $directoryPath
+                'directory' => $directoryPath,
             ]);
         }
 
@@ -1249,7 +1262,7 @@ class BookImportService
             }
         } catch (\Exception $e) {
             Log::warning("Failed to cleanup source directory: " . $e->getMessage(), [
-                'path' => $sourcePath
+                'path' => $sourcePath,
             ]);
         }
     }
@@ -1277,7 +1290,7 @@ class BookImportService
 
                     // If we have pre-calculated data, use it
                     if (is_array($filePath) && isset($filePath['duration'])) {
-                        $totalDuration += (int)$filePath['duration'];
+                        $totalDuration += (int) $filePath['duration'];
                         if (isset($filePath['tags'])) {
                             $allTags[$fileName] = $filePath['tags'];
                         }
@@ -1298,7 +1311,7 @@ class BookImportService
         return [
             'count' => $audioFileCount,
             'duration' => $totalDuration, // in seconds
-            'tags' => $allTags
+            'tags' => $allTags,
         ];
     }
 
@@ -1311,7 +1324,7 @@ class BookImportService
             // Try ffprobe first (most reliable)
             $output = shell_exec("ffprobe -i " . escapeshellarg($filePath) . " -show_entries format=duration -v quiet -of csv=\"p=0\"");
             if ($output && is_numeric(trim($output))) {
-                return (int)round(floatval(trim($output)));
+                return (int) round(floatval(trim($output)));
             }
 
             // Fallback to file modification patterns
@@ -1511,10 +1524,25 @@ class BookImportService
     protected function validateAndMapGenre(string $genreName): string
     {
         $validGenres = [
-            'Science Fiction', 'Fantasy', 'LitRPG', 'Romance', 'History',
-            'Historical Fiction', 'Non Fiction', 'Religion', 'Church',
-            'Kids', 'Action', 'Classic', 'General Fiction', 'Computer',
-            'Western', 'Horror', 'Mystery', 'Other', 'Science',
+            'Science Fiction',
+            'Fantasy',
+            'LitRPG',
+            'Romance',
+            'History',
+            'Historical Fiction',
+            'Non Fiction',
+            'Religion',
+            'Church',
+            'Kids',
+            'Action',
+            'Classic',
+            'General Fiction',
+            'Computer',
+            'Western',
+            'Horror',
+            'Mystery',
+            'Other',
+            'Science',
         ];
 
         // If already a valid genre, return as-is

@@ -27,7 +27,8 @@ class ShowBookInfo extends Command
                             {--l|language= : Update language code}
                             {--r|release-date= : Update release date (YYYY-MM-DD)}
                             {--d|description= : Update book description}
-                            {--S|source= : Update source of the book data}';
+                            {--S|source= : Update source of the book data}
+                            {--e|edit : Open book edit page in browser}';
 
     protected $description = 'Display and optionally update book information from database';
 
@@ -45,6 +46,9 @@ class ShowBookInfo extends Command
         if ($deleteId = $this->option('delete')) {
             return $this->handleDelete($deleteId);
         }
+
+        // Handle edit option - will open browser after displaying book info
+        $openEdit = $this->option('edit');
 
         $directories = $this->argument('directories');
 
@@ -206,6 +210,12 @@ class ShowBookInfo extends Command
         }
 
         $this->displayBookInfo($book);
+
+        // Open edit page if requested
+        if ($this->option('edit')) {
+            $this->openEditPage($book);
+        }
+
         $this->newLine();
     }
 
@@ -232,6 +242,12 @@ class ShowBookInfo extends Command
                 $this->updateBookFields($book, $directory);
             }
             $this->displayBookInfo($book);
+
+            // Open edit page if requested
+            if ($this->option('edit')) {
+                $this->openEditPage($book);
+            }
+
             $this->newLine();
             return;
         }
@@ -263,6 +279,12 @@ class ShowBookInfo extends Command
                         $this->info("Book imported successfully!");
                         $this->newLine();
                         $this->displayBookInfo($book);
+
+                        // Open edit page if requested
+                        if ($this->option('edit')) {
+                            $this->openEditPage($book);
+                        }
+
                         $this->newLine();
                         return;
                     }
@@ -295,6 +317,12 @@ class ShowBookInfo extends Command
             }
 
             $this->displayBookInfo($book);
+
+            // Open edit page if requested
+            if ($this->option('edit')) {
+                $this->openEditPage($book);
+            }
+
             $this->newLine();
             return;
         } else {
@@ -309,6 +337,12 @@ class ShowBookInfo extends Command
             }
 
             $this->displayBookInfo($book);
+
+            // Open edit page if requested (only for single book)
+            if ($books->count() === 1 && $this->option('edit')) {
+                $this->openEditPage($book);
+            }
+
             $this->newLine();
         }
     }
@@ -887,12 +921,12 @@ class ShowBookInfo extends Command
                             'follow_location' => true,
                             'max_redirects' => 10,
                             'timeout' => 30,
-                            'user_agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                            'user_agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                         ],
                         'ssl' => [
                             'verify_peer' => false,
-                            'verify_peer_name' => false
-                        ]
+                            'verify_peer_name' => false,
+                        ],
                     ]);
 
                     $imageData = file_get_contents($coverInput, false, $context);
@@ -1163,10 +1197,45 @@ class ShowBookInfo extends Command
 
         // Parse response (format: ESC[row;colR)
         if (preg_match('/\033\[(\d+);(\d+)R/', $response, $matches)) {
-            return [(int)$matches[1], (int)$matches[2]];
+            return [(int) $matches[1], (int) $matches[2]];
         }
 
         return null;
+    }
+
+    /**
+     * Open the book's edit page in browser
+     */
+    protected function openEditPage(Book $book): void
+    {
+        $appUrl = rtrim(config('app.url', 'http://localhost'), '/');
+        $editUrl = $appUrl . '/admin/books/' . $book->id . '/edit';
+
+        $this->info("Opening edit page: {$editUrl}");
+
+        // Detect OS and use appropriate browser command
+        $os = PHP_OS_FAMILY;
+
+        if ($os === 'Linux') {
+            // Try xdg-open first (most common), then sensible-browser, then common browsers
+            $commands = ['xdg-open', 'sensible-browser', 'firefox', 'google-chrome', 'chromium-browser'];
+            foreach ($commands as $cmd) {
+                $check = shell_exec("which {$cmd} 2>/dev/null");
+                if ($check) {
+                    exec("{$cmd} " . escapeshellarg($editUrl) . " > /dev/null 2>&1 &");
+                    return;
+                }
+            }
+            $this->warn("Could not find a browser to open the URL. Please open manually:");
+            $this->line("  {$editUrl}");
+        } elseif ($os === 'Darwin') {
+            exec("open " . escapeshellarg($editUrl));
+        } elseif ($os === 'Windows') {
+            exec("start " . escapeshellarg($editUrl));
+        } else {
+            $this->warn("Unknown OS. Please open this URL manually:");
+            $this->line("  {$editUrl}");
+        }
     }
 
     /**

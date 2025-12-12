@@ -187,8 +187,9 @@ class ImportBooksFromDownloads extends Command
         // Check for specific paths first (files or folders)
         $specificPaths = $this->argument('path');
         if (!empty($specificPaths)) {
-            $this->info("📁 Processing specific paths: " . implode(', ', $specificPaths));
-            $audiobooks = $this->processSpecificPaths($specificPaths);
+            $pathsToProcess = is_array($specificPaths) ? $specificPaths : [$specificPaths];
+            $this->info("📁 Processing specific paths: " . implode(', ', $pathsToProcess));
+            $audiobooks = $this->processSpecificPaths($pathsToProcess);
         } else {
             // Get directories to scan
             $directories = $this->getDirectoriesToScan();
@@ -756,7 +757,7 @@ class ImportBooksFromDownloads extends Command
                 'score' => $score,
                 'reasons' => $reasons,
                 'depth' => $depth,
-                'filename' => $fileInfo->getFilename()
+                'filename' => $fileInfo->getFilename(),
             ];
         }
 
@@ -891,7 +892,7 @@ class ImportBooksFromDownloads extends Command
 
         foreach ($files as $file) {
             $extension = strtolower($file->getExtension());
-            if (! in_array($extension, $audioExtensions)) {
+            if (!in_array($extension, $audioExtensions)) {
                 continue;
             }
 
@@ -965,12 +966,14 @@ class ImportBooksFromDownloads extends Command
         foreach ($largeFiles as $fileData) {
             // Try metadata first - prefer album over title for M4B files (title often contains chapter info)
             $bookTitle = null;
-            if (! empty($fileData['metadata']['album'])) {
+            if (!empty($fileData['metadata']['album'])) {
                 // Remove "(Unabridged)" and similar suffixes from album
                 $bookTitle = preg_replace('/\s*\((Unabridged|Abridged)\)\s*$/i', '', $fileData['metadata']['album']);
                 $hasMetadata = true;
-            } elseif (! empty($fileData['metadata']['title']) &&
-                      !preg_match('/^(Chapter|Part|Track|Section)\s+\d+/i', $fileData['metadata']['title'])) {
+            } elseif (
+                !empty($fileData['metadata']['title']) &&
+                !preg_match('/^(Chapter|Part|Track|Section)\s+\d+/i', $fileData['metadata']['title'])
+            ) {
                 // Use title only if it doesn't look like a chapter title
                 $bookTitle = $fileData['metadata']['title'];
                 $hasMetadata = true;
@@ -1073,11 +1076,13 @@ class ImportBooksFromDownloads extends Command
             }
 
             // Use metadata album (preferred for M4B) or title, or extract from filename
-            if (! empty($metadata['album'])) {
+            if (!empty($metadata['album'])) {
                 // Remove "(Unabridged)" and similar suffixes
                 $bookTitle = preg_replace('/\s*\((Unabridged|Abridged)\)\s*$/i', '', $metadata['album']);
-            } elseif (! empty($metadata['title']) &&
-                      !preg_match('/^(Chapter|Part|Track|Section)\s+\d+/i', $metadata['title'])) {
+            } elseif (
+                !empty($metadata['title']) &&
+                !preg_match('/^(Chapter|Part|Track|Section)\s+\d+/i', $metadata['title'])
+            ) {
                 // Use title only if it doesn't look like a chapter title
                 $bookTitle = $metadata['title'];
             } else {
@@ -1204,7 +1209,7 @@ class ImportBooksFromDownloads extends Command
                         if (is_string($trackNumber) && strpos($trackNumber, '/') !== false) {
                             $trackNumber = explode('/', $trackNumber)[0];
                         }
-                        $trackNumber = (int)$trackNumber;
+                        $trackNumber = (int) $trackNumber;
                         break;
                     }
                 }
@@ -1863,7 +1868,8 @@ class ImportBooksFromDownloads extends Command
         }
 
         // If enrichment provided both Audible and Google cover URLs, prefer Audible
-        if (!empty($aiMetadata['google_books_raw']['volumeInfo']['imageLinks']['thumbnail']) &&
+        if (
+            !empty($aiMetadata['google_books_raw']['volumeInfo']['imageLinks']['thumbnail']) &&
             !empty($aiMetadata['audible_raw']['coverImageUrl']) &&
             empty($aiMetadata['cover_is_local_file']) &&
             empty($aiMetadata['cover_data'])
@@ -2168,7 +2174,7 @@ class ImportBooksFromDownloads extends Command
         $targetFileNames = array_map(fn ($file) => $file->getFilename(), $targetFiles);
 
         $identical = count($sourceFiles) === count($targetFiles) &&
-                     empty(array_diff($sourceFileNames, $targetFileNames));
+            empty(array_diff($sourceFileNames, $targetFileNames));
 
         return [
             'identical' => $identical,
@@ -2371,8 +2377,10 @@ class ImportBooksFromDownloads extends Command
             $preservedIsLocalFile = false;
 
             if (isset($aiMetadata['cover_source'])) {
-                if ($aiMetadata['cover_source'] === 'Existing file in directory' ||
-                    $aiMetadata['cover_source'] === 'Local file in directory') {
+                if (
+                    $aiMetadata['cover_source'] === 'Existing file in directory' ||
+                    $aiMetadata['cover_source'] === 'Local file in directory'
+                ) {
                     $preservedCover = $aiMetadata['cover_url'] ?? null;
                     $preservedSource = $aiMetadata['cover_source'];
                     $preservedIsLocalFile = !empty($aiMetadata['cover_is_local_file']);
@@ -3509,8 +3517,8 @@ class ImportBooksFromDownloads extends Command
         $path = $audiobook['path'] ?? '';
 
         $isGraphicAudio = stripos($author, 'Graphic Audio') !== false ||
-                         stripos($path, 'GraphicAudio') !== false ||
-                         stripos($path, 'Graphic Audio') !== false;
+            stripos($path, 'GraphicAudio') !== false ||
+            stripos($path, 'Graphic Audio') !== false;
 
         if (!$isGraphicAudio) {
             return; // Not a Graphic Audio book
@@ -3561,8 +3569,8 @@ class ImportBooksFromDownloads extends Command
     }
 
     /**
- * Find existing book for restore operation
- */
+     * Find existing book for restore operation
+     */
     protected function findExistingBookForRestore(array $aiMetadata): ?Book
     {
         $title = $aiMetadata['title'] ?? null;
@@ -3774,7 +3782,7 @@ class ImportBooksFromDownloads extends Command
                 'audiobook' => $audiobook,
                 'book_id' => $book->id,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
             return false;
         }
