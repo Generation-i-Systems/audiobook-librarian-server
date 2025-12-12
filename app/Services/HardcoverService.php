@@ -294,17 +294,29 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
                 continue;
             }
 
+            $formattedAuthors = $this->formatAuthors($item['authors'] ?? []);
+
+            // Extract simple author names for the 'author' field
+            $authorNames = array_map(function($a) {
+                return $a['author']['name'] ?? '';
+            }, $formattedAuthors);
+            $authorNames = array_filter($authorNames);
+
             $results[] = [
+                'source' => 'Hardcover',
                 'id' => $item['id'],
                 'title' => $item['title'] ?? 'Unknown Title',
                 'subtitle' => $item['subtitle'] ?? null,
-                'authors' => $this->formatAuthors($item['authors'] ?? []),
+                'author' => array_values($authorNames), // Simple array of author names
+                'authors' => $formattedAuthors, // Nested format
                 'publisher' => $item['publisher'] ?? null,
                 'published_date' => $item['release_date'] ?? null,
+                'publishedYear' => $item['release_date'] ? substr($item['release_date'], 0, 4) : null,
                 'description' => $item['description'] ?? null,
                 'page_count' => $item['pages'] ?? null,
                 'genres' => $item['genres'] ?? [],
                 'cover_image_url' => $item['cover_image_url'] ?? null,
+                'coverImageUrl' => $item['cover_image_url'] ?? null, // Alias for consistency
                 'isbn_10' => $item['isbn_10'] ?? null,
                 'isbn_13' => $item['isbn_13'] ?? null,
             ];
