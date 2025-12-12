@@ -2167,6 +2167,34 @@ class ImportBooksFromDownloads extends Command
      */
     protected function compareDirectories(string $sourceDir, string $targetDir): array
     {
+        // Handle single file case
+        if (File::isFile($sourceDir)) {
+            $sourceFileName = basename($sourceDir);
+            $targetFiles = File::isDirectory($targetDir) ? File::allFiles($targetDir) : [];
+            $targetFileNames = array_map(fn ($file) => $file->getFilename(), $targetFiles);
+
+            $identical = count($targetFiles) === 1 && in_array($sourceFileName, $targetFileNames);
+
+            return [
+                'identical' => $identical,
+                'source_count' => 1,
+                'target_count' => count($targetFiles),
+                'source_files' => [$sourceFileName],
+                'target_files' => $targetFileNames,
+            ];
+        }
+
+        // Handle directory case
+        if (!File::isDirectory($sourceDir) || !File::isDirectory($targetDir)) {
+            return [
+                'identical' => false,
+                'source_count' => 0,
+                'target_count' => 0,
+                'source_files' => [],
+                'target_files' => [],
+            ];
+        }
+
         $sourceFiles = File::allFiles($sourceDir);
         $targetFiles = File::allFiles($targetDir);
 
