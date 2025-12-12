@@ -177,12 +177,13 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
         }
 
         // Use the search endpoint instead of books with where clause
+        // Note: search endpoint doesn't accept limit parameter, use per_page instead
         $query = '
-            query SearchBooks($query: String!, $limit: Int!) {
+            query SearchBooks($query: String!, $per_page: Int!) {
                 search(
                     query: $query
                     query_type: "book"
-                    limit: $limit
+                    per_page: $per_page
                 ) {
                     results
                 }
@@ -191,7 +192,7 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
 
         $variables = [
             'query' => $searchQuery,
-            'limit' => $limit,
+            'per_page' => $limit,
         ];
 
         \Illuminate\Support\Facades\Log::debug('Making search request', [

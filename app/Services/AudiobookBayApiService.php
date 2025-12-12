@@ -544,12 +544,11 @@ class AudiobookBayApiService
         $this->checkRateLimit();
 
         $fullUrl = $this->baseUrl . $endpoint;
+        $queryString = http_build_query($params);
+        $fullUrlWithQuery = $fullUrl . ($queryString ? '?' . $queryString : '');
+
         Log::debug('[ABB-REQUEST] Making HTTP request', [
-            'base_url' => $this->baseUrl,
-            'endpoint' => $endpoint,
-            'params' => $params,
-            'full_url' => $fullUrl,
-            'query_string' => http_build_query($params),
+            'url' => $fullUrlWithQuery,
         ]);
 
         $response = Http::withHeaders($this->getDefaultHeaders())
