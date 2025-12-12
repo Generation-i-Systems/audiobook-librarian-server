@@ -2633,10 +2633,11 @@ class ImportBooksFromDownloads extends Command
                 '1'
             );
 
-            if ($choice === '2') {
+            // Laravel's choice() returns the VALUE (description) not the KEY (number)
+            if ($choice === 'Skip this import') {
                 $this->info("⏭️  Skipping import");
                 return;
-            } elseif ($choice === '3') {
+            } elseif ($choice === 'Create new book anyway (will have duplicate!)') {
                 $existingBookAtPath = null; // Create new book
             }
         }
