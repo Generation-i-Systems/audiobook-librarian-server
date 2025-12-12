@@ -56,20 +56,23 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
 
                 $formattedResults = [];
                 foreach ($results as $resultItem) {
-                    $urlPath = (string) (parse_url($resultItem['url'] ?? '', PHP_URL_PATH) ?? '');
+                    // Use formatBookDetails to enrich with detail page data if needed
+                    $enriched = $this->formatBookDetails($resultItem);
+
+                    $urlPath = (string) (parse_url($enriched['url'] ?? $resultItem['url'] ?? '', PHP_URL_PATH) ?? '');
                     $urlPath = rtrim($urlPath, '/');
 
                     $formattedResults[] = [
                         'id' => basename($urlPath),
-                        'title' => $resultItem['title'] ?? '',
-                        'author' => $resultItem['authors'][0]['name'] ?? '',
-                        'narrator' => $resultItem['narrators'][0]['name'] ?? '',
-                        'size' => $resultItem['metadata']['size'] ?? '',
-                        'format' => $resultItem['metadata']['format'] ?? '',
-                        'link' => $resultItem['url'] ?? '',
-                        'cover' => $resultItem['cover_image_url'] ?? $resultItem['coverImageUrl'] ?? '',
-                        'description' => $resultItem['description'] ?? '',
-                        'metadata' => $resultItem['metadata'] ?? [],
+                        'title' => $enriched['title'] ?? '',
+                        'author' => $enriched['authors'][0]['author']['name'] ?? '',
+                        'narrator' => $enriched['narrators'][0]['author']['name'] ?? '',
+                        'size' => $enriched['metadata']['size'] ?? '',
+                        'format' => $enriched['metadata']['format'] ?? '',
+                        'link' => $enriched['metadata']['url'] ?? $enriched['url'] ?? '',
+                        'cover' => $enriched['coverImageUrl'] ?? '',
+                        'description' => $enriched['description'] ?? '',
+                        'metadata' => $enriched['metadata'] ?? [],
                     ];
                 }
 
