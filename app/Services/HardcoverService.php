@@ -169,80 +169,30 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
             'limit' => $limit,
         ]);
 
-        // Build the GraphQL query based on whether author is provided
+        // Hardcover uses Typesense search API, not where operators
+        // Combine title and author into single search query
+        $searchQuery = $title;
         if ($author) {
-            $query = '
-                query SearchBooks($title: String!, $author: String!, $limit: Int!) {
-                    books(
-                        where: {
-                            _and: [
-                                {title: {_regex: $title}}
-                                {contributions: {author: {name: {_regex: $author}}}}
-                            ]
-                        },
-                        limit: $limit
-                    ) {
-                        id
-                        title
-                        subtitle
-                        description
-                        release_date
-                        cover_image_url: cover_image_url(size: LARGE)
-                        genres {
-                            genre {
-                                name
-                            }
-                        }
-                        authors: contributions(where: {role: {_eq: "AUTHOR"}}) {
-                            author {
-                                name
-                                id
-                            }
-                        }
-                    }
-                }
-            ';
-            // Regex pattern for case-insensitive partial match ((?i) = case insensitive)
-            $variables = [
-                'title' => "(?i)$title",
-                'author' => "(?i)$author",
-                'limit' => $limit,
-            ];
-        } else {
-            $query = '
-                query SearchBooks($title: String!, $limit: Int!) {
-                    books(
-                        where: {
-                            title: {_regex: $title}
-                        },
-                        limit: $limit
-                    ) {
-                        id
-                        title
-                        subtitle
-                        description
-                        release_date
-                        cover_image_url: cover_image_url(size: LARGE)
-                        genres {
-                            genre {
-                                name
-                            }
-                        }
-                        authors: contributions(where: {role: {_eq: "AUTHOR"}}) {
-                            author {
-                                name
-                                id
-                            }
-                        }
-                    }
-                }
-            ';
-            // Regex pattern for case-insensitive partial match ((?i) = case insensitive)
-            $variables = [
-                'title' => "(?i)$title",
-                'limit' => $limit,
-            ];
+            $searchQuery = "$title $author";
         }
+
+        // Use the search endpoint instead of books with where clause
+        $query = '
+            query SearchBooks($query: String!, $limit: Int!) {
+                search(
+                    query: $query
+                    query_type: "book"
+                    limit: $limit
+                ) {
+                    results
+                }
+            }
+        ';
+
+        $variables = [
+            'query' => $searchQuery,
+            'limit' => $limit,
+        ];
 
         \Illuminate\Support\Facades\Log::debug('Making search request', [
             'query' => $query,
@@ -260,12 +210,25 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
             'result' => $result,
         ]);
 
-        $books = $result['data']['books'] ?? [];
+        // Search endpoint returns results as JSONB
+        $searchResults = $result['data']['search']['results'] ?? null;
 
-        if (empty($books)) {
+        if (empty($searchResults)) {
             Log::warning('No results found in Hardcover API response', [
                 'query' => $query,
                 'options' => $options,
+            ]);
+
+            return [];
+        }
+
+        // Parse the JSONB results - they should be an array of book objects
+        $books = is_string($searchResults) ? json_decode($searchResults, true) : $searchResults;
+
+        if (!is_array($books) || empty($books)) {
+            Log::warning('Invalid search results format from Hardcover', [
+                'results_type' => gettype($searchResults),
+                'results' => $searchResults,
             ]);
 
             return [];
