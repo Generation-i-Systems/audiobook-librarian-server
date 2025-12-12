@@ -211,11 +211,11 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
             'result' => $result,
         ]);
 
-        // Search endpoint returns results as JSONB
-        $searchResults = $result['data']['search']['results'] ?? null;
+        // Search endpoint returns results with hits array containing documents
+        $searchData = $result['data']['search']['results'] ?? null;
 
-        if (empty($searchResults)) {
-            Log::warning('No results found in Hardcover API response', [
+        if (empty($searchData)) {
+            Log::warning('No search data in Hardcover API response', [
                 'query' => $query,
                 'options' => $options,
             ]);
@@ -223,14 +223,28 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
             return [];
         }
 
-        // Parse the JSONB results - they should be an array of book objects
-        $books = is_string($searchResults) ? json_decode($searchResults, true) : $searchResults;
+        // Extract hits array from search results
+        $hits = $searchData['hits'] ?? [];
 
-        if (!is_array($books) || empty($books)) {
-            Log::warning('Invalid search results format from Hardcover', [
-                'results_type' => gettype($searchResults),
-                'results' => $searchResults,
+        if (empty($hits)) {
+            Log::info('No books found in Hardcover search', [
+                'found' => $searchData['found'] ?? 0,
+                'query' => $query,
             ]);
+
+            return [];
+        }
+
+        // Extract document from each hit
+        $books = array_map(function ($hit) {
+            return $hit['document'] ?? [];
+        }, $hits);
+
+        // Filter out any empty documents
+        $books = array_filter($books);
+
+        if (empty($books)) {
+            Log::warning('No valid book documents in Hardcover search results');
 
             return [];
         }
@@ -303,31 +317,52 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
                 continue;
             }
 
-            $formattedAuthors = $this->formatAuthors($item['authors'] ?? []);
+            // Search API returns author_names as simple array, convert to expected format
+            $authorNames = $item['author_names'] ?? [];
+            $formattedAuthors = array_map(function ($name) {
+                return [
+                    'author' => [
+                        'id' => null,
+                        'name' => $name,
+                    ],
+                ];
+            }, $authorNames);
 
-            // Extract simple author names for the 'author' field
-            $authorNames = array_map(function($a) {
-                return $a['author']['name'] ?? '';
-            }, $formattedAuthors);
-            $authorNames = array_filter($authorNames);
+            // Get cover image URL from nested image object
+            $coverUrl = null;
+            if (isset($item['image']['url'])) {
+                $coverUrl = $item['image']['url'];
+            }
+
+            // Get ISBNs from array
+            $isbns = $item['isbns'] ?? [];
+            $isbn10 = null;
+            $isbn13 = null;
+            foreach ($isbns as $isbn) {
+                if (strlen($isbn) === 10) {
+                    $isbn10 = $isbn;
+                } elseif (strlen($isbn) === 13) {
+                    $isbn13 = $isbn;
+                }
+            }
 
             $results[] = [
                 'source' => 'Hardcover',
                 'id' => $item['id'],
                 'title' => $item['title'] ?? 'Unknown Title',
                 'subtitle' => $item['subtitle'] ?? null,
-                'author' => array_values($authorNames), // Simple array of author names
+                'author' => $authorNames, // Simple array of author names
                 'authors' => $formattedAuthors, // Nested format
-                'publisher' => $item['publisher'] ?? null,
+                'publisher' => null, // Not in search results
                 'published_date' => $item['release_date'] ?? null,
-                'publishedYear' => $item['release_date'] ? substr($item['release_date'], 0, 4) : null,
+                'publishedYear' => $item['release_year'] ?? ($item['release_date'] ? substr($item['release_date'], 0, 4) : null),
                 'description' => $item['description'] ?? null,
                 'page_count' => $item['pages'] ?? null,
                 'genres' => $item['genres'] ?? [],
-                'cover_image_url' => $item['cover_image_url'] ?? null,
-                'coverImageUrl' => $item['cover_image_url'] ?? null, // Alias for consistency
-                'isbn_10' => $item['isbn_10'] ?? null,
-                'isbn_13' => $item['isbn_13'] ?? null,
+                'cover_image_url' => $coverUrl,
+                'coverImageUrl' => $coverUrl, // Alias for consistency
+                'isbn_10' => $isbn10,
+                'isbn_13' => $isbn13,
             ];
         }
 
