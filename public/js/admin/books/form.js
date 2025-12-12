@@ -220,46 +220,64 @@ $(function () {
 
 // Helper function to initialize jQuery UI Autocomplete
 function initializeAutocomplete($container, selector, sourceUrl) {
+    console.log("[DEBUG] initializeAutocomplete called for selector:", selector, "with URL:", sourceUrl);
+
+    // Check if jQuery UI autocomplete is available
+    if (!$.fn.autocomplete) {
+        console.error("[ERROR] jQuery UI autocomplete is not available!");
+        return;
+    }
+
+    if (!sourceUrl) {
+        console.error("[ERROR] No sourceUrl provided for selector:", selector);
+        return;
+    }
+
     $container.on("focus", selector, function () {
         const $inputField = $(this); // Capture 'this' to use in callbacks
 
+        console.log("[DEBUG] Focus event on", selector, "- checking initialization");
+
         // Check if autocomplete has already been initialized on this element
         if (!$inputField.data("autocomplete-initialized")) {
-            $inputField.autocomplete({
-                minLength: 2,
-                source: function (request, responseCallback) {
-                    $.ajax({
-                        url: sourceUrl,
-                        dataType: "json",
-                        data: {
-                            term: request.term,
-                        },
-                        async: true, // Explicitly ensure the request is asynchronous
-                        success: function (data) {
-                            responseCallback(data); // Provide the data to jQuery UI
-                        },
-                        error: function (jqXHR, textStatus, errorThrown) {
-                            responseCallback([]); // Call with empty array on error
-                        },
-                    });
-                },
-                select: function (event, ui) {
-                    event.preventDefault(); // Prevent any default behavior that might trigger form submission
-                    $inputField.val(ui.item.value); // Set the input field's value to the selected item
-                    // You might want to trigger a 'change' event if other parts of your code listen for it
-                    // $inputField.trigger('change');
-                    return false; // Prevent the default behavior of setting the value, as we did it manually
-                },
-                // Optional: Customize how items are rendered in the dropdown
-                create: function () {
-                    // $(this).data('ui-autocomplete')._renderItem = function (ul, item) {
-                    //     return $('<li>')
-                    //         .append('<div>' + item.label + '</div>') // Adjust 'item.label' based on your server response
-                    //         .appendTo(ul);
-                    // };
-                },
-            });
-            $inputField.data("autocomplete-initialized", true); // Mark as initialized
+            console.log("[DEBUG] Initializing autocomplete for field:", $inputField.attr('name'));
+
+            try {
+                $inputField.autocomplete({
+                    minLength: 2,
+                    source: function (request, responseCallback) {
+                        console.log("[DEBUG] Autocomplete source called for term:", request.term);
+                        $.ajax({
+                            url: sourceUrl,
+                            dataType: "json",
+                            data: {
+                                term: request.term,
+                            },
+                            async: true, // Explicitly ensure the request is asynchronous
+                            success: function (data) {
+                                console.log("[DEBUG] Autocomplete response:", data);
+                                responseCallback(data); // Provide the data to jQuery UI
+                            },
+                            error: function (jqXHR, textStatus, errorThrown) {
+                                console.error("[ERROR] Autocomplete AJAX failed:", textStatus, errorThrown);
+                                responseCallback([]); // Call with empty array on error
+                            },
+                        });
+                    },
+                    select: function (event, ui) {
+                        event.preventDefault(); // Prevent any default behavior that might trigger form submission
+                        $inputField.val(ui.item.value); // Set the input field's value to the selected item
+                        console.log("[DEBUG] Autocomplete item selected:", ui.item.value);
+                        return false; // Prevent the default behavior of setting the value, as we did it manually
+                    },
+                });
+                $inputField.data("autocomplete-initialized", true); // Mark as initialized
+                console.log("[DEBUG] Autocomplete successfully initialized for", $inputField.attr('name'));
+            } catch (error) {
+                console.error("[ERROR] Failed to initialize autocomplete:", error);
+            }
+        } else {
+            console.log("[DEBUG] Autocomplete already initialized for this field");
         }
     });
 }
@@ -593,6 +611,9 @@ window.initBookForm = function (formContainerSelector) {
 
     // Initialize autocomplete for all author, narrator, and series fields on page load
     if (typeof initializeAutocomplete === "function") {
+        console.log("[DEBUG] Initializing autocomplete with routes:", window.BOOK_FORM_ROUTES);
+        console.log("[DEBUG] jQuery UI autocomplete available:", typeof $.fn.autocomplete);
+
         initializeAutocomplete(
             $container,
             ".author-autocomplete",
@@ -608,6 +629,8 @@ window.initBookForm = function (formContainerSelector) {
             ".series-autocomplete",
             window.BOOK_FORM_ROUTES.seriesAutocomplete,
         );
+    } else {
+        console.error("[DEBUG] initializeAutocomplete function not found!");
     }
 
     // Event delegation for add row buttons
