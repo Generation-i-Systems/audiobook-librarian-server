@@ -410,7 +410,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
                 if (is_array($author) && isset($author['name'])) {
                     return $author;
                 }
-                return ['name' => (string)$author];
+                return ['name' => (string) $author];
             }, $authors);
         }
 
@@ -426,7 +426,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
                     }
                     return $series;
                 }
-                return ['seriesName' => (string)$series];
+                return ['seriesName' => (string) $series];
             }, $seriesList);
         }
 
@@ -464,7 +464,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
                         'position' => $series['position'] ?? null,
                     ];
                 }
-                return ['seriesName' => (string)$series];
+                return ['seriesName' => (string) $series];
             }, $book['series']);
         }
 
@@ -687,6 +687,20 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         return array_values($this->genres);
     }
 
+    public function listGenresWithStats(): array
+    {
+        $genres = $this->listGenres();
+
+        return array_map(function (array $genre) {
+            return [
+                'id' => (string) ($genre['id'] ?? ''),
+                'name' => (string) ($genre['name'] ?? ''),
+                'bookCount' => 0,
+                'authorCount' => 0,
+            ];
+        }, $genres);
+    }
+
     /**
      * Get a genre by ID
      *
@@ -814,6 +828,19 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         return array_values($this->authors);
     }
 
+    public function listAuthorsWithStats(): array
+    {
+        $authors = $this->listAuthors();
+
+        return array_map(function (array $author) {
+            return [
+                'id' => (string) ($author['id'] ?? ''),
+                'name' => (string) ($author['name'] ?? ''),
+                'bookCount' => 0,
+            ];
+        }, $authors);
+    }
+
     public function deleteAuthor(string $id): void
     {
         if (isset($this->authors[$id])) {
@@ -893,7 +920,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     {
         $items = [];
         foreach ($this->books as $book) {
-            $needsReview = (bool)($book['needs_review'] ?? false);
+            $needsReview = (bool) ($book['needs_review'] ?? false);
             if (!$needsReview) {
                 continue;
             }
@@ -1539,6 +1566,59 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         return $count;
     }
 
+    public function getGenreAuthorsHierarchy(string $genreId): array
+    {
+        $genre = $this->genres[$genreId] ?? null;
+
+        if (!$genre) {
+            return [
+                'genre' => null,
+                'authors' => [],
+            ];
+        }
+
+        return [
+            'genre' => [
+                'id' => (string) ($genre['id'] ?? $genreId),
+                'name' => (string) ($genre['name'] ?? ''),
+            ],
+            'authors' => [],
+        ];
+    }
+
+    public function getAuthorHierarchy(string $authorId, ?string $genreId = null): array
+    {
+        $author = $this->authors[$authorId] ?? null;
+
+        if (!$author) {
+            return [
+                'author' => null,
+                'genre' => null,
+                'series' => [],
+                'standaloneBooks' => [],
+            ];
+        }
+
+        $genre = null;
+        if ($genreId !== null && isset($this->genres[$genreId])) {
+            $g = $this->genres[$genreId];
+            $genre = [
+                'id' => (string) ($g['id'] ?? $genreId),
+                'name' => (string) ($g['name'] ?? ''),
+            ];
+        }
+
+        return [
+            'author' => [
+                'id' => (string) ($author['id'] ?? $authorId),
+                'name' => (string) ($author['name'] ?? ''),
+            ],
+            'genre' => $genre,
+            'series' => [],
+            'standaloneBooks' => [],
+        ];
+    }
+
     /**
      * Rename a series across all books
      *
@@ -1575,5 +1655,33 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         }
 
         return $updated;
+    }
+
+    public function mergeAuthors(string $primaryAuthorId, array $secondaryAuthorIds): int
+    {
+        $affected = 0;
+
+        foreach ($secondaryAuthorIds as $secondaryId) {
+            if (isset($this->authors[$secondaryId])) {
+                unset($this->authors[$secondaryId]);
+                $affected++;
+            }
+        }
+
+        return $affected;
+    }
+
+    public function mergeGenres(string $primaryGenreId, array $secondaryGenreIds): int
+    {
+        $affected = 0;
+
+        foreach ($secondaryGenreIds as $secondaryId) {
+            if (isset($this->genres[$secondaryId])) {
+                unset($this->genres[$secondaryId]);
+                $affected++;
+            }
+        }
+
+        return $affected;
     }
 }

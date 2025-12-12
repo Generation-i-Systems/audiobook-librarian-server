@@ -72,7 +72,7 @@ class MySqlService implements DocumentStoreServiceInterface
             $releaseDate = $bookArray['release_date'];
             if ($releaseDate && preg_match('/^(\d{4})-01-01(?:\s|T|$)/', $releaseDate, $matches)) {
                 // If the date is YYYY-01-01 (with or without time), just use the year
-                $camelCasedBook['publishedYear'] = (int)$matches[1];
+                $camelCasedBook['publishedYear'] = (int) $matches[1];
             } elseif ($releaseDate) {
                 // Otherwise, keep the full date
                 $camelCasedBook['publishedYear'] = $releaseDate;
@@ -227,7 +227,7 @@ class MySqlService implements DocumentStoreServiceInterface
 
         // Exclude books flagged for review from API listings by default
         // Allow override via filters['include_needs_review'] === true
-        $includeNeedsReview = (bool)($filters['include_needs_review'] ?? false);
+        $includeNeedsReview = (bool) ($filters['include_needs_review'] ?? false);
         if (!$includeNeedsReview) {
             $query->where('needs_review', false);
         }
@@ -679,6 +679,307 @@ class MySqlService implements DocumentStoreServiceInterface
         return Genre::orderBy('name')->get()->toArray();
     }
 
+    public function listGenresWithStats(): array
+    {
+        try {
+            $rows = DB::table('genres')
+                ->leftJoin('book_genre', 'genres.id', '=', 'book_genre.genre_id')
+                ->leftJoin('books', 'book_genre.book_id', '=', 'books.id')
+                ->leftJoin('author_book', 'books.id', '=', 'author_book.book_id')
+                ->groupBy('genres.id', 'genres.name')
+                ->orderBy('genres.name')
+                ->select(
+                    'genres.id',
+                    'genres.name',
+                    DB::raw('COUNT(DISTINCT books.id) as book_count'),
+                    DB::raw('COUNT(DISTINCT author_book.author_id) as author_count')
+                )
+                ->get();
+
+            return $rows->map(function ($row) {
+                return [
+                    'id' => (string) $row->id,
+                    'name' => (string) $row->name,
+                    'bookCount' => (int) $row->book_count,
+                    'authorCount' => (int) $row->author_count,
+                ];
+            })->toArray();
+        } catch (\Exception $e) {
+            Log::error('MySqlService listGenresWithStats failed: ' . $e->getMessage());
+
+            return [];
+        }
+    }
+
+    public function listAuthorsWithStats(): array
+    {
+        try {
+            $rows = DB::table('authors')
+                ->leftJoin('author_book', 'authors.id', '=', 'author_book.author_id')
+                ->leftJoin('books', 'author_book.book_id', '=', 'books.id')
+                ->groupBy('authors.id', 'authors.name')
+                ->orderBy('authors.name')
+                ->select(
+                    'authors.id',
+                    'authors.name',
+                    DB::raw('COUNT(DISTINCT books.id) as book_count')
+                )
+                ->get();
+
+            return $rows->map(function ($row) {
+                return [
+                    'id' => (string) $row->id,
+                    'name' => (string) $row->name,
+                    'bookCount' => (int) $row->book_count,
+                ];
+            })->toArray();
+        } catch (\Exception $e) {
+            Log::error('MySqlService listAuthorsWithStats failed: ' . $e->getMessage());
+
+            return [];
+        }
+    }
+
+    public function getGenreAuthorsHierarchy(string $genreId): array
+    {
+        try {
+            $genre = Genre::find($genreId);
+            if (!$genre) {
+                return [
+                    'genre' => null,
+                    'authors' => [],
+                ];
+            }
+
+            $rows = DB::table('authors')
+                ->join('author_book', 'authors.id', '=', 'author_book.author_id')
+                ->join('book_genre', 'author_book.book_id', '=', 'book_genre.book_id')
+                ->where('book_genre.genre_id', $genreId)
+                ->groupBy('authors.id', 'authors.name')
+                ->orderBy('authors.name')
+                ->select(
+                    'authors.id',
+                    'authors.name',
+                    DB::raw('COUNT(DISTINCT author_book.book_id) as book_count')
+                )
+                ->get();
+
+            $authors = $rows->map(function ($row) {
+                return [
+                    'id' => (string) $row->id,
+                    'name' => (string) $row->name,
+                    'bookCount' => (int) $row->book_count,
+                ];
+            })->toArray();
+
+            return [
+                'genre' => [
+                    'id' => (string) $genre->id,
+                    'name' => (string) $genre->name,
+                ],
+                'authors' => $authors,
+            ];
+        } catch (\Exception $e) {
+            Log::error('MySqlService getGenreAuthorsHierarchy failed: ' . $e->getMessage());
+
+            return [
+                'genre' => null,
+                'authors' => [],
+            ];
+        }
+    }
+
+    public function getAuthorHierarchy(string $authorId, ?string $genreId = null): array
+    {
+        try {
+            $author = Author::find($authorId);
+            if (!$author) {
+                return [
+                    'author' => null,
+                    'genre' => null,
+                    'series' => [],
+                    'standaloneBooks' => [],
+                ];
+            }
+
+            $genreData = null;
+            if ($genreId) {
+                $genre = Genre::find($genreId);
+                if ($genre) {
+                    $genreData = [
+                        'id' => (string) $genre->id,
+                        'name' => (string) $genre->name,
+                    ];
+                }
+            }
+
+            $seriesQuery = DB::table('series')
+                ->join('book_series', 'series.id', '=', 'book_series.series_id')
+                ->join('books', 'book_series.book_id', '=', 'books.id')
+                ->join('author_book', 'books.id', '=', 'author_book.book_id')
+                ->where('author_book.author_id', $authorId);
+
+            if ($genreId) {
+                $seriesQuery->join('book_genre', 'books.id', '=', 'book_genre.book_id')
+                    ->where('book_genre.genre_id', $genreId);
+            }
+
+            $seriesRows = $seriesQuery
+                ->groupBy('series.id', 'series.name')
+                ->orderBy('series.name')
+                ->select(
+                    'series.id',
+                    'series.name',
+                    DB::raw('COUNT(DISTINCT books.id) as book_count')
+                )
+                ->get();
+
+            $series = $seriesRows->map(function ($row) {
+                return [
+                    'id' => (string) $row->id,
+                    'name' => (string) $row->name,
+                    'bookCount' => (int) $row->book_count,
+                ];
+            })->toArray();
+
+            $booksQuery = Book::query()
+                ->select('id', 'title', 'directory_path')
+                ->whereHas('authors', function ($q) use ($authorId) {
+                    $q->where('authors.id', $authorId);
+                })
+                ->whereDoesntHave('series');
+
+            if ($genreId) {
+                $booksQuery->whereHas('genres', function ($q) use ($genreId) {
+                    $q->where('genres.id', $genreId);
+                });
+            }
+
+            $standaloneBooks = $booksQuery
+                ->orderBy('title')
+                ->get()
+                ->map(function (Book $book) {
+                    return [
+                        'id' => (string) $book->id,
+                        'title' => (string) $book->title,
+                        'directoryPath' => $book->directory_path,
+                    ];
+                })
+                ->toArray();
+
+            return [
+                'author' => [
+                    'id' => (string) $author->id,
+                    'name' => (string) $author->name,
+                ],
+                'genre' => $genreData,
+                'series' => $series,
+                'standaloneBooks' => $standaloneBooks,
+            ];
+        } catch (\Exception $e) {
+            Log::error('MySqlService getAuthorHierarchy failed: ' . $e->getMessage());
+
+            return [
+                'author' => null,
+                'genre' => null,
+                'series' => [],
+                'standaloneBooks' => [],
+            ];
+        }
+    }
+
+    public function mergeAuthors(string $primaryAuthorId, array $secondaryAuthorIds): int
+    {
+        $secondaryAuthorIds = array_values(array_unique(array_filter($secondaryAuthorIds, function ($id) use ($primaryAuthorId) {
+            return $id !== $primaryAuthorId;
+        })));
+
+        if (empty($secondaryAuthorIds)) {
+            return 0;
+        }
+
+        try {
+            return DB::transaction(function () use ($primaryAuthorId, $secondaryAuthorIds) {
+                $bookIds = DB::table('author_book')
+                    ->whereIn('author_id', $secondaryAuthorIds)
+                    ->pluck('book_id')
+                    ->unique();
+
+                foreach ($bookIds as $bookId) {
+                    $exists = DB::table('author_book')
+                        ->where('book_id', $bookId)
+                        ->where('author_id', $primaryAuthorId)
+                        ->exists();
+
+                    if (!$exists) {
+                        DB::table('author_book')->insert([
+                            'book_id' => $bookId,
+                            'author_id' => $primaryAuthorId,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
+                }
+
+                DB::table('author_book')->whereIn('author_id', $secondaryAuthorIds)->delete();
+
+                Author::whereIn('id', $secondaryAuthorIds)->delete();
+
+                return $bookIds->count();
+            });
+        } catch (\Exception $e) {
+            Log::error('MySqlService mergeAuthors failed: ' . $e->getMessage());
+
+            return 0;
+        }
+    }
+
+    public function mergeGenres(string $primaryGenreId, array $secondaryGenreIds): int
+    {
+        $secondaryGenreIds = array_values(array_unique(array_filter($secondaryGenreIds, function ($id) use ($primaryGenreId) {
+            return $id !== $primaryGenreId;
+        })));
+
+        if (empty($secondaryGenreIds)) {
+            return 0;
+        }
+
+        try {
+            return DB::transaction(function () use ($primaryGenreId, $secondaryGenreIds) {
+                $bookIds = DB::table('book_genre')
+                    ->whereIn('genre_id', $secondaryGenreIds)
+                    ->pluck('book_id')
+                    ->unique();
+
+                foreach ($bookIds as $bookId) {
+                    $exists = DB::table('book_genre')
+                        ->where('book_id', $bookId)
+                        ->where('genre_id', $primaryGenreId)
+                        ->exists();
+
+                    if (!$exists) {
+                        DB::table('book_genre')->insert([
+                            'book_id' => $bookId,
+                            'genre_id' => $primaryGenreId,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
+                }
+
+                DB::table('book_genre')->whereIn('genre_id', $secondaryGenreIds)->delete();
+
+                Genre::whereIn('id', $secondaryGenreIds)->delete();
+
+                return $bookIds->count();
+            });
+        } catch (\Exception $e) {
+            Log::error('MySqlService mergeGenres failed: ' . $e->getMessage());
+
+            return 0;
+        }
+    }
+
     /**
      * Get a genre by ID
      *
@@ -925,26 +1226,32 @@ class MySqlService implements DocumentStoreServiceInterface
     {
         // Start with base columns that definitely exist
         $columns = [
-            'id', 'name', 'username', 'email', 'role',
-            'email_verified_at', 'created_at', 'updated_at'
+            'id',
+            'name',
+            'username',
+            'email',
+            'role',
+            'email_verified_at',
+            'created_at',
+            'updated_at',
         ];
-        
+
         // Add photo_url if the column exists
         if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'photo_url')) {
             $columns[] = 'photo_url';
         }
-        
+
         // Add google_id if the column exists
         if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'google_id')) {
             $columns[] = 'google_id';
         }
-        
+
         $user = User::select($columns)->find($identifier);
-        
+
         if (!$user) {
             return null;
         }
-        
+
         // Convert to array and ensure consistent attribute naming
         $result = [
             'id' => $user->id,
@@ -956,18 +1263,18 @@ class MySqlService implements DocumentStoreServiceInterface
             'created_at' => $user->created_at,
             'updated_at' => $user->updated_at,
         ];
-        
+
         // Handle camelCase attribute naming from CamelCaseAttributeAccess trait
         $photoUrl = $user->photo_url ?? $user->photoUrl ?? null;
         if ($photoUrl) {
             $result['photo_url'] = $photoUrl;
         }
-        
+
         $googleId = $user->google_id ?? $user->googleId ?? null;
         if ($googleId) {
             $result['google_id'] = $googleId;
         }
-        
+
         return $result;
     }
 
@@ -1305,9 +1612,9 @@ class MySqlService implements DocumentStoreServiceInterface
         try {
             // Get all users with necessary fields
             $users = User::all(['id', 'name', 'username', 'email', 'photo_url', 'role', 'email_verified_at', 'created_at', 'updated_at']);
-            
+
             // Convert to array and ensure consistent attribute naming
-            return $users->map(function($user) {
+            return $users->map(function ($user) {
                 return [
                     'id' => $user->id,
                     'name' => $user->name,

@@ -388,7 +388,7 @@ class MongoService implements DocumentStoreServiceInterface
                 $days = 30;
                 $dateThreshold = time() - ($days * 24 * 60 * 60);
                 $query['created_at'] = [
-                    '$gte' => new \MongoDB\BSON\UTCDateTime($dateThreshold * 1000)
+                    '$gte' => new \MongoDB\BSON\UTCDateTime($dateThreshold * 1000),
                 ];
             } else {
                 // Handle as a specific date
@@ -651,27 +651,11 @@ class MongoService implements DocumentStoreServiceInterface
             $normalized['series'] = $seriesArr;
         }
 
-        // Build update with $set and optionally $unset to remove legacy keys
+        // Build update with $set
         $set = $normalized;
-        $unset = [];
-        // If we set singular keys, clear out plural/snake_case legacy ones
-        foreach (
-            [
-            'authors', 'genres', 'narrators',
-            'directory_path', 'published_year',
-            ] as $legacyKey
-        ) {
-            if (array_key_exists($legacyKey, $set)) {
-                // already unset above, skip
-                continue;
-            }
-        }
 
         // Execute update
         $update = ['$set' => $set];
-        if (!empty($unset)) {
-            $update['$unset'] = array_fill_keys(array_keys($unset), '');
-        }
 
         return $this->getCollection('books')->updateOne(['_id' => $id], $update);
     }
@@ -946,7 +930,13 @@ class MongoService implements DocumentStoreServiceInterface
                 $genres[] = $doc['name'];
             }
         }
+
         return array_unique($genres);
+    }
+
+    public function listGenresWithStats(): array
+    {
+        return [];
     }
 
     public function updateGenre(string $id, array $data): bool
@@ -1134,7 +1124,13 @@ class MongoService implements DocumentStoreServiceInterface
                 $authors[] = ['name' => $doc['name']];
             }
         }
+
         return $authors;
+    }
+
+    public function listAuthorsWithStats(): array
+    {
+        return [];
     }
 
     public function listNarrators(): array
@@ -1158,6 +1154,24 @@ class MongoService implements DocumentStoreServiceInterface
     public function deleteAuthor(string $id): void
     {
         $this->getCollection('authors')->deleteOne(['_id' => $id]);
+    }
+
+    public function getGenreAuthorsHierarchy(string $genreId): array
+    {
+        return [
+            'genre' => null,
+            'authors' => [],
+        ];
+    }
+
+    public function getAuthorHierarchy(string $authorId, ?string $genreId = null): array
+    {
+        return [
+            'author' => null,
+            'genre' => null,
+            'series' => [],
+            'standaloneBooks' => [],
+        ];
     }
     /**
      * @inheritDoc
@@ -1798,7 +1812,7 @@ class MongoService implements DocumentStoreServiceInterface
             'book_id' => $bookId,
         ]);
 
-        if (! $doc) {
+        if (!$doc) {
             return null;
         }
 
@@ -2134,7 +2148,16 @@ class MongoService implements DocumentStoreServiceInterface
      */
     public function renameSeries(string $oldName, string $newName): int
     {
-        // Mongo backend is deprecated and not queried by the app; return 0.
+        return 0;
+    }
+
+    public function mergeAuthors(string $primaryAuthorId, array $secondaryAuthorIds): int
+    {
+        return 0;
+    }
+
+    public function mergeGenres(string $primaryGenreId, array $secondaryGenreIds): int
+    {
         return 0;
     }
 

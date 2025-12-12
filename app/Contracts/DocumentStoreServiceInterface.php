@@ -200,6 +200,19 @@ interface DocumentStoreServiceInterface
      */
     public function updateGenre(string $id, array $data): bool;
 
+    /**
+     * List all genres with aggregated statistics.
+     *
+     * Implementations should at minimum provide:
+     * - id: string
+     * - name: string
+     * - authorCount: int (distinct authors with books in this genre)
+     * - bookCount: int (books in this genre)
+     *
+     * @return array
+     */
+    public function listGenresWithStats(): array;
+
     // SERIES
     public function createSeries(string $name, bool $isCollection = false);
 
@@ -240,6 +253,78 @@ interface DocumentStoreServiceInterface
     public function listAuthors();
 
     public function deleteAuthor(string $id): void;
+
+    /**
+     * List all authors with aggregated statistics.
+     *
+     * Implementations should at minimum provide:
+     * - id: string
+     * - name: string
+     * - bookCount: int (total books for this author)
+     *
+     * @return array
+     */
+    public function listAuthorsWithStats(): array;
+
+    /**
+     * Get hierarchy information for a specific genre.
+     *
+     * This should return authors that have at least one book in the genre and
+     * their respective book counts within that genre.
+     *
+     * Expected shape:
+     * [
+     *   'genre' => ['id' => string, 'name' => string],
+     *   'authors' => [
+     *       ['id' => string, 'name' => string, 'bookCount' => int],
+     *       ...
+     *   ],
+     * ]
+     */
+    public function getGenreAuthorsHierarchy(string $genreId): array;
+
+    /**
+     * Get hierarchy information for a specific author, optionally scoped to a genre.
+     *
+     * Expected shape:
+     * [
+     *   'author' => ['id' => string, 'name' => string],
+     *   'genre' => ['id' => string, 'name' => string]|null,
+     *   'series' => [
+     *       ['id' => string, 'name' => string, 'bookCount' => int],
+     *   ],
+     *   'standaloneBooks' => [
+     *       ['id' => string, 'title' => string, 'directoryPath' => ?string],
+     *   ],
+     * ]
+     */
+    public function getAuthorHierarchy(string $authorId, ?string $genreId = null): array;
+
+    /**
+     * Merge multiple authors into a single primary author.
+     *
+     * Implementations should move all book relationships from secondary authors
+     * to the primary author, avoiding duplicate pivot rows, and delete the
+     * secondary author records.
+     *
+     * @param string $primaryAuthorId
+     * @param array $secondaryAuthorIds
+     * @return int Number of affected books or relationships
+     */
+    public function mergeAuthors(string $primaryAuthorId, array $secondaryAuthorIds): int;
+
+    /**
+     * Merge multiple genres into a single primary genre.
+     *
+     * Implementations should move all book relationships from secondary genres
+     * to the primary genre, avoiding duplicate pivot rows, and delete the
+     * secondary genre records.
+     *
+     * @param string $primaryGenreId
+     * @param array $secondaryGenreIds
+     * @return int Number of affected books or relationships
+     */
+    public function mergeGenres(string $primaryGenreId, array $secondaryGenreIds): int;
 
     /**
      * Search for authors by name

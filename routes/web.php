@@ -334,6 +334,12 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     // AJAX: Rename series across all books
     Route::post('books/rename-series', [Admin\BookController::class, 'renameSeries'])->name('books.renameSeries');
 
+    Route::get('genres/{genre}/authors', [Admin\GenreController::class, 'authors'])->name('genres.authors');
+    Route::post('genres/merge', [Admin\GenreController::class, 'merge'])->name('genres.merge');
+
+    Route::get('authors/{author}/browse', [Admin\AuthorController::class, 'browse'])->name('authors.browse');
+    Route::post('authors/merge', [Admin\AuthorController::class, 'merge'])->name('authors.merge');
+
     Route::resource('genres', Admin\GenreController::class);
     Route::resource('authors', Admin\AuthorController::class);
     Route::resource('books', Admin\BookController::class);

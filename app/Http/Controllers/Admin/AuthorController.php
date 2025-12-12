@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Contracts\DocumentStoreServiceInterface;
+use Illuminate\Support\Facades\Log;
 
 class AuthorController extends Controller
 {
@@ -20,14 +21,46 @@ class AuthorController extends Controller
     public function index(Request $request)
     {
         $search = $request->input('search');
-        $authors = $this->documentStoreService->listAuthors();
-        if ($search) {
-            $authors = array_filter($authors, fn ($author) => stripos($author['name'], $search) !== false);
-        }
-        // Optionally sort authors by name
-        usort($authors, fn ($a, $b) => strcmp($a['name'], $b['name']));
+        $sort = $request->input('sort', 'name');
+        $direction = $request->input('direction', 'asc');
 
-        return view('admin.authors.index', ['authors' => $authors, 'search' => $search]);
+        $allowedSorts = ['name', 'books'];
+        if (!in_array($sort, $allowedSorts, true)) {
+            $sort = 'name';
+        }
+
+        $direction = $direction === 'desc' ? 'desc' : 'asc';
+        $authors = $this->documentStoreService->listAuthorsWithStats();
+
+        if ($search) {
+            $authors = array_filter($authors, function (array $author) use ($search) {
+                return stripos($author['name'] ?? '', $search) !== false;
+            });
+        }
+
+        usort($authors, function (array $a, array $b) use ($sort, $direction) {
+            $multiplier = $direction === 'desc' ? -1 : 1;
+
+            if ($sort === 'books') {
+                $aValue = $a['bookCount'] ?? 0;
+                $bValue = $b['bookCount'] ?? 0;
+
+                if ($aValue === $bValue) {
+                    return $multiplier * strcmp($a['name'] ?? '', $b['name'] ?? '');
+                }
+
+                return $multiplier * ($aValue <=> $bValue);
+            }
+
+            return $multiplier * strcmp($a['name'] ?? '', $b['name'] ?? '');
+        });
+
+        return view('admin.authors.index', [
+            'authors' => $authors,
+            'search' => $search,
+            'sort' => $sort,
+            'direction' => $direction,
+        ]);
     }
 
 
@@ -98,12 +131,120 @@ class AuthorController extends Controller
         $q = $request->input('q', '');
         $authors = $this->documentStoreService->listAuthors();
         if ($q) {
-            $authors = array_filter($authors, fn ($author) => stripos($author['name'], $q) !== false);
+            $authors = array_filter($authors, fn($author) => stripos($author['name'], $q) !== false);
         }
         // Limit and sort
         $authors = array_slice($authors, 0, 20);
-        usort($authors, fn ($a, $b) => strcmp($a['name'], $b['name']));
+        usort($authors, fn($a, $b) => strcmp($a['name'], $b['name']));
 
         return response()->json(['data' => array_values($authors)]);
+    }
+
+    public function browse($id, Request $request)
+    {
+        $genreId = $request->input('genre_id');
+        $sort = $request->input('sort', 'series_name');
+        $direction = $request->input('direction', 'asc');
+
+        $allowedSorts = ['series_name', 'series_books'];
+        if (!in_array($sort, $allowedSorts, true)) {
+            $sort = 'series_name';
+        }
+
+        $direction = $direction === 'desc' ? 'desc' : 'asc';
+
+        try {
+            $hierarchy = $this->documentStoreService->getAuthorHierarchy($id, $genreId);
+
+            if (empty($hierarchy['author'])) {
+                abort(404);
+            }
+
+            if (!empty($hierarchy['series']) && is_array($hierarchy['series'])) {
+                usort($hierarchy['series'], function (array $a, array $b) use ($sort, $direction) {
+                    $multiplier = $direction === 'desc' ? -1 : 1;
+
+                    if ($sort === 'series_books') {
+                        $aValue = $a['bookCount'] ?? 0;
+                        $bValue = $b['bookCount'] ?? 0;
+
+                        if ($aValue === $bValue) {
+                            return $multiplier * strcmp($a['name'] ?? '', $b['name'] ?? '');
+                        }
+
+                        return $multiplier * ($aValue <=> $bValue);
+                    }
+
+                    return $multiplier * strcmp($a['name'] ?? '', $b['name'] ?? '');
+                });
+            }
+
+            if (!empty($hierarchy['standaloneBooks']) && is_array($hierarchy['standaloneBooks'])) {
+                usort($hierarchy['standaloneBooks'], function (array $a, array $b) use ($direction) {
+                    $multiplier = $direction === 'desc' ? -1 : 1;
+
+                    return $multiplier * strcmp($a['title'] ?? '', $b['title'] ?? '');
+                });
+            }
+
+            return view('admin.authors.browse', [
+                'hierarchy' => $hierarchy,
+                'sort' => $sort,
+                'direction' => $direction,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to load author hierarchy: ' . $e->getMessage());
+
+            return redirect()->route('admin.authors.index')->with(
+                'error',
+                'Failed to load author hierarchy. Please try again.'
+            );
+        }
+    }
+
+    public function merge(Request $request)
+    {
+        $validated = $request->validate([
+            'primary_author_id' => 'required|string',
+            'author_ids' => 'required|array|min:2',
+            'author_ids.*' => 'string',
+        ]);
+
+        $primaryAuthorId = $validated['primary_author_id'];
+        $authorIds = array_values(array_unique($validated['author_ids']));
+
+        if (!in_array($primaryAuthorId, $authorIds, true)) {
+            return redirect()->back()->with(
+                'error',
+                'Primary author must be one of the selected authors.'
+            );
+        }
+
+        $secondaryAuthorIds = array_values(array_filter($authorIds, function ($id) use ($primaryAuthorId) {
+            return $id !== $primaryAuthorId;
+        }));
+
+        if (empty($secondaryAuthorIds)) {
+            return redirect()->back()->with(
+                'error',
+                'Please select at least one author to merge into the primary.'
+            );
+        }
+
+        try {
+            $affectedBooks = $this->documentStoreService->mergeAuthors($primaryAuthorId, $secondaryAuthorIds);
+
+            return redirect()->route('admin.authors.index')->with(
+                'success',
+                'Merged ' . count($secondaryAuthorIds) . ' author(s). Updated ' . $affectedBooks . ' book(s).'
+            );
+        } catch (\Exception $e) {
+            Log::error('Failed to merge authors: ' . $e->getMessage());
+
+            return redirect()->back()->with(
+                'error',
+                'Failed to merge authors. Please try again.'
+            );
+        }
     }
 }

@@ -18,11 +18,54 @@ class GenreController extends Controller
     }
 
 
-    public function index()
+    public function index(Request $request)
     {
         try {
-            $genres = $this->documentStoreService->listGenres();
-            return view('admin.genres.index', compact('genres'));
+            $genres = $this->documentStoreService->listGenresWithStats();
+
+            $sort = $request->input('sort', 'name');
+            $direction = $request->input('direction', 'asc');
+
+            $allowedSorts = ['name', 'books', 'authors'];
+            if (!in_array($sort, $allowedSorts, true)) {
+                $sort = 'name';
+            }
+
+            $direction = $direction === 'desc' ? 'desc' : 'asc';
+
+            usort($genres, function (array $a, array $b) use ($sort, $direction) {
+                $multiplier = $direction === 'desc' ? -1 : 1;
+
+                if ($sort === 'books') {
+                    $aValue = $a['bookCount'] ?? 0;
+                    $bValue = $b['bookCount'] ?? 0;
+
+                    if ($aValue === $bValue) {
+                        return $multiplier * strcmp($a['name'] ?? '', $b['name'] ?? '');
+                    }
+
+                    return $multiplier * ($aValue <=> $bValue);
+                }
+
+                if ($sort === 'authors') {
+                    $aValue = $a['authorCount'] ?? 0;
+                    $bValue = $b['authorCount'] ?? 0;
+
+                    if ($aValue === $bValue) {
+                        return $multiplier * strcmp($a['name'] ?? '', $b['name'] ?? '');
+                    }
+
+                    return $multiplier * ($aValue <=> $bValue);
+                }
+
+                return $multiplier * strcmp($a['name'] ?? '', $b['name'] ?? '');
+            });
+
+            return view('admin.genres.index', [
+                'genres' => $genres,
+                'sort' => $sort,
+                'direction' => $direction,
+            ]);
         } catch (\Exception $e) {
             Log::error('Failed to list genres: ' . $e->getMessage());
             return redirect()->back()->with('error', 'Failed to load genres. Please try again.');
@@ -119,6 +162,107 @@ class GenreController extends Controller
         } catch (\Exception $e) {
             Log::error('Failed to delete genre: ' . $e->getMessage());
             return redirect()->route('admin.genres.index')->with('error', 'Failed to delete genre. Please try again.');
+        }
+    }
+
+
+    public function authors($id, Request $request)
+    {
+        try {
+            $hierarchy = $this->documentStoreService->getGenreAuthorsHierarchy($id);
+
+            if (empty($hierarchy['genre'])) {
+                abort(404, 'Genre not found');
+            }
+
+            $sort = $request->input('sort', 'name');
+            $direction = $request->input('direction', 'asc');
+
+            $allowedSorts = ['name', 'books'];
+            if (!in_array($sort, $allowedSorts, true)) {
+                $sort = 'name';
+            }
+
+            $direction = $direction === 'desc' ? 'desc' : 'asc';
+
+            if (!empty($hierarchy['authors']) && is_array($hierarchy['authors'])) {
+                usort($hierarchy['authors'], function (array $a, array $b) use ($sort, $direction) {
+                    $multiplier = $direction === 'desc' ? -1 : 1;
+
+                    if ($sort === 'books') {
+                        $aValue = $a['bookCount'] ?? 0;
+                        $bValue = $b['bookCount'] ?? 0;
+
+                        if ($aValue === $bValue) {
+                            return $multiplier * strcmp($a['name'] ?? '', $b['name'] ?? '');
+                        }
+
+                        return $multiplier * ($aValue <=> $bValue);
+                    }
+
+                    return $multiplier * strcmp($a['name'] ?? '', $b['name'] ?? '');
+                });
+            }
+
+            return view('admin.genres.authors', [
+                'hierarchy' => $hierarchy,
+                'sort' => $sort,
+                'direction' => $direction,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to load genre authors hierarchy: ' . $e->getMessage());
+
+            return redirect()->route('admin.genres.index')->with(
+                'error',
+                'Failed to load authors for genre. Please try again.'
+            );
+        }
+    }
+
+
+    public function merge(Request $request)
+    {
+        $validated = $request->validate([
+            'primary_genre_id' => 'required|string',
+            'genre_ids' => 'required|array|min:2',
+            'genre_ids.*' => 'string',
+        ]);
+
+        $primaryGenreId = $validated['primary_genre_id'];
+        $genreIds = array_values(array_unique($validated['genre_ids']));
+
+        if (!in_array($primaryGenreId, $genreIds, true)) {
+            return redirect()->back()->with(
+                'error',
+                'Primary genre must be one of the selected genres.'
+            );
+        }
+
+        $secondaryGenreIds = array_values(array_filter($genreIds, function ($id) use ($primaryGenreId) {
+            return $id !== $primaryGenreId;
+        }));
+
+        if (empty($secondaryGenreIds)) {
+            return redirect()->back()->with(
+                'error',
+                'Please select at least one genre to merge into the primary.'
+            );
+        }
+
+        try {
+            $affectedBooks = $this->documentStoreService->mergeGenres($primaryGenreId, $secondaryGenreIds);
+
+            return redirect()->route('admin.genres.index')->with(
+                'success',
+                'Merged ' . count($secondaryGenreIds) . ' genre(s). Updated ' . $affectedBooks . ' book(s).'
+            );
+        } catch (\Exception $e) {
+            Log::error('Failed to merge genres: ' . $e->getMessage());
+
+            return redirect()->back()->with(
+                'error',
+                'Failed to merge genres. Please try again.'
+            );
         }
     }
 }
