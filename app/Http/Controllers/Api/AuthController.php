@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Services\NewUserRegistrationNotifier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
@@ -12,9 +13,12 @@ class AuthController extends Controller
 {
     protected DocumentStoreServiceInterface $documentStoreService;
 
-    public function __construct(DocumentStoreServiceInterface $documentStoreService)
+    protected NewUserRegistrationNotifier $registrationNotifier;
+
+    public function __construct(DocumentStoreServiceInterface $documentStoreService, NewUserRegistrationNotifier $registrationNotifier)
     {
         $this->documentStoreService = $documentStoreService;
+        $this->registrationNotifier = $registrationNotifier;
     }
 
     public function register(Request $request)
@@ -50,7 +54,7 @@ class AuthController extends Controller
             return response()->json(['username' => ['The username has already been taken.']], 400);
         }
 
-        // Create the user in document store
+        // Build the user payload
         $userData = [
             'name' => $request->name,
             'username' => $request->username,
@@ -59,14 +63,32 @@ class AuthController extends Controller
             'role' => 'unverified',
         ];
 
+        // Block obvious spam registrations before creating the user
+        if ($this->registrationNotifier->isSpamRegistration($userData, $request)) {
+            Log::info('Registration blocked as spam', [
+                'email' => $userData['email'] ?? null,
+                'username' => $userData['username'] ?? null,
+                'ip' => $request->ip(),
+            ]);
+
+            return response()->json([
+                'message' => 'Registration rejected.',
+            ], 400);
+        }
+
+        // Create the user in document store
         $createdId = $this->documentStoreService->createUser($userData);
         if (!$createdId) {
             Log::error('Failed to create user in document store');
             return response()->json(['message' => 'Registration failed'], 500);
         }
 
-        // TODO: Notify all admins about the new user
-        // This would require a Message model and notification system
+        // Send admin notification email about the new registration
+        $completeUserData = $this->documentStoreService->getUserById($createdId) ?? array_merge($userData, [
+            'id' => $createdId,
+        ]);
+
+        $this->registrationNotifier->send($completeUserData, 'api', $request);
 
         return response()->json([
             'message' => 'Account created. Waiting for admin approval.',
@@ -174,22 +196,24 @@ class AuthController extends Controller
             Log::debug('Google login verified', [
                 'email' => $email,
                 'name' => $name,
-                'google_id' => $googleId
+                'google_id' => $googleId,
             ]);
 
             // Check if user exists by email
             $user = $this->documentStoreService->getUserByEmail($email);
+            $isNewUser = false;
+            $createdId = null;
 
             if (!$user) {
-                // Create new user with Google info
+                // Create new user with Google info treated as a registration
                 $userData = [
                     'name' => $name,
-                    'username' => explode('@', $email)[0], // Use email prefix as username
+                    'username' => explode('@', $email)[0],
                     'email' => $email,
                     'google_id' => $googleId,
                     'photo_url' => $photoUrl,
-                    'role' => 'unverified', // New Google users start as unverified
-                    'password' => null, // No password for Google-authenticated users
+                    'role' => 'unverified',
+                    'password' => null,
                 ];
 
                 $createdId = $this->documentStoreService->createUser($userData);
@@ -205,6 +229,7 @@ class AuthController extends Controller
                     return response()->json(['message' => 'User creation failed'], 500);
                 }
 
+                $isNewUser = true;
                 Log::info('New Google user created', ['email' => $email, 'id' => $createdId]);
             } else {
                 // Update existing user's Google info if not set
@@ -215,6 +240,15 @@ class AuthController extends Controller
                     ]);
                     Log::debug('Updated existing user with Google ID', ['user_id' => $user['id']]);
                 }
+            }
+
+            if ($isNewUser) {
+                $userIdForNotification = (string) ($user['id'] ?? $createdId ?? '');
+                $completeUserData = $userIdForNotification !== ''
+                    ? $this->documentStoreService->getUserById($userIdForNotification) ?? $user
+                    : $user;
+
+                $this->registrationNotifier->send((array) $completeUserData, 'api-google', $request);
             }
 
             // Check if user is approved
@@ -246,7 +280,7 @@ class AuthController extends Controller
         } catch (\Exception $e) {
             Log::error('Google login failed', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
             return response()->json(['message' => 'Google authentication failed: ' . $e->getMessage()], 500);
         }

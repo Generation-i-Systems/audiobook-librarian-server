@@ -212,10 +212,10 @@ class BookApiController extends Controller
                 $content,
                 200
             )->header('Content-Type', $mime)
-             ->header('Access-Control-Allow-Origin', '*')
-             ->header('Access-Control-Allow-Methods', 'GET, OPTIONS')
-             ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-             ->header('Cache-Control', 'public, max-age=3600');
+                ->header('Access-Control-Allow-Origin', '*')
+                ->header('Access-Control-Allow-Methods', 'GET, OPTIONS')
+                ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+                ->header('Cache-Control', 'public, max-age=3600');
         }
 
         //split out context into multiple log entries
@@ -368,7 +368,7 @@ class BookApiController extends Controller
                 Log::warning('Remote cover image request failed', [
                     'url' => $url,
                     'status' => $response->status(),
-                    'response' => \Illuminate\Support\Str::limit($response->body(), 200)
+                    'response' => \Illuminate\Support\Str::limit($response->body(), 200),
                 ]);
                 return $this->coverNotFoundResponse();
             }
@@ -376,7 +376,7 @@ class BookApiController extends Controller
             Log::error('Exception while proxying remote cover image', [
                 'url' => $url,
                 'message' => $e->getMessage(),
-                'trace' => \Illuminate\Support\Str::limit($e->getTraceAsString(), 500)
+                'trace' => \Illuminate\Support\Str::limit($e->getTraceAsString(), 500),
             ]);
             return $this->coverNotFoundResponse();
         }
@@ -391,7 +391,7 @@ class BookApiController extends Controller
     {
         return response()->json([
             'error' => 'Cover not found',
-            'message' => 'Cover image file could not be found'
+            'message' => 'Cover image file could not be found',
         ], 404);
     }
 
@@ -555,7 +555,7 @@ class BookApiController extends Controller
                 ];
             } elseif (
                 in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp']) &&
-                      (strpos(strtolower($fileName), 'cover') !== false || strpos(strtolower($fileName), 'folder') !== false)
+                (strpos(strtolower($fileName), 'cover') !== false || strpos(strtolower($fileName), 'folder') !== false)
             ) {
                 $coverFile = [
                     'filename' => $fileName,
@@ -686,7 +686,7 @@ class BookApiController extends Controller
             'file_size_mb' => round($fileSize / 1024 / 1024, 2),
             'full_path' => $fullPath,
             'user_id' => Auth::id(),
-            'ip' => request()->ip()
+            'ip' => request()->ip(),
         ]);
 
         // Handle Range requests for resumable downloads
@@ -727,7 +727,7 @@ class BookApiController extends Controller
                 'client_ip' => request()->ip(),
                 'user_agent' => request()->header('User-Agent'),
                 'start_time' => date('Y-m-d H:i:s'),
-                'start_timestamp' => $startTime
+                'start_timestamp' => $startTime,
             ]);
 
             $handle = fopen($fullPath, 'rb');
@@ -737,7 +737,7 @@ class BookApiController extends Controller
                     'file_name' => $fileName,
                     'file_path' => $fullPath,
                     'user_id' => $user->id,
-                    'error' => 'fopen_failed'
+                    'error' => 'fopen_failed',
                 ]);
                 return;
             }
@@ -801,7 +801,7 @@ class BookApiController extends Controller
                             'progress_percent' => $fileSize > 0 ? round(($bytesSent / $fileSize) * 100, 2) : 0,
                             'elapsed_seconds' => round($elapsedSeconds, 2),
                             'chunks_sent' => $chunkCount,
-                            'reason' => 'connection_aborted'
+                            'reason' => 'connection_aborted',
                         ]);
                         break;
                     }
@@ -822,7 +822,7 @@ class BookApiController extends Controller
                         'elapsed_seconds' => round($elapsedSeconds, 2),
                         'avg_speed_mbps' => $elapsedSeconds > 0 ? round(($bytesSent / (1024 * 1024)) / $elapsedSeconds, 2) : 0,
                         'chunks_sent' => $chunkCount,
-                        'status' => 'completed'
+                        'status' => 'completed',
                     ]);
                 } else {
                     Log::warning('File download ended incomplete', [
@@ -836,7 +836,7 @@ class BookApiController extends Controller
                         'elapsed_seconds' => round($elapsedSeconds, 2),
                         'chunks_sent' => $chunkCount,
                         'status' => 'incomplete',
-                        'reason' => 'stream_ended_early'
+                        'reason' => 'stream_ended_early',
                     ]);
                 }
             } catch (\Exception $e) {
@@ -853,7 +853,7 @@ class BookApiController extends Controller
                     'chunks_sent' => $chunkCount,
                     'exception_message' => $e->getMessage(),
                     'exception_class' => get_class($e),
-                    'status' => 'error'
+                    'status' => 'error',
                 ]);
                 throw $e;
             }
@@ -876,7 +876,7 @@ class BookApiController extends Controller
 
         if ($start > $end || $start >= $fileSize || $end >= $fileSize) {
             return response('Range not satisfiable', 416, [
-                'Content-Range' => "bytes */{$fileSize}"
+                'Content-Range' => "bytes */{$fileSize}",
             ]);
         }
 
@@ -910,7 +910,7 @@ class BookApiController extends Controller
                 'client_ip' => request()->ip(),
                 'user_agent' => request()->header('User-Agent'),
                 'start_time' => date('Y-m-d H:i:s'),
-                'start_timestamp' => $startTime
+                'start_timestamp' => $startTime,
             ]);
 
             $handle = fopen($filePath, 'rb');
@@ -920,7 +920,7 @@ class BookApiController extends Controller
                     'range_start' => $start,
                     'range_length' => $length,
                     'user_id' => $user->id,
-                    'error' => 'fopen_failed'
+                    'error' => 'fopen_failed',
                 ]);
                 return;
             }
@@ -989,7 +989,7 @@ class BookApiController extends Controller
                             'elapsed_seconds' => round($elapsedSeconds, 2),
                             'chunks_sent' => $chunkCount,
                             'remaining_bytes' => $remaining,
-                            'reason' => 'connection_aborted'
+                            'reason' => 'connection_aborted',
                         ]);
                         break;
                     }
@@ -1010,7 +1010,7 @@ class BookApiController extends Controller
                         'elapsed_seconds' => round($elapsedSeconds, 2),
                         'avg_speed_mbps' => $elapsedSeconds > 0 ? round(($bytesSent / (1024 * 1024)) / $elapsedSeconds, 2) : 0,
                         'chunks_sent' => $chunkCount,
-                        'status' => 'completed'
+                        'status' => 'completed',
                     ]);
                 } else {
                     Log::warning('Range download ended incomplete', [
@@ -1024,7 +1024,7 @@ class BookApiController extends Controller
                         'chunks_sent' => $chunkCount,
                         'remaining_bytes' => $remaining,
                         'status' => 'incomplete',
-                        'reason' => 'stream_ended_early'
+                        'reason' => 'stream_ended_early',
                     ]);
                 }
             } catch (\Exception $e) {
@@ -1041,7 +1041,7 @@ class BookApiController extends Controller
                     'remaining_bytes' => $remaining,
                     'exception_message' => $e->getMessage(),
                     'exception_class' => get_class($e),
-                    'status' => 'error'
+                    'status' => 'error',
                 ]);
                 throw $e;
             }
@@ -1121,7 +1121,7 @@ class BookApiController extends Controller
                 'size' => $fileSize,
                 'download_url' => route('api.books.downloadFile', [
                     'book' => $id,
-                    'file' => urlencode($fileName)
+                    'file' => urlencode($fileName),
                 ]) . "?expires={$expiresAt->timestamp}&signature={$signature}",
             ];
         }
@@ -1133,9 +1133,9 @@ class BookApiController extends Controller
 
             // Cover images first
             $isCoverA = in_array($extensionA, ['jpg', 'jpeg', 'png', 'gif', 'webp']) &&
-                       (strpos(strtolower($a['filename']), 'cover') !== false || strpos(strtolower($a['filename']), 'folder') !== false);
+                (strpos(strtolower($a['filename']), 'cover') !== false || strpos(strtolower($a['filename']), 'folder') !== false);
             $isCoverB = in_array($extensionB, ['jpg', 'jpeg', 'png', 'gif', 'webp']) &&
-                       (strpos(strtolower($b['filename']), 'cover') !== false || strpos(strtolower($b['filename']), 'folder') !== false);
+                (strpos(strtolower($b['filename']), 'cover') !== false || strpos(strtolower($b['filename']), 'folder') !== false);
 
             if ($isCoverA && !$isCoverB) {
                 return -1;
@@ -1159,7 +1159,7 @@ class BookApiController extends Controller
                 'order' => 'Download files in the provided order for best experience',
                 'resume' => 'All URLs support HTTP Range headers for resumable downloads',
                 'authentication' => 'URLs are signed and will expire at the specified time',
-            ]
+            ],
         ]);
     }
 
@@ -1252,15 +1252,25 @@ class BookApiController extends Controller
      */
     public function listGenres(Request $request)
     {
-        $genres = $this->documentStoreService->listGenres();
-        usort($genres, function ($a, $b) {
-            return strcmp($a['name'], $b['name']);
+        $genres = $this->documentStoreService->listGenresWithStats();
+
+        // Filter out genres that have no books associated with them
+        $genres = array_filter($genres, function (array $genre) {
+            return ($genre['bookCount'] ?? 0) > 0;
         });
-        $genres = array_map(function ($g) {
-            return ['id' => $g['id'], 'name' => $g['name']];
+
+        usort($genres, function (array $a, array $b) {
+            return strcmp($a['name'] ?? '', $b['name'] ?? '');
+        });
+
+        $genres = array_map(function (array $genre) {
+            return [
+                'id' => $genre['id'],
+                'name' => $genre['name'],
+            ];
         }, $genres);
 
-        return response()->json($genres);
+        return response()->json(array_values($genres));
     }
 
     /**
@@ -1329,10 +1339,10 @@ class BookApiController extends Controller
             return ($book['genre_id'] ?? null) == $genreId;
         });
         $authorIds = array_unique(array_column($books, 'author_id'));
-        $authors = array_filter($documentStore->listAuthors(), fn ($author) => in_array($author['id'], $authorIds));
+        $authors = array_filter($documentStore->listAuthors(), fn($author) => in_array($author['id'], $authorIds));
         $authors = array_values($authors);
-        usort($authors, fn ($a, $b) => strcmp($a['name'], $b['name']));
-        $authors = array_map(fn ($a) => ['id' => $a['id'], 'name' => $a['name']], $authors);
+        usort($authors, fn($a, $b) => strcmp($a['name'], $b['name']));
+        $authors = array_map(fn($a) => ['id' => $a['id'], 'name' => $a['name']], $authors);
 
         return response()->json([
             'genre' => ['id' => $genre['id'], 'name' => $genre['name']],
@@ -1356,7 +1366,7 @@ class BookApiController extends Controller
                 'message' => 'The specified series could not be found',
             ], 404);
         }
-        $books = array_filter($documentStore->listBooks(), fn ($book) => ($book['series_id'] ?? null) == $seriesId);
+        $books = array_filter($documentStore->listBooks(), fn($book) => ($book['series_id'] ?? null) == $seriesId);
         $books = array_values($books);
         // Filter out any non-array entries that may have gotten into the books array
         $books = array_filter($books, 'is_array');
@@ -1364,7 +1374,7 @@ class BookApiController extends Controller
         $page = (int) $request->input('page', 1);
         $offset = ($page - 1) * $perPage;
         $paginatedBooks = array_slice($books, $offset, $perPage);
-        $paginatedBooks = array_map(fn ($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $paginatedBooks);
+        $paginatedBooks = array_map(fn($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $paginatedBooks);
 
         return response()->json([
             'series' => ['id' => $series['id'], 'name' => $series['name']],
@@ -1396,7 +1406,7 @@ class BookApiController extends Controller
                 'message' => 'The specified author could not be found',
             ], 404);
         }
-        $books = array_filter($documentStore->listBooks(), fn ($book) => ($book['author_id'] ?? null) == $authorId);
+        $books = array_filter($documentStore->listBooks(), fn($book) => ($book['author_id'] ?? null) == $authorId);
         $books = array_values($books);
         // Filter out any non-array entries that may have gotten into the books array
         $books = array_filter($books, 'is_array');
@@ -1404,7 +1414,7 @@ class BookApiController extends Controller
         $page = (int) $request->input('page', 1);
         $offset = ($page - 1) * $perPage;
         $paginatedBooks = array_slice($books, $offset, $perPage);
-        $paginatedBooks = array_map(fn ($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $paginatedBooks);
+        $paginatedBooks = array_map(fn($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $paginatedBooks);
 
         return response()->json([
             'author' => ['id' => $author['id'], 'name' => $author['name']],
@@ -1430,12 +1440,12 @@ class BookApiController extends Controller
         if (!$author) {
             return response()->json(['error' => 'Author not found'], 404);
         }
-        $books = array_filter($documentStore->listBooks(), fn ($book) => ($book['author_id'] ?? null) == $authorId);
+        $books = array_filter($documentStore->listBooks(), fn($book) => ($book['author_id'] ?? null) == $authorId);
         $seriesIds = array_unique(array_column($books, 'series_id'));
-        $series = array_filter($documentStore->listSeries(), fn ($ser) => in_array($ser['id'], $seriesIds));
+        $series = array_filter($documentStore->listSeries(), fn($ser) => in_array($ser['id'], $seriesIds));
         $series = array_values($series);
-        usort($series, fn ($a, $b) => strcmp($a['name'], $b['name']));
-        $series = array_map(fn ($s) => ['id' => $s['id'], 'name' => $s['name']], $series);
+        usort($series, fn($a, $b) => strcmp($a['name'], $b['name']));
+        $series = array_map(fn($s) => ['id' => $s['id'], 'name' => $s['name']], $series);
 
         return response()->json([
             'author' => ['id' => $author['id'], 'name' => $author['name']],
@@ -1487,7 +1497,7 @@ class BookApiController extends Controller
         $page = max(1, (int) $request->input('page', 1));
         $offset = ($page - 1) * $perPage;
         $paginatedBooks = array_slice($books, $offset, $perPage);
-        $paginatedBooks = array_map(fn ($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $paginatedBooks);
+        $paginatedBooks = array_map(fn($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $paginatedBooks);
 
         return response()->json([
             'data' => $paginatedBooks,
@@ -1573,6 +1583,7 @@ class BookApiController extends Controller
 
     /**
      * Format series data as an array with name and series number
+     * Returns only entries with valid (non-null, non-empty) series names
      */
     private function formatSeriesData($book): array
     {
@@ -1580,15 +1591,26 @@ class BookApiController extends Controller
         if (isset($book['series']) && is_array($book['series']) && !empty($book['series'])) {
             $result = [];
             foreach ($book['series'] as $series) {
+                $name = null;
+                $seriesNumber = null;
+
                 if (is_array($series)) {
-                    $result[] = [
-                        'name' => $series['name'] ?? null,
-                        'series_number' => $series['pivot']['series_number'] ?? null,
-                    ];
+                    $name = $series['name'] ?? null;
+                    $seriesNumber = $series['pivot']['series_number']
+                        ?? $series['series_number']
+                        ?? null;
                 } elseif (is_object($series)) {
+                    $name = $series->name ?? null;
+                    $seriesNumber = $series->pivot->series_number
+                        ?? $series->series_number
+                        ?? null;
+                }
+
+                // Only include entries with valid series names (not null or empty)
+                if (!empty($name)) {
                     $result[] = [
-                        'name' => $series->name ?? null,
-                        'series_number' => $series->pivot->series_number ?? null,
+                        'name' => $name,
+                        'series_number' => $seriesNumber,
                     ];
                 }
             }
@@ -1725,7 +1747,7 @@ class BookApiController extends Controller
         $query = \App\Models\Author::query()
             ->select([
                 'authors.id',
-                'authors.name'
+                'authors.name',
             ])
             ->selectSub(function ($q) use ($includeNeedsReview) {
                 $q->from('author_book')
@@ -1747,7 +1769,7 @@ class BookApiController extends Controller
         // Add genre filtering if specified
         if ($genreId || $genreName) {
             $query->join('book_genre', 'books.id', '=', 'book_genre.book_id')
-                  ->join('genres', 'book_genre.genre_id', '=', 'genres.id');
+                ->join('genres', 'book_genre.genre_id', '=', 'genres.id');
 
             if ($genreId) {
                 $query->where('genres.id', $genreId);
@@ -1802,7 +1824,7 @@ class BookApiController extends Controller
         // Add same genre filtering as main query if present
         if ($genreId || $genreName) {
             $countQuery->join('book_genre', 'books.id', '=', 'book_genre.book_id')
-                      ->join('genres', 'book_genre.genre_id', '=', 'genres.id');
+                ->join('genres', 'book_genre.genre_id', '=', 'genres.id');
             if ($genreId) {
                 $countQuery->where('genres.id', $genreId);
             } elseif ($genreName) {
@@ -1863,7 +1885,7 @@ class BookApiController extends Controller
                     return [
                         'id' => $series->id,
                         'name' => $series->name,
-                        'books_in_series' => $series->books_in_series
+                        'books_in_series' => $series->books_in_series,
                     ];
                 });
 
@@ -1875,7 +1897,7 @@ class BookApiController extends Controller
                 'book_count_in_genre' => $author->book_count_in_genre ?? $author->book_count,
                 'image_url' => null, // Column doesn't exist in database
                 'genres' => $author->genres,
-                'series' => $authorSeries->toArray()
+                'series' => $authorSeries->toArray(),
             ];
         });
 
@@ -1892,8 +1914,8 @@ class BookApiController extends Controller
                 'total' => $total,
                 'total_pages' => $totalPages,
                 'has_next' => $hasNext,
-                'has_prev' => $hasPrev
-            ]
+                'has_prev' => $hasPrev,
+            ],
         ]);
     }
 
@@ -1923,7 +1945,7 @@ class BookApiController extends Controller
         $query = \App\Models\Series::query()
             ->select([
                 'series.id',
-                'series.name'
+                'series.name',
             ])
             ->withCount('books as book_count')
             ->join('book_series', 'series.id', '=', 'book_series.series_id')
@@ -1936,7 +1958,7 @@ class BookApiController extends Controller
         // Add author filtering if specified
         if ($authorId || $authorName) {
             $query->join('author_book', 'books.id', '=', 'author_book.book_id')
-                  ->join('authors', 'author_book.author_id', '=', 'authors.id');
+                ->join('authors', 'author_book.author_id', '=', 'authors.id');
 
             if ($authorId) {
                 $query->where('authors.id', $authorId);
@@ -1991,7 +2013,7 @@ class BookApiController extends Controller
         // Add same author filtering as main query if present
         if ($authorId || $authorName) {
             $countQuery->join('author_book', 'books.id', '=', 'author_book.book_id')
-                      ->join('authors', 'author_book.author_id', '=', 'authors.id');
+                ->join('authors', 'author_book.author_id', '=', 'authors.id');
             if ($authorId) {
                 $countQuery->where('authors.id', $authorId);
             } elseif ($authorName) {
@@ -2039,7 +2061,7 @@ class BookApiController extends Controller
                 'description' => null, // Column doesn't exist in database
                 'book_count' => $totalBookCount,
                 'book_count_by_author' => $series->book_count_by_author ?? $series->book_count,
-                'authors' => $series->authors
+                'authors' => $series->authors,
             ];
         });
 
@@ -2056,8 +2078,8 @@ class BookApiController extends Controller
                 'total' => $total,
                 'total_pages' => $totalPages,
                 'has_next' => $hasNext,
-                'has_prev' => $hasPrev
-            ]
+                'has_prev' => $hasPrev,
+            ],
         ]);
     }
 
@@ -2099,7 +2121,7 @@ class BookApiController extends Controller
         // Add genre filtering
         if ($genreId || $genreName) {
             $query->join('book_genre', 'books.id', '=', 'book_genre.book_id')
-                  ->join('genres', 'book_genre.genre_id', '=', 'genres.id');
+                ->join('genres', 'book_genre.genre_id', '=', 'genres.id');
 
             if ($genreId) {
                 $query->where('genres.id', $genreId);
@@ -2111,7 +2133,7 @@ class BookApiController extends Controller
         // Add author filtering
         if ($authorId || $authorName) {
             $query->join('author_book', 'books.id', '=', 'author_book.book_id')
-                  ->join('authors', 'author_book.author_id', '=', 'authors.id');
+                ->join('authors', 'author_book.author_id', '=', 'authors.id');
 
             if ($authorId) {
                 $query->where('authors.id', $authorId);
@@ -2123,7 +2145,7 @@ class BookApiController extends Controller
         // Add series filtering
         if ($seriesId || $seriesName) {
             $query->join('book_series', 'books.id', '=', 'book_series.book_id')
-                  ->join('series', 'book_series.series_id', '=', 'series.id');
+                ->join('series', 'book_series.series_id', '=', 'series.id');
 
             if ($seriesId) {
                 $query->where('series.id', $seriesId);
@@ -2155,8 +2177,8 @@ class BookApiController extends Controller
                 if (!($authorId || $authorName)) {
                     // Only join authors if not already joined for filtering
                     $query->leftJoin('author_book as ab_sort', 'books.id', '=', 'ab_sort.book_id')
-                          ->leftJoin('authors as a_sort', 'ab_sort.author_id', '=', 'a_sort.id')
-                          ->orderBy('a_sort.name', 'asc');
+                        ->leftJoin('authors as a_sort', 'ab_sort.author_id', '=', 'a_sort.id')
+                        ->orderBy('a_sort.name', 'asc');
                 } else {
                     $query->orderBy('authors.name', 'asc');
                 }
@@ -2164,8 +2186,8 @@ class BookApiController extends Controller
             case 'author_desc':
                 if (!($authorId || $authorName)) {
                     $query->leftJoin('author_book as ab_sort', 'books.id', '=', 'ab_sort.book_id')
-                          ->leftJoin('authors as a_sort', 'ab_sort.author_id', '=', 'a_sort.id')
-                          ->orderBy('a_sort.name', 'desc');
+                        ->leftJoin('authors as a_sort', 'ab_sort.author_id', '=', 'a_sort.id')
+                        ->orderBy('a_sort.name', 'desc');
                 } else {
                     $query->orderBy('authors.name', 'desc');
                 }
@@ -2182,7 +2204,7 @@ class BookApiController extends Controller
         // Add same filtering as main query
         if ($genreId || $genreName) {
             $countQuery->join('book_genre', 'books.id', '=', 'book_genre.book_id')
-                      ->join('genres', 'book_genre.genre_id', '=', 'genres.id');
+                ->join('genres', 'book_genre.genre_id', '=', 'genres.id');
             if ($genreId) {
                 $countQuery->where('genres.id', $genreId);
             } elseif ($genreName) {
@@ -2192,7 +2214,7 @@ class BookApiController extends Controller
 
         if ($authorId || $authorName) {
             $countQuery->join('author_book', 'books.id', '=', 'author_book.book_id')
-                      ->join('authors', 'author_book.author_id', '=', 'authors.id');
+                ->join('authors', 'author_book.author_id', '=', 'authors.id');
             if ($authorId) {
                 $countQuery->where('authors.id', $authorId);
             } elseif ($authorName) {
@@ -2202,7 +2224,7 @@ class BookApiController extends Controller
 
         if ($seriesId || $seriesName) {
             $countQuery->join('book_series', 'books.id', '=', 'book_series.book_id')
-                      ->join('series', 'book_series.series_id', '=', 'series.id');
+                ->join('series', 'book_series.series_id', '=', 'series.id');
             if ($seriesId) {
                 $countQuery->where('series.id', $seriesId);
             } elseif ($seriesName) {
@@ -2274,8 +2296,8 @@ class BookApiController extends Controller
                 'total' => $total,
                 'total_pages' => $totalPages,
                 'has_next' => $hasNext,
-                'has_prev' => $hasPrev
-            ]
+                'has_prev' => $hasPrev,
+            ],
         ]);
     }
 }
