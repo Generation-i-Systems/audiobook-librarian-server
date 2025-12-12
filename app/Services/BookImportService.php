@@ -589,8 +589,23 @@ class BookImportService
             }
 
             // Handle directory conflicts
+            $originalTargetDir = $targetDir;
             if (File::isDirectory($targetDir)) {
                 $targetDir = $this->handleDirectoryConflict($audiobook, $targetDir);
+
+                // If directory was changed due to conflict, update book's directory_path
+                if ($targetDir !== $originalTargetDir) {
+                    $bookStoragePath = rtrim($bookStoragePath, '/');
+                    $relativePath = str_starts_with($targetDir, $bookStoragePath . '/')
+                        ? substr($targetDir, strlen($bookStoragePath) + 1)
+                        : $targetDir;
+                    $book->directory_path = $relativePath;
+                    Log::warning("Directory conflict detected - updated path", [
+                        'original' => $originalTargetDir,
+                        'new' => $targetDir,
+                        'book_id' => $book->id,
+                    ]);
+                }
             }
 
             if (!File::isDirectory($targetDir)) {
@@ -608,11 +623,7 @@ class BookImportService
                 $this->copyDirectoryContents($sourcePath, $targetDir);
             }
 
-            // CRITICAL: Only update directory_path if it wasn't already set by user approval
-            // If book->directory_path is already set, it came from user-approved metadata
-            // DO NOT OVERWRITE USER-APPROVED DATA
-            // The directory_path should already be correct from createBookFromMetadata
-            // We only need to save if there were other changes (like cover image)
+            // Save any changes (including directory_path if there was a conflict)
             $book->save();
 
             return true;
