@@ -163,44 +163,17 @@ class MoveBookDirectory extends Command
             }
         }
 
-        // Normalize destination path with escape handling
+        // Tentatively normalize destination path - we'll validate it later if there are books
         $destinationOutsideBookRoot = false;
+        $destPath = null;
 
         try {
             $destPath = $this->normalizePath($destination);
         } catch (PathEscapesBookRootException $exception) {
+            // Defer handling until we know if there are any books
             $destinationOutsideBookRoot = true;
-
-            $this->logWarning('Destination path escapes book root', [
-                'destination' => $destination,
-                'book_root' => $this->bookRoot,
-            ]);
-
-            $this->warn($exception->getMessage());
-
-            if (!$this->confirm('Destination is outside the configured book root. Continue with filesystem move only (database will not be updated)?')) {
-                $this->info('Operation cancelled.');
-                return 0;
-            }
-
-            if (!$noDb) {
-                $this->warn('Skipping database updates because the destination is outside the book root.');
-            }
-
-            $noDb = true;
-            $this->forcedNoDb = true;
             $destPath = $this->normalizePath($destination, false);
-
-            $this->logWarning('Continuing without database updates for destination outside book root', [
-                'destination' => $destPath,
-            ]);
         }
-
-        $this->logDebug('Destination path normalized', [
-            'input_destination' => $destination,
-            'normalized_destination' => $destPath,
-            'outside_book_root' => $destinationOutsideBookRoot,
-        ]);
 
         // Auto-create parent directories (mkdmv behavior)
         $destDir = $destPath;
@@ -290,6 +263,38 @@ class MoveBookDirectory extends Command
             $this->warn('No directories within the book root matched the provided sources. Falling back with exit code 2.');
             return 2; // Signal to fall back to regular mv
         }
+
+        // Now that we know we have books, validate the destination path
+        if ($destinationOutsideBookRoot) {
+            $this->logWarning('Destination path escapes book root', [
+                'destination' => $destination,
+                'book_root' => $this->bookRoot,
+            ]);
+
+            $this->warn("Path escapes book root: {$destPath} (from: {$destination}, bookRoot: {$this->bookRoot})");
+
+            if (!$this->confirm('Destination is outside the configured book root. Continue with filesystem move only (database will not be updated)?')) {
+                $this->info('Operation cancelled.');
+                return 0;
+            }
+
+            if (!$noDb) {
+                $this->warn('Skipping database updates because the destination is outside the book root.');
+            }
+
+            $noDb = true;
+            $this->forcedNoDb = true;
+
+            $this->logWarning('Continuing without database updates for destination outside book root', [
+                'destination' => $destPath,
+            ]);
+        }
+
+        $this->logDebug('Destination path normalized', [
+            'input_destination' => $destination,
+            'normalized_destination' => $destPath,
+            'outside_book_root' => $destinationOutsideBookRoot,
+        ]);
 
         $this->info("Found " . count($allAffectedBooks) . " book(s) to update across " . count($bookSources) . " source(s)");
 
