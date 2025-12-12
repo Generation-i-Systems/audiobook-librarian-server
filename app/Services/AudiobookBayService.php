@@ -72,6 +72,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
                         'link' => $enriched['metadata']['url'] ?? $enriched['url'] ?? '',
                         'cover' => $enriched['coverImageUrl'] ?? '',
                         'description' => $enriched['description'] ?? '',
+                        'genres' => $enriched['categories'] ?? [],
                         'metadata' => $enriched['metadata'] ?? [],
                     ];
                 }
