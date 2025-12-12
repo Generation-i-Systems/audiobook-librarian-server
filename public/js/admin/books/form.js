@@ -873,22 +873,25 @@ window.initBookForm = function (formContainerSelector) {
 
             if (!value) return;
 
-            // Check for separators: & or ,
-            const hasAmpersand = value.includes(' & ');
-            const hasComma = value.includes(',');
+            // Check for any separators: &, ,, or "and"
+            const hasSeparators = value.includes('&') || value.includes(',') || / and /i.test(value);
 
-            if (hasAmpersand || hasComma) {
-                // Split the authors
-                let authors;
-                if (hasAmpersand) {
-                    authors = value.split(' & ').map(a => a.trim()).filter(a => a.length > 0);
-                } else {
-                    authors = value.split(',').map(a => a.trim()).filter(a => a.length > 0);
-                }
+            if (hasSeparators) {
+                // Replace all separator types with a uniform delimiter (|) for easy splitting
+                // Handle word boundaries for "and" to avoid matching words like "Andrew" or "Brandon"
+                let normalized = value
+                    .replace(/\s*&\s*/g, '|')           // Replace & with |
+                    .replace(/\s*,\s*/g, '|')           // Replace , with |
+                    .replace(/\s+and\s+/gi, '|');       // Replace " and " with | (case insensitive)
+
+                // Split by the delimiter and clean up
+                const authors = normalized
+                    .split('|')
+                    .map(a => a.trim())
+                    .filter(a => a.length > 0);
 
                 // Only offer to split if we actually have multiple authors
                 if (authors.length > 1) {
-                    const separator = hasAmpersand ? ' & ' : ', ';
                     const authorList = authors.map(a => '"' + a + '"').join(', ');
 
                     if (confirm(`Split "${value}" into ${authors.length} separate authors?\n\n${authorList}`)) {
