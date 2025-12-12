@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\ApiHealthController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BookApiController;
 use App\Http\Controllers\Api\BookmarkApiController;
@@ -17,6 +18,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
+    // Health check endpoints (no authentication required - for uptime monitors)
+    Route::get('/health/ping', [ApiHealthController::class, 'ping']);
+    Route::get('/health', [ApiHealthController::class, 'health']);
+    Route::get('/health/validate', [ApiHealthController::class, 'validateSpec']);
+
     Route::get('/books/{book}/cover', [BookApiController::class, 'cover']);
 
     Route::middleware(['api.auth', 'standard'])->group(function () {
