@@ -96,7 +96,7 @@ interface DocumentStoreServiceInterface
 
     public function updateBook(string $id, array $data);
 
-    public function deleteBook(string $id);
+    public function deleteBook(string $id, bool $deleteFiles = true);
 
     public function getBooksByAuthorAndGenre($author, $genre);
 

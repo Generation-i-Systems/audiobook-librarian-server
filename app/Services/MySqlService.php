@@ -14,6 +14,7 @@ use App\Models\Narrator;
 use App\Models\Series;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -2339,13 +2340,39 @@ class MySqlService implements DocumentStoreServiceInterface
         }
     }
 
-    public function deleteBook(string $bookId): bool
+    public function deleteBook(string $bookId, bool $deleteFiles = true): bool
     {
         try {
             $book = Book::where('id', $bookId)->first();
             if (!$book) {
                 return false;
             }
+
+            // Delete physical files if requested
+            if ($deleteFiles && $book->directory_path) {
+                $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
+                if ($bookStoragePath) {
+                    $fullPath = str_starts_with($book->directory_path, '/')
+                        ? $book->directory_path
+                        : $bookStoragePath . '/' . $book->directory_path;
+
+                    if (File::isDirectory($fullPath)) {
+                        try {
+                            File::deleteDirectory($fullPath);
+                            Log::info('Deleted book directory', ['book_id' => $bookId, 'path' => $fullPath]);
+                        } catch (\Exception $e) {
+                            Log::warning('Failed to delete book directory', [
+                                'book_id' => $bookId,
+                                'path' => $fullPath,
+                                'error' => $e->getMessage(),
+                            ]);
+                        }
+                    }
+                }
+            } else {
+                Log::info('Skipping file deletion for book', ['book_id' => $bookId, 'delete_files' => $deleteFiles]);
+            }
+
             $book->delete();
             return true;
         } catch (\Exception $e) {

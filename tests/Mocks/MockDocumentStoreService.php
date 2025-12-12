@@ -162,7 +162,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         return true;
     }
 
-    public function deleteBook($id)
+    public function deleteBook($id, bool $deleteFiles = true)
     {
         if (!isset($this->books[$id])) {
             return false;

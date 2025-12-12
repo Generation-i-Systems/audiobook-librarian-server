@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Contracts\DocumentStoreServiceInterface;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use MongoDB\BSON\ObjectId;
@@ -660,8 +661,36 @@ class MongoService implements DocumentStoreServiceInterface
         return $this->getCollection('books')->updateOne(['_id' => $id], $update);
     }
     /** @inheritDoc */
-    public function deleteBook(string $id)
+    public function deleteBook(string $id, bool $deleteFiles = true)
     {
+        // Get book before deleting to access directory_path
+        if ($deleteFiles) {
+            $book = $this->getBook($id);
+            if ($book && !empty($book['directoryPath'])) {
+                $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
+                if ($bookStoragePath) {
+                    $fullPath = str_starts_with($book['directoryPath'], '/')
+                        ? $book['directoryPath']
+                        : $bookStoragePath . '/' . $book['directoryPath'];
+
+                    if (File::isDirectory($fullPath)) {
+                        try {
+                            File::deleteDirectory($fullPath);
+                            Log::info('Deleted book directory', ['book_id' => $id, 'path' => $fullPath]);
+                        } catch (\Exception $e) {
+                            Log::warning('Failed to delete book directory', [
+                                'book_id' => $id,
+                                'path' => $fullPath,
+                                'error' => $e->getMessage(),
+                            ]);
+                        }
+                    }
+                }
+            }
+        } else {
+            Log::info('Skipping file deletion for book', ['book_id' => $id, 'delete_files' => $deleteFiles]);
+        }
+
         return $this->getCollection('books')->deleteOne(['_id' => $id]);
     }
     /** @inheritDoc */

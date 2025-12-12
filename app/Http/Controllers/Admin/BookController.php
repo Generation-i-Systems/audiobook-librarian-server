@@ -1488,12 +1488,21 @@ class BookController extends Controller
     /**
      * Remove the specified book from storage.
      */
-    public function destroy($book)
+    public function destroy(Request $request, $book)
     {
         $documentStore = $this->documentStoreService;
-        $documentStore->deleteBook($book);
 
-        return redirect()->route('admin.books.index')->with('success', 'Book deleted successfully.');
+        // Check if we should delete files (default: true)
+        // Can be overridden with ?delete_files=false query parameter
+        $deleteFiles = $request->query('delete_files', 'true') !== 'false';
+
+        $documentStore->deleteBook($book, $deleteFiles);
+
+        $message = $deleteFiles
+            ? 'Book and files deleted successfully.'
+            : 'Book deleted from database (files preserved).';
+
+        return redirect()->route('admin.books.index')->with('success', $message);
     }
 
     public function download($id)
