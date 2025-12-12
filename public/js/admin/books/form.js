@@ -844,12 +844,12 @@ window.initBookForm = function (formContainerSelector) {
         const newPath = $(this).val();
         const $coverInput = $container.find("#coverImage");
         const coverFilename = $coverInput.val();
-        
+
         if (newPath && coverFilename) {
             // Update cover preview with new path
             const coverUrl = "/cover/" + newPath + "/" + coverFilename;
             const $coverPreview = $container.find(".cover-preview img, img[alt='cover'], .cover-option img");
-            
+
             if ($coverPreview.length) {
                 $coverPreview.each(function() {
                     const $img = $(this);
@@ -863,6 +863,66 @@ window.initBookForm = function (formContainerSelector) {
             }
         }
     });
+
+    // Auto-split authors on blur if multiple authors detected
+    $container
+        .off("blur", ".author-autocomplete")
+        .on("blur", ".author-autocomplete", function () {
+            const $input = $(this);
+            const value = $input.val().trim();
+
+            if (!value) return;
+
+            // Check for separators: & or ,
+            const hasAmpersand = value.includes(' & ');
+            const hasComma = value.includes(',');
+
+            if (hasAmpersand || hasComma) {
+                // Split the authors
+                let authors;
+                if (hasAmpersand) {
+                    authors = value.split(' & ').map(a => a.trim()).filter(a => a.length > 0);
+                } else {
+                    authors = value.split(',').map(a => a.trim()).filter(a => a.length > 0);
+                }
+
+                // Only offer to split if we actually have multiple authors
+                if (authors.length > 1) {
+                    const separator = hasAmpersand ? ' & ' : ', ';
+                    const authorList = authors.map(a => '"' + a + '"').join(', ');
+
+                    if (confirm(`Split "${value}" into ${authors.length} separate authors?\n\n${authorList}`)) {
+                        // Clear the current input
+                        $input.val('');
+
+                        // Get the current row
+                        const $currentRow = $input.closest('.author-row');
+                        const $authorsGroup = $container.find('#authors-group');
+
+                        // Remove all existing author rows except the first one
+                        $authorsGroup.find('.author-row:not(:first)').remove();
+
+                        // Set first author in the first row
+                        $authorsGroup.find('.author-row:first input[name="author[]"]').val(authors[0]);
+
+                        // Add remaining authors
+                        for (let i = 1; i < authors.length; i++) {
+                            addAuthorRow($container, authors[i]);
+                        }
+
+                        // Update button positions
+                        updateAddRowButtons(
+                            $container,
+                            "#authors-group",
+                            ".author-row",
+                            ".add-author-row"
+                        );
+
+                        console.log("[DEBUG] Split authors:", authors);
+                    }
+                }
+            }
+        });
 
 };
 
