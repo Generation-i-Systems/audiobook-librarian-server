@@ -783,8 +783,9 @@ class AudiobookBayApiService
         $page = $options['page'] ?? 1;
         $endpoint = $page > 1 ? "/page/$page/" : '/';
 
+        // AudiobookBay requires lowercase search queries
         $params = [
-            's' => $query,
+            's' => strtolower($query),
             'cat' => 'undefined,undefined', // Required by AudiobookBay
         ];
 
