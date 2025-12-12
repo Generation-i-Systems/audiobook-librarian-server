@@ -463,14 +463,18 @@ class AudiobookBayApiService
         if (preg_match('/Bitrate: ([^\n\r]+?)(?: Unabridged|$)/i', $bodyText, $m)) {
             $book['metadata']['bitrate'] = trim($m[1]);
         }
-        // Description: grab paragraph after format/bitrate line, stop at torrent/tracker info
-        if (
+        // Description: Find <p> tags, skip the first one with metadata, get the second one
+        $paragraphs = $xpath->query('//p[@itemprop="description"]/following-sibling::p[1]');
+        if ($paragraphs && $paragraphs->length > 0) {
+            $book['description'] = trim($paragraphs->item(0)->textContent);
+        } elseif (
             preg_match(
-                '/Unabridged\s*\n(.+?)(?:Announce URL:|Tracker:|Torrent Free Downloads|Start Direct Download|Download Files Now|Creation Date:|This is a Multifile|Top|$)/is',
+                '/Bitrate:.*?\n\s*(.+?)(?:Announce URL:|Tracker:|Torrent Free Downloads|Start Direct Download|Download Files Now|Creation Date:|This is a Multifile|Top|$)/is',
                 $bodyText,
                 $m
             )
         ) {
+            // Fallback to regex if XPath fails
             $book['description'] = trim($m[1]);
         }
         // Categories: look for [Category] links
