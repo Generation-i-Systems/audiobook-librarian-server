@@ -77,3 +77,9 @@ the button is still not functional neither is the raw json edit button. no conso
 when a new image is updated from the autofill the image in the corner of the form should update to show that. it should always show the image that would be "selected" on the radio buttons if you click on it
 
 when doing autofill when results come back select the first option by default. add a magic autofill button (with just a magic wand icon) that runs with the search and populates the form with the first result. Default the autofill to audible not google books. in the autofill popup instead of having a dropdown to select the source add a separate search button for each source. and a button with the search icon only that searches all sources and shows all results as they come in in the same list
+
+---
+
+## 2025-12-10
+
+The clients are getting api responses from `https://books.thelin.org/api/v1/books/10708` and similar urls containing things like "series":[{"name":null,"series_number":null}] this doesn't follow the spec listed at `api-docs/openapi.json`. Fix that and make a test suite that can be run independently of other tests that verifies the api output. Make an api endpoint that can be hit without auth by an uptime monitor that will show that each api endpoint is returning data that follows the spec

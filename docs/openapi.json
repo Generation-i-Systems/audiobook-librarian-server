@@ -378,7 +378,7 @@
         "required": ["book_id", "title", "total_files", "total_size", "files", "download_instructions", "generated_at"]
       },
       "DownloadFile": {
-        "type": "object", 
+        "type": "object",
         "properties": {
           "filename": {
             "type": "string",
@@ -409,7 +409,7 @@
         "type": "object",
         "properties": {
           "book_id": {
-            "type": "integer", 
+            "type": "integer",
             "description": "Book identifier",
             "example": 1
           },
@@ -426,7 +426,7 @@
           },
           "total_size": {
             "type": "integer",
-            "description": "Total size of all files in bytes", 
+            "description": "Total size of all files in bytes",
             "example": 687194112
           },
           "total_files": {
@@ -478,7 +478,7 @@
             "example": "Files should be downloaded in the provided order"
           },
           "recommended_start": {
-            "type": "string", 
+            "type": "string",
             "description": "Suggested starting files for optimal experience",
             "example": "Start with cover image, then first audio file"
           },
@@ -1279,6 +1279,209 @@
     }
   },
   "paths": {
+    "/health/ping": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Basic ping endpoint for uptime checks",
+        "description": "Returns a simple OK response to verify the API is responding. No authentication required.",
+        "operationId": "healthPing",
+        "responses": {
+          "200": {
+            "description": "API is responding",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "ok"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time",
+                      "example": "2024-01-15T10:30:00Z"
+                    },
+                    "service": {
+                      "type": "string",
+                      "example": "audiobook-librarian-api"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Detailed health check with validation",
+        "description": "Returns detailed health status including database connectivity, book format compliance, and series format validation. No authentication required.",
+        "operationId": "healthCheck",
+        "responses": {
+          "200": {
+            "description": "System is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["healthy", "unhealthy"],
+                      "example": "healthy"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "checks": {
+                      "type": "object",
+                      "properties": {
+                        "database": {
+                          "type": "object",
+                          "properties": {
+                            "passed": { "type": "boolean" },
+                            "message": { "type": "string" },
+                            "book_count": { "type": "integer" }
+                          }
+                        },
+                        "book_format": {
+                          "type": "object",
+                          "properties": {
+                            "passed": { "type": "boolean" },
+                            "message": { "type": "string" },
+                            "sample_count": { "type": "integer" }
+                          }
+                        },
+                        "series_format": {
+                          "type": "object",
+                          "properties": {
+                            "passed": { "type": "boolean" },
+                            "message": { "type": "string" },
+                            "books_checked": { "type": "integer" },
+                            "books_with_series": { "type": "integer" }
+                          }
+                        }
+                      }
+                    },
+                    "api_version": {
+                      "type": "string",
+                      "example": "v1"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "System is unhealthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "unhealthy"
+                    },
+                    "checks": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/validate": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Full OpenAPI spec compliance validation",
+        "description": "Validates API responses against the OpenAPI specification. Checks books list, single book, and array format compliance. No authentication required.",
+        "operationId": "healthValidateSpec",
+        "responses": {
+          "200": {
+            "description": "API is spec compliant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["spec_compliant", "spec_violations_found"],
+                      "example": "spec_compliant"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "validations": {
+                      "type": "object",
+                      "properties": {
+                        "books_list": {
+                          "type": "object",
+                          "properties": {
+                            "passed": { "type": "boolean" },
+                            "message": { "type": "string" }
+                          }
+                        },
+                        "single_book": {
+                          "type": "object",
+                          "properties": {
+                            "passed": { "type": "boolean" },
+                            "message": { "type": "string" }
+                          }
+                        },
+                        "array_formats": {
+                          "type": "object",
+                          "properties": {
+                            "passed": { "type": "boolean" },
+                            "message": { "type": "string" }
+                          }
+                        }
+                      }
+                    },
+                    "api_version": {
+                      "type": "string",
+                      "example": "v1"
+                    },
+                    "openapi_version": {
+                      "type": "string",
+                      "example": "3.0.3"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Spec violations found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "spec_violations_found"
+                    },
+                    "validations": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/register": {
       "post": {
         "tags": ["Authentication"],
@@ -2045,7 +2248,7 @@
                           "download_url": "https://books.thelin.org/api/v1/books/1/download/01%20-%20Chapter%201.mp3"
                         },
                         {
-                          "filename": "02 - Chapter 2.mp3", 
+                          "filename": "02 - Chapter 2.mp3",
                           "size": 61440000,
                           "type": "audio",
                           "download_url": "https://books.thelin.org/api/v1/books/1/download/02%20-%20Chapter%202.mp3"
@@ -2053,7 +2256,7 @@
                         {
                           "filename": "12 - Epilogue.mp3",
                           "size": 34560000,
-                          "type": "audio", 
+                          "type": "audio",
                           "download_url": "https://books.thelin.org/api/v1/books/1/download/12%20-%20Epilogue.mp3"
                         }
                       ],
@@ -2122,7 +2325,7 @@
         "parameters": [
           {
             "name": "book",
-            "in": "path", 
+            "in": "path",
             "description": "Book ID",
             "required": true,
             "schema": {
@@ -2163,7 +2366,7 @@
               },
               "audio/mp4": {
                 "schema": {
-                  "type": "string", 
+                  "type": "string",
                   "format": "binary"
                 }
               },
@@ -2270,7 +2473,7 @@
           {
             "name": "book",
             "in": "path",
-            "description": "Book ID", 
+            "description": "Book ID",
             "required": true,
             "schema": {
               "type": "integer",
@@ -2329,7 +2532,7 @@
             }
           },
           "401": {
-            "description": "Unauthorized", 
+            "description": "Unauthorized",
             "content": {
               "application/json": {
                 "schema": {
@@ -2365,7 +2568,7 @@
           },
           {
             "name": "genre_name",
-            "in": "query", 
+            "in": "query",
             "description": "Filter authors who have books in this genre (by genre name)",
             "required": false,
             "schema": {

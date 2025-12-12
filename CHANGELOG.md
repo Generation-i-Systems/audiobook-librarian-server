@@ -1,5 +1,28 @@
 ## [Unreleased]
 ### Fixed
+- Fixed `books:move` command error "Property [name] does not exist on this collection instance"
+  - The `series` relationship is `belongsToMany` (returns Collection), not a single model
+  - Now correctly uses `->first()` to get the first series before accessing `->name`
+- Fixed API returning null series entries (e.g., `{"name":null,"series_number":null}`)
+  - `formatSeriesData()` now filters out entries with null or empty series names
+  - API responses now return empty `[]` instead of arrays with null values
+  - Ensures compliance with OpenAPI spec for series field
+
+### Added
+- Added API health check endpoints for uptime monitoring (no authentication required)
+  - `GET /api/v1/health/ping` - Basic ping endpoint for uptime checks
+  - `GET /api/v1/health` - Detailed health check with database, format, and spec validation
+  - `GET /api/v1/health/validate` - Full OpenAPI spec compliance validation
+  - Validates series format, array fields, and book structure
+  - Returns 200/healthy or 503/unhealthy status with detailed check results
+
+- Added comprehensive API spec validation test suite (`ApiSpecValidationTest.php`)
+  - Run independently with: `php artisan test --filter=ApiSpecValidationTest`
+  - Run all spec tests: `php artisan test --group=api-spec`
+  - Tests for series field (no null entries), author/narrator/genre arrays
+  - Tests for pagination meta structure compliance
+
+### Fixed
 - Fixed multi-book series detection to use actual book titles instead of chapter titles
   - Now extracts SERIES and PART metadata fields from M4B files
   - Prefers 'album' metadata field over 'title' field for book titles (avoids "Chapter 1" issues)

@@ -136,8 +136,8 @@ book-mv "Fantasy/Author" "Sci-Fi/Author" --force-mv
 
 ### 2. Quick Database Check (< 50ms)
 ```sql
-SELECT id, directory_path, title 
-FROM books 
+SELECT id, directory_path, title
+FROM books
 WHERE directory_path LIKE 'source/path%'
 ```
 
@@ -148,9 +148,9 @@ rename(source, destination)
 
 ### 4. Database Update (< 100ms per book)
 ```sql
-UPDATE books 
-SET directory_path = 'new/path', 
-    updated_at = NOW() 
+UPDATE books
+SET directory_path = 'new/path',
+    updated_at = NOW()
 WHERE id = ?
 ```
 
@@ -313,6 +313,14 @@ After move, verify in web interface that books appear correctly
 - `php artisan books:parse` - Scan and import books
 - `php artisan books:fix-paths` - Fix incorrect directory paths
 - `php artisan series:manage` - Manage series and merging
+
+## Edge Case Tests
+- Special characters, unicode, spaces
+- Very long paths, deep nesting
+- Empty directories, symlinks, dot files
+- Concurrent operations
+- Permission changes mid-operation
+- Destination outside book root prompts for confirmation and runs filesystem-only move
 
 ## Support
 
