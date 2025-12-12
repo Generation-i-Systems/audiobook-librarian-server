@@ -1288,12 +1288,22 @@ class ShowBookInfo extends Command
             } else {
                 $this->line("  No other books use this directory");
 
-                if (!$this->confirm("\nDelete book record AND directory?", false)) {
+                $choice = $this->choice(
+                    "\nWhat would you like to delete?",
+                    [
+                        '1' => 'Book record only (preserve directory and files)',
+                        '2' => 'Book record AND directory (delete everything)',
+                        '3' => 'Cancel (delete nothing)',
+                    ],
+                    '1'
+                );
+
+                if ($choice === 'Cancel (delete nothing)') {
                     $this->info("Cancelled");
                     return 0;
                 }
 
-                $deleteDirectory = true;
+                $deleteDirectory = $choice === 'Book record AND directory (delete everything)';
             }
         } else {
             $this->line("  Directory exists: <fg=red>No</>");
