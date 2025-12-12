@@ -960,6 +960,32 @@ $(document).on("click", "#autofill-modal-btn", function (e) {
     }
 });
 
+// Auto-search when autofill modal is shown
+$("#autofillModal").on("shown.bs.modal", function () {
+    console.log("[DEBUG] Autofill modal shown, auto-searching all sources");
+
+    // Pre-populate search fields from the current form
+    const currentTitle = $("#title").val();
+    const currentAuthor = $("#authors-group").find('input[name="author[]"]').first().val();
+    const currentSeries = $("#series-group").find('input[name="series[]"]').first().val();
+
+    if (currentTitle) {
+        $("#autofill-title").val(currentTitle);
+    }
+    if (currentAuthor) {
+        $("#autofill-author").val(currentAuthor);
+    }
+    if (currentSeries) {
+        $("#autofill-series").val(currentSeries);
+    }
+
+    // Automatically trigger search for all sources if any search criteria exists
+    if (currentTitle || currentAuthor || currentSeries) {
+        console.log("[DEBUG] Auto-triggering search with criteria:", { title: currentTitle, author: currentAuthor, series: currentSeries });
+        performAutofillSearch(["audible", "google", "audiobookbay", "hardcover"], false);
+    }
+});
+
 document.addEventListener("DOMContentLoaded", function () {
     console.log("[DEBUG] DOM ready event fired");
     // Always bind autofill modal button globally after DOM is ready
@@ -1396,7 +1422,7 @@ function performAutofillSearch(sources, autoApplyFirst) {
 
     // Show loading state
     $resultsTable.html(
-        '<tr><td colspan="7" class="text-center text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Searching...</td></tr>',
+        '<tr><td colspan="8" class="text-center text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Searching...</td></tr>',
     );
 
     // Gather search fields
@@ -1475,6 +1501,17 @@ function displayAutofillResults(results, autoApplyFirst) {
             var authors = Array.isArray(item.author)
                 ? item.author.join(", ")
                 : item.author || "";
+
+            // Handle narrators - could be array or string
+            var narrators = "";
+            if (item.narratorList && Array.isArray(item.narratorList)) {
+                narrators = item.narratorList.join(", ");
+            } else if (item.narrator) {
+                narrators = Array.isArray(item.narrator)
+                    ? item.narrator.join(", ")
+                    : item.narrator;
+            }
+
             var coverUrl =
                 item.coverImageUrl ||
                 item.cover_image_url ||
@@ -1502,6 +1539,9 @@ function displayAutofillResults(results, autoApplyFirst) {
                 "</td>" +
                 "<td>" +
                 authors +
+                "</td>" +
+                "<td>" +
+                (narrators || '<span class="text-muted">—</span>') +
                 "</td>" +
                 "<td>" +
                 (item.series || "") +
@@ -1552,7 +1592,7 @@ function displayAutofillResults(results, autoApplyFirst) {
         }
     } else {
         $resultsTable.html(
-            '<tr><td colspan="7" class="text-center text-muted">No results found</td></tr>',
+            '<tr><td colspan="8" class="text-center text-muted">No results found</td></tr>',
         );
     }
 }
@@ -1610,6 +1650,11 @@ function applyAutofillResult(idx) {
                                 // Set title
                                 $("#title").val(item.title || "");
 
+                                // Set description
+                                if (item.description) {
+                                    $("#description").val(item.description);
+                                }
+
                                 // Authors - handle both single string and array formats
                                 if (item.author) {
                                     $("#authors-group").html("");
@@ -1633,7 +1678,24 @@ function applyAutofillResult(idx) {
                                     }
                                 }
 
-                                // Narrators are handled in the source-specific sections below
+                                // Narrators - handle both narratorList (Audible) and narrator field
+                                $("#narrators-group").html("");
+                                if (item.narratorList && Array.isArray(item.narratorList) && item.narratorList.length > 0) {
+                                    item.narratorList.forEach(function (narrator) {
+                                        addNarratorRow($("#book-form"), narrator);
+                                    });
+                                } else if (item.narrator) {
+                                    if (typeof item.narrator === "string") {
+                                        addNarratorRow($("#book-form"), item.narrator);
+                                    } else if (Array.isArray(item.narrator)) {
+                                        item.narrator.forEach(function (narrator) {
+                                            addNarratorRow($("#book-form"), narrator);
+                                        });
+                                    }
+                                } else {
+                                    // Add empty narrator row if no narrators
+                                    addNarratorRow($("#book-form"), "");
+                                }
 
                                 // Series - handle both formats
                                 var series = item.series || "";
@@ -1768,49 +1830,7 @@ function applyAutofillResult(idx) {
                                         console.log("[DEBUG] Updated hidden input for Audible ID (value: " + audibleId + ")");
                                     }
 
-                                    // Handle narrators if available
-                                    // Clear any existing narrators first
-                                    $("#narrators-group").html("");
-
-                                    // Try narratorList first (from Audible API)
-                                    if (
-                                        item.narratorList &&
-                                        Array.isArray(item.narratorList) &&
-                                        item.narratorList.length > 0
-                                    ) {
-                                        item.narratorList.forEach(
-                                            function (narrator) {
-                                                addNarratorRow(
-                                                    $("#book-form"),
-                                                    narrator
-                                                );
-                                            }
-                                        );
-                                    }
-                                    // Fall back to narrator field if available
-                                    else if (item.narrator) {
-                                        if (typeof item.narrator === "string") {
-                                            addNarratorRow(
-                                                $("#book-form"),
-                                                item.narrator
-                                            );
-                                        } else if (
-                                            Array.isArray(item.narrator)
-                                        ) {
-                                            item.narrator.forEach(
-                                                function (narrator) {
-                                                    addNarratorRow(
-                                                        $("#book-form"),
-                                                        narrator
-                                                    );
-                                                }
-                                            );
-                                        }
-                                    }
-                                    // If no narrators, add an empty row
-                                    else {
-                                        addNarratorRow($("#book-form"), "");
-                                    }
+                                    // Narrators are now handled globally above
                                 } else {
                                     // Set Google Books ID
                                     var gbIdInput = $("#googleBooksId");

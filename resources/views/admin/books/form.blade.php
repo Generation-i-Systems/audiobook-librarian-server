@@ -1183,6 +1183,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <th scope="col">Cover</th>
                 <th scope="col">Title</th>
                 <th scope="col">Author</th>
+                <th scope="col">Narrator</th>
                 <th scope="col">Series</th>
                 <th scope="col">Year</th>
                 <th scope="col">Source</th>
