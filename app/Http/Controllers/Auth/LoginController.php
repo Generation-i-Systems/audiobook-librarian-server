@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Auth\DocumentstoreUser;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
+use App\Services\NewUserRegistrationNotifier;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -27,10 +28,13 @@ class LoginController extends Controller
 
     protected DocumentStoreServiceInterface $documentStoreService;
 
+    protected NewUserRegistrationNotifier $registrationNotifier;
 
-    public function __construct(DocumentStoreServiceInterface $documentStoreService)
+
+    public function __construct(DocumentStoreServiceInterface $documentStoreService, NewUserRegistrationNotifier $registrationNotifier)
     {
         $this->documentStoreService = $documentStoreService;
+        $this->registrationNotifier = $registrationNotifier;
         $this->middleware('guest')->except('logout');
         $this->middleware('auth')->only('logout');
     }
@@ -130,22 +134,28 @@ class LoginController extends Controller
             // Check if user exists
             $existingUserArr = $this->documentStoreService->getUserByEmail($googleUser->getEmail());
             $userId = null;
+            $isNewUser = false;
 
             // Create or update user
             if (!$existingUserArr) {
-                // Create new user
+                // Create new unverified user treated as a registration
+                $baseName = $googleUser->getName() ?? $googleUser->getNickname() ?? explode('@', $googleUser->getEmail())[0];
+                $username = explode('@', $googleUser->getEmail())[0];
+
                 $newUserData = [
-                    'name' => $googleUser->getName() ?? $googleUser->getNickname() ?? explode('@', $googleUser->getEmail())[0],
+                    'name' => $baseName,
+                    'username' => $username,
                     'email' => $googleUser->getEmail(),
-                    'password' => bcrypt(Str::random(32)), // random password, not used
-                    'role' => 'user', // Default role
-                    'email_verified_at' => new \DateTime(),
+                    'password' => bcrypt(Str::random(32)),
+                    'role' => 'unverified',
+                    'email_verified_at' => null,
                     'created_at' => new \DateTime(),
                     'updated_at' => new \DateTime(),
                     'google_id' => $googleUser->getId(),
                     'avatar' => $googleUser->getAvatar(),
                 ];
                 $userId = $this->documentStoreService->createUser($newUserData);
+                $isNewUser = true;
                 Log::info('New user created via Google login', ['user_id' => $userId, 'email' => $newUserData['email']]);
             } else {
                 // Update existing user
@@ -169,6 +179,10 @@ class LoginController extends Controller
 
             if (empty($userArr)) {
                 throw new \Exception('Failed to retrieve user account after create/update.');
+            }
+
+            if ($isNewUser) {
+                $this->registrationNotifier->send((array) $userArr, 'web-google', request());
             }
 
             Log::debug('User array from DB before creating DocumentstoreUser', ['userArr' => $userArr]);

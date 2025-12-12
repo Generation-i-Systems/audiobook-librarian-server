@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Auth\DocumentstoreUser;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
+use App\Services\NewUserRegistrationNotifier;
 use Illuminate\Foundation\Auth\RegistersUsers;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -37,9 +38,13 @@ class RegisterController extends Controller
      *
      * @return void
      */
-    public function __construct()
+    protected NewUserRegistrationNotifier $registrationNotifier;
+
+
+    public function __construct(NewUserRegistrationNotifier $registrationNotifier)
     {
         $this->middleware('guest');
+        $this->registrationNotifier = $registrationNotifier;
     }
 
 
@@ -108,6 +113,9 @@ class RegisterController extends Controller
 
             // Notify admins about the new registration
             $this->notifyAdminsAboutNewUser($documentStore, $completeUserData);
+
+            // Send external email notification about the new registration
+            $this->registrationNotifier->send($completeUserData, 'web', request());
 
             // Return a DocumentstoreUser instance for authentication
             return new DocumentstoreUser($completeUserData);
