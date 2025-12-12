@@ -1060,9 +1060,9 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 {{-- Include form.js, directory-browser.js, and series-rename.js scripts --}}
-<script src="{{ asset('js/admin/books/form.js') }}"></script>
-<script src="{{ asset('js/admin/books/directory-browser.js') }}"></script>
-<script src="{{ asset('js/admin/books/series-rename.js') }}"></script>
+<script src="{{ asset('js/admin/books/form.js') }}?v={{ filemtime(public_path('js/admin/books/form.js')) }}"></script>
+<script src="{{ asset('js/admin/books/directory-browser.js') }}?v={{ filemtime(public_path('js/admin/books/directory-browser.js')) }}"></script>
+<script src="{{ asset('js/admin/books/series-rename.js') }}?v={{ filemtime(public_path('js/admin/books/series-rename.js')) }}"></script>
 <script type="text/javascript">
 $(function() {
     var formSelector = '#book-form';

@@ -587,6 +587,7 @@ window.loadDirectoryFiles = loadDirectoryFiles; // Expose if called by onclick
 
 window.initBookForm = function (formContainerSelector) {
     console.log("[DEBUG] initBookForm called with", formContainerSelector);
+    console.log("[DEBUG] UPDATED VERSION - Dec 12 2025");
     const $container = $(formContainerSelector); // Scope all operations to this container
 
     // Initialize dynamic row buttons
