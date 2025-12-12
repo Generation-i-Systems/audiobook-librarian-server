@@ -169,52 +169,78 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
             'limit' => $limit,
         ]);
 
-        // Build the where clause based on whether author is provided
+        // Build the GraphQL query based on whether author is provided
         if ($author) {
-            $whereClause = '
-                _and: [
-                    {title: {_ilike: $title}}
-                    {contributions: {author: {name: {_ilike: $author}}}}
-                ]
-            ';
-        } else {
-            $whereClause = 'title: {_ilike: $title}';
-        }
-
-        $query = "
-            query SearchBooks(\$title: String!, \$author: String, \$limit: Int!) {
-                books(
-                    where: {
-                        $whereClause
-                    },
-                    limit: \$limit
-                ) {
-                    id
-                    title
-                    subtitle
-                    description
-                    release_date
-                    cover_image_url: cover_image_url(size: LARGE)
-                    genres {
-                        genre {
-                            name
+            $query = '
+                query SearchBooks($title: String!, $author: String!, $limit: Int!) {
+                    books(
+                        where: {
+                            _and: [
+                                {title: {_ilike: $title}}
+                                {contributions: {author: {name: {_ilike: $author}}}}
+                            ]
+                        },
+                        limit: $limit
+                    ) {
+                        id
+                        title
+                        subtitle
+                        description
+                        release_date
+                        cover_image_url: cover_image_url(size: LARGE)
+                        genres {
+                            genre {
+                                name
+                            }
                         }
-                    }
-                    authors: contributions(where: {role: {_eq: \"AUTHOR\"}}) {
-                        author {
-                            name
-                            id
+                        authors: contributions(where: {role: {_eq: "AUTHOR"}}) {
+                            author {
+                                name
+                                id
+                            }
                         }
                     }
                 }
-            }
-        ";
-
-        $variables = [
-            'title' => "%$title%",
-            'author' => $author ? "%$author%" : null,
-            'limit' => $limit,
-        ];
+            ';
+            $variables = [
+                'title' => "%$title%",
+                'author' => "%$author%",
+                'limit' => $limit,
+            ];
+        } else {
+            $query = '
+                query SearchBooks($title: String!, $limit: Int!) {
+                    books(
+                        where: {
+                            title: {_ilike: $title}
+                        },
+                        limit: $limit
+                    ) {
+                        id
+                        title
+                        subtitle
+                        description
+                        release_date
+                        cover_image_url: cover_image_url(size: LARGE)
+                        genres {
+                            genre {
+                                name
+                            }
+                        }
+                        authors: contributions(where: {role: {_eq: "AUTHOR"}}) {
+                            author {
+                                name
+                                id
+                            }
+                        }
+                    }
+                }
+            ';
+            $variables = [
+                'title' => "%$title%",
+                'limit' => $limit,
+            ];
+        }
 
         \Illuminate\Support\Facades\Log::debug('Making search request', [
             'query' => $query,
