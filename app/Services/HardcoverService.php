@@ -163,6 +163,12 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
         $author = $options['author'] ?? null;
         $limit = $options['limit'] ?? 5;
 
+        \Illuminate\Support\Facades\Log::info('HardcoverService: performSearch called', [
+            'title' => $title,
+            'author' => $author,
+            'limit' => $limit,
+        ]);
+
         // Build the where clause based on whether author is provided
         if ($author) {
             $whereClause = '
