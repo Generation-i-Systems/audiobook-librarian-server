@@ -176,8 +176,8 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
                     books(
                         where: {
                             _and: [
-                                {title: {_ilike: $title}}
-                                {contributions: {author: {name: {_ilike: $author}}}}
+                                {title: {_regex: $title}}
+                                {contributions: {author: {name: {_regex: $author}}}}
                             ]
                         },
                         limit: $limit
@@ -202,9 +202,10 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
                     }
                 }
             ';
+            // Regex pattern for case-insensitive partial match ((?i) = case insensitive)
             $variables = [
-                'title' => "%$title%",
-                'author' => "%$author%",
+                'title' => "(?i)$title",
+                'author' => "(?i)$author",
                 'limit' => $limit,
             ];
         } else {
@@ -212,7 +213,7 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
                 query SearchBooks($title: String!, $limit: Int!) {
                     books(
                         where: {
-                            title: {_ilike: $title}
+                            title: {_regex: $title}
                         },
                         limit: $limit
                     ) {
@@ -236,8 +237,9 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
                     }
                 }
             ';
+            // Regex pattern for case-insensitive partial match ((?i) = case insensitive)
             $variables = [
-                'title' => "%$title%",
+                'title' => "(?i)$title",
                 'limit' => $limit,
             ];
         }
