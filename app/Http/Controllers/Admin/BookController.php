@@ -6,8 +6,10 @@ use App\Contracts\DocumentStoreServiceInterface;
 use App\Events\NewBookAdded;
 use App\Http\Controllers\Controller;
 use App\Services\AudibleService;
+use App\Services\AudiobookBayService;
 use App\Services\ExternalCoverService;
 use App\Services\GoogleBooksApiService;
+use App\Services\HardcoverService;
 use App\Traits\BookImportTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -1713,9 +1715,45 @@ class BookController extends Controller
                     $results = $this->googleBooksApiService->searchBooks($query, ['limit' => $limit]);
                     break;
 
+                case 'audiobookbay':
+                    $audiobookBayService = app(AudiobookBayService::class);
+                    if ($apiId) {
+                        $bookDetails = $audiobookBayService->getBookDetails($apiId);
+                        if ($bookDetails) {
+                            $results[] = $bookDetails;
+                        }
+                    } else {
+                        $searchQuery = trim($title . ' ' . $author);
+                        $searchResults = $audiobookBayService->searchBooks($searchQuery, ['limit' => $limit]);
+                        $results = is_array($searchResults) ? $searchResults : [];
+                    }
+                    break;
+
+                case 'hardcover':
+                    $hardcoverService = app(HardcoverService::class);
+                    if (!$hardcoverService->isAvailable()) {
+                        return response()->json([
+                            'error' => 'Hardcover service is not configured. Please set HARDCOVER_API_KEY in your .env file.',
+                        ], 400);
+                    }
+
+                    if ($apiId) {
+                        $bookDetails = $hardcoverService->getBookDetails($apiId);
+                        if ($bookDetails) {
+                            $results[] = $bookDetails;
+                        }
+                    } else {
+                        $searchResults = $hardcoverService->searchBooks($title, [
+                            'author' => $author,
+                            'limit' => $limit,
+                        ]);
+                        $results = is_array($searchResults) ? $searchResults : [];
+                    }
+                    break;
+
                 default:
                     return response()->json([
-                        'error' => 'Invalid source specified. Supported sources: audible, googlebooks',
+                        'error' => 'Invalid source specified. Supported sources: audible, googlebooks, audiobookbay, hardcover',
                     ], 400);
             }
 
