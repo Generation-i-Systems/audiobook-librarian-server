@@ -1656,10 +1656,10 @@ $(function () {
             performAutofillSearch("hardcover", false);
         });
         
-        // Handle search all button
+        // Handle search all button (excludes AudiobookBay due to performance)
         $("#search-all-btn").on("click", function(e) {
             e.preventDefault();
-            performAutofillSearch(["audible", "google", "audiobookbay", "hardcover"], false);
+            performAutofillSearch(["audible", "google", "hardcover"], false);
         });
         
         // Handle the apply button click
