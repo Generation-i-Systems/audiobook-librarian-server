@@ -162,16 +162,26 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
         $title = $query;
         $author = $options['author'] ?? null;
         $limit = $options['limit'] ?? 5;
-        $query = '
-            query SearchBooks($title: String!, $author: String, $limit: Int!) {
+
+        // Build the where clause based on whether author is provided
+        if ($author) {
+            $whereClause = '
+                _and: [
+                    {title: {_ilike: $title}}
+                    {contributions: {author: {name: {_ilike: $author}}}}
+                ]
+            ';
+        } else {
+            $whereClause = 'title: {_ilike: $title}';
+        }
+
+        $query = "
+            query SearchBooks(\$title: String!, \$author: String, \$limit: Int!) {
                 books(
                     where: {
-                        title: {_ilike: $title}
-                        _or: [
-                            {contributions: {author: {name: {_ilike: $author}}}}
-                        ]
+                        $whereClause
                     },
-                    limit: $limit
+                    limit: \$limit
                 ) {
                     id
                     title
@@ -184,14 +194,15 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
                             name
                         }
                     }
-                    authors: contributions(where: {role: {_eq: "AUTHOR"}}) {
+                    authors: contributions(where: {role: {_eq: \"AUTHOR\"}}) {
                         author {
                             name
+                            id
                         }
                     }
                 }
             }
-        ';
+        ";
 
         $variables = [
             'title' => "%$title%",
