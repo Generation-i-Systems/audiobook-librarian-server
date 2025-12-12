@@ -2455,54 +2455,105 @@ class ImportBooksFromDownloads extends Command
 
     /**
      * Inherit primary genre from existing books in the same series by the same author
+     * Falls back to genre from any book by the same author if no series match found
      */
     protected function inheritGenreFromSeries(array &$metadata): void
     {
-        // Only proceed if we have series and author
-        if (empty($metadata['series']) || empty($metadata['author'])) {
+        // Skip if genre is already set to something other than "General Fiction"
+        $currentGenre = is_array($metadata['genre']) ? ($metadata['genre'][0] ?? '') : ($metadata['genre'] ?? '');
+        $normalizedGenre = $this->normalizeGenreName($currentGenre);
+
+        if (!empty($currentGenre) && $normalizedGenre !== 'General Fiction' && $normalizedGenre !== 'Fiction') {
+            if ($this->isOptionEnabled('verbose')) {
+                $this->line("  Skipping genre inheritance - already have specific genre: {$currentGenre}");
+            }
+            return;
+        }
+
+        // Only proceed if we have author
+        if (empty($metadata['author'])) {
             return;
         }
 
         $authors = is_array($metadata['author']) ? $metadata['author'] : [$metadata['author']];
-        $seriesName = $metadata['series'];
+        $seriesName = $metadata['series'] ?? null;
 
-        // DEBUG: Show what we're searching for
-        $this->line("  DEBUG: Looking for series '{$seriesName}' by " . implode(', ', $authors));
-
-        // Find existing books in this series by this author
-        $existingBook = Book::whereHas('series', function ($query) use ($seriesName) {
-            $query->where('name', $seriesName);
-        })->whereHas('authors', function ($query) use ($authors) {
-            $query->whereIn('name', $authors);
-        })->with('genres')->first();
-
-        if ($existingBook) {
-            $this->line("  DEBUG: Found book ID {$existingBook->id}: {$existingBook->title}");
-            if ($existingBook->genres->isNotEmpty()) {
-                // Get primary genre, or first genre if no primary is set
-                $primaryGenre = $existingBook->genres->where('pivot.is_primary', true)->first();
-                if (!$primaryGenre) {
-                    // If no primary genre, use the first one (if there's only one, it's implicitly primary)
-                    $primaryGenre = $existingBook->genres->first();
-                }
-
-                if ($primaryGenre) {
-                    $primaryGenreName = $primaryGenre->name;
-                    $oldGenre = is_array($metadata['genre']) ? $metadata['genre'][0] : $metadata['genre'];
-
-                    $this->line("  DEBUG: Primary genre: {$primaryGenreName}, Current genre: {$oldGenre}");
-
-                    if ($oldGenre !== $primaryGenreName) {
-                        $metadata['genre'] = $primaryGenreName;
-                        $this->line("  ℹ️  Inherited genre '{$primaryGenreName}' from existing series books (was: '{$oldGenre}')");
-                    }
-                }
+        if ($this->isOptionEnabled('verbose')) {
+            if ($seriesName) {
+                $this->line("  Looking for genre from series '{$seriesName}' by " . implode(', ', $authors));
             } else {
-                $this->line("  DEBUG: Book has no genres");
+                $this->line("  Looking for genre from other books by " . implode(', ', $authors));
             }
-        } else {
-            $this->line("  DEBUG: No existing books found in this series");
         }
+
+        $existingBook = null;
+
+        // First, try to find books in the same series by this author
+        if ($seriesName) {
+            $existingBook = Book::whereHas('series', function ($query) use ($seriesName) {
+                $query->where('name', $seriesName);
+            })->whereHas('authors', function ($query) use ($authors) {
+                $query->whereIn('name', $authors);
+            })->with('genres')->first();
+
+            if ($existingBook && $this->isOptionEnabled('verbose')) {
+                $this->line("  Found series book ID {$existingBook->id}: {$existingBook->title}");
+            }
+        }
+
+        // If no series match, try to find ANY book by this author
+        if (!$existingBook) {
+            $existingBook = Book::whereHas('authors', function ($query) use ($authors) {
+                $query->whereIn('name', $authors);
+            })->with('genres')->first();
+
+            if ($existingBook && $this->isOptionEnabled('verbose')) {
+                $this->line("  Found author book ID {$existingBook->id}: {$existingBook->title}");
+            }
+        }
+
+        if ($existingBook && $existingBook->genres->isNotEmpty()) {
+            // Get primary genre, or first genre if no primary is set
+            $primaryGenre = $existingBook->genres->where('pivot.is_primary', true)->first();
+            if (!$primaryGenre) {
+                // If no primary genre, use the first one (if there's only one, it's implicitly primary)
+                $primaryGenre = $existingBook->genres->first();
+            }
+
+            if ($primaryGenre) {
+                $primaryGenreName = $primaryGenre->name;
+                $oldGenre = is_array($metadata['genre']) ? ($metadata['genre'][0] ?? '') : ($metadata['genre'] ?? '');
+
+                if ($this->isOptionEnabled('verbose')) {
+                    $this->line("  Primary genre from existing book: {$primaryGenreName}, Current genre: {$oldGenre}");
+                }
+
+                // Only inherit if the old genre was "General Fiction" or empty
+                $normalizedOld = $this->normalizeGenreName($oldGenre);
+                if (empty($oldGenre) || $normalizedOld === 'General Fiction' || $normalizedOld === 'Fiction') {
+                    $metadata['genre'] = $primaryGenreName;
+                    $inheritSource = $seriesName ? "series" : "author's other books";
+                    $this->info("  ✓ Inherited genre '{$primaryGenreName}' from {$inheritSource} (was: '{$oldGenre}')");
+                }
+            }
+        } elseif ($this->isOptionEnabled('verbose')) {
+            if ($existingBook) {
+                $this->line("  Existing book has no genres");
+            } else {
+                $this->line("  No existing books found by this author");
+            }
+        }
+    }
+
+    /**
+     * Normalize genre name for comparison
+     */
+    protected function normalizeGenreName(string $genre): string
+    {
+        $genre = trim($genre);
+        // Remove common variations
+        $genre = preg_replace('/\s+/', ' ', $genre);
+        return $genre;
     }
 
     /**
@@ -3002,12 +3053,27 @@ class ImportBooksFromDownloads extends Command
             $this->line("2. (E)dit individual fields");
             $this->line("3. (P)ath - edit directory path only");
             $this->line("4. (C)over - edit cover image URL only");
-            $this->line("5. (S)kip this book");
+            $this->line("5. (G)enre - change genre only");
+            $this->line("6. (S)kip this book");
 
-            // Default to accept all if confidence is over 80%, otherwise default to edit
+            // Default logic:
+            // - If genre is "General Fiction", default to genre change (5)
+            // - Otherwise, if confidence > 80%, default to accept (1)
+            // - Otherwise, default to edit (2)
             $confidence = $metadata['confidence'] ?? 0;
-            $defaultChoice = $confidence > 80 ? '1' : '2';
-            $confidenceNote = $confidence > 80 ? " (high confidence: {$confidence}%)" : " (confidence: {$confidence}%)";
+            $currentGenre = is_array($metadata['genre']) ? ($metadata['genre'][0] ?? '') : ($metadata['genre'] ?? '');
+            $normalizedGenre = $this->normalizeGenreName($currentGenre);
+
+            if ($normalizedGenre === 'General Fiction' || $normalizedGenre === 'Fiction') {
+                $defaultChoice = '5';  // Change genre
+                $confidenceNote = " (genre is generic - consider changing)";
+            } elseif ($confidence > 80) {
+                $defaultChoice = '1';  // Accept
+                $confidenceNote = " (high confidence: {$confidence}%)";
+            } else {
+                $defaultChoice = '2';  // Edit
+                $confidenceNote = " (confidence: {$confidence}%)";
+            }
 
             // Prepare background tasks for potential next books
             $backgroundTasks = [
@@ -3015,7 +3081,7 @@ class ImportBooksFromDownloads extends Command
                 ['type' => 'duplicate_check', 'data' => $audiobook],
             ];
 
-            $choice = $this->askWithBackground("Choose an option (1-5)", $defaultChoice, $backgroundTasks);
+            $choice = $this->askWithBackground("Choose an option (1-6)", $defaultChoice, $backgroundTasks);
 
             // Normalize choice to handle letters
             $choice = strtolower(trim($choice));
@@ -3031,13 +3097,16 @@ class ImportBooksFromDownloads extends Command
             if (in_array($choice, ['c', 'cover'])) {
                 $choice = '4';
             }
-            if (in_array($choice, ['s', 'skip'])) {
+            if (in_array($choice, ['g', 'genre'])) {
                 $choice = '5';
             }
+            if (in_array($choice, ['s', 'skip'])) {
+                $choice = '6';
+            }
 
-            $validChoices = ['1', '2', '3', '4', '5'];
+            $validChoices = ['1', '2', '3', '4', '5', '6'];
             while (!in_array($choice, $validChoices, true)) {
-                $choice = strtolower(trim($this->ask("Invalid option. Please choose 1-5 (or press Enter for default {$defaultChoice}{$confidenceNote}):")));
+                $choice = strtolower(trim($this->ask("Invalid option. Please choose 1-6 (or press Enter for default {$defaultChoice}{$confidenceNote}):")));
                 if ($choice === '') {
                     $choice = $defaultChoice;
                     break;
@@ -3050,8 +3119,10 @@ class ImportBooksFromDownloads extends Command
                     $choice = '3';
                 } elseif (in_array($choice, ['c', 'cover'], true)) {
                     $choice = '4';
-                } elseif (in_array($choice, ['s', 'skip'], true)) {
+                } elseif (in_array($choice, ['g', 'genre'], true)) {
                     $choice = '5';
+                } elseif (in_array($choice, ['s', 'skip'], true)) {
+                    $choice = '6';
                 }
             }
 
@@ -3073,6 +3144,12 @@ class ImportBooksFromDownloads extends Command
                     }
                     return true;
                 case '5':
+                    $metadata = $this->editGenreOnly($metadata, $audiobook);
+                    if ($this->inputInterrupted) {
+                        return false;
+                    }
+                    return true;
+                case '6':
                     return false;
             }
         }
@@ -4072,6 +4149,63 @@ class ImportBooksFromDownloads extends Command
 
             // Show updated metadata
             $this->newLine();
+            $this->displayEnrichedMetadata($metadata);
+        }
+
+        return $metadata;
+    }
+
+    /**
+     * Edit genre only
+     */
+    protected function editGenreOnly(array $metadata, array $audiobook): array
+    {
+        $this->newLine();
+        $this->info("📚 Change Genre");
+
+        $currentGenre = is_array($metadata['genre']) ? implode(', ', $metadata['genre']) : ($metadata['genre'] ?? '');
+        $this->line("Current genre: {$currentGenre}");
+
+        // Get list of all genres from database for suggestions
+        $allGenres = Genre::orderBy('name')->pluck('name')->toArray();
+        if (!empty($allGenres)) {
+            $this->newLine();
+            $this->line("Available genres:");
+            $chunks = array_chunk($allGenres, 4);
+            foreach ($chunks as $chunk) {
+                $this->line("  " . implode(', ', $chunk));
+            }
+            $this->newLine();
+        }
+
+        $newGenre = $this->askWithImmediateInterrupt("Genre", $currentGenre);
+        if ($this->inputInterrupted) {
+            return $metadata;
+        }
+
+        // Handle ' ' as a special value meaning "blank/clear this field"
+        if ($newGenre === ' ') {
+            $newGenre = '';
+        } else {
+            $newGenre = trim($newGenre);
+        }
+
+        if ($newGenre !== $currentGenre) {
+            if (empty($newGenre)) {
+                $metadata['genre'] = 'General Fiction';  // Default to General Fiction if cleared
+                $this->info("✓ Genre cleared - defaulting to: General Fiction");
+            } else {
+                $metadata['genre'] = $newGenre;
+                $this->info("✓ Genre updated to: {$newGenre}");
+            }
+
+            // Clear and regenerate custom_directory_path since genre affects path
+            unset($metadata['custom_directory_path']);
+            $newPath = $this->getImportService()->generateDirectoryPath($metadata, ['include_title' => true]);
+
+            // Show updated metadata
+            $this->newLine();
+            $this->info("📁 Updated directory path: {$newPath}");
             $this->displayEnrichedMetadata($metadata);
         }
 
