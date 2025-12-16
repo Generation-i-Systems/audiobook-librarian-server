@@ -222,6 +222,8 @@ class ShowBookInfo extends Command
     protected function showBookFromDirectory(string $directory): void
     {
         $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
+        // Resolve symlinks in book root for consistent path handling
+        $bookRoot = realpath($bookRoot) ?: $bookRoot;
         $searchPath = $directory;
 
         if (str_starts_with($directory, $bookRoot)) {
@@ -364,6 +366,8 @@ class ShowBookInfo extends Command
             $coverPath = $book->coverImage;
             if (!str_starts_with($coverPath, 'http')) {
                 $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
+                // Resolve symlinks in book root for consistent path handling
+                $bookRoot = realpath($bookRoot) ?: $bookRoot;
                 $coverPath = $bookRoot . '/' . ltrim($coverPath, '/');
             }
             if (!file_exists($coverPath) && !str_starts_with($book->coverImage, 'http')) {
@@ -453,6 +457,8 @@ class ShowBookInfo extends Command
 
         // Check if directory exists on disk
         $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
+        // Resolve symlinks in book root for consistent path handling
+        $bookRoot = realpath($bookRoot) ?: $bookRoot;
         $fullPath = $bookRoot . '/' . ltrim($directoryPath, '/');
         // Use file_exists and is_dir together, and check that it's readable
         $directoryExists = file_exists($fullPath) && is_dir($fullPath) && is_readable($fullPath);
@@ -607,6 +613,8 @@ class ShowBookInfo extends Command
             $coverPath = $book->coverImage;
             if (!str_starts_with($coverPath, 'http')) {
                 $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
+                // Resolve symlinks in book root for consistent path handling
+                $bookRoot = realpath($bookRoot) ?: $bookRoot;
                 $coverPath = $bookRoot . '/' . ltrim($coverPath, '/');
             }
             if (file_exists($coverPath) || str_starts_with($book->coverImage, 'http')) {
@@ -661,6 +669,8 @@ class ShowBookInfo extends Command
         // Check if directory exists on disk
         $directoryPath = $book->directoryPath ?? 'N/A';
         $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
+        // Resolve symlinks in book root for consistent path handling
+        $bookRoot = realpath($bookRoot) ?: $bookRoot;
         $fullPath = $bookRoot . '/' . ltrim($directoryPath, '/');
         // Use file_exists and is_dir together, and check that it's readable
         $directoryExists = file_exists($fullPath) && is_dir($fullPath) && is_readable($fullPath);
@@ -880,6 +890,8 @@ class ShowBookInfo extends Command
     {
         $updated = false;
         $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
+        // Resolve symlinks in book root for consistent path handling
+        $bookRoot = realpath($bookRoot) ?: $bookRoot;
 
         // Update cover image
         if ($this->option('cover')) {
@@ -1260,6 +1272,8 @@ class ShowBookInfo extends Command
 
         // Check if directory exists
         $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
+        // Resolve symlinks in book root for consistent path handling
+        $bookRoot = realpath($bookRoot) ?: $bookRoot;
         $fullPath = $bookRoot . '/' . ltrim($book->directoryPath, '/');
         $directoryExists = file_exists($fullPath) && is_dir($fullPath);
 
