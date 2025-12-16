@@ -211,8 +211,8 @@ class ImportFileController extends Controller
                     // Check if the directory contains any files with allowed extensions
                     $hasMatchingFiles = collect(File::files($d))
                         ->filter(function ($f) use ($allowedExtensions) {
-                            return in_array(strtolower($f->getExtension()), $allowedExtensions);
-                        })
+                        return in_array(strtolower($f->getExtension()), $allowedExtensions);
+                    })
                         ->isNotEmpty();
 
                     return $hasMatchingFiles;
@@ -356,7 +356,13 @@ class ImportFileController extends Controller
             // Determine the appropriate genre path based on existing genres
             $genrePath = $this->determineGenrePath($meta);
             if ($genrePath === null) {
-                Log::debug('[ImportFile] Genre could not be determined automatically; user input required');
+                $defaultGenrePath = session('import_default_genre_path');
+                if (is_string($defaultGenrePath) && $defaultGenrePath !== '') {
+                    $genrePath = $defaultGenrePath;
+                    Log::debug('[ImportFile] Using session default genre path', ['genrePath' => $genrePath]);
+                } else {
+                    Log::debug('[ImportFile] Genre could not be determined automatically; user input required');
+                }
             } else {
                 Log::debug("[ImportFile] Determined genre path: {$genrePath}");
             }
@@ -440,7 +446,7 @@ class ImportFileController extends Controller
                 'root' => $root,
                 'path' => $relPath,
                 'type' => $type,
-                'redirectToForm' => false
+                'redirectToForm' => false,
             ]);
 
             $regularResponse = $this->extract($regularExtractionRequest);
@@ -516,7 +522,7 @@ class ImportFileController extends Controller
 
                     Log::info("[ImportFile] AI enhancement low confidence", [
                         'model' => $aiModel,
-                        'confidence' => $aiMetadata['confidence']
+                        'confidence' => $aiMetadata['confidence'],
                     ]);
                 }
             } catch (\Exception $e) {
@@ -705,8 +711,10 @@ class ImportFileController extends Controller
      */
     private function determineGenrePath(array $meta): ?string
     {
-        // Get the library root directory from environment variable
-        $libraryRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
+        $libraryRoot = rtrim((string) config('app.book_root', ''), '/');
+        if ($libraryRoot === '') {
+            $libraryRoot = rtrim((string) env('BOOK_STORAGE_PATH', ''), '/');
+        }
         if (!is_dir($libraryRoot)) {
             Log::warning('[ImportFile] Library root directory not found', [
                 'path' => $libraryRoot,
@@ -799,7 +807,7 @@ class ImportFileController extends Controller
             if (count($topGenres) > 1) {
                 // Rule 3: Use the one with the most books
                 $mostBooks = 0;
-                $bestGenre = $defaultGenre;
+                $bestGenre = $topGenres[0] ?? null;
 
                 foreach ($topGenres as $genre) {
                     if ($genreBookCounts[$genre] > $mostBooks) {
@@ -1473,7 +1481,10 @@ class ImportFileController extends Controller
     {
         try {
             // Get the book storage root
-            $bookStorageRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
+            $bookStorageRoot = rtrim((string) config('app.book_root', ''), '/');
+            if ($bookStorageRoot === '') {
+                $bookStorageRoot = rtrim((string) env('BOOK_STORAGE_PATH', ''), '/');
+            }
             if (!$bookStorageRoot || !is_dir($bookStorageRoot)) {
                 Log::error('[ImportFile] Book storage path not found or invalid', [
                     'path' => $bookStorageRoot,
@@ -1601,7 +1612,11 @@ class ImportFileController extends Controller
             return response()->json(['success' => false, 'message' => 'File or directory does not exist'], 404);
         }
 
-        $destRoot = env('BOOK_STORAGE_PATH') ?? Config::get('audiobooks.root') ?? Config::get('import.dest_root') ?? storage_path('audiobooks');
+        $destRoot = config('app.book_root')
+            ?? env('BOOK_STORAGE_PATH')
+            ?? Config::get('audiobooks.root')
+            ?? Config::get('import.dest_root')
+            ?? storage_path('audiobooks');
 
         $genrePath = $request->input('genrePath', $request->input('genre'));
 
@@ -1763,11 +1778,13 @@ class ImportFileController extends Controller
      *
      * @param  array  $meta  Extracted metadata
      * @param  string  $directoryPath  Composed directory path
-     * @param  string  $genrePath  Determined genre path
+     * @param  string|null  $genrePath  Determined genre path
      * @return array Form data for URL parameters
      */
-    protected function prepareFormDataForRedirect(array $meta, string $directoryPath, string $genrePath): array
+    protected function prepareFormDataForRedirect(array $meta, string $directoryPath, ?string $genrePath): array
     {
+        $resolvedGenrePath = $genrePath ?? 'Other';
+
         $formData = [
             'title' => $meta['title'] ?? '',
             'description' => $meta['description'] ?? '',
@@ -1776,7 +1793,7 @@ class ImportFileController extends Controller
             'isbn' => $meta['isbn'] ?? '',
             'asin' => $meta['asin'] ?? '',
             'directoryPath' => $directoryPath,
-            'genrePath' => $genrePath,
+            'genrePath' => $resolvedGenrePath,
             'sourcePath' => $meta['sourcePath'] ?? '',
             'sourceRoot' => $meta['sourceRoot'] ?? '',
             'sourceRelPath' => $meta['sourceRelPath'] ?? '',
@@ -1808,13 +1825,13 @@ class ImportFileController extends Controller
 
         // Handle genres as array - prefer genrePath over generic audio metadata genres
         $audioGenre = $meta['genre'] ?? '';
-        $intelligentGenre = $genrePath ?? 'Other';
+        $intelligentGenre = $resolvedGenrePath;
 
         // Use genrePath if audio genre is generic/unhelpful, otherwise use audio metadata
         $genericAudioGenres = ['Audiobook', 'Audio', 'Spoken Word', 'Book', 'Literature', 'Other'];
         if (
             !empty($intelligentGenre) && $intelligentGenre !== 'Other' &&
-            (empty($audioGenre) || in_array($audioGenre, $genericAudioGenres))
+            (empty($audioGenre) || in_array($audioGenre, $genericAudioGenres, true))
         ) {
             $genre = $intelligentGenre;
         } else {

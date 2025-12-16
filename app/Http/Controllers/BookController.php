@@ -520,22 +520,24 @@ class BookController extends Controller
             return url($coverImage);
         }
 
-        // Handle relative paths that might need directory path prefix
-        $finalCoverPath = $coverImage;
-        $bookStoragePath = env('BOOK_STORAGE_PATH', '/media/audiobooks/books');
+        // Handle relative paths: always prefer directoryPath + basename when available.
+        $coverFilename = basename($coverImage);
 
-        // If we have a directory path and the cover image doesn't contain it
-        if (!empty($directoryPath) && !Str::contains($coverImage, $directoryPath)) {
-            // Check if the file exists without directory path
-            $coverWithoutDir = rtrim($bookStoragePath, '/') . '/' . ltrim($coverImage, '/');
-            $coverWithDir = rtrim($bookStoragePath, '/') . '/' . ltrim($directoryPath, '/') . '/' . ltrim($coverImage, '/');
+        $finalCoverPath = $coverFilename;
+        if (!empty($directoryPath)) {
+            $directoryPath = trim((string) $directoryPath, '/');
 
-            // If file doesn't exist without directory but does exist with directory, use directory version
-            if (!file_exists($coverWithoutDir) && file_exists($coverWithDir)) {
-                $finalCoverPath = $directoryPath . '/' . $coverImage;
+            if ($directoryPath !== '') {
+                if (Str::contains($coverImage, $directoryPath . '/')) {
+                    $finalCoverPath = trim($coverImage, '/');
+                } else {
+                    $finalCoverPath = $directoryPath . '/' . $coverFilename;
+                }
             }
         }
 
-        return route('cover.proxy', ['path' => rawurlencode($finalCoverPath)]);
+        $encodedPath = str_replace(['%2F'], ['/'], rawurlencode($finalCoverPath));
+
+        return url('/cover/' . $encodedPath);
     }
 }

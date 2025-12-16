@@ -1702,6 +1702,11 @@ class BookApiController extends Controller
             }
         }
 
+        $resolvedCoverPath = null;
+        if (!empty($book['coverImage'])) {
+            $resolvedCoverPath = $this->resolveCoverImagePath($book['coverImage'], $book['directoryPath'] ?? null);
+        }
+
         // Build the manifest
         $manifest = [
             'book_id' => $id,
@@ -1710,12 +1715,12 @@ class BookApiController extends Controller
             'series' => $book['series_name'] ?? '',
             'series_number' => $book['series_number'] ?? null,
             'total_duration_seconds' => $totalDuration,
-            'cover_included' => !empty($book['coverImage']) && Storage::disk('books')->exists($book['coverImage']),
+            'cover_included' => !empty($resolvedCoverPath) && Storage::disk('books')->exists($resolvedCoverPath),
             'format' => 'zip',
             'chapters' => $chapters,
             'has_audio' => $hasAudio,
             'total_chapters' => count($chapters),
-            'total_files' => count($chapters) + ($book['coverImage'] ? 1 : 0),
+            'total_files' => count($chapters) + (!empty($book['coverImage']) ? 1 : 0),
         ];
 
         return response()->json($manifest);
