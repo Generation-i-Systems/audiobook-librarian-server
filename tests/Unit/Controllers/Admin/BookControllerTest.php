@@ -205,7 +205,7 @@ class BookControllerTest extends TestCase
         Log::debug('Google Books test response', [
             'status' => $response->getStatusCode(),
             'content' => $response->getContent(),
-            'responseData' => $responseData
+            'responseData' => $responseData,
         ]);
 
         $this->assertIsArray($responseData);
@@ -507,7 +507,7 @@ class BookControllerTest extends TestCase
         $this->documentStore->shouldReceive('findOrCreateMany')
             ->with('authors', ['Test Author'])
             ->once()
-            ->andReturn([['id' => 'author-1', 'name' => 'Test Author']]);
+            ->andReturn(['author-id-1']);
 
         $this->documentStore->shouldReceive('findOrCreateMany')
             ->with('narrators', [])
@@ -517,7 +517,7 @@ class BookControllerTest extends TestCase
         $this->documentStore->shouldReceive('findOrCreateMany')
             ->with('genres', ['Test Genre'])
             ->once()
-            ->andReturn([['id' => 'genre-1', 'name' => 'Test Genre']]);
+            ->andReturn(['genre-id-1']);
 
         // Call the store method
         $response = $this->controller->store($request, $this->importFileController);
@@ -528,6 +528,8 @@ class BookControllerTest extends TestCase
         // Get the stored book to verify the redirect URL
         $this->assertNotEmpty($this->storedBooks, 'No books were stored');
         $book = reset($this->storedBooks);
+
+        $bookId = $book['id'];
 
         // Assert the redirect is to the book's edit page
         $this->assertEquals(route('admin.books.edit', $book['id']), $response->getTargetUrl());
@@ -541,17 +543,6 @@ class BookControllerTest extends TestCase
         $this->assertEquals('cover.jpg', $book['cover']->getClientOriginalName());
         $this->assertEquals('image/jpeg', $book['cover']->getMimeType());
 
-        // Note: NewBookAdded event is not dispatched in the store method, only in processImport
-    }
-
-    #[\PHPUnit\Framework\Attributes\Test]
-    public function testUpdateMethodUpdatesBook()
-    {
-        // Initialize session for the test
-        $this->startSession();
-
-        $bookId = 'test-book-id';
-
         // Create a request with updated book data
         $request = new Request([
             'title' => 'Updated Title',
@@ -559,7 +550,7 @@ class BookControllerTest extends TestCase
             'narrator' => ['Updated Narrator'],
             'genre' => ['Updated Genre'],
             'series' => [
-                ['seriesName' => 'Updated Series', 'number' => '1']
+                ['seriesName' => 'Updated Series', 'number' => '1'],
             ],
             'description' => 'Updated description',
             'sourceType' => 'file',
@@ -631,6 +622,77 @@ class BookControllerTest extends TestCase
         // Flash messages are tested in feature tests where session handling works properly
     }
 
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function testUpdateMethodMergesSplitSeriesPayload(): void
+    {
+        $bookId = 'test-book-id';
+
+        $request = new Request([
+            'title' => 'The Thief',
+            'author' => ['J.R. Ward'],
+            'narrator' => ['Jim Frangione'],
+            'genre' => ['Romance'],
+            'series' => [
+                ['number' => '16'],
+                ['seriesName' => 'The Black Dagger Brotherhood'],
+            ],
+            'description' => 'Updated description',
+            'directoryPath' => 'Romance/J.R. Ward/Black Dagger Brotherhood/16 The Thief',
+        ]);
+        $request->setLaravelSession($this->app['session.store']);
+
+        $this->documentStore->shouldReceive('getBook')
+            ->with($bookId)
+            ->once()
+            ->andReturn([
+                'id' => $bookId,
+                'title' => 'The Thief',
+                'author' => ['J.R. Ward'],
+                'genre' => ['Romance'],
+                'directoryPath' => 'Romance/J.R. Ward/Black Dagger Brotherhood/16 The Thief',
+            ]);
+
+        $this->documentStore->shouldReceive('findOrCreateMany')
+            ->with('authors', ['J.R. Ward'])
+            ->once()
+            ->andReturn(['author-id-1']);
+
+        $this->documentStore->shouldReceive('findOrCreateMany')
+            ->with('narrators', ['Jim Frangione'])
+            ->once()
+            ->andReturn(['narrator-id-1']);
+
+        $this->documentStore->shouldReceive('findOrCreateMany')
+            ->with('genres', ['Romance'])
+            ->once()
+            ->andReturn(['genre-id-1']);
+
+        $this->documentStore->shouldReceive('getSeriesByName')
+            ->with('The Black Dagger Brotherhood')
+            ->once()
+            ->andReturn(['id' => 'series-id-1', 'name' => 'The Black Dagger Brotherhood']);
+
+        $this->documentStore->shouldReceive('updateBook')
+            ->with($bookId, \Mockery::on(function ($payload) {
+                if (!is_array($payload)) {
+                    return false;
+                }
+                if (!isset($payload['series']) || !is_array($payload['series'])) {
+                    return false;
+                }
+
+                return count($payload['series']) === 1 &&
+                    ($payload['series'][0]['seriesName'] ?? null) === 'The Black Dagger Brotherhood' &&
+                    (string) ($payload['series'][0]['number'] ?? '') === '16';
+            }))
+            ->once()
+            ->andReturn(['success' => true]);
+
+        $response = $this->controller->update($request, $bookId);
+
+        $this->assertInstanceOf(\Illuminate\Http\RedirectResponse::class, $response);
+    }
+
     /**
      * Test the processImport method
      *
@@ -648,7 +710,7 @@ class BookControllerTest extends TestCase
             'author' => ['Test Author'],
             'narrator' => ['Test Narrator'],
             'series' => [
-                ['seriesName' => 'Test Series', 'number' => 1]
+                ['seriesName' => 'Test Series', 'number' => 1],
             ],
             'genre' => ['Test Genre'],
             'description' => 'Test description',
@@ -660,7 +722,7 @@ class BookControllerTest extends TestCase
             'import_path' => '/path/to/import',
             'import_root' => '/import/root',
             'import_type' => 'dir',
-            'genre_path' => 'Audiobooks/Test Genre',
+            'genre_path' => 'Test Genre',
         ];
 
         // Create a mock request with the book data
@@ -736,6 +798,9 @@ class BookControllerTest extends TestCase
         // Assert the response is a redirect to the edit page
         $this->assertEquals(302, $response->getStatusCode());
 
+        // Assert the selected genre is persisted for subsequent imports
+        $this->assertSame('Test Genre', session('import_default_genre_path'));
+
         // Check that the redirect URL contains the admin/books/{id}/edit pattern
         $location = $response->headers->get('Location');
         $this->assertMatchesRegularExpression(
@@ -749,8 +814,8 @@ class BookControllerTest extends TestCase
             NewBookAdded::class,
             function ($event) {
                 return isset($event->book['id']) &&
-                       isset($event->book['title']) &&
-                       $event->book['title'] === 'Test Book';
+                    isset($event->book['title']) &&
+                    $event->book['title'] === 'Test Book';
             }
         );
 

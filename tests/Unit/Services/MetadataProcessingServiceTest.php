@@ -288,6 +288,61 @@ class MetadataProcessingServiceTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
+    public function extractSeriesNumberFromTitleStripsBracketedSeriesSuffixAndQualifiers(): void
+    {
+        $metadata = [
+            'title' => 'Lover at Last [The Black Dagger Brotherhood #11] (Unabridged)',
+        ];
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('extractSeriesNumberFromTitle');
+        $method->setAccessible(true);
+
+        $method->invokeArgs($this->service, [&$metadata]);
+
+        $this->assertEquals('Lover at Last', $metadata['title']);
+        $this->assertEquals('The Black Dagger Brotherhood', $metadata['series']);
+        $this->assertEquals(11, $metadata['series_number']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function extractSeriesNumberFromTitleSupportsDecimalSeriesNumbers(): void
+    {
+        $metadata = [
+            'title' => 'Some Novella [Example Series #16.5] (Unabridged)',
+        ];
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('extractSeriesNumberFromTitle');
+        $method->setAccessible(true);
+
+        $method->invokeArgs($this->service, [&$metadata]);
+
+        $this->assertEquals('Some Novella', $metadata['title']);
+        $this->assertEquals('Example Series', $metadata['series']);
+        $this->assertEquals(16.5, $metadata['series_number']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function extractSeriesNumberFromTitleSanitizesTitleWhenSeriesNumberAlreadySet(): void
+    {
+        $metadata = [
+            'title' => 'Lover at Last [The Black Dagger Brotherhood #11] (Unabridged)',
+            'series_number' => 11,
+        ];
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('extractSeriesNumberFromTitle');
+        $method->setAccessible(true);
+
+        $method->invokeArgs($this->service, [&$metadata]);
+
+        $this->assertEquals('Lover at Last', $metadata['title']);
+        $this->assertEquals('The Black Dagger Brotherhood', $metadata['series']);
+        $this->assertEquals(11, $metadata['series_number']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
     public function detectMultiBookPatternRecognizesBooksRange(): void
     {
         $title = 'Honor Harrington Books 1-3';

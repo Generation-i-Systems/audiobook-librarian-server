@@ -9,6 +9,7 @@ use App\Models\Series;
 use App\Services\BookImportService;
 use App\Services\GenreMappingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
 class BookImportServiceTest extends TestCase
@@ -23,6 +24,23 @@ class BookImportServiceTest extends TestCase
 
         $genreMappingService = $this->app->make(GenreMappingService::class);
         $this->service = new BookImportService($genreMappingService);
+    }
+
+    private function createTempDirectory(string $prefix): string
+    {
+        $path = sys_get_temp_dir() . '/' . $prefix . '_' . uniqid('', true);
+        File::makeDirectory($path, 0775, true);
+
+        return $path;
+    }
+
+    private function createTempBook(): Book
+    {
+        return Book::create([
+            'title' => 'Test Book',
+            'directory_path' => 'Test/Path',
+            'language' => 'en',
+        ]);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
@@ -70,6 +88,22 @@ class BookImportServiceTest extends TestCase
         $path = $this->service->generateDirectoryPath($metadata, ['include_title' => true]);
 
         $this->assertStringContainsString('09 Book Nine', $path);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function generateDirectoryPathFormatsDecimalSeriesNumberWithPadding(): void
+    {
+        $metadata = [
+            'title' => 'Side Story',
+            'author' => ['Jane Smith'],
+            'genre' => 'Fantasy',
+            'series' => 'Epic Series',
+            'series_number' => 16.5,
+        ];
+
+        $path = $this->service->generateDirectoryPath($metadata, ['include_title' => true]);
+
+        $this->assertStringContainsString('16.5 Side Story', $path);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
@@ -264,5 +298,146 @@ class BookImportServiceTest extends TestCase
         unlink($audioFile);
         unlink($pdfFile);
         rmdir($tempDir);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function moveFilesToLibraryReturnsFalseWhenDestinationHasNoAudioFiles(): void
+    {
+        $sourceDir = $this->createTempDirectory('book_import_source');
+        $targetDir = $this->createTempDirectory('book_import_target');
+
+        try {
+            file_put_contents($sourceDir . '/notes.txt', 'not audio');
+
+            $book = $this->createTempBook();
+
+            $audiobook = [
+                'path' => $sourceDir,
+                'files' => [$sourceDir . '/notes.txt'],
+            ];
+
+            $result = $this->service->moveFilesToLibrary($audiobook, $book, [
+                'operation' => 'copy',
+                'target_directory' => $targetDir,
+            ]);
+
+            $this->assertFalse($result);
+        } finally {
+            File::deleteDirectory($sourceDir);
+            File::deleteDirectory($targetDir);
+        }
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function moveFilesToLibraryReusesExistingDirectoryWhenOnlyCoverExists(): void
+    {
+        $sourceDir = $this->createTempDirectory('book_import_source');
+        $targetDir = $this->createTempDirectory('book_import_target');
+
+        try {
+            file_put_contents($sourceDir . '/track01.mp3', 'audio');
+            file_put_contents($targetDir . '/cover.jpg', 'cover');
+
+            $book = $this->createTempBook();
+
+            $audiobook = [
+                'path' => $sourceDir,
+                'files' => [$sourceDir . '/track01.mp3'],
+            ];
+
+            $result = $this->service->moveFilesToLibrary($audiobook, $book, [
+                'operation' => 'copy',
+                'target_directory' => $targetDir,
+            ]);
+
+            $this->assertTrue($result);
+            $this->assertFileExists($targetDir . '/cover.jpg');
+            $this->assertFileExists($targetDir . '/track01.mp3');
+            $this->assertDirectoryDoesNotExist($targetDir . '_01');
+        } finally {
+            File::deleteDirectory($sourceDir);
+            File::deleteDirectory($targetDir);
+            File::deleteDirectory($targetDir . '_01');
+        }
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function moveFilesToLibraryReturnsTrueWhenDestinationHasAudioFiles(): void
+    {
+        $sourceDir = $this->createTempDirectory('book_import_source');
+        $targetDir = $this->createTempDirectory('book_import_target');
+
+        try {
+            file_put_contents($sourceDir . '/track01.mp3', 'audio');
+
+            $book = $this->createTempBook();
+
+            $audiobook = [
+                'path' => $sourceDir,
+                'files' => [$sourceDir . '/track01.mp3'],
+            ];
+
+            $result = $this->service->moveFilesToLibrary($audiobook, $book, [
+                'operation' => 'copy',
+                'target_directory' => $targetDir,
+            ]);
+
+            $this->assertTrue($result);
+        } finally {
+            File::deleteDirectory($sourceDir);
+            File::deleteDirectory($targetDir);
+        }
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function moveFilesToLibraryInPlaceReturnsFalseWhenSourceDirectoryHasNoAudioFiles(): void
+    {
+        $sourceDir = $this->createTempDirectory('book_import_source');
+
+        try {
+            file_put_contents($sourceDir . '/readme.txt', 'not audio');
+
+            $book = $this->createTempBook();
+
+            $audiobook = [
+                'path' => $sourceDir,
+                'files' => [$sourceDir . '/readme.txt'],
+            ];
+
+            $result = $this->service->moveFilesToLibrary($audiobook, $book, [
+                'operation' => 'move',
+                'target_directory' => $sourceDir,
+            ]);
+
+            $this->assertFalse($result);
+        } finally {
+            File::deleteDirectory($sourceDir);
+        }
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function moveFilesToLibraryInPlaceReturnsTrueWhenSourceDirectoryHasAudioFiles(): void
+    {
+        $sourceDir = $this->createTempDirectory('book_import_source');
+
+        try {
+            file_put_contents($sourceDir . '/book.m4b', 'audio');
+
+            $book = $this->createTempBook();
+
+            $audiobook = [
+                'path' => $sourceDir,
+                'files' => [$sourceDir . '/book.m4b'],
+            ];
+
+            $result = $this->service->moveFilesToLibrary($audiobook, $book, [
+                'operation' => 'move',
+                'target_directory' => $sourceDir,
+            ]);
+
+            $this->assertTrue($result);
+        } finally {
+            File::deleteDirectory($sourceDir);
+        }
     }
 }

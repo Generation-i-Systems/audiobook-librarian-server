@@ -93,6 +93,49 @@ class BookEnrichmentServiceTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
+    public function extractSeriesNumberFromTitleStripsBracketedSeriesSuffixAndQualifiers(): void
+    {
+        $metadata = [
+            'title' => 'Lover at Last [The Black Dagger Brotherhood #11] (Unabridged)',
+        ];
+
+        $this->service->extractSeriesNumberFromTitle($metadata);
+
+        $this->assertEquals('Lover at Last', $metadata['title']);
+        $this->assertEquals('The Black Dagger Brotherhood', $metadata['series']);
+        $this->assertEquals(11, $metadata['series_number']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function extractSeriesNumberFromTitleSupportsDecimalSeriesNumbers(): void
+    {
+        $metadata = [
+            'title' => 'Some Novella [Example Series #16.5] (Unabridged)',
+        ];
+
+        $this->service->extractSeriesNumberFromTitle($metadata);
+
+        $this->assertEquals('Some Novella', $metadata['title']);
+        $this->assertEquals('Example Series', $metadata['series']);
+        $this->assertEquals(16.5, $metadata['series_number']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function extractSeriesNumberFromTitleSanitizesTitleWhenSeriesNumberAlreadySet(): void
+    {
+        $metadata = [
+            'title' => 'Lover at Last [The Black Dagger Brotherhood #11] (Unabridged)',
+            'series_number' => 11,
+        ];
+
+        $this->service->extractSeriesNumberFromTitle($metadata);
+
+        $this->assertEquals('Lover at Last', $metadata['title']);
+        $this->assertEquals('The Black Dagger Brotherhood', $metadata['series']);
+        $this->assertEquals(11, $metadata['series_number']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
     public function cleanDescriptionRemovesHtmlTags(): void
     {
         // Use reflection to access protected method
@@ -184,7 +227,7 @@ class BookEnrichmentServiceTest extends TestCase
         $originalMetadata = ['title' => 'Test'];
 
         $enrichedData = [
-            'year' => (int)date('Y') + 3, // Too far in future
+            'year' => (int) date('Y') + 3, // Too far in future
         ];
 
         $result = $this->service->isValidEnrichment($originalMetadata, $enrichedData);

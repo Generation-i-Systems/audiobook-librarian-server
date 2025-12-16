@@ -139,6 +139,46 @@ class BookDirectoryParserTest extends TestCase
     }
 
     #[Test]
+    public function test_handles_decimal_series_number_in_metadata_abs(): void
+    {
+        $structure = [
+            'books' => [
+                'Fantasy' => [
+                    'Jane Smith' => [
+                        'Epic Series' => [
+                            'Side Story' => [
+                                'file1.mp3' => 'audio content',
+                                'metadata.abs' => "title=Side Story\n" .
+                                    "author=Jane Smith\n" .
+                                    "series=Epic Series\n" .
+                                    'series_number=16.5',
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+        vfsStream::create($structure, $this->root);
+
+        $this->mockAudioAnalyzer->method('getAudioDuration')
+            ->willReturn(3600.0);
+
+        $this->mockMetadataService->method('loadMetadata')
+            ->willReturn([]);
+
+        $file = vfsStream::url('testDir/books/Fantasy/Jane Smith/Epic Series/Side Story/file1.mp3');
+        $reflection = new \ReflectionClass($this->parser);
+        $method = $reflection->getMethod('parseBookFile');
+        $method->setAccessible(true);
+        $book = $method->invoke($this->parser, new \SplFileInfo($file));
+
+        $this->assertEquals('Side Story', $book['title']);
+        $this->assertEquals(['Jane Smith'], $book['author']);
+        $this->assertEquals('Epic Series', $book['series']);
+        $this->assertEquals(16.5, $book['series_number']);
+    }
+
+    #[Test]
     public function test_marks_books_without_author_as_needing_review()
     {
         // Skipping due to vfsStream/Symfony Finder incompatibility
