@@ -22,6 +22,34 @@ use Illuminate\Support\Str;
 
 class MySqlService implements DocumentStoreServiceInterface
 {
+    private function buildCoverImageOutput(?string $coverImage, ?string $directoryPath): ?string
+    {
+        if ($coverImage === null) {
+            return null;
+        }
+
+        $coverImage = trim($coverImage);
+        if ($coverImage === '') {
+            return null;
+        }
+
+        if (str_starts_with($coverImage, 'http://') || str_starts_with($coverImage, 'https://')) {
+            return $coverImage;
+        }
+
+        $baseName = basename($coverImage);
+        if ($baseName === '') {
+            return null;
+        }
+
+        $directoryPath = is_string($directoryPath) ? trim($directoryPath, '/') : '';
+        if ($directoryPath === '') {
+            return $baseName;
+        }
+
+        return $directoryPath . '/' . $baseName;
+    }
+
     public function getBook(string $id): ?array
     {
         $book = Book::with(['authors', 'narrators', 'genres', 'series', 'chapters'])->find($id);
@@ -65,7 +93,10 @@ class MySqlService implements DocumentStoreServiceInterface
 
         // Handle cover image separately to ensure the key is correct
         if (isset($bookArray['cover_image'])) {
-            $camelCasedBook['coverImage'] = $bookArray['cover_image'];
+            $camelCasedBook['coverImage'] = $this->buildCoverImageOutput(
+                $bookArray['cover_image'],
+                $camelCasedBook['directoryPath'] ?? null
+            );
         }
 
         // Map release_date to publishedYear (extract year if date is YYYY-01-01, otherwise keep full date)
@@ -311,7 +342,9 @@ class MySqlService implements DocumentStoreServiceInterface
                     $query->whereDate('created_at', $filters['date_added']);
                 } catch (\Exception $e) {
                     // Log invalid date format
-                    \Illuminate\Support\Facades\Log::warning("Invalid date format for date_added filter: {$filters['date_added']}");
+                    \Illuminate\Support\Facades\Log::warning(
+                        "Invalid date format for date_added filter: {$filters['date_added']}"
+                    );
                 }
             }
         }
@@ -322,6 +355,26 @@ class MySqlService implements DocumentStoreServiceInterface
                 $query->leftJoin('author_book', 'books.id', '=', 'author_book.book_id')
                     ->leftJoin('authors', 'author_book.author_id', '=', 'authors.id')
                     ->orderBy('authors.name', $order)
+                    ->select('books.*')
+                    ->distinct();
+                break;
+            case 'series':
+                $query->leftJoin('book_series', 'books.id', '=', 'book_series.book_id')
+                    ->leftJoin('series', 'book_series.series_id', '=', 'series.id')
+                    ->orderBy('series.name', $order)
+                    ->select('books.*')
+                    ->distinct();
+                break;
+            case 'series_number':
+                $query->leftJoin('book_series', 'books.id', '=', 'book_series.book_id')
+                    ->orderBy('book_series.series_number', $order)
+                    ->select('books.*')
+                    ->distinct();
+                break;
+            case 'genre':
+                $query->leftJoin('book_genre', 'books.id', '=', 'book_genre.book_id')
+                    ->leftJoin('genres', 'book_genre.genre_id', '=', 'genres.id')
+                    ->orderBy('genres.name', $order)
                     ->select('books.*')
                     ->distinct();
                 break;
@@ -380,11 +433,14 @@ class MySqlService implements DocumentStoreServiceInterface
                 'author' => $book->authors->pluck('name')->toArray(),
                 'narrator' => $book->narrators->pluck('name')->toArray(),
                 'series' => $seriesData,
-                'genre' => $book->genres->pluck('name')->toArray(), // OpenAPI spec shows string, but array is more flexible
+                // OpenAPI spec shows string, but array is more flexible
+                'genre' => $book->genres->pluck('name')->toArray(),
                 'year' => $book->release_date ? (int) $book->release_date->format('Y') : null,
                 'duration' => $durationFormatted,
                 'description' => $book->description,
-                'coverImage' => $book->cover_image, // Add coverImage field for BookApiController::getBookWithCover
+                // Add coverImage field for BookApiController::getBookWithCover
+                'coverImage' => $this->buildCoverImageOutput($book->cover_image, $book->directory_path),
+                'directoryPath' => $book->directory_path,
                 'cover_url' => $coverUrl,
                 'needs_review' => (bool) $book->needs_review,
                 'file_count' => $book->audio_file_count,
@@ -445,7 +501,18 @@ class MySqlService implements DocumentStoreServiceInterface
     {
         try {
             return Book::query()
-                ->select('id', 'title', 'cover_image', 'directory_path', 'created_at', 'description', 'duration', 'release_date', 'audio_file_count', 'total_size')
+                ->select([
+                    'id',
+                    'title',
+                    'cover_image',
+                    'directory_path',
+                    'created_at',
+                    'description',
+                    'duration',
+                    'release_date',
+                    'audio_file_count',
+                    'total_size',
+                ])
                 ->where('needs_review', false)
                 ->with([
                     'authors' => function ($q) {
@@ -460,15 +527,24 @@ class MySqlService implements DocumentStoreServiceInterface
                 ->limit($limit)
                 ->get()
                 ->map(function (Book $book) {
+                    $releaseDate = null;
+                    if ($book->release_date) {
+                        if (is_object($book->release_date) && method_exists($book->release_date, 'toDateString')) {
+                            $releaseDate = $book->release_date->toDateString();
+                        } else {
+                            $releaseDate = (string) $book->release_date;
+                        }
+                    }
+
                     return [
                         'id' => (string) $book->id,
                         'title' => (string) $book->title,
-                        'coverImageUrl' => $book->cover_image,
                         'directoryPath' => $book->directory_path,
+                        'coverImage' => $this->buildCoverImageOutput($book->cover_image, $book->directory_path),
                         'createdAt' => $book->created_at ? $book->created_at->toIso8601String() : null,
                         'description' => (string) ($book->description ?? ''),
                         'duration' => (int) ($book->duration ?? 0),
-                        'releaseDate' => $book->release_date ? (is_object($book->release_date) && method_exists($book->release_date, 'toDateString') ? $book->release_date->toDateString() : (string) $book->release_date) : null,
+                        'releaseDate' => $releaseDate,
                         'audioFileCount' => (int) ($book->audio_file_count ?? 0),
                         'totalSize' => (int) ($book->total_size ?? 0),
                         'authors' => $book->authors->pluck('name')->values()->all(),
@@ -891,9 +967,12 @@ class MySqlService implements DocumentStoreServiceInterface
 
     public function mergeAuthors(string $primaryAuthorId, array $secondaryAuthorIds): int
     {
-        $secondaryAuthorIds = array_values(array_unique(array_filter($secondaryAuthorIds, function ($id) use ($primaryAuthorId) {
-            return $id !== $primaryAuthorId;
-        })));
+        $secondaryAuthorIds = array_values(array_unique(array_filter(
+            $secondaryAuthorIds,
+            function ($id) use ($primaryAuthorId) {
+                return $id !== $primaryAuthorId;
+            }
+        )));
 
         if (empty($secondaryAuthorIds)) {
             return 0;
@@ -937,9 +1016,12 @@ class MySqlService implements DocumentStoreServiceInterface
 
     public function mergeGenres(string $primaryGenreId, array $secondaryGenreIds): int
     {
-        $secondaryGenreIds = array_values(array_unique(array_filter($secondaryGenreIds, function ($id) use ($primaryGenreId) {
-            return $id !== $primaryGenreId;
-        })));
+        $secondaryGenreIds = array_values(array_unique(array_filter(
+            $secondaryGenreIds,
+            function ($id) use ($primaryGenreId) {
+                return $id !== $primaryGenreId;
+            }
+        )));
 
         if (empty($secondaryGenreIds)) {
             return 0;
@@ -1056,14 +1138,92 @@ class MySqlService implements DocumentStoreServiceInterface
 
     // --- Placeholder Implementations ---
 
+    private function normalizeCoverImageValue(?string $coverImage): ?string
+    {
+        if ($coverImage === null) {
+            return null;
+        }
+
+        $coverImage = trim($coverImage);
+        if ($coverImage === '') {
+            return null;
+        }
+
+        if (str_starts_with($coverImage, 'file://')) {
+            $parsedPath = parse_url($coverImage, PHP_URL_PATH);
+            if (is_string($parsedPath) && $parsedPath !== '') {
+                $coverImage = $parsedPath;
+            }
+        }
+
+        $parsedUrl = parse_url($coverImage);
+        if (
+            is_array($parsedUrl)
+            && isset($parsedUrl['scheme'])
+            && in_array($parsedUrl['scheme'], ['http', 'https'], true)
+        ) {
+            return $coverImage;
+        }
+
+        $coverImage = str_replace('\\', '/', $coverImage);
+
+        $baseName = basename($coverImage);
+        if ($baseName === '') {
+            return null;
+        }
+
+        return $baseName;
+    }
+
+    private function normalizeRelatedIds(array $items): array
+    {
+        $ids = [];
+        foreach ($items as $item) {
+            if (is_array($item) && isset($item['id'])) {
+                $ids[] = $item['id'];
+                continue;
+            }
+
+            if (is_string($item) || is_int($item)) {
+                $value = trim((string) $item);
+                if ($value !== '') {
+                    $ids[] = $value;
+                }
+            }
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    private function isLikelyIdList(array $items): bool
+    {
+        if (empty($items)) {
+            return false;
+        }
+
+        $ids = $this->normalizeRelatedIds($items);
+        if (empty($ids)) {
+            return false;
+        }
+
+        foreach ($ids as $id) {
+            if (!is_string($id) || $id === '' || !is_numeric($id)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     public function createBook(array $data)
     {
         try {
+            $normalizedCover = $this->normalizeCoverImageValue($data['cover_image'] ?? $data['coverImage'] ?? null);
             $book = Book::create([
                 'title' => $data['title'],
                 'description' => $data['description'] ?? null,
                 'release_date' => $data['release_date'] ?? null,
-                'cover_image' => $data['cover_image'] ?? null,
+                'cover_image' => $normalizedCover,
                 'language' => $data['language'] ?? 'en',
                 'source' => $data['source'] ?? 'unknown',
                 'series_id' => $data['series_id'] ?? null,
@@ -1071,7 +1231,7 @@ class MySqlService implements DocumentStoreServiceInterface
                 'directory_path' => $data['directory_path'] ?? null,
                 'duration' => $data['duration'] ?? null,
                 'publisher' => $data['publisher'] ?? null,
-                'needs_review' => $data['needs_review'] ?? null,
+                'needs_review' => $data['needs_review'] ?? false,
                 'needs_review_reasons' => $data['needs_review_reasons'] ?? null,
                 'audio_file_count' => $data['audio_file_count'] ?? null,
                 'mongo_record' => $data['mongo_record'] ?? null,
@@ -1082,6 +1242,69 @@ class MySqlService implements DocumentStoreServiceInterface
                 'audiobook_bay_info' => $data['audiobook_bay_info'] ?? null,
             ]);
 
+            // Handle authors (support both IDs and names)
+            $authorData = $data['authors'] ?? $data['author'] ?? null;
+            if (is_array($authorData)) {
+                if ($this->isLikelyIdList($authorData)) {
+                    $book->authors()->sync($this->normalizeRelatedIds($authorData));
+                } else {
+                    $authorIds = [];
+                    foreach ($authorData as $authorName) {
+                        if (is_string($authorName) || is_int($authorName)) {
+                            $name = trim((string) $authorName);
+                            if ($name === '') {
+                                continue;
+                            }
+                            $author = Author::firstOrCreate(['name' => $name]);
+                            $authorIds[] = $author->id;
+                        }
+                    }
+                    $book->authors()->sync($authorIds);
+                }
+            }
+
+            // Handle narrators (support both IDs and names)
+            $narratorData = $data['narrators'] ?? $data['narrator'] ?? null;
+            if (is_array($narratorData)) {
+                if ($this->isLikelyIdList($narratorData)) {
+                    $book->narrators()->sync($this->normalizeRelatedIds($narratorData));
+                } else {
+                    $narratorIds = [];
+                    foreach ($narratorData as $narratorName) {
+                        if (is_string($narratorName) || is_int($narratorName)) {
+                            $name = trim((string) $narratorName);
+                            if ($name === '') {
+                                continue;
+                            }
+                            $narrator = Narrator::firstOrCreate(['name' => $name]);
+                            $narratorIds[] = $narrator->id;
+                        }
+                    }
+                    $book->narrators()->sync($narratorIds);
+                }
+            }
+
+            // Handle genres (support both IDs and names)
+            $genreData = $data['genres'] ?? $data['genre'] ?? null;
+            if (is_array($genreData)) {
+                if ($this->isLikelyIdList($genreData)) {
+                    $book->genres()->sync($this->normalizeRelatedIds($genreData));
+                } else {
+                    $genreIds = [];
+                    foreach ($genreData as $genreName) {
+                        if (is_string($genreName) || is_int($genreName)) {
+                            $name = trim((string) $genreName);
+                            if ($name === '') {
+                                continue;
+                            }
+                            $genre = Genre::firstOrCreate(['name' => $name]);
+                            $genreIds[] = $genre->id;
+                        }
+                    }
+                    $book->genres()->sync($genreIds);
+                }
+            }
+
             if (!empty($data['chapters'])) {
                 foreach ($data['chapters'] as $chapterData) {
                     $book->chapters()->create($chapterData);
@@ -1090,7 +1313,9 @@ class MySqlService implements DocumentStoreServiceInterface
 
             return $book;
         } catch (\Exception $e) {
-            Log::error('MySqlService createBook failed: ' . $e->getMessage() . ' for book ' . ($data['title'] ?? 'Unknown'));
+            Log::error(
+                'MySqlService createBook failed: ' . $e->getMessage() . ' for book ' . ($data['title'] ?? 'Unknown')
+            );
             throw $e; // Re-throw the exception to be caught by the calling command
         }
     }
@@ -1099,6 +1324,8 @@ class MySqlService implements DocumentStoreServiceInterface
     {
         try {
             $book = Book::findOrFail($id);
+
+            $normalizedCover = $this->normalizeCoverImageValue($data['cover_image'] ?? $data['coverImage'] ?? null);
 
             // Handle publishedYear -> release_date mapping
             if (isset($data['publishedYear']) && !empty($data['publishedYear']) && is_numeric($data['publishedYear'])) {
@@ -1113,7 +1340,7 @@ class MySqlService implements DocumentStoreServiceInterface
                 'series_id' => $data['series_id'] ?? $book->series_id,
                 'mongo_id' => $data['mongo_id'] ?? $book->mongo_id,
                 'release_date' => $data['release_date'] ?? $book->release_date,
-                'cover_image' => $data['cover_image'] ?? $data['coverImage'] ?? $book->cover_image,
+                'cover_image' => $normalizedCover ?? $book->cover_image,
                 'directory_path' => $data['directory_path'] ?? $data['directoryPath'] ?? $book->directory_path,
                 'duration' => $data['duration'] ?? $book->duration,
                 'publisher' => $data['publisher'] ?? $book->publisher,
@@ -1130,35 +1357,92 @@ class MySqlService implements DocumentStoreServiceInterface
 
             // Handle authors (support both 'authors' and 'author' keys)
             $authorData = $data['authors'] ?? $data['author'] ?? null;
-            if (isset($authorData)) {
-                $authorIds = [];
-                foreach ($authorData as $authorName) {
-                    $author = Author::firstOrCreate(['name' => $authorName]);
-                    $authorIds[] = $author->id;
+            if (is_array($authorData)) {
+                if ($this->isLikelyIdList($authorData)) {
+                    $book->authors()->sync($this->normalizeRelatedIds($authorData));
+                } else {
+                    $authorIds = [];
+                    foreach ($authorData as $authorName) {
+                        if (is_string($authorName) || is_int($authorName)) {
+                            $name = trim((string) $authorName);
+                            if ($name === '') {
+                                continue;
+                            }
+
+                            if (is_numeric($name)) {
+                                $existingAuthor = Author::find($name);
+                                if ($existingAuthor) {
+                                    $authorIds[] = $existingAuthor->id;
+                                    continue;
+                                }
+                            }
+
+                            $author = Author::firstOrCreate(['name' => $name]);
+                            $authorIds[] = $author->id;
+                        }
+                    }
+                    $book->authors()->sync($authorIds);
                 }
-                $book->authors()->sync($authorIds);
             }
 
             // Handle narrators (support both 'narrators' and 'narrator' keys)
             $narratorData = $data['narrators'] ?? $data['narrator'] ?? null;
-            if (isset($narratorData)) {
-                $narratorIds = [];
-                foreach ($narratorData as $narratorName) {
-                    $narrator = Narrator::firstOrCreate(['name' => $narratorName]);
-                    $narratorIds[] = $narrator->id;
+            if (is_array($narratorData)) {
+                if ($this->isLikelyIdList($narratorData)) {
+                    $book->narrators()->sync($this->normalizeRelatedIds($narratorData));
+                } else {
+                    $narratorIds = [];
+                    foreach ($narratorData as $narratorName) {
+                        if (is_string($narratorName) || is_int($narratorName)) {
+                            $name = trim((string) $narratorName);
+                            if ($name === '') {
+                                continue;
+                            }
+
+                            if (is_numeric($name)) {
+                                $existingNarrator = Narrator::find($name);
+                                if ($existingNarrator) {
+                                    $narratorIds[] = $existingNarrator->id;
+                                    continue;
+                                }
+                            }
+
+                            $narrator = Narrator::firstOrCreate(['name' => $name]);
+                            $narratorIds[] = $narrator->id;
+                        }
+                    }
+                    $book->narrators()->sync($narratorIds);
                 }
-                $book->narrators()->sync($narratorIds);
             }
 
             // Handle genres (support both 'genres' and 'genre' keys)
             $genreData = $data['genres'] ?? $data['genre'] ?? null;
-            if (isset($genreData)) {
-                $genreIds = [];
-                foreach ($genreData as $genreName) {
-                    $genre = Genre::firstOrCreate(['name' => $genreName]);
-                    $genreIds[] = $genre->id;
+            if (is_array($genreData)) {
+                if ($this->isLikelyIdList($genreData)) {
+                    $book->genres()->sync($this->normalizeRelatedIds($genreData));
+                } else {
+                    $genreIds = [];
+                    foreach ($genreData as $genreName) {
+                        if (is_string($genreName) || is_int($genreName)) {
+                            $name = trim((string) $genreName);
+                            if ($name === '') {
+                                continue;
+                            }
+
+                            if (is_numeric($name)) {
+                                $existingGenre = Genre::find($name);
+                                if ($existingGenre) {
+                                    $genreIds[] = $existingGenre->id;
+                                    continue;
+                                }
+                            }
+
+                            $genre = Genre::firstOrCreate(['name' => $name]);
+                            $genreIds[] = $genre->id;
+                        }
+                    }
+                    $book->genres()->sync($genreIds);
                 }
-                $book->genres()->sync($genreIds);
             }
 
             // Handle series (support both legacy 'series_name' and new 'series' array structure)
@@ -1194,7 +1478,9 @@ class MySqlService implements DocumentStoreServiceInterface
 
             return $book->toArray();
         } catch (\Exception $e) {
-            Log::error('MySqlService updateBook failed: ' . $e->getMessage() . ' for book ' . ($data['title'] ?? 'Unknown'));
+            Log::error(
+                'MySqlService updateBook failed: ' . $e->getMessage() . ' for book ' . ($data['title'] ?? 'Unknown')
+            );
             throw $e; // Re-throw the exception to be caught by the calling command
         }
     }
@@ -1313,7 +1599,7 @@ class MySqlService implements DocumentStoreServiceInterface
             $counter++;
         }
 
-        return User::create([
+        $user = User::create([
             'name' => $data['name'],
             'username' => $username,
             'email' => $data['email'],
@@ -1321,6 +1607,8 @@ class MySqlService implements DocumentStoreServiceInterface
             'role' => $data['role'] ?? 'user',
             'email_verified_at' => $data['email_verified_at'] ?? null,
         ]);
+
+        return (string) $user->id;
     }
 
     public function updateUser(string $id, array $data)
@@ -1612,7 +1900,17 @@ class MySqlService implements DocumentStoreServiceInterface
     {
         try {
             // Get all users with necessary fields
-            $users = User::all(['id', 'name', 'username', 'email', 'photo_url', 'role', 'email_verified_at', 'created_at', 'updated_at']);
+            $users = User::all([
+                'id',
+                'name',
+                'username',
+                'email',
+                'photo_url',
+                'role',
+                'email_verified_at',
+                'created_at',
+                'updated_at',
+            ]);
 
             // Convert to array and ensure consistent attribute naming
             return $users->map(function ($user) {
@@ -1970,6 +2268,30 @@ class MySqlService implements DocumentStoreServiceInterface
         $book = Book::with(['authors', 'narrators', 'genres', 'series'])->findOrFail($bookId);
 
         return $book->toArray();
+    }
+
+    public function findOrCreateAuthors(array $data): Author
+    {
+        $name = trim((string) ($data['name'] ?? ''));
+        return Author::firstOrCreate(['name' => $name]);
+    }
+
+    public function findOrCreateGenres(array $data): Genre
+    {
+        $name = trim((string) ($data['name'] ?? ''));
+        return Genre::firstOrCreate(['name' => $name]);
+    }
+
+    public function findOrCreateNarrators(array $data): Narrator
+    {
+        $name = trim((string) ($data['name'] ?? ''));
+        return Narrator::firstOrCreate(['name' => $name]);
+    }
+
+    public function findOrCreateSeries(array $data): Series
+    {
+        $name = trim((string) ($data['name'] ?? ''));
+        return Series::firstOrCreate(['name' => $name]);
     }
 
     /**
@@ -2352,9 +2674,13 @@ class MySqlService implements DocumentStoreServiceInterface
             if ($deleteFiles && $book->directory_path) {
                 $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
                 if ($bookStoragePath) {
-                    $fullPath = str_starts_with($book->directory_path, '/')
-                        ? $book->directory_path
-                        : $bookStoragePath . '/' . $book->directory_path;
+                    $directoryPath = $book->directory_path;
+
+                    if (str_starts_with($directoryPath, '/')) {
+                        $fullPath = $directoryPath;
+                    } else {
+                        $fullPath = $bookStoragePath . '/' . $directoryPath;
+                    }
 
                     if (File::isDirectory($fullPath)) {
                         try {
