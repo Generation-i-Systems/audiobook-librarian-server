@@ -4,7 +4,7 @@
     <div class="container">
         <h1>Manage Books</h1>
 
-        <form action="{{ route('admin.books.index') }}" method="GET">
+        <form action="{{ route('admin.books.index') }}" method="GET" id="filter-form">
             <div class="input-group mb-3">
                 <input type="text" class="form-control" placeholder="Search title, author, or series" name="search"
                     value="{{ request('search') }}">
@@ -12,10 +12,18 @@
                     <option value="recent_desc" {{ (request('sort', 'recent_desc') == 'recent_desc') ? 'selected' : '' }}>Most
                         Recent</option>
                     <option value="recent_asc" {{ (request('sort') == 'recent_asc') ? 'selected' : '' }}>Oldest</option>
-                    <option value="author_asc" {{ (request('sort') == 'author_asc') ? 'selected' : '' }}>Author A-Z</option>
-                    <option value="author_desc" {{ (request('sort') == 'author_desc') ? 'selected' : '' }}>Author Z-A</option>
                     <option value="title_asc" {{ (request('sort') == 'title_asc') ? 'selected' : '' }}>Title A-Z</option>
                     <option value="title_desc" {{ (request('sort') == 'title_desc') ? 'selected' : '' }}>Title Z-A</option>
+                    <option value="author_asc" {{ (request('sort') == 'author_asc') ? 'selected' : '' }}>Author A-Z</option>
+                    <option value="author_desc" {{ (request('sort') == 'author_desc') ? 'selected' : '' }}>Author Z-A</option>
+                    <option value="series_asc" {{ (request('sort') == 'series_asc') ? 'selected' : '' }}>Series A-Z</option>
+                    <option value="series_desc" {{ (request('sort') == 'series_desc') ? 'selected' : '' }}>Series Z-A</option>
+                    <option value="series_number_asc" {{ (request('sort') == 'series_number_asc') ? 'selected' : '' }}>Series
+                        # Asc</option>
+                    <option value="series_number_desc" {{ (request('sort') == 'series_number_desc') ? 'selected' : '' }}>
+                        Series # Desc</option>
+                    <option value="genre_asc" {{ (request('sort') == 'genre_asc') ? 'selected' : '' }}>Genre A-Z</option>
+                    <option value="genre_desc" {{ (request('sort') == 'genre_desc') ? 'selected' : '' }}>Genre Z-A</option>
                     <option value="year_asc" {{ (request('sort') == 'year_asc') ? 'selected' : '' }}>Year Asc</option>
                     <option value="year_desc" {{ (request('sort') == 'year_desc') ? 'selected' : '' }}>Year Desc</option>
                 </select>
@@ -40,15 +48,56 @@
             <span class="ms-3">Showing {{ $books->count() }} of {{ $totalBooks }} books</span>
         </div>
 
+        @php
+            $currentSort = request('sort', 'recent_desc');
+            $showYear = in_array($currentSort, ['year_asc', 'year_desc']);
+            $showModified = in_array($currentSort, ['recent_asc', 'recent_desc']);
+
+            // Helper function to get sort URL
+            $getSortUrl = function ($field) use ($currentSort) {
+                $newSort = $field . '_asc';
+                if (str_starts_with($currentSort, $field . '_asc')) {
+                    $newSort = $field . '_desc';
+                }
+                return route('admin.books.index', array_merge(request()->query(), ['sort' => $newSort, 'page' => 1]));
+            };
+
+            // Helper function to get sort indicator
+            $getSortIndicator = function ($field) use ($currentSort) {
+                if (str_starts_with($currentSort, $field . '_asc')) {
+                    return ' ↑';
+                } elseif (str_starts_with($currentSort, $field . '_desc')) {
+                    return ' ↓';
+                }
+                return '';
+            };
+        @endphp
+
         <table class="table">
             <thead>
                 <tr>
                     <th style="width: 56px;"></th>
-                    <th>Title</th>
-                    <th>Author</th>
-                    <th>Series</th>
-                    <th style="width: 60px; text-align: center;">#</th>
-                    <th>Genre</th>
+                    <th style="cursor: pointer;"><a href="{{ $getSortUrl('title') }}"
+                            style="text-decoration: none; color: inherit;">Title{{ $getSortIndicator('title') }}</a></th>
+                    <th style="cursor: pointer;"><a href="{{ $getSortUrl('author') }}"
+                            style="text-decoration: none; color: inherit;">Author{{ $getSortIndicator('author') }}</a></th>
+                    <th style="cursor: pointer;"><a href="{{ $getSortUrl('series') }}"
+                            style="text-decoration: none; color: inherit;">Series{{ $getSortIndicator('series') }}</a></th>
+                    <th style="width: 60px; text-align: center; cursor: pointer;"><a
+                            href="{{ $getSortUrl('series_number') }}"
+                            style="text-decoration: none; color: inherit;">#{{ $getSortIndicator('series_number') }}</a>
+                    </th>
+                    <th style="cursor: pointer;"><a href="{{ $getSortUrl('genre') }}"
+                            style="text-decoration: none; color: inherit;">Genre{{ $getSortIndicator('genre') }}</a></th>
+                    @if($showYear)
+                        <th style="cursor: pointer;"><a href="{{ $getSortUrl('year') }}"
+                                style="text-decoration: none; color: inherit;">Year{{ $getSortIndicator('year') }}</a></th>
+                    @endif
+                    @if($showModified)
+                        <th style="cursor: pointer;"><a href="{{ $getSortUrl('recent') }}"
+                                style="text-decoration: none; color: inherit;">Modified{{ $getSortIndicator('recent') }}</a>
+                        </th>
+                    @endif
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -56,17 +105,19 @@
                 @foreach($books as $book)
                     @php
                         $rowClass = '';
-                        if (!empty($book['directoryExists']) && $book['directoryExists'] === false) {
+                        $directoryMissing = isset($book['directoryExists']) && $book['directoryExists'] === false;
+                        if ($directoryMissing) {
                             $rowClass = 'table-danger';
                         } elseif ($loop->iteration % 2 == 0) {
                             $rowClass = 'table-secondary';
                         }
                     @endphp
-                    <tr class="{{ $rowClass }}" @if(!empty($book['directoryExists']) && $book['directoryExists'] === false) title="Directory not found: {{ $book['directoryPath'] ?? 'unknown' }}" @endif>
+                    <tr class="{{ $rowClass }}" @if($directoryMissing)
+                    title="Directory not found: {{ $book['directoryPath'] ?? 'unknown' }}" @endif>
                         <td style="vertical-align: middle; text-align: center;">
                             @php
                                 $coverImage = $book['coverImage'] ?? null;
-                                
+
                                 // Debug logging for problematic data
                                 if (is_array($coverImage) && isset($coverImage['83mb'])) {
                                     \Illuminate\Support\Facades\Log::error('Found problematic coverImage', [
@@ -77,7 +128,7 @@
                                         'coverImage_data' => $coverImage,
                                     ]);
                                 }
-                                
+
                                 // Handle array coverImage (extract path if it's an array)
                                 if (is_array($coverImage)) {
                                     $coverImage = $coverImage['path'] ?? $coverImage[0] ?? null;
@@ -86,7 +137,7 @@
                                 if (is_array($coverImage)) {
                                     $coverImage = null;
                                 }
-                                
+
                                 try {
                                     if (is_string($coverImage) && !empty(trim($coverImage))) {
                                         // URL encode the path to handle special characters like {, }, etc.
@@ -112,8 +163,9 @@
                         </td>
                         <td>
                             {{ $book['title'] ?? 'Untitled' }}
-                            @if(!empty($book['directoryExists']) && $book['directoryExists'] === false)
-                                <span class="badge bg-danger ms-2" title="Directory not found: {{ $book['directoryPath'] ?? 'unknown' }}">⚠️ Missing Files</span>
+                            @if($directoryMissing)
+                                <span class="badge bg-danger ms-2"
+                                    title="Directory not found: {{ $book['directoryPath'] ?? 'unknown' }}">⚠️ Missing Files</span>
                             @endif
                         </td>
                         <td>
@@ -165,7 +217,10 @@
                                 @endphp
                                 @if(is_array($series))
                                     @foreach($series as $key => $item)
-                                        @if(is_array($item) && !empty($item['number']))
+                                        @if(is_array($item) && !empty($item['series_number']))
+                                            {{ $item['series_number'] }}
+                                            @php $seriesNumber = $item['series_number']; @endphp
+                                        @elseif(is_array($item) && !empty($item['number']))
                                             {{ $item['number'] }}
                                             @php $seriesNumber = $item['number']; @endphp
                                         @elseif(is_string($key) && (is_scalar($item) || is_null($item)))
@@ -194,12 +249,34 @@
                                 Unknown
                             @endif
                         </td>
+                        @if($showYear)
+                            <td>
+                                @if(!empty($book['year']))
+                                    {{ $book['year'] }}
+                                @elseif(!empty($book['release_date']))
+                                    {{ \Carbon\Carbon::parse($book['release_date'])->format('Y') }}
+                                @else
+                                    -
+                                @endif
+                            </td>
+                        @endif
+                        @if($showModified)
+                            <td>
+                                @if(!empty($book['updated_at']))
+                                    {{ \Carbon\Carbon::parse($book['updated_at'])->format('M d, Y') }}
+                                @elseif(!empty($book['created_at']))
+                                    {{ \Carbon\Carbon::parse($book['created_at'])->format('M d, Y') }}
+                                @else
+                                    -
+                                @endif
+                            </td>
+                        @endif
                         <td>
                             @php
                                 $bookId = $book['id'] ?? ($book['documentId'] ?? 0);
                             @endphp
-                            <a href="{{ route('admin.books.edit', array_merge([$bookId], request()->query())) }}" class="btn btn-sm btn-outline-primary"
-                                title="Edit"><i class="fas fa-pencil-alt"></i></a>
+                            <a href="{{ route('admin.books.edit', array_merge([$bookId], request()->query())) }}"
+                                class="btn btn-sm btn-outline-primary" title="Edit"><i class="fas fa-pencil-alt"></i></a>
                             <form action="{{ route('admin.books.destroy', $bookId) }}" method="POST" style="display: inline;">
                                 @csrf
                                 @method('DELETE')
