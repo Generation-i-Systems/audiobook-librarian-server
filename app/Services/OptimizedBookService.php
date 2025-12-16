@@ -33,8 +33,8 @@ class OptimizedBookService
             // Apply author filter
             if (!empty($filters['author'])) {
                 $whereConditions[] = 'EXISTS (
-                    SELECT 1 FROM author_book ab 
-                    JOIN authors a ON ab.author_id = a.id 
+                    SELECT 1 FROM author_book ab
+                    JOIN authors a ON ab.author_id = a.id
                     WHERE ab.book_id = books.id AND a.name LIKE ?
                 )';
                 $params[] = '%' . $filters['author'] . '%';
@@ -43,8 +43,8 @@ class OptimizedBookService
             // Apply genre filter
             if (!empty($filters['genre'])) {
                 $whereConditions[] = 'EXISTS (
-                    SELECT 1 FROM book_genre bg 
-                    JOIN genres g ON bg.genre_id = g.id 
+                    SELECT 1 FROM book_genre bg
+                    JOIN genres g ON bg.genre_id = g.id
                     WHERE bg.book_id = books.id AND g.name = ?
                 )';
                 $params[] = $filters['genre'];
@@ -57,10 +57,10 @@ class OptimizedBookService
                 SELECT books.id, books.title, books.cover_image, books.directory_path, books.description,
                        GROUP_CONCAT(DISTINCT a.name ORDER BY a.name SEPARATOR '|') as authors,
                        GROUP_CONCAT(DISTINCT g.name ORDER BY g.name SEPARATOR '|') as genres
-                FROM books 
+                FROM books
                 LEFT JOIN author_book ab ON books.id = ab.book_id
                 LEFT JOIN authors a ON ab.author_id = a.id
-                LEFT JOIN book_genre bg ON books.id = bg.book_id  
+                LEFT JOIN book_genre bg ON books.id = bg.book_id
                 LEFT JOIN genres g ON bg.genre_id = g.id
                 {$whereClause}
                 GROUP BY books.id, books.title, books.cover_image, books.directory_path, books.description
@@ -71,10 +71,10 @@ class OptimizedBookService
             // Get total count
             $totalQuery = "
                 SELECT COUNT(DISTINCT books.id) as total
-                FROM books 
+                FROM books
                 LEFT JOIN author_book ab ON books.id = ab.book_id
                 LEFT JOIN authors a ON ab.author_id = a.id
-                LEFT JOIN book_genre bg ON books.id = bg.book_id  
+                LEFT JOIN book_genre bg ON books.id = bg.book_id
                 LEFT JOIN genres g ON bg.genre_id = g.id
                 {$whereClause}
             ";
@@ -88,7 +88,7 @@ class OptimizedBookService
                     'title' => $book->title ?? 'Untitled',
                     'author' => !empty($book->authors) ? explode('|', $book->authors) : ['Unknown'],
                     'genre' => !empty($book->genres) ? explode('|', $book->genres) : ['Unknown'],
-                    'coverImage' => $this->processCoverImage($book->cover_image),
+                    'coverImage' => $this->processCoverImage($book->cover_image, $book->directory_path),
                     'description' => substr($book->description ?? 'No description available.', 0, 200),
                     'series' => [], // Skip series for now to save memory
                 ];
@@ -105,15 +105,17 @@ class OptimizedBookService
             Log::error('OptimizedBookService failed: ' . $e->getMessage());
 
             return [
-                'data' => [[
-                    'id' => '1',
-                    'title' => 'Database Error - Contact Admin',
-                    'author' => ['System'],
-                    'genre' => ['Error'],
-                    'coverImage' => asset('images/placeholder.png'),
-                    'description' => 'Error loading books: ' . $e->getMessage(),
-                    'series' => [],
-                ]],
+                'data' => [
+                    [
+                        'id' => '1',
+                        'title' => 'Database Error - Contact Admin',
+                        'author' => ['System'],
+                        'genre' => ['Error'],
+                        'coverImage' => asset('images/placeholder.png'),
+                        'description' => 'Error loading books: ' . $e->getMessage(),
+                        'series' => [],
+                    ],
+                ],
                 'total' => 1,
                 'perPage' => $perPage,
                 'currentPage' => $page,
@@ -174,7 +176,7 @@ class OptimizedBookService
             $books = DB::select("
                 SELECT books.id, books.title, books.cover_image, books.created_at,
                        GROUP_CONCAT(DISTINCT a.name ORDER BY a.name SEPARATOR '|') as authors
-                FROM books 
+                FROM books
                 LEFT JOIN author_book ab ON books.id = ab.book_id
                 LEFT JOIN authors a ON ab.author_id = a.id
                 WHERE books.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
@@ -204,7 +206,7 @@ class OptimizedBookService
     /**
      * Process cover image URL efficiently
      */
-    protected function processCoverImage(?string $coverImage): string
+    protected function processCoverImage(?string $coverImage, ?string $directoryPath = null): string
     {
         if (empty($coverImage)) {
             return asset('images/placeholder.png');
@@ -214,6 +216,12 @@ class OptimizedBookService
             return $coverImage;
         }
 
-        return route('cover.proxy', ['path' => rawurlencode($coverImage)]);
+        $filename = basename($coverImage);
+        $relativePath = $filename;
+        if (!empty($directoryPath)) {
+            $relativePath = rtrim($directoryPath, '/') . '/' . $filename;
+        }
+
+        return route('cover.proxy', ['path' => rawurlencode($relativePath)]);
     }
 }

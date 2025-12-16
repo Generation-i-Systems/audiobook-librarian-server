@@ -6,6 +6,7 @@ use App\Contracts\BookServiceInterface;
 use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class GoogleBooksApiService extends BaseBookService implements BookServiceInterface
 {
@@ -133,21 +134,19 @@ class GoogleBooksApiService extends BaseBookService implements BookServiceInterf
             $coverUrl = $merged['coverImageUrl'];
             $directory = rtrim($book['directoryPath'], '/');
             $ext = pathinfo(parse_url($coverUrl, PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'jpg';
-            $localFilename = $directory . '/cover.' . $ext;
+            $localFilename = 'cover.' . $ext;
             try {
                 // Use Laravel's Http client if available, else fallback to file_get_contents
                 if (class_exists('Illuminate\\Support\\Facades\\Http')) {
                     $response = \Illuminate\Support\Facades\Http::withOptions(['verify' => false])->get($coverUrl);
                     if ($response->successful()) {
-                        file_put_contents($localFilename, $response->body());
-                        // Set both camelCase and snake_case versions for compatibility
+                        Storage::disk('books')->put($directory . '/' . $localFilename, $response->body());
                         $merged['coverImage'] = $localFilename;
                     }
                 } else {
                     $imageData = @file_get_contents($coverUrl);
                     if ($imageData !== false) {
-                        file_put_contents($localFilename, $imageData);
-                        // Set both camelCase and snake_case versions for compatibility
+                        Storage::disk('books')->put($directory . '/' . $localFilename, $imageData);
                         $merged['coverImage'] = $localFilename;
                     }
                 }

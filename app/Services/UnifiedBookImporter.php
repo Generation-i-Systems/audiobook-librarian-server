@@ -202,6 +202,13 @@ class UnifiedBookImporter
             if ($book) {
                 return $book;
             }
+
+            // Fallback: if we couldn't match by author relationship (or authors are missing),
+            // but there is exactly one book with this title, treat it as the existing record.
+            $titleMatches = Book::where('title', $bookData['title'])->limit(2)->get();
+            if ($titleMatches->count() === 1) {
+                return $titleMatches->first();
+            }
         }
 
         return null;
@@ -243,19 +250,34 @@ class UnifiedBookImporter
         // Map genre if we have genre mapper
         $genre = 'General Fiction';
         if (!empty($bookData['genre'])) {
+            $genreValue = $bookData['genre'];
+            if (is_array($genreValue)) {
+                $genreValue = $genreValue[0] ?? '';
+            }
+
             if ($this->genreMapper) {
-                $genre = $this->genreMapper->mapToPrimaryGenre($bookData['genre']);
+                $genre = $this->genreMapper->mapToPrimaryGenre($genreValue);
             } else {
-                $genreParts = is_array($bookData['genre'])
-                    ? $bookData['genre']
-                    : explode(':', $bookData['genre']);
+                $genreParts = is_array($genreValue)
+                    ? $genreValue
+                    : explode(':', (string) $genreValue);
                 $genre = trim($genreParts[0]);
             }
         }
 
         $genre = $this->sanitizePath($genre);
-        $author = $this->sanitizePath($bookData['author'] ?? 'Unknown Author');
-        $title = $this->sanitizePath($bookData['title_short'] ?? $bookData['title'] ?? 'Unknown Title');
+
+        $authorValue = $bookData['author'] ?? 'Unknown Author';
+        if (is_array($authorValue)) {
+            $authorValue = $authorValue[0] ?? 'Unknown Author';
+        }
+        $author = $this->sanitizePath((string) $authorValue);
+
+        $titleValue = $bookData['title_short'] ?? $bookData['title'] ?? 'Unknown Title';
+        if (is_array($titleValue)) {
+            $titleValue = $titleValue[0] ?? 'Unknown Title';
+        }
+        $title = $this->sanitizePath((string) $titleValue);
 
         // If part of series, organize by series
         if (!empty($bookData['series_name']) || !empty($bookData['series'])) {

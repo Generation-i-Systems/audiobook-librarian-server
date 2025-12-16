@@ -80,8 +80,28 @@ class NewUserRegistrationNotifier
             'requestedAt' => now(),
         ];
 
-        Mail::mailer('ses_smtp')
-            ->to(self::ADMIN_EMAIL)
-            ->send(new NewUserRegistrationNotification($userData, $meta, $editUserUrl, $verifyUserUrl, $usersIndexUrl));
+        $mailable = new NewUserRegistrationNotification($userData, $meta, $editUserUrl, $verifyUserUrl, $usersIndexUrl);
+
+        try {
+            $sesMailerConfig = config('mail.mailers.ses_smtp');
+            $hasSesMailer = is_array($sesMailerConfig) && !empty($sesMailerConfig['host']);
+
+            if ($hasSesMailer) {
+                Mail::mailer('ses_smtp')->to(self::ADMIN_EMAIL)->send($mailable);
+                return;
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Failed to send registration email via ses_smtp; falling back to default mailer', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        try {
+            Mail::to(self::ADMIN_EMAIL)->send($mailable);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to send registration email', [
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }
