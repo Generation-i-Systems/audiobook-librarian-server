@@ -2,8 +2,17 @@
 ### Added
 - Added `/admin/books/search` support for `source=audiobookbay` and `source=hardcover`
 - Added standalone external integration test suite for metadata lookup (real network calls; not part of default test run)
+- Added import destination audio-file sanity check to prevent successful imports when the destination directory contains no audio files
+- Import-from-File: remember selected genre during multi-book imports and reuse it for subsequent books in the same session
+- Added `--no-multi-book` flag to `books:import-downloads` command to disable multi-book directory detection for the entire run
+- Added `^` suffix support for book directories to disable multi-book detection for specific directories (e.g., "Series Books 1-3^" won't be treated as multi-book)
+- Title parsing now automatically strips trailing colons from parsed directory names (manual edits preserve colons)
+- User edit prompts now support single space (' ') input to clear a field instead of using the default value
 
 ### Fixed
+- Fixed import-bk creating duplicate book directories with a `_01` suffix when the destination directory already exists from an earlier step (e.g., cover image creation)
+- Fixed admin book edit not persisting series updates when the form submits malformed `series` payloads; also fixed MySqlService `findOrCreateMany()` undefined-method errors by adding missing `findOrCreate*` helpers
+- Fixed inconsistent cover image storage by persisting local `coverImage` values as filename-only (relative to `directoryPath`) while remaining backward compatible with legacy values that include the directory path
 - Fixed `books:move` command error "Property [name] does not exist on this collection instance"
   - The `series` relationship is `belongsToMany` (returns Collection), not a single model
   - Now correctly uses `->first()` to get the first series before accessing `->name`

@@ -23,30 +23,96 @@ class BookEnrichmentService
         }
 
         $title = trim($metadata['title']);
+        $title = $this->stripTrailingTitleQualifiers($title);
+
+        if (preg_match('/^(.*?)\s*\[\s*([^\]]+)\s*\]\s*$/', $title, $matches)) {
+            $possibleTitle = trim($matches[1]);
+            $bracketContent = trim($matches[2]);
+            $bracketContent = $this->stripTrailingTitleQualifiers($bracketContent);
+
+            if (
+                preg_match(
+                    '/^(.*?)\s*(?:#|book|volume|vol\.?|part)\s*([\d.]+)\s*$/i',
+                    $bracketContent,
+                    $bracketMatches
+                )
+            ) {
+                $seriesName = trim($bracketMatches[1]);
+                $seriesNumber = $this->parseSeriesNumber($bracketMatches[2]);
+
+                if ($seriesName !== '' && empty($metadata['series'])) {
+                    $metadata['series'] = $seriesName;
+                }
+                if ($seriesNumber !== null && empty($metadata['series_number'])) {
+                    $metadata['series_number'] = $seriesNumber;
+                }
+
+                if ($possibleTitle !== '') {
+                    $title = $possibleTitle;
+                }
+            }
+        }
 
         $patterns = [
-            '/^(.+?),\s*Book\s+(\d+)$/i',            // "Title, Book 1"
-            '/^(.+?)\s+Book\s+(\d+)$/i',             // "Title Book 1"
-            '/^(.+?),\s*Volume\s+(\d+)$/i',          // "Title, Volume 1"
-            '/^(.+?)\s+Volume\s+(\d+)$/i',           // "Title Volume 1"
-            '/^(.+?),\s*#(\d+)$/i',                  // "Title, #1"
-            '/^(.+?)\s+#(\d+)$/i',                   // "Title #1"
-            '/^(.+?),\s*Part\s+(\d+)$/i',            // "Title, Part 1"
-            '/^(.+?)\s+Part\s+(\d+)$/i',             // "Title Part 1"
-            '/^(.+?)\s+(\d+)$/',                     // "Title 1" (last resort)
+            '/^(.+?),\s*Book\s+([\d.]+)$/i',            // "Title, Book 1"
+            '/^(.+?)\s+Book\s+([\d.]+)$/i',             // "Title Book 1"
+            '/^(.+?),\s*Volume\s+([\d.]+)$/i',          // "Title, Volume 1"
+            '/^(.+?)\s+Volume\s+([\d.]+)$/i',           // "Title Volume 1"
+            '/^(.+?),\s*#([\d.]+)$/i',                  // "Title, #1"
+            '/^(.+?)\s+#([\d.]+)$/i',                   // "Title #1"
+            '/^(.+?),\s*Part\s+([\d.]+)$/i',            // "Title, Part 1"
+            '/^(.+?)\s+Part\s+([\d.]+)$/i',             // "Title Part 1"
+            '/^(.+?)\s+([\d.]+)$/',                     // "Title 1" (last resort)
         ];
 
         foreach ($patterns as $pattern) {
             if (preg_match($pattern, $title, $matches)) {
-                $cleanTitle = trim($matches[1]);
-                $bookNumber = (int)$matches[2];
+                $cleanTitle = $this->stripTrailingTitleQualifiers(trim($matches[1]));
+                $bookNumber = $this->parseSeriesNumber($matches[2]);
 
                 $metadata['title'] = $cleanTitle;
-                $metadata['series_number'] = $bookNumber;
+                if (empty($metadata['series_number'])) {
+                    $metadata['series_number'] = $bookNumber;
+                }
 
                 return;
             }
         }
+
+        $metadata['title'] = $title;
+    }
+
+    private function parseSeriesNumber(string $value): int|float|null
+    {
+        $trimmed = trim($value);
+        if ($trimmed === '' || !is_numeric($trimmed)) {
+            return null;
+        }
+
+        if (str_contains($trimmed, '.')) {
+            return (float) $trimmed;
+        }
+
+        return (int) $trimmed;
+    }
+
+    private function stripTrailingTitleQualifiers(string $title): string
+    {
+        $current = trim($title);
+        $patterns = [
+            '/\s*\((?:unabridged|abridged|complete|full\s*cast|dramati[sz]ed\s*adaptation|enhanced|remastered|special\s*edition|revised\s*edition|anniversary\s*edition)\)\s*$/i',
+            '/\s*\[(?:unabridged|abridged|complete|full\s*cast|dramati[sz]ed\s*adaptation|enhanced|remastered|special\s*edition|revised\s*edition|anniversary\s*edition)\]\s*$/i',
+        ];
+
+        do {
+            $previous = $current;
+            foreach ($patterns as $pattern) {
+                $current = preg_replace($pattern, '', $current);
+                $current = trim($current);
+            }
+        } while ($current !== $previous);
+
+        return $current;
     }
 
     /**
@@ -177,7 +243,7 @@ class BookEnrichmentService
                 if (!empty($bookData['publishDate'])) {
                     $year = date('Y', strtotime($bookData['publishDate']));
                     if ($year && $year > 1800) {
-                        $enrichedData['year'] = (int)$year;
+                        $enrichedData['year'] = (int) $year;
                     }
                 }
 
@@ -245,7 +311,7 @@ class BookEnrichmentService
             if (!empty($volumeInfo['publishedDate'])) {
                 $year = date('Y', strtotime($volumeInfo['publishedDate']));
                 if ($year && $year > 1800) {
-                    $enrichedData['year'] = (int)$year;
+                    $enrichedData['year'] = (int) $year;
                 }
             }
 
@@ -327,7 +393,7 @@ class BookEnrichmentService
 
         // Check for reasonable data values
         if (isset($enrichedData['year']) && is_numeric($enrichedData['year'])) {
-            $year = (int)$enrichedData['year'];
+            $year = (int) $enrichedData['year'];
             if ($year < 1800 || $year > date('Y') + 2) {
                 return false;
             }
@@ -352,7 +418,7 @@ class BookEnrichmentService
             'audible_raw',
             'google_books_raw',
             'audiobook_bay_raw',
-            'cover_url'
+            'cover_url',
         ];
 
         foreach ($enrichmentFields as $field) {
@@ -385,9 +451,9 @@ class BookEnrichmentService
                 return [
                     'type' => $type,
                     'series_name' => trim($matches[1]),
-                    'start_number' => (int)$matches[2],
-                    'end_number' => (int)$matches[3],
-                    'count' => (int)$matches[3] - (int)$matches[2] + 1
+                    'start_number' => (int) $matches[2],
+                    'end_number' => (int) $matches[3],
+                    'count' => (int) $matches[3] - (int) $matches[2] + 1
                 ];
             }
         }

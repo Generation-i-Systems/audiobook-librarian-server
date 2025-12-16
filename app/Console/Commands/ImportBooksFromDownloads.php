@@ -32,6 +32,7 @@ use Illuminate\Support\Facades\App;
 class ImportBooksFromDownloads extends Command
 {
     use GenreMapping;
+
     /**
      * @var getID3
      */
@@ -58,7 +59,8 @@ class ImportBooksFromDownloads extends Command
                             {--no-cache : Disable background processing cache}
                             {--clear-cache : Clear background processing cache before starting}
                             {--force-audio : Force audio transcription even when AI confidence is high}
-                            {--skip-pattern=* : Skip directories matching these patterns (supports wildcards)}';
+                            {--skip-pattern=* : Skip directories matching these patterns (supports wildcards)}
+                            {--no-multi-book : Disable multi-book directory detection for this run}';
 
     /**
      * The console command description.
@@ -1031,9 +1033,11 @@ class ImportBooksFromDownloads extends Command
                 $seriesFromMetadata = $fileData['metadata']['series'];
             }
             if (!empty($fileData['metadata']['author'])) {
-                $authorFromMetadata = is_array($fileData['metadata']['author'])
-                    ? ($fileData['metadata']['author'][0] ?? '')
-                    : $fileData['metadata']['author'];
+                if (is_array($fileData['metadata']['author'])) {
+                    $authorFromMetadata = $fileData['metadata']['author'][0] ?? '';
+                } else {
+                    $authorFromMetadata = $fileData['metadata']['author'];
+                }
             }
             if ($seriesFromMetadata && $authorFromMetadata) {
                 break; // Found both, no need to continue
@@ -1587,6 +1591,10 @@ class ImportBooksFromDownloads extends Command
                 $this->inputInterrupted = true;
                 return '';
             }
+            // Treat a single space as blank/empty input (don't use default)
+            if ($input === ' ') {
+                return '';
+            }
             return trim($input) ?: ($default ?? '');
         } else {
             // Fallback to basic input if readline extension is not available
@@ -1599,6 +1607,10 @@ class ImportBooksFromDownloads extends Command
             $this->output->write($question . ($default ? " [{$default}]" : '') . ': ');
             $input = trim(fgets(STDIN));
 
+            // Treat a single space as blank/empty input (don't use default)
+            if ($input === ' ') {
+                return '';
+            }
             // Return default if empty
             return $input ?: ($default ?? '');
         }
@@ -1962,18 +1974,28 @@ class ImportBooksFromDownloads extends Command
         }
 
         // Extract series number from title and clean metadata (only if not already set)
-        if (empty($aiMetadata['series_number'])) {
+        if (!empty($aiMetadata['title'])) {
             $this->getEnrichmentService()->extractSeriesNumberFromTitle($aiMetadata);
         }
 
         // Handle multi-book patterns (simplified) - skip if already a split book
         // CRITICAL: Only use if series is NOT already set from file tags
-        if (empty($audiobook['is_split_book']) && empty($aiMetadata['series'])) {
+        // Check for --no-multi-book flag or '^' suffix in directory name
+        $disableMultiBook = $this->option('no-multi-book') || str_ends_with($audiobook['name'], '^');
+        if (!$disableMultiBook && empty($audiobook['is_split_book']) && empty($aiMetadata['series'])) {
             $multiBookInfo = $this->getMetadataService()->detectMultiBookPattern($audiobook['name']);
             if ($multiBookInfo) {
                 $this->info("📚 Detected multi-book directory: {$multiBookInfo['series_name']} [{$multiBookInfo['start_number']}-{$multiBookInfo['end_number']}]");
                 $aiMetadata['series'] = $multiBookInfo['series_name'];
                 $aiMetadata['multi_book_numbers'] = range($multiBookInfo['start_number'], $multiBookInfo['end_number']);
+            }
+        }
+
+        // Strip '^' suffix from directory name if present (used to disable multi-book detection)
+        if (str_ends_with($audiobook['name'], '^')) {
+            $audiobook['name'] = substr($audiobook['name'], 0, -1);
+            if (isset($aiMetadata['title']) && str_ends_with($aiMetadata['title'], '^')) {
+                $aiMetadata['title'] = substr($aiMetadata['title'], 0, -1);
             }
         }
 
@@ -2045,7 +2067,7 @@ class ImportBooksFromDownloads extends Command
         $this->line("  Found existing book: '{$existingBook->title}' (ID: {$existingBook->id})");
 
         // Get the existing book's directory path in the library
-        $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
+        $bookStoragePath = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
         if (!$bookStoragePath || !$existingBook->directory_path) {
             $this->warn("📁 Cannot compare directories (storage path or directory path missing)");
             $this->warn("  This may indicate a configuration issue or corrupted database entry");
@@ -2229,8 +2251,7 @@ class ImportBooksFromDownloads extends Command
             '/media/download/audiobooks',
             '/media/lyra_data',
             '/media/lyra_data/download',
-            config('filesystems.disks.books.root'),
-            env('BOOK_STORAGE_PATH'),
+            config('app.book_root', '/media/lyra_data1/audiobooks/books'),
         ];
 
         foreach ($protectedPaths as $protectedPath) {
@@ -2334,7 +2355,7 @@ class ImportBooksFromDownloads extends Command
         switch ($choice) {
             case '2':
                 // Replace existing - remove existing and continue with import
-                $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
+                $bookStoragePath = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
                 // Handle both absolute and relative paths
                 if (str_starts_with($existingBook->directory_path, '/')) {
                     $existingDir = $existingBook->directory_path;
@@ -2719,7 +2740,7 @@ class ImportBooksFromDownloads extends Command
                 $this->info("Found existing book: '{$existingBook->title}' (ID: {$existingBook->id})");
 
                 // Check if files exist
-                $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
+                $bookStoragePath = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
                 // Handle both absolute and relative paths
                 if (str_starts_with($existingBook->directory_path, '/')) {
                     $existingDir = $existingBook->directory_path;
@@ -3799,7 +3820,7 @@ class ImportBooksFromDownloads extends Command
     protected function moveSplitBookFiles(array $audiobook, Book $book, array $aiMetadata): bool
     {
         try {
-            $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
+            $bookStoragePath = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
             if (!$bookStoragePath) {
                 throw new \Exception('Book storage path not configured');
             }
@@ -3841,6 +3862,14 @@ class ImportBooksFromDownloads extends Command
                 }
             }
 
+            $this->getImportService()->assertDirectoryHasAudioFiles($targetDir, [
+                'book_id' => $book->id,
+                'source' => $sourceFile,
+                'target' => $targetDir,
+                'operation' => $operation,
+                'import_mode' => 'split_book',
+            ]);
+
             // Save cover image to target directory
             $coverSaved = false;
 
@@ -3851,9 +3880,8 @@ class ImportBooksFromDownloads extends Command
                 file_put_contents($coverTarget, $aiMetadata['cover_data']);
                 $book->coverImage = $relativePath . '/' . $bookSubdir . '/cover.jpg';
                 $coverSaved = true;
-            }
-            // Otherwise copy existing cover file if it exists
-            elseif (!empty($aiMetadata['cover_url']) && File::exists($aiMetadata['cover_url'])) {
+            } elseif (!empty($aiMetadata['cover_url']) && File::exists($aiMetadata['cover_url'])) {
+                // Otherwise copy existing cover file if it exists
                 $coverTarget = $targetDir . '/cover.jpg';
                 $this->line("  Copying cover image");
                 File::copy($aiMetadata['cover_url'], $coverTarget);
@@ -3910,8 +3938,7 @@ class ImportBooksFromDownloads extends Command
         $protectedPaths = [
             '/media/download',
             '/media/download/audiobooks',
-            config('filesystems.disks.books.root'),
-            env('BOOK_STORAGE_PATH'),
+            config('app.book_root', '/media/lyra_data1/audiobooks/books'),
         ];
 
         foreach ($protectedPaths as $protectedPath) {
@@ -4290,22 +4317,6 @@ class ImportBooksFromDownloads extends Command
     {
         $this->line("📋 File Operation Details:");
         $this->line("   Source: {$audiobook['path']}");
-
-        // Try to determine the target path
-        try {
-            $metadata = [
-                'author' => $book->authors->pluck('name')->toArray(),
-                'genre' => $book->genres->first()?->name ?? 'Unknown',
-                'series' => $book->series->first()?->name,
-                'title' => $book->title,
-            ];
-            $targetPath = $this->getImportService()->generateDirectoryPath($metadata);
-            $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
-            $fullTargetPath = "{$bookStoragePath}/{$targetPath}/{$book->title}";
-            $this->line("   Target: {$fullTargetPath}");
-        } catch (\Exception $e) {
-            $this->line("   Target: [Could not determine target path]");
-        }
 
         // Check recent logs for specific error
         $this->checkRecentFileOperationLogs($audiobook['path']);

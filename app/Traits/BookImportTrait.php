@@ -461,9 +461,13 @@ trait BookImportTrait
                 $book['series_number'] = $seriesNumber;  // For test compatibility
             }
 
-            $book['title'] = trim($title);
-            $book['seriesNumber'] = $seriesNumber;
-            $book['edition'] = $edition;
+            $title = trim($title);
+            // Strip trailing colon from parsed titles (but not if manually edited by user)
+            if (str_ends_with($title, ':')) {
+                $title = rtrim($title, ':');
+                $title = trim($title);
+            }
+            $book['title'] = $title;
             $book['seriesNumber'] = $seriesNumber;
             $book['edition'] = $edition;
         } catch (\Exception $e) {

@@ -224,7 +224,7 @@ class MetadataProcessingService
                 $skipSecondary = (
                     $rootCategory === $specificGenre ||
                     ($rootCategory === 'Science Fiction & Fantasy' &&
-                     ($specificGenre === 'Science Fiction' || $specificGenre === 'Fantasy'))
+                        ($specificGenre === 'Science Fiction' || $specificGenre === 'Fantasy'))
                 );
 
                 if (!$skipSecondary && count($genreParts) > 1) {
@@ -266,7 +266,7 @@ class MetadataProcessingService
         $metadata['source_path'] = $audiobook['path'];
 
         // Extract series number from title if not already done
-        if (empty($metadata['series_number']) && !empty($metadata['title'])) {
+        if (!empty($metadata['title'])) {
             $this->extractSeriesNumberFromTitle($metadata);
         }
 
@@ -416,35 +416,66 @@ class MetadataProcessingService
         }
 
         $title = trim($metadata['title']);
+        $title = $this->stripTrailingTitleQualifiers($title);
+
+        $originalTitle = $title;
+
+        if (preg_match('/^(.*?)\s*\[\s*([^\]]+)\s*\]\s*$/', $title, $matches)) {
+            $possibleTitle = trim($matches[1]);
+            $bracketContent = trim($matches[2]);
+            $bracketContent = $this->stripTrailingTitleQualifiers($bracketContent);
+
+            if (
+                preg_match(
+                    '/^(.*?)\s*(?:#|book|volume|vol\.?|part)\s*([\d.]+)\s*$/i',
+                    $bracketContent,
+                    $bracketMatches
+                )
+            ) {
+                $seriesName = trim($bracketMatches[1]);
+                $seriesNumber = $this->parseSeriesNumber($bracketMatches[2]);
+
+                if ($seriesName !== '' && empty($metadata['series'])) {
+                    $metadata['series'] = $seriesName;
+                }
+                if ($seriesNumber !== null && empty($metadata['series_number'])) {
+                    $metadata['series_number'] = $seriesNumber;
+                }
+
+                if ($possibleTitle !== '') {
+                    $title = $possibleTitle;
+                }
+            }
+        }
 
         $patterns = [
             // Patterns with series name: "Title - Series Name, Book N"
-            '/^(.+?)\s*[-–—]\s*(.+?),\s*Book\s+(\d+)$/i',     // "Title - Series, Book 1"
-            '/^(.+?)\s*[-–—]\s*(.+?),\s*Volume\s+(\d+)$/i',   // "Title - Series, Volume 1"
-            '/^(.+?)\s*[-–—]\s*(.+?),\s*Part\s+(\d+)$/i',     // "Title - Series, Part 1"
-            '/^(.+?)\s*[-–—]\s*(.+?),\s*#(\d+)$/i',           // "Title - Series, #1"
+            '/^(.+?)\s*[-–—]\s*(.+?),\s*Book\s+([\d.]+)$/i',     // "Title - Series, Book 1"
+            '/^(.+?)\s*[-–—]\s*(.+?),\s*Volume\s+([\d.]+)$/i',   // "Title - Series, Volume 1"
+            '/^(.+?)\s*[-–—]\s*(.+?),\s*Part\s+([\d.]+)$/i',     // "Title - Series, Part 1"
+            '/^(.+?)\s*[-–—]\s*(.+?),\s*#([\d.]+)$/i',           // "Title - Series, #1"
 
             // Simple patterns: "Title, Book N"
-            '/^(.+?),\s*Book\s+(\d+)$/i',            // "Title, Book 1"
-            '/^(.+?)\s+Book\s+(\d+)$/i',             // "Title Book 1"
-            '/^(.+?),\s*Volume\s+(\d+)$/i',          // "Title, Volume 1"
-            '/^(.+?)\s+Volume\s+(\d+)$/i',           // "Title Volume 1"
-            '/^(.+?),\s*#(\d+)$/i',                  // "Title, #1"
-            '/^(.+?)\s+#(\d+)$/i',                   // "Title #1"
-            '/^(.+?),\s*Part\s+(\d+)$/i',            // "Title, Part 1"
-            '/^(.+?)\s+Part\s+(\d+)$/i',             // "Title Part 1"
-            '/^(.+?)\s+(\d+)$/',                     // "Title 1" (last resort)
+            '/^(.+?),\s*Book\s+([\d.]+)$/i',            // "Title, Book 1"
+            '/^(.+?)\s+Book\s+([\d.]+)$/i',             // "Title Book 1"
+            '/^(.+?),\s*Volume\s+([\d.]+)$/i',          // "Title, Volume 1"
+            '/^(.+?)\s+Volume\s+([\d.]+)$/i',           // "Title Volume 1"
+            '/^(.+?),\s*#([\d.]+)$/i',                  // "Title, #1"
+            '/^(.+?)\s+#([\d.]+)$/i',                   // "Title #1"
+            '/^(.+?),\s*Part\s+([\d.]+)$/i',            // "Title, Part 1"
+            '/^(.+?)\s+Part\s+([\d.]+)$/i',             // "Title Part 1"
+            '/^(.+?)\s+([\d.]+)$/',                     // "Title 1" (last resort)
         ];
 
         foreach ($patterns as $pattern) {
             if (preg_match($pattern, $title, $matches)) {
-                $cleanTitle = trim($matches[1]);
+                $cleanTitle = $this->stripTrailingTitleQualifiers(trim($matches[1]));
 
                 // Check if this pattern includes series name (3 groups) or not (2 groups)
                 if (count($matches) === 4) {
                     // Pattern with series name: "Title - Series, Book N"
                     $seriesName = trim($matches[2]);
-                    $bookNumber = (int)$matches[3];
+                    $bookNumber = $this->parseSeriesNumber($matches[3]);
 
                     $metadata['title'] = $cleanTitle;
                     if (empty($metadata['series'])) {
@@ -453,7 +484,7 @@ class MetadataProcessingService
                     $metadata['series_number'] = $bookNumber;
                 } else {
                     // Pattern without series name: "Title, Book N"
-                    $bookNumber = (int)$matches[2];
+                    $bookNumber = $this->parseSeriesNumber($matches[2]);
 
                     $metadata['title'] = $cleanTitle;
                     $metadata['series_number'] = $bookNumber;
@@ -462,13 +493,56 @@ class MetadataProcessingService
                 return;
             }
         }
+
+        if ($title !== $originalTitle) {
+            $metadata['title'] = $title;
+        }
+    }
+
+    private function parseSeriesNumber(string $value): int|float|null
+    {
+        $trimmed = trim($value);
+        if ($trimmed === '' || !is_numeric($trimmed)) {
+            return null;
+        }
+
+        if (str_contains($trimmed, '.')) {
+            return (float) $trimmed;
+        }
+
+        return (int) $trimmed;
+    }
+
+    private function stripTrailingTitleQualifiers(string $title): string
+    {
+        $current = trim($title);
+        $patterns = [
+            '/\s*\((?:unabridged|abridged|complete|full\s*cast|dramati[sz]ed\s*adaptation|enhanced|remastered|special\s*edition|revised\s*edition|anniversary\s*edition)\)\s*$/i',
+            '/\s*\[(?:unabridged|abridged|complete|full\s*cast|dramati[sz]ed\s*adaptation|enhanced|remastered|special\s*edition|revised\s*edition|anniversary\s*edition)\]\s*$/i',
+        ];
+
+        do {
+            $previous = $current;
+            foreach ($patterns as $pattern) {
+                $current = preg_replace($pattern, '', $current);
+                $current = trim($current);
+            }
+        } while ($current !== $previous);
+
+        return $current;
     }
 
     /**
      * Detect multi-book pattern
+     * Returns null if title ends with '^' (disables multi-book detection)
      */
     public function detectMultiBookPattern(string $title): ?array
     {
+        // Check for '^' suffix which disables multi-book detection
+        if (str_ends_with(trim($title), '^')) {
+            return null;
+        }
+
         $patterns = [
             'books' => '/^(.+?)\s*books?\s*(\d+)\s*[-–]\s*(\d+)$/i',
             'parts' => '/^(.+?)\s*parts?\s*(\d+)\s*[-–]\s*(\d+)$/i',
@@ -481,9 +555,9 @@ class MetadataProcessingService
                 return [
                     'type' => $type,
                     'series_name' => trim($matches[1]),
-                    'start_number' => (int)$matches[2],
-                    'end_number' => (int)$matches[3],
-                    'count' => (int)$matches[3] - (int)$matches[2] + 1
+                    'start_number' => (int) $matches[2],
+                    'end_number' => (int) $matches[3],
+                    'count' => (int) $matches[3] - (int) $matches[2] + 1
                 ];
             }
         }
