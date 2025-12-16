@@ -185,6 +185,27 @@ class MoveBookDirectoryTest extends TestCase
         $this->assertEquals('Sci-Fi/Book1', $book->directory_path);
     }
 
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_treats_existing_destination_directory_as_parent_for_single_source(): void
+    {
+        $sourcePath = 'Brandon Sanderson/Infinity Blade/Infinity Blade - Redemption';
+        $destDir = 'Fantasy/Brandon Sanderson';
+
+        $this->createTestDirectory($sourcePath);
+        $this->createTestDirectory($destDir);
+        $book = $this->createTestBook($sourcePath);
+
+        $this->artisan('books:move', [
+            'sources' => [$sourcePath, $destDir],
+        ])->assertExitCode(0);
+
+        $this->assertDirDoesNotExist($this->testBookRoot . '/' . $sourcePath);
+        $this->assertDirExists($this->testBookRoot . '/' . $destDir . '/' . basename($sourcePath));
+
+        $book->refresh();
+        $this->assertEquals($destDir . '/' . basename($sourcePath), $book->directory_path);
+    }
+
     /** @test */
     public function it_returns_exit_code_2_when_no_books_found()
     {

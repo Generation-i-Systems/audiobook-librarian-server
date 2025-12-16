@@ -15,6 +15,7 @@
   - Fixes "Could not read image dimensions" errors when displaying cover images
   - Books can now be found regardless of whether paths use symlinks or real paths
 - Fixed admin book edit `directoryPath` updates to move/merge files when the destination directory already exists
+- Fixed `book-mv`/`books:move` aborting when the destination directory already exists by treating the destination as a parent directory
 - Fixed import-bk creating duplicate book directories with a `_01` suffix when the destination directory already exists from an earlier step (e.g., cover image creation)
 - Fixed admin book edit not persisting series updates when the form submits malformed `series` payloads; also fixed MySqlService `findOrCreateMany()` undefined-method errors by adding missing `findOrCreate*` helpers
 - Fixed inconsistent cover image storage by persisting local `coverImage` values as filename-only (relative to `directoryPath`) while remaining backward compatible with legacy values that include the directory path

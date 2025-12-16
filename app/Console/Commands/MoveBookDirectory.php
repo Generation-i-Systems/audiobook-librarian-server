@@ -339,9 +339,11 @@ class MoveBookDirectory extends Command
             $sourcePath = $bookSource['path'];
             $finalDest = $destPath;
 
+            $destinationIsDirectory = is_dir($destPath) || str_ends_with($destination, '/');
+
             // If multiple sources, trailing slash, OR destination is an existing directory,
             // treat as "move into directory" operation
-            if (count($sources) > 1 || str_ends_with($destination, '/')) {
+            if (count($sources) > 1 || $destinationIsDirectory) {
                 $finalDest = $destPath . '/' . basename($sourcePath);
             }
 
@@ -373,7 +375,8 @@ class MoveBookDirectory extends Command
 
                 // Calculate final destination for this source
                 $finalDest = $destPath;
-                if (count($sources) > 1 || str_ends_with($destination, '/')) {
+                $destinationIsDirectory = is_dir($destPath) || str_ends_with($destination, '/');
+                if (count($sources) > 1 || $destinationIsDirectory) {
                     $finalDest = $destPath . '/' . basename($sourcePath);
                 }
 
