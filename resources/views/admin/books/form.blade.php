@@ -61,14 +61,23 @@
         } elseif (!empty($initial['coverImage'])) {
             $currentCover = $initial['coverImage'];
         }
-        
+
         $coverUrl = null;
         if ($currentCover && is_string($currentCover)) {
-            $bookDir = isset($book) && !empty($book['directoryPath']) ? $book['directoryPath'] : ($directoryPath ?? ($initial['directoryPath'] ?? null));
-            if ($bookDir) {
-                $coverPath = $bookDir . '/' . basename($currentCover);
-                $encodedPath = str_replace(['%2F'], ['/'], rawurlencode($coverPath));
-                $coverUrl = url('/cover/' . $encodedPath);
+            // Handle both remote URLs and local paths
+            if (str_starts_with($currentCover, 'http://') || str_starts_with($currentCover, 'https://')) {
+                // Remote URL - use as-is
+                $coverUrl = $currentCover;
+            } else {
+                // Local path - construct cover URL
+                $bookDir = isset($book) && !empty($book['directoryPath']) ? $book['directoryPath'] : ($directoryPath ?? ($initial['directoryPath'] ?? null));
+                if ($bookDir) {
+                    // Extract just the basename in case $currentCover is a full path like "Author - Title/cover.jpg"
+                    $coverBasename = basename($currentCover);
+                    $coverPath = $bookDir . '/' . $coverBasename;
+                    $encodedPath = str_replace(['%2F'], ['/'], rawurlencode($coverPath));
+                    $coverUrl = url('/cover/' . $encodedPath);
+                }
             }
         }
     @endphp
@@ -84,15 +93,15 @@
                     @endif
                 </div>
             </div>
-            @if($coverUrl)
+            <div id="cover-preview-container" style="display: {{ $coverUrl ? 'block' : 'none' }};">
                 <div class="position-relative" style="cursor: pointer;" id="cover-preview-trigger">
-                    <img src="{{ $coverUrl }}" alt="Book Cover" style="height: 120px; border: 2px solid #dee2e6; border-radius: 4px;">
-                    <div class="position-absolute top-0 end-0 bg-primary text-white rounded-circle" 
+                    <img src="{{ $coverUrl ?? '' }}" alt="Book Cover" style="height: 120px; border: 2px solid #dee2e6; border-radius: 4px;">
+                    <div class="position-absolute top-0 end-0 bg-primary text-white rounded-circle"
                          style="width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; margin: -8px;">
                         <i class="fas fa-edit" style="font-size: 12px;"></i>
                     </div>
                 </div>
-            @endif
+            </div>
         </div>
     @endif
     @if(session('error'))
@@ -146,7 +155,11 @@
         @php
             $displayPath = old('directoryPath') ?? request()->get('import_path') ?? ($book['directoryPath'] ?? null) ?? ($initial['directoryPath'] ?? '');
         @endphp
-        <input type="hidden" id="directoryPath" name="directoryPath" value="{{ $displayPath }}">
+        <input type="hidden" id="directoryPathHidden" name="directoryPath" value="{{ $displayPath }}">
+
+        <!-- Hidden inputs for cover image URLs (preserved on validation failure) -->
+        <input type="hidden" id="coverImageUrl" name="coverImageUrl" value="{{ old('coverImageUrl', '') }}">
+        <input type="hidden" id="audibleCoverImageUrl" name="audibleCoverImageUrl" value="{{ old('audibleCoverImageUrl', '') }}">
 
         <!-- Import-related hidden fields -->
         @if(!empty($initial['sourcePath']))
@@ -176,7 +189,7 @@
                     <div class="col-md-6">
                         <label for="title" class="form-label">Title</label>
                         <input type="text" class="form-control @error('title') is-invalid @enderror" id="title" name="title"
-                            value="{{ old('title') ?? request()->get('title') ?? ($book['title'] ?? null) ?? ($initial['title'] ?? '') }}" 
+                            value="{{ old('title') ?? request()->get('title') ?? ($book['title'] ?? null) ?? ($initial['title'] ?? '') }}"
                             placeholder="Enter book title" required>
                         @error('title')
                             <span class="invalid-feedback d-block">{{ $message }}</span>
@@ -200,18 +213,18 @@
                             @foreach($seriesList as $idx => $series)
                                 <div class="d-flex align-items-start mb-2 series-row">
                                     <input type="number" name="series[{{ $idx }}][number]" class="form-control"
-                                        style="width:60px; height:32px; flex-shrink:0;" placeholder="#" value="{{ $series['number'] ?? '' }}" step="any">
+                                        style="width:80px; height:32px; flex-shrink:0;" placeholder="#" value="{{ $series['number'] ?? '' }}" step="any">
                                     <input type="text" name="series[{{ $idx }}][seriesName]" class="form-control series-autocomplete ms-2" style="height:32px; flex:1;"
                                          placeholder="Series Name" value="{{ $series['seriesName'] ?? '' }}">
                                     <div class="form-check ms-2 d-flex align-items-center" style="height:32px;" title="Collection (not a primary series)">
-                                        <input type="checkbox" name="series[{{ $idx }}][isCollection]" class="form-check-input" 
+                                        <input type="checkbox" name="series[{{ $idx }}][isCollection]" class="form-check-input"
                                                value="1" {{ ($series['isCollection'] ?? false) ? 'checked' : '' }}
                                                style="margin-top:0;">
                                         <label class="form-check-label ms-1 small">Collection</label>
                                     </div>
                                     <datalist id="series-list"></datalist>
                                     @if(!empty($series['seriesName']))
-                                        <button type="button" class="btn btn-sm btn-outline-primary ms-2 rename-series-btn" 
+                                        <button type="button" class="btn btn-sm btn-outline-primary ms-2 rename-series-btn"
                                             data-series-name="{{ $series['seriesName'] }}"
                                             style="height:32px; width:32px; padding:0; display:flex; align-items:center; justify-content:center; flex-shrink:0;"
                                             title="Rename this series">
@@ -233,7 +246,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="row">
                     <div class="col-md-6">
                         <label class="form-label">Authors</label>
@@ -360,15 +373,15 @@
                 <div class="d-flex align-items-center">
                     <div class="position-relative" style="flex: 1;">
                         <input type="text" class="form-control @error('directoryPath') is-invalid @enderror" id="directoryPath"
-                            name="directoryPath" value="{{ old('directoryPath', $directoryPath ?? ($initial['directoryPath'] ?? '')) }}" 
+                            name="directoryPath" value="{{ old('directoryPath', $directoryPath ?? ($initial['directoryPath'] ?? '')) }}"
                             style="padding-right: 35px;" placeholder="Path to book directory">
-                        <button type="button" class="btn btn-link text-danger position-absolute" id="directory-not-found-btn" 
+                        <button type="button" class="btn btn-link text-danger position-absolute" id="directory-not-found-btn"
                             style="display: none; right: 5px; top: 50%; transform: translateY(-50%); padding: 0; width: 25px; height: 25px;"
                             title="Directory not found - Click to browse">
                             <i class="fas fa-times-circle"></i>
                         </button>
                     </div>
-                    <button type="button" class="btn btn-outline-secondary ms-2" id="resync-path-btn" 
+                    <button type="button" class="btn btn-outline-secondary ms-2" id="resync-path-btn"
                         title="Parse directory path to populate title, author, and series fields">
                         <i class="fas fa-sync-alt me-1"></i>Resync Fields from Path
                     </button>
@@ -402,7 +415,7 @@
                     <div class="col-md-9">
                         <label for="description" class="form-label">Description <span class="text-muted">(Optional)</span></label>
                         <textarea class="form-control @error('description') is-invalid @enderror" id="description"
-                            name="description" rows="3" 
+                            name="description" rows="3"
                             placeholder="Enter book description">{{ old('description', isset($book) && !empty($book['description']) ? $book['description'] : ($initial['description'] ?? null)) }}</textarea>
                         @error('description')
                             <span class="invalid-feedback d-block">{{ $message }}</span>
@@ -567,7 +580,7 @@
             @endphp
             <!-- Original coverImageSource field -->
             <input type="hidden" name="coverImageSource" id="coverImageSource" value="{{ $initialCoverSource }}">
-            
+
             <!-- Add a script to ensure coverImageSource is set correctly on form submission -->
             <script>
                 document.addEventListener('DOMContentLoaded', function() {
@@ -645,7 +658,7 @@
         // Open cover image modal when clicking cover preview
         document.addEventListener('DOMContentLoaded', function() {
             const coverPreviewTrigger = document.getElementById('cover-preview-trigger');
-            
+
             if (coverPreviewTrigger) {
                 coverPreviewTrigger.addEventListener('click', function() {
                     const modal = new bootstrap.Modal(document.getElementById('coverImageModal'));
@@ -653,12 +666,12 @@
                 });
             }
         });
-        
+
         // Collapsible card sections with summaries
         document.addEventListener('DOMContentLoaded', function() {
             function generateSummary(card) {
                 const cardType = card.querySelector('.book-form-section-title').dataset.card;
-                
+
                 if (cardType === 'basic-info') {
                     const title = document.getElementById('title')?.value || '';
                     const authors = Array.from(document.querySelectorAll('#authors-group input[name="author[]"]'))
@@ -673,56 +686,56 @@
                         }).filter(v => v).join(', ') || '';
                     const genres = Array.from(document.querySelectorAll('#genres-group input[name="genre[]"]'))
                         .map(i => i.value).filter(v => v).join(', ') || '';
-                    
+
                     let summary = title;
                     if (series) summary += ` (${series})`;
                     if (authors) summary += ` by ${authors}`;
                     if (narrators) summary += ` narrated by ${narrators}`;
                     if (genres) summary += ` [${genres}]`;
-                    
+
                     return summary || 'No information entered';
                 }
-                
+
                 if (cardType === 'additional-info') {
                     const description = document.getElementById('description')?.value || '';
                     const releaseDate = document.getElementById('release_date')?.value || '';
-                    
+
                     let summary = '';
                     if (releaseDate) summary += `Released: ${releaseDate}`;
                     if (description) {
                         const shortDesc = description.substring(0, 100) + (description.length > 100 ? '...' : '');
                         summary += (summary ? ' | ' : '') + shortDesc;
                     }
-                    
+
                     return summary || 'No additional information';
                 }
-                
+
                 if (cardType === 'directory') {
                     const path = document.getElementById('directoryPath')?.value || '';
                     return path || 'No directory path set';
                 }
-                
+
                 return '';
             }
-            
+
             document.querySelectorAll('.book-form-section-title').forEach(function(title) {
                 // Create summary element
                 const summary = document.createElement('div');
                 summary.className = 'card-summary';
                 summary.style.display = 'none';
-                
+
                 // Insert summary after the title
                 title.parentNode.insertBefore(summary, title.nextSibling);
-                
+
                 title.addEventListener('click', function() {
                     const content = summary.nextElementSibling;
                     const card = this.closest('.book-form-card');
-                    
+
                     if (content && content.classList.contains('card-content')) {
                         const isCollapsing = content.style.display !== 'none';
                         content.style.display = isCollapsing ? 'none' : 'block';
                         this.classList.toggle('collapsed');
-                        
+
                         // Show/hide summary and toggle card class
                         if (isCollapsing) {
                             summary.textContent = generateSummary(card);
@@ -901,7 +914,7 @@ document.addEventListener('DOMContentLoaded', function() {
         @if(!empty($isModal))
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="modal-cancel-btn">Cancel</button>
         @else
-            <a href="{{ route('admin.books.index') }}" class="btn btn-secondary">Cancel</a>
+            <a href="{{ $finalReturnUrl ?? route('admin.books.index') }}" class="btn btn-secondary">Cancel</a>
         @endif
     </form>
 </div>

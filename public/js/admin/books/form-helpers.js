@@ -93,11 +93,13 @@
             return;
         }
 
+        const idx = group.querySelectorAll(".series-row").length;
+
         const div = document.createElement("div");
         div.className = "d-flex align-items-start mb-2 series-row";
         div.innerHTML = `
-            <input type="number" name="series[][number]" class="form-control" style="width:60px; height:32px; flex-shrink:0;" placeholder="#" value="${seriesNumber}" step="any">
-            <input type="text" name="series[][seriesName]" class="form-control series-autocomplete ms-2" style="height:32px; flex:1;" placeholder="Series Name" value="${seriesName}">
+            <input type="number" name="series[${idx}][number]" class="form-control" style="width:80px; height:32px; flex-shrink:0;" placeholder="#" value="${seriesNumber}" step="any">
+            <input type="text" name="series[${idx}][seriesName]" class="form-control series-autocomplete ms-2" style="height:32px; flex:1;" placeholder="Series Name" value="${seriesName}">
             <div style="width:32px; height:32px; margin-left:0.5rem; flex-shrink:0;"></div>
             <div class="d-flex flex-column ms-2" style="gap:2px;">
                 <button type="button" class="btn btn-outline-danger btn-sm remove-series" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">&times;</button>

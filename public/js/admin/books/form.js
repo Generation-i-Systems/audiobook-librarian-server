@@ -95,11 +95,12 @@ window.addNarratorRow = addNarratorRow;
 function addSeriesRow($container, seriesName = "", seriesNumber = "") {
     const group = $container.find("#series-group")[0];
     if (!group) return;
+    const idx = group.querySelectorAll(".series-row").length;
     const div = document.createElement("div");
     div.className = "d-flex align-items-start mb-2 series-row";
     div.innerHTML = `
-        <input type="number" name="series[][number]" class="form-control" style="width:60px; height:32px; flex-shrink:0;" placeholder="#" value="${seriesNumber}" step="any">
-        <input type="text" name="series[][seriesName]" class="form-control series-autocomplete ms-2" style="height:32px; flex:1;" placeholder="Series Name" value="${seriesName}">
+        <input type="number" name="series[${idx}][number]" class="form-control" style="width:80px; height:32px; flex-shrink:0;" placeholder="#" value="${seriesNumber}" step="any">
+        <input type="text" name="series[${idx}][seriesName]" class="form-control series-autocomplete ms-2" style="height:32px; flex:1;" placeholder="Series Name" value="${seriesName}">
         <div style="width:32px; height:32px; margin-left:0.5rem; flex-shrink:0;"></div>
         <div class="d-flex flex-column ms-2" style="gap:2px;">
             <button type="button" class="btn btn-outline-danger btn-sm remove-series" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">&times;</button>
@@ -307,7 +308,7 @@ function initializeAutocomplete($container, selector, sourceUrl) {
         const authorInputs = $container.find('input[name="author[]"]');
         const authorName = $(authorInputs[0]).val().trim();
         const series = $container.find('#series-select option:selected').text() || ''; // Assuming TomSelect for series, otherwise adjust
-        const seriesNumber = $container.find('input[name="series[][number]"]').first().val() || ''; // Assuming first series number
+        const seriesNumber = $container.find('#series-group input[name*="[number]"]').first().val() || ''; // Assuming first series number
         $container.find('#autofill-btn').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Searching...');
 
         const googleBooksUrl = window.BOOK_FORM_ROUTES.googleBooks || '/admin/books/google-books'; // Fallback if not defined
@@ -533,14 +534,14 @@ function loadDirectoryFiles($container) {
         success: function (response) {
             $viewFilesBtn.prop("disabled", false).html(originalBtnHtml);
             let html = "";
-            
+
             // Check if directory exists
             if (response.exists === false) {
                 html = '<div class="p-3 text-danger"><i class="fas fa-exclamation-triangle me-2"></i>Directory not found</div>';
                 filesList.html(html);
                 return;
             }
-            
+
             let files = response.files || [];
 
             if (files.length > 0) {
@@ -550,7 +551,7 @@ function loadDirectoryFiles($container) {
                     const filename = file.name || file.filename || "Unknown";
                     const size = file.size ? formatFileSize(file.size) : '';
                     const ext = file.extension || '';
-                    
+
                     // Choose icon based on file type
                     let icon = 'fa-file';
                     let isImage = false;
@@ -566,10 +567,10 @@ function loadDirectoryFiles($container) {
                     } else if (['json', 'xml'].includes(ext.toLowerCase())) {
                         icon = 'fa-file-code text-warning';
                     }
-                    
+
                     const itemClass = isImage ? 'list-group-item-action cursor-pointer' : '';
                     const dataAttrs = isImage ? 'data-cover-file="' + filename + '"' : '';
-                    
+
                     html += '<div class="list-group-item py-1 px-2 small d-flex justify-content-between align-items-center ' + itemClass + '" ' + dataAttrs + '>';
                     html += '<span><i class="fas ' + icon + ' me-2"></i>' + filename;
                     if (isImage) {
@@ -704,7 +705,7 @@ window.initBookForm = function (formContainerSelector) {
             const rows = group.querySelectorAll(".author-row");
             const row = $(this).closest(".author-row")[0];
             const rowIndex = Array.from(rows).indexOf(row);
-            
+
             if (rowIndex === 0) {
                 // First row: just clear the value
                 row.querySelector('input[name="author[]"]').value = "";
@@ -752,7 +753,7 @@ window.initBookForm = function (formContainerSelector) {
             const rows = group.querySelectorAll(".narrator-row");
             const row = $(this).closest(".narrator-row")[0];
             const rowIndex = Array.from(rows).indexOf(row);
-            
+
             if (rowIndex === 0) {
                 // First row: just clear the value
                 row.querySelector('input[name="narrator[]"]').value = "";
@@ -774,7 +775,7 @@ window.initBookForm = function (formContainerSelector) {
             const rows = group.querySelectorAll(".genre-row");
             const row = $(this).closest(".genre-row")[0];
             const rowIndex = Array.from(rows).indexOf(row);
-            
+
             if (rowIndex === 0) {
                 // First row: just reset the select
                 row.querySelector('select[name="genre[]"]').value = "";
@@ -805,34 +806,34 @@ window.initBookForm = function (formContainerSelector) {
             e.preventDefault();
             const filename = $(this).data("cover-file");
             const dirPath = $container.find("#directoryPath").val();
-            
+
             if (!filename || !dirPath) {
                 alert("Unable to set cover - missing filename or directory path");
                 return;
             }
-            
+
             // Set the cover image field to the selected filename
             const $coverInput = $container.find("#coverImage");
             if ($coverInput.length) {
                 $coverInput.val(filename);
-                
+
                 // Trigger change event to update any preview
                 $coverInput.trigger("change");
-                
+
                 // Show success message
                 $(this).addClass("bg-success text-white");
                 setTimeout(() => {
                     $(this).removeClass("bg-success text-white");
                 }, 1000);
-                
+
                 // If there's a cover preview, update it
-                const coverUrl = window.BOOK_FORM_ROUTES?.filesAjax 
+                const coverUrl = window.BOOK_FORM_ROUTES?.filesAjax
                     ? "/cover/" + dirPath + "/" + filename
                     : "";
                 if (coverUrl) {
                     $container.find(".cover-preview img").attr("src", coverUrl);
                 }
-                
+
                 console.log("Cover image set to:", filename);
             } else {
                 console.error("Cover image input field not found");
@@ -1025,14 +1026,31 @@ document.addEventListener("DOMContentLoaded", function () {
         radio.addEventListener("change", function () {
             console.log("Cover image selected: " + this.value);
             console.log("Cover source: " + this.dataset.source);
-            
+
             // Set the hidden coverImageSource field
             const coverImageSourceField = document.getElementById('coverImageSource');
             if (coverImageSourceField) {
                 coverImageSourceField.value = this.dataset.source || '';
                 console.log("Set coverImageSource to: " + coverImageSourceField.value);
             }
-            
+
+            // Preserve cover URL in hidden fields for validation failure recovery
+            const source = this.dataset.source || '';
+            const coverUrl = this.value;
+            if (source === 'audible') {
+                const audibleUrlField = document.getElementById('audibleCoverImageUrl');
+                if (audibleUrlField) {
+                    audibleUrlField.value = coverUrl;
+                    console.log("[DEBUG] Set audibleCoverImageUrl to:", coverUrl);
+                }
+            } else if (source === 'google') {
+                const googleUrlField = document.getElementById('coverImageUrl');
+                if (googleUrlField) {
+                    googleUrlField.value = coverUrl;
+                    console.log("[DEBUG] Set coverImageUrl to:", coverUrl);
+                }
+            }
+
             // Update the corner preview image to show the selected cover
             const $cornerPreview = $("#cover-preview-trigger img");
             if ($cornerPreview.length) {
@@ -1047,7 +1065,7 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         });
     });
-    
+
     // Set initial value for coverImageSource if a radio is already checked
     const checkedCoverRadio = document.querySelector('input[name="coverImageCandidate"]:checked');
     if (checkedCoverRadio) {
@@ -1057,12 +1075,12 @@ document.addEventListener("DOMContentLoaded", function () {
             const source = checkedCoverRadio.dataset.source || '';
             console.log("[DEBUG] Initial checked radio data-source:", source);
             console.log("[DEBUG] Initial checked radio value:", checkedCoverRadio.value);
-            
+
             coverImageSourceField.value = source;
             console.log("Initial coverImageSource set to: " + coverImageSourceField.value);
         }
     }
-    
+
     // Force update the coverImageSource field now to ensure it's set correctly
     setTimeout(() => {
         const checkedRadio = document.querySelector('input[name="coverImageCandidate"]:checked');
@@ -1087,12 +1105,12 @@ document.addEventListener("DOMContentLoaded", function () {
                     const sourceValue = checkedRadioButton.dataset.source || '';
                     coverSourceField.value = sourceValue;
                     console.log("[SUBMIT] Setting coverImageSource to:", sourceValue);
-                    
+
                     // Force a data attribute to the form to ensure it's used
                     form.dataset.coverSource = sourceValue;
                 }
             }
-            
+
             // Clear previous validation
             form.querySelectorAll(".is-invalid").forEach((field) =>
                 field.classList.remove("is-invalid"),
@@ -1119,14 +1137,14 @@ document.addEventListener("DOMContentLoaded", function () {
             // Check if an external cover image is selected
             const selectedCoverRadio = form.querySelector('input[name="coverImageCandidate"]:checked');
             console.log("[DEBUG] Selected cover radio data-source:", selectedCoverRadio ? selectedCoverRadio.dataset.source : "none");
-            
+
             if (selectedCoverRadio && (selectedCoverRadio.dataset.source === "audible" || selectedCoverRadio.dataset.source === "google")) {
                 console.log("[DEBUG] External cover image selected: " + selectedCoverRadio.dataset.source);
-                
+
                 // Check if the cover has already been downloaded (filename starts with cover_audible_ or cover_google_)
                 const coverValue = selectedCoverRadio.value;
                 const isAlreadyDownloaded = coverValue && (coverValue.startsWith('cover_audible_') || coverValue.startsWith('cover_google_'));
-                
+
                 if (!isAlreadyDownloaded) {
                     // Only validate IDs and URLs if we need to download the cover
                     // Verify we have the corresponding ID for the external source
@@ -1229,7 +1247,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 console.log("[DEBUG] Selected cover image value before submission:", selectedCoverRadio.value);
                 console.log("[DEBUG] Selected cover image data-source:", selectedCoverRadio.dataset.source);
             }
-            
+
             if (hasError) {
                 e.preventDefault();
                 // Re-enable the submit button if there are validation errors
@@ -1626,14 +1644,14 @@ function displayAutofillResults(results, autoApplyFirst) {
                 "</tr>";
         });
         $resultsTable.html(rows);
-        
+
         // Store results for later use
         window.autofillMatches = results;
-        
+
         // Enable the apply button for first result
         $applyBtn.prop("disabled", false);
         $applyBtn.data("selectedIdx", 0);
-        
+
         // Enable selection logic
         $(document)
             .off("change.autofillResult")
@@ -1674,34 +1692,34 @@ $(function () {
     if ($autofillForm.length) {
         // Remove old submit handler
         $autofillForm.off("submit");
-        
+
         // Handle individual source buttons
         $("#search-audible-btn").on("click", function(e) {
             e.preventDefault();
             performAutofillSearch("audible", false);
         });
-        
+
         $("#search-google-btn").on("click", function(e) {
             e.preventDefault();
             performAutofillSearch("google", false);
         });
-        
+
         $("#search-audiobookbay-btn").on("click", function(e) {
             e.preventDefault();
             performAutofillSearch("audiobookbay", false);
         });
-        
+
         $("#search-hardcover-btn").on("click", function(e) {
             e.preventDefault();
             performAutofillSearch("hardcover", false);
         });
-        
+
         // Handle search all button (excludes AudiobookBay due to performance)
         $("#search-all-btn").on("click", function(e) {
             e.preventDefault();
             performAutofillSearch(["audible", "google", "hardcover"], false);
         });
-        
+
         // Handle the apply button click
         $("#autofill-apply-btn")
             .off("click.autofillApply")
@@ -1873,11 +1891,12 @@ function applyAutofillResult(idx) {
 
                                         // Ensure the cover candidates group is visible
                                         $("#cover-candidates-group").show();
-                                        
+
                                         // Update the corner preview image to show the newly selected cover
                                         var $cornerPreview = $("#cover-preview-trigger img");
                                         if ($cornerPreview.length) {
                                             $cornerPreview.attr("src", coverUrl);
+                                            $("#cover-preview-container").show();
                                             console.log("[DEBUG] Updated corner preview to show autofilled cover");
                                         }
                                     } else {
@@ -1885,6 +1904,7 @@ function applyAutofillResult(idx) {
                                         var $cornerPreview = $("#cover-preview-trigger img");
                                         if ($cornerPreview.length && coverUrl) {
                                             $cornerPreview.attr("src", coverUrl);
+                                            $("#cover-preview-container").show();
                                             console.log("[DEBUG] Updated corner preview to show autofilled cover");
                                         }
                                     }
@@ -1967,7 +1987,7 @@ function applyAutofillResult(idx) {
 $(document).on("click", "#magic-autofill-btn", function(e) {
     e.preventDefault();
     console.log("[DEBUG] Magic autofill button clicked");
-    
+
     // Get current form values
     var title = $('input[name="title"]').val() || '';
     var author = '';
@@ -1975,11 +1995,11 @@ $(document).on("click", "#magic-autofill-btn", function(e) {
     if (authorInputs.length > 0) {
         author = $(authorInputs[0]).val() || '';
     }
-    
+
     // Set autofill modal fields
     $("#autofill-title").val(title);
     $("#autofill-author").val(author);
-    
+
     // Perform Audible search and auto-apply first result
     performAutofillSearch("audible", true);
 });
@@ -2024,9 +2044,9 @@ function showToast(message, type = 'success') {
             boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
         })
         .text(message);
-    
+
     $('body').append(toast);
-    
+
     setTimeout(function() {
         toast.fadeOut(300, function() {
             $(this).remove();
@@ -2034,15 +2054,14 @@ function showToast(message, type = 'success') {
     }, 2000);
 }
 
-// Resync fields from directory path
-$(document).on('click', '#resync-path-btn', function() {
-    const directoryPath = $('#directoryPath').val();
+// Resync fields from directory path - reads current directoryPath value
+$(document).off('click.resyncPath', '#resync-path-btn').on('click.resyncPath', '#resync-path-btn', function() {
+    const directoryPath = $('input[name="directoryPath"]:not(#directoryPathHidden)').val();
     if (!directoryPath) {
         showToast('Please enter a directory path first', 'warning');
         return;
     }
-    
-    // Call the server-side parser to use the existing parsing logic
+
     $.ajax({
         url: window.BOOK_FORM_ROUTES.parsePath,
         method: 'POST',
@@ -2051,42 +2070,33 @@ $(document).on('click', '#resync-path-btn', function() {
             _token: $('meta[name="csrf-token"]').attr('content')
         },
         success: function(data) {
-            // Set title
             if (data.title) {
                 $('#title').val(data.title);
             }
-            
-            // Set author (first row)
             if (data.author) {
                 const firstAuthorInput = $('#authors-group .author-row:first input[name="author[]"]');
                 if (firstAuthorInput.length) {
                     firstAuthorInput.val(data.author);
                 }
             }
-            
-            // Set genre (first row) - it's a select dropdown, not an input
             if (data.genre) {
                 const firstGenreSelect = $('#genres-group .genre-row:first select[name="genre[]"]');
                 if (firstGenreSelect.length) {
                     firstGenreSelect.val(data.genre);
                 }
             }
-            
-            // Set series if present
             if (data.series) {
                 const firstSeriesNameInput = $('#series-group .series-row:first input[name*="[seriesName]"]');
                 if (firstSeriesNameInput.length) {
                     firstSeriesNameInput.val(data.series);
                 }
             }
-            
             if (data.seriesNumber) {
                 const firstSeriesNumberInput = $('#series-group .series-row:first input[name*="[number]"]');
                 if (firstSeriesNumberInput.length) {
                     firstSeriesNumberInput.val(data.seriesNumber);
                 }
             }
-            
             showToast('Fields updated from path!', 'success');
         },
         error: function(xhr) {
@@ -2101,7 +2111,7 @@ $(document).on('click', '.view-metadata', function(e) {
     const filePath = $(this).data('file');
     const modal = new bootstrap.Modal(document.getElementById('audioMetadataModal'));
     const metadataContent = $('#metadata-content');
-    
+
     // Show loading state
     metadataContent.html(`
         <div class="text-center p-4">
@@ -2111,9 +2121,9 @@ $(document).on('click', '.view-metadata', function(e) {
             <p class="mt-2 text-muted">Loading metadata...</p>
         </div>
     `);
-    
+
     modal.show();
-    
+
     // Fetch metadata
     $.ajax({
         url: window.BOOK_FORM_ROUTES.audioMetadata || '/admin/books/audio-metadata',
@@ -2145,7 +2155,7 @@ $(document).on('click', '.view-metadata', function(e) {
 
 function displayMetadata(metadata, filename) {
     let html = '<div class="metadata-display">';
-    
+
     // File info
     if (metadata.file) {
         html += '<h6 class="border-bottom pb-2 mb-3"><i class="fas fa-file me-2"></i>File Information</h6>';
@@ -2162,7 +2172,7 @@ function displayMetadata(metadata, filename) {
         }
         html += '</table>';
     }
-    
+
     // Format info
     if (metadata.format) {
         html += '<h6 class="border-bottom pb-2 mb-3"><i class="fas fa-info-circle me-2"></i>Format Information</h6>';
@@ -2178,7 +2188,7 @@ function displayMetadata(metadata, filename) {
         }
         html += '</table>';
     }
-    
+
     // Stream info
     if (metadata.streams && metadata.streams.length > 0) {
         html += '<h6 class="border-bottom pb-2 mb-3"><i class="fas fa-stream me-2"></i>Audio Streams</h6>';
@@ -2200,7 +2210,7 @@ function displayMetadata(metadata, filename) {
             html += '</table>';
         });
     }
-    
+
     // Tags
     if (metadata.tags && Object.keys(metadata.tags).length > 0) {
         html += '<h6 class="border-bottom pb-2 mb-3"><i class="fas fa-tags me-2"></i>Metadata Tags</h6>';
@@ -2211,7 +2221,7 @@ function displayMetadata(metadata, filename) {
         });
         html += '</table>';
     }
-    
+
     html += '</div>';
     $('#metadata-content').html(html);
 }
