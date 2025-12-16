@@ -289,8 +289,8 @@
             </tbody>
         </table>
 
-        <div class="d-flex justify-content-center mt-4 mb-3">
-            {{ $books->links('pagination::bootstrap-4') }}
+        <div class="pagination">
+            {{ $books->links() }}
         </div>
 
     </div>
