@@ -648,10 +648,13 @@ class MoveBookDirectory extends Command
      */
     private function isInBookRoot(string $path): bool
     {
-        $realPath = realpath($path) ?: $path;
-        $realBookRoot = realpath($this->bookRoot);
+        $realPath = $this->normalizePathString(realpath($path) ?: $path);
+        $realBookRoot = $this->normalizePathString(realpath($this->bookRoot) ?: $this->bookRoot);
 
-        return str_starts_with($realPath, $realBookRoot);
+        return $this->startsWithSegments(
+            $this->splitPathSegments($realPath),
+            $this->splitPathSegments($realBookRoot)
+        );
     }
 
     /**
@@ -659,7 +662,19 @@ class MoveBookDirectory extends Command
      */
     private function getRelativePath(string $absolutePath): string
     {
-        return trim(str_replace($this->bookRoot, '', $absolutePath), '/');
+        $normalizedAbsolute = $this->normalizePathString(realpath($absolutePath) ?: $absolutePath);
+        $normalizedRoot = $this->normalizePathString(realpath($this->bookRoot) ?: $this->bookRoot);
+
+        $absoluteSegments = $this->splitPathSegments($normalizedAbsolute);
+        $rootSegments = $this->splitPathSegments($normalizedRoot);
+
+        if (!$this->startsWithSegments($absoluteSegments, $rootSegments)) {
+            return trim(str_replace($normalizedRoot, '', $normalizedAbsolute), '/');
+        }
+
+        $relativeSegments = array_slice($absoluteSegments, count($rootSegments));
+
+        return implode('/', $relativeSegments);
     }
 
     private function splitPathSegments(string $path): array
@@ -703,7 +718,10 @@ class MoveBookDirectory extends Command
         try {
             // Use raw query for speed - find books where directoryPath starts with the source path
             $books = DB::table('books')
-                ->where('directory_path', 'like', $relativePath . '%')
+                ->where(function ($query) use ($relativePath) {
+                    $query->where('directory_path', $relativePath)
+                        ->orWhere('directory_path', 'like', $relativePath . '/%');
+                })
                 ->select('id', 'directory_path', 'title')
                 ->get()
                 ->toArray();

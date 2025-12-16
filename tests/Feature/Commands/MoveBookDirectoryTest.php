@@ -82,6 +82,73 @@ class MoveBookDirectoryTest extends TestCase
         $this->assertEquals($destPath, $book->directory_path);
     }
 
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_updates_database_when_book_root_is_a_symlink(): void
+    {
+        $symlinkRoot = storage_path('testing/books');
+        $realRoot = storage_path('testing/books-real');
+
+        $originalConfigBookRoot = (string) Config::get('app.book_root');
+        $originalDiskRoot = (string) Config::get('filesystems.disks.books.root');
+        $originalEnvRoot = getenv('BOOK_STORAGE_PATH') ?: null;
+
+        try {
+            if (is_link($symlinkRoot)) {
+                @unlink($symlinkRoot);
+            } elseif (File::exists($symlinkRoot)) {
+                File::deleteDirectory($symlinkRoot);
+            }
+
+            if (File::exists($realRoot)) {
+                File::deleteDirectory($realRoot);
+            }
+
+            File::makeDirectory($realRoot, 0755, true, true);
+
+            $symlinkOk = @symlink($realRoot, $symlinkRoot);
+            if (!$symlinkOk) {
+                $this->markTestSkipped('Unable to create symlink for test.');
+            }
+
+            Config::set('app.book_root', $symlinkRoot);
+            Config::set('filesystems.disks.books.root', $symlinkRoot);
+            putenv('BOOK_STORAGE_PATH=' . $symlinkRoot);
+
+            $sourcePath = 'Fantasy/Author/Book1';
+            $destPath = 'Sci-Fi/Author/Book1';
+
+            File::makeDirectory($realRoot . '/' . $sourcePath, 0755, true, true);
+
+            $book = $this->createTestBook($sourcePath);
+
+            $this->artisan('books:move', [
+                'sources' => [$sourcePath, $destPath],
+            ])->assertExitCode(0);
+
+            $this->assertDirDoesNotExist($realRoot . '/' . $sourcePath);
+            $this->assertDirExists($realRoot . '/' . $destPath);
+
+            $book->refresh();
+            $this->assertEquals($destPath, $book->directory_path);
+        } finally {
+            Config::set('app.book_root', $originalConfigBookRoot);
+            Config::set('filesystems.disks.books.root', $originalDiskRoot);
+
+            if ($originalEnvRoot !== null) {
+                putenv('BOOK_STORAGE_PATH=' . $originalEnvRoot);
+            } else {
+                putenv('BOOK_STORAGE_PATH');
+            }
+
+            if (is_link($symlinkRoot)) {
+                @unlink($symlinkRoot);
+            }
+            if (File::exists($realRoot)) {
+                File::deleteDirectory($realRoot);
+            }
+        }
+    }
+
     /** @test */
     public function it_moves_multiple_books_to_directory()
     {
