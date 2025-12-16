@@ -290,66 +290,7 @@
         </table>
 
         <div class="d-flex justify-content-center mt-4 mb-3">
-            <nav aria-label="Page navigation">
-                <ul class="pagination mb-0">
-                    {{-- First Page --}}
-                    @if($books->onFirstPage())
-                        <li class="page-item disabled">
-                            <span class="page-link">« First</span>
-                        </li>
-                    @else
-                        <li class="page-item">
-                            <a class="page-link" href="{{ $books->url(1) }}" aria-label="First">« First</a>
-                        </li>
-                    @endif
-
-                    {{-- Previous Page --}}
-                    @if($books->onFirstPage())
-                        <li class="page-item disabled">
-                            <span class="page-link">‹ Previous</span>
-                        </li>
-                    @else
-                        <li class="page-item">
-                            <a class="page-link" href="{{ $books->previousPageUrl() }}" aria-label="Previous">‹ Previous</a>
-                        </li>
-                    @endif
-
-                    {{-- Page Numbers --}}
-                    @foreach($books->getUrlRange(max(1, $books->currentPage() - 2), min($books->lastPage(), $books->currentPage() + 2)) as $page => $url)
-                        @if($page == $books->currentPage())
-                            <li class="page-item active">
-                                <span class="page-link">{{ $page }}</span>
-                            </li>
-                        @else
-                            <li class="page-item">
-                                <a class="page-link" href="{{ $url }}">{{ $page }}</a>
-                            </li>
-                        @endif
-                    @endforeach
-
-                    {{-- Next Page --}}
-                    @if($books->hasMorePages())
-                        <li class="page-item">
-                            <a class="page-link" href="{{ $books->nextPageUrl() }}" aria-label="Next">Next ›</a>
-                        </li>
-                    @else
-                        <li class="page-item disabled">
-                            <span class="page-link">Next ›</span>
-                        </li>
-                    @endif
-
-                    {{-- Last Page --}}
-                    @if($books->hasMorePages())
-                        <li class="page-item">
-                            <a class="page-link" href="{{ $books->url($books->lastPage()) }}" aria-label="Last">Last »</a>
-                        </li>
-                    @else
-                        <li class="page-item disabled">
-                            <span class="page-link">Last »</span>
-                        </li>
-                    @endif
-                </ul>
-            </nav>
+            {{ $books->links('pagination::bootstrap-4') }}
         </div>
 
     </div>
