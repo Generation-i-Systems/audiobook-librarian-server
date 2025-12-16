@@ -5,8 +5,8 @@
         $total = $paginator->total();
     @endphp
 
-    <div class="d-flex justify-content-between align-items-center mb-2 px-2">
-        <div class="text-muted small">
+    <div class="d-flex justify-content-center align-items-center mb-2 px-2">
+        <div class="text-muted small text-center">
             Showing {{ $from }} to {{ $to }} of {{ $total }} results
         </div>
     </div>
