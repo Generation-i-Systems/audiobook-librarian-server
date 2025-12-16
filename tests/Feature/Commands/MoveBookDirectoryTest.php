@@ -222,6 +222,65 @@ class MoveBookDirectoryTest extends TestCase
         ])->assertExitCode(2);
     }
 
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_fails_when_require_book_is_set_and_no_books_found(): void
+    {
+        $sourcePath = 'Fantasy/EmptyDir';
+        $destPath = 'Sci-Fi/EmptyDir';
+
+        $this->createTestDirectory($sourcePath);
+
+        $this->artisan('books:move', [
+            'sources' => [$sourcePath, $destPath],
+            '--require-book' => true,
+        ])
+            ->expectsOutputToContain('No matching books were found')
+            ->assertExitCode(1);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_prompts_for_verification_before_applying_updates(): void
+    {
+        $sourcePath = 'Fantasy/Author/Book1';
+        $destPath = 'Sci-Fi/Author/Book1';
+
+        $this->createTestDirectory($sourcePath);
+        $book = $this->createTestBook($sourcePath);
+
+        $this->artisan('books:move', [
+            'sources' => [$sourcePath, $destPath],
+            '--verify' => true,
+        ])
+            ->expectsOutputToContain('=== VERIFY MODE ===')
+            ->expectsConfirmation('Proceed with filesystem move and database updates?', 'yes')
+            ->assertExitCode(0);
+
+        $book->refresh();
+        $this->assertEquals($destPath, $book->directory_path);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function it_allows_cancelling_in_verify_mode(): void
+    {
+        $sourcePath = 'Fantasy/Author/Book1';
+        $destPath = 'Sci-Fi/Author/Book1';
+
+        $this->createTestDirectory($sourcePath);
+        $book = $this->createTestBook($sourcePath);
+
+        $this->artisan('books:move', [
+            'sources' => [$sourcePath, $destPath],
+            '--verify' => true,
+        ])
+            ->expectsConfirmation('Proceed with filesystem move and database updates?', 'no')
+            ->assertExitCode(0);
+
+        $book->refresh();
+        $this->assertEquals($sourcePath, $book->directory_path);
+        $this->assertDirExists($this->testBookRoot . '/' . $sourcePath);
+        $this->assertDirDoesNotExist($this->testBookRoot . '/' . $destPath);
+    }
+
     /** @test */
     public function it_supports_dry_run_mode()
     {
@@ -290,7 +349,7 @@ class MoveBookDirectoryTest extends TestCase
             $this->artisan('books:move', [
                 'sources' => [$sourcePath, $destinationPath],
             ])
-                ->expectsQuestion('Destination is outside the configured book root. Continue with filesystem move only (database will not be updated)?', 'yes')
+                ->expectsConfirmation('Destination is outside the configured book root. Continue with filesystem move only (database will not be updated)?', 'yes')
                 ->expectsOutputToContain('Skipping database updates because the destination is outside the book root.')
                 ->expectsOutputToContain('Database updates were skipped because the destination is outside the book root. Remember to update or remove affected book records manually.')
                 ->assertExitCode(0);

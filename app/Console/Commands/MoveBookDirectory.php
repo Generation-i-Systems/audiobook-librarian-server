@@ -26,6 +26,8 @@ class MoveBookDirectory extends Command
                             {--dry-run : Show what would be done without making changes}
                             {--no-db : Only move files, do not update database}
                             {--no-parse : Do not parse and update metadata from new path}
+                            {--require-book : Fail if no matching books are found (do not fall back to filesystem-only move)}
+                            {--verify : Interactively review planned database/path changes before applying}
                             {--regex= : Use regex rename (format: s/pattern/replacement/flags)}
                             {--mv-options=* : Options to pass to mv command}';
 
@@ -271,6 +273,11 @@ class MoveBookDirectory extends Command
                 'book_root' => $this->bookRoot,
             ]);
 
+            if ((bool) $this->option('require-book')) {
+                $this->error('No matching books were found for the provided sources. Aborting because --require-book is set.');
+                return 1;
+            }
+
             $this->warn('No directories within the book root matched the provided sources. Falling back with exit code 2.');
             return 2; // Signal to fall back to regular mv
         }
@@ -320,6 +327,50 @@ class MoveBookDirectory extends Command
         ]);
 
         $this->info("Found " . count($allAffectedBooks) . " book(s) to update across " . count($bookSources) . " source(s)");
+
+        if ((bool) $this->option('verify')) {
+            $isInteractive = isset($this->input) && $this->input->isInteractive();
+            if (!$isInteractive) {
+                $this->error('Cannot use --verify in non-interactive mode.');
+                return 1;
+            }
+
+            $this->info("\n=== VERIFY MODE ===");
+            foreach ($bookSources as $bookSource) {
+                $sourcePath = $bookSource['path'];
+
+                $finalDest = $destPath;
+                $destinationIsDirectory = is_dir($destPath) || str_ends_with($destination, '/');
+                if (count($sources) > 1 || $destinationIsDirectory) {
+                    $finalDest = $destPath . '/' . basename($sourcePath);
+                }
+
+                $sourceRelative = $bookSource['relative'];
+                $destRelative = $this->getRelativePath($finalDest);
+
+                $this->line("\nMove: {$sourceRelative} → {$destRelative}");
+
+                if ((bool) $noDb) {
+                    continue;
+                }
+
+                foreach ($bookSource['books'] as $book) {
+                    $oldPath = $book['directoryPath'] ?? '';
+                    $newPath = $this->calculateNewPath($oldPath, $sourceRelative, $destRelative);
+                    $title = $book['title'] ?? '';
+                    $this->line("  • {$title}: {$oldPath} → {$newPath}");
+                }
+            }
+
+            $confirmPrompt = $noDb
+                ? 'Proceed with filesystem move?'
+                : 'Proceed with filesystem move and database updates?';
+
+            if (!$this->confirm($confirmPrompt, false)) {
+                $this->info('Operation cancelled.');
+                return 0;
+            }
+        }
 
         if ($dryRun) {
             $this->info("\n=== DRY RUN MODE ===");

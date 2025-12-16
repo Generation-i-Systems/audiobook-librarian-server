@@ -29,19 +29,19 @@ DESCRIPTION
 OPTIONS
     -n, --dry-run
         Show what would be done without making changes
-        
+
     -v, --verbose
         Enable verbose debug output
-        
+
     -h, --help
         Show this help message
-        
+
     --regex=PATTERN
         Use regex-based renaming (format: s/pattern/replacement/flags)
         Applies the regex to each matching book directory basename
         Supports Perl-style regex with flags: g (global), i (case-insensitive),
         m (multiline), s (dotall), x (extended)
-        
+
     Standard mv options are also supported (e.g., -i, -f, -u)
 
 BEHAVIOR
@@ -49,46 +49,56 @@ BEHAVIOR
        - Uses Laravel command: php artisan books:move
        - Updates database records automatically
        - Preserves book metadata and relationships
-       
+
     2. If moving files/dirs outside book root:
        - Uses mkdmv (mv with auto-created parent dirs)
        - No database interaction
-       
+
     3. If database update not needed:
        - Falls back to mkdmv automatically
 
 EXAMPLES
     # Move book directory (updates database)
     book-mv "Action/Author/Book 1" "SciFi/Author/Book 1"
-    
+
     # Dry-run to preview changes
     book-mv -n "Action/Author/Book 1" "SciFi/Author/Book 1"
-    
+
     # Verbose mode to see what's happening
     book-mv -v "Action/Author/Book 1" "SciFi/Author/Book 1"
-    
+
     # Move multiple books to a directory
     book-mv "Action/Author/Book 1" "Action/Author/Book 2" "SciFi/Author/"
-    
+
     # Regex rename: swap parts of directory name
     book-mv --regex='s#fry (.)/(.*)#$1-$2#' Action/Author/*
-    
+
     # Regex rename: reorder chapter numbers in filenames
     book-mv --regex='s/(..)( The Way of .* - Chapter )(..)/$3$2$1/' "Series/Book"/*
-    
+
     # Regex rename: add prefix to all matching directories
     book-mv --regex='s/^/Book /' Action/Author/[0-9]*
-    
+
     # Regex rename with dry-run to preview
     book-mv -n --regex='s/Book/Novel/g' Action/Author/*
-    
+
     # Move non-book files (auto-creates parent dirs)
     book-mv ~/file.txt /path/to/new/location/file.txt
 
 ENVIRONMENT
     BOOK_STORAGE_PATH
         Root directory for audiobook storage
-        Loaded from .env file in project root
+        Loaded from the environment; falls back to .env file in project root if not set
+
+FLAGS
+    --book-only, --require-book
+        Require the move to be a database-backed book move; abort if no matching books are detected
+    --non-book
+        Force filesystem-only move (mkdmv behavior); never invoke Laravel/books:move
+    --verify
+        Enable interactive verification of planned path/database changes (passed through to books:move)
+    -y, --yes
+        Assume "yes" for fallback prompts and proceed with filesystem-only move when no books are detected
 
 EXIT CODES
     0   Success
@@ -102,10 +112,10 @@ STANDARD MV OPTIONS
     The following standard mv options are supported when falling back to mkdmv:
 
 EOF
-    
+
     # Include standard mv help
     mv --help 2>&1 | sed 's/^/    /'
-    
+
     exit 0
 fi
 
@@ -126,6 +136,10 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 # Debug mode flag
 DEBUG=0
 DRY_RUN=0
+FORCE_BOOK=0
+FORCE_NON_BOOK=0
+VERIFY_CHANGES=0
+ASSUME_YES=0
 
 # Debug function
 debug() {
@@ -178,6 +192,22 @@ while [[ $# -gt 0 ]]; do
             DRY_RUN=1
             shift
             ;;
+        --book-only|--require-book)
+            FORCE_BOOK=1
+            shift
+            ;;
+        --non-book|--no-book|--force-non-book)
+            FORCE_NON_BOOK=1
+            shift
+            ;;
+        --verify)
+            VERIFY_CHANGES=1
+            shift
+            ;;
+        -y|--yes)
+            ASSUME_YES=1
+            shift
+            ;;
         -nv|-vn)
             # Handle combined -nv or -vn flags
             DRY_RUN=1
@@ -222,33 +252,48 @@ debug "Options: ${opts[*]}"
 debug "Arguments: ${args[*]}"
 debug "Regex pattern: $REGEX_PATTERN"
 
+if [[ $FORCE_BOOK -eq 1 && $FORCE_NON_BOOK -eq 1 ]]; then
+    echo -e "${RED}Cannot use --book-only and --non-book together${NC}" >&2
+    exit 1
+fi
+
 if [[ $DRY_RUN -eq 1 ]]; then
     echo -e "${YELLOW}=== DRY RUN MODE ===${NC}"
     DEBUG=1  # Enable debug output for dry-run
+fi
+
+if [[ $FORCE_NON_BOOK -eq 1 ]]; then
+    debug "Forced non-book mode enabled, using mkdmv"
+    if [[ $DRY_RUN -eq 1 ]]; then
+        echo -e "${YELLOW}Would execute (forced non-book): mkdmv ${opts[*]} ${args[*]}${NC}"
+        exit 0
+    fi
+    mkdmv "${opts[@]}" "${args[@]}"
+    exit $?
 fi
 
 # Handle regex mode directly in bash
 if [[ -n "$REGEX_PATTERN" ]]; then
     debug "Regex mode enabled"
     debug "Regex pattern: $REGEX_PATTERN"
-    
+
     # Basic validation - just check it starts with 's' and has a delimiter
     if [[ ! "$REGEX_PATTERN" =~ ^s. ]]; then
         echo -e "${RED}Invalid regex pattern. Must start with 's' followed by delimiter${NC}" >&2
         echo "Example: s/Book/Novel/g or s#^0[123] ## or s/^0[123] // or s:a:b" >&2
         exit 1
     fi
-    
+
     # Process each source file/directory
     for src in "${args[@]}"; do
         if [[ ! -e "$src" ]]; then
             echo -e "${YELLOW}Skipping non-existent: $src${NC}"
             continue
         fi
-        
+
         basename=$(basename "$src")
         dirname=$(dirname "$src")
-        
+
         # Apply regex using Perl (more compatible with s/// syntax)
         # Just pass the entire pattern to Perl/sed - they know how to parse it!
         if command -v perl >/dev/null 2>&1; then
@@ -257,14 +302,14 @@ if [[ -n "$REGEX_PATTERN" ]]; then
             # Fallback to sed
             newbasename=$(printf '%s\n' "$basename" | sed "$REGEX_PATTERN")
         fi
-        
+
         if [[ "$basename" == "$newbasename" ]]; then
             debug "No change for: $src"
             continue
         fi
-        
+
         newsrc="${dirname}/${newbasename}"
-        
+
         if [[ $DRY_RUN -eq 1 ]]; then
             echo -e "${GREEN}Would rename:${NC} $src ${BLUE}→${NC} $newsrc"
         else
@@ -276,7 +321,7 @@ if [[ -n "$REGEX_PATTERN" ]]; then
             fi
         fi
     done
-    
+
     exit 0
 fi
 
@@ -299,15 +344,23 @@ debug "Sources: ${sources[*]}"
 debug "Destination: $dest"
 
 # Load environment to get BOOK_STORAGE_PATH
-if [ -f "$PROJECT_ROOT/.env" ]; then
-    debug "Loading environment from $PROJECT_ROOT/.env"
-    export $(grep -v '^#' "$PROJECT_ROOT/.env" | grep BOOK_STORAGE_PATH | xargs)
+if [ -z "$BOOK_STORAGE_PATH" ]; then
+    if [ -f "$PROJECT_ROOT/.env" ]; then
+        debug "Loading environment from $PROJECT_ROOT/.env"
+        export $(grep -v '^#' "$PROJECT_ROOT/.env" | grep BOOK_STORAGE_PATH | xargs)
+    fi
+else
+    debug "BOOK_STORAGE_PATH already set in environment; skipping .env load"
 fi
 
 debug "BOOK_STORAGE_PATH: $BOOK_STORAGE_PATH"
 
 # Check if BOOK_STORAGE_PATH is set
 if [ -z "$BOOK_STORAGE_PATH" ]; then
+    if [[ $FORCE_BOOK -eq 1 ]]; then
+        echo -e "${RED}BOOK_STORAGE_PATH not set. Aborting because --book-only is set.${NC}" >&2
+        exit 1
+    fi
     debug "BOOK_STORAGE_PATH not set, falling back to mkdmv"
     if [[ $DRY_RUN -eq 1 ]]; then
         echo -e "${YELLOW}Would execute: mkdmv ${opts[*]} ${args[*]}${NC}"
@@ -368,6 +421,10 @@ done
 
 # If no sources are in book root, use mkdmv with original working directory
 if [[ $is_book -eq 0 ]]; then
+    if [[ $FORCE_BOOK -eq 1 ]]; then
+        echo -e "${RED}No sources detected under BOOK_STORAGE_PATH. Aborting because --book-only is set.${NC}" >&2
+        exit 1
+    fi
     debug "No sources in book root, falling back to mkdmv"
     if [[ $DRY_RUN -eq 1 ]]; then
         echo -e "${YELLOW}Would execute: mkdmv ${opts[*]} ${args[*]}${NC}"
@@ -438,6 +495,12 @@ fi
 if [[ $DRY_RUN -eq 1 ]]; then
     LARAVEL_OPTS+=("--dry-run")
 fi
+if [[ $FORCE_BOOK -eq 1 ]]; then
+    LARAVEL_OPTS+=("--require-book")
+fi
+if [[ $VERIFY_CHANGES -eq 1 ]]; then
+    LARAVEL_OPTS+=("--verify")
+fi
 
 # Run the Laravel command with resolved absolute paths
 debug "Running Laravel command: php artisan books:move ${resolved_sources[*]} $abs_dest ${LARAVEL_OPTS[*]}"
@@ -449,6 +512,25 @@ debug "Laravel command exit code: $EXIT_CODE"
 # Exit code 2 means "not a book move, use mkdmv"
 if [ $EXIT_CODE -eq 2 ]; then
     debug "Exit code 2: Not a book move, falling back to mkdmv"
+
+    if [[ $FORCE_BOOK -eq 1 ]]; then
+        echo -e "${RED}No matching books detected. Aborting because --book-only is set.${NC}" >&2
+        exit 1
+    fi
+
+    if [[ $ASSUME_YES -eq 1 ]]; then
+        debug "--yes set; proceeding with filesystem-only move"
+    elif [[ -t 0 && -t 1 ]]; then
+        echo -e "${YELLOW}Sources are under BOOK_STORAGE_PATH but no matching books were found in the database.${NC}" >&2
+        read -r -p "Proceed with filesystem-only move? [y/N] " reply < /dev/tty
+        if [[ ! "$reply" =~ ^[Yy]$ ]]; then
+            echo -e "${YELLOW}Operation cancelled.${NC}" >&2
+            exit 0
+        fi
+    else
+        echo -e "${YELLOW}Non-interactive session: falling back to filesystem-only move (no matching books found).${NC}" >&2
+    fi
+
     if [[ $DRY_RUN -eq 1 ]]; then
         echo -e "${YELLOW}No books found in database - would execute: mkdmv ${opts[*]} ${args[*]}${NC}"
         exit 0
