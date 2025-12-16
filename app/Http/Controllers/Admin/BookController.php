@@ -105,7 +105,6 @@ class BookController extends Controller
                 'authors' => $authors,
                 'series' => $series,
             ]);
-            Log::debug('BookController@processImport: validation passed', ['validated_keys' => array_keys($validated)]);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => 'Error: ' . $e->getMessage()], 500);
         }
@@ -185,6 +184,30 @@ class BookController extends Controller
                     break;
                 case 'title_desc':
                     $sort = 'title';
+                    $order = 'desc';
+                    break;
+                case 'series_asc':
+                    $sort = 'series';
+                    $order = 'asc';
+                    break;
+                case 'series_desc':
+                    $sort = 'series';
+                    $order = 'desc';
+                    break;
+                case 'series_number_asc':
+                    $sort = 'series_number';
+                    $order = 'asc';
+                    break;
+                case 'series_number_desc':
+                    $sort = 'series_number';
+                    $order = 'desc';
+                    break;
+                case 'genre_asc':
+                    $sort = 'genre';
+                    $order = 'asc';
+                    break;
+                case 'genre_desc':
+                    $sort = 'genre';
                     $order = 'desc';
                     break;
                 case 'year_asc':
@@ -629,6 +652,10 @@ class BookController extends Controller
                     $genrePath = $validated['genre'][0];
                 } else {
                     $genrePath = 'Other';
+                }
+
+                if (is_string($genrePath) && $genrePath !== '') {
+                    session(['import_default_genre_path' => $genrePath]);
                 }
 
                 $directoryPath = $this->buildDirectoryPath($validated);
@@ -1197,6 +1224,52 @@ class BookController extends Controller
                 $incomingSeries = [];
             }
 
+            if (!empty($incomingSeries)) {
+                $normalizedSeries = [];
+                $pending = [];
+
+                foreach ($incomingSeries as $seriesEntry) {
+                    if (!is_array($seriesEntry)) {
+                        $normalizedSeries[] = $seriesEntry;
+                        continue;
+                    }
+
+                    $seriesName = trim((string) ($seriesEntry['seriesName'] ?? $seriesEntry['name'] ?? ''));
+                    $number = $seriesEntry['number'] ?? null;
+                    $isCollection = $seriesEntry['isCollection'] ?? $seriesEntry['is_collection'] ?? null;
+
+                    $hasOnlyName = $seriesName !== '' && ($number === null || $number === '') && empty($seriesEntry['id']);
+                    $hasOnlyNumber = ($seriesName === '') && ($number !== null && $number !== '');
+
+                    if ($hasOnlyNumber) {
+                        $pending['number'] = $number;
+                        if ($isCollection !== null) {
+                            $pending['isCollection'] = $isCollection;
+                        }
+
+                        continue;
+                    }
+
+                    if ($hasOnlyName && !empty($pending)) {
+                        $merged = $seriesEntry;
+                        if (!isset($merged['number']) || $merged['number'] === null || $merged['number'] === '') {
+                            $merged['number'] = $pending['number'] ?? null;
+                        }
+                        if (!isset($merged['isCollection']) && isset($pending['isCollection'])) {
+                            $merged['isCollection'] = $pending['isCollection'];
+                        }
+                        $normalizedSeries[] = $merged;
+                        $pending = [];
+
+                        continue;
+                    }
+
+                    $normalizedSeries[] = $seriesEntry;
+                }
+
+                $incomingSeries = $normalizedSeries;
+            }
+
             try {
                 $seriesLinks = collect($incomingSeries)->map(function ($seriesEntry) {
                     // Map legacy 'name' to 'seriesName' if present
@@ -1221,6 +1294,7 @@ class BookController extends Controller
                         'id' => $seriesId,
                         'seriesName' => $seriesName,
                         'number' => is_array($seriesEntry) ? ($seriesEntry['number'] ?? null) : null,
+                        'isCollection' => is_array($seriesEntry) ? ($seriesEntry['isCollection'] ?? null) : null,
                     ];
                 })->filter()->values();
 
@@ -1300,24 +1374,26 @@ class BookController extends Controller
                 ]);
                 $oldCover = $book['coverImage'];
                 $coverName = basename($oldCover);
-                $validated['coverImage'] = $newDirectoryPath . '/' . $coverName;
+                $validated['coverImage'] = $coverName;
             }
         }
 
         // Handle cover image upload or candidate selection
+        // Use the updated directoryPath if it changed, otherwise use the original
+        $targetDirectoryPath = $validated['directoryPath'] ?? $book['directoryPath'] ?? null;
+
         if ($request->hasFile('coverImage') && $request->file('coverImage')->isValid()) {
             Log::info('Updating cover image', [
                 'book' => $book,
-                'directoryPath' => $book['directoryPath'],
+                'directoryPath' => $targetDirectoryPath,
             ]);
             $file = $request->file('coverImage');
-            $directoryPath = $book['directoryPath'] ?? null;
+            $directoryPath = $targetDirectoryPath;
             if ($directoryPath) {
                 $coverName = 'cover_' . uniqid() . '.' . $file->getClientOriginalExtension();
-                $storagePath = $directoryPath . '/' . $coverName;
                 // Store file in books disk
                 $file->storeAs($directoryPath, $coverName, 'books');
-                $validated['coverImage'] = $storagePath;
+                $validated['coverImage'] = $coverName;
             } else {
                 Log::error('Failed to update cover image', [
                     'book' => $book,
@@ -1326,15 +1402,15 @@ class BookController extends Controller
             }
         } elseif (
             $request->filled('coverImageCandidate') &&
-            Storage::disk('books')->exists($book['directoryPath'] . '/' . $request->input('coverImageCandidate'))
+            Storage::disk('books')->exists($targetDirectoryPath . '/' . $request->input('coverImageCandidate'))
         ) {
             Log::debug('Updating cover image candidate', [
                 'candidate' => $request->input('coverImageCandidate'),
             ]);
-            $directoryPath = $book['directoryPath'] ?? null;
+            $directoryPath = $targetDirectoryPath;
             $candidate = $request->input('coverImageCandidate');
             if ($directoryPath && $candidate) {
-                $validated['coverImage'] = $directoryPath . '/' . $candidate;
+                $validated['coverImage'] = basename($candidate);
             }
         } elseif ($request->filled('coverImageUrl')) {
             Log::debug('Updating cover image URL', [
@@ -1347,7 +1423,7 @@ class BookController extends Controller
             ]);
             // Handle external cover image URL
             $coverUrl = $request->input('coverImageUrl');
-            $directoryPath = $book['directoryPath'] ?? null;
+            $directoryPath = $targetDirectoryPath;
             $googleBooksId = $request->input('googleBooksId') ?? $book['googleBooksId'] ?? null;
 
             // Get the cover image source from the form
@@ -1372,7 +1448,7 @@ class BookController extends Controller
                     );
 
                     if ($result['success']) {
-                        $validated['coverImage'] = $result['path'];
+                        $validated['coverImage'] = basename((string) $result['path']);
                     } else {
                         // Log the error but continue with the update
                         Log::error('Failed to download Google Books cover image', [
@@ -1401,7 +1477,7 @@ class BookController extends Controller
         } elseif ($request->filled('audibleCoverImageUrl')) {
             // Handle Audible cover image URL
             $coverUrl = $request->input('audibleCoverImageUrl');
-            $directoryPath = $book['directoryPath'] ?? null;
+            $directoryPath = $targetDirectoryPath;
             $asin = $request->input('audibleId') ?? $book['audibleId'] ?? null;
 
             if ($coverUrl && $directoryPath) {
@@ -1422,7 +1498,7 @@ class BookController extends Controller
                     );
 
                     if ($result['success']) {
-                        $validated['coverImage'] = $result['path'];
+                        $validated['coverImage'] = basename((string) $result['path']);
                     } else {
                         // Log the error but continue with the update
                         Log::error('Failed to download Audible cover image', [
