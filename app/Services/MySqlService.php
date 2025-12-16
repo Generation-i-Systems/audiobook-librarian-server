@@ -367,7 +367,7 @@ class MySqlService implements DocumentStoreServiceInterface
                 break;
             case 'series_number':
                 $query->leftJoin('book_series', 'books.id', '=', 'book_series.book_id')
-                    ->orderBy('book_series.series_number', $order)
+                    ->orderByRaw('CAST(book_series.series_number AS DECIMAL(10,2)) ' . $order)
                     ->select('books.*')
                     ->distinct();
                 break;
