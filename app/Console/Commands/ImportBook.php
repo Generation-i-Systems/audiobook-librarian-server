@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\File;
 class ImportBook extends Command
 {
     protected $signature = 'books:import
-                            {paths* : Book directories or files to import}
+                            {paths?* : Book directories or files to import}
                             {--dry-run : Show what would be imported without making changes}
                             {--force : Reimport books that already exist}';
 
@@ -34,7 +34,10 @@ class ImportBook extends Command
         parent::__construct();
         $this->importer = $importer;
         $this->parser = $parser;
-        $this->bookRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
+        $this->bookRoot = rtrim(
+            (string) config('app.book_root', env('BOOK_STORAGE_PATH') ?: '/media/lyra_data1/audiobooks/books'),
+            '/'
+        );
     }
 
     public function handle(): int
@@ -136,8 +139,6 @@ class ImportBook extends Command
 
     private function processPath(string $path, bool $dryRun, bool $force): void
     {
-        $this->stats['total']++;
-
         if (is_file($path)) {
             $this->processFile($path, $dryRun, $force);
         } elseif (is_dir($path)) {
@@ -172,51 +173,59 @@ class ImportBook extends Command
             $this->line("Processing: {$dirPath}");
 
             // Parse the directory
-            $bookData = $this->parser->parseDirectory($dirPath);
+            $books = $this->parser->parseDirectory($dirPath);
 
-            if (empty($bookData)) {
+            if (empty($books)) {
                 $this->warn("  No valid book data found");
                 $this->stats['skipped']++;
                 return;
             }
 
-            // Use unified importer
-            $result = $this->importer->importBook($bookData, [
-                'source_path' => $dirPath,
-                'dry_run' => $dryRun,
-                'force' => $force,
-            ]);
+            foreach ($books as $bookData) {
+                $this->stats['total']++;
 
-            // Handle result and update stats
-            switch ($result['status']) {
-                case 'imported':
-                    $this->line("  <fg=green>✓</> Imported: {$bookData['title']}");
-                    $this->stats['imported']++;
-                    break;
-                case 'updated':
-                    $this->line("  <fg=cyan>✓</> Updated: {$bookData['title']}");
-                    $this->stats['updated']++;
-                    break;
-                case 'skipped':
-                    $reason = $result['reason'] ?? 'unknown';
-                    $this->line("  <fg=yellow>Skipped:</> {$bookData['title']} ({$reason})");
-                    $this->stats['skipped']++;
-                    break;
-                case 'would_import':
-                    $this->line("  <fg=green>Would import:</> {$bookData['title']}");
-                    $this->stats['imported']++;
-                    break;
-                case 'would_update':
-                    $this->line("  <fg=cyan>Would update:</> {$bookData['title']}");
-                    $this->stats['updated']++;
-                    break;
-                case 'error':
-                    $this->error("  Error: " . ($result['error'] ?? 'Unknown error'));
-                    $this->stats['errors']++;
-                    break;
-                default:
-                    $this->stats['errors']++;
-                    break;
+                $result = $this->importer->importBook($bookData, [
+                    'source_path' => $dirPath,
+                    'dry_run' => $dryRun,
+                    'force' => $force,
+                ]);
+
+                $title = $bookData['title'] ?? 'Unknown Title';
+
+                switch ($result['status']) {
+                    case 'imported':
+                        $this->line("  <fg=green>✓</> Imported: {$title}");
+                        $this->stats['imported']++;
+                        break;
+                    case 'updated':
+                        $this->line("  <fg=cyan>✓</> Updated: {$title}");
+                        $this->stats['updated']++;
+                        break;
+                    case 'skipped':
+                        $reason = $result['reason'] ?? 'unknown';
+                        if ($reason === 'already_exists') {
+                            $this->line("  Book already exists: {$title}");
+                        } else {
+                            $this->line("  <fg=yellow>Skipped:</> {$title} ({$reason})");
+                        }
+                        $this->stats['skipped']++;
+                        break;
+                    case 'would_import':
+                        $this->line("  <fg=green>Would import:</> {$title}");
+                        $this->stats['imported']++;
+                        break;
+                    case 'would_update':
+                        $this->line("  <fg=cyan>Would update:</> {$title}");
+                        $this->stats['updated']++;
+                        break;
+                    case 'error':
+                        $this->error("  Error: " . ($result['error'] ?? 'Unknown error'));
+                        $this->stats['errors']++;
+                        break;
+                    default:
+                        $this->stats['errors']++;
+                        break;
+                }
             }
         } catch (\Exception $e) {
             $this->error("  Error: " . $e->getMessage());
