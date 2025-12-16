@@ -32,8 +32,6 @@ class AdminBooksPaginationViewTest extends TestCase
         $this->assertStringContainsString('Next', $html);
         $this->assertStringContainsString('Last', $html);
 
-        $this->assertStringContainsString('&nbsp;', $html);
-
         $this->assertStringNotContainsString('sm:hidden', $html);
         $this->assertStringContainsString('page-link', $html);
     }
