@@ -152,12 +152,12 @@ class ImportFileControllerTest extends TestCase
 
         // Verify test file is listed
         $this->assertTrue(
-            collect($json['items'])->contains(fn ($item) => 'file' === $item['type'] && 'test.mp3' === $item['name'])
+            collect($json['items'])->contains(fn($item) => 'file' === $item['type'] && 'test.mp3' === $item['name'])
         );
 
         // Verify test subdirectory is listed
         $this->assertTrue(
-            collect($json['items'])->contains(fn ($item) => 'dir' === $item['type'] && 'subdir' === $item['name'])
+            collect($json['items'])->contains(fn($item) => 'dir' === $item['type'] && 'subdir' === $item['name'])
         );
     }
 
@@ -192,21 +192,21 @@ class ImportFileControllerTest extends TestCase
         // Directory with matching files should be included
         $this->assertTrue(
             collect($json['items'])->contains(
-                fn ($item) => 'dir' === $item['type'] && 'dir_with_matching' === $item['name']
+                fn($item) => 'dir' === $item['type'] && 'dir_with_matching' === $item['name']
             )
         );
 
         // Directory without matching files should be excluded
         $this->assertFalse(
             collect($json['items'])->contains(
-                fn ($item) => 'dir' === $item['type'] && 'dir_without_matching' === $item['name']
+                fn($item) => 'dir' === $item['type'] && 'dir_without_matching' === $item['name']
             )
         );
 
         // Empty directory should be excluded
         $this->assertFalse(
             collect($json['items'])->contains(
-                fn ($item) => 'dir' === $item['type'] && 'empty_dir' === $item['name']
+                fn($item) => 'dir' === $item['type'] && 'empty_dir' === $item['name']
             )
         );
     }
@@ -469,6 +469,43 @@ class ImportFileControllerTest extends TestCase
         $this->assertArrayHasKey('formData', $json);
         $this->assertArrayHasKey('author', $json);
         $this->assertArrayHasKey('genre', $json);
+
+        // Clean up
+        File::deleteDirectory($bookDir);
+    }
+
+    #[Test]
+    public function testExtractFallsBackToSessionDefaultGenrePathWhenUndetermined(): void
+    {
+        // Arrange: Create test book directory
+        $bookDir = $this->testRoot . '/Undetermined_Genre_Test';
+        mkdir($bookDir);
+        file_put_contents($bookDir . '/chapter1.mp3', 'test content');
+
+        // Ensure no author/series search influences genre selection
+        $this->documentStoreMock->shouldReceive('searchAuthorsByName')
+            ->withAnyArgs()
+            ->andReturn([]);
+
+        // Set the session default genre path as if a previous book was imported
+        $this->withSession(['import_default_genre_path' => 'Fantasy']);
+
+        // Act
+        $response = $this->withoutMiddleware()
+            ->withSession(['import_default_genre_path' => 'Fantasy'])
+            ->post('/admin/import/extract', [
+                'root' => $this->testRoot,
+                'path' => basename($bookDir),
+                'type' => 'dir',
+                '_token' => csrf_token(),
+            ]);
+
+        // Assert
+        $response->assertStatus(200);
+        $json = $response->json();
+        $this->assertTrue($json['success']);
+        $this->assertSame('Fantasy', $json['genrePath']);
+        $this->assertFalse($json['needsGenreSelection']);
 
         // Clean up
         File::deleteDirectory($bookDir);

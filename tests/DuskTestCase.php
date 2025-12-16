@@ -27,10 +27,25 @@ abstract class DuskTestCase extends BaseTestCase
      */
     protected function driver(): RemoteWebDriver
     {
-        $options = (new ChromeOptions())->addArguments(collect([
+        $userDataDir = $_ENV['DUSK_USER_DATA_DIR']
+            ?? env('DUSK_USER_DATA_DIR')
+            ?? (sys_get_temp_dir() . '/librarian-dusk-profile-' . (string) getmypid());
+
+        $options = new ChromeOptions();
+
+        $browserPath = $_ENV['DUSK_BROWSER_PATH'] ?? env('DUSK_BROWSER_PATH');
+        if (is_string($browserPath) && $browserPath !== '') {
+            $options->setBinary($browserPath);
+        }
+
+        $options->addArguments(collect([
             $this->shouldStartMaximized() ? '--start-maximized' : '--window-size=1920,1080',
             '--disable-search-engine-choice-screen',
             '--disable-smooth-scrolling',
+            '--no-first-run',
+            '--no-default-browser-check',
+            '--disable-extensions',
+            '--user-data-dir=' . $userDataDir,
         ])->unless($this->hasHeadlessDisabled(), function (Collection $items) {
             return $items->merge([
                 '--disable-gpu',

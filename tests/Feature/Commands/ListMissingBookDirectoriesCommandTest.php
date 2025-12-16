@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace Tests\Feature\Commands;
 
 use App\Models\Book;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ListMissingBookDirectoriesCommandTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_lists_missing_directories_as_text(): void
     {
         Storage::fake('books');
@@ -25,8 +28,8 @@ class ListMissingBookDirectoriesCommandTest extends TestCase
         $this->artisan('books:list-missing-directories', [
             '--disk' => 'books',
         ])->expectsOutput('fantasy/author/Series/02/Book Two')
-          ->expectsOutput('sci-fi/other_author/Standalone Book')
-          ->assertExitCode(0);
+            ->expectsOutput('sci-fi/other_author/Standalone Book')
+            ->assertExitCode(0);
     }
 
     public function test_outputs_json_when_requested(): void
@@ -71,9 +74,9 @@ class ListMissingBookDirectoriesCommandTest extends TestCase
             '--disk' => 'books',
             '--unreferenced' => true,
         ])->expectsOutput('fantasy/author/Series/02')
-          ->expectsOutput('sci-fi/other/Standalone')
-          ->doesntExpectOutput('fantasy/author/Series/01')
-          ->assertExitCode(0);
+            ->expectsOutput('sci-fi/other/Standalone')
+            ->doesntExpectOutput('fantasy/author/Series/01')
+            ->assertExitCode(0);
     }
 
     public function test_unreferenced_mode_honors_root_option(): void
@@ -92,8 +95,8 @@ class ListMissingBookDirectoriesCommandTest extends TestCase
             '--unreferenced' => true,
             '--root' => 'rootB',
         ])->expectsOutput('rootB/book2')
-          ->doesntExpectOutput('rootA/book1')
-          ->assertExitCode(0);
+            ->doesntExpectOutput('rootA/book1')
+            ->assertExitCode(0);
     }
 
     public function test_default_mode_can_include_unreferenced_in_json_and_write_second_file(): void

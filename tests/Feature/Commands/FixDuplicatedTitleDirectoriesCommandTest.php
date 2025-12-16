@@ -3,12 +3,15 @@
 namespace Tests\Feature\Commands;
 
 use App\Models\Book;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
 class FixDuplicatedTitleDirectoriesCommandTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_command_merges_duplicated_title_directory_into_parent(): void
     {
         $tempRoot = sys_get_temp_dir() . '/books_fix_dup_' . uniqid();

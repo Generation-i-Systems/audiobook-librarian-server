@@ -41,21 +41,26 @@ class HardcoverServiceTest extends TestCase
         $mock->method('makeRequest')
             ->willReturn([
                 'data' => [
-                    'books' => [
-                        [
-                            'id' => '1',
-                            'title' => 'Test Book',
-                            'subtitle' => 'A Test Subtitle',
-                            'description' => 'A test book',
-                            'release_date' => '2023-01-01',
-                            'cover_image_url' => 'https://example.com/cover.jpg',
-                            'genres' => [
-                                ['genre' => ['name' => 'Science Fiction']],
-                                ['genre' => ['name' => 'Adventure']],
+                    'search' => [
+                        'results' => [
+                            'hits' => [
+                                [
+                                    'document' => [
+                                        'id' => '1',
+                                        'title' => 'Test Book',
+                                        'subtitle' => 'A Test Subtitle',
+                                        'description' => 'A test book',
+                                        'release_date' => '2023-01-01',
+                                        'release_year' => 2023,
+                                        'author_names' => ['Test Author'],
+                                        'genres' => ['Science Fiction', 'Adventure'],
+                                        'image' => ['url' => 'https://example.com/cover.jpg'],
+                                        'isbns' => ['1234567890', '9781234567897'],
+                                        'pages' => 300,
+                                    ],
+                                ],
                             ],
-                            'authors' => [
-                                ['author' => ['name' => 'Test Author']],
-                            ],
+                            'found' => 1,
                         ],
                     ],
                 ],

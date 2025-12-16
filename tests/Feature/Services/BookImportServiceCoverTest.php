@@ -14,12 +14,16 @@ class BookImportServiceCoverTest extends TestCase
 
     private BookImportService $service;
     private string $testDirectory;
+    private string $relativeDirectory;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->service = app(BookImportService::class);
-        $this->testDirectory = storage_path('app/test_books');
+        $this->relativeDirectory = 'test_books';
+        $this->testDirectory = storage_path('app/' . $this->relativeDirectory);
+
+        $this->app['config']->set('app.book_root', storage_path('app'));
 
         // Create test directory
         if (!File::exists($this->testDirectory)) {
@@ -48,7 +52,7 @@ class BookImportServiceCoverTest extends TestCase
         // Use file:// URL for testing
         $result = $this->service->downloadCoverImage(
             'file://' . $tempFile,
-            $this->testDirectory,
+            $this->relativeDirectory,
             'audible'
         );
 
@@ -66,7 +70,7 @@ class BookImportServiceCoverTest extends TestCase
         // Use non-existent file URL
         $result = $this->service->downloadCoverImage(
             'file:///nonexistent/path/cover.jpg',
-            $this->testDirectory,
+            $this->relativeDirectory,
             'audible'
         );
 
@@ -82,7 +86,7 @@ class BookImportServiceCoverTest extends TestCase
 
         $result = $this->service->downloadCoverImage(
             'file://' . $tempFile,
-            $this->testDirectory,
+            $this->relativeDirectory,
             'googlebooks'
         );
 
@@ -101,7 +105,7 @@ class BookImportServiceCoverTest extends TestCase
 
         $result = $this->service->downloadCoverImage(
             'file://' . $tempFile,
-            $this->testDirectory,
+            $this->relativeDirectory,
             'audible'
         );
 
@@ -120,7 +124,7 @@ class BookImportServiceCoverTest extends TestCase
 
         $result = $this->service->downloadCoverImage(
             'file://' . $tempFile,
-            $this->testDirectory,
+            $this->relativeDirectory,
             'audible'
         );
 

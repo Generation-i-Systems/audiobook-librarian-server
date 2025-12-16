@@ -256,7 +256,8 @@ class BookControllerUpdateTest extends TestCase
                 $this->equalTo($bookId),
                 $this->callback(function ($data) {
                     return $data['title'] === 'Updated Audible Book' &&
-                        isset($data['coverImage']);
+                        isset($data['coverImage']) &&
+                        $data['coverImage'] === 'cover_audible_B01234ABCD.jpg';
                 })
             )
             ->willReturn(true);
@@ -275,7 +276,7 @@ class BookControllerUpdateTest extends TestCase
                 Storage::disk('books')->put('test/path/cover_audible_B01234ABCD.jpg', 'fake image content');
                 return [
                     'success' => true,
-                    'path' => 'test/path/cover_audible_B01234ABCD.jpg'
+                    'path' => 'test/path/cover_audible_B01234ABCD.jpg',
                 ];
             });
 
