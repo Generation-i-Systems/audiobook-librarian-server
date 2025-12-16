@@ -1552,7 +1552,10 @@ class BookController extends Controller
             ? 'Book and files deleted successfully.'
             : 'Book deleted from database (files preserved).';
 
-        return redirect()->route('admin.books.index')->with('success', $message);
+        // Preserve query parameters (except delete_files) to maintain filters/sort
+        $queryParams = $request->except(['delete_files']);
+
+        return redirect()->route('admin.books.index', $queryParams)->with('success', $message);
     }
 
     public function download($id)

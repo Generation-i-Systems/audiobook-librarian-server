@@ -277,7 +277,7 @@
                             @endphp
                             <a href="{{ route('admin.books.edit', array_merge([$bookId], request()->query())) }}"
                                 class="btn btn-sm btn-outline-primary" title="Edit"><i class="fas fa-pencil-alt"></i></a>
-                            <form action="{{ route('admin.books.destroy', $bookId) }}" method="POST" style="display: inline;">
+                            <form action="{{ route('admin.books.destroy', array_merge([$bookId], request()->query())) }}" method="POST" style="display: inline;">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"
