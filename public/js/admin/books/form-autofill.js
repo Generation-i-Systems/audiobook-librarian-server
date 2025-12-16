@@ -267,12 +267,17 @@
                     if (typeof addSeries === "function") {
                         addSeries($form, series, seriesNumber);
                     } else {
+                        const idx = 0;
                         seriesGroup.append(
                             '<div class="series-row mb-2">' +
-                                '<input type="number" name="series[][number]" class="form-control" value="' +
+                                '<input type="number" name="series[' +
+                                idx +
+                                '][number]" class="form-control" value="' +
                                 (seriesNumber || "") +
                                 '">' +
-                                '<input type="text" name="series[][seriesName]" class="form-control ms-2" value="' +
+                                '<input type="text" name="series[' +
+                                idx +
+                                '][seriesName]" class="form-control ms-2" value="' +
                                 series +
                                 '">' +
                                 "</div>"
@@ -422,7 +427,7 @@
                     ? authorField.value
                     : "";
 
-                const seriesField = document.querySelector("input[name='series[][seriesName]']");
+                const seriesField = document.querySelector("#series-group input[name*='[seriesName]']");
                 document.getElementById("autofill-series").value = seriesField
                     ? seriesField.value
                     : "";

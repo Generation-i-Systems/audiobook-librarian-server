@@ -140,8 +140,8 @@
                 if (rows.length > 1) {
                     if (row) row.remove();
                 } else if (row) {
-                    const numberInput = row.querySelector('input[name="series[][number]"]');
-                    const seriesNameInput = row.querySelector('input[name="series[][seriesName]"]');
+                    const numberInput = row.querySelector('input[name*="[number]"]');
+                    const seriesNameInput = row.querySelector('input[name*="[seriesName]"]');
                     if (numberInput) numberInput.value = "";
                     if (seriesNameInput) seriesNameInput.value = "";
                 }

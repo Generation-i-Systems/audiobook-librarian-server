@@ -10,7 +10,9 @@
         <div class="row">
             <div class="col-md-4">
                 @php
-                    $cover = isset($book['coverImage']) && $book['coverImage'] ? url('/cover/' . $book['coverImage']) : url('/images/placeholder.png');
+                    $cover = isset($book['coverImage']) && $book['coverImage']
+                        ? $book['coverImage']
+                        : url('/images/placeholder.png');
                 @endphp
                 <img src="{{ $cover }}" alt="{{ $book['title'] }}" class="img-fluid">
             </div>
@@ -46,12 +48,12 @@
                 </a>
 
                 @auth
-    @if(Auth::user()->is_admin)
-        <a href="{{ route('admin.books.edit', $book['id']) }}" class="btn btn-sm btn-primary float-end ms-2">
-            <i class="bi bi-pencil"></i> Edit
-        </a>
-    @endif
-@endauth
+                    @if(Auth::user()->is_admin)
+                        <a href="{{ route('admin.books.edit', $book['id']) }}" class="btn btn-sm btn-primary float-end ms-2">
+                            <i class="bi bi-pencil"></i> Edit
+                        </a>
+                    @endif
+                @endauth
                 <hr>
 
                 @if(!empty($relatedBooks))
@@ -61,9 +63,9 @@
                             <div class="col-md-4 mb-3">
                                 <div class="card h-100">
                                     @php
-                                        $relatedCover = isset($relatedBook['coverImage']) && $relatedBook['coverImage'] ?
-                                            url('/cover/' . $relatedBook['coverImage']) :
-                                            url('/images/placeholder.png');
+                                        $relatedCover = isset($relatedBook['coverImage']) && $relatedBook['coverImage']
+                                            ? $relatedBook['coverImage']
+                                            : url('/images/placeholder.png');
                                     @endphp
                                     <img src="{{ $relatedCover }}" class="card-img-top" alt="{{ $relatedBook['title'] }}"
                                         style="height: 150px; object-fit: contain;">
