@@ -25,10 +25,14 @@ class AdminBooksPaginationViewTest extends TestCase
 
         $html = $paginator->links('pagination.admin-books')->toHtml();
 
+        $this->assertStringContainsString('Showing', $html);
+        $this->assertStringContainsString('of 100 results', $html);
         $this->assertStringContainsString('First', $html);
         $this->assertStringContainsString('Previous', $html);
         $this->assertStringContainsString('Next', $html);
         $this->assertStringContainsString('Last', $html);
+
+        $this->assertStringContainsString('&nbsp;', $html);
 
         $this->assertStringNotContainsString('sm:hidden', $html);
         $this->assertStringContainsString('page-link', $html);

@@ -289,7 +289,7 @@
             </tbody>
         </table>
 
-        <div class="pagination">
+        <div class="mt-3">
             {{ $books->links('pagination.admin-books') }}
         </div>
 
