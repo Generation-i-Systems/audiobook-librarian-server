@@ -20,10 +20,95 @@ class BookImportService
 
     protected GenreMappingService $genreMappingService;
 
+    private const AUDIO_EXTENSIONS = [
+        'mp3',
+        'm4a',
+        'm4b',
+        'm4p',
+        'mp4',
+        'aac',
+        'ogg',
+        'oga',
+        'wav',
+        'flac',
+        'wma',
+    ];
+
     public function __construct(GenreMappingService $genreMappingService)
     {
         $this->genreMappingService = $genreMappingService;
     }
+
+    protected function areOnSameFileSystem(string $sourcePath, string $targetPath): bool
+    {
+        $sourceRealPath = realpath($sourcePath) ?: $sourcePath;
+        $targetRealPath = realpath($targetPath) ?: $targetPath;
+
+        $sourceStatPath = File::isDirectory($sourceRealPath) ? $sourceRealPath : dirname($sourceRealPath);
+        $targetStatPath = File::isDirectory($targetRealPath) ? $targetRealPath : dirname($targetRealPath);
+
+        $sourceStat = @stat($sourceStatPath);
+        $targetStat = @stat($targetStatPath);
+
+        if (!is_array($sourceStat) || !is_array($targetStat)) {
+            return false;
+        }
+
+        return ($sourceStat['dev'] ?? null) !== null
+            && ($targetStat['dev'] ?? null) !== null
+            && $sourceStat['dev'] === $targetStat['dev'];
+    }
+
+    public function directoryHasAudioFiles(string $directory): bool
+    {
+        if (File::isFile($directory)) {
+            $extension = strtolower(pathinfo($directory, PATHINFO_EXTENSION));
+            if (!in_array($extension, self::AUDIO_EXTENSIONS, true)) {
+                return false;
+            }
+
+            return filesize($directory) > 0;
+        }
+
+        if (!File::isDirectory($directory)) {
+            return false;
+        }
+
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($directory, \RecursiveDirectoryIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::LEAVES_ONLY
+        );
+
+        foreach ($iterator as $file) {
+            if (!$file->isFile()) {
+                continue;
+            }
+
+            $extension = strtolower($file->getExtension());
+            if (!in_array($extension, self::AUDIO_EXTENSIONS, true)) {
+                continue;
+            }
+
+            if ($file->getSize() > 0) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function assertDirectoryHasAudioFiles(string $directory, array $context = []): void
+    {
+        if ($this->directoryHasAudioFiles($directory)) {
+            return;
+        }
+
+        $message = "Sanity check failed: destination directory contains no audio files: {$directory}";
+        Log::error($message, array_merge(['directory' => $directory], $context));
+
+        throw new \Exception($message);
+    }
+
     /**
      * Create book from metadata with comprehensive handling
      */
@@ -37,8 +122,8 @@ class BookImportService
             $book->description = $metadata['description'] ?? null;
 
             // Handle year/release_date
-            if (isset($metadata['year']) && $metadata['year']) {
-                $book->release_date = $metadata['year'] . '-01-01'; // Convert year to date
+            if (isset($metadata['year']) && $metadata['year'] && is_numeric($metadata['year'])) {
+                $book->release_date = new \DateTime(((int) $metadata['year']) . '-01-01');
             }
 
             $book->isbn = $metadata['isbn'] ?? null;
@@ -60,7 +145,10 @@ class BookImportService
 
             // Fallback to metadata duration only if no audio files analyzed
             if (empty($book->duration) && isset($metadata['duration'])) {
-                if (is_string($metadata['duration']) && preg_match('/(\d{2}):(\d{2}):(\d{2})/', $metadata['duration'], $matches)) {
+                if (
+                    is_string($metadata['duration'])
+                    && preg_match('/(\d{2}):(\d{2}):(\d{2})/', $metadata['duration'], $matches)
+                ) {
                     // Convert HH:MM:SS to seconds
                     $book->duration = ($matches[1] * 3600) + ($matches[2] * 60) + $matches[3];
                 } elseif (is_numeric($metadata['duration'])) {
@@ -88,7 +176,7 @@ class BookImportService
                     $book->cover_image = $coverPath;
                 }
             } elseif (!empty($metadata['cover_path'])) {
-                $book->cover_image = $metadata['cover_path'];
+                $book->cover_image = basename((string) $metadata['cover_path']);
             } elseif (!empty($metadata['cover_url'])) {
                 // Determine source for filename
                 if (!empty($metadata['cover_is_local_file'])) {
@@ -280,8 +368,8 @@ class BookImportService
             $book->description = $metadata['description'] ?? $book->description;
 
             // Handle year/release_date
-            if (isset($metadata['year']) && $metadata['year']) {
-                $book->release_date = $metadata['year'] . '-01-01';
+            if (isset($metadata['year']) && $metadata['year'] && is_numeric($metadata['year'])) {
+                $book->release_date = new \DateTime(((int) $metadata['year']) . '-01-01');
             }
 
             $book->isbn = $metadata['isbn'] ?? $book->isbn;
@@ -307,7 +395,12 @@ class BookImportService
                     $book->cover_image = $coverPath;
                 }
             } elseif (!empty($metadata['cover_url'])) {
-                $source = !empty($metadata['cover_is_local_file']) ? 'local' : (isset($metadata['audible_raw']) ? 'audible' : 'googlebooks');
+                $source = 'googlebooks';
+                if (!empty($metadata['cover_is_local_file'])) {
+                    $source = 'local';
+                } elseif (isset($metadata['audible_raw'])) {
+                    $source = 'audible';
+                }
                 $coverPath = $this->downloadCoverImage($metadata['cover_url'], $book->directory_path, $source);
                 if ($coverPath) {
                     $book->cover_image = $coverPath;
@@ -461,8 +554,10 @@ class BookImportService
 
             // If we have a series number, prefix it to the title
             if (!empty($metadata['series_number'])) {
-                $seriesNumber = str_pad($metadata['series_number'], 2, '0', STR_PAD_LEFT);
-                $title = $seriesNumber . ' ' . $title;
+                $seriesNumber = $this->formatSeriesNumberForTitlePrefix($metadata['series_number']);
+                if ($seriesNumber !== '') {
+                    $title = $seriesNumber . ' ' . $title;
+                }
             }
 
             // Add GraphicAudio marker if detected
@@ -472,6 +567,31 @@ class BookImportService
         }
 
         return $path;
+    }
+
+    private function formatSeriesNumberForTitlePrefix(mixed $seriesNumber): string
+    {
+        if ($seriesNumber === null || $seriesNumber === '') {
+            return '';
+        }
+
+        $value = is_string($seriesNumber) ? trim($seriesNumber) : (string) $seriesNumber;
+        if ($value === '' || !is_numeric($value)) {
+            return '';
+        }
+
+        if (!str_contains($value, '.')) {
+            return str_pad((string) (int) $value, 2, '0', STR_PAD_LEFT);
+        }
+
+        [$intPart, $decimalPart] = array_pad(explode('.', $value, 2), 2, '');
+        $intPart = str_pad((string) (int) $intPart, 2, '0', STR_PAD_LEFT);
+        $decimalPart = rtrim($decimalPart, '0');
+        if ($decimalPart === '') {
+            return $intPart;
+        }
+
+        return $intPart . '.' . $decimalPart;
     }
 
     /**
@@ -555,13 +675,20 @@ class BookImportService
     public function moveFilesToLibrary(array $audiobook, Book $book, array $options = []): bool
     {
         try {
-            $bookStoragePath = $options['storage_path'] ?? config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
+            $bookStoragePath = $options['storage_path'] ?? rtrim(
+                config('app.book_root', '/media/lyra_data1/audiobooks/books'),
+                '/'
+            );
             if (!$bookStoragePath) {
                 throw new \Exception('Book storage path not configured');
             }
 
             $sourcePath = $audiobook['path'];
-            $targetDir = $options['target_directory'] ?? $this->generateTargetDirectory($book, $bookStoragePath, $options);
+            $targetDir = $options['target_directory'] ?? $this->generateTargetDirectory(
+                $book,
+                $bookStoragePath,
+                $options
+            );
 
             // Normalize target directory to avoid duplicate trailing segments like "Title/Title"
             $normalizedTargetDir = rtrim($targetDir, '/');
@@ -590,6 +717,13 @@ class BookImportService
                 // Just flatten CD directories if needed, but don't move files
                 $this->flattenCdDirectories($sourcePath);
 
+                $this->assertDirectoryHasAudioFiles($sourcePath, [
+                    'book_id' => $book->id,
+                    'source' => $sourcePath,
+                    'target' => $targetDir,
+                    'operation' => 'in_place',
+                ]);
+
                 Log::info("In-place import: Files already at target location", [
                     'source' => $sourcePath,
                     'target' => $targetDir,
@@ -601,15 +735,21 @@ class BookImportService
 
             // Handle directory conflicts
             $originalTargetDir = $targetDir;
-            if (File::isDirectory($targetDir)) {
+            $hasExplicitTargetDirectory = array_key_exists('target_directory', $options)
+                && is_string($options['target_directory'])
+                && $options['target_directory'] !== '';
+
+            if (!$hasExplicitTargetDirectory && File::isDirectory($targetDir)) {
                 $targetDir = $this->handleDirectoryConflict($audiobook, $targetDir);
 
                 // If directory was changed due to conflict, update book's directory_path
                 if ($targetDir !== $originalTargetDir) {
                     $bookStoragePath = rtrim($bookStoragePath, '/');
-                    $relativePath = str_starts_with($targetDir, $bookStoragePath . '/')
-                        ? substr($targetDir, strlen($bookStoragePath) + 1)
-                        : $targetDir;
+                    if (str_starts_with($targetDir, $bookStoragePath . '/')) {
+                        $relativePath = substr($targetDir, strlen($bookStoragePath) + 1);
+                    } else {
+                        $relativePath = $targetDir;
+                    }
                     $book->directory_path = $relativePath;
                     Log::warning("Directory conflict detected - updated path", [
                         'original' => $originalTargetDir,
@@ -633,6 +773,13 @@ class BookImportService
             } else {
                 $this->copyDirectoryContents($sourcePath, $targetDir);
             }
+
+            $this->assertDirectoryHasAudioFiles($targetDir, [
+                'book_id' => $book->id,
+                'source' => $sourcePath,
+                'target' => $targetDir,
+                'operation' => $operation,
+            ]);
 
             // Save any changes (including directory_path if there was a conflict)
             $book->save();
@@ -761,6 +908,8 @@ class BookImportService
      */
     protected function moveDirectoryContents(string $source, string $target): void
     {
+        $sameFileSystem = $this->areOnSameFileSystem($source, $target);
+
         // Handle single file source
         if (File::isFile($source)) {
             $filename = basename($source);
@@ -770,16 +919,20 @@ class BookImportService
                 File::makeDirectory($target, 0775, true);
             }
 
-            if (!File::copy($source, $targetFile)) {
-                throw new \Exception("Failed to copy file: {$source} to {$targetFile}");
+            if ($sameFileSystem) {
+                if (!File::move($source, $targetFile)) {
+                    throw new \Exception("Failed to move file: {$source} to {$targetFile}");
+                }
+            } else {
+                if (!File::copy($source, $targetFile)) {
+                    throw new \Exception("Failed to copy file: {$source} to {$targetFile}");
+                }
+                File::delete($source);
             }
 
             chmod($targetFile, 0664);
 
             $this->moveMatchingPdfFile($source, $target);
-
-            // Delete source file after successful copy
-            File::delete($source);
             return;
         }
 
@@ -798,16 +951,21 @@ class BookImportService
                 File::makeDirectory($targetSubDir, 0775, true);
             }
 
-            // Use copy+delete instead of move to avoid cross-filesystem issues
-            if (!File::copy($file->getPathname(), $targetFile)) {
-                throw new \Exception("Failed to copy file: {$file->getPathname()} to {$targetFile}");
+            if ($sameFileSystem) {
+                if (!File::move($file->getPathname(), $targetFile)) {
+                    throw new \Exception("Failed to move file: {$file->getPathname()} to {$targetFile}");
+                }
+            } else {
+                // Use copy+delete instead of move to avoid cross-filesystem issues
+                if (!File::copy($file->getPathname(), $targetFile)) {
+                    throw new \Exception("Failed to copy file: {$file->getPathname()} to {$targetFile}");
+                }
+
+                File::delete($file->getPathname());
             }
 
-            // Set file permissions after copying
+            // Set file permissions after move/copy
             chmod($targetFile, 0664);
-
-            // Delete source file after successful copy
-            File::delete($file->getPathname());
         }
 
         // Remove empty directories from source
@@ -853,8 +1011,18 @@ class BookImportService
             $pdfFilename = basename($pdfPath);
             $targetPdfPath = "{$targetDir}/{$pdfFilename}";
 
+            $sameFileSystem = $this->areOnSameFileSystem($pdfPath, $targetDir);
+
             try {
-                if (File::copy($pdfPath, $targetPdfPath)) {
+                if ($sameFileSystem) {
+                    if (File::move($pdfPath, $targetPdfPath)) {
+                        chmod($targetPdfPath, 0664);
+                        Log::info("Moved matching PDF file", [
+                            'pdf' => $pdfPath,
+                            'target' => $targetPdfPath,
+                        ]);
+                    }
+                } elseif (File::copy($pdfPath, $targetPdfPath)) {
                     chmod($targetPdfPath, 0664);
                     File::delete($pdfPath);
                     Log::info("Moved matching PDF file", [
@@ -1063,13 +1231,24 @@ class BookImportService
             }
 
             // Check if this is a local file path instead of a URL
-            if (file_exists($imageUrl) && is_file($imageUrl)) {
+            $localImagePath = $imageUrl;
+            if (str_starts_with($imageUrl, 'file://')) {
+                $parsedPath = parse_url($imageUrl, PHP_URL_PATH);
+                if (is_string($parsedPath) && $parsedPath !== '') {
+                    $localImagePath = $parsedPath;
+                }
+            }
+
+            if (file_exists($localImagePath) && is_file($localImagePath)) {
                 // It's a local file - copy it instead of downloading
-                $extension = strtolower(pathinfo($imageUrl, PATHINFO_EXTENSION));
+                $extension = strtolower(pathinfo($localImagePath, PATHINFO_EXTENSION));
+                if (!in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
+                    $extension = 'jpg';
+                }
                 $filename = "cover_{$source}.{$extension}";
                 $destPath = "{$absoluteDir}/{$filename}";
 
-                if (File::copy($imageUrl, $destPath)) {
+                if (File::copy($localImagePath, $destPath)) {
                     chmod($destPath, 0664);
                     return $filename;
                 }
@@ -1344,7 +1523,9 @@ class BookImportService
     {
         try {
             // Try ffprobe first (most reliable)
-            $output = shell_exec("ffprobe -i " . escapeshellarg($filePath) . " -show_entries format=duration -v quiet -of csv=\"p=0\"");
+            $command = 'ffprobe -i ' . escapeshellarg($filePath)
+                . ' -show_entries format=duration -v quiet -of csv="p=0"';
+            $output = shell_exec($command);
             if ($output && is_numeric(trim($output))) {
                 return (int) round(floatval(trim($output)));
             }
@@ -1467,8 +1648,10 @@ class BookImportService
                     break;
                 }
             }
-        } elseif (is_string($narrator) && stripos($narrator, 'graphic') !== false && stripos($narrator, 'audio') !== false) {
-            $isGraphicAudio = true;
+        } elseif (is_string($narrator)) {
+            if (stripos($narrator, 'graphic') !== false && stripos($narrator, 'audio') !== false) {
+                $isGraphicAudio = true;
+            }
         }
 
         // Check publisher field
@@ -1479,8 +1662,10 @@ class BookImportService
                     break;
                 }
             }
-        } elseif (is_string($publisher) && stripos($publisher, 'graphic') !== false && stripos($publisher, 'audio') !== false) {
-            $isGraphicAudio = true;
+        } elseif (is_string($publisher)) {
+            if (stripos($publisher, 'graphic') !== false && stripos($publisher, 'audio') !== false) {
+                $isGraphicAudio = true;
+            }
         }
 
         if ($isGraphicAudio && !preg_match('/\(GraphicAudio\)/i', $title)) {

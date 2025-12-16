@@ -360,13 +360,20 @@ class BookDirectoryParser
                                     $metadata['series'] = $value;
                                     break;
                                 case 'series_number':
-                                    $metadata['seriesNumber'] = is_numeric($value) ? (int) $value : null;
+                                    if (is_numeric($value)) {
+                                        $metadata['seriesNumber'] = str_contains((string) $value, '.') ? (float) $value : (int) $value;
+                                    } else {
+                                        $metadata['seriesNumber'] = null;
+                                    }
                                     // Keep legacy key for backward compatibility
                                     $metadata['series_number'] = $metadata['seriesNumber'];
                                     break;
                                 case 'year':
                                     $yearTrimmed = trim($value);
                                     $metadata['year'] = is_numeric($yearTrimmed) ? (int) $yearTrimmed : null;
+                                    break;
+                                case 'genre':
+                                    $metadata['genre'] = $value;
                                     break;
                                 case 'publishedyear':
                                     $publishedYearTrimmed = trim($value);
@@ -390,10 +397,21 @@ class BookDirectoryParser
                         'author' => array_key_exists('author', $metadata) ? (is_array($metadata['author']) ? $metadata['author'] : [$metadata['author']]) : [],
                         'narrator' => array_key_exists('narrator', $metadata) ? $metadata['narrator'] : '',
                         'series' => array_key_exists('series', $metadata) ? $metadata['series'] : '',
-                        'seriesNumber' => array_key_exists('seriesNumber', $metadata) ? (is_numeric($metadata['seriesNumber']) ? (int) $metadata['seriesNumber'] : null) : (array_key_exists('series_number', $metadata) ? (is_numeric($metadata['series_number']) ? (int) $metadata['series_number'] : null) : (array_key_exists('seriesIndex', $metadata) && is_numeric($metadata['seriesIndex']) ? (int) $metadata['seriesIndex'] : null)),
+                        'seriesNumber' => array_key_exists('seriesNumber', $metadata)
+                            ? (is_numeric($metadata['seriesNumber'])
+                                ? (str_contains((string) $metadata['seriesNumber'], '.') ? (float) $metadata['seriesNumber'] : (int) $metadata['seriesNumber'])
+                                : null)
+                            : (array_key_exists('series_number', $metadata)
+                                ? (is_numeric($metadata['series_number'])
+                                    ? (str_contains((string) $metadata['series_number'], '.') ? (float) $metadata['series_number'] : (int) $metadata['series_number'])
+                                    : null)
+                                : (array_key_exists('seriesIndex', $metadata) && is_numeric($metadata['seriesIndex'])
+                                    ? (str_contains((string) $metadata['seriesIndex'], '.') ? (float) $metadata['seriesIndex'] : (int) $metadata['seriesIndex'])
+                                    : null)),
                         'year' => (
                             (array_key_exists('year', $metadata) && is_numeric($metadata['year'])) ? (int) $metadata['year'] : ((array_key_exists('publishedYear', $metadata) && is_numeric($metadata['publishedYear'])) ? (int) $metadata['publishedYear'] : null)
                         ),
+                        'genre' => array_key_exists('genre', $metadata) ? $metadata['genre'] : '',
                         'description' => array_key_exists('description', $metadata) ? preg_replace('/^\[description\]\s*/i', '', $metadata['description']) : '',
                     ];
                 }
@@ -675,6 +693,7 @@ class BookDirectoryParser
                     [$coverImage, $coverCandidates] = $this->findCoverImageCandidate($path);
                     $book = [
                         'directoryPath' => $path,
+                        'directory_path' => $path,
                         'genre' => $bookPathInfo['genre'] ?? [],
                         'author' => is_array($bookPathInfo['author']) ? $bookPathInfo['author'] : [$bookPathInfo['author'] ?? 'Unknown Author'],
                         'series' => $seriesName,
@@ -690,6 +709,31 @@ class BookDirectoryParser
                         'coverImage' => $coverImage ?? null,
                         'edition' => $edition,
                     ];
+
+                    $fileMetadata = $this->readMetadataFile($directory);
+                    if (!empty($fileMetadata['title'])) {
+                        $book['title'] = $fileMetadata['title'];
+                    }
+                    if (!empty($fileMetadata['author'])) {
+                        $book['author'] = $fileMetadata['author'];
+                    }
+                    if (!empty($fileMetadata['genre'])) {
+                        $book['genre'] = $fileMetadata['genre'];
+                    }
+                    if (!empty($fileMetadata['description'])) {
+                        $book['description'] = $fileMetadata['description'];
+                    }
+                    if (!empty($fileMetadata['series'])) {
+                        $book['series'] = $fileMetadata['series'];
+                        $book['seriesName'] = $fileMetadata['series'];
+                    }
+                    if (!empty($fileMetadata['seriesNumber'])) {
+                        $book['seriesNumber'] = $fileMetadata['seriesNumber'];
+                        $book['series_number'] = $fileMetadata['seriesNumber'];
+                    }
+                    if (!empty($fileMetadata['year'])) {
+                        $book['year'] = $fileMetadata['year'];
+                    }
                     $books[] = $book;
                 }
             }

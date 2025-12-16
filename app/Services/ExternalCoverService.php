@@ -48,6 +48,30 @@ class ExternalCoverService
                 'sourceId' => $sourceId,
             ]);
 
+            try {
+                $booksDisk = Storage::disk('books');
+                $booksRoot = $booksDisk->path('');
+                $absoluteDir = $booksDisk->path($directoryPath);
+                Log::debug('ExternalCoverService: books disk paths', [
+                    'booksRoot' => $booksRoot,
+                    'directoryPath' => $directoryPath,
+                    'absoluteDir' => $absoluteDir,
+                ]);
+
+                if (is_dir($absoluteDir) && !is_writable($absoluteDir)) {
+                    $result['error'] = 'Destination directory is not writable: ' . $absoluteDir;
+                    Log::error('ExternalCoverService: Destination directory not writable', [
+                        'absoluteDir' => $absoluteDir,
+                    ]);
+
+                    return $result;
+                }
+            } catch (\Throwable $t) {
+                Log::warning('ExternalCoverService: Unable to preflight disk paths', [
+                    'error' => $t->getMessage(),
+                ]);
+            }
+
             // Validate URL format before attempting to download
             if (!filter_var($url, FILTER_VALIDATE_URL)) {
                 $result['error'] = 'Invalid URL format';
@@ -115,7 +139,31 @@ class ExternalCoverService
                 }
 
                 try {
-                    Storage::disk('books')->put($storagePath, $imageContents);
+                    $saved = Storage::disk('books')->put($storagePath, $imageContents);
+                    if ($saved !== true) {
+                        $result['error'] = 'Failed to save image: write returned false';
+                        Log::error('ExternalCoverService: Failed to save image (put returned false)', [
+                            'storagePath' => $storagePath,
+                        ]);
+
+                        return $result;
+                    }
+
+                    if (!Storage::disk('books')->exists($storagePath)) {
+                        $result['error'] = 'Failed to save image: file does not exist after write';
+                        Log::error('ExternalCoverService: Failed to save image (file missing after write)', [
+                            'storagePath' => $storagePath,
+                        ]);
+
+                        return $result;
+                    }
+
+                    try {
+                        $fullPath = Storage::disk('books')->path($storagePath);
+                        @chmod($fullPath, 0664);
+                    } catch (\Throwable $t) {
+                        // Ignore chmod failures
+                    }
                 } catch (\Exception $e) {
                     $result['error'] = 'Failed to save image: ' . $e->getMessage();
                     Log::error('ExternalCoverService: Failed to save image', [
