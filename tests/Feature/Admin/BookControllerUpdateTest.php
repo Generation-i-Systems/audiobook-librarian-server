@@ -315,4 +315,77 @@ class BookControllerUpdateTest extends TestCase
         // The controller uses 'jpg' extension for image/jpeg content type
         $this->assertTrue(Storage::disk('books')->exists('test/path/cover_audible_B01234ABCD.jpg'));
     }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function updateBookMovesFilesWhenDirectoryPathChangesAndDestinationExists(): void
+    {
+        Log::spy();
+        Storage::fake('books');
+
+        $bookId = 'test-book-move-1';
+        $bookData = [
+            'id' => $bookId,
+            'title' => 'Move Test',
+            'author' => ['Old Author'],
+            'genre' => ['Old Genre'],
+            'directoryPath' => 'old/path',
+            'coverImage' => 'cover.jpg',
+        ];
+
+        Storage::disk('books')->put('old/path/track1.mp3', 'a');
+        Storage::disk('books')->put('old/path/cover.jpg', 'oldcover');
+        Storage::disk('books')->put('old/path/sub/track2.mp3', 'b');
+
+        Storage::disk('books')->put('new/path/existing.mp3', 'c');
+        Storage::disk('books')->put('new/path/cover.jpg', 'newcover');
+        Storage::disk('books')->put('new/path/sub/track2.mp3', 'existing-sub');
+
+        $this->documentStoreService->expects($this->once())
+            ->method('getBook')
+            ->with($bookId)
+            ->willReturn($bookData);
+
+        $this->documentStoreService->method('findOrCreateMany')
+            ->willReturnCallback(function ($type, $items) {
+                if ($type === 'authors') {
+                    return ['author-1'];
+                }
+                if ($type === 'genres') {
+                    return ['genre-1'];
+                }
+                return [];
+            });
+
+        $this->documentStoreService->expects($this->once())
+            ->method('updateBook')
+            ->with(
+                $this->equalTo($bookId),
+                $this->callback(function ($data) {
+                    return ($data['directoryPath'] ?? null) === 'new/path'
+                        && ($data['coverImage'] ?? null) === 'cover_01.jpg';
+                })
+            )
+            ->willReturn(true);
+
+        $request = new Request([
+            'title' => 'Move Test',
+            'author' => ['Old Author'],
+            'genre' => ['Old Genre'],
+            'directoryPath' => 'new/path',
+        ]);
+        $this->app->instance('request', $request);
+
+        $response = $this->controller->update($request, $bookId);
+
+        $this->assertEquals(302, $response->getStatusCode());
+
+        $this->assertTrue(Storage::disk('books')->exists('new/path/track1.mp3'));
+        $this->assertTrue(Storage::disk('books')->exists('new/path/cover_01.jpg'));
+        $this->assertTrue(Storage::disk('books')->exists('new/path/sub/track2_01.mp3'));
+
+        $this->assertTrue(Storage::disk('books')->exists('new/path/cover.jpg'));
+        $this->assertTrue(Storage::disk('books')->exists('new/path/sub/track2.mp3'));
+
+        $this->assertCount(0, Storage::disk('books')->allFiles('old/path'));
+    }
 }

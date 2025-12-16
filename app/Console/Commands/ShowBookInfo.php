@@ -368,7 +368,15 @@ class ShowBookInfo extends Command
                 $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
                 // Resolve symlinks in book root for consistent path handling
                 $bookRoot = realpath($bookRoot) ?: $bookRoot;
-                $coverPath = $bookRoot . '/' . ltrim($coverPath, '/');
+
+                // Check if cover path already includes directory or is just filename
+                if (!str_contains($coverPath, '/')) {
+                    // Filename only - combine with book's directory path
+                    $coverPath = $bookRoot . '/' . ltrim($book->directoryPath, '/') . '/' . ltrim($coverPath, '/');
+                } else {
+                    // Already includes directory path (legacy format)
+                    $coverPath = $bookRoot . '/' . ltrim($coverPath, '/');
+                }
             }
             if (!file_exists($coverPath) && !str_starts_with($book->coverImage, 'http')) {
                 $coverPath = null;
@@ -615,7 +623,15 @@ class ShowBookInfo extends Command
                 $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
                 // Resolve symlinks in book root for consistent path handling
                 $bookRoot = realpath($bookRoot) ?: $bookRoot;
-                $coverPath = $bookRoot . '/' . ltrim($coverPath, '/');
+
+                // Check if cover path already includes directory or is just filename
+                if (!str_contains($coverPath, '/')) {
+                    // Filename only - combine with book's directory path
+                    $coverPath = $bookRoot . '/' . ltrim($book->directoryPath, '/') . '/' . ltrim($coverPath, '/');
+                } else {
+                    // Already includes directory path (legacy format)
+                    $coverPath = $bookRoot . '/' . ltrim($coverPath, '/');
+                }
             }
             if (file_exists($coverPath) || str_starts_with($book->coverImage, 'http')) {
                 $this->terminalImageService->displayImage(

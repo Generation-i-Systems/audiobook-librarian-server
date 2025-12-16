@@ -7,6 +7,7 @@ use App\Events\NewBookAdded;
 use App\Http\Controllers\Controller;
 use App\Services\AudibleService;
 use App\Services\AudiobookBayService;
+use App\Services\BookDirectoryMoveService;
 use App\Services\ExternalCoverService;
 use App\Services\GoogleBooksApiService;
 use App\Services\HardcoverService;
@@ -1321,25 +1322,13 @@ class BookController extends Controller
         if ($oldDirectoryPath && $newDirectoryPath && $oldDirectoryPath !== $newDirectoryPath) {
             Log::info('Moving files from old directory to new directory: ' . $oldDirectoryPath . ' -> ' . $newDirectoryPath);
 
-            $disk = \Illuminate\Support\Facades\Storage::disk('books');
-            if ($disk->exists($oldDirectoryPath)) {
-                $files = $disk->allFiles($oldDirectoryPath);
-                foreach ($files as $file) {
-                    $filename = basename($file);
-                    $disk->makeDirectory($newDirectoryPath);
-                    try {
-                        $disk->move($file, $newDirectoryPath . '/' . $filename);
-                    } catch (\Exception $e) {
-                        Log::error('Failed to move file during directory update', [
-                            'oldPath' => $oldDirectoryPath,
-                            'newPath' => $newDirectoryPath,
-                            'file' => $file,
-                            'error' => $e->getMessage(),
-                        ]);
-                    }
-                }
-                // Set permissions/ownership on new directory to match old
-                $storageRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
+            $oldCoverBasename = !empty($book['coverImage']) ? basename((string) $book['coverImage']) : null;
+            $moveService = app(BookDirectoryMoveService::class);
+            $moveResult = $moveService->moveBookDirectoryContents($oldDirectoryPath, $newDirectoryPath, $oldCoverBasename);
+
+            $storageRoot = (string) config('app.book_root', env('BOOK_STORAGE_PATH', ''));
+            $storageRoot = rtrim($storageRoot, '/');
+            if ($storageRoot !== '') {
                 $oldAbs = $storageRoot . '/' . ltrim($oldDirectoryPath, '/');
                 $newAbs = $storageRoot . '/' . ltrim($newDirectoryPath, '/');
                 if (is_dir($oldAbs) && is_dir($newAbs)) {
@@ -1356,25 +1345,10 @@ class BookController extends Controller
                         }
                     }
                 }
-                // Remove old (now empty) directory
-                try {
-                    $disk->deleteDirectory($oldDirectoryPath);
-                } catch (\Exception $e) {
-                    Log::error('Failed to delete old directory during directory update', [
-                        'oldPath' => $oldDirectoryPath,
-                        'error' => $e->getMessage(),
-                    ]);
-                }
             }
-            // Update file references (coverImage, etc)
-            if (!empty($book['coverImage'])) {
-                Log::debug('Updating cover image reference', [
-                    'book' => $book,
-                    'newDirectoryPath' => $newDirectoryPath,
-                ]);
-                $oldCover = $book['coverImage'];
-                $coverName = basename($oldCover);
-                $validated['coverImage'] = $coverName;
+
+            if ($oldCoverBasename !== null) {
+                $validated['coverImage'] = $moveResult['coverImage'] ?? $oldCoverBasename;
             }
         }
 
