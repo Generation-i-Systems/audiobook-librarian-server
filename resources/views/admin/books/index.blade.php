@@ -290,7 +290,7 @@
         </table>
 
         <div class="pagination">
-            {{ $books->links() }}
+            {{ $books->links('pagination.admin-books') }}
         </div>
 
     </div>
