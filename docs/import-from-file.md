@@ -33,6 +33,13 @@ The Import-from-File feature allows administrators to easily add books to the li
    - Click "Import and Prefill Book Form" to create a book record and redirect to the edit page for additional adjustments
    - Click "Move to Library" to move the selected file(s) to your library storage location
 
+### Multi-Book Imports: Sticky Genre
+
+When importing multiple books in a row from the same batch:
+
+- After you manually select a genre for one imported book, that genre is remembered for the rest of the import session.
+- For subsequent books where the system cannot automatically determine a genre, the import UI will default to the previously selected genre.
+
 ### Metadata Extraction
 
 The system attempts to extract the following metadata from audio files:

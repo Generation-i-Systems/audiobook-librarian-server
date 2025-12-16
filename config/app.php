@@ -62,6 +62,8 @@ return [
 
     'name' => env('APP_NAME', 'ab5'),
 
+    'book_root' => env('BOOK_STORAGE_PATH', '/media/lyra_data1/audiobooks/books'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Environment

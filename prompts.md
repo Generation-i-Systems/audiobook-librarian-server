@@ -89,3 +89,21 @@ The clients are getting api responses from `https://books.thelin.org/api/v1/book
 ## 2025-12-11
 
 implement the metadata lookup for audiobookbay and hardcover. audiobookbay should not need auth credentials for any of the features currently implemented. validate the data with integration tests that hit the actual audiobookbay url. Do the same for hardcover. these tests should not be part of any existing test suite. They are only for developing the endpoint handlers or for verifying the handlers going forward so they  would need to be ran specifically and not even in global test suite runs. among other things this is an example url that should work https://books.thelin.org/admin/books/search?source=audiobookbay&title=The%20Last%20Guardian&author=Eoin%20Colfer&series=&api_id=
+
+---
+
+## 2025-12-13
+
+add a sanity check for imports to make sure there are audio files in the destination directory
+
+when importing a multi book directory default to using the same genre for all future books after selecting a genre in one book
+
+the directory should be set at the beginning of the import and just USED (do not create a _01 directory)
+
+---
+
+## 2025-12-15
+
+I am trying to save an update that changes the coverimage and the series but neither are being saved.
+
+all cover images should be relative to the directoryPath. So   "coverImage": "Romance/J.R. Ward/Black Dagger Brotherhood/02 Lover Eternal/cover_audible_1765842643.jpg", should just be cover_audible_1765842643.jpg. Look at import edit and display logics to make sure we are using the new format. But also support existing data that includes the directoryPath

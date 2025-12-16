@@ -163,6 +163,11 @@ asin=B01234567
 - Check that metadata can be parsed from directory structure or `.abs` file
 - Verify the directory path follows a recognizable pattern
 
+### "Sanity check failed: destination directory contains no audio files"
+- This indicates the import completed file operations but the destination folder ended up with no audio files (e.g., only images/text)
+- Ensure the source directory contains supported audio files and that permissions allow copying/moving them
+- Re-run the import with `--dry-run` to confirm the expected source paths and detected files
+
 ### "Book already exists"
 - Use `--force` to update existing books
 - Check if the book is already in the database with a different path
