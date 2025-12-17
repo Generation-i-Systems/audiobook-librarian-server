@@ -15,6 +15,7 @@
   - Fixes "Could not read image dimensions" errors when displaying cover images
   - Books can now be found regardless of whether paths use symlinks or real paths
 - Fixed admin book edit `directoryPath` updates to move/merge files when the destination directory already exists
+- Fixed admin book edit `directoryPath` updates not moving files when the old path is a directory (used file-only existence checks)
 - Fixed `book-mv`/`books:move` aborting when the destination directory already exists by treating the destination as a parent directory
 - Added `books:move --require-book` to abort instead of falling back when no matching books are found
 - Added `books:move --verify` and `book-mv --verify` to interactively review planned path/database changes before applying

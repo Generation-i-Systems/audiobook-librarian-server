@@ -107,3 +107,9 @@ the directory should be set at the beginning of the import and just USED (do not
 I am trying to save an update that changes the coverimage and the series but neither are being saved.
 
 all cover images should be relative to the directoryPath. So   "coverImage": "Romance/J.R. Ward/Black Dagger Brotherhood/02 Lover Eternal/cover_audible_1765842643.jpg", should just be cover_audible_1765842643.jpg. Look at import edit and display logics to make sure we are using the new format. But also support existing data that includes the directoryPath
+
+---
+
+## 2025-12-17
+
+updating the path in the form still isn't moving the files

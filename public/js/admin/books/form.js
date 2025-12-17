@@ -1097,6 +1097,74 @@ document.addEventListener("DOMContentLoaded", function () {
     const form = document.getElementById("book-form"); // Ensure your form has id="book-form"
     if (form) {
         form.addEventListener("submit", function (e) {
+            function removeValidationSummary() {
+                const existingSummary = document.getElementById("book-form-validation-summary");
+                if (existingSummary) {
+                    existingSummary.remove();
+                }
+            }
+
+            function setValidationSummary(messages) {
+                removeValidationSummary();
+
+                if (!Array.isArray(messages) || messages.length === 0) {
+                    return;
+                }
+
+                const summary = document.createElement("div");
+                summary.id = "book-form-validation-summary";
+                summary.className = "alert alert-danger";
+                summary.setAttribute("role", "alert");
+
+                const heading = document.createElement("div");
+                heading.className = "fw-bold";
+                heading.textContent = "Cannot save because there are validation errors:";
+                summary.appendChild(heading);
+
+                const list = document.createElement("ul");
+                list.className = "mb-0";
+                messages.forEach((message) => {
+                    const li = document.createElement("li");
+                    li.textContent = String(message);
+                    list.appendChild(li);
+                });
+                summary.appendChild(list);
+
+                form.insertAdjacentElement("afterbegin", summary);
+            }
+
+            function addFieldError(field, message) {
+                if (!field) {
+                    return;
+                }
+
+                try {
+                    field.classList.add("is-invalid");
+                } catch (error) {
+                    // ignore
+                }
+
+                const feedback = document.createElement("span");
+                feedback.className = "invalid-feedback d-block";
+                feedback.textContent = String(message);
+
+                const container =
+                    field.closest(".input-group") ||
+                    field.closest(".form-group") ||
+                    field.closest(".author-row") ||
+                    field.closest(".narrator-row") ||
+                    field.closest(".series-row") ||
+                    field.closest(".genre-row") ||
+                    field.closest(".mb-3");
+
+                if (container && container !== field) {
+                    container.insertAdjacentElement("afterend", feedback);
+                    return;
+                }
+
+                field.insertAdjacentElement("afterend", feedback);
+            }
+
             // CRITICAL: Update coverImageSource right before form submission
             const checkedRadioButton = document.querySelector('input[name="coverImageCandidate"]:checked');
             if (checkedRadioButton) {
@@ -1119,6 +1187,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 msg.remove(),
             );
 
+            removeValidationSummary();
+
             // Disable submit button and show spinner
             const submitBtn = form.querySelector('button[type="submit"]');
             const originalBtnText = submitBtn.innerHTML;
@@ -1138,12 +1208,25 @@ document.addEventListener("DOMContentLoaded", function () {
             const selectedCoverRadio = form.querySelector('input[name="coverImageCandidate"]:checked');
             console.log("[DEBUG] Selected cover radio data-source:", selectedCoverRadio ? selectedCoverRadio.dataset.source : "none");
 
+            const validationMessages = [];
+
             if (selectedCoverRadio && (selectedCoverRadio.dataset.source === "audible" || selectedCoverRadio.dataset.source === "google")) {
                 console.log("[DEBUG] External cover image selected: " + selectedCoverRadio.dataset.source);
 
                 // Check if the cover has already been downloaded (filename starts with cover_audible_ or cover_google_)
                 const coverValue = selectedCoverRadio.value;
-                const isAlreadyDownloaded = coverValue && (coverValue.startsWith('cover_audible_') || coverValue.startsWith('cover_google_'));
+                const normalizedCoverValue = (coverValue || '').toString();
+                const isAlreadyDownloaded =
+                    normalizedCoverValue !== '' &&
+                    (
+                        normalizedCoverValue.startsWith('cover_audible_') ||
+                        // Current naming (ExternalCoverService::normalizeSourceName => googlebooks)
+                        normalizedCoverValue.startsWith('cover_googlebooks_') ||
+                        // Legacy naming used elsewhere in the UI
+                        normalizedCoverValue.startsWith('cover_google_') ||
+                        // Some older/current covers are stored as googlebooks_*.jpg (without cover_ prefix)
+                        normalizedCoverValue.startsWith('googlebooks_')
+                    );
 
                 if (!isAlreadyDownloaded) {
                     // Only validate IDs and URLs if we need to download the cover
@@ -1151,21 +1234,17 @@ document.addEventListener("DOMContentLoaded", function () {
                     if (selectedCoverRadio.dataset.source === "audible") {
                         const audibleIdInput = form.querySelector('#audibleId');
                         if (!audibleIdInput || !audibleIdInput.value.trim()) {
-                            $(audibleIdInput).closest('.form-group').addClass("is-invalid");
-                            $(audibleIdInput).closest('.form-group').after(
-                                '<span class="invalid-feedback d-block">Audible ID is missing. Cannot download Audible cover image.</span>'
-                            );
+                            addFieldError(audibleIdInput, "Audible ID is missing. Cannot download Audible cover image.");
                             hasError = true;
+                            validationMessages.push("Audible ID is missing.");
                             console.log("[DEBUG] (error) Audible ID is missing");
                         }
                     } else if (selectedCoverRadio.dataset.source === "google") {
                         const googleBooksIdInput = form.querySelector('#googleBooksId');
                         if (!googleBooksIdInput || !googleBooksIdInput.value.trim()) {
-                            $(selectedCoverRadio).closest('.form-group').addClass("is-invalid");
-                            $(selectedCoverRadio).closest('.form-group').after(
-                                '<span class="invalid-feedback d-block">Google Books ID is missing. Cannot download Google Books cover image.</span>'
-                            );
+                            addFieldError(googleBooksIdInput, "Google Books ID is missing. Cannot download Google Books cover image.");
                             hasError = true;
+                            validationMessages.push("Google Books ID is missing.");
                             console.log("[DEBUG] (error) Google Books ID is missing");
                         }
                     }
@@ -1173,11 +1252,13 @@ document.addEventListener("DOMContentLoaded", function () {
                     // Verify we have a cover URL if using external cover
                     const coverUrlInput = form.querySelector('#coverImageUrl');
                     if (!coverUrlInput || !coverUrlInput.value.trim()) {
-                        $(selectedCoverRadio).closest('.form-group').addClass("is-invalid");
-                        $(selectedCoverRadio).closest('.form-group').after(
-                            '<span class="invalid-feedback d-block">External cover image URL is missing. Cannot download cover image.</span>'
-                        );
+                        const coverGroup =
+                            selectedCoverRadio.closest('.form-group') ||
+                            document.getElementById('cover-candidates-group') ||
+                            selectedCoverRadio;
+                        addFieldError(coverGroup, "External cover image URL is missing. Cannot download cover image.");
                         hasError = true;
+                        validationMessages.push("External cover image URL is missing.");
                         console.log("[DEBUG] (error) External cover image URL is missing");
                     }
                 } else {
@@ -1187,11 +1268,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
             const titleInput = form.querySelector('input[name="title"]');
             if (!titleInput || !titleInput.value.trim()) {
-                titleInput.classList.add("is-invalid");
-                $(titleInput).after(
-                    '<span class="invalid-feedback d-block">Title is required.</span>',
-                );
+                addFieldError(titleInput, "Title is required.");
                 hasError = true;
+                validationMessages.push("Title is required.");
                 console.log("[DEBUG] (error) Title is required");
             }
 
@@ -1203,19 +1282,16 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (input.value.trim()) hasAuthor = true;
             });
             if (!hasAuthor && authorInputs.length > 0) {
-                authorInputs[0].classList.add("is-invalid");
-                $(authorInputs[0].closest(".input-group")).after(
-                    '<span class="invalid-feedback d-block">At least one author is required.</span>',
-                );
+                addFieldError(authorInputs[0], "At least one author is required.");
                 hasError = true;
+                validationMessages.push("At least one author is required.");
                 console.log("[DEBUG] (error) No author selected");
             } else if (authorInputs.length === 0) {
                 // No author input fields at all
                 const authorsGroup = document.getElementById("authors-group");
-                $(authorsGroup).after(
-                    '<span class="invalid-feedback d-block">At least one author is required.</span>',
-                );
+                addFieldError(authorsGroup, "At least one author is required.");
                 hasError = true;
+                validationMessages.push("At least one author is required.");
                 console.log("[DEBUG] (error) No author input fields found");
             }
 
@@ -1227,19 +1303,16 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (select.value) hasGenre = true;
             });
             if (!hasGenre && genreSelects.length > 0) {
-                genreSelects[0].classList.add("is-invalid");
-                $(genreSelects[0].closest(".input-group")).after(
-                    '<span class="invalid-feedback d-block">At least one genre is required.</span>',
-                );
+                addFieldError(genreSelects[0], "At least one genre is required.");
                 console.log("[DEBUG] (error) No genre selected");
                 hasError = true;
+                validationMessages.push("At least one genre is required.");
             } else if (genreSelects.length === 0) {
                 const genresGroup = document.getElementById("genres-group");
-                $(genresGroup).after(
-                    '<span class="invalid-feedback d-block">At least one genre is required.</span>',
-                );
+                addFieldError(genresGroup, "At least one genre is required.");
                 console.log("[DEBUG] (error) No genre select fields found");
                 hasError = true;
+                validationMessages.push("At least one genre is required.");
             }
 
             // Log the selected cover image value for debugging
@@ -1254,12 +1327,34 @@ document.addEventListener("DOMContentLoaded", function () {
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalBtnText;
 
+                setValidationSummary(validationMessages);
+
+                submitBtn.disabled = true;
+                submitBtn.dataset.disabledByValidation = "1";
+
+                if (!form.dataset.validationChangeHandlerAttached) {
+                    form.dataset.validationChangeHandlerAttached = "1";
+
+                    const handleUserChange = function () {
+                        if (submitBtn.dataset.disabledByValidation === "1") {
+                            submitBtn.disabled = false;
+                            delete submitBtn.dataset.disabledByValidation;
+                            removeValidationSummary();
+                        }
+                    };
+
+                    form.addEventListener("input", handleUserChange, true);
+                    form.addEventListener("change", handleUserChange, true);
+                }
+
                 const firstErrorField = form.querySelector(".is-invalid");
                 if (firstErrorField) {
-                    firstErrorField.scrollIntoView({
-                        behavior: "smooth",
-                        block: "center",
-                    });
+                    if (typeof firstErrorField.scrollIntoView === "function") {
+                        firstErrorField.scrollIntoView({
+                            behavior: "smooth",
+                            block: "center",
+                        });
+                    }
                 }
                 console.log(
                     "[DEBUG] Form will not submit due to validation errors",

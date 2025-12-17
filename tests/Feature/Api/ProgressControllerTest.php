@@ -11,26 +11,14 @@ use Laravel\Sanctum\Sanctum;
 
 class ProgressControllerTest extends TestCase
 {
-    // Not using RefreshDatabase to avoid SQLite issues
+    use RefreshDatabase;
 
     protected $user;
     protected $token;
-    protected static $migrationsRun = false;
 
     protected function setUp(): void
     {
         parent::setUp();
-
-        if (!self::$migrationsRun) {
-            try {
-                // Try to run migrations for the in-memory database
-                $this->artisan('migrate')->execute();
-            } catch (\Exception $e) {
-                // If migrations fail, try migrate:fresh
-                $this->artisan('migrate:fresh')->execute();
-            }
-            self::$migrationsRun = true;
-        }
 
         // Create a test user without running the problematic seeders
         $this->user = User::factory()->create([
@@ -45,25 +33,14 @@ class ProgressControllerTest extends TestCase
         Sanctum::actingAs($this->user);
     }
 
-    protected function tearDown(): void
-    {
-        // Clean up created records
-        if (isset($this->user)) {
-            $this->user->tokens()->delete();
-            $this->user->delete();
-        }
-
-        parent::tearDown();
-    }
-
     public function test_get_progress_returns_empty_for_new_book()
     {
         $book = Book::factory()->create();
 
         // Use Bearer token for API authentication
         $response = $this->withHeaders([
-                'Authorization' => 'Bearer ' . $this->token,
-            ])
+            'Authorization' => 'Bearer ' . $this->token,
+        ])
             ->getJson("/api/v1/books/{$book->id}/progress?device_id=test-device");
 
         $response->assertStatus(200)
@@ -81,8 +58,8 @@ class ProgressControllerTest extends TestCase
         $book = Book::factory()->create();
 
         $response = $this->withHeaders([
-                'Authorization' => 'Bearer ' . $this->token,
-            ])
+            'Authorization' => 'Bearer ' . $this->token,
+        ])
             ->putJson("/api/v1/books/{$book->id}/progress", [
                 'device_id' => 'test-device',
                 'current_position_seconds' => 1800, // 30 minutes
@@ -116,8 +93,8 @@ class ProgressControllerTest extends TestCase
         $book = Book::factory()->create();
 
         $response = $this->withHeaders([
-                'Authorization' => 'Bearer ' . $this->token,
-            ])
+            'Authorization' => 'Bearer ' . $this->token,
+        ])
             ->putJson("/api/v1/books/{$book->id}/progress", [
                 'device_id' => 'test-device',
                 'current_position_seconds' => 6840, // 95% of 2 hours
@@ -142,8 +119,8 @@ class ProgressControllerTest extends TestCase
         ]);
 
         $response = $this->withHeaders([
-                'Authorization' => 'Bearer ' . $this->token,
-            ])
+            'Authorization' => 'Bearer ' . $this->token,
+        ])
             ->postJson("/api/v1/books/{$book->id}/progress/complete", [
                 'device_id' => 'test-device',
             ]);
@@ -186,8 +163,8 @@ class ProgressControllerTest extends TestCase
         ]);
 
         $response = $this->withHeaders([
-                'Authorization' => 'Bearer ' . $this->token,
-            ])
+            'Authorization' => 'Bearer ' . $this->token,
+        ])
             ->getJson("/api/v1/progress/device?device_id=test-device");
 
 
@@ -204,14 +181,14 @@ class ProgressControllerTest extends TestCase
                         'book' => [
                             'id',
                             'title',
-                            'cover_image'
+                            'cover_image',
                         ],
                         'current_position_seconds',
                         'progress_percentage',
                         'formatted_progress',
-                    ]
+                    ],
                 ],
-                'count'
+                'count',
             ]);
     }
 
@@ -226,8 +203,8 @@ class ProgressControllerTest extends TestCase
         ]);
 
         $response = $this->withHeaders([
-                'Authorization' => 'Bearer ' . $this->token,
-            ])
+            'Authorization' => 'Bearer ' . $this->token,
+        ])
             ->deleteJson("/api/v1/books/{$book->id}/progress", [
                 'device_id' => 'test-device',
             ]);
@@ -248,8 +225,8 @@ class ProgressControllerTest extends TestCase
         $book = Book::factory()->create();
 
         $response = $this->withHeaders([
-                'Authorization' => 'Bearer ' . $this->token,
-            ])
+            'Authorization' => 'Bearer ' . $this->token,
+        ])
             ->putJson("/api/v1/books/{$book->id}/progress", [
                 'device_id' => '', // Required field empty
                 'current_position_seconds' => -1, // Invalid negative value

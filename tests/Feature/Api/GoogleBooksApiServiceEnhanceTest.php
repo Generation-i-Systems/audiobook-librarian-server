@@ -7,6 +7,7 @@ namespace Tests\Feature\Api;
 use App\Services\GoogleBooksApiService;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Orchestra\Testbench\TestCase;
 use PHPUnit\Framework\Attributes\Test;
 
@@ -19,6 +20,9 @@ class GoogleBooksApiServiceEnhanceTest extends TestCase
         parent::setUp();
         $this->testDir = sys_get_temp_dir() . '/gbapi_enhance_' . uniqid();
         mkdir($this->testDir, 0777, true);
+
+        $this->app['config']->set('filesystems.disks.books.driver', 'local');
+        $this->app['config']->set('filesystems.disks.books.root', $this->testDir);
     }
 
     protected function tearDown(): void
@@ -39,10 +43,11 @@ class GoogleBooksApiServiceEnhanceTest extends TestCase
             ->getMock();
 
         $coverUrl = 'https://via.placeholder.com/150';
+        $relativeDirectoryPath = 'Test Author/Test Book';
         $book = [
             'title' => 'Test Book',
             'authors' => [['author' => ['name' => 'Test Author']]],
-            'directoryPath' => $this->testDir,
+            'directoryPath' => $relativeDirectoryPath,
         ];
 
         // Mock the API response - using flattened format expected by searchAndMerge
@@ -73,9 +78,11 @@ class GoogleBooksApiServiceEnhanceTest extends TestCase
         // Assertions
         $this->assertNotNull($result, 'searchAndMerge should not return null');
         $this->assertArrayHasKey('coverImage', $result);
-        $this->assertStringContainsString($this->testDir, $result['coverImage']);
+        $this->assertSame('cover.jpg', $result['coverImage']);
 
         // Verify the file was actually created
-        $this->assertTrue(file_exists($result['coverImage']));
+        $this->assertTrue(
+            Storage::disk('books')->exists($relativeDirectoryPath . '/cover.jpg')
+        );
     }
 }

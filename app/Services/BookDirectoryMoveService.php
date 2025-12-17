@@ -17,7 +17,24 @@ class BookDirectoryMoveService
     ): array {
         $disk = Storage::disk('books');
 
-        if (!$disk->exists($oldDirectoryPath)) {
+        $oldDirectoryPath = trim($oldDirectoryPath, '/');
+        $newDirectoryPath = trim($newDirectoryPath, '/');
+
+        if ($oldDirectoryPath === '') {
+            return [
+                'moved' => false,
+                'coverImage' => $coverImageBasename,
+            ];
+        }
+
+        $directoryExists = false;
+        if (method_exists($disk, 'directoryExists')) {
+            $directoryExists = $disk->{'directoryExists'}($oldDirectoryPath);
+        } else {
+            $directoryExists = count($disk->allFiles($oldDirectoryPath)) > 0;
+        }
+
+        if (!$directoryExists) {
             return [
                 'moved' => false,
                 'coverImage' => $coverImageBasename,

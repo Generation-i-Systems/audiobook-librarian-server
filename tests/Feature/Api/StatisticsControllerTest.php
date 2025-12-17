@@ -11,26 +11,14 @@ use Laravel\Sanctum\Sanctum;
 
 class StatisticsControllerTest extends TestCase
 {
-    // Not using RefreshDatabase to avoid SQLite issues
+    use RefreshDatabase;
 
     protected $user;
     protected $token;
-    protected static $migrationsRun = false;
 
     protected function setUp(): void
     {
         parent::setUp();
-
-        if (!self::$migrationsRun) {
-            try {
-                // Try to run migrations for the in-memory database
-                $this->artisan('migrate')->execute();
-            } catch (\Exception $e) {
-                // If migrations fail, try migrate:fresh
-                $this->artisan('migrate:fresh')->execute();
-            }
-            self::$migrationsRun = true;
-        }
 
         // Create a test user without running the problematic seeders
         $this->user = User::factory()->create([
@@ -45,24 +33,13 @@ class StatisticsControllerTest extends TestCase
         Sanctum::actingAs($this->user);
     }
 
-    protected function tearDown(): void
-    {
-        // Clean up created records but leave database structure
-        if (isset($this->user)) {
-            $this->user->tokens()->delete();
-            $this->user->delete();
-        }
-
-        parent::tearDown();
-    }
-
     public function test_record_session_creates_listening_statistic()
     {
         $book = Book::factory()->create();
 
         $response = $this->withHeaders([
-                'Authorization' => 'Bearer ' . $this->token,
-            ])
+            'Authorization' => 'Bearer ' . $this->token,
+        ])
             ->postJson('/api/v1/statistics/sessions', [
                 'book_id' => $book->id,
                 'device_id' => 'test-device',
@@ -95,8 +72,8 @@ class StatisticsControllerTest extends TestCase
     public function test_record_session_validates_input()
     {
         $response = $this->withHeaders([
-                'Authorization' => 'Bearer ' . $this->token,
-            ])
+            'Authorization' => 'Bearer ' . $this->token,
+        ])
             ->postJson('/api/v1/statistics/sessions', [
                 'book_id' => 999, // Non-existent book
                 'device_id' => '', // Empty device_id
@@ -149,8 +126,8 @@ class StatisticsControllerTest extends TestCase
         ]);
 
         $response = $this->withHeaders([
-                'Authorization' => 'Bearer ' . $this->token,
-            ])
+            'Authorization' => 'Bearer ' . $this->token,
+        ])
             ->getJson("/api/v1/statistics/legacy-daily?device_id=test-device&date={$today}");
 
         $response->assertStatus(200)
@@ -183,8 +160,8 @@ class StatisticsControllerTest extends TestCase
         }
 
         $response = $this->withHeaders([
-                'Authorization' => 'Bearer ' . $this->token,
-            ])
+            'Authorization' => 'Bearer ' . $this->token,
+        ])
             ->getJson("/api/v1/statistics/weekly?device_id=test-device&start_date={$startOfWeek->toDateString()}");
 
         $response->assertStatus(200)
@@ -230,8 +207,8 @@ class StatisticsControllerTest extends TestCase
         ]);
 
         $response = $this->withHeaders([
-                'Authorization' => 'Bearer ' . $this->token,
-            ])
+            'Authorization' => 'Bearer ' . $this->token,
+        ])
             ->getJson("/api/v1/books/{$book->id}/statistics?device_id=test-device");
 
         $response->assertStatus(200)
@@ -268,8 +245,8 @@ class StatisticsControllerTest extends TestCase
         }
 
         $response = $this->withHeaders([
-                'Authorization' => 'Bearer ' . $this->token,
-            ])
+            'Authorization' => 'Bearer ' . $this->token,
+        ])
             ->getJson('/api/v1/statistics/trends?device_id=test-device&period=week');
 
         $response->assertStatus(200)
@@ -330,8 +307,8 @@ class StatisticsControllerTest extends TestCase
         ]);
 
         $response = $this->withHeaders([
-                'Authorization' => 'Bearer ' . $this->token,
-            ])
+            'Authorization' => 'Bearer ' . $this->token,
+        ])
             ->getJson('/api/v1/statistics/top-books?device_id=test-device&limit=2');
 
         $response->assertStatus(200)
@@ -391,8 +368,8 @@ class StatisticsControllerTest extends TestCase
         ]);
 
         $response = $this->withHeaders([
-                'Authorization' => 'Bearer ' . $this->token,
-            ])
+            'Authorization' => 'Bearer ' . $this->token,
+        ])
             ->getJson('/api/v1/statistics/dashboard?device_id=test-device');
 
         $response->assertStatus(200)
@@ -441,8 +418,8 @@ class StatisticsControllerTest extends TestCase
 
         foreach ($validTypes as $type) {
             $response = $this->withHeaders([
-                    'Authorization' => 'Bearer ' . $this->token,
-                ])
+                'Authorization' => 'Bearer ' . $this->token,
+            ])
                 ->postJson('/api/v1/statistics/sessions', [
                     'book_id' => $book->id,
                     'device_id' => 'test-device',
@@ -467,8 +444,8 @@ class StatisticsControllerTest extends TestCase
         ];
 
         $response = $this->withHeaders([
-                'Authorization' => 'Bearer ' . $this->token,
-            ])
+            'Authorization' => 'Bearer ' . $this->token,
+        ])
             ->postJson('/api/v1/statistics/sessions', [
                 'book_id' => $book->id,
                 'device_id' => 'test-device',

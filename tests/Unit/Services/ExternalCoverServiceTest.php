@@ -27,6 +27,7 @@ class ExternalCoverServiceTest extends TestCase
 
         // Allow any Log calls by default
         Log::shouldReceive('info')->byDefault();
+        Log::shouldReceive('warning')->byDefault();
         Log::shouldReceive('error')->byDefault();
     }
 

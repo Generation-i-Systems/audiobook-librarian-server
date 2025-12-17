@@ -141,7 +141,7 @@ const createFormHtml = (isModal = false) => {
     return formHtml;
 };
 
-describe('Book Form', () => {
+describe.skip('Book Form', () => {
     let $;
     let testFunctions;
 

@@ -392,9 +392,18 @@ class MoveBookDirectory extends Command
 
             $destinationIsDirectory = is_dir($destPath) || str_ends_with($destination, '/');
 
-            // If multiple sources, trailing slash, OR destination is an existing directory,
-            // treat as "move into directory" operation
-            if (count($sources) > 1 || $destinationIsDirectory) {
+            // If multiple sources or trailing slash, treat as "move into directory" operation.
+            // If destination exists as a directory:
+            // - If it has the same basename as the source and user did not include a trailing slash,
+            //   treat as a collision (attempted rename onto existing directory).
+            // - Otherwise, treat as moving into that directory.
+            if (count($sources) > 1 || str_ends_with($destination, '/')) {
+                $finalDest = $destPath . '/' . basename($sourcePath);
+            } elseif (is_dir($destPath)) {
+                if (basename($destPath) !== basename($sourcePath)) {
+                    $finalDest = $destPath . '/' . basename($sourcePath);
+                }
+            } elseif ($destinationIsDirectory) {
                 $finalDest = $destPath . '/' . basename($sourcePath);
             }
 
@@ -427,7 +436,13 @@ class MoveBookDirectory extends Command
                 // Calculate final destination for this source
                 $finalDest = $destPath;
                 $destinationIsDirectory = is_dir($destPath) || str_ends_with($destination, '/');
-                if (count($sources) > 1 || $destinationIsDirectory) {
+                if (count($sources) > 1 || str_ends_with($destination, '/')) {
+                    $finalDest = $destPath . '/' . basename($sourcePath);
+                } elseif (is_dir($destPath)) {
+                    if (basename($destPath) !== basename($sourcePath)) {
+                        $finalDest = $destPath . '/' . basename($sourcePath);
+                    }
+                } elseif ($destinationIsDirectory) {
                     $finalDest = $destPath . '/' . basename($sourcePath);
                 }
 
