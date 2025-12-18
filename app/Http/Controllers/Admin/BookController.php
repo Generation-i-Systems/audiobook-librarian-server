@@ -409,18 +409,28 @@ class BookController extends Controller
                 }
             }
         }
-        if ($directoryPath && Storage::disk('books')->exists($directoryPath)) {
-            $files = Storage::disk('books')->files($directoryPath);
-            foreach ($files as $file) {
-                if (preg_match('/\.(jpe?g|png|gif|svg)$/i', $file)) {
-                    $candidate = basename($file);
-                    $coverCandidates[] = $candidate;
-                    $size = Storage::disk('books')->size($file);
-                    if ($size > $biggestSize) {
-                        $biggestSize = $size;
-                        $biggestCover = $candidate;
+        if ($directoryPath) {
+            try {
+                if (Storage::disk('books')->exists($directoryPath)) {
+                    $files = Storage::disk('books')->files($directoryPath);
+                    foreach ($files as $file) {
+                        if (preg_match('/\.(jpe?g|png|gif|svg)$/i', $file)) {
+                            $candidate = basename($file);
+                            $coverCandidates[] = $candidate;
+                            $size = Storage::disk('books')->size($file);
+                            if ($size > $biggestSize) {
+                                $biggestSize = $size;
+                                $biggestCover = $candidate;
+                            }
+                        }
                     }
                 }
+            } catch (\League\Flysystem\UnableToCreateDirectory $e) {
+                $bookStoragePath = config('filesystems.disks.books.root');
+                throw new \RuntimeException(
+                    "Book storage directory is not accessible. The configured path '{$bookStoragePath}' does not exist or cannot be created. " .
+                    "Please check that the BOOK_STORAGE_PATH environment variable points to a valid, accessible directory."
+                );
             }
         }
         // Always fetch genreList as array for the form
@@ -858,13 +868,23 @@ class BookController extends Controller
         $coverAuto = null;
         $directoryPath = $book['directoryPath'] ?? null;
         // Find cover candidates for this directory
-        if ($directoryPath && Storage::disk('books')->exists($directoryPath)) {
-            $files = Storage::disk('books')->files($directoryPath);
-            foreach ($files as $file) {
-                if (preg_match('/\.(jpe?g|png|gif|svg)$/i', $file)) {
-                    $candidate = basename($file);
-                    $coverCandidates[] = $candidate;
+        if ($directoryPath) {
+            try {
+                if (Storage::disk('books')->exists($directoryPath)) {
+                    $files = Storage::disk('books')->files($directoryPath);
+                    foreach ($files as $file) {
+                        if (preg_match('/\.(jpe?g|png|gif|svg)$/i', $file)) {
+                            $candidate = basename($file);
+                            $coverCandidates[] = $candidate;
+                        }
+                    }
                 }
+            } catch (\League\Flysystem\UnableToCreateDirectory $e) {
+                $bookStoragePath = config('filesystems.disks.books.root');
+                throw new \RuntimeException(
+                    "Book storage directory is not accessible. The configured path '{$bookStoragePath}' does not exist or cannot be created. " .
+                    "Please check that the BOOK_STORAGE_PATH environment variable points to a valid, accessible directory."
+                );
             }
         }
         // Set coverAuto to the filename of the book's coverImage if present
@@ -1364,27 +1384,42 @@ class BookController extends Controller
             $file = $request->file('coverImage');
             $directoryPath = $targetDirectoryPath;
             if ($directoryPath) {
-                $coverName = 'cover_' . uniqid() . '.' . $file->getClientOriginalExtension();
-                // Store file in books disk
-                $file->storeAs($directoryPath, $coverName, 'books');
-                $validated['coverImage'] = $coverName;
+                try {
+                    $coverName = 'cover_' . uniqid() . '.' . $file->getClientOriginalExtension();
+                    // Store file in books disk
+                    $file->storeAs($directoryPath, $coverName, 'books');
+                    $validated['coverImage'] = $coverName;
+                } catch (\League\Flysystem\UnableToCreateDirectory $e) {
+                    $bookStoragePath = config('filesystems.disks.books.root');
+                    throw new \RuntimeException(
+                        "Book storage directory is not accessible. The configured path '{$bookStoragePath}' does not exist or cannot be created. " .
+                        "Please check that the BOOK_STORAGE_PATH environment variable points to a valid, accessible directory."
+                    );
+                }
             } else {
                 Log::error('Failed to update cover image', [
                     'book' => $book,
                     'directoryPath' => $directoryPath,
                 ]);
             }
-        } elseif (
-            $request->filled('coverImageCandidate') &&
-            Storage::disk('books')->exists($targetDirectoryPath . '/' . $request->input('coverImageCandidate'))
-        ) {
-            Log::debug('Updating cover image candidate', [
-                'candidate' => $request->input('coverImageCandidate'),
-            ]);
-            $directoryPath = $targetDirectoryPath;
-            $candidate = $request->input('coverImageCandidate');
-            if ($directoryPath && $candidate) {
-                $validated['coverImage'] = basename($candidate);
+        } elseif ($request->filled('coverImageCandidate')) {
+            try {
+                if (Storage::disk('books')->exists($targetDirectoryPath . '/' . $request->input('coverImageCandidate'))) {
+                    Log::debug('Updating cover image candidate', [
+                        'candidate' => $request->input('coverImageCandidate'),
+                    ]);
+                    $directoryPath = $targetDirectoryPath;
+                    $candidate = $request->input('coverImageCandidate');
+                    if ($directoryPath && $candidate) {
+                        $validated['coverImage'] = basename($candidate);
+                    }
+                }
+            } catch (\League\Flysystem\UnableToCreateDirectory $e) {
+                $bookStoragePath = config('filesystems.disks.books.root');
+                throw new \RuntimeException(
+                    "Book storage directory is not accessible. The configured path '{$bookStoragePath}' does not exist or cannot be created. " .
+                    "Please check that the BOOK_STORAGE_PATH environment variable points to a valid, accessible directory."
+                );
             }
         } elseif ($request->filled('coverImageUrl')) {
             Log::debug('Updating cover image URL', [
@@ -1564,11 +1599,19 @@ class BookController extends Controller
         $book = $documentStore->getBook($id);
         $directoryPath = $book['directoryPath'];
 
-        if (!$directoryPath || !Storage::disk('books')->exists($directoryPath)) {
-            abort(404, 'Book directory not found.');
-        }
+        try {
+            if (!$directoryPath || !Storage::disk('books')->exists($directoryPath)) {
+                abort(404, 'Book directory not found.');
+            }
 
-        $files = Storage::disk('books')->files($directoryPath);
+            $files = Storage::disk('books')->files($directoryPath);
+        } catch (\League\Flysystem\UnableToCreateDirectory $e) {
+            $bookStoragePath = config('filesystems.disks.books.root');
+            throw new \RuntimeException(
+                "Book storage directory is not accessible. The configured path '{$bookStoragePath}' does not exist or cannot be created. " .
+                "Please check that the BOOK_STORAGE_PATH environment variable points to a valid, accessible directory."
+            );
+        }
 
         if (empty($files)) {
             abort(404, 'No files found for this book.');
