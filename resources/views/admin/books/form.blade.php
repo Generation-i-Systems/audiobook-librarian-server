@@ -155,7 +155,6 @@
         @php
             $displayPath = old('directoryPath') ?? request()->get('import_path') ?? ($book['directoryPath'] ?? null) ?? ($initial['directoryPath'] ?? '');
         @endphp
-        <input type="hidden" id="directoryPathHidden" name="directoryPath" value="{{ $displayPath }}">
 
         <!-- Hidden inputs for cover image URLs (preserved on validation failure) -->
         <input type="hidden" id="coverImageUrl" name="coverImageUrl" value="{{ old('coverImageUrl', '') }}">
