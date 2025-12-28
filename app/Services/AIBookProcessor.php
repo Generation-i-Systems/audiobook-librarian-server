@@ -412,7 +412,7 @@ class AIBookProcessor
             $prompt .= "\n";
         }
 
-        // Include most important tags only
+        // Include most important tags only (filter out generic/useless values)
         if (!empty($fileTags)) {
             $firstFileTags = reset($fileTags);
             $importantTags = ['title', 'artist', 'album', 'genre', 'year', 'comment'];
@@ -420,10 +420,22 @@ class AIBookProcessor
             $tagParts = [];
             foreach ($importantTags as $key) {
                 if (!empty($firstFileTags[$key])) {
-                    $tagParts[] = "{$key}:{$firstFileTags[$key]}";
+                    $value = $firstFileTags[$key];
+                    // Skip generic/placeholder titles that provide no useful information
+                    if ($key === 'title' || $key === 'album') {
+                        $lowercaseValue = strtolower($value);
+                        if (preg_match('/unknown|untitled|track\s*\d+|part\s*\d+|chapter\s*\d+|^no\s+title/i', $lowercaseValue)) {
+                            continue; // Skip this useless tag
+                        }
+                    }
+                    $tagParts[] = "{$key}:{$value}";
                 }
             }
-            $prompt .= implode(', ', $tagParts) . "\n";
+            if (!empty($tagParts)) {
+                $prompt .= implode(', ', $tagParts) . "\n";
+            } else {
+                $prompt .= "No useful metadata tags found\n";
+            }
         }
 
         $prompt .= "\nReturn JSON with these fields: title, author, narrator, series{name,number}, genre, year, publisher, language, isbn, confidence (0-100).\n";
@@ -439,6 +451,16 @@ class AIBookProcessor
         $prompt .= "- Use the overall book title (like 'Alice's Adventures in Wonderland'), not chapter names\n";
         $prompt .= "- Only use series information if this is genuinely part of a multi-book series (Book 1, Book 2, etc.)\n";
         $prompt .= "- Individual chapters/parts within one book are NOT separate series entries\n\n";
+
+        $prompt .= "CRITICAL: Extract metadata from directory path structure:\n";
+        $prompt .= "- Directory pattern: '.../ParentDir/N BookTitle' where N is a number indicates:\n";
+        $prompt .= "  * Series Name = ParentDir (e.g., 'The Forgotten Five')\n";
+        $prompt .= "  * Series Number = N (e.g., 3)\n";
+        $prompt .= "  * Book Title = BookTitle without the leading number (e.g., 'Rebel Undercover' not '3 Rebel Undercover')\n";
+        $prompt .= "- Example: '/The Forgotten Five/3 Rebel Undercover' → Title: 'Rebel Undercover', Series: 'The Forgotten Five' #3\n";
+        $prompt .= "- Example: '/Harry Potter/1 Philosopher's Stone' → Title: 'Philosopher's Stone', Series: 'Harry Potter' #1\n";
+        $prompt .= "- IGNORE generic ID3 tags like 'Unknown Book-PartN', 'Track N', 'Untitled' - use directory structure instead\n";
+        $prompt .= "- Always remove leading numbers/dashes from title (e.g., '3 Title' → 'Title', '01 - Title' → 'Title')\n\n";
 
         $prompt .= "IMPORTANT: For genre, choose the MOST SPECIFIC literary genre that fits the content. Valid genres are:\n";
         $prompt .= "Kids, Religion, General Fiction, Church, Science, Historical Fiction, Computer, Classic, History, Non Fiction, Action, LitRPG, Romance, Science Fiction, Other, Fantasy\n";

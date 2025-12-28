@@ -88,6 +88,9 @@ class ImportBooksFromDownloads extends Command
     // Cache for file tags to avoid re-extracting
     protected array $fileTagsCache = [];
 
+    // Track metadata from previously processed books for series metadata propagation
+    protected array $previousBookMetadata = [];
+
     // OpenAudible books.json data cache
     protected ?array $openAudibleBooksData = null;
     protected ?string $openAudibleRootPath = null;
@@ -640,6 +643,11 @@ class ImportBooksFromDownloads extends Command
         // Require at least 1 audio file and 10MB total size
         if (count($files) >= 1 && $totalSize > 10 * 1024 * 1024) {
             $coverImagePath = $this->findCoverImageInDirectory($directory);
+
+            // CRITICAL: Sort files naturally so Part1 comes before Part2, Part10, etc.
+            // This ensures we extract metadata from the first file which typically has the book intro
+            natsort($files);
+            $files = array_values($files); // Re-index array after sorting
 
             return [
                 'path' => $directory,
@@ -1919,7 +1927,7 @@ class ImportBooksFromDownloads extends Command
             $audioFilePath = $audiobook['files'][0];
 
             // Extract file tags using existing AIBookProcessor method (cached)
-            $this->line("  Extracting metadata from M4B file: " . basename($audioFilePath));
+            $this->line("  Extracting metadata from audio file: " . basename($audioFilePath));
             $this->line("  Full path: " . $audioFilePath);
             $this->line("  File exists: " . (file_exists($audioFilePath) ? 'YES' : 'NO'));
 
@@ -1936,23 +1944,23 @@ class ImportBooksFromDownloads extends Command
             if (!empty($fileTags)) {
                 if (empty($aiMetadata['narrator']) && !empty($fileTags['narrator'])) {
                     $aiMetadata['narrator'] = is_array($fileTags['narrator']) ? $fileTags['narrator'] : [$fileTags['narrator']];
-                    $this->line("  ✓ Using narrator from M4B: " . (is_array($aiMetadata['narrator']) ? implode(', ', $aiMetadata['narrator']) : $aiMetadata['narrator']));
+                    $this->line("  ✓ Using narrator from audio file: " . (is_array($aiMetadata['narrator']) ? implode(', ', $aiMetadata['narrator']) : $aiMetadata['narrator']));
                 }
                 if (empty($aiMetadata['year']) && !empty($fileTags['year'])) {
                     $aiMetadata['year'] = $fileTags['year'];
-                    $this->line("  ✓ Using year from M4B: {$aiMetadata['year']}");
+                    $this->line("  ✓ Using year from audio file: {$aiMetadata['year']}");
                 }
                 if (empty($aiMetadata['publisher']) && !empty($fileTags['publisher'])) {
                     $aiMetadata['publisher'] = $fileTags['publisher'];
-                    $this->line("  ✓ Using publisher from M4B: {$aiMetadata['publisher']}");
+                    $this->line("  ✓ Using publisher from audio file: {$aiMetadata['publisher']}");
                 }
 
                 // Extract embedded cover image if available
                 if (!empty($fileTags['picture']['data'])) {
-                    $this->line("  Found embedded cover image in M4B file");
+                    $this->line("  Found embedded cover image in audio file");
                     // Store the cover data temporarily, don't write to source directory
                     $aiMetadata['cover_data'] = $fileTags['picture']['data'];
-                    $aiMetadata['cover_source'] = 'Embedded in M4B';
+                    $aiMetadata['cover_source'] = 'Embedded in audio file';
 
                     // CRITICAL: Clear cover_url so we don't download when we have embedded cover
                     // Embedded covers have priority over downloaded covers
@@ -1961,21 +1969,96 @@ class ImportBooksFromDownloads extends Command
                         unset($aiMetadata['cover_url']);
                     }
 
-                    $this->info("  ✓ Found embedded cover in M4B file (will be saved to final directory)");
+                    $this->info("  ✓ Found embedded cover in audio file (will be saved to final directory)");
                 } else {
-                    $this->warn("  ✗ No embedded cover image found in M4B file");
+                    $this->warn("  ✗ No embedded cover image found in audio file");
                     if (isset($fileTags['picture'])) {
                         $this->line("  Picture field exists but no data: " . json_encode(array_keys($fileTags['picture'])));
                     }
                 }
             } else {
-                $this->warn("  ✗ No file tags extracted from M4B");
+                $this->warn("  ✗ No file tags extracted from audio file");
             }
         }
 
         // Extract series number from title and clean metadata (only if not already set)
         if (!empty($aiMetadata['title'])) {
             $this->getEnrichmentService()->extractSeriesNumberFromTitle($aiMetadata);
+        }
+
+        // CRITICAL: Fix generic/useless titles extracted from poor ID3 tags
+        // If title matches generic patterns, derive it from directory name instead
+        if (!empty($aiMetadata['title'])) {
+            $title = $aiMetadata['title'];
+            $isGenericTitle = preg_match('/unknown|untitled|track\s*\d+|part\s*\d+|chapter\s*\d+|^no\s+title/i', $title);
+
+            if ($isGenericTitle && !empty($audiobook['path'])) {
+                // Extract title from directory structure
+                // Pattern: .../SeriesName/N BookTitle -> Title: "BookTitle", Series: "SeriesName" #N
+                $pathParts = explode('/', trim($audiobook['path'], '/'));
+                $dirName = end($pathParts); // e.g., "3 Rebel Undercover"
+                $parentDirName = count($pathParts) > 1 ? $pathParts[count($pathParts) - 2] : null;
+
+                // Remove leading number from directory name (e.g., "3 Rebel Undercover" -> "Rebel Undercover")
+                $cleanedTitle = preg_replace('/^(\d+[\s\-._]*)+/', '', $dirName);
+                $cleanedTitle = trim($cleanedTitle);
+
+                if (!empty($cleanedTitle)) {
+                    $this->info("  ✓ Fixing generic title '{$title}' -> '{$cleanedTitle}' (from directory name)");
+                    $aiMetadata['title'] = $cleanedTitle;
+
+                    // If series not set and parent directory exists, use it as series
+                    if (empty($aiMetadata['series']) && !empty($parentDirName)) {
+                        // Extract series number from directory name (e.g., "3 Rebel Undercover" -> 3)
+                        if (preg_match('/^(\d+)[\s\-._]/', $dirName, $matches)) {
+                            $aiMetadata['series'] = $parentDirName;
+                            $aiMetadata['series_number'] = (int)$matches[1];
+                            $this->info("  ✓ Extracted series from path: '{$parentDirName}' #{$aiMetadata['series_number']}");
+                        }
+                    }
+                }
+            }
+        }
+
+        // CRITICAL: Propagate metadata from previous books in the same series
+        // When importing multiple books from a series, copy missing fields from previous books
+        if (!empty($aiMetadata['series'])) {
+            $seriesKey = strtolower(trim($aiMetadata['series']));
+
+            // If we have metadata from a previous book in this series, use it to fill gaps
+            if (isset($this->previousBookMetadata[$seriesKey])) {
+                $previousMeta = $this->previousBookMetadata[$seriesKey];
+                $fieldsToPropagate = ['author', 'narrator', 'genre', 'publisher', 'language'];
+
+                foreach ($fieldsToPropagate as $field) {
+                    // Check if field is missing or empty (including empty arrays)
+                    $isFieldEmpty = !isset($aiMetadata[$field]) ||
+                                    $aiMetadata[$field] === null ||
+                                    $aiMetadata[$field] === '' ||
+                                    (is_array($aiMetadata[$field]) && count($aiMetadata[$field]) === 0);
+
+                    $hasPreviousValue = isset($previousMeta[$field]) &&
+                                       $previousMeta[$field] !== null &&
+                                       $previousMeta[$field] !== '' &&
+                                       (!is_array($previousMeta[$field]) || count($previousMeta[$field]) > 0);
+
+                    if ($isFieldEmpty && $hasPreviousValue) {
+                        $aiMetadata[$field] = $previousMeta[$field];
+                        $displayValue = is_array($aiMetadata[$field]) ? implode(', ', $aiMetadata[$field]) : $aiMetadata[$field];
+                        $this->info("  ✓ Using {$field} from previous book in series: {$displayValue}");
+                    }
+                }
+            }
+
+            // Store this book's metadata for future books in the series
+            $this->previousBookMetadata[$seriesKey] = [
+                'author' => $aiMetadata['author'] ?? [],
+                'narrator' => $aiMetadata['narrator'] ?? [],
+                'genre' => $aiMetadata['genre'] ?? [],
+                'publisher' => $aiMetadata['publisher'] ?? null,
+                'language' => $aiMetadata['language'] ?? null,
+                'year' => $aiMetadata['year'] ?? null,
+            ];
         }
 
         // Handle multi-book patterns (simplified) - skip if already a split book
