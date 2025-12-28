@@ -5,7 +5,7 @@
         <h1>Search Results</h1>
 
         @if (count($books) > 0)
-            <form action="{{ route('books.importFromGoogleBooks') }}" method="POST">
+            <form action="{{ route('admin.books.importFromGoogleBooks') }}" method="POST">
                 @csrf
                 <ul>
                     @foreach ($books as $book)
