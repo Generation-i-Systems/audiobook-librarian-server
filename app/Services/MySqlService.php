@@ -13,6 +13,7 @@ use App\Models\Message;
 use App\Models\Narrator;
 use App\Models\Series;
 use App\Models\User;
+use App\Traits\HandlesLibraryJson;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
@@ -22,6 +23,8 @@ use Illuminate\Support\Str;
 
 class MySqlService implements DocumentStoreServiceInterface
 {
+    use HandlesLibraryJson;
+
     private function buildCoverImageOutput(?string $coverImage, ?string $directoryPath): ?string
     {
         if ($coverImage === null) {
@@ -112,6 +115,29 @@ class MySqlService implements DocumentStoreServiceInterface
         }
 
         return $camelCasedBook;
+    }
+
+    public function findBookByDirectoryPath(string $directoryPath): ?array
+    {
+        $directoryPath = trim($directoryPath, '/');
+        if ($directoryPath === '') {
+            return null;
+        }
+
+        $book = Book::query()
+            ->select(['id', 'title', 'directory_path'])
+            ->where('directory_path', $directoryPath)
+            ->first();
+
+        if (!$book) {
+            return null;
+        }
+
+        return [
+            'id' => (string) $book->id,
+            'title' => $book->title,
+            'directoryPath' => $book->directory_path,
+        ];
     }
 
     /**
@@ -1476,7 +1502,14 @@ class MySqlService implements DocumentStoreServiceInterface
                 }
             }
 
-            return $book->toArray();
+            $book->refresh();
+            $book->load(['authors', 'narrators', 'genres', 'series', 'publisher']);
+
+            $bookArray = $book->toArray();
+
+            $this->updateLibraryJson($book);
+
+            return $bookArray;
         } catch (\Exception $e) {
             Log::error(
                 'MySqlService updateBook failed: ' . $e->getMessage() . ' for book ' . ($data['title'] ?? 'Unknown')

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Traits\HandlesLibraryJson;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -18,6 +19,8 @@ use RuntimeException;
  */
 class MongoService implements DocumentStoreServiceInterface
 {
+    use HandlesLibraryJson;
+
     /** @var Client */
     protected $client;
 
@@ -307,6 +310,34 @@ class MongoService implements DocumentStoreServiceInterface
             $doc['genre'] = (array) $doc['genre'];
         }
         $doc['id'] = (string) $doc['_id'];
+        return $doc;
+    }
+
+    public function findBookByDirectoryPath(string $directoryPath): ?array
+    {
+        $directoryPath = trim($directoryPath, '/');
+        if ($directoryPath === '') {
+            return null;
+        }
+
+        $doc = $this->getCollection('books')->findOne([
+            '$or' => [
+                ['directoryPath' => $directoryPath],
+                ['directory_path' => $directoryPath],
+            ],
+        ]);
+
+        if (!$doc) {
+            return null;
+        }
+
+        if ($doc instanceof BSONDocument) {
+            $doc = (array) $doc;
+        }
+
+        $doc = $this->normalizeMongoValue($doc);
+        $doc['id'] = (string) ($doc['_id'] ?? '');
+
         return $doc;
     }
     /**
@@ -658,7 +689,14 @@ class MongoService implements DocumentStoreServiceInterface
         // Execute update
         $update = ['$set' => $set];
 
-        return $this->getCollection('books')->updateOne(['_id' => $id], $update);
+        $result = $this->getCollection('books')->updateOne(['_id' => $id], $update);
+
+        $book = $this->getBook($id);
+        if ($book) {
+            $this->updateLibraryJson($book);
+        }
+
+        return $result;
     }
     /** @inheritDoc */
     public function deleteBook(string $id, bool $deleteFiles = true)
