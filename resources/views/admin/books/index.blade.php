@@ -162,7 +162,12 @@
                                 loading="lazy">
                         </td>
                         <td>
-                            {{ $book['title'] ?? 'Untitled' }}
+                            @php
+                                $bookId = $book['id'] ?? ($book['documentId'] ?? 0);
+                            @endphp
+                            <a href="{{ route('admin.books.show', $bookId) }}" class="text-decoration-none fw-bold text-dark">
+                                {{ $book['title'] ?? 'Untitled' }}
+                            </a>
                             @if($directoryMissing)
                                 <span class="badge bg-danger ms-2"
                                     title="Directory not found: {{ $book['directoryPath'] ?? 'unknown' }}">⚠️ Missing Files</span>
