@@ -1387,6 +1387,7 @@ class BookController extends Controller
         // Handle cover image upload or candidate selection
         // Use the updated directoryPath if it changed, otherwise use the original
         $targetDirectoryPath = $validated['directoryPath'] ?? $book['directoryPath'] ?? null;
+        $coverProcessed = false;
 
         if ($request->hasFile('coverImage') && $request->file('coverImage')->isValid()) {
             Log::info('Updating cover image', [
@@ -1401,6 +1402,7 @@ class BookController extends Controller
                     // Store file in books disk
                     $file->storeAs($directoryPath, $coverName, 'books');
                     $validated['coverImage'] = $coverName;
+                    $coverProcessed = true;
                 } catch (\League\Flysystem\UnableToCreateDirectory $e) {
                     $bookStoragePath = config('filesystems.disks.books.root');
                     throw new \RuntimeException(
@@ -1414,7 +1416,9 @@ class BookController extends Controller
                     'directoryPath' => $directoryPath,
                 ]);
             }
-        } elseif ($request->filled('coverImageCandidate')) {
+        }
+
+        if (!$coverProcessed && $request->filled('coverImageCandidate')) {
             try {
                 if (Storage::disk('books')->exists($targetDirectoryPath . '/' . $request->input('coverImageCandidate'))) {
                     Log::debug('Updating cover image candidate', [
@@ -1424,16 +1428,16 @@ class BookController extends Controller
                     $candidate = $request->input('coverImageCandidate');
                     if ($directoryPath && $candidate) {
                         $validated['coverImage'] = basename($candidate);
+                        $coverProcessed = true;
                     }
                 }
             } catch (\League\Flysystem\UnableToCreateDirectory $e) {
-                $bookStoragePath = config('filesystems.disks.books.root');
-                throw new \RuntimeException(
-                    "Book storage directory is not accessible. The configured path '{$bookStoragePath}' does not exist or cannot be created. " .
-                    "Please check that the BOOK_STORAGE_PATH environment variable points to a valid, accessible directory."
-                );
+                // Log and ignore, proceed to URL download
+                Log::warning('Unable to check cover image candidate: ' . $e->getMessage());
             }
-        } elseif ($request->filled('coverImageUrl')) {
+        }
+
+        if (!$coverProcessed && $request->filled('coverImageUrl')) {
             Log::debug('Updating cover image URL', [
                 'coverImageUrl' => $request->input('coverImageUrl'),
                 'coverImageSource' => $request->input('coverImageSource'),

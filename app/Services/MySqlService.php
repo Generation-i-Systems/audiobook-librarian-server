@@ -1471,16 +1471,8 @@ class MySqlService implements DocumentStoreServiceInterface
                 }
             }
 
-            // Handle series (support both legacy 'series_name' and new 'series' array structure)
-            if (array_key_exists('series_name', $data)) {
-                if ($data['series_name']) {
-                    $series = Series::firstOrCreate(['name' => $data['series_name']]);
-                    $book->series()->associate($series);
-                } else {
-                    $book->series()->dissociate();
-                }
-                $book->save();
-            } elseif (isset($data['series']) && is_array($data['series'])) {
+            // Handle series (prioritize new 'series' array structure over legacy 'series_name')
+            if (isset($data['series']) && is_array($data['series'])) {
                 // Handle new series array structure from BookController
                 $seriesSyncData = [];
                 foreach ($data['series'] as $seriesEntry) {
@@ -1493,6 +1485,14 @@ class MySqlService implements DocumentStoreServiceInterface
                     }
                 }
                 $book->series()->sync($seriesSyncData);
+            } elseif (array_key_exists('series_name', $data)) {
+                if ($data['series_name']) {
+                    $series = Series::firstOrCreate(['name' => $data['series_name']]);
+                    $book->series()->associate($series);
+                } else {
+                    $book->series()->dissociate();
+                }
+                $book->save();
             }
 
             if (isset($data['chapters'])) {
