@@ -697,6 +697,44 @@ class AIBookProcessor
             $normalized['is_collection'] = $metadata['series']['is_collection'] ?? false;
         }
 
+        // CRITICAL: Adjust confidence based on missing critical fields
+        // Author and narrator are essential metadata - low confidence should trigger audio transcription
+        $confidencePenalty = 0;
+
+        // Check if author is missing or empty
+        $hasAuthor = !empty($normalized['author']) && (
+            (is_array($normalized['author']) && count($normalized['author']) > 0) ||
+            (is_string($normalized['author']) && trim($normalized['author']) !== '')
+        );
+
+        // Check if narrator is missing or empty
+        $hasNarrator = !empty($normalized['narrator']) && (
+            (is_array($normalized['narrator']) && count($normalized['narrator']) > 0) ||
+            (is_string($normalized['narrator']) && trim($normalized['narrator']) !== '')
+        );
+
+        if (!$hasAuthor) {
+            $confidencePenalty += 40; // Missing author is critical - major penalty
+        }
+
+        if (!$hasNarrator) {
+            $confidencePenalty += 20; // Missing narrator is important but less critical
+        }
+
+        // Apply penalty to confidence
+        if ($confidencePenalty > 0) {
+            $originalConfidence = $normalized['confidence'];
+            $normalized['confidence'] = max(0, $originalConfidence - $confidencePenalty);
+
+            Log::info("Reduced confidence due to missing fields", [
+                'original' => $originalConfidence,
+                'adjusted' => $normalized['confidence'],
+                'penalty' => $confidencePenalty,
+                'has_author' => $hasAuthor,
+                'has_narrator' => $hasNarrator
+            ]);
+        }
+
         // Detect collection patterns in series name
         if (!empty($normalized['series'])) {
             $seriesName = $normalized['series'];
@@ -1054,15 +1092,29 @@ class AIBookProcessor
                 return null;
             }
 
-            // Check file size limits based on provider
+            // Extract first 120 seconds (2 minutes) if file is too large
+            // The intro typically contains "Written by...", "Narrated by..." metadata
             $maxSize = $this->getAudioFileSizeLimit();
-            if ($fileSize > $maxSize) {
-                Log::error("Audio file too large for {$this->provider} API", [
-                    'file' => $audioFilePath,
-                    'size_mb' => round($fileSize / (1024 * 1024), 2),
+            $needsExtraction = $fileSize > $maxSize;
+
+            if ($needsExtraction) {
+                Log::info("Audio file too large, extracting first 120 seconds", [
+                    'file' => basename($audioFilePath),
+                    'original_size_mb' => round($fileSize / (1024 * 1024), 2),
                     'max_size_mb' => round($maxSize / (1024 * 1024), 2)
                 ]);
-                return null;
+
+                $audioFilePath = $this->extractAudioClip($audioFilePath, 120);
+                if (!$audioFilePath || !file_exists($audioFilePath)) {
+                    Log::error("Failed to extract audio clip");
+                    return null;
+                }
+
+                $fileSize = filesize($audioFilePath);
+                Log::info("Extracted audio clip", [
+                    'new_file' => basename($audioFilePath),
+                    'new_size_mb' => round($fileSize / (1024 * 1024), 2)
+                ]);
             }
 
             // Track this request for rate limiting
@@ -1228,6 +1280,57 @@ class AIBookProcessor
     /**
      * Get MIME type for audio file
      */
+    /**
+     * Extract a clip from an audio file using ffmpeg
+     */
+    protected function extractAudioClip(string $audioFilePath, int $durationSeconds = 120): ?string
+    {
+        try {
+            // Create temp file for the extracted clip
+            $tempDir = sys_get_temp_dir();
+            $extension = pathinfo($audioFilePath, PATHINFO_EXTENSION);
+            $outputFile = $tempDir . '/audio_clip_' . uniqid() . '.' . $extension;
+
+            // Use ffmpeg to extract first N seconds
+            $command = sprintf(
+                'ffmpeg -i %s -t %d -acodec copy %s -y 2>&1',
+                escapeshellarg($audioFilePath),
+                $durationSeconds,
+                escapeshellarg($outputFile)
+            );
+
+            Log::info("Executing ffmpeg command", [
+                'command' => $command,
+                'duration' => $durationSeconds
+            ]);
+
+            exec($command, $output, $returnCode);
+
+            if ($returnCode !== 0 || !file_exists($outputFile)) {
+                Log::error("ffmpeg extraction failed", [
+                    'return_code' => $returnCode,
+                    'output' => implode("\n", $output),
+                    'output_file' => $outputFile,
+                    'file_exists' => file_exists($outputFile)
+                ]);
+                return null;
+            }
+
+            Log::info("Audio clip extracted successfully", [
+                'output_file' => $outputFile,
+                'size' => filesize($outputFile)
+            ]);
+
+            return $outputFile;
+        } catch (\Exception $e) {
+            Log::error("Failed to extract audio clip", [
+                'file' => $audioFilePath,
+                'error' => $e->getMessage()
+            ]);
+            return null;
+        }
+    }
+
     protected function getAudioMimeType(string $filePath): string
     {
         $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));

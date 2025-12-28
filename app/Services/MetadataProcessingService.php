@@ -171,12 +171,28 @@ class MetadataProcessingService
      */
     public function processWithAudioAnalysis(array $audiobook): ?array
     {
-        if (!$this->audioAnalyzer) {
-            $this->audioAnalyzer = app(AudioFileAnalyzer::class);
-        }
-
         try {
-            $metadata = $this->audioAnalyzer->analyzeDirectory($audiobook['path']);
+            // Use AIBookProcessor for real audio transcription (Whisper), not just ID3 tags
+            $aiProcessor = app(AIBookProcessor::class);
+
+            // Get first audio file (should already be sorted by Part1, Part2, etc.)
+            $audioFilePath = $audiobook['files'][0] ?? null;
+
+            if (!$audioFilePath || !file_exists($audioFilePath)) {
+                Log::warning("No audio file found for transcription", [
+                    'path' => $audiobook['path'] ?? 'unknown'
+                ]);
+                return null;
+            }
+
+            // Extract just the first 45 seconds for intro metadata
+            $directoryHint = $audiobook['path'] ?? '';
+            Log::info("Starting audio transcription for metadata extraction", [
+                'file' => basename($audioFilePath),
+                'directory_hint' => $directoryHint,
+            ]);
+
+            $metadata = $aiProcessor->processAudioSample($audioFilePath, $directoryHint);
 
             if ($metadata) {
                 return $this->postProcessAIResult($metadata, $audiobook);
@@ -184,7 +200,7 @@ class MetadataProcessingService
 
             return null;
         } catch (\Exception $e) {
-            Log::error("MetadataProcessingService: Audio analysis failed", [
+            Log::error("MetadataProcessingService: Audio transcription failed", [
                 'path' => $audiobook['path'] ?? 'unknown',
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
