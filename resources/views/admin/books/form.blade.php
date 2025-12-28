@@ -981,6 +981,47 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
 </div>
 
+{{-- Directory Conflict Resolution Modal --}}
+<div class="modal fade" id="directoryConflictModal" tabindex="-1" aria-labelledby="directoryConflictModalLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title" id="directoryConflictModalLabel">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Directory Path Conflict
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <strong>Warning:</strong> The directory path you entered is already used by another book.
+                </div>
+                <div id="conflict-book-info" class="mb-3">
+                    <p class="mb-2"><strong>Conflicting book:</strong></p>
+                    <ul id="conflict-book-list" class="list-unstyled ms-3">
+                    </ul>
+                </div>
+                <p class="mb-3">What would you like to do?</p>
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-primary" id="conflict-change-path-btn">
+                        <i class="fas fa-edit me-2"></i>Change This Book's Directory Path
+                    </button>
+                    <button type="button" class="btn btn-warning" id="conflict-merge-btn">
+                        <i class="fas fa-compress-arrows-alt me-2"></i>Merge Directories (Keep Both Books)
+                    </button>
+                    <button type="button" class="btn btn-danger" id="conflict-move-other-btn" style="display: none;">
+                        <i class="fas fa-exchange-alt me-2"></i>Move Other Book's Directory
+                    </button>
+                </div>
+                <div class="mt-3">
+                    <small class="text-muted">
+                        <strong>Note:</strong> Merging will combine all files from both directories. Moving will relocate the other book's files.
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 {{-- Audio Metadata Modal --}}
 <div class="modal fade" id="audioMetadataModal" tabindex="-1" aria-labelledby="audioMetadataModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
@@ -1065,16 +1106,18 @@ document.addEventListener('DOMContentLoaded', function() {
     window.AUDIBLE_SEARCH_URL = "{{ route('admin.books.audible') }}";
     window.BOOK_FORM_ROUTES.browseDirectories = "{{ route('admin.books.browseDirectories') }}";
     window.BOOK_FORM_ROUTES.parsePath = "{{ route('admin.books.parsePath') }}";
+    window.BOOK_FORM_ROUTES.checkDirectoryConflict = "{{ route('books.checkDirectoryConflict') }}";
 
     // Debug: Confirm jQuery and jQuery UI are loaded
     console.log('window.jQuery:', typeof window.jQuery, window.jQuery ? 'OK' : 'MISSING');
     console.log('$.fn.autocomplete:', typeof $.fn.autocomplete, $.fn.autocomplete ? 'OK' : 'MISSING');
 </script>
 
-{{-- Include form.js, directory-browser.js, and series-rename.js scripts --}}
+{{-- Include form.js, directory-browser.js, series-rename.js, and directory-conflict.js scripts --}}
 <script src="{{ asset('js/admin/books/form.js') }}?v={{ filemtime(public_path('js/admin/books/form.js')) }}"></script>
 <script src="{{ asset('js/admin/books/directory-browser.js') }}?v={{ filemtime(public_path('js/admin/books/directory-browser.js')) }}"></script>
 <script src="{{ asset('js/admin/books/series-rename.js') }}?v={{ filemtime(public_path('js/admin/books/series-rename.js')) }}"></script>
+<script src="{{ asset('js/admin/books/directory-conflict.js') }}?v={{ filemtime(public_path('js/admin/books/directory-conflict.js')) }}"></script>
 <script type="text/javascript">
 $(function() {
     var formSelector = '#book-form';

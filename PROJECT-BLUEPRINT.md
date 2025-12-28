@@ -66,6 +66,8 @@ See `docs/requirements/reading-progress-and-stats.md`.
 
 ## 4. Key Backend Components
 - `Admin\BookController`: CRUD, autocomplete endpoints, REST API endpoints
+- `Admin\BookFilesystemController`: admin filesystem AJAX endpoints (rename/move directory path helpers, directory browser helpers)
+- `BookFilesystemService`: filesystem operations for book directories (rename/list/browse) with document store updates
 - `FirestoreService`: list/search authors/series
 - **Web Routes:**
   - `/admin/books` (CRUD)

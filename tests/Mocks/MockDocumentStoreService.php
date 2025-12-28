@@ -142,6 +142,31 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         return $this->books[$id] ?? null;
     }
 
+    public function findBookByDirectoryPath(string $directoryPath): ?array
+    {
+        $directoryPath = trim($directoryPath, '/');
+        if ($directoryPath === '') {
+            return null;
+        }
+
+        foreach ($this->books as $book) {
+            if (!is_array($book)) {
+                continue;
+            }
+
+            $bookPath = $book['directoryPath'] ?? ($book['directory_path'] ?? ($book['path'] ?? null));
+            if (!is_string($bookPath)) {
+                continue;
+            }
+
+            if (trim($bookPath, '/') === $directoryPath) {
+                return $book;
+            }
+        }
+
+        return null;
+    }
+
     public function createBook(array $data)
     {
         $id = $data['id'] ?? uniqid('book_');

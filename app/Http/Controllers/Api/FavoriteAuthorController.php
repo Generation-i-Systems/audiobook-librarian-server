@@ -152,7 +152,7 @@ class FavoriteAuthorController extends Controller
 
         $favoriteAuthors = FavoriteAuthor::where('user_id', $user->id)
             ->pluck('author_name')
-            ->map(fn($name) => strtolower(trim($name)))
+            ->map(fn ($name) => strtolower(trim($name)))
             ->toArray();
 
         if (empty($favoriteAuthors)) {

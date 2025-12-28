@@ -211,8 +211,8 @@ class ImportFileController extends Controller
                     // Check if the directory contains any files with allowed extensions
                     $hasMatchingFiles = collect(File::files($d))
                         ->filter(function ($f) use ($allowedExtensions) {
-                        return in_array(strtolower($f->getExtension()), $allowedExtensions);
-                    })
+                            return in_array(strtolower($f->getExtension()), $allowedExtensions);
+                        })
                         ->isNotEmpty();
 
                     return $hasMatchingFiles;

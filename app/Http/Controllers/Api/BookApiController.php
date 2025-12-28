@@ -1339,10 +1339,10 @@ class BookApiController extends Controller
             return ($book['genre_id'] ?? null) == $genreId;
         });
         $authorIds = array_unique(array_column($books, 'author_id'));
-        $authors = array_filter($documentStore->listAuthors(), fn($author) => in_array($author['id'], $authorIds));
+        $authors = array_filter($documentStore->listAuthors(), fn ($author) => in_array($author['id'], $authorIds));
         $authors = array_values($authors);
-        usort($authors, fn($a, $b) => strcmp($a['name'], $b['name']));
-        $authors = array_map(fn($a) => ['id' => $a['id'], 'name' => $a['name']], $authors);
+        usort($authors, fn ($a, $b) => strcmp($a['name'], $b['name']));
+        $authors = array_map(fn ($a) => ['id' => $a['id'], 'name' => $a['name']], $authors);
 
         return response()->json([
             'genre' => ['id' => $genre['id'], 'name' => $genre['name']],
@@ -1366,7 +1366,7 @@ class BookApiController extends Controller
                 'message' => 'The specified series could not be found',
             ], 404);
         }
-        $books = array_filter($documentStore->listBooks(), fn($book) => ($book['series_id'] ?? null) == $seriesId);
+        $books = array_filter($documentStore->listBooks(), fn ($book) => ($book['series_id'] ?? null) == $seriesId);
         $books = array_values($books);
         // Filter out any non-array entries that may have gotten into the books array
         $books = array_filter($books, 'is_array');
@@ -1374,7 +1374,7 @@ class BookApiController extends Controller
         $page = (int) $request->input('page', 1);
         $offset = ($page - 1) * $perPage;
         $paginatedBooks = array_slice($books, $offset, $perPage);
-        $paginatedBooks = array_map(fn($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $paginatedBooks);
+        $paginatedBooks = array_map(fn ($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $paginatedBooks);
 
         return response()->json([
             'series' => ['id' => $series['id'], 'name' => $series['name']],
@@ -1406,7 +1406,7 @@ class BookApiController extends Controller
                 'message' => 'The specified author could not be found',
             ], 404);
         }
-        $books = array_filter($documentStore->listBooks(), fn($book) => ($book['author_id'] ?? null) == $authorId);
+        $books = array_filter($documentStore->listBooks(), fn ($book) => ($book['author_id'] ?? null) == $authorId);
         $books = array_values($books);
         // Filter out any non-array entries that may have gotten into the books array
         $books = array_filter($books, 'is_array');
@@ -1414,7 +1414,7 @@ class BookApiController extends Controller
         $page = (int) $request->input('page', 1);
         $offset = ($page - 1) * $perPage;
         $paginatedBooks = array_slice($books, $offset, $perPage);
-        $paginatedBooks = array_map(fn($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $paginatedBooks);
+        $paginatedBooks = array_map(fn ($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $paginatedBooks);
 
         return response()->json([
             'author' => ['id' => $author['id'], 'name' => $author['name']],
@@ -1440,12 +1440,12 @@ class BookApiController extends Controller
         if (!$author) {
             return response()->json(['error' => 'Author not found'], 404);
         }
-        $books = array_filter($documentStore->listBooks(), fn($book) => ($book['author_id'] ?? null) == $authorId);
+        $books = array_filter($documentStore->listBooks(), fn ($book) => ($book['author_id'] ?? null) == $authorId);
         $seriesIds = array_unique(array_column($books, 'series_id'));
-        $series = array_filter($documentStore->listSeries(), fn($ser) => in_array($ser['id'], $seriesIds));
+        $series = array_filter($documentStore->listSeries(), fn ($ser) => in_array($ser['id'], $seriesIds));
         $series = array_values($series);
-        usort($series, fn($a, $b) => strcmp($a['name'], $b['name']));
-        $series = array_map(fn($s) => ['id' => $s['id'], 'name' => $s['name']], $series);
+        usort($series, fn ($a, $b) => strcmp($a['name'], $b['name']));
+        $series = array_map(fn ($s) => ['id' => $s['id'], 'name' => $s['name']], $series);
 
         return response()->json([
             'author' => ['id' => $author['id'], 'name' => $author['name']],
@@ -1497,7 +1497,7 @@ class BookApiController extends Controller
         $page = max(1, (int) $request->input('page', 1));
         $offset = ($page - 1) * $perPage;
         $paginatedBooks = array_slice($books, $offset, $perPage);
-        $paginatedBooks = array_map(fn($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $paginatedBooks);
+        $paginatedBooks = array_map(fn ($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $paginatedBooks);
 
         return response()->json([
             'data' => $paginatedBooks,

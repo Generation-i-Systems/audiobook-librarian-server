@@ -198,9 +198,9 @@ class BookImportTraitTest extends TestCase
     {
         $trait = $this->getTraitObject();
         $dirPath = '/Fiction';
-        
+
         $result = $trait->processDirPath($dirPath);
-        
+
         $this->assertIsArray($result);
         $this->assertArrayHasKey('error', $result);
         $this->assertArrayHasKey('skipped', $result);

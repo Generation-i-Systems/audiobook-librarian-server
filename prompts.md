@@ -80,6 +80,12 @@ when doing autofill when results come back select the first option by default. a
 
 ---
 
+## 2025-12-19
+
+admin/BookController.php is too large move functionality out of it where possible
+
+---
+
 ## 2025-12-10
 
 The clients are getting api responses from `https://books.thelin.org/api/v1/books/10708` and similar urls containing things like "series":[{"name":null,"series_number":null}] this doesn't follow the spec listed at `api-docs/openapi.json`. Fix that and make a test suite that can be run independently of other tests that verifies the api output. Make an api endpoint that can be hit without auth by an uptime monitor that will show that each api endpoint is returning data that follows the spec

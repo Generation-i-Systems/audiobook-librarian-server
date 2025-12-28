@@ -325,20 +325,23 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::get('/series/ajax', [Admin\BookController::class, 'seriesAjax'])->name('series.ajax');
     Route::post(
         '/import/rename',
-        [Admin\BookController::class, 'books.renameImportItem']
+        [Admin\BookFilesystemController::class, 'renameImportItem']
     )->name('import.rename');
 
     // AJAX: List files in book directory
-    Route::get('books/files-ajax', [Admin\BookController::class, 'filesAjax'])->name('books.filesAjax');
+    Route::get('books/files-ajax', [Admin\BookFilesystemController::class, 'filesAjax'])->name('books.filesAjax');
 
     // AJAX: Get audio file metadata
     Route::get('books/audio-metadata', [Admin\AudioMetadataController::class, 'getMetadata'])->name('books.audioMetadata');
 
     // AJAX: Browse directories for path selection
-    Route::get('books/browse-directories', [Admin\BookController::class, 'browseDirectories'])->name('books.browseDirectories');
+    Route::get('books/browse-directories', [Admin\BookFilesystemController::class, 'browseDirectories'])->name('books.browseDirectories');
 
     // AJAX: Rename series across all books
     Route::post('books/rename-series', [Admin\BookController::class, 'renameSeries'])->name('books.renameSeries');
+
+    // AJAX: Check for directory path conflicts
+    Route::post('books/check-directory-conflict', [Admin\BookController::class, 'checkDirectoryConflict'])->name('books.checkDirectoryConflict');
 
     Route::get('genres/{genre}/authors', [Admin\GenreController::class, 'authors'])->name('genres.authors');
     Route::post('genres/merge', [Admin\GenreController::class, 'merge'])->name('genres.merge');

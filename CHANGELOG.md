@@ -8,6 +8,7 @@
 - Added `^` suffix support for book directories to disable multi-book detection for specific directories (e.g., "Series Books 1-3^" won't be treated as multi-book)
 - Title parsing now automatically strips trailing colons from parsed directory names (manual edits preserve colons)
 - User edit prompts now support single space (' ') input to clear a field instead of using the default value
+- Added `DocumentStoreServiceInterface::findBookByDirectoryPath()` for consistent directory-based lookups.
 
 ### Fixed
 - Fixed `books:info` command not finding books when `BOOK_STORAGE_PATH` is a symlink
@@ -30,6 +31,9 @@
   - `formatSeriesData()` now filters out entries with null or empty series names
   - API responses now return empty `[]` instead of arrays with null values
   - Ensures compliance with OpenAPI spec for series field
+
+### Changed
+- Refactored `Admin\BookController` by moving filesystem-related AJAX endpoints into `Admin\BookFilesystemController` and `BookFilesystemService`.
 
 ### Added
 - Added API health check endpoints for uptime monitoring (no authentication required)

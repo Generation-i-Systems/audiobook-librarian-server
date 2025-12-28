@@ -340,7 +340,7 @@ trait BookImportTrait
             if (property_exists($this, 'documentStore') && $this->documentStore) {
                 try {
                     $genresList = $this->documentStore->listGenres();
-                    $validGenres = array_map(fn($g) => $g['name'], $genresList);
+                    $validGenres = array_map(fn ($g) => $g['name'], $genresList);
                 } catch (\Exception $e) {
                     // Fall back to hardcoded list if documentStore is not available
                     $validGenres = [];

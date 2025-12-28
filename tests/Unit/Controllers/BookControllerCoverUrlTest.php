@@ -8,7 +8,6 @@ use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\BookController;
 use App\Services\GoogleBooksApiService;
 use Mockery;
-use Mockery\MockInterface;
 use Tests\TestCase;
 
 class BookControllerCoverUrlTest extends TestCase

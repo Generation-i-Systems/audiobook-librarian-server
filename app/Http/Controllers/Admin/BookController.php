@@ -132,7 +132,7 @@ class BookController extends Controller
         $this->setGoogleBooksApiService($googleBooksApiService);
         $this->audibleService = $audibleService;
         $this->externalCoverService = $externalCoverService;
-        $this->storagePath = env('BOOK_STORAGE_PATH');
+        $this->storagePath = (string) config('app.book_root', '/media/lyra_data1/audiobooks/books');
     }
 
     public function index(Request $request)
@@ -1339,6 +1339,13 @@ class BookController extends Controller
         // Move files if directoryPath changed
         $oldDirectoryPath = $book['directoryPath'] ?? null;
         $newDirectoryPath = $validated['directoryPath'] ?? null;
+        Log::debug('Directory path check', [
+            'oldDirectoryPath' => $oldDirectoryPath,
+            'newDirectoryPath' => $newDirectoryPath,
+            'oldTruthy' => (bool) $oldDirectoryPath,
+            'newTruthy' => (bool) $newDirectoryPath,
+            'different' => $oldDirectoryPath !== $newDirectoryPath,
+        ]);
         if ($oldDirectoryPath && $newDirectoryPath && $oldDirectoryPath !== $newDirectoryPath) {
             Log::info('Moving files from old directory to new directory: ' . $oldDirectoryPath . ' -> ' . $newDirectoryPath);
 
@@ -1583,9 +1590,11 @@ class BookController extends Controller
             $documentStore->deleteBook($book, false);
         }
 
-        $message = $deleteFiles
-            ? 'Book and files deleted successfully.'
-            : 'Book deleted from database (files preserved).';
+        if ($deleteFiles) {
+            $message = 'Book and files deleted successfully.';
+        } else {
+            $message = 'Book deleted from database (files preserved).';
+        }
 
         // Preserve query parameters (except delete_files) to maintain filters/sort
         $queryParams = $request->except(['delete_files']);
@@ -2050,25 +2059,6 @@ class BookController extends Controller
     }
 
     /**
-     * Serve an image from BOOK_STORAGE_PATH for preview (secure).
-     */
-    public function previewImage($book, $filename)
-    {
-        $storagePath = env('BOOK_STORAGE_PATH');
-        $dir = rtrim($storagePath, '/') . '/' . ltrim($book['directoryPath'], '/');
-        $fullPath = $dir . '/' . $filename;
-        if (!file_exists($fullPath)) {
-            abort(404);
-        }
-        $mime = mime_content_type($fullPath);
-
-        return response()->file($fullPath, [
-            'Content-Type' => $mime,
-            'Cache-Control' => 'no-store',
-        ]);
-    }
-
-    /**
      * AJAX endpoint for Tom Select: returns series matching query string, or all if no query.
      */
     public function seriesAjax(Request $request)
@@ -2087,169 +2077,6 @@ class BookController extends Controller
         $series = array_slice($series, 0, 20);
 
         return response()->json(['data' => array_values($series)]);
-    }
-
-    /**
-     * AJAX: Rename a file or folder in the import directory browser.
-     */
-    public function renameImportItem(Request $request)
-    {
-        Log::info($request->all());
-        $request->validate([
-            'path' => 'required|string', // relative path to file/folder
-            'new_name' => 'required|string', // new name only, not path
-        ]);
-        $relPath = trim($request->input('path'), '/');
-        $path = $this->storagePath . '/' . $relPath;
-        $newName = $request->input('new_name');
-
-        $dir = dirname($path);
-        $newPath = $dir . DIRECTORY_SEPARATOR . $newName;
-
-        Log::info("{$path} -> {$newPath}");
-
-        $oldRel = str_replace($this->storagePath, '', $path);
-        $newRel = str_replace($this->storagePath, '', $newPath);
-        Log::info("({$this->storagePath}) {$oldRel} -> {$newRel}");
-
-        if (!file_exists($path)) {
-            return response()->json(['error' => 'Original file/folder does not exist.'], 404);
-        }
-        if (file_exists($newPath)) {
-            return response()->json(['error' => 'A file/folder with the new name already exists.'], 409);
-        }
-        Log::info("{$path} -> {$newPath}");
-        // Try to rename
-        $success = @rename($path, $newPath);
-        if ($success) {
-            // If it's a directory, update any Book records using this directoryPath
-            if (is_dir($newPath)) {
-                $oldRel = str_replace($this->storagePath, '', $path);
-                $newRel = str_replace($this->storagePath, '', $newPath);
-                Log::info("({$this->storagePath}) {$oldRel} -> {$newRel}");
-                // Update Documentstore books whose directoryPath matches $oldRel
-                $documentStore = $this->documentStoreService;
-                $booksToUpdate = array_filter($this->documentStoreService->listBooks(), function ($book) use ($oldRel) {
-                    return isset($book['directoryPath']) && $book['directoryPath'] === $oldRel;
-                });
-                foreach ($booksToUpdate as $book) {
-                    $this->documentStoreService->updateBook($book['id'], ['directoryPath' => $newRel]);
-                }
-            }
-
-            // Always return relative paths to the frontend!
-            return response()->json([
-                'success' => true,
-                'newPath' => ltrim($newRel, '/'),
-                'newName' => $newName,
-            ]);
-        } else {
-            return response()->json([
-                'error' => 'Rename failed. Check permissions.',
-            ], 500);
-        }
-    }
-
-    /**
-     * AJAX: List ALL files in a book directory and check if directory exists.
-     */
-    public function filesAjax(Request $request)
-    {
-        $directory = $request->input('directory');
-        $storagePath = env('BOOK_STORAGE_PATH');
-        $dir = rtrim($storagePath, '/') . '/' . ltrim($directory, '/');
-        $files = [];
-        $exists = is_dir($dir);
-
-        if ($exists) {
-            $allFiles = scandir($dir);
-            foreach ($allFiles as $file) {
-                if ($file === '.' || $file === '..') {
-                    continue;
-                }
-                $path = $dir . '/' . $file;
-                if (is_file($path)) {
-                    $files[] = [
-                        'name' => $file,
-                        'size' => filesize($path),
-                        'type' => is_dir($path) ? 'directory' : 'file',
-                        'extension' => pathinfo($file, PATHINFO_EXTENSION),
-                    ];
-                }
-            }
-        }
-
-        return response()->json([
-            'files' => $files,
-            'exists' => $exists,
-            'path' => $dir,
-        ]);
-    }
-
-    /**
-     * AJAX: Browse directories starting from deepest existing path
-     */
-    public function browseDirectories(Request $request)
-    {
-        $requestedPath = $request->input('path', '');
-        $storagePath = env('BOOK_STORAGE_PATH');
-        $bookRoot = rtrim($storagePath, '/');
-
-        // Find deepest existing path
-        $pathParts = array_filter(explode('/', trim($requestedPath, '/')));
-        $currentPath = $bookRoot;
-        $existingPath = $bookRoot;
-
-        foreach ($pathParts as $part) {
-            $testPath = $currentPath . '/' . $part;
-            if (is_dir($testPath)) {
-                $existingPath = $testPath;
-                $currentPath = $testPath;
-            } else {
-                break;
-            }
-        }
-
-        // Get directories and files in the existing path
-        $directories = [];
-        $files = [];
-        if (is_dir($existingPath)) {
-            $items = scandir($existingPath);
-            foreach ($items as $item) {
-                if ($item === '.' || $item === '..') {
-                    continue;
-                }
-                $fullPath = $existingPath . '/' . $item;
-                if (is_dir($fullPath)) {
-                    $relativePath = str_replace($bookRoot . '/', '', $fullPath);
-                    $directories[] = [
-                        'name' => $item,
-                        'path' => $relativePath,
-                        'fullPath' => $fullPath,
-                        'type' => 'directory',
-                    ];
-                } elseif (is_file($fullPath)) {
-                    $files[] = [
-                        'name' => $item,
-                        'type' => 'file',
-                        'size' => filesize($fullPath),
-                        'extension' => pathinfo($item, PATHINFO_EXTENSION),
-                    ];
-                }
-            }
-        }
-
-        $relativeCurrent = str_replace($bookRoot . '/', '', $existingPath);
-        $parentPath = dirname($existingPath);
-        $canGoUp = $parentPath !== $bookRoot && strpos($parentPath, $bookRoot) === 0;
-
-        return response()->json([
-            'currentPath' => $relativeCurrent === $bookRoot ? '' : $relativeCurrent,
-            'directories' => $directories,
-            'files' => $files,
-            'canGoUp' => $canGoUp,
-            'parentPath' => $canGoUp ? str_replace($bookRoot . '/', '', $parentPath) : null
-        ]);
     }
 
     /**
@@ -2274,15 +2101,22 @@ class BookController extends Controller
             ], 400);
         }
 
-        try {
-            // Check if new series name already exists using Series model
-            $newSeriesExists = \App\Models\Series::where('name', $newName)->exists();
+        $newSeriesExists = false;
 
-            // If new series exists and merge not confirmed, return warning
+        try {
+            $newSeriesExists = $this->documentStoreService->getSeriesByName($newName) !== null;
+
             if ($newSeriesExists && !$merge) {
-                // Get count of books in old series
-                $oldSeries = \App\Models\Series::where('name', $oldName)->first();
-                $bookCount = $oldSeries ? $oldSeries->books()->count() : 0;
+                $oldSeriesBooks = $this->documentStoreService->listBooks(
+                    1,
+                    1,
+                    ['series' => $oldName, 'include_needs_review' => true],
+                    false,
+                    'title',
+                    'asc',
+                    true
+                );
+                $bookCount = (int) ($oldSeriesBooks['total'] ?? 0);
 
                 return response()->json([
                     'success' => false,
@@ -2296,19 +2130,91 @@ class BookController extends Controller
             // Perform the rename/merge using the service method
             $count = $this->documentStoreService->renameSeries($oldName, $newName);
 
+            if ($newSeriesExists) {
+                $message = "Successfully merged series '{$oldName}' into '{$newName}' for {$count} book(s).";
+            } else {
+                $message = "Successfully renamed series from '{$oldName}' to '{$newName}' for {$count} book(s).";
+            }
+
             return response()->json([
                 'success' => true,
                 'merged' => $newSeriesExists,
                 'count' => $count,
-                'message' => $newSeriesExists
-                    ? "Successfully merged series '{$oldName}' into '{$newName}' for {$count} book(s)."
-                    : "Successfully renamed series from '{$oldName}' to '{$newName}' for {$count} book(s)."
+                'message' => $message,
             ]);
         } catch (\Exception $e) {
             Log::error('Error renaming series: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'An error occurred while renaming the series: ' . $e->getMessage()
+                'message' => 'An error occurred while renaming the series: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Check if a directory path is already used by another book
+     */
+    public function checkDirectoryConflict(Request $request)
+    {
+        $validated = $request->validate([
+            'directoryPath' => 'required|string',
+            'currentBookId' => 'nullable|string',
+        ]);
+
+        $directoryPath = trim($validated['directoryPath']);
+        $currentBookId = $validated['currentBookId'] ?? null;
+
+        if (empty($directoryPath)) {
+            return response()->json([
+                'conflict' => false,
+            ]);
+        }
+
+        try {
+            // Search for books with this directory path
+            $results = $this->documentStoreService->listBooks(
+                1,
+                100,
+                ['directoryPath' => $directoryPath],
+                false,
+                'title',
+                'asc',
+                true
+            );
+
+            $conflictingBooks = [];
+            if (!empty($results['books'])) {
+                foreach ($results['books'] as $book) {
+                    // Skip the current book being edited
+                    if ($currentBookId && $book['id'] === $currentBookId) {
+                        continue;
+                    }
+                    $conflictingBooks[] = [
+                        'id' => $book['id'],
+                        'title' => $book['title'] ?? 'Unknown',
+                        'author' => is_array($book['author'] ?? null)
+                            ? implode(', ', $book['author'])
+                            : ($book['author'] ?? 'Unknown'),
+                    ];
+                }
+            }
+
+            if (empty($conflictingBooks)) {
+                return response()->json([
+                    'conflict' => false,
+                ]);
+            }
+
+            return response()->json([
+                'conflict' => true,
+                'books' => $conflictingBooks,
+                'count' => count($conflictingBooks),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error checking directory conflict: ' . $e->getMessage());
+            return response()->json([
+                'conflict' => false,
+                'error' => 'Failed to check for conflicts',
             ], 500);
         }
     }

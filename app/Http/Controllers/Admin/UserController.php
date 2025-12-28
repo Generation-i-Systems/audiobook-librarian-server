@@ -115,7 +115,7 @@ class UserController extends Controller
     public function verify($id)
     {
         $user = $this->documentStoreService->getUserById($id);
-        
+
         if (!$user) {
             return back()->with('error', 'User not found.');
         }

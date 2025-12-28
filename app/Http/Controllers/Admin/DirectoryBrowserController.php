@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -11,7 +12,7 @@ class DirectoryBrowserController extends Controller
 {
     public function browse(Request $request)
     {
-        $basePath = env('BOOK_STORAGE_PATH');
+        $basePath = (string) config('app.book_root', '/media/lyra_data1/audiobooks/books');
 
         if (!$basePath) {
             Log::error('BOOK_STORAGE_PATH is not defined in the .env file.');
@@ -34,19 +35,22 @@ class DirectoryBrowserController extends Controller
             );
         }
 
-        $path = $request->input('path', $basePath);
+        $path = (string) $request->input('path', '');
         $filterLetter = $request->input('filter_letter');
         $search = $request->input('search');
 
-        if (!is_dir($basePath . '/' . $path)) {
-            Log::error('Path: ' . $basePath . '/' . $path . ' is not a directory');
+        $relativePath = trim($path, '/');
+        $fullPath = $relativePath === '' ? $basePath : $basePath . '/' . $relativePath;
+
+        if (!is_dir($fullPath)) {
+            Log::error('Path: ' . $fullPath . ' is not a directory');
 
             return response()->json([
                 'error' => 'Invalid directory.',
             ], 400);
         }
 
-        $files = $this->scanDirectory($basePath . '/' . $path);
+        $files = $this->scanDirectory($fullPath);
 
         if ($files === false) {
             Log::error('Attempt to perform a scandir but failed to get value.');

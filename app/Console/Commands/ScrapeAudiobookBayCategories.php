@@ -3,10 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Models\FavoriteAuthor;
-use App\Models\User;
 use App\Services\AudiobookBayCategoryScraperService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Log;
 
 class ScrapeAudiobookBayCategories extends Command
 {
@@ -125,7 +123,7 @@ class ScrapeAudiobookBayCategories extends Command
         return FavoriteAuthor::with('user')
             ->get()
             ->pluck('author_name')
-            ->map(fn($name) => strtolower(trim($name)))
+            ->map(fn ($name) => strtolower(trim($name)))
             ->unique()
             ->toArray();
     }

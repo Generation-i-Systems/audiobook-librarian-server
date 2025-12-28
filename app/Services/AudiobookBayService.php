@@ -267,7 +267,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
         }
 
         // Remove nulls from array
-        return array_filter($merged, fn($v) => $v !== null);
+        return array_filter($merged, fn ($v) => $v !== null);
     }
 
     /**
@@ -310,7 +310,7 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
                     // Recursively format but skip further detail fetching
                     $enrichedDetails = $this->formatBookDetails($fullDetails, true);
                     // Merge, preferring enriched data over search result data
-                    $formattedDetails = array_merge($formattedDetails, array_filter($enrichedDetails, fn($v) => !empty($v)));
+                    $formattedDetails = array_merge($formattedDetails, array_filter($enrichedDetails, fn ($v) => !empty($v)));
                     Log::info('[ABB-FORMAT] Merged details', ['final_authors' => $formattedDetails['authors'], 'final_narrators' => $formattedDetails['narrators']]);
                 }
             }

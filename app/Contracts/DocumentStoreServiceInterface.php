@@ -23,6 +23,11 @@ interface DocumentStoreServiceInterface
     public function getBook(string $id);
 
     /**
+     * Find a book by its directoryPath.
+     */
+    public function findBookByDirectoryPath(string $directoryPath): ?array;
+
+    /**
      * List books with pagination and optional filtering
      *
      * @param int $page Page number (1-based)

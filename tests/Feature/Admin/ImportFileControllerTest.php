@@ -152,12 +152,12 @@ class ImportFileControllerTest extends TestCase
 
         // Verify test file is listed
         $this->assertTrue(
-            collect($json['items'])->contains(fn($item) => 'file' === $item['type'] && 'test.mp3' === $item['name'])
+            collect($json['items'])->contains(fn ($item) => 'file' === $item['type'] && 'test.mp3' === $item['name'])
         );
 
         // Verify test subdirectory is listed
         $this->assertTrue(
-            collect($json['items'])->contains(fn($item) => 'dir' === $item['type'] && 'subdir' === $item['name'])
+            collect($json['items'])->contains(fn ($item) => 'dir' === $item['type'] && 'subdir' === $item['name'])
         );
     }
 
@@ -192,21 +192,21 @@ class ImportFileControllerTest extends TestCase
         // Directory with matching files should be included
         $this->assertTrue(
             collect($json['items'])->contains(
-                fn($item) => 'dir' === $item['type'] && 'dir_with_matching' === $item['name']
+                fn ($item) => 'dir' === $item['type'] && 'dir_with_matching' === $item['name']
             )
         );
 
         // Directory without matching files should be excluded
         $this->assertFalse(
             collect($json['items'])->contains(
-                fn($item) => 'dir' === $item['type'] && 'dir_without_matching' === $item['name']
+                fn ($item) => 'dir' === $item['type'] && 'dir_without_matching' === $item['name']
             )
         );
 
         // Empty directory should be excluded
         $this->assertFalse(
             collect($json['items'])->contains(
-                fn($item) => 'dir' === $item['type'] && 'empty_dir' === $item['name']
+                fn ($item) => 'dir' === $item['type'] && 'empty_dir' === $item['name']
             )
         );
     }

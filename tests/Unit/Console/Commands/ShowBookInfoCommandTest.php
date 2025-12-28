@@ -17,7 +17,7 @@ class ShowBookInfoCommandTest extends TestCase
     {
         parent::setUp();
 
-        $terminalImageService = new class extends TerminalImageService {
+        $terminalImageService = new class () extends TerminalImageService {
             public function supportsImages(): bool
             {
                 return false;

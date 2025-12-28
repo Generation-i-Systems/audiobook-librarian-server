@@ -13,12 +13,12 @@ class AuthorNormalizationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Mock the GenreMappingService
         $genreMappingService = $this->createMock(\App\Services\GenreMappingService::class);
-        
+
         // Create a new instance of BookImportService with the mock
-        $this->service = new class($genreMappingService) extends BookImportService {
+        $this->service = new class ($genreMappingService) extends BookImportService {
             // Override any methods that use facades or other Laravel features
             protected function methodThatUsesFacades()
             {
@@ -26,9 +26,9 @@ class AuthorNormalizationTest extends TestCase
                 return [];
             }
         };
-        
+
         // Add reflection helper method
-        $this->invokeMethod = function($object, $method, array $parameters = []) {
+        $this->invokeMethod = function ($object, $method, array $parameters = []) {
             $reflection = new \ReflectionClass(get_class($object));
             $method = $reflection->getMethod($method);
             $method->setAccessible(true);

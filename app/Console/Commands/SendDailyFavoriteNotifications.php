@@ -4,7 +4,6 @@ namespace App\Console\Commands;
 
 use App\Mail\NewFavoriteBooksNotification;
 use App\Models\DiscoveredBook;
-use App\Models\FavoriteAuthor;
 use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Mail;
@@ -67,7 +66,7 @@ class SendDailyFavoriteNotifications extends Command
         $favoriteAuthors = $user->favoriteAuthors()
             ->where('notify_email', true)
             ->pluck('author_name')
-            ->map(fn($name) => strtolower(trim($name)))
+            ->map(fn ($name) => strtolower(trim($name)))
             ->toArray();
 
         if (empty($favoriteAuthors)) {

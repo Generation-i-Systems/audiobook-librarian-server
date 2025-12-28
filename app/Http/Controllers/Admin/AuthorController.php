@@ -131,11 +131,11 @@ class AuthorController extends Controller
         $q = $request->input('q', '');
         $authors = $this->documentStoreService->listAuthors();
         if ($q) {
-            $authors = array_filter($authors, fn($author) => stripos($author['name'], $q) !== false);
+            $authors = array_filter($authors, fn ($author) => stripos($author['name'], $q) !== false);
         }
         // Limit and sort
         $authors = array_slice($authors, 0, 20);
-        usort($authors, fn($a, $b) => strcmp($a['name'], $b['name']));
+        usort($authors, fn ($a, $b) => strcmp($a['name'], $b['name']));
 
         return response()->json(['data' => array_values($authors)]);
     }
