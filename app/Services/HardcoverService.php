@@ -489,6 +489,13 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
                 if (!mkdir($directoryPath, 0775, true) && !is_dir($directoryPath)) {
                     return null;
                 }
+
+                // Set directory ownership to eric:audio
+                if (is_dir($directoryPath)) {
+                    @chown($directoryPath, 'eric');
+                    @chgrp($directoryPath, 'audio');
+                    @chmod($directoryPath, 0775);
+                }
             }
 
             $ext = pathinfo(parse_url($imageUrl, PHP_URL_PATH) ?? '', PATHINFO_EXTENSION) ?: 'jpg';
@@ -500,6 +507,13 @@ class HardcoverService extends BaseBookService implements BookServiceInterface
             }
 
             file_put_contents($targetPath, $response->body());
+
+            // Set file permissions and ownership
+            if (file_exists($targetPath)) {
+                @chmod($targetPath, 0664);
+                @chown($targetPath, 'eric');
+                @chgrp($targetPath, 'audio');
+            }
 
             return $targetPath;
         } catch (\Throwable $e) {

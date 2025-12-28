@@ -761,6 +761,9 @@ class BookImportService
 
             if (!File::isDirectory($targetDir)) {
                 File::makeDirectory($targetDir, 0775, true);
+
+                // Set directory ownership to eric:audio
+                $this->setDirectoryOwnership($targetDir);
             }
 
             // Flatten CD directories before moving files
@@ -869,6 +872,7 @@ class BookImportService
 
             if (!File::isDirectory($target)) {
                 File::makeDirectory($target, 0775, true);
+                $this->setDirectoryOwnership($target);
             }
 
             if (!File::copy($source, $targetFile)) {
@@ -876,6 +880,7 @@ class BookImportService
             }
 
             chmod($targetFile, 0664);
+            $this->setFileOwnership($targetFile);
 
             $this->copyMatchingPdfFile($source, $target);
             return;
@@ -894,12 +899,14 @@ class BookImportService
             $targetSubDir = dirname($targetFile);
             if (!File::isDirectory($targetSubDir)) {
                 File::makeDirectory($targetSubDir, 0775, true);
+                $this->setDirectoryOwnership($targetSubDir);
             }
 
             File::copy($file->getPathname(), $targetFile);
 
             // Set file permissions after copying
             chmod($targetFile, 0664);
+            $this->setFileOwnership($targetFile);
         }
     }
 
@@ -1197,6 +1204,7 @@ class BookImportService
             // Create directory if it doesn't exist
             if (!is_dir($absoluteDir)) {
                 mkdir($absoluteDir, 0775, true);
+                $this->setDirectoryOwnership($absoluteDir);
             }
 
             $filename = 'cover.jpg';
@@ -1204,6 +1212,7 @@ class BookImportService
 
             if (file_put_contents($filePath, $coverData)) {
                 chmod($filePath, 0664);
+                $this->setFileOwnership($filePath);
                 return $filename;
             }
         } catch (\Exception $e) {

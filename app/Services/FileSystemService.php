@@ -70,7 +70,7 @@ class FileSystemService
             '*torrent*tracker*',
             '*RARBG.txt',
             '*Downloaded from*',
-            '*AudioBook Bay*'
+            '*AudioBook Bay*',
         ];
 
         foreach ($trackingPatterns as $pattern) {
@@ -96,7 +96,7 @@ class FileSystemService
 
         foreach ($patterns as $pattern) {
             if (preg_match($pattern, $filename, $matches)) {
-                return (int)$matches[1];
+                return (int) $matches[1];
             }
         }
 
@@ -253,6 +253,11 @@ class FileSystemService
 
         if (!File::isDirectory($target)) {
             File::makeDirectory($target, 0775, true);
+            if (is_dir($target)) {
+                @chown($target, 'eric');
+                @chgrp($target, 'audio');
+                @chmod($target, 0775);
+            }
         }
 
         try {
@@ -265,6 +270,11 @@ class FileSystemService
                 $targetSubDir = dirname($targetFile);
                 if (!File::isDirectory($targetSubDir)) {
                     File::makeDirectory($targetSubDir, 0775, true);
+                    if (is_dir($targetSubDir)) {
+                        @chown($targetSubDir, 'eric');
+                        @chgrp($targetSubDir, 'audio');
+                        @chmod($targetSubDir, 0775);
+                    }
                 }
 
                 if ($copy) {
@@ -273,8 +283,12 @@ class FileSystemService
                     File::move($file, $targetFile);
                 }
 
-                // Set appropriate permissions
+                // Set appropriate permissions and ownership
                 chmod($targetFile, 0664);
+                if (file_exists($targetFile)) {
+                    @chown($targetFile, 'eric');
+                    @chgrp($targetFile, 'audio');
+                }
             }
 
             return true;

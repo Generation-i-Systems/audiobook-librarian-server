@@ -43,6 +43,14 @@ class BookDirectoryMoveService
 
         $disk->makeDirectory($newDirectoryPath);
 
+        // Set directory ownership
+        $newAbsPath = $disk->path($newDirectoryPath);
+        if (is_dir($newAbsPath)) {
+            @chown($newAbsPath, 'eric');
+            @chgrp($newAbsPath, 'audio');
+            @chmod($newAbsPath, 0775);
+        }
+
         $files = $disk->allFiles($oldDirectoryPath);
         $newCoverImageBasename = $coverImageBasename;
 
@@ -55,6 +63,12 @@ class BookDirectoryMoveService
             $targetDir = trim((string) dirname($target), '/');
             if ($targetDir !== '') {
                 $disk->makeDirectory($targetDir);
+                $targetAbsDir = $disk->path($targetDir);
+                if (is_dir($targetAbsDir)) {
+                    @chown($targetAbsDir, 'eric');
+                    @chgrp($targetAbsDir, 'audio');
+                    @chmod($targetAbsDir, 0775);
+                }
             }
 
             $finalTarget = $target;
@@ -64,6 +78,14 @@ class BookDirectoryMoveService
 
             try {
                 $disk->move($file, $finalTarget);
+
+                // Set file ownership
+                $finalAbsPath = $disk->path($finalTarget);
+                if (file_exists($finalAbsPath)) {
+                    @chmod($finalAbsPath, 0664);
+                    @chown($finalAbsPath, 'eric');
+                    @chgrp($finalAbsPath, 'audio');
+                }
 
                 if ($coverImageBasename !== null && basename($file) === $coverImageBasename) {
                     $newCoverImageBasename = basename($finalTarget);
