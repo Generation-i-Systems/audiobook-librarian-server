@@ -151,7 +151,12 @@ class BookController extends Controller
             if ($request->filled('author')) {
                 $filters['author'] = $request->input('author');
             }
-            if ($request->filled('genre_id')) {
+            if ($request->filled('series')) {
+                $filters['series'] = $request->input('series');
+            }
+            if ($request->filled('genre')) {
+                $filters['genre'] = $request->input('genre');
+            } elseif ($request->filled('genre_id')) {
                 $filters['genre'] = $request->input('genre_id');
             }
             // Admin panel should see books that need review

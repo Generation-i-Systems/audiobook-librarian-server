@@ -172,14 +172,15 @@
                             @if(!empty($book['author']))
                                 @if(is_array($book['author']))
                                     @foreach($book['author'] as $author)
-                                        @if(is_array($author) && isset($author['name']))
-                                            {{ $author['name'] }}@if(!$loop->last)<br>@endif
-                                        @else
-                                            {{ is_string($author) ? $author : 'Unknown' }}@if(!$loop->last)<br>@endif
-                                        @endif
+                                        @php
+                                            $authorName = is_array($author) && isset($author['name']) ? $author['name'] : (is_string($author) ? $author : 'Unknown');
+                                        @endphp
+                                        <a href="{{ route('admin.books.index', ['author' => $authorName]) }}"
+                                            class="text-decoration-none">{{ $authorName }}</a>@if(!$loop->last)<br>@endif
                                     @endforeach
                                 @else
-                                    {{ $book['author'] }}
+                                    <a href="{{ route('admin.books.index', ['author' => $book['author']]) }}"
+                                        class="text-decoration-none">{{ $book['author'] }}</a>
                                 @endif
                             @else
                                 Unknown
@@ -192,20 +193,25 @@
                                 @endphp
                                 @if(is_array($series))
                                     @foreach($series as $key => $item)
-                                        @if(is_array($item) && (isset($item['seriesName']) || isset($item['name'])))
-                                            {{-- Canonical: [{seriesName, number}] or [{name, number}] --}}
-                                            {{ $item['seriesName'] ?? $item['name'] }}
-                                        @elseif(is_string($key) && (is_scalar($item) || is_null($item)))
-                                            {{-- Assoc: ['Name' => number] --}}
-                                            {{ $key }}
-                                        @elseif(is_string($item))
-                                            {{-- Legacy: ['Name', ...] --}}
-                                            {{ $item }}
+                                        @php
+                                            $seriesName = null;
+                                            if (is_array($item) && (isset($item['seriesName']) || isset($item['name']))) {
+                                                $seriesName = $item['seriesName'] ?? $item['name'];
+                                            } elseif (is_string($key) && (is_scalar($item) || is_null($item))) {
+                                                $seriesName = $key;
+                                            } elseif (is_string($item)) {
+                                                $seriesName = $item;
+                                            }
+                                        @endphp
+                                        @if($seriesName)
+                                            <a href="{{ route('admin.books.index', ['series' => $seriesName]) }}"
+                                                class="text-decoration-none">{{ $seriesName }}</a>
                                         @endif
                                         @if(!$loop->last)<br>@endif
                                     @endforeach
                                 @elseif(is_string($series))
-                                    {{ $series }}
+                                    <a href="{{ route('admin.books.index', ['series' => $series]) }}"
+                                        class="text-decoration-none">{{ $series }}</a>
                                 @endif
                             @endif
                         </td>
@@ -236,14 +242,20 @@
                             @if(!empty($book['genre']))
                                 @if(is_array($book['genre']))
                                     @if(isset($book['genre']['name']))
-                                        {{ $book['genre']['name'] }}
+                                        <a href="{{ route('admin.books.index', ['genre' => $book['genre']['name']]) }}"
+                                            class="text-decoration-none">{{ $book['genre']['name'] }}</a>
                                     @else
                                         @foreach($book['genre'] as $genre)
-                                            {{ is_array($genre) ? ($genre['name'] ?? '') : $genre }}@if(!$loop->last), @endif
+                                            @php
+                                                $genreName = is_array($genre) ? ($genre['name'] ?? '') : $genre;
+                                            @endphp
+                                            <a href="{{ route('admin.books.index', ['genre' => $genreName]) }}"
+                                                class="text-decoration-none">{{ $genreName }}</a>@if(!$loop->last), @endif
                                         @endforeach
                                     @endif
                                 @else
-                                    {{ $book['genre'] }}
+                                    <a href="{{ route('admin.books.index', ['genre' => $book['genre']]) }}"
+                                        class="text-decoration-none">{{ $book['genre'] }}</a>
                                 @endif
                             @else
                                 Unknown
@@ -277,7 +289,8 @@
                             @endphp
                             <a href="{{ route('admin.books.edit', array_merge([$bookId], request()->query())) }}"
                                 class="btn btn-sm btn-outline-primary" title="Edit"><i class="fas fa-pencil-alt"></i></a>
-                            <form action="{{ route('admin.books.destroy', array_merge([$bookId], request()->query())) }}" method="POST" style="display: inline;">
+                            <form action="{{ route('admin.books.destroy', array_merge([$bookId], request()->query())) }}"
+                                method="POST" style="display: inline;">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"
