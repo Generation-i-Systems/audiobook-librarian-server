@@ -1106,7 +1106,7 @@ document.addEventListener('DOMContentLoaded', function() {
     window.AUDIBLE_SEARCH_URL = "{{ route('admin.books.audible') }}";
     window.BOOK_FORM_ROUTES.browseDirectories = "{{ route('admin.books.browseDirectories') }}";
     window.BOOK_FORM_ROUTES.parsePath = "{{ route('admin.books.parsePath') }}";
-    window.BOOK_FORM_ROUTES.checkDirectoryConflict = "{{ route('books.checkDirectoryConflict') }}";
+    window.BOOK_FORM_ROUTES.checkDirectoryConflict = "{{ route('admin.books.checkDirectoryConflict') }}";
 
     // Debug: Confirm jQuery and jQuery UI are loaded
     console.log('window.jQuery:', typeof window.jQuery, window.jQuery ? 'OK' : 'MISSING');
