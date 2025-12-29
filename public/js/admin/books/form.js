@@ -777,10 +777,16 @@ window.initBookForm = function (formContainerSelector) {
             const rowIndex = Array.from(rows).indexOf(row);
 
             if (rowIndex === 0) {
-                // First row: just reset the select
-                row.querySelector('select[name="genre[]"]').value = "";
+                if (rows.length > 1) {
+                    const secondRow = rows[1];
+                    const secondSelect = secondRow.querySelector('select[name="genre[]"]');
+                    const firstSelect = row.querySelector('select[name="genre[]"]');
+                    firstSelect.value = secondSelect.value;
+                    secondRow.remove();
+                } else {
+                    row.querySelector('select[name="genre[]"]').value = "";
+                }
             } else {
-                // Other rows: remove the row
                 row.remove();
             }
             updateAddRowButtons(
@@ -2198,6 +2204,82 @@ $(document).off('click.resyncPath', '#resync-path-btn').on('click.resyncPath', '
             showToast('Error parsing path: ' + (xhr.responseJSON?.error || 'Unknown error'), 'danger');
         }
     });
+});
+
+// Update path from fields - constructs path from current field values
+$(document).off('click.updatePathFromFields', '#update-path-from-fields-btn').on('click.updatePathFromFields', '#update-path-from-fields-btn', function() {
+    const genre = $('#genres-group .genre-row:first select[name="genre[]"]').val();
+    const author = $('#authors-group .author-row:first input[name="author[]"]').val();
+    const title = $('#title').val();
+    const seriesName = $('#series-group .series-row:first input[name*="[seriesName]"]').val();
+    const seriesNumber = $('#series-group .series-row:first input[name*="[number]"]').val();
+
+    if (!genre || !author || !title) {
+        showToast('Please fill in at least Genre, Author, and Title fields', 'warning');
+        return;
+    }
+
+    let path;
+
+    if (seriesName && seriesName.trim() !== '') {
+        // Series book: Genre/Author/Series/## Title
+        let finalDir = title;
+        if (seriesNumber && seriesNumber.toString().trim() !== '') {
+            // Zero-pad the series number to 2 digits
+            const paddedNumber = String(seriesNumber).padStart(2, '0');
+            finalDir = `${paddedNumber} ${title}`;
+        }
+        path = `${genre}/${author}/${seriesName}/${finalDir}`;
+    } else {
+        // Standalone book: Genre/Author/Title
+        path = `${genre}/${author}/${title}`;
+    }
+
+    $('input[name="directoryPath"]:not(#directoryPathHidden)').val(path);
+    showToast('Directory path updated from fields!', 'success');
+});
+
+// Update path from genre change - replaces the genre portion of the path
+$(document).off('click.updatePathFromGenre', '.update-path-from-genre').on('click.updatePathFromGenre', '.update-path-from-genre', function() {
+    const currentPath = $('input[name="directoryPath"]:not(#directoryPathHidden)').val();
+    const newGenre = $('#genres-group .genre-row:first select[name="genre[]"]').val();
+
+    if (!currentPath) {
+        showToast('No directory path to update', 'warning');
+        return;
+    }
+
+    if (!newGenre) {
+        showToast('Please select a genre first', 'warning');
+        return;
+    }
+
+    const pathParts = currentPath.split('/');
+    if (pathParts.length > 0) {
+        pathParts[0] = newGenre;
+        const newPath = pathParts.join('/');
+        $('input[name="directoryPath"]:not(#directoryPathHidden)').val(newPath);
+
+        $(this).hide();
+        const firstGenreRow = $('#genres-group .genre-row:first');
+        firstGenreRow.attr('data-original-genre', newGenre);
+
+        showToast('Directory path updated to new genre!', 'success');
+    }
+});
+
+// Monitor first genre select for changes to show/hide the update path button
+$(document).off('change.genrePathUpdate', '#genres-group').on('change.genrePathUpdate', '#genres-group .genre-row:first select[name="genre[]"]', function() {
+    const firstGenreRow = $(this).closest('.genre-row');
+    const originalGenre = firstGenreRow.attr('data-original-genre');
+    const currentGenre = $(this).val();
+    const updateBtn = firstGenreRow.find('.update-path-from-genre');
+
+    if (currentGenre && currentGenre !== originalGenre && currentGenre !== '') {
+        updateBtn.show();
+    } else {
+        updateBtn.hide();
+    }
 });
 
 // Handle metadata button clicks

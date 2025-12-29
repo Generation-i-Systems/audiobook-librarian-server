@@ -388,13 +388,20 @@
                                     $genresCount = count($genres);
                                 @endphp
                                 @foreach($genres as $idx => $genre)
-                                    <div class="d-flex align-items-start mb-2 genre-row">
+                                    <div class="d-flex align-items-start mb-2 genre-row" data-original-genre="{{ $genre }}">
                                         <select name="genre[]" class="form-select" style="height:32px; flex:1;" required>
                                             <option value="">Select a genre</option>
                                             @foreach($genreList as $g)
                                                 <option value="{{ $g }}" {{ $genre === $g ? 'selected' : '' }}>{{ $g }}</option>
                                             @endforeach
                                         </select>
+                                        @if($idx === 0)
+                                            <button type="button" class="btn btn-outline-info btn-sm ms-2 update-path-from-genre"
+                                                style="width:auto; height:32px; padding:0 8px; display:none; align-items:center; justify-content:center; white-space:nowrap;"
+                                                title="Update directory path to move book to this genre">
+                                                <i class="fas fa-folder-open me-1"></i>Update Path
+                                            </button>
+                                        @endif
                                         <div class="d-flex flex-column ms-2" style="gap:2px;">
                                             <button type="button" class="btn btn-outline-danger btn-sm remove-genre"
                                                 style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">&times;</button>
@@ -420,8 +427,8 @@
                 <div class="card-content">
                     <div class="mb-3">
                         <label for="directoryPath" class="form-label">Directory Path</label>
-                        <div class="d-flex align-items-center">
-                            <div class="position-relative" style="flex: 1;">
+                        <div class="d-flex align-items-center flex-wrap" style="gap: 0.5rem;">
+                            <div class="position-relative" style="flex: 1; min-width: 300px;">
                                 <input type="text" class="form-control @error('directoryPath') is-invalid @enderror"
                                     id="directoryPath" name="directoryPath"
                                     value="{{ old('directoryPath', $directoryPath ?? ($initial['directoryPath'] ?? '')) }}"
@@ -433,9 +440,13 @@
                                     <i class="fas fa-times-circle"></i>
                                 </button>
                             </div>
-                            <button type="button" class="btn btn-outline-secondary ms-2" id="resync-path-btn"
+                            <button type="button" class="btn btn-outline-secondary" id="update-path-from-fields-btn"
+                                title="Update directory path based on current genre, author, title, and series fields">
+                                <i class="fas fa-folder-plus me-1"></i>Update Path from Fields
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" id="resync-path-btn"
                                 title="Parse directory path to populate title, author, and series fields">
-                                <i class="fas fa-sync-alt me-1"></i>Resync Fields from Path
+                                <i class="fas fa-sync-alt me-1"></i>Parse Path to Fields
                             </button>
                         </div>
                         @error('directoryPath')
