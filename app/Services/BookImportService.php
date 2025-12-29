@@ -123,7 +123,7 @@ class BookImportService
 
             // Handle year/release_date
             if (isset($metadata['year']) && $metadata['year'] && is_numeric($metadata['year'])) {
-                $book->release_date = new \DateTime(((int) $metadata['year']) . '-01-01');
+                $book->release_date = ((int) $metadata['year']) . '-01-01';
             }
 
             $book->isbn = $metadata['isbn'] ?? null;
@@ -369,7 +369,7 @@ class BookImportService
 
             // Handle year/release_date
             if (isset($metadata['year']) && $metadata['year'] && is_numeric($metadata['year'])) {
-                $book->release_date = new \DateTime(((int) $metadata['year']) . '-01-01');
+                $book->release_date = ((int) $metadata['year']) . '-01-01';
             }
 
             $book->isbn = $metadata['isbn'] ?? $book->isbn;

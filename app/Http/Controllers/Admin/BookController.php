@@ -163,11 +163,12 @@ class BookController extends Controller
             $filters['include_needs_review'] = true;
 
             // Get sorting parameters
-            $sort = $request->input('sort', 'title');
-            $order = $request->input('order', 'asc');
+            $sortParam = $request->input('sort', 'recent_desc');
+            $sort = 'created_at'; // Default internal sort
+            $order = 'desc';      // Default internal order
 
             // Map admin panel sort options to MySqlService sort options
-            switch ($request->input('sort')) {
+            switch ($sortParam) {
                 case 'recent_desc':
                     $sort = 'created_at';
                     $order = 'desc';
@@ -225,8 +226,9 @@ class BookController extends Controller
                     $order = 'desc';
                     break;
                 default:
-                    $sort = 'title';
-                    $order = 'asc';
+                    // If an unknown sort param is passed, fall back to recent_desc
+                    $sort = 'created_at';
+                    $order = 'desc';
                     break;
             }
 

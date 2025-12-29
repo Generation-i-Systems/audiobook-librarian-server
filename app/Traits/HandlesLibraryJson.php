@@ -127,61 +127,104 @@ trait HandlesLibraryJson
         $relativePath = $book['directory_path'] ?? $book['directoryPath'] ?? null;
 
         $authors = [];
+        $authorNames = [];
         if (!empty($book['authors'])) {
             foreach ($book['authors'] as $author) {
-                $authors[] = is_array($author) ? ($author['name'] ?? '') : (string) $author;
+                if (is_array($author)) {
+                    $authors[] = [
+                        'id' => $author['id'] ?? null,
+                        'name' => $author['name'] ?? '',
+                    ];
+                    $authorNames[] = $author['name'] ?? '';
+                } else {
+                    $authorNames[] = (string) $author;
+                }
             }
         }
 
         $narrators = [];
+        $narratorNames = [];
         if (!empty($book['narrators'])) {
             foreach ($book['narrators'] as $narrator) {
-                $narrators[] = is_array($narrator) ? ($narrator['name'] ?? '') : (string) $narrator;
+                if (is_array($narrator)) {
+                    $narrators[] = [
+                        'id' => $narrator['id'] ?? null,
+                        'name' => $narrator['name'] ?? '',
+                    ];
+                    $narratorNames[] = $narrator['name'] ?? '';
+                } else {
+                    $narratorNames[] = (string) $narrator;
+                }
             }
         }
 
         $genres = [];
+        $genreNames = [];
         if (!empty($book['genres'])) {
             foreach ($book['genres'] as $genre) {
-                $genres[] = is_array($genre) ? ($genre['name'] ?? '') : (string) $genre;
+                if (is_array($genre)) {
+                    $genres[] = [
+                        'id' => $genre['id'] ?? null,
+                        'name' => $genre['name'] ?? '',
+                    ];
+                    $genreNames[] = $genre['name'] ?? '';
+                } else {
+                    $genreNames[] = (string) $genre;
+                }
             }
         }
 
-        $publishers = [];
+        $publisherData = null;
+        $publisherName = null;
         if (!empty($book['publisher'])) {
             if (is_array($book['publisher'])) {
-                $publishers[] = $book['publisher']['name'] ?? '';
+                $publisherData = [
+                    'id' => $book['publisher']['id'] ?? null,
+                    'name' => $book['publisher']['name'] ?? '',
+                ];
+                $publisherName = $book['publisher']['name'] ?? '';
             } else {
-                $publishers[] = (string) $book['publisher'];
+                $publisherName = (string) $book['publisher'];
             }
         }
 
-        $seriesData = [];
+        $seriesData = null;
         $seriesName = '';
         $seriesNumber = null;
+        $seriesMap = [];
 
         if (!empty($book['series'])) {
             $series = $book['series'];
 
             if (is_array($series) && isset($series[0])) {
-                // Multiple series - loop through all
+                // Multiple series - use first one as primary
+                $firstSeries = $series[0];
+                $seriesData = [
+                    'id' => $firstSeries['id'] ?? null,
+                    'name' => $firstSeries['name'] ?? '',
+                    'is_collection' => $firstSeries['is_collection'] ?? false,
+                ];
+                $seriesName = $firstSeries['name'] ?? '';
+                $seriesNumber = $firstSeries['pivot']['series_number'] ?? null;
+
+                // Build series map for backward compatibility
                 foreach ($series as $seriesItem) {
                     $name = $seriesItem['name'] ?? '';
                     $number = $seriesItem['pivot']['series_number'] ?? null;
                     if ($name) {
-                        $seriesData[$name] = $number;
+                        $seriesMap[$name] = $number;
                     }
-                }
-                // Set first series as primary for backward compatibility
-                if (!empty($series[0])) {
-                    $seriesName = $series[0]['name'] ?? '';
-                    $seriesNumber = $series[0]['pivot']['series_number'] ?? null;
                 }
             } elseif (is_array($series) && isset($series['name'])) {
                 // Single series object
+                $seriesData = [
+                    'id' => $series['id'] ?? null,
+                    'name' => $series['name'] ?? '',
+                    'is_collection' => $series['is_collection'] ?? false,
+                ];
                 $seriesName = $series['name'];
                 $seriesNumber = $series['pivot']['series_number'] ?? null;
-                $seriesData[$seriesName] = $seriesNumber;
+                $seriesMap[$seriesName] = $seriesNumber;
             }
         }
 
@@ -189,33 +232,52 @@ trait HandlesLibraryJson
         $updatedAt = $book['updated_at'] ?? $book['updatedAt'] ?? null;
 
         return [
+            'id' => $book['id'] ?? null,
+            'title' => $book['title'] ?? '',
+            'description' => $book['description'] ?? null,
+            'isbn' => $book['isbn'] ?? null,
+            'release_date' => $book['release_date'] ?? $book['releaseDate'] ?? null,
+            'language' => $book['language'] ?? 'english',
+            'duration' => $book['duration'] ?? null,
+            'cover_image' => $book['cover_image'] ?? $book['coverImage'] ?? null,
             'directoryPath' => $relativePath,
-            'genre' => $genres,
-            'author' => $authors,
+            'audioFileCount' => $book['audio_file_count'] ?? $book['audioFileCount'] ?? 0,
+            'durationFormatted' => $book['duration_formatted'] ?? $book['durationFormatted'] ?? null,
+            'needsReview' => $book['needs_review'] ?? $book['needsReview'] ?? false,
+            'dateAdded' => $createdAt,
+            'source' => $book['source'] ?? 'manual',
+            'fileTags' => $book['file_tags'] ?? $book['fileTags'] ?? null,
+            'runtime' => $book['duration'] ? round($book['duration'] / 60, 1) : null,
+            'created_at' => $createdAt,
+            'updated_at' => $updatedAt,
+
+            // New format with full objects
+            'authors' => $authors,
+            'narrators' => $narrators,
+            'genres' => $genres,
             'series' => $seriesData,
+            'publisher' => $publisherData,
+
+            // Legacy format for backward compatibility
+            'author' => !empty($authorNames) ? $authorNames : [],
+            'narrator' => !empty($narratorNames) ? $narratorNames : [],
+            'genre' => !empty($genreNames) ? $genreNames : [],
             'seriesName' => $seriesName,
             'seriesNumber' => $seriesNumber,
             'series_number' => $seriesNumber,
-            'title' => $book['title'] ?? '',
-            'audioFileCount' => $book['audio_file_count'] ?? $book['audioFileCount'] ?? 0,
-            'duration' => $book['duration'] ?? null,
-            'durationFormatted' => $book['duration_formatted'] ?? $book['durationFormatted'] ?? null,
-            'fileTags' => $book['file_tags'] ?? $book['fileTags'] ?? null,
-            'needsReview' => $book['needs_review'] ?? $book['needsReview'] ?? false,
-            'coverImage' => $book['cover_image'] ?? $book['coverImage'] ?? null,
-            'dateAdded' => $createdAt,
-            'source' => $book['source'] ?? 'manual',
-            'id' => $book['id'] ?? null,
+            'seriesMap' => $seriesMap,
+
+            // Legacy audible fields
             'audibleAuthors' => [],
             'audibleNarrators' => [],
-            'narrator' => $narrators,
             'audibleCoverImageUrl' => null,
-            'description' => $book['description'] ?? null,
-            'releaseDate' => $book['release_date'] ?? $book['releaseDate'] ?? null,
-            'runtime' => $book['duration'] ? round($book['duration'] / 60, 1) : null,
-            'publisher' => !empty($publishers) ? $publishers[0] : null,
-            'language' => $book['language'] ?? 'english',
             'audibleCoverPath' => null,
+
+            // Metadata
+            'metadata' => [
+                'version' => '1.0',
+                'updated_at' => $updatedAt,
+            ],
         ];
     }
 }

@@ -26,11 +26,14 @@
                         <td>{{ $request['email'] }}</td>
                         <td>{{ $request['status'] }}</td>
                         <td>
-                            <form action="{{ route('admin.account_requests.update', ['account_request' => $request['id']]) }}" method="POST" style="display:inline;">
+                            <form action="{{ route('admin.account_requests.update', ['account_request' => $request['id']]) }}"
+                                method="POST" style="display:inline;">
                                 @csrf
                                 <button type="submit" class="btn btn-success btn-sm">Approve</button>
                             </form>
-                            <form action="{{ route('admin.account_requests.destroy', ['account_request' => $request['id']]) }}" method="POST" style="display:inline;">
+                            <form action="{{ route('admin.account_requests.destroy', ['account_request' => $request['id']]) }}"
+                                method="POST" style="display:inline;"
+                                onsubmit="return confirm('Are you sure you want to reject the request from &quot;{{ $request['name'] }}&quot;?')">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-danger btn-sm">Reject</button>

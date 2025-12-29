@@ -41,7 +41,7 @@ class AIBookProcessor
             'pricing' => [
                 'input_tokens_per_million' => 0.10,   // Official: $0.10 per 1M input tokens (text/image/video)
                 'output_tokens_per_million' => 0.40,  // Official: $0.40 per 1M output tokens
-            ]
+            ],
         ],
         'gemini-2.0-flash-lite' => [
             'free' => [
@@ -59,7 +59,7 @@ class AIBookProcessor
             'pricing' => [
                 'input_tokens_per_million' => 0.075,  // Official: $0.075 per 1M input tokens
                 'output_tokens_per_million' => 0.30,  // Official: $0.30 per 1M output tokens
-            ]
+            ],
         ],
         'gemini-2.5-flash' => [
             'free' => [
@@ -77,7 +77,7 @@ class AIBookProcessor
             'pricing' => [
                 'input_tokens_per_million' => 0.30,   // Official: $0.30 per 1M input tokens (text/image/video)
                 'output_tokens_per_million' => 2.50,  // Official: $2.50 per 1M output tokens
-            ]
+            ],
         ],
         'gemini-2.5-flash-lite' => [
             'free' => [
@@ -95,7 +95,7 @@ class AIBookProcessor
             'pricing' => [
                 'input_tokens_per_million' => 0.10,   // Official: $0.10 per 1M input tokens (text/image/video)
                 'output_tokens_per_million' => 0.40,  // Official: $0.40 per 1M output tokens
-            ]
+            ],
         ],
         'gemini-2.5-pro' => [
             'free' => [
@@ -113,7 +113,7 @@ class AIBookProcessor
             'pricing' => [
                 'input_tokens_per_million' => 1.25,   // Official: $1.25 per 1M (≤200K tokens), $2.50 (>200K tokens)
                 'output_tokens_per_million' => 10.00, // Official: $10.00 per 1M (≤200K tokens), $15.00 (>200K tokens)
-            ]
+            ],
         ],
 
         // Claude Models (Anthropic)
@@ -128,7 +128,7 @@ class AIBookProcessor
             'pricing' => [
                 'input_tokens_per_million' => 0.80,   // Official: $0.80 per 1M input tokens
                 'output_tokens_per_million' => 4.00,  // Official: $4.00 per 1M output tokens
-            ]
+            ],
         ],
         'claude-3-5-sonnet' => [
             'free' => null, // No free tier for Claude API
@@ -141,7 +141,7 @@ class AIBookProcessor
             'pricing' => [
                 'input_tokens_per_million' => 3.00,   // Official: $3.00 per 1M input tokens
                 'output_tokens_per_million' => 15.00, // Official: $15.00 per 1M output tokens
-            ]
+            ],
         ],
         'claude-4-sonnet' => [
             'free' => null, // No free tier for Claude API
@@ -154,7 +154,7 @@ class AIBookProcessor
             'pricing' => [
                 'input_tokens_per_million' => 3.00,   // Official: $3.00 per 1M input tokens
                 'output_tokens_per_million' => 15.00, // Official: $15.00 per 1M output tokens
-            ]
+            ],
         ],
         'claude-4-opus' => [
             'free' => null, // No free tier for Claude API
@@ -167,7 +167,7 @@ class AIBookProcessor
             'pricing' => [
                 'input_tokens_per_million' => 15.00,  // Official: $15.00 per 1M input tokens
                 'output_tokens_per_million' => 75.00, // Official: $75.00 per 1M output tokens
-            ]
+            ],
         ],
 
         // OpenAI Models (ChatGPT)
@@ -182,7 +182,7 @@ class AIBookProcessor
             'pricing' => [
                 'input_tokens_per_million' => 0.15,   // Official: $0.15 per 1M input tokens
                 'output_tokens_per_million' => 0.60,  // Official: $0.60 per 1M output tokens
-            ]
+            ],
         ],
         'gpt-4o' => [
             'free' => null, // No free tier for OpenAI API
@@ -195,7 +195,7 @@ class AIBookProcessor
             'pricing' => [
                 'input_tokens_per_million' => 2.50,   // Official: $2.50 per 1M input tokens
                 'output_tokens_per_million' => 10.00, // Official: $10.00 per 1M output tokens
-            ]
+            ],
         ],
         'gpt-4-turbo' => [
             'free' => null, // No free tier for OpenAI API
@@ -208,7 +208,7 @@ class AIBookProcessor
             'pricing' => [
                 'input_tokens_per_million' => 10.00,  // Official: $10.00 per 1M input tokens
                 'output_tokens_per_million' => 30.00, // Official: $30.00 per 1M output tokens
-            ]
+            ],
         ],
         'gpt-3.5-turbo' => [
             'free' => null, // No free tier for OpenAI API
@@ -221,8 +221,8 @@ class AIBookProcessor
             'pricing' => [
                 'input_tokens_per_million' => 0.50,   // Official: $0.50 per 1M input tokens
                 'output_tokens_per_million' => 1.50,  // Official: $1.50 per 1M output tokens
-            ]
-        ]
+            ],
+        ],
     ];
 
     public function __construct(?string $model = null, bool $paidTier = false)
@@ -266,7 +266,10 @@ class AIBookProcessor
         $tier = $this->paidTier ? 'paid' : 'free';
 
         // Claude and OpenAI models don't have free tier
-        if (($this->provider === 'claude' || $this->provider === 'openai') && !$this->modelConfigs[$this->model]['paid']) {
+        if (
+            ($this->provider === 'claude' || $this->provider === 'openai') &&
+            !$this->modelConfigs[$this->model]['paid']
+        ) {
             throw new \InvalidArgumentException("{$this->provider} models require paid tier access");
         }
 
@@ -319,7 +322,7 @@ class AIBookProcessor
 
         $withinMinuteLimit = $minuteRequests < $this->modelLimits['requests_per_minute'];
         $withinDailyLimit = $this->modelLimits['requests_per_day'] === null ||
-                           $dailyRequests < $this->modelLimits['requests_per_day'];
+            $dailyRequests < $this->modelLimits['requests_per_day'];
 
         return $withinMinuteLimit && $withinDailyLimit;
     }
@@ -362,8 +365,12 @@ class AIBookProcessor
     /**
      * Process a book directory and extract metadata using AI
      */
-    public function processBookDirectory(string $directoryPath, array $fileNames = [], array $fileTags = [], array $nfoData = null): array
-    {
+    public function processBookDirectory(
+        string $directoryPath,
+        array $fileNames = [],
+        array $fileTags = [],
+        array $nfoData = null
+    ): array {
         try {
             // Check rate limits before making request
             $this->respectRateLimit();
@@ -375,7 +382,7 @@ class AIBookProcessor
         } catch (\Exception $e) {
             Log::error("{$this->provider} book processing failed", [
                 'directory' => $directoryPath,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
 
             return $this->getFallbackMetadata($directoryPath, $fileNames, $fileTags);
@@ -385,8 +392,12 @@ class AIBookProcessor
     /**
      * Build the prompt for AI API (optimized for free tier)
      */
-    protected function buildPrompt(string $directoryPath, array $fileNames, array $fileTags, array $nfoData = null): string
-    {
+    protected function buildPrompt(
+        string $directoryPath,
+        array $fileNames,
+        array $fileTags,
+        array $nfoData = null
+    ): string {
         $prompt = "Extract audiobook metadata from this data and return JSON only:\n\n";
 
         $prompt .= "Directory: {$directoryPath}\n";
@@ -438,11 +449,14 @@ class AIBookProcessor
             }
         }
 
-        $prompt .= "\nReturn JSON with these fields: title, author, narrator, series{name,number}, genre, year, publisher, language, isbn, confidence (0-100).\n";
-        $prompt .= "Clean titles (remove file artifacts, bitrates, sizes). Separate authors from narrators. Extract series info from patterns.\n";
+        $prompt .= "\nReturn JSON with these fields: title, author, narrator, series{name,number}, genre, " .
+            "year, publisher, language, isbn, confidence (0-100).\n";
+        $prompt .= "Clean titles (remove file artifacts, bitrates, sizes). Separate authors from narrators. " .
+            "Extract series info from patterns.\n";
 
         if (!empty($nfoData)) {
-            $prompt .= "CRITICAL: The NFO file data above is AUTHORITATIVE - use it as the primary source. Only supplement with other data if NFO fields are missing.\n";
+            $prompt .= "CRITICAL: The NFO file data above is AUTHORITATIVE - use it as the primary source. " .
+                "Only supplement with other data if NFO fields are missing.\n";
         }
 
         $prompt .= "CRITICAL INSTRUCTION: You are analyzing ONE COMPLETE AUDIOBOOK, not individual chapters. \n";
@@ -457,10 +471,12 @@ class AIBookProcessor
         $prompt .= "  * Series Name = ParentDir (e.g., 'The Forgotten Five')\n";
         $prompt .= "  * Series Number = N (e.g., 3)\n";
         $prompt .= "  * Book Title = BookTitle without the leading number (e.g., 'Rebel Undercover' not '3 Rebel Undercover')\n";
-        $prompt .= "- Example: '/The Forgotten Five/3 Rebel Undercover' → Title: 'Rebel Undercover', Series: 'The Forgotten Five' #3\n";
+        $prompt .= "- Example: '/The Forgotten Five/3 Rebel Undercover' → Title: 'Rebel Undercover', " .
+            "Series: 'The Forgotten Five' #3\n";
         $prompt .= "- Example: '/Harry Potter/1 Philosopher's Stone' → Title: 'Philosopher's Stone', Series: 'Harry Potter' #1\n";
         $prompt .= "- IGNORE generic ID3 tags like 'Unknown Book-PartN', 'Track N', 'Untitled' - use directory structure instead\n";
-        $prompt .= "- Always remove leading numbers/dashes from title (e.g., '3 Title' → 'Title', '01 - Title' → 'Title')\n\n";
+        $prompt .= "- Always remove leading numbers/dashes from title " .
+            "(e.g., '3 Title' → 'Title', '01 - Title' → 'Title')\n\n";
 
         $prompt .= "IMPORTANT: For genre, choose the MOST SPECIFIC literary genre that fits the content. Valid genres are:\n";
         $prompt .= "Kids, Religion, General Fiction, Church, Science, Historical Fiction, Computer, Classic, History, Non Fiction, Action, LitRPG, Romance, Science Fiction, Other, Fantasy\n";
@@ -494,7 +510,7 @@ class AIBookProcessor
         } catch (GuzzleException $e) {
             Log::error("{$this->provider} API call failed", [
                 'error' => $e->getMessage(),
-                'code' => $e->getCode()
+                'code' => $e->getCode(),
             ]);
 
             return ['success' => false, 'error' => $e->getMessage()];
@@ -517,41 +533,41 @@ class AIBookProcessor
     protected function callGeminiAPI(string $prompt, int $estimatedInputTokens, int $estimatedOutputTokens): array
     {
         $response = $this->client->post($this->getApiUrl(), [
-                'query' => ['key' => $this->apiKey],
-                'json' => [
-                    'contents' => [
-                        [
-                            'parts' => [
-                                ['text' => $prompt]
-                            ]
-                        ]
+            'query' => ['key' => $this->apiKey],
+            'json' => [
+                'contents' => [
+                    [
+                        'parts' => [
+                            ['text' => $prompt],
+                        ],
                     ],
-                    'generationConfig' => [
-                        'temperature' => 0.1, // Low temperature for consistent results
-                        'topK' => 1,
-                        'topP' => 0.8,
-                        'maxOutputTokens' => $this->modelLimits['max_output_tokens'],
+                ],
+                'generationConfig' => [
+                    'temperature' => 0.1, // Low temperature for consistent results
+                    'topK' => 1,
+                    'topP' => 0.8,
+                    'maxOutputTokens' => $this->modelLimits['max_output_tokens'],
+                ],
+                'safetySettings' => [
+                    [
+                        'category' => 'HARM_CATEGORY_HARASSMENT',
+                        'threshold' => 'BLOCK_MEDIUM_AND_ABOVE',
                     ],
-                    'safetySettings' => [
-                        [
-                            'category' => 'HARM_CATEGORY_HARASSMENT',
-                            'threshold' => 'BLOCK_MEDIUM_AND_ABOVE'
-                        ],
-                        [
-                            'category' => 'HARM_CATEGORY_HATE_SPEECH',
-                            'threshold' => 'BLOCK_MEDIUM_AND_ABOVE'
-                        ],
-                        [
-                            'category' => 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-                            'threshold' => 'BLOCK_MEDIUM_AND_ABOVE'
-                        ],
-                        [
-                            'category' => 'HARM_CATEGORY_DANGEROUS_CONTENT',
-                            'threshold' => 'BLOCK_MEDIUM_AND_ABOVE'
-                        ]
-                    ]
-                ]
-            ]);
+                    [
+                        'category' => 'HARM_CATEGORY_HATE_SPEECH',
+                        'threshold' => 'BLOCK_MEDIUM_AND_ABOVE',
+                    ],
+                    [
+                        'category' => 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+                        'threshold' => 'BLOCK_MEDIUM_AND_ABOVE',
+                    ],
+                    [
+                        'category' => 'HARM_CATEGORY_DANGEROUS_CONTENT',
+                        'threshold' => 'BLOCK_MEDIUM_AND_ABOVE',
+                    ],
+                ],
+            ],
+        ]);
 
         $body = json_decode($response->getBody(), true);
 
@@ -582,9 +598,9 @@ class AIBookProcessor
             'messages' => [
                 [
                     'role' => 'user',
-                    'content' => $prompt
-                ]
-            ]
+                    'content' => $prompt,
+                ],
+            ],
         ]);
 
         if (isset($response['content'][0]['text'])) {
@@ -615,8 +631,8 @@ class AIBookProcessor
             'messages' => [
                 [
                     'role' => 'user',
-                    'content' => $prompt
-                ]
+                    'content' => $prompt,
+                ],
             ],
             'max_tokens' => $this->modelLimits['max_output_tokens'],
             'temperature' => 0.1, // Low temperature for consistent results
@@ -659,7 +675,7 @@ class AIBookProcessor
         if (json_last_error() !== JSON_ERROR_NONE) {
             Log::warning("Failed to parse {$this->provider} JSON response", [
                 'response' => $jsonText,
-                'json_error' => json_last_error_msg()
+                'json_error' => json_last_error_msg(),
             ]);
             throw new \Exception('Failed to parse AI response as JSON');
         }
@@ -677,23 +693,23 @@ class AIBookProcessor
             'author' => $this->normalizeStringOrArray($metadata['author'] ?? []),
             'narrator' => $this->normalizeStringOrArray($metadata['narrator'] ?? []),
             'genre' => $this->normalizeStringOrArray($metadata['genre'] ?? []),
-            'year' => isset($metadata['year']) ? (int)$metadata['year'] : null,
+            'year' => isset($metadata['year']) ? (int) $metadata['year'] : null,
             'description' => $metadata['description'] ?? null,
             'publisher' => $metadata['publisher'] ?? null,
             'duration' => $metadata['duration'] ?? '00:00:00',
             'language' => $metadata['language'] ?? 'en',
             'isbn' => $metadata['isbn'] ?? null,
-            'confidence' => isset($metadata['confidence']) ? (int)$metadata['confidence'] : 50,
+            'confidence' => isset($metadata['confidence']) ? (int) $metadata['confidence'] : 50,
             'series' => null,
             'series_number' => null,
             'ai_processed' => true,
-            'processed_at' => now()->toISOString()
+            'processed_at' => now()->toISOString(),
         ];
 
         // Handle series information
         if (isset($metadata['series']) && is_array($metadata['series'])) {
             $normalized['series'] = $metadata['series']['name'] ?? null;
-            $normalized['series_number'] = isset($metadata['series']['number']) ? (int)$metadata['series']['number'] : null;
+            $normalized['series_number'] = isset($metadata['series']['number']) ? (int) $metadata['series']['number'] : null;
             $normalized['is_collection'] = $metadata['series']['is_collection'] ?? false;
         }
 
@@ -731,7 +747,7 @@ class AIBookProcessor
                 'adjusted' => $normalized['confidence'],
                 'penalty' => $confidencePenalty,
                 'has_author' => $hasAuthor,
-                'has_narrator' => $hasNarrator
+                'has_narrator' => $hasNarrator,
             ]);
         }
 
@@ -802,7 +818,7 @@ class AIBookProcessor
             'author' => !empty($firstFileTags['artist']) ? [$firstFileTags['artist']] : [],
             'narrator' => [],
             'genre' => !empty($firstFileTags['genre']) ? [$firstFileTags['genre']] : [],
-            'year' => !empty($firstFileTags['year']) ? (int)$firstFileTags['year'] : null,
+            'year' => !empty($firstFileTags['year']) ? (int) $firstFileTags['year'] : null,
             'description' => null,
             'publisher' => null,
             'duration' => '00:00:00',
@@ -812,7 +828,7 @@ class AIBookProcessor
             'series' => null,
             'series_number' => null,
             'ai_processed' => false,
-            'processed_at' => now()->toISOString()
+            'processed_at' => now()->toISOString(),
         ];
     }
 
@@ -903,7 +919,7 @@ class AIBookProcessor
         } catch (\Exception $e) {
             Log::warning('Failed to extract audio file tags', [
                 'file' => $filePath,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
         }
 
@@ -964,7 +980,7 @@ class AIBookProcessor
             return [
                 'total_cost' => 0.0,
                 'cost_per_book' => 0.0,
-                'tier' => 'free'
+                'tier' => 'free',
             ];
         }
 
@@ -1003,7 +1019,7 @@ class AIBookProcessor
             'tier' => $this->paidTier ? 'paid' : 'free',
             'limits' => $this->modelLimits,
             'pricing' => $this->paidTier ? $this->modelPricing : null,
-            'total_cost' => $this->getTotalCost()
+            'total_cost' => $this->getTotalCost(),
         ];
     }
 
@@ -1029,7 +1045,7 @@ class AIBookProcessor
             Log::info("Starting audio transcription", [
                 'file' => $audioFilePath,
                 'hint' => $directoryHint,
-                'file_size' => filesize($audioFilePath)
+                'file_size' => filesize($audioFilePath),
             ]);
 
             // Check rate limits before making request
@@ -1061,7 +1077,7 @@ class AIBookProcessor
         } catch (\Exception $e) {
             Log::error("Audio analysis failed", [
                 'file' => $audioFilePath,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
             return null;
         }
@@ -1078,7 +1094,7 @@ class AIBookProcessor
                 'file_exists' => file_exists($audioFilePath),
                 'file_size' => file_exists($audioFilePath) ? filesize($audioFilePath) : 'N/A',
                 'provider' => $this->provider,
-                'model' => $this->model
+                'model' => $this->model,
             ]);
 
             if (!file_exists($audioFilePath)) {
@@ -1092,19 +1108,19 @@ class AIBookProcessor
                 return null;
             }
 
-            // Extract first 120 seconds (2 minutes) if file is too large
+            // Extract first 45 seconds if file is too large
             // The intro typically contains "Written by...", "Narrated by..." metadata
             $maxSize = $this->getAudioFileSizeLimit();
             $needsExtraction = $fileSize > $maxSize;
 
             if ($needsExtraction) {
-                Log::info("Audio file too large, extracting first 120 seconds", [
+                Log::info("Audio file too large, extracting first 45 seconds", [
                     'file' => basename($audioFilePath),
                     'original_size_mb' => round($fileSize / (1024 * 1024), 2),
-                    'max_size_mb' => round($maxSize / (1024 * 1024), 2)
+                    'max_size_mb' => round($maxSize / (1024 * 1024), 2),
                 ]);
 
-                $audioFilePath = $this->extractAudioClip($audioFilePath, 120);
+                $audioFilePath = $this->extractAudioClip($audioFilePath, 45);
                 if (!$audioFilePath || !file_exists($audioFilePath)) {
                     Log::error("Failed to extract audio clip");
                     return null;
@@ -1113,7 +1129,7 @@ class AIBookProcessor
                 $fileSize = filesize($audioFilePath);
                 Log::info("Extracted audio clip", [
                     'new_file' => basename($audioFilePath),
-                    'new_size_mb' => round($fileSize / (1024 * 1024), 2)
+                    'new_size_mb' => round($fileSize / (1024 * 1024), 2),
                 ]);
             }
 
@@ -1122,7 +1138,7 @@ class AIBookProcessor
 
             Log::info("Sending audio file to {$this->provider} API", [
                 'file' => basename($audioFilePath),
-                'size_mb' => round($fileSize / (1024 * 1024), 2)
+                'size_mb' => round($fileSize / (1024 * 1024), 2),
             ]);
 
             // Use the configured AI provider for audio transcription
@@ -1143,7 +1159,7 @@ class AIBookProcessor
                 'file' => $audioFilePath,
                 'provider' => $this->provider,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
             return null;
         }
@@ -1190,24 +1206,24 @@ class AIBookProcessor
                         [
                             'parts' => [
                                 [
-                                    'text' => 'Please transcribe this audio file. This is the beginning of an audiobook where the title, author, and narrator are typically announced. Return only the transcribed text, no additional formatting or commentary.'
+                                    'text' => 'Please transcribe this audio file. This is the beginning of an audiobook where the title, author, and narrator are typically announced. Return only the transcribed text, no additional formatting or commentary.',
                                 ],
                                 [
                                     'inline_data' => [
                                         'mime_type' => $mimeType,
-                                        'data' => $base64Audio
-                                    ]
-                                ]
-                            ]
-                        ]
+                                        'data' => $base64Audio,
+                                    ],
+                                ],
+                            ],
+                        ],
                     ],
                     'generationConfig' => [
                         'temperature' => 0.1,
                         'topK' => 1,
                         'topP' => 0.8,
                         'maxOutputTokens' => $this->modelLimits['max_output_tokens'],
-                    ]
-                ]
+                    ],
+                ],
             ]);
 
             $body = json_decode($response->getBody(), true);
@@ -1217,7 +1233,7 @@ class AIBookProcessor
 
                 Log::info("Gemini audio transcription completed", [
                     'transcription_length' => strlen($transcription),
-                    'preview' => substr($transcription, 0, 100)
+                    'preview' => substr($transcription, 0, 100),
                 ]);
 
                 return $transcription;
@@ -1228,7 +1244,7 @@ class AIBookProcessor
         } catch (\Exception $e) {
             Log::error("Gemini audio transcription failed", [
                 'error' => $e->getMessage(),
-                'file' => $audioFilePath
+                'file' => $audioFilePath,
             ]);
             return null;
         }
@@ -1264,14 +1280,14 @@ class AIBookProcessor
 
             Log::info("OpenAI Whisper transcription completed", [
                 'transcription_length' => strlen($response),
-                'preview' => substr($response, 0, 100)
+                'preview' => substr($response, 0, 100),
             ]);
 
             return trim($response);
         } catch (\Exception $e) {
             Log::error("OpenAI Whisper transcription failed", [
                 'error' => $e->getMessage(),
-                'file' => $audioFilePath
+                'file' => $audioFilePath,
             ]);
             return null;
         }
@@ -1283,7 +1299,7 @@ class AIBookProcessor
     /**
      * Extract a clip from an audio file using ffmpeg
      */
-    protected function extractAudioClip(string $audioFilePath, int $durationSeconds = 120): ?string
+    protected function extractAudioClip(string $audioFilePath, int $durationSeconds = 45): ?string
     {
         try {
             // Create temp file for the extracted clip
@@ -1301,7 +1317,7 @@ class AIBookProcessor
 
             Log::info("Executing ffmpeg command", [
                 'command' => $command,
-                'duration' => $durationSeconds
+                'duration' => $durationSeconds,
             ]);
 
             exec($command, $output, $returnCode);
@@ -1311,21 +1327,21 @@ class AIBookProcessor
                     'return_code' => $returnCode,
                     'output' => implode("\n", $output),
                     'output_file' => $outputFile,
-                    'file_exists' => file_exists($outputFile)
+                    'file_exists' => file_exists($outputFile),
                 ]);
                 return null;
             }
 
             Log::info("Audio clip extracted successfully", [
                 'output_file' => $outputFile,
-                'size' => filesize($outputFile)
+                'size' => filesize($outputFile),
             ]);
 
             return $outputFile;
         } catch (\Exception $e) {
             Log::error("Failed to extract audio clip", [
                 'file' => $audioFilePath,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
             return null;
         }

@@ -6,6 +6,7 @@ namespace Tests\Unit\Services;
 
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Services\BookFilesystemService;
+use App\Services\BookPathService;
 use Mockery;
 use org\bovigo\vfs\vfsStream;
 use PHPUnit\Framework\Attributes\Test;
@@ -68,7 +69,11 @@ class BookFilesystemServiceTest extends TestCase
             ->once()
             ->with('book-1', ['directoryPath' => 'Fiction/NewName']);
 
-        $service = new BookFilesystemService($documentStore);
+        $bookPathService = Mockery::mock(BookPathService::class);
+        $bookPathService->shouldReceive('getBookRoot')
+            ->andReturn(vfsStream::url('testRoot/books'));
+
+        $service = new BookFilesystemService($documentStore, $bookPathService);
 
         $result = $service->renameItem('Fiction/OldName', 'NewName');
 

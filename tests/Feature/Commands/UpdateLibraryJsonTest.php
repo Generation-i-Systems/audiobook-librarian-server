@@ -71,12 +71,18 @@ class UpdateLibraryJsonTest extends TestCase
         $book->authors()->attach($author->id);
         $book->genres()->attach($genre->id);
 
+        $jsonPath = Storage::disk('books')->path($bookDir . '/librarian.json');
+
+        // Observer may have created the file, delete it to test dry-run behavior
+        if (file_exists($jsonPath)) {
+            unlink($jsonPath);
+        }
+
         $this->artisan('books:update-json', [
             '--book-id' => $book->id,
             '--dry-run' => true,
         ])->assertExitCode(0);
 
-        $jsonPath = Storage::disk('books')->path($bookDir . '/librarian.json');
         $this->assertFileDoesNotExist($jsonPath);
     }
 
@@ -122,7 +128,7 @@ class UpdateLibraryJsonTest extends TestCase
             '--book-id' => $book->id,
             '--no-confirm' => true,
         ])->assertExitCode(0)
-            ->expectsOutput('Skipped: 1');
+            ->expectsOutput('No field differences detected. All books are already in sync.');
     }
 
     public function testUpdateJsonCommandWithMultipleBooks()
