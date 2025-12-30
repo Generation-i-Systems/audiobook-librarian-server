@@ -103,9 +103,9 @@ class GenreMappingServiceTest extends TestCase
     /** @test */
     public function it_defaults_to_general_fiction()
     {
-        $this->assertEquals('General Fiction', $this->service->mapToPrimaryGenre('Unknown Genre'));
-        $this->assertEquals('General Fiction', $this->service->mapToPrimaryGenre('Fiction'));
-        $this->assertEquals('General Fiction', $this->service->mapToPrimaryGenre('Contemporary:Fiction'));
+        $this->assertEquals('Other', $this->service->mapToPrimaryGenre('Unknown Genre'));
+        $this->assertEquals('Other', $this->service->mapToPrimaryGenre('Fiction'));
+        $this->assertEquals('Other', $this->service->mapToPrimaryGenre('Contemporary:Fiction'));
     }
 
     /** @test */

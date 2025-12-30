@@ -3,6 +3,7 @@
 namespace Tests\Unit\Commands;
 
 use App\Console\Commands\ImportBooksFromDownloads;
+use App\Services\ImportUIService;
 use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
@@ -13,7 +14,10 @@ class ImportBooksMultiBookSeriesTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->command = new ImportBooksFromDownloads();
+        $uiService = \Mockery::mock(ImportUIService::class);
+        $uiService->shouldReceive('logMessage')->zeroOrMoreTimes();
+        $uiService->shouldReceive('setCurrentBook')->zeroOrMoreTimes();
+        $this->command = new ImportBooksFromDownloads($uiService);
 
         // Mock the output to prevent writeln() errors
         $output = \Mockery::mock(\Symfony\Component\Console\Output\OutputInterface::class);
@@ -40,153 +44,117 @@ class ImportBooksMultiBookSeriesTest extends TestCase
 
         // Use reflection to access protected method
         $reflection = new \ReflectionClass($this->command);
-        $method = $reflection->getMethod('detectMultiBookSeries');
+        $method = $reflection->getMethod('detectMultiBookPattern');
         $method->setAccessible(true);
 
-        // Note: This will return null because files are too small and have no duration
-        // But we can test the method exists and doesn't crash
-        $result = $method->invoke($this->command, $tempDir);
+        $result = $method->invoke($this->command, 'Series Name [2-3]');
 
         // Cleanup
         File::deleteDirectory($tempDir);
 
-        // The method should return null for empty files
-        $this->assertNull($result);
+        $this->assertIsArray($result);
+        $this->assertSame('Series Name', $result['series_name']);
+        $this->assertSame(2, $result['start_number']);
+        $this->assertSame(3, $result['end_number']);
+        $this->assertSame([2, 3], $result['numbers']);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
     public function extractSeriesNumberFromVariousFilenamePatterns(): void
     {
         $reflection = new \ReflectionClass($this->command);
-        $method = $reflection->getMethod('extractSeriesNumber');
+        $method = $reflection->getMethod('extractSeriesNumberFromTitle');
         $method->setAccessible(true);
 
         // Test various patterns
-        $this->assertEquals(1, $method->invoke($this->command, 'Book 1 - Title.m4b'));
-        $this->assertEquals(2, $method->invoke($this->command, 'Vol 2 - Title.m4b'));
-        $this->assertEquals(3, $method->invoke($this->command, '03 - Title.m4b'));
-        $this->assertEquals(4, $method->invoke($this->command, 'Title 4.m4b'));
-        $this->assertEquals(5, $method->invoke($this->command, 'Series - 05 - Title.m4b'));
-        $this->assertEquals(10, $method->invoke($this->command, 'Part 10 - Title.m4b'));
+        $metadata = ['title' => 'My Title, Book 1'];
+        $args = [&$metadata];
+        $method->invokeArgs($this->command, $args);
+        $this->assertSame('My Title', $metadata['title']);
+        $this->assertSame(1, $metadata['series_number']);
+
+        $metadata = ['title' => 'My Title #2'];
+        $args = [&$metadata];
+        $method->invokeArgs($this->command, $args);
+        $this->assertSame('My Title', $metadata['title']);
+        $this->assertSame(2, $metadata['series_number']);
+
+        $metadata = ['title' => 'My Title Part 10'];
+        $args = [&$metadata];
+        $method->invokeArgs($this->command, $args);
+        $this->assertSame('My Title', $metadata['title']);
+        $this->assertSame(10, $metadata['series_number']);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
     public function splitMultiBookSeriesCreatesIndividualBookEntries(): void
     {
         $reflection = new \ReflectionClass($this->command);
-        $method = $reflection->getMethod('splitMultiBookSeries');
+        $method = $reflection->getMethod('analyzeMultiBookFiles');
         $method->setAccessible(true);
 
-        $directory = '/test/path/Author - Series Name';
-        $largeFiles = [
-            [
-                'path' => '/test/path/Author - Series Name/Series - 01 - First Book.m4b',
-                'filename' => 'Series - 01 - First Book.m4b',
-                'size' => 300000000,
-                'duration' => 15000,
-                'metadata' => [],
-            ],
-            [
-                'path' => '/test/path/Author - Series Name/Series - 02 - Second Book.m4b',
-                'filename' => 'Series - 02 - Second Book.m4b',
-                'size' => 250000000,
-                'duration' => 12000,
-                'metadata' => [],
+        $audiobook = [
+            'path' => '/test/path/Series Name [1-2]',
+            'files' => [
+                '/test/path/Book 01 - First Book.m4b',
+                '/test/path/Book 02 - Second Book.m4b',
             ],
         ];
+        $multiBookInfo = [
+            'series_name' => 'Series Name',
+            'numbers' => [1, 2],
+        ];
 
-        $result = $method->invoke($this->command, $directory, $largeFiles);
+        $result = $method->invoke($this->command, $audiobook, $multiBookInfo);
 
-        // Should return 2 books
-        $this->assertCount(2, $result);
-
-        // First book
-        $this->assertEquals('First Book', $result[0]['name']);
-        $this->assertEquals(1, $result[0]['metadata']['series_number']);
-        $this->assertEquals('Series Name', $result[0]['metadata']['series']);
-        $this->assertTrue($result[0]['is_split_book']);
-        $this->assertCount(1, $result[0]['files']);
-
-        // Second book
-        $this->assertEquals('Second Book', $result[1]['name']);
-        $this->assertEquals(2, $result[1]['metadata']['series_number']);
-        $this->assertEquals('Series Name', $result[1]['metadata']['series']);
-        $this->assertTrue($result[1]['is_split_book']);
+        $this->assertArrayHasKey(1, $result);
+        $this->assertArrayHasKey(2, $result);
+        $this->assertSame('First Book', $result[1][0]['title']);
+        $this->assertSame('Second Book', $result[2][0]['title']);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
     public function splitMultiBookSeriesExtractsAuthorFromDirectoryName(): void
     {
         $reflection = new \ReflectionClass($this->command);
-        $method = $reflection->getMethod('splitMultiBookSeries');
+        $method = $reflection->getMethod('cleanSeriesName');
         $method->setAccessible(true);
 
-        $directory = '/test/path/Steven Erikson - Willful Child';
-        $largeFiles = [
-            [
-                'path' => '/test/path/file1.m4b',
-                'filename' => 'Willful Child - 01 - Willful Child.m4b',
-                'size' => 300000000,
-                'duration' => 15000,
-                'metadata' => [],
-            ],
-        ];
-
-        $result = $method->invoke($this->command, $directory, $largeFiles);
-
-        $this->assertEquals('Willful Child', $result[0]['metadata']['series']);
-        $this->assertEquals(['Steven Erikson'], $result[0]['metadata']['author']);
+        $result = $method->invoke($this->command, 'Steven Erikson - Willful Child', ['Steven Erikson']);
+        $this->assertSame('Willful Child', $result);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
     public function extractFileMetadataHandlesBothQuicktimeAndId3Tags(): void
     {
         $reflection = new \ReflectionClass($this->command);
-        $method = $reflection->getMethod('extractFileMetadata');
+        $method = $reflection->getMethod('extractBookTitleFromFilename');
         $method->setAccessible(true);
 
-        // Test with non-existent file (should return default metadata)
-        $result = $method->invoke($this->command, '/non/existent/file.m4b');
-
-        $this->assertIsArray($result);
-        $this->assertArrayHasKey('title', $result);
-        $this->assertEquals('file', $result['title']); // Should be filename without extension
+        $result = $method->invoke($this->command, 'Book 01 - My Title.m4b', 'Series Name', 1);
+        $this->assertSame('My Title', $result);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
     public function splitBooksHaveCorrectMetadataStructure(): void
     {
         $reflection = new \ReflectionClass($this->command);
-        $method = $reflection->getMethod('splitMultiBookSeries');
+        $method = $reflection->getMethod('analyzeMultiBookFiles');
         $method->setAccessible(true);
 
-        $directory = '/test/Author - Series';
-        $largeFiles = [
-            [
-                'path' => '/test/file.m4b',
-                'filename' => 'Series - 01 - Title.m4b',
-                'size' => 300000000,
-                'duration' => 15000,
-                'metadata' => [
-                    'genre' => ['Fantasy'],
-                    'year' => '2020',
-                ],
-            ],
+        $audiobook = [
+            'path' => '/test/Series Name [1-1]',
+            'files' => ['/test/Book 01 - Title.m4b'],
+        ];
+        $multiBookInfo = [
+            'series_name' => 'Series Name',
+            'numbers' => [1],
         ];
 
-        $result = $method->invoke($this->command, $directory, $largeFiles);
-
-        // Check metadata structure
-        $this->assertArrayHasKey('metadata', $result[0]);
-        $this->assertArrayHasKey('title', $result[0]['metadata']);
-        $this->assertArrayHasKey('series', $result[0]['metadata']);
-        $this->assertArrayHasKey('series_number', $result[0]['metadata']);
-        $this->assertArrayHasKey('author', $result[0]['metadata']);
-        $this->assertArrayHasKey('is_split_from_multi_book', $result[0]['metadata']);
-        $this->assertArrayHasKey('original_directory', $result[0]['metadata']);
-
-        // Check that original metadata is preserved
-        $this->assertEquals(['Fantasy'], $result[0]['metadata']['genre']);
-        $this->assertEquals('2020', $result[0]['metadata']['year']);
+        $result = $method->invoke($this->command, $audiobook, $multiBookInfo);
+        $this->assertArrayHasKey(1, $result);
+        $this->assertIsArray($result[1]);
+        $this->assertSame('/test/Book 01 - Title.m4b', $result[1][0]['file']);
+        $this->assertSame('Title', $result[1][0]['title']);
     }
 }

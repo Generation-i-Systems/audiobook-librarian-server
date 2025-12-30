@@ -15,6 +15,12 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
+        $compiledPath = sys_get_temp_dir() . '/librarian_framework_views';
+        if (!is_dir($compiledPath)) {
+            mkdir($compiledPath, 0777, true);
+        }
+        config(['view.compiled' => $compiledPath]);
+
         // All test configuration is handled by phpunit.xml
         // Database connection is set to 'testing' via phpunit.xml
         // Individual tests should use RefreshDatabase trait as needed

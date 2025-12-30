@@ -3,6 +3,7 @@
 namespace Tests\Unit\Services;
 
 use App\Services\BookEnrichmentService;
+use App\Services\AudibleService;
 use Tests\TestCase;
 
 class BookEnrichmentServiceTest extends TestCase
@@ -25,6 +26,134 @@ class BookEnrichmentServiceTest extends TestCase
         $result = $this->service->enrichWithExternalData($metadata);
 
         $this->assertEmpty($result);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function enrichWithExternalDataMapsAudibleNarratorsListAndCategoryToNarratorAndGenre(): void
+    {
+        $audibleMock = $this->createMock(AudibleService::class);
+        $audibleMock->method('searchBooksWithFiltering')->willReturn([
+            [
+                'description' => 'Test description',
+                'coverImageUrl' => 'https://example.com/cover.jpg',
+                'publishedYear' => '2025',
+                'publisher' => ['name' => 'Random House Audio'],
+                'series' => '',
+                'narratorsList' => ['Narrator One', 'Narrator Two'],
+                'category' => ['Science Fiction'],
+            ],
+        ]);
+
+        $this->app->instance(AudibleService::class, $audibleMock);
+
+        $result = $this->service->enrichWithExternalData([
+            'title' => 'Kingdom Come',
+            'author' => ['Mark Waid'],
+        ], ['sources' => ['audible']]);
+
+        $this->assertSame(['Narrator One', 'Narrator Two'], $result['narrator']);
+        $this->assertSame(['Science Fiction'], $result['genre']);
+        $this->assertSame(2025, $result['year']);
+        $this->assertSame('https://example.com/cover.jpg', $result['cover_url']);
+        $this->assertArrayHasKey('audible_raw', $result);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function enrichWithExternalDataNormalizesAudibleCategoryObjectsToGenreStrings(): void
+    {
+        $audibleMock = $this->createMock(AudibleService::class);
+        $audibleMock->method('searchBooksWithFiltering')->willReturn([
+            [
+                'description' => 'Test description',
+                'coverImageUrl' => 'https://example.com/cover.jpg',
+                'publishedYear' => '2025',
+                'publisher' => ['name' => 'Random House Audio'],
+                'series' => '',
+                'narratorsList' => ['Narrator One'],
+                'category' => [
+                    ['name' => 'Science Fiction'],
+                    ['name' => 'Adventure'],
+                ],
+            ],
+        ]);
+
+        $this->app->instance(AudibleService::class, $audibleMock);
+
+        $result = $this->service->enrichWithExternalData([
+            'title' => 'Kingdom Come',
+            'author' => ['Mark Waid'],
+        ], ['sources' => ['audible']]);
+
+        $this->assertSame(['Science Fiction', 'Action'], $result['genre']);
+    }
+
+    #[Test]
+    public function enrichWithExternalDataStillQueriesAudibleWhenOnlyGenreIsMissing(): void
+    {
+        $audibleMock = $this->createMock(AudibleService::class);
+        $audibleMock->expects($this->once())
+            ->method('searchBooksWithFiltering')
+            ->willReturn([
+                [
+                    'description' => 'Test description from audible',
+                    'coverImageUrl' => 'https://example.com/audible-cover.jpg',
+                    'publishedYear' => '2025',
+                    'publisher' => ['name' => 'Random House Audio'],
+                    'series' => '',
+                    'narratorsList' => ['Narrator One'],
+                    'category' => ['Science Fiction'],
+                ],
+            ]);
+
+        $this->app->instance(AudibleService::class, $audibleMock);
+
+        $result = $this->service->enrichWithExternalData([
+            'title' => 'Kingdom Come',
+            'author' => ['Mark Waid'],
+            'cover_url' => 'https://example.com/existing-cover.jpg',
+            'description' => 'Existing description',
+            'genre' => [],
+        ], ['sources' => ['audible']]);
+
+        $this->assertSame(['Science Fiction'], $result['genre']);
+    }
+
+    #[Test]
+    public function enrichWithExternalDataMapsAudibleCategoryToValidSystemGenre(): void
+    {
+        $audibleMock = $this->createMock(AudibleService::class);
+        $audibleMock->method('searchBooksWithFiltering')->willReturn([
+            [
+                'description' => 'Test description',
+                'coverImageUrl' => 'https://example.com/cover.jpg',
+                'publishedYear' => '2025',
+                'publisher' => ['name' => 'Random House Audio'],
+                'series' => '',
+                'narratorsList' => ['Narrator One'],
+                'category' => ['Science Fiction & Fantasy'],
+            ],
+        ]);
+
+        $this->app->instance(AudibleService::class, $audibleMock);
+
+        $result = $this->service->enrichWithExternalData([
+            'title' => 'Kingdom Come',
+            'author' => ['Mark Waid'],
+        ], ['sources' => ['audible']]);
+
+        $this->assertSame(['Science Fiction'], $result['genre']);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function normalizeAuthorForExternalLookupUsesPrimaryAuthorFromMultiAuthorString(): void
+    {
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('normalizeAuthorForExternalLookup');
+        $method->setAccessible(true);
+
+        $this->assertSame('Mark Waid', $method->invoke($this->service, 'Mark Waid, Alex Ross'));
+        $this->assertSame('Mark Waid', $method->invoke($this->service, 'Mark Waid & Alex Ross'));
+        $this->assertSame('Mark Waid', $method->invoke($this->service, 'Mark Waid and Alex Ross'));
     }
 
     #[\PHPUnit\Framework\Attributes\Test]

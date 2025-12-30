@@ -107,6 +107,38 @@ class BookImportServiceTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
+    public function generateDirectoryPathUsesCustomDirectoryPathWhenRelative(): void
+    {
+        $metadata = [
+            'custom_directory_path' => 'Fantasy/Mark Waid, Alex Ross/Kingdom Come',
+            'title' => 'Ignored Title',
+            'author' => ['Ignored Author'],
+            'genre' => 'Ignored Genre',
+        ];
+
+        $path = $this->service->generateDirectoryPath($metadata, ['include_title' => true]);
+
+        $this->assertSame('Fantasy/Mark Waid, Alex Ross/Kingdom Come', $path);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function generateDirectoryPathStripsBookRootFromCustomDirectoryPathWhenAbsolute(): void
+    {
+        config(['app.book_root' => '/media/lyra_data1/audiobooks/books']);
+
+        $metadata = [
+            'custom_directory_path' => '/media/lyra_data1/audiobooks/books/Fantasy/Mark Waid, Alex Ross/Kingdom Come',
+            'title' => 'Ignored Title',
+            'author' => ['Ignored Author'],
+            'genre' => 'Ignored Genre',
+        ];
+
+        $path = $this->service->generateDirectoryPath($metadata, ['include_title' => true]);
+
+        $this->assertSame('Fantasy/Mark Waid, Alex Ross/Kingdom Come', $path);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
     public function generateTargetDirectoryIncludesSeriesNumberFromBook(): void
     {
         // Create test data

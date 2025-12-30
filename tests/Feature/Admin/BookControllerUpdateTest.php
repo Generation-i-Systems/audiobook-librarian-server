@@ -361,8 +361,8 @@ class BookControllerUpdateTest extends TestCase
             ->with(
                 $this->equalTo($bookId),
                 $this->callback(function ($data) {
-                    return ($data['directoryPath'] ?? null) === 'new/path'
-                        && ($data['coverImage'] ?? null) === 'cover_01.jpg';
+                    return ($data['directoryPath'] ?? null) === 'new/path_01'
+                        && ($data['coverImage'] ?? null) === 'cover.jpg';
                 })
             )
             ->willReturn(true);
@@ -379,9 +379,9 @@ class BookControllerUpdateTest extends TestCase
 
         $this->assertEquals(302, $response->getStatusCode());
 
-        $this->assertTrue(Storage::disk('books')->exists('new/path/track1.mp3'));
-        $this->assertTrue(Storage::disk('books')->exists('new/path/cover_01.jpg'));
-        $this->assertTrue(Storage::disk('books')->exists('new/path/sub/track2_01.mp3'));
+        $this->assertTrue(Storage::disk('books')->exists('new/path_01/track1.mp3'));
+        $this->assertTrue(Storage::disk('books')->exists('new/path_01/cover.jpg'));
+        $this->assertTrue(Storage::disk('books')->exists('new/path_01/sub/track2.mp3'));
 
         $this->assertTrue(Storage::disk('books')->exists('new/path/cover.jpg'));
         $this->assertTrue(Storage::disk('books')->exists('new/path/sub/track2.mp3'));

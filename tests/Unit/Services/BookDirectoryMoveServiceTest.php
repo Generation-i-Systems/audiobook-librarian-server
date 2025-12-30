@@ -53,10 +53,12 @@ class BookDirectoryMoveServiceTest extends TestCase
 
         $this->assertTrue($result['moved']);
 
+        $this->assertSame('new/path_01', $result['directoryPath']);
+
         $this->assertTrue($disk->exists('new/path/file.txt'));
         $this->assertSame('existing', $disk->get('new/path/file.txt'));
 
-        $this->assertTrue($disk->exists('new/path/file_01.txt'));
-        $this->assertSame('from-old', $disk->get('new/path/file_01.txt'));
+        $this->assertTrue($disk->exists('new/path_01/file.txt'));
+        $this->assertSame('from-old', $disk->get('new/path_01/file.txt'));
     }
 }

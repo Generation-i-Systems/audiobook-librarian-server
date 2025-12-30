@@ -25,7 +25,7 @@ class BookImportServiceGenreValidationTest extends TestCase
         $metadata = [
             'title' => 'Test Book',
             'author' => 'Test Author',
-            'genre' => 'Fiction', // Invalid - should map to "General Fiction"
+            'genre' => 'Fiction', // Invalid - should map to "Other"
         ];
 
         $audiobook = [
@@ -37,7 +37,7 @@ class BookImportServiceGenreValidationTest extends TestCase
 
         $this->assertNotNull($book);
         $this->assertCount(1, $book->genres);
-        $this->assertEquals('General Fiction', $book->genres->first()->name);
+        $this->assertEquals('Other', $book->genres->first()->name);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
@@ -83,10 +83,24 @@ class BookImportServiceGenreValidationTest extends TestCase
         // Check that genres were mapped to valid ones
         $genreNames = $book->genres->pluck('name')->toArray();
         $validGenres = [
-            'Science Fiction', 'Fantasy', 'LitRPG', 'Romance', 'History',
-            'Historical Fiction', 'Non Fiction', 'Religion', 'Church',
-            'Kids', 'Action', 'Classic', 'General Fiction', 'Computer',
-            'Western', 'Horror', 'Mystery', 'Other', 'Science',
+            'Science Fiction',
+            'Fantasy',
+            'LitRPG',
+            'Romance',
+            'History',
+            'Historical Fiction',
+            'Non Fiction',
+            'Religion',
+            'Church',
+            'Kids',
+            'Action',
+            'Classic',
+            'Computer',
+            'Western',
+            'Horror',
+            'Mystery',
+            'Other',
+            'Science',
         ];
 
         foreach ($genreNames as $genreName) {
@@ -156,10 +170,25 @@ class BookImportServiceGenreValidationTest extends TestCase
             // Verify a valid genre was created instead
             $this->assertCount(1, $book->genres);
             $validGenres = [
-                'Science Fiction', 'Fantasy', 'LitRPG', 'Romance', 'History',
-                'Historical Fiction', 'Non Fiction', 'Religion', 'Church',
-                'Kids', 'Action', 'Classic', 'General Fiction', 'Computer',
-                'Western', 'Horror', 'Mystery', 'Other', 'Science',
+                'Science Fiction',
+                'Fantasy',
+                'LitRPG',
+                'Romance',
+                'History',
+                'Historical Fiction',
+                'Non Fiction',
+                'Religion',
+                'Church',
+                'Kids',
+                'Action',
+                'Classic',
+                'General Fiction',
+                'Computer',
+                'Western',
+                'Horror',
+                'Mystery',
+                'Other',
+                'Science',
             ];
             $this->assertContains($book->genres->first()->name, $validGenres);
         }
