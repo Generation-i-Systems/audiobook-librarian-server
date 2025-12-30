@@ -22,6 +22,8 @@ class AIBookProcessor
     protected array $modelPricing;
     protected float $estimatedCost = 0.0;
 
+    protected array $inMemoryCache = [];
+
     // Model configurations with rate limits and pricing (based on official documentation)
     protected array $modelConfigs = [
         // Gemini Models (Google)
@@ -317,8 +319,8 @@ class AIBookProcessor
         $cacheKey = "{$this->provider}_api_requests_{$this->model}_" . date('Y-m-d-H-i');
         $dailyCacheKey = "{$this->provider}_api_requests_{$this->model}_" . date('Y-m-d');
 
-        $minuteRequests = cache()->get($cacheKey, 0);
-        $dailyRequests = cache()->get($dailyCacheKey, 0);
+        $minuteRequests = $this->cacheGetInt($cacheKey, 0);
+        $dailyRequests = $this->cacheGetInt($dailyCacheKey, 0);
 
         $withinMinuteLimit = $minuteRequests < $this->modelLimits['requests_per_minute'];
         $withinDailyLimit = $this->modelLimits['requests_per_day'] === null ||
@@ -335,11 +337,41 @@ class AIBookProcessor
         $cacheKey = "{$this->provider}_api_requests_{$this->model}_" . date('Y-m-d-H-i');
         $dailyCacheKey = "{$this->provider}_api_requests_{$this->model}_" . date('Y-m-d');
 
-        cache()->increment($cacheKey, 1);
-        cache()->put($cacheKey, cache()->get($cacheKey, 1), 60); // 1 minute
+        $this->cacheIncrement($cacheKey, 1);
+        $this->cachePut($cacheKey, $this->cacheGetInt($cacheKey, 1), 60);
 
-        cache()->increment($dailyCacheKey, 1);
-        cache()->put($dailyCacheKey, cache()->get($dailyCacheKey, 1), 24 * 60 * 60); // 24 hours
+        $this->cacheIncrement($dailyCacheKey, 1);
+        $this->cachePut($dailyCacheKey, $this->cacheGetInt($dailyCacheKey, 1), 24 * 60 * 60);
+    }
+
+    protected function cacheGetInt(string $key, int $default = 0): int
+    {
+        try {
+            $value = cache()->get($key, $default);
+        } catch (\Throwable $e) {
+            $value = $this->inMemoryCache[$key] ?? $default;
+        }
+
+        return (int) $value;
+    }
+
+    protected function cacheIncrement(string $key, int $amount = 1): void
+    {
+        try {
+            cache()->increment($key, $amount);
+        } catch (\Throwable $e) {
+            $current = $this->cacheGetInt($key, 0);
+            $this->inMemoryCache[$key] = $current + $amount;
+        }
+    }
+
+    protected function cachePut(string $key, mixed $value, int $seconds): void
+    {
+        try {
+            cache()->put($key, $value, $seconds);
+        } catch (\Throwable $e) {
+            $this->inMemoryCache[$key] = $value;
+        }
     }
 
     /**
@@ -435,7 +467,9 @@ class AIBookProcessor
                     // Skip generic/placeholder titles that provide no useful information
                     if ($key === 'title' || $key === 'album') {
                         $lowercaseValue = strtolower($value);
-                        if (preg_match('/unknown|untitled|track\s*\d+|part\s*\d+|chapter\s*\d+|^no\s+title/i', $lowercaseValue)) {
+                        $uselessTitlePattern = '/unknown|untitled|track\s*\d+|' .
+                            'part\s*\d+|chapter\s*\d+|^no\s+title/i';
+                        if (preg_match($uselessTitlePattern, $lowercaseValue)) {
                             continue; // Skip this useless tag
                         }
                     }
@@ -461,26 +495,35 @@ class AIBookProcessor
 
         $prompt .= "CRITICAL INSTRUCTION: You are analyzing ONE COMPLETE AUDIOBOOK, not individual chapters. \n";
         $prompt .= "- The directory represents ONE BOOK, even if it contains multiple audio files\n";
-        $prompt .= "- Do NOT extract chapter titles (like 'The Pool of Tears', 'Chapter 1', etc.) as the main book title\n";
-        $prompt .= "- Use the overall book title (like 'Alice's Adventures in Wonderland'), not chapter names\n";
-        $prompt .= "- Only use series information if this is genuinely part of a multi-book series (Book 1, Book 2, etc.)\n";
+        $prompt .= "- Do NOT extract chapter titles (like 'The Pool of Tears', 'Chapter 1', etc.) " .
+            "as the main book title\n";
+        $prompt .= "- Use the overall book title (like 'Alice's Adventures in Wonderland'), " .
+            "not chapter names\n";
+        $prompt .= "- Only use series information if this is genuinely part of a multi-book series " .
+            "(Book 1, Book 2, etc.)\n";
         $prompt .= "- Individual chapters/parts within one book are NOT separate series entries\n\n";
 
         $prompt .= "CRITICAL: Extract metadata from directory path structure:\n";
         $prompt .= "- Directory pattern: '.../ParentDir/N BookTitle' where N is a number indicates:\n";
         $prompt .= "  * Series Name = ParentDir (e.g., 'The Forgotten Five')\n";
         $prompt .= "  * Series Number = N (e.g., 3)\n";
-        $prompt .= "  * Book Title = BookTitle without the leading number (e.g., 'Rebel Undercover' not '3 Rebel Undercover')\n";
+        $prompt .= "  * Book Title = BookTitle without the leading number " .
+            "(e.g., 'Rebel Undercover' not '3 Rebel Undercover')\n";
         $prompt .= "- Example: '/The Forgotten Five/3 Rebel Undercover' → Title: 'Rebel Undercover', " .
             "Series: 'The Forgotten Five' #3\n";
-        $prompt .= "- Example: '/Harry Potter/1 Philosopher's Stone' → Title: 'Philosopher's Stone', Series: 'Harry Potter' #1\n";
-        $prompt .= "- IGNORE generic ID3 tags like 'Unknown Book-PartN', 'Track N', 'Untitled' - use directory structure instead\n";
+        $prompt .= "- Example: '/Harry Potter/1 Philosopher's Stone' → Title: 'Philosopher's Stone', " .
+            "Series: 'Harry Potter' #1\n";
+        $prompt .= "- IGNORE generic ID3 tags like 'Unknown Book-PartN', 'Track N', 'Untitled' " .
+            "- use directory structure instead\n";
         $prompt .= "- Always remove leading numbers/dashes from title " .
             "(e.g., '3 Title' → 'Title', '01 - Title' → 'Title')\n\n";
 
-        $prompt .= "IMPORTANT: For genre, choose the MOST SPECIFIC literary genre that fits the content. Valid genres are:\n";
-        $prompt .= "Kids, Religion, General Fiction, Church, Science, Historical Fiction, Computer, Classic, History, Non Fiction, Action, LitRPG, Romance, Science Fiction, Other, Fantasy\n";
-        $prompt .= "Do NOT use generic terms like 'Audiobook', 'Book', 'Audio' - analyze the actual story content and choose the appropriate literary genre.\n";
+        $prompt .= "IMPORTANT: For genre, choose the MOST SPECIFIC literary genre that fits the content. " .
+            "Valid genres are:\n";
+        $prompt .= "Kids, Religion, General Fiction, Church, Science, Historical Fiction, Computer, Classic, " .
+            "History, Non Fiction, Action, LitRPG, Romance, Science Fiction, Other, Fantasy\n";
+        $prompt .= "Do NOT use generic terms like 'Audiobook', 'Book', 'Audio' - analyze the actual story " .
+            "content and choose the appropriate literary genre.\n";
 
         return $prompt;
     }
@@ -688,11 +731,15 @@ class AIBookProcessor
      */
     protected function normalizeMetadata(array $metadata): array
     {
+        $authors = $metadata['author'] ?? ($metadata['authors'] ?? []);
+        $narrators = $metadata['narrator'] ?? ($metadata['narrators'] ?? []);
+        $genres = $metadata['genre'] ?? ($metadata['genres'] ?? []);
+
         $normalized = [
             'title' => $metadata['title'] ?? 'Unknown Title',
-            'author' => $this->normalizeStringOrArray($metadata['author'] ?? []),
-            'narrator' => $this->normalizeStringOrArray($metadata['narrator'] ?? []),
-            'genre' => $this->normalizeStringOrArray($metadata['genre'] ?? []),
+            'author' => $this->normalizeStringOrArray($authors),
+            'narrator' => $this->normalizeStringOrArray($narrators),
+            'genre' => $this->normalizeStringOrArray($genres),
             'year' => isset($metadata['year']) ? (int) $metadata['year'] : null,
             'description' => $metadata['description'] ?? null,
             'publisher' => $metadata['publisher'] ?? null,
@@ -709,7 +756,9 @@ class AIBookProcessor
         // Handle series information
         if (isset($metadata['series']) && is_array($metadata['series'])) {
             $normalized['series'] = $metadata['series']['name'] ?? null;
-            $normalized['series_number'] = isset($metadata['series']['number']) ? (int) $metadata['series']['number'] : null;
+            if (isset($metadata['series']['number'])) {
+                $normalized['series_number'] = (int) $metadata['series']['number'];
+            }
             $normalized['is_collection'] = $metadata['series']['is_collection'] ?? false;
         }
 
@@ -718,16 +767,10 @@ class AIBookProcessor
         $confidencePenalty = 0;
 
         // Check if author is missing or empty
-        $hasAuthor = !empty($normalized['author']) && (
-            (is_array($normalized['author']) && count($normalized['author']) > 0) ||
-            (is_string($normalized['author']) && trim($normalized['author']) !== '')
-        );
+        $hasAuthor = count($normalized['author']) > 0;
 
         // Check if narrator is missing or empty
-        $hasNarrator = !empty($normalized['narrator']) && (
-            (is_array($normalized['narrator']) && count($normalized['narrator']) > 0) ||
-            (is_string($normalized['narrator']) && trim($normalized['narrator']) !== '')
-        );
+        $hasNarrator = count($normalized['narrator']) > 0;
 
         if (!$hasAuthor) {
             $confidencePenalty += 40; // Missing author is critical - major penalty
@@ -790,7 +833,18 @@ class AIBookProcessor
         }
 
         if (is_array($value)) {
-            return array_filter(array_map('trim', $value));
+            $normalized = array_map(function ($item) {
+                if (is_string($item)) {
+                    return trim($item);
+                }
+                if (is_int($item) || is_float($item)) {
+                    return (string) $item;
+                }
+
+                return null;
+            }, $value);
+
+            return array_values(array_filter($normalized, static fn ($item) => $item !== null && $item !== ''));
         }
 
         return [];
@@ -849,7 +903,8 @@ class AIBookProcessor
             $tags = [];
 
             if (isset($fileInfo['tags'])) {
-                // CRITICAL: For M4B files, prefer 'quicktime' tags (container level) over 'id3v2' (chapter level)
+                // CRITICAL: For M4B files, prefer 'quicktime' tags (container level)
+                // over 'id3v2' (chapter level)
                 // This prevents chapter titles like "Opening Credits" from overriding the book title
                 $preferredFormats = ['quicktime', 'id3v2', 'id3v1'];
 
@@ -857,7 +912,8 @@ class AIBookProcessor
                     if (isset($fileInfo['tags'][$format])) {
                         foreach ($fileInfo['tags'][$format] as $key => $values) {
                             if (!isset($tags[$key]) && !empty($values)) {
-                                // CRITICAL: For 'title' in M4B files, use LAST value (book title) not first (chapter title)
+                                // CRITICAL: For 'title' in M4B files, use LAST value (book title)
+                                // not first (chapter title)
                                 // M4B files list all chapter titles first, then the book title last
                                 if ($key === 'title' && is_array($values) && count($values) > 1) {
                                     $tags[$key] = end($values);
@@ -1206,7 +1262,12 @@ class AIBookProcessor
                         [
                             'parts' => [
                                 [
-                                    'text' => 'Please transcribe this audio file. This is the beginning of an audiobook where the title, author, and narrator are typically announced. Return only the transcribed text, no additional formatting or commentary.',
+                                    'text' => implode(' ', [
+                                        'Please transcribe this audio file.',
+                                        'This is the beginning of an audiobook where the title,',
+                                        'author, and narrator are typically announced.',
+                                        'Return only the transcribed text, no additional formatting or commentary.',
+                                    ]),
                                 ],
                                 [
                                     'inline_data' => [
@@ -1278,12 +1339,23 @@ class AIBookProcessor
 
             fclose($fileHandle);
 
-            Log::info("OpenAI Whisper transcription completed", [
-                'transcription_length' => strlen($response),
-                'preview' => substr($response, 0, 100),
+            $responseText = '';
+            if (is_string($response)) {
+                $responseText = $response;
+            } else {
+                $responseText = (string) (data_get($response, 'text') ?? '');
+            }
+            if ($responseText === '') {
+                Log::error('OpenAI Whisper transcription returned empty response', ['file' => $audioFilePath]);
+                return null;
+            }
+
+            Log::info('OpenAI Whisper transcription completed', [
+                'transcription_length' => strlen($responseText),
+                'preview' => substr($responseText, 0, 100),
             ]);
 
-            return trim($response);
+            return trim($responseText);
         } catch (\Exception $e) {
             Log::error("OpenAI Whisper transcription failed", [
                 'error' => $e->getMessage(),
@@ -1370,15 +1442,18 @@ class AIBookProcessor
     {
         try {
             // Build a prompt to analyze the transcription
-            $prompt = "Analyze this audiobook introduction transcription and extract metadata. Return JSON only:\n\n";
+            $prompt = "Analyze this audiobook introduction transcription and extract metadata. " .
+                "Return JSON only:\n\n";
             $prompt .= "TRANSCRIPTION:\n{$transcription}\n\n";
 
             if (!empty($directoryHint)) {
                 $prompt .= "DIRECTORY HINT: {$directoryHint}\n\n";
             }
 
-            $prompt .= "Extract: title, author, narrator, series{name,number}, genre, year, publisher, language, confidence (0-100).\n";
-            $prompt .= "This is the beginning of an audiobook where title, author, and narrator are typically announced.\n";
+            $prompt .= "Extract: title, author, narrator, series{name,number}, genre, year, publisher, " .
+                "language, confidence (0-100).\n";
+            $prompt .= "This is the beginning of an audiobook where title, author, and narrator are typically " .
+                "announced.\n";
             $prompt .= "Focus on the main book title, not chapter titles. Look for phrases like:\n";
             $prompt .= "- 'This is [Title] by [Author]'\n";
             $prompt .= "- 'Narrated by [Narrator]'\n";
@@ -1386,7 +1461,8 @@ class AIBookProcessor
             $prompt .= "- 'Written by [Author]', 'Read by [Narrator]'\n\n";
 
             $prompt .= "IMPORTANT: For genre, choose the MOST SPECIFIC literary genre. Valid genres:\n";
-            $prompt .= "Kids, Religion, General Fiction, Church, Science, Historical Fiction, Computer, Classic, History, Non Fiction, Action, LitRPG, Romance, Science Fiction, Other, Fantasy\n";
+            $prompt .= "Kids, Religion, General Fiction, Church, Science, Historical Fiction, Computer, Classic, " .
+                "History, Non Fiction, Action, LitRPG, Romance, Science Fiction, Other, Fantasy\n";
             $prompt .= "Analyze the content/story type, not just that it's an audiobook.\n";
 
             // Use the current AI model to analyze the transcription

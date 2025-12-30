@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Models\Book;
+use App\Services\BookDeletionService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
 
@@ -16,7 +17,8 @@ class RemoveDuplicateBooksCommand extends Command
      */
     protected $signature = 'books:remove-duplicates
                             {--dry-run : Run without making changes}
-                            {--keep=newest : Which duplicate to keep (newest, oldest, most-complete)}';
+                            {--keep=newest : Which duplicate to keep (newest, oldest, most-complete)}
+                            {--permanent : Permanently delete without using trash}';
 
     /**
      * The console command description.
@@ -33,15 +35,24 @@ class RemoveDuplicateBooksCommand extends Command
     protected $documentStore;
 
     /**
+     * The book deletion service.
+     *
+     * @var BookDeletionService
+     */
+    protected $deletionService;
+
+    /**
      * Create a new command instance.
      *
      * @param DocumentStoreServiceInterface $documentStore
+     * @param BookDeletionService $deletionService
      * @return void
      */
-    public function __construct(DocumentStoreServiceInterface $documentStore)
+    public function __construct(DocumentStoreServiceInterface $documentStore, BookDeletionService $deletionService)
     {
         parent::__construct();
         $this->documentStore = $documentStore;
+        $this->deletionService = $deletionService;
     }
 
     /**
@@ -51,9 +62,16 @@ class RemoveDuplicateBooksCommand extends Command
     {
         $dryRun = $this->option('dry-run');
         $keepStrategy = $this->option('keep');
+        $permanent = $this->option('permanent');
 
         if ($dryRun) {
             $this->info('Running in dry-run mode. No changes will be made.');
+        }
+
+        if ($permanent) {
+            $this->warn('Using --permanent flag: Books will be permanently deleted without trash.');
+        } else {
+            $this->info('Books will be moved to trash (can be restored from /admin/trash).');
         }
 
         $this->info('Finding duplicate books based on directory_path AND title...');
@@ -97,22 +115,36 @@ class RemoveDuplicateBooksCommand extends Command
 
                     if (!$dryRun) {
                         try {
-                            // Delete the book
-                            $result = $this->documentStore->deleteBook($book->id);
+                            if ($permanent) {
+                                // Permanently delete without trash
+                                $result = $this->documentStore->deleteBook($book->id);
 
-                            if ($result) {
-                                $this->info(sprintf('Successfully removed book ID: %d', $book->id));
-                                $totalRemoved++;
+                                if ($result) {
+                                    $this->info(sprintf('Successfully removed book ID: %d (permanent)', $book->id));
+                                    $totalRemoved++;
+                                } else {
+                                    $this->error(sprintf('Failed to remove book ID: %d', $book->id));
+                                    $errors++;
+                                }
                             } else {
-                                $this->error(sprintf('Failed to remove book ID: %d', $book->id));
-                                $errors++;
+                                // Move to trash
+                                $result = $this->deletionService->moveToTrash((string) $book->id, true);
+
+                                if ($result['success']) {
+                                    $this->info(sprintf('Successfully moved book ID: %d to trash', $book->id));
+                                    $totalRemoved++;
+                                } else {
+                                    $this->error(sprintf('Failed to move book ID: %d to trash - %s', $book->id, $result['error'] ?? 'Unknown error'));
+                                    $errors++;
+                                }
                             }
                         } catch (\Exception $e) {
                             $this->error(sprintf('Error removing book ID: %d - %s', $book->id, $e->getMessage()));
                             $errors++;
                         }
                     } else {
-                        $this->info('[DRY RUN] Would remove book ID: ' . $book->id);
+                        $action = $permanent ? 'permanently delete' : 'move to trash';
+                        $this->info("[DRY RUN] Would {$action} book ID: " . $book->id);
                         $totalRemoved++;
                     }
                 } else {

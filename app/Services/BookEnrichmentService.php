@@ -2,11 +2,15 @@
 
 namespace App\Services;
 
+use App\Traits\GenreMapping;
 use Illuminate\Support\Facades\Log;
 
 class BookEnrichmentService
 {
+    use GenreMapping;
+
     protected ?AudibleService $audibleService = null;
+    protected ?GoogleBooksApiService $googleBooksService = null;
 
     public function __construct()
     {
@@ -100,8 +104,10 @@ class BookEnrichmentService
     {
         $current = trim($title);
         $patterns = [
-            '/\s*\((?:unabridged|abridged|complete|full\s*cast|dramati[sz]ed\s*adaptation|enhanced|remastered|special\s*edition|revised\s*edition|anniversary\s*edition)\)\s*$/i',
-            '/\s*\[(?:unabridged|abridged|complete|full\s*cast|dramati[sz]ed\s*adaptation|enhanced|remastered|special\s*edition|revised\s*edition|anniversary\s*edition)\]\s*$/i',
+            '/\s*\((?:unabridged|abridged|complete|full\s*cast|dramati[sz]ed\s*adaptation|enhanced|remastered|' .
+            'special\s*edition|revised\s*edition|anniversary\s*edition)\)\s*$/i',
+            '/\s*\[(?:unabridged|abridged|complete|full\s*cast|dramati[sz]ed\s*adaptation|enhanced|remastered|' .
+            'special\s*edition|revised\s*edition|anniversary\s*edition)\]\s*$/i',
         ];
 
         do {
@@ -125,11 +131,13 @@ class BookEnrichmentService
         }
 
         $enrichedData = [];
+        $enrichmentResults = [];
         $authorName = is_array($metadata['author']) ? $metadata['author'][0] : $metadata['author'];
 
         // CRITICAL: Normalize author before sending to enrichment services
         // Extract actual author from patterns like "Graphic Audio [Alex Archer]"
         $authorName = $this->normalizeAuthorForEnrichment($authorName);
+        $authorName = $this->normalizeAuthorForExternalLookup($authorName);
 
         // If author is invalid (e.g., just "Graphic Audio"), skip enrichment
         if (empty($authorName)) {
@@ -147,6 +155,9 @@ class BookEnrichmentService
             $sourceData = $this->searchFromSource($source, $metadata['title'], $authorName, $maxRetries);
             if ($sourceData) {
                 $enrichedData = array_merge($enrichedData, $sourceData);
+                $enrichmentResults[$source] = 'success';
+            } else {
+                $enrichmentResults[$source] = 'no_data';
             }
 
             $missingFields = $this->getMissingDataFields($enrichedData);
@@ -155,7 +166,24 @@ class BookEnrichmentService
             }
         }
 
+        if (!empty($enrichmentResults)) {
+            $enrichedData['_enrichment_results'] = $enrichmentResults;
+        }
+
         return $enrichedData;
+    }
+
+    protected function normalizeAuthorForExternalLookup(string $authorName): string
+    {
+        $value = trim($authorName);
+        if ($value === '') {
+            return '';
+        }
+
+        $parts = preg_split('/\s*(?:,|&|\band\b)\s*/i', $value);
+        $primary = $parts[0] ?? $value;
+
+        return trim($primary);
     }
 
     /**
@@ -164,8 +192,18 @@ class BookEnrichmentService
     protected function searchFromSource(string $source, string $title, string $author, int $maxRetries = 3): ?array
     {
         return match ($source) {
-            'audible' => $this->retryApiCall(fn () => $this->searchAudible($title, $author), 'Audible', '', $maxRetries),
-            'google_books' => $this->retryApiCall(fn () => $this->searchGoogleBooks($title, $author), 'Google Books', '', $maxRetries),
+            'audible' => $this->retryApiCall(
+                fn () => $this->searchAudible($title, $author),
+                'Audible',
+                '',
+                $maxRetries
+            ),
+            'google_books' => $this->retryApiCall(
+                fn () => $this->searchGoogleBooks($title, $author),
+                'Google Books',
+                '',
+                $maxRetries
+            ),
             default => null
         };
     }
@@ -173,8 +211,12 @@ class BookEnrichmentService
     /**
      * Retry API calls with exponential backoff
      */
-    protected function retryApiCall(callable $apiCall, string $serviceName, string $description = '', int $maxRetries = 3): mixed
-    {
+    protected function retryApiCall(
+        callable $apiCall,
+        string $serviceName,
+        string $description = '',
+        int $maxRetries = 3
+    ): mixed {
         $attempt = 1;
 
         while ($attempt <= $maxRetries) {
@@ -210,7 +252,91 @@ class BookEnrichmentService
             $missing[] = 'description';
         }
 
+        $genre = $enrichedData['genre'] ?? null;
+        $isMissingGenre = $genre === null
+            || $genre === ''
+            || (is_array($genre) && count($genre) === 0)
+            || (!is_array($genre) && is_string($genre) && in_array(trim($genre), ['Other', 'Unknown'], true));
+        if ($isMissingGenre) {
+            $missing[] = 'genre';
+        }
+
+        $narrator = $enrichedData['narrator'] ?? null;
+        $isMissingNarrator = $narrator === null
+            || $narrator === ''
+            || (is_array($narrator) && count($narrator) === 0);
+        if ($isMissingNarrator) {
+            $missing[] = 'narrator';
+        }
+
         return $missing;
+    }
+
+    protected function normalizeGenreList(mixed $value): array
+    {
+        if ($value === null) {
+            return [];
+        }
+
+        $items = is_array($value) ? $value : [$value];
+        $result = [];
+
+        foreach ($items as $item) {
+            if ($item === null) {
+                continue;
+            }
+
+            if (is_string($item)) {
+                $trimmed = trim($item);
+                if ($trimmed !== '') {
+                    $result[] = $trimmed;
+                }
+                continue;
+            }
+
+            if (is_array($item)) {
+                $candidateKeys = ['name', 'label', 'title', 'fullPath', 'path'];
+                foreach ($candidateKeys as $key) {
+                    if (!empty($item[$key]) && is_string($item[$key])) {
+                        $trimmed = trim($item[$key]);
+                        if ($trimmed !== '') {
+                            $result[] = $trimmed;
+                        }
+                        continue 2;
+                    }
+                }
+
+                continue;
+            }
+        }
+
+        $result = array_values(array_unique($result));
+
+        return $result;
+    }
+
+    protected function mapToValidGenreList(array $genres): array
+    {
+        $result = [];
+        foreach ($genres as $genre) {
+            if (!is_string($genre)) {
+                continue;
+            }
+
+            $trimmed = trim($genre);
+            if ($trimmed === '') {
+                continue;
+            }
+
+            $result[] = $this->mapToValidGenre($trimmed);
+        }
+
+        $result = array_values(array_unique($result));
+        if (empty($result)) {
+            return [];
+        }
+
+        return $result;
     }
 
     /**
@@ -223,7 +349,9 @@ class BookEnrichmentService
                 $this->audibleService = app(AudibleService::class);
             }
 
-            $results = $this->audibleService->searchBooksWithFiltering($title, $author, ['limit' => 1]);
+            $results = $this->audibleService->searchBooksWithFiltering($title, $author, [
+                'limit' => 1,
+            ]);
 
             if (!empty($results) && isset($results[0])) {
                 $bookData = $results[0];
@@ -240,7 +368,12 @@ class BookEnrichmentService
                     $enrichedData['cover_url'] = $bookData['coverImageUrl'];
                 }
 
-                if (!empty($bookData['publishDate'])) {
+                if (!empty($bookData['publishedYear']) && is_numeric($bookData['publishedYear'])) {
+                    $year = (int) $bookData['publishedYear'];
+                    if ($year > 1800) {
+                        $enrichedData['year'] = $year;
+                    }
+                } elseif (!empty($bookData['publishDate'])) {
                     $year = date('Y', strtotime($bookData['publishDate']));
                     if ($year && $year > 1800) {
                         $enrichedData['year'] = (int) $year;
@@ -255,11 +388,33 @@ class BookEnrichmentService
                     $enrichedData['series'] = $bookData['series'];
                 }
 
+                if (!empty($bookData['narratorsList'])) {
+                    if (is_array($bookData['narratorsList'])) {
+                        $enrichedData['narrator'] = $bookData['narratorsList'];
+                    } else {
+                        $enrichedData['narrator'] = [$bookData['narratorsList']];
+                    }
+                } elseif (!empty($bookData['narrator'])) {
+                    if (is_array($bookData['narrator'])) {
+                        $enrichedData['narrator'] = $bookData['narrator'];
+                    } else {
+                        $enrichedData['narrator'] = [$bookData['narrator']];
+                    }
+                }
+
                 // Extract genre/categories if available
                 if (!empty($bookData['genre'])) {
-                    $enrichedData['genre'] = is_array($bookData['genre']) ? $bookData['genre'] : [$bookData['genre']];
+                    $enrichedData['genre'] = $this->mapToValidGenreList(
+                        $this->normalizeGenreList($bookData['genre'])
+                    );
                 } elseif (!empty($bookData['categories'])) {
-                    $enrichedData['genre'] = is_array($bookData['categories']) ? $bookData['categories'] : [$bookData['categories']];
+                    $enrichedData['genre'] = $this->mapToValidGenreList(
+                        $this->normalizeGenreList($bookData['categories'])
+                    );
+                } elseif (!empty($bookData['category'])) {
+                    $enrichedData['genre'] = $this->mapToValidGenreList(
+                        $this->normalizeGenreList($bookData['category'])
+                    );
                 }
 
                 return $enrichedData;
@@ -305,7 +460,11 @@ class BookEnrichmentService
             } elseif (!empty($volumeInfo['imageLinks']['medium'])) {
                 $enrichedData['cover_url'] = $volumeInfo['imageLinks']['medium'];
             } elseif (!empty($volumeInfo['imageLinks']['thumbnail'])) {
-                $enrichedData['cover_url'] = str_replace('zoom=1', 'zoom=2', $volumeInfo['imageLinks']['thumbnail']);
+                $enrichedData['cover_url'] = str_replace(
+                    'zoom=1',
+                    'zoom=2',
+                    $volumeInfo['imageLinks']['thumbnail']
+                );
             }
 
             if (!empty($volumeInfo['publishedDate'])) {
@@ -321,7 +480,9 @@ class BookEnrichmentService
 
             // Extract genre/categories if available
             if (!empty($volumeInfo['categories'])) {
-                $enrichedData['genre'] = is_array($volumeInfo['categories']) ? $volumeInfo['categories'] : [$volumeInfo['categories']];
+                $enrichedData['genre'] = $this->mapToValidGenreList(
+                    $this->normalizeGenreList($volumeInfo['categories'])
+                );
             }
 
             return $enrichedData;
@@ -338,7 +499,11 @@ class BookEnrichmentService
     protected function cleanDescription(string $description): string
     {
         $description = strip_tags($description);
-        $description = html_entity_decode($description, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $description = html_entity_decode(
+            $description,
+            ENT_QUOTES | ENT_HTML5,
+            'UTF-8'
+        );
         $description = preg_replace('/\s+/', ' ', $description);
         return trim($description);
     }
@@ -370,7 +535,11 @@ class BookEnrichmentService
 
         // Validate author consistency if both exist
         if (!empty($originalMetadata['author']) && !empty($enrichedData['author'])) {
-            $originalAuthors = is_array($originalMetadata['author']) ? $originalMetadata['author'] : [$originalMetadata['author']];
+            if (is_array($originalMetadata['author'])) {
+                $originalAuthors = $originalMetadata['author'];
+            } else {
+                $originalAuthors = [$originalMetadata['author']];
+            }
             $enrichedAuthors = is_array($enrichedData['author']) ? $enrichedData['author'] : [$enrichedData['author']];
 
             $hasMatchingAuthor = false;

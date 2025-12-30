@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Book;
+use App\Services\BookDeletionService;
 use App\Services\SafeLoggingService;
 
 class VerifyBookDirectories extends Command
@@ -15,7 +16,8 @@ class VerifyBookDirectories extends Command
                           {--limit=0 : Limit number of books to process (0 for all)}
                           {--dry-run : Perform a dry run without making changes (fixing is default)}
                           {--auto-confirm : Auto-confirm obvious matches}
-                          {--similarity-threshold=0.7 : Minimum similarity score for auto-suggestions}';
+                          {--similarity-threshold=0.7 : Minimum similarity score for auto-suggestions}
+                          {--permanent : Permanently delete without using trash}';
 
     protected $description = 'Verify book directory paths and suggest fixes for missing directories';
 
@@ -24,6 +26,11 @@ class VerifyBookDirectories extends Command
     protected $fixMode = false;
     protected $autoConfirm = false;
     protected $similarityThreshold = 0.7;
+
+    public function __construct(protected BookDeletionService $deletionService)
+    {
+        parent::__construct();
+    }
 
     public function handle(): int
     {
@@ -549,7 +556,10 @@ class VerifyBookDirectories extends Command
     protected function deleteBook(Book $book): string
     {
         $this->newLine();
-        $this->warn("⚠️ You are about to delete the following book:");
+        $permanent = $this->option('permanent');
+        $action = $permanent ? 'permanently delete' : 'move to trash';
+
+        $this->warn("⚠️ You are about to {$action} the following book:");
         $this->line("   Title: {$book->title}");
         $this->line("   Author: " . ($book->authors->isNotEmpty() ? $book->authors->pluck('name')->implode(', ') : 'N/A'));
         $this->line("   Series: " . ($book->series->isNotEmpty() ? $book->series->map(function ($s) {
@@ -557,18 +567,49 @@ class VerifyBookDirectories extends Command
         })->implode(', ') : 'N/A'));
         $this->line("   Current Path: {$book->directory_path}");
         $this->line("   Description: " . substr($book->description, 0, 100) . (strlen($book->description) > 100 ? '...' : ''));
-        // Add more relevant fields as needed
 
-        if ($this->confirm('Are you sure you want to DELETE this book? This action cannot be undone.')) {
+        if (!$permanent) {
+            $this->info("   (Book can be restored from /admin/trash)");
+        }
+
+        $confirmMessage = $permanent ? 'Are you sure you want to PERMANENTLY DELETE this book? This action cannot be undone.' : 'Are you sure you want to move this book to trash?';
+
+        if ($this->confirm($confirmMessage)) {
             try {
                 $bookTitle = $book->title; // Store title before deletion
-                $book->delete();
-                $this->info("🗑️ Successfully deleted book: {$bookTitle}");
-                SafeLoggingService::safeLog('info', "Book deleted", [
-                    'book_id' => $book->id ?? 'N/A',
-                    'book_title' => $bookTitle,
-                    'deleted_from_command' => true,
-                ]);
+                $bookId = $book->id;
+
+                if ($permanent) {
+                    $book->delete();
+                    $this->info("🗑️ Successfully permanently deleted book: {$bookTitle}");
+                    SafeLoggingService::safeLog('info', "Book permanently deleted", [
+                        'book_id' => $bookId ?? 'N/A',
+                        'book_title' => $bookTitle,
+                        'deleted_from_command' => true,
+                        'permanent' => true,
+                    ]);
+                } else {
+                    $result = $this->deletionService->moveToTrash((string) $bookId, true);
+
+                    if ($result['success']) {
+                        $this->info("🗑️ Successfully moved book to trash: {$bookTitle}");
+                        $this->line("   Trash ID: {$result['trash_item_id']}");
+                        SafeLoggingService::safeLog('info', "Book moved to trash", [
+                            'book_id' => $bookId ?? 'N/A',
+                            'book_title' => $bookTitle,
+                            'deleted_from_command' => true,
+                            'trash_item_id' => $result['trash_item_id'],
+                        ]);
+                    } else {
+                        $this->error("❌ Failed to move book to trash: " . ($result['error'] ?? 'Unknown error'));
+                        SafeLoggingService::safeLog('error', "Failed to move book to trash", [
+                            'book_id' => $bookId ?? 'N/A',
+                            'book_title' => $bookTitle,
+                            'error' => $result['error'] ?? 'Unknown error',
+                        ]);
+                        return 'skipped';
+                    }
+                }
                 return 'deleted';
             } catch (\Exception $e) {
                 $this->error("❌ Failed to delete book {$book->title}: " . $e->getMessage());

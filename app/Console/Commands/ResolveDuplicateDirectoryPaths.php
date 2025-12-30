@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Services\BookDeletionService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
@@ -11,12 +12,14 @@ class ResolveDuplicateDirectoryPaths extends Command
     protected $signature = 'books:resolve-duplicate-paths
                             {--dry-run : Show what would be done without making changes}
                             {--auto : Automatically keep the most complete book}
-                            {--limit= : Limit number of duplicates to process}';
+                            {--limit= : Limit number of duplicates to process}
+                            {--permanent : Permanently delete without using trash}';
 
     protected $description = 'Find and resolve books with duplicate directory paths';
 
     public function __construct(
-        protected DocumentStoreServiceInterface $documentStore
+        protected DocumentStoreServiceInterface $documentStore,
+        protected BookDeletionService $deletionService
     ) {
         parent::__construct();
     }
@@ -27,6 +30,13 @@ class ResolveDuplicateDirectoryPaths extends Command
         $auto = $this->option('auto');
         $limit = $this->option('limit');
         $verbose = $this->option('verbose');
+        $permanent = $this->option('permanent');
+
+        if ($permanent) {
+            $this->warn('Using --permanent flag: Books will be permanently deleted without trash.');
+        } else {
+            $this->info('Deleted books will be moved to trash (can be restored from /admin/trash).');
+        }
 
         $this->info('🔍 Searching for duplicate directory paths...');
         $this->newLine();
@@ -362,6 +372,7 @@ class ResolveDuplicateDirectoryPaths extends Command
         $keepBook = $books[$keepIndex];
         $keepId = $keepBook['id'] ?? $keepBook['_id'];
         $keepTitle = $keepBook['title'] ?? 'N/A';
+        $permanent = $this->option('permanent');
 
         $this->info("✓ Keeping book ID: {$keepId} - {$keepTitle}");
 
@@ -372,15 +383,26 @@ class ResolveDuplicateDirectoryPaths extends Command
                 $bookTitle = $book['title'] ?? 'N/A';
 
                 if ($dryRun) {
-                    $this->line("  Would delete book ID: {$bookId} - {$bookTitle}");
+                    $action = $permanent ? 'permanently delete' : 'move to trash';
+                    $this->line("  Would {$action} book ID: {$bookId} - {$bookTitle}");
                 } else {
-                    $this->documentStore->deleteBook($bookId);
-                    $this->line("  <fg=red>Deleted</> book ID: {$bookId} - {$bookTitle}");
+                    if ($permanent) {
+                        $this->documentStore->deleteBook($bookId);
+                        $this->line("  <fg=red>Permanently deleted</> book ID: {$bookId} - {$bookTitle}");
+                    } else {
+                        $result = $this->deletionService->moveToTrash((string) $bookId, true);
+                        if ($result['success']) {
+                            $this->line("  <fg=yellow>Moved to trash</> book ID: {$bookId} - {$bookTitle}");
+                        } else {
+                            $this->error("  Failed to move book ID: {$bookId} to trash - " . ($result['error'] ?? 'Unknown error'));
+                        }
+                    }
 
                     Log::info('Deleted duplicate book', [
                         'deleted_id' => $bookId,
                         'kept_id' => $keepId,
-                        'directory_path' => $keepBook['directory_path'] ?? 'N/A'
+                        'directory_path' => $keepBook['directory_path'] ?? 'N/A',
+                        'used_trash' => !$permanent
                     ]);
                 }
             }
@@ -559,11 +581,22 @@ class ResolveDuplicateDirectoryPaths extends Command
             $this->info("✓ Updated book ID: {$baseId} with merged data");
 
             // Delete the other books
+            $permanent = $this->option('permanent');
             foreach ($books as $index => $book) {
                 if ($index > 0) {
                     $bookId = $book['id'] ?? $book['_id'];
-                    $this->documentStore->deleteBook($bookId);
-                    $this->line("  <fg=red>Deleted</> book ID: {$bookId}");
+
+                    if ($permanent) {
+                        $this->documentStore->deleteBook($bookId);
+                        $this->line("  <fg=red>Permanently deleted</> book ID: {$bookId}");
+                    } else {
+                        $result = $this->deletionService->moveToTrash((string) $bookId, true);
+                        if ($result['success']) {
+                            $this->line("  <fg=yellow>Moved to trash</> book ID: {$bookId}");
+                        } else {
+                            $this->error("  Failed to move book ID: {$bookId} to trash - " . ($result['error'] ?? 'Unknown error'));
+                        }
+                    }
                 }
             }
         }

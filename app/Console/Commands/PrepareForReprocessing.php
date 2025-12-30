@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Book;
+use App\Services\BookDeletionService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -15,20 +16,35 @@ class PrepareForReprocessing extends Command
                             {--delete-db : Delete database entries for books in _NEEDS_REPROCESSING}
                             {--flatten : Flatten directory structure to max 1 level deep}
                             {--delete-google-covers : Delete Google Books cover images}
-                            {--remove-paths : Remove author/series directory structure (move to root of _NEEDS_REPROCESSING)}';
+                            {--remove-paths : Remove author/series directory structure (move to root of _NEEDS_REPROCESSING)}
+                            {--permanent : Permanently delete without using trash}';
 
     protected $description = 'Prepare books in _NEEDS_REPROCESSING for reimport';
 
     protected array $changeLog = [];
 
+    public function __construct(protected BookDeletionService $deletionService)
+    {
+        parent::__construct();
+    }
+
     public function handle(): int
     {
         $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
         $quarantinePath = $bookRoot . '/_NEEDS_REPROCESSING';
+        $permanent = $this->option('permanent');
 
         if (!is_dir($quarantinePath)) {
             $this->error("❌ Directory not found: {$quarantinePath}");
             return 1;
+        }
+
+        if ($this->option('delete-db')) {
+            if ($permanent) {
+                $this->warn('Using --permanent flag: Books will be permanently deleted without trash.');
+            } else {
+                $this->info('Deleted books will be moved to trash (can be restored from /admin/trash).');
+            }
         }
 
         $this->info('🔍 Finding books in _NEEDS_REPROCESSING...');
@@ -123,26 +139,42 @@ class PrepareForReprocessing extends Command
             // Delete database entry
             if ($this->option('delete-db')) {
                 if (!$this->option('dry-run')) {
-                    DB::beginTransaction();
                     try {
-                        // Detach relationships
-                        $book->authors()->detach();
-                        $book->narrators()->detach();
-                        $book->genres()->detach();
-                        $book->series()->detach();
+                        if ($this->option('permanent')) {
+                            // Permanently delete without trash
+                            DB::beginTransaction();
+                            // Detach relationships
+                            $book->authors()->detach();
+                            $book->narrators()->detach();
+                            $book->genres()->detach();
+                            $book->series()->detach();
 
-                        // Delete book
-                        $book->delete();
+                            // Delete book
+                            $book->delete();
 
-                        DB::commit();
-                        $this->line("   ✓ Deleted from database");
-                        $deletedCount++;
+                            DB::commit();
+                            $this->line("   ✓ Permanently deleted from database");
+                            $deletedCount++;
+                        } else {
+                            // Move to trash (files are already in _NEEDS_REPROCESSING, don't move them again)
+                            $result = $this->deletionService->moveToTrash((string) $book->id, false);
+
+                            if ($result['success']) {
+                                $this->line("   ✓ Moved to trash (database entry preserved)");
+                                $deletedCount++;
+                            } else {
+                                $this->error("   ✗ Failed to move to trash: " . ($result['error'] ?? 'Unknown error'));
+                            }
+                        }
                     } catch (\Exception $e) {
-                        DB::rollBack();
+                        if ($this->option('permanent')) {
+                            DB::rollBack();
+                        }
                         $this->error("   ✗ Failed to delete: " . $e->getMessage());
                     }
                 } else {
-                    $this->line("   [DRY RUN] Would delete from database");
+                    $action = $this->option('permanent') ? 'permanently delete' : 'move to trash';
+                    $this->line("   [DRY RUN] Would {$action} from database");
                     $deletedCount++;
                 }
             }
