@@ -1,0 +1,328 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Services\AIQueryService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
+class AIQueryController extends Controller
+{
+    protected AIQueryService $aiQueryService;
+
+    public function __construct()
+    {
+        $this->middleware('auth');
+        $this->middleware('admin');
+
+        $model = config('services.ai.default_model', 'claude-3-5-sonnet');
+        $paidTier = config('services.ai.paid_tier', true);
+        $this->aiQueryService = new AIQueryService($model, $paidTier);
+    }
+
+    public function process(Request $request)
+    {
+        $request->validate([
+            'prompt' => 'required|string|min:3',
+            'context_query_id' => 'nullable|integer',
+            'context_limit' => 'nullable|integer|min:0|max:1000',
+        ]);
+
+        $contextQueryId = $request->input('context_query_id');
+        $contextLimit = $request->input('context_limit', 50);
+
+        $result = $this->aiQueryService->processQuery(
+            $request->input('prompt'),
+            Auth::id(),
+            $contextQueryId,
+            $contextLimit
+        );
+
+        if (!$result['success']) {
+            return back()->with('error', $result['error']);
+        }
+
+        $queryId = $result['query_id'];
+
+        // Auto-execute all query types to generate results/preview
+        $executeResult = $this->aiQueryService->executeQuery($queryId);
+
+        if (!$executeResult['success']) {
+            return back()->with('error', $executeResult['error']);
+        }
+
+        // If this is a follow-up, redirect to the root conversation ID
+        // Otherwise redirect to the new query (which becomes the conversation root)
+        $conversationId = $contextQueryId ?? $queryId;
+
+        return redirect()->route('admin.ai-query.results', ['queryId' => $conversationId]);
+    }
+
+    public function results($queryId)
+    {
+        // Load the conversation root query
+        $rootQuery = DB::table('ai_queries')->where('id', $queryId)->first();
+
+        if (!$rootQuery || $rootQuery->user_id != Auth::id()) {
+            abort(404);
+        }
+
+        // Load all queries in this conversation (root + all follow-ups)
+        // Only include queries explicitly linked to this conversation via parent_query_id
+        $conversationQueries = DB::table('ai_queries')
+            ->where('user_id', Auth::id())
+            ->where(function ($query) use ($queryId) {
+                $query->where('id', $queryId)
+                    ->orWhere(function ($q) use ($queryId) {
+                        $q->whereRaw("JSON_EXTRACT(results, '$.parent_query_id') = ?", [$queryId])
+                          ->whereNotNull(DB::raw("JSON_EXTRACT(results, '$.parent_query_id')"));
+                    });
+            })
+            ->orderBy('id', 'asc')
+            ->get();
+
+        // Format conversation for display
+        $conversation = [];
+        foreach ($conversationQueries as $query) {
+            $conversation[] = [
+                'id' => $query->id,
+                'prompt' => $query->prompt,
+                'operation_type' => $query->operation_type,
+                'queries' => json_decode($query->generated_queries, true),
+                'results' => json_decode($query->results, true),
+                'explanation' => $this->getExplanationFromQueries(json_decode($query->generated_queries, true)),
+            ];
+        }
+
+        // Get the latest query for the main display
+        $latestQuery = end($conversation);
+
+        return view('admin.ai-query.results', [
+            'conversationId' => $queryId,
+            'conversation' => $conversation,
+            'latestQuery' => $latestQuery,
+            'operationType' => $latestQuery['operation_type'],
+            'results' => $latestQuery['results'],
+        ]);
+    }
+
+    protected function getExplanationFromQueries($queries)
+    {
+        if (empty($queries)) {
+            return 'No explanation available.';
+        }
+
+        return collect($queries)->pluck('purpose')->join('; ');
+    }
+
+    public function execute(Request $request)
+    {
+        $request->validate([
+            'query_id' => 'required|integer',
+        ]);
+
+        $queryId = $request->input('query_id');
+
+        $result = $this->aiQueryService->executeQuery($queryId);
+
+        if (!$result['success']) {
+            return response()->json([
+                'success' => false,
+                'error' => $result['error'],
+            ], 400);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $result['data'],
+        ]);
+    }
+
+    public function applyBulkUpdate(Request $request)
+    {
+        $request->validate([
+            'query_id' => 'required|integer',
+            'selected_ids' => 'required|array',
+            'selected_ids.*' => 'integer',
+        ]);
+
+        $queryId = $request->input('query_id');
+        $selectedIds = $request->input('selected_ids');
+
+        Log::info('Applying bulk update', [
+            'query_id' => $queryId,
+            'selected_count' => count($selectedIds),
+        ]);
+
+        $result = $this->aiQueryService->applyBulkUpdate($queryId, $selectedIds);
+
+        if (!$result['success']) {
+            return back()->with('error', $result['error']);
+        }
+
+        // Re-execute the query to show remaining items
+        $executeResult = $this->aiQueryService->executeQuery($queryId);
+
+        if (!$executeResult['success']) {
+            Log::warning('Failed to re-execute query after bulk update', [
+                'query_id' => $queryId,
+                'error' => $executeResult['error'],
+            ]);
+        }
+
+        $appliedCount = $result['applied_count'];
+        $successMessage = "Successfully applied changes to {$appliedCount} item(s).";
+
+        return redirect()->route('admin.ai-query.results', ['queryId' => $queryId])
+            ->with('success', $successMessage);
+    }
+
+    public function editQuery(Request $request)
+    {
+        $request->validate([
+            'query_id' => 'required|integer',
+            'queries' => 'required|array',
+        ]);
+
+        $queryId = $request->input('query_id');
+        $queries = $request->input('queries');
+
+        try {
+            DB::table('ai_queries')
+                ->where('id', $queryId)
+                ->where('user_id', Auth::id())
+                ->update([
+                    'generated_queries' => json_encode($queries),
+                    'updated_at' => now(),
+                ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Query updated successfully',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Query edit failed', [
+                'query_id' => $queryId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 400);
+        }
+    }
+
+    public function history(Request $request)
+    {
+        $limit = $request->input('limit', 10);
+        $history = $this->aiQueryService->getQueryHistory(Auth::id(), $limit);
+
+        return response()->json([
+            'success' => true,
+            'history' => $history,
+        ]);
+    }
+
+    public function executeCustom(Request $request)
+    {
+        $request->validate([
+            'conversation_id' => 'required|integer',
+            'query_id' => 'required|integer',
+            'queries' => 'required|array',
+            'queries.*.query' => 'required|string',
+            'queries.*.type' => 'required|string',
+            'queries.*.purpose' => 'required|string',
+        ]);
+
+        $queryId = $request->input('query_id');
+        $conversationId = $request->input('conversation_id');
+        $customQueries = $request->input('queries');
+
+        // Verify ownership
+        $queryRecord = DB::table('ai_queries')->where('id', $queryId)->first();
+        if (!$queryRecord || $queryRecord->user_id != Auth::id()) {
+            abort(403);
+        }
+
+        // Update the query record with custom SQL
+        DB::table('ai_queries')
+            ->where('id', $queryId)
+            ->update([
+                'generated_queries' => json_encode($customQueries),
+                'updated_at' => now(),
+            ]);
+
+        // Re-execute the query
+        $executeResult = $this->aiQueryService->executeQuery($queryId);
+
+        if (!$executeResult['success']) {
+            return back()->with('error', $executeResult['error']);
+        }
+
+        return redirect()->route('admin.ai-query.results', ['queryId' => $conversationId])
+            ->with('success', 'Custom query executed successfully.');
+    }
+
+    public function editPrompt(Request $request)
+    {
+        $request->validate([
+            'query_id' => 'required|integer',
+            'conversation_id' => 'required|integer',
+            'prompt' => 'required|string|min:3',
+        ]);
+
+        $queryId = $request->input('query_id');
+        $conversationId = $request->input('conversation_id');
+        $newPrompt = $request->input('prompt');
+
+        // Verify ownership
+        $queryRecord = DB::table('ai_queries')->where('id', $queryId)->first();
+        if (!$queryRecord || $queryRecord->user_id != Auth::id()) {
+            abort(403);
+        }
+
+        // Delete all queries after this one in the conversation
+        DB::table('ai_queries')
+            ->whereRaw("JSON_EXTRACT(results, '$.parent_query_id') = ?", [$conversationId])
+            ->where('id', '>', $queryId)
+            ->delete();
+
+        // Update the prompt
+        DB::table('ai_queries')
+            ->where('id', $queryId)
+            ->update([
+                'prompt' => $newPrompt,
+                'updated_at' => now(),
+            ]);
+
+        // Get the context (parent query ID if this is a follow-up)
+        $results = json_decode($queryRecord->results, true);
+        $contextQueryId = $results['parent_query_id'] ?? null;
+
+        // Re-process the query with new prompt
+        $result = $this->aiQueryService->processQuery(
+            $newPrompt,
+            Auth::id(),
+            $contextQueryId
+        );
+
+        if (!$result['success']) {
+            return back()->with('error', $result['error']);
+        }
+
+        // Execute the new query
+        $newQueryId = $result['query_id'];
+        $executeResult = $this->aiQueryService->executeQuery($newQueryId);
+
+        if (!$executeResult['success']) {
+            return back()->with('error', $executeResult['error']);
+        }
+
+        return redirect()->route('admin.ai-query.results', ['queryId' => $conversationId])
+            ->with('success', 'Prompt updated and conversation reset to this point.');
+    }
+}

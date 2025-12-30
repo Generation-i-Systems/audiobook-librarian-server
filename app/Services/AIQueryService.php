@@ -6,7 +6,6 @@ use App\Models\Book;
 use App\Models\Author;
 use App\Models\Genre;
 use App\Models\Series;
-use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -830,7 +829,7 @@ PROMPT;
 
     protected function formatFieldsList(array $fields): string
     {
-        return implode("\n", array_map(fn($field) => "- {$field}", $fields));
+        return implode("\n", array_map(fn ($field) => "- {$field}", $fields));
     }
 
     protected function executeSingleQuery(array $queryDef)
