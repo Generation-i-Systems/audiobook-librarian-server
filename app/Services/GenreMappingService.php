@@ -94,14 +94,14 @@ class GenreMappingService
             'classics' => 'Classic',
             'literature' => 'Classic',
 
-            // General Fiction (default)
-            'fiction' => 'General Fiction',
-            'general fiction' => 'General Fiction',
-            'contemporary' => 'General Fiction',
+            // Generic fiction labels are too broad for most libraries; prefer Other
+            'fiction' => 'Other',
+            'general fiction' => 'Other',
+            'contemporary' => 'Other',
 
-            // Garbage genres that should never exist - map to General Fiction
-            'copyright' => 'General Fiction',
-            'trademarks' => 'General Fiction',
+            // Garbage genres that should never exist - map to Other
+            'copyright' => 'Other',
+            'trademarks' => 'Other',
         ];
 
         // Check for direct match
@@ -116,8 +116,8 @@ class GenreMappingService
             }
         }
 
-        // Default to General Fiction
-        return 'General Fiction';
+        // Default to Other
+        return 'Other';
     }
 
     /**

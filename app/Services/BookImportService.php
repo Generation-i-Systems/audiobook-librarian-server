@@ -59,6 +59,53 @@ class BookImportService
             && $sourceStat['dev'] === $targetStat['dev'];
     }
 
+    protected function normalizeSourcePathForImport(string $sourcePath): string
+    {
+        $normalizedPath = rtrim($sourcePath, '/');
+
+        while (File::isDirectory($normalizedPath)) {
+            $files = File::files($normalizedPath);
+            $dirs = File::directories($normalizedPath);
+
+            if (count($files) > 0 || count($dirs) !== 1) {
+                break;
+            }
+
+            $normalizedPath = rtrim($dirs[0], '/');
+        }
+
+        return $normalizedPath;
+    }
+
+    protected function moveNonAudioFilesToDirectory(string $sourceDir, string $targetDir): void
+    {
+        if (!File::isDirectory($sourceDir)) {
+            return;
+        }
+
+        if (!File::isDirectory($targetDir)) {
+            File::makeDirectory($targetDir, 0775, true);
+            $this->setDirectoryOwnership($targetDir);
+        }
+
+        $files = File::files($sourceDir);
+        foreach ($files as $file) {
+            $path = $file->getPathname();
+            $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+            if (in_array($extension, self::AUDIO_EXTENSIONS, true)) {
+                continue;
+            }
+
+            $targetPath = rtrim($targetDir, '/') . '/' . $file->getFilename();
+            File::move($path, $targetPath);
+            $this->setFileOwnership($targetPath);
+        }
+
+        if (File::isDirectory($sourceDir) && count(File::allFiles($sourceDir)) === 0) {
+            File::deleteDirectory($sourceDir);
+        }
+    }
+
     public function directoryHasAudioFiles(string $directory): bool
     {
         if (File::isFile($directory)) {
@@ -683,7 +730,8 @@ class BookImportService
                 throw new \Exception('Book storage path not configured');
             }
 
-            $sourcePath = $audiobook['path'];
+            $originalSourcePath = $audiobook['path'];
+            $sourcePath = $this->normalizeSourcePathForImport($originalSourcePath);
             $targetDir = $options['target_directory'] ?? $this->generateTargetDirectory(
                 $book,
                 $bookStoragePath,
@@ -756,6 +804,9 @@ class BookImportService
                         'new' => $targetDir,
                         'book_id' => $book->id,
                     ]);
+
+                    // Move cover images / librarian.json (non-audio files) into the conflict-resolved directory
+                    $this->moveNonAudioFilesToDirectory($originalTargetDir, $targetDir);
                 }
             }
 
@@ -772,7 +823,9 @@ class BookImportService
             if ($operation === 'move') {
                 $this->moveDirectoryContents($sourcePath, $targetDir);
                 // Clean up source directory after successful move
-                $this->cleanupSourceDirectory($audiobook);
+                $cleanupAudiobook = $audiobook;
+                $cleanupAudiobook['path'] = $originalSourcePath;
+                $this->cleanupSourceDirectory($cleanupAudiobook);
             } else {
                 $this->copyDirectoryContents($sourcePath, $targetDir);
             }
@@ -786,6 +839,9 @@ class BookImportService
 
             // Save any changes (including directory_path if there was a conflict)
             $book->save();
+
+            // Ensure librarian.json is generated in the final directory (especially after conflict renames)
+            $this->updateLibraryJson($book);
 
             return true;
         } catch (\Exception $e) {

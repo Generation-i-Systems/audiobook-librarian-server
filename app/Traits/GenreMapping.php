@@ -5,15 +5,36 @@ namespace App\Traits;
 trait GenreMapping
 {
     /**
+     * Get list of valid genres
+     */
+    public function getValidGenres(): array
+    {
+        return [
+            'Kids',
+            'Religion',
+            'General Fiction',
+            'Church',
+            'Science',
+            'Historical Fiction',
+            'Computer',
+            'Classic',
+            'History',
+            'Non Fiction',
+            'Action',
+            'LitRPG',
+            'Romance',
+            'Science Fiction',
+            'Other',
+            'Fantasy',
+        ];
+    }
+
+    /**
      * Map AI-extracted genres to valid database genres
      */
     protected function mapToValidGenre(string $aiGenre): string
     {
-        $validGenres = [
-            'Kids', 'Religion', 'General Fiction', 'Church', 'Science', 'Historical Fiction',
-            'Computer', 'Classic', 'History', 'Non Fiction', 'Action', 'LitRPG',
-            'Romance', 'Science Fiction', 'Other', 'Fantasy'
-        ];
+        $validGenres = $this->getValidGenres();
 
         // Direct match (case-insensitive)
         foreach ($validGenres as $validGenre) {

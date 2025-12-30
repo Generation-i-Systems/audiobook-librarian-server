@@ -41,6 +41,7 @@ class BookDirectoryMoveService
             ];
         }
 
+        $newDirectoryPath = $this->resolveNonConflictingDirectoryPath($disk, $newDirectoryPath);
         $disk->makeDirectory($newDirectoryPath);
 
         // Set directory ownership
@@ -55,9 +56,11 @@ class BookDirectoryMoveService
         $newCoverImageBasename = $coverImageBasename;
 
         foreach ($files as $file) {
-            $relative = Str::startsWith($file, $oldDirectoryPath . '/')
-                ? Str::after($file, $oldDirectoryPath . '/')
-                : basename($file);
+            if (Str::startsWith($file, $oldDirectoryPath . '/')) {
+                $relative = Str::after($file, $oldDirectoryPath . '/');
+            } else {
+                $relative = basename($file);
+            }
 
             $target = rtrim($newDirectoryPath, '/') . '/' . ltrim($relative, '/');
             $targetDir = trim((string) dirname($target), '/');
@@ -116,7 +119,46 @@ class BookDirectoryMoveService
         return [
             'moved' => true,
             'coverImage' => $newCoverImageBasename,
+            'directoryPath' => $newDirectoryPath,
         ];
+    }
+
+    private function resolveNonConflictingDirectoryPath($disk, string $directoryPath): string
+    {
+        $directoryPath = trim($directoryPath, '/');
+        if ($directoryPath === '') {
+            return $directoryPath;
+        }
+
+        if (method_exists($disk, 'directoryExists')) {
+            $exists = $disk->{'directoryExists'}($directoryPath);
+        } else {
+            $exists = count($disk->allFiles($directoryPath)) > 0;
+        }
+
+        if (!$exists) {
+            return $directoryPath;
+        }
+
+        if (count($disk->allFiles($directoryPath)) === 0) {
+            return $directoryPath;
+        }
+
+        $counter = 1;
+        while (true) {
+            $suffix = '_' . str_pad((string) $counter, 2, '0', STR_PAD_LEFT);
+            $candidate = $directoryPath . $suffix;
+
+            if (method_exists($disk, 'directoryExists')) {
+                $candidateExists = $disk->{'directoryExists'}($candidate);
+            } else {
+                $candidateExists = count($disk->allFiles($candidate)) > 0;
+            }
+            if (!$candidateExists) {
+                return $candidate;
+            }
+            $counter++;
+        }
     }
 
     private function generateNonConflictingPath($disk, string $targetPath): string
