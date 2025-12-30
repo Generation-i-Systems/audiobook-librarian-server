@@ -418,17 +418,17 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::get('/series/{series}/edit', [
         Admin\SeriesController::class,
         'edit',
-    ])->name('admin.series.edit');
+    ])->name('series.edit');
 
     Route::put('/series/{series}', [
         Admin\SeriesController::class,
         'update',
-    ])->name('admin.series.update');
+    ])->name('series.update');
 
     Route::delete('/series/{series}', [
         Admin\SeriesController::class,
         'destroy',
-    ])->name('admin.series.destroy');
+    ])->name('series.destroy');
 
     Route::resource('account_requests', Admin\AccountRequestController::class);
     Route::get('/books/import-from-title', [
