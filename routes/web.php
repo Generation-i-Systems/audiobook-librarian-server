@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin;
+use App\Http\Controllers\Admin\AdminerController;
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\AdminNotificationController;
 use App\Http\Controllers\BookController;
@@ -254,6 +255,9 @@ Route::get('/admin/series-autocomplete', [Admin\BookController::class, 'autocomp
     ->middleware(['auth', 'admin']);
 
 Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(function () {
+    Route::any('/adminer/{any?}', [Admin\AdminerController::class, 'handle'])->where('any', '.*')->name('adminer');
+    // NEW ROUTE FOR DATABASE ADMIN PAGE
+    Route::get('/database', [Admin\AdminerController::class, 'index'])->name('database');
     Route::get('/', function () {
         return redirect()->route('admin.books.index');
     });
@@ -262,6 +266,18 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         ->name('needs_review.index');
     Route::post('/books/resync-from-path', [Admin\BookController::class, 'resyncFromPath'])
         ->name('books.resyncFromPath');
+
+    // AI Query routes
+    Route::post('/ai-query/process', [Admin\AIQueryController::class, 'process'])
+        ->name('ai-query.process');
+    Route::get('/ai-query/results/{queryId}', [Admin\AIQueryController::class, 'results'])
+        ->name('ai-query.results');
+    Route::post('/ai-query/apply-bulk-update', [Admin\AIQueryController::class, 'applyBulkUpdate'])
+        ->name('ai-query.apply-bulk-update');
+    Route::post('/ai-query/execute-custom', [Admin\AIQueryController::class, 'executeCustom'])
+        ->name('ai-query.execute-custom');
+    Route::post('/ai-query/edit-prompt', [Admin\AIQueryController::class, 'editPrompt'])
+        ->name('ai-query.edit-prompt');
 
     // Directory validation routes
     Route::get('/directory-validation', [Admin\DirectoryValidationController::class, 'index'])
@@ -343,6 +359,9 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     // AJAX: Check for directory path conflicts
     Route::post('books/check-directory-conflict', [Admin\BookController::class, 'checkDirectoryConflict'])->name('books.checkDirectoryConflict');
 
+    // AJAX: Planned actions preview for edit form
+    Route::post('books/{id}/planned-actions', [Admin\BookController::class, 'plannedActions'])->name('books.plannedActions');
+
     Route::get('genres/{genre}/authors', [Admin\GenreController::class, 'authors'])->name('genres.authors');
     Route::post('genres/merge', [Admin\GenreController::class, 'merge'])->name('genres.merge');
 
@@ -396,6 +415,21 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         Admin\ManageSeriesController::class,
         'rename',
     ])->name('series.rename');
+
+    Route::get('/series/{series}/edit', [
+        Admin\SeriesController::class,
+        'edit',
+    ])->name('admin.series.edit');
+
+    Route::put('/series/{series}', [
+        Admin\SeriesController::class,
+        'update',
+    ])->name('admin.series.update');
+
+    Route::delete('/series/{series}', [
+        Admin\SeriesController::class,
+        'destroy',
+    ])->name('admin.series.destroy');
 
     Route::resource('account_requests', Admin\AccountRequestController::class);
     Route::get('/books/import-from-title', [
@@ -505,4 +539,11 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         Admin\JobController::class,
         'errors',
     ])->name('jobs.errors');
+
+    // Trash management routes
+    Route::get('/trash', [Admin\TrashController::class, 'index'])->name('trash.index');
+    Route::post('/trash/{id}/restore', [Admin\TrashController::class, 'restore'])->name('trash.restore');
+    Route::delete('/trash/{id}', [Admin\TrashController::class, 'destroy'])->name('trash.destroy');
+    Route::delete('/trash', [Admin\TrashController::class, 'destroyAll'])->name('trash.destroyAll');
+    Route::post('/trash/cleanup', [Admin\TrashController::class, 'applyAutoCleanup'])->name('trash.cleanup');
 });

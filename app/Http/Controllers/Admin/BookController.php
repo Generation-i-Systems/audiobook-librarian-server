@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Services\AudibleService;
 use App\Services\AudiobookBayService;
 use App\Services\BookDirectoryMoveService;
+use App\Services\BookEditPlannedActionsService;
 use App\Services\ExternalCoverService;
 use App\Services\GoogleBooksApiService;
 use App\Services\HardcoverService;
@@ -50,6 +51,20 @@ class BookController extends Controller
         }
 
         return null;
+    }
+
+    public function plannedActions(Request $request, string $id)
+    {
+        $directoryPath = (string) $request->input('directoryPath', '');
+        $coverImageUrl = (string) $request->input('coverImageUrl', '');
+        $audibleCoverImageUrl = (string) $request->input('audibleCoverImageUrl', '');
+
+        $coverUrl = $audibleCoverImageUrl !== '' ? $audibleCoverImageUrl : $coverImageUrl;
+
+        $service = app(BookEditPlannedActionsService::class);
+        $plan = $service->computePlannedActions($id, $directoryPath, $coverUrl);
+
+        return response()->json($plan);
     }
 
     /**
@@ -1360,6 +1375,11 @@ class BookController extends Controller
             $moveService = app(BookDirectoryMoveService::class);
             $moveResult = $moveService->moveBookDirectoryContents($oldDirectoryPath, $newDirectoryPath, $oldCoverBasename);
 
+            if (!empty($moveResult['directoryPath']) && is_string($moveResult['directoryPath'])) {
+                $validated['directoryPath'] = $moveResult['directoryPath'];
+                $newDirectoryPath = $moveResult['directoryPath'];
+            }
+
             $storageRoot = (string) config('app.book_root', env('BOOK_STORAGE_PATH', ''));
             $storageRoot = rtrim($storageRoot, '/');
             if ($storageRoot !== '') {
@@ -1568,6 +1588,21 @@ class BookController extends Controller
             Log::warning('BookController@update: findOrCreateMany failed', ['error' => $e->getMessage()]);
         }
 
+        // Handle needs_review checkbox logic
+        if ($request->has('needsReviewPresent')) {
+            $keptReasons = $request->input('needsReviewReasons', []);
+
+            if (empty($keptReasons)) {
+                // All unchecked - clear needs review
+                $validated['needsReview'] = false;
+                $validated['needsReviewReasons'] = [];
+            } else {
+                // Some kept - update reasons
+                $validated['needsReview'] = true;
+                $validated['needsReviewReasons'] = $keptReasons;
+            }
+        }
+
         Log::debug('BookController@update: calling updateBook', [
             'service_class' => get_class($documentStore),
             'id' => $id,
@@ -1589,28 +1624,22 @@ class BookController extends Controller
      */
     public function destroy(Request $request, $book)
     {
-        $documentStore = $this->documentStoreService;
+        $deletionService = app(\App\Services\BookDeletionService::class);
 
-        // Check if we should delete files (default: true)
-        // Can be overridden with ?delete_files=false query parameter
-        $deleteFiles = $request->query('delete_files', 'true') !== 'false';
+        $deleteFiles = $request->input('delete_files', 'true') === 'true';
 
-        if ($deleteFiles) {
-            $documentStore->deleteBook($book);
-        } else {
-            $documentStore->deleteBook($book, false);
+        $result = $deletionService->moveToTrash($book, $deleteFiles);
+
+        if ($result['success']) {
+            $message = $deleteFiles ? 'Book and files moved to trash successfully.' : 'Book deleted from database (files preserved).';
+
+            return redirect()->route('admin.books.index')
+                ->with('success', $message)
+                ->with('trash_item_id', $result['trash_item_id']);
         }
 
-        if ($deleteFiles) {
-            $message = 'Book and files deleted successfully.';
-        } else {
-            $message = 'Book deleted from database (files preserved).';
-        }
-
-        // Preserve query parameters (except delete_files) to maintain filters/sort
-        $queryParams = $request->except(['delete_files']);
-
-        return redirect()->route('admin.books.index', $queryParams)->with('success', $message);
+        return redirect()->route('admin.books.index')
+            ->with('error', 'Failed to delete book: ' . ($result['error'] ?? 'Unknown error'));
     }
 
     public function download($id)
@@ -2200,12 +2229,15 @@ class BookController extends Controller
                     if ($currentBookId && $book['id'] === $currentBookId) {
                         continue;
                     }
+
+                    $authorDisplay = $book['author'] ?? 'Unknown';
+                    if (is_array($authorDisplay)) {
+                        $authorDisplay = implode(', ', $authorDisplay);
+                    }
                     $conflictingBooks[] = [
                         'id' => $book['id'],
                         'title' => $book['title'] ?? 'Unknown',
-                        'author' => is_array($book['author'] ?? null)
-                            ? implode(', ', $book['author'])
-                            : ($book['author'] ?? 'Unknown'),
+                        'author' => $authorDisplay,
                     ];
                 }
             }

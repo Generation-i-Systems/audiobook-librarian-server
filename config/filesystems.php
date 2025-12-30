@@ -54,6 +54,13 @@ return [
             'report' => false,
         ],
 
+        'trash' => [
+            'driver' => 'local',
+            'root' => env('DELETED_BOOKS_PATH', storage_path('app/trash')),
+            'throw' => false,
+            'report' => false,
+        ],
+
         'covers' => [
             'driver' => 'local',
             'root' => storage_path('app/public/covers'),

@@ -1,5 +1,12 @@
 ## [Unreleased]
 ### Added
+- Book edit page: needs_review_reasons now editable via checkboxes to keep or remove specific review flags
+- Book deletion now moves files to trash instead of permanent deletion
+- BookDeletionService for unified deletion operations across web and CLI
+- Admin trash management page at /admin/trash with restore and permanent delete functionality
+- Trash auto-cleanup by age feature with configurable days threshold
+- Environment variables: DELETED_BOOKS_PATH and TRASH_AUTO_CLEANUP_DAYS
+- Delete button on book edit page with confirmation modal and option to delete files
 - Added `/admin/books/search` support for `source=audiobookbay` and `source=hardcover`
 - Added standalone external integration test suite for metadata lookup (real network calls; not part of default test run)
 - Added import destination audio-file sanity check to prevent successful imports when the destination directory contains no audio files
@@ -10,7 +17,15 @@
 - User edit prompts now support single space (' ') input to clear a field instead of using the default value
 - Added `DocumentStoreServiceInterface::findBookByDirectoryPath()` for consistent directory-based lookups.
 
+### Changed
+- Book edit form: needs_review section now interactive with checkboxes (check to keep reasons, uncheck to remove)
+- BookController::destroy() now uses trash system instead of direct deletion
+- Book delete confirmation shows directory path and file count with option to preserve or delete files
+- `books:info --delete` command now uses trash system instead of permanent deletion
+
 ### Fixed
+- Fixed TUI import preview Directory to always show the destination `directory_path` under `app.book_root` and made it editable during review
+- Fixed TUI prompt area reserving too much vertical space by sizing it dynamically to the current prompt content
 - Fixed `books:info` command not finding books when `BOOK_STORAGE_PATH` is a symlink
   - Now resolves symlinks using `realpath()` for consistent path handling
   - Fixes "Could not read image dimensions" errors when displaying cover images

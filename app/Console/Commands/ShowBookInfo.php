@@ -7,6 +7,7 @@ use App\Models\Book;
 use App\Models\Genre;
 use App\Models\Publisher;
 use App\Models\Series;
+use App\Services\BookDeletionService;
 use App\Services\TerminalImageService;
 use App\Traits\BookImportTrait;
 use Illuminate\Console\Command;
@@ -14,6 +15,7 @@ use Illuminate\Console\Command;
 class ShowBookInfo extends Command
 {
     use BookImportTrait;
+
     protected $signature = 'books:info {directories?*}
                             {--compact : Use compact view instead of table}
                             {--show-paths : Show full paths being checked}
@@ -35,7 +37,8 @@ class ShowBookInfo extends Command
     protected $aliases = ['books:show'];
 
     public function __construct(
-        protected TerminalImageService $terminalImageService
+        protected TerminalImageService $terminalImageService,
+        protected BookDeletionService $deletionService
     ) {
         parent::__construct();
     }
@@ -1346,60 +1349,31 @@ class ShowBookInfo extends Command
             $deleteDirectory = false;
         }
 
-        // Delete the book record
+        // Delete the book using trash system
         try {
-            $book->delete();
-            $this->info("✓ Book record deleted");
-        } catch (\Exception $e) {
-            $this->error("Failed to delete book record: " . $e->getMessage());
-            return 1;
-        }
+            $result = $this->deletionService->moveToTrash((string) $book->id, $deleteDirectory);
 
-        // Delete the directory if requested and safe
-        if ($deleteDirectory && $directoryExists) {
-            try {
-                // Use recursive directory deletion
-                $this->deleteDirectory($fullPath);
-                $this->info("✓ Directory deleted: {$fullPath}");
-            } catch (\Exception $e) {
-                $this->error("Failed to delete directory: " . $e->getMessage());
-                $this->warn("Book record was deleted, but directory remains at: {$fullPath}");
+            if ($result['success']) {
+                if ($deleteDirectory) {
+                    $this->info("✓ Book and files moved to trash");
+                    $this->line("  Trash ID: {$result['trash_item_id']}");
+                    $this->line("  Files moved: {$result['file_count']}");
+                } else {
+                    $this->info("✓ Book record moved to trash (files preserved)");
+                    $this->line("  Trash ID: {$result['trash_item_id']}");
+                }
+                $this->newLine();
+                $this->info("You can restore this book from /admin/trash");
+            } else {
+                $this->error("Failed to delete book: " . ($result['error'] ?? 'Unknown error'));
                 return 1;
             }
+        } catch (\Exception $e) {
+            $this->error("Failed to delete book: " . $e->getMessage());
+            return 1;
         }
 
         $this->info("\n✓ Deletion completed successfully!");
         return 0;
-    }
-
-    /**
-     * Recursively delete a directory
-     */
-    protected function deleteDirectory(string $path): void
-    {
-        if (!is_dir($path)) {
-            throw new \Exception("Not a directory: {$path}");
-        }
-
-        $items = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($path, \RecursiveDirectoryIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
-
-        foreach ($items as $item) {
-            if ($item->isDir()) {
-                if (!rmdir($item->getRealPath())) {
-                    throw new \Exception("Failed to delete directory: " . $item->getRealPath());
-                }
-            } else {
-                if (!unlink($item->getRealPath())) {
-                    throw new \Exception("Failed to delete file: " . $item->getRealPath());
-                }
-            }
-        }
-
-        if (!rmdir($path)) {
-            throw new \Exception("Failed to delete directory: {$path}");
-        }
     }
 }

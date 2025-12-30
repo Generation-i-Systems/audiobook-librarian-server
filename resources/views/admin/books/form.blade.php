@@ -1,6 +1,7 @@
 @extends(isset($layout) ? $layout : 'layouts.app')
 
 @section('content')
+
     <style>
         .cursor-pointer {
             cursor: pointer;
@@ -134,14 +135,27 @@
         @endif
 
         @if(isset($book) && !empty($book['needsReview']) && !empty($book['needsReviewReasons']))
-            <div class="alert alert-warning">
-                <h5 class="alert-heading mb-2"><i class="fas fa-exclamation-triangle me-2"></i>This book needs review</h5>
-                <strong>Reasons:</strong>
-                <ul class="mb-0 mt-2">
-                    @foreach($book['needsReviewReasons'] as $reason)
-                        <li>{{ $reason }}</li>
+            <div class="card mb-3 border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Review Status
+                </div>
+                <div class="card-body">
+                    <p class="mb-2"><strong>This book has been flagged for review.</strong></p>
+                    <p class="text-muted small mb-3">Check the boxes below to <strong>KEEP</strong> those reasons. Unchecked reasons will be removed when you save. If all are unchecked, the needs review flag will be cleared.</p>
+
+                    @foreach($book['needsReviewReasons'] as $index => $reason)
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox"
+                                   name="needsReviewReasons[]" value="{{ $reason }}"
+                                   id="reason-{{ $index }}">
+                            <label class="form-check-label" for="reason-{{ $index }}">
+                                {{ $reason }}
+                            </label>
+                        </div>
                     @endforeach
-                </ul>
+
+                    <input type="hidden" name="needsReviewPresent" value="1">
+                </div>
             </div>
         @endif
 
@@ -454,6 +468,8 @@
                         @enderror
                     </div>
 
+                    <div id="planned-actions-preview" class="small text-muted mb-3" style="display:none;"></div>
+
                     <div class="mb-3">
                         <a href="#" class="text-decoration-none" id="show-files-link">
                             <i class="fas fa-folder-open me-1"></i>View Directory Files
@@ -576,18 +592,6 @@
                     ];
                 }
 
-                // Add Google Books cover if available and not the same as current cover
-                if (!empty($coverAuto) && $coverAuto !== $currentCoverFilename) {
-                    $coverOptions[] = [
-                        'type' => 'google',
-                        'value' => $coverAuto,
-                        'src' => $createCoverUrl($directoryPath, $coverAuto),
-                        'label' => 'Google Books',
-                        'display_name' => $coverAuto,
-                    ];
-                    $addedCovers[] = $coverAuto;
-                }
-
                 // Add Audible cover if available
                 if (!empty($audibleCover) && !in_array($audibleCover, $addedCovers)) {
                     $coverOptions[] = [
@@ -598,6 +602,18 @@
                         'display_name' => $audibleCover,
                     ];
                     $addedCovers[] = $audibleCover;
+                }
+
+                // Add Google Books cover if available and not the same as current cover
+                if (!empty($coverAuto) && $coverAuto !== $currentCoverFilename) {
+                    $coverOptions[] = [
+                        'type' => 'google',
+                        'value' => $coverAuto,
+                        'src' => $createCoverUrl($directoryPath, $coverAuto),
+                        'label' => 'Google Books',
+                        'display_name' => $coverAuto,
+                    ];
+                    $addedCovers[] = $coverAuto;
                 }
 
                 // Add other candidates (already filtered in controller)
@@ -631,6 +647,13 @@
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body">
+                            <div class="mb-3">
+                                <label for="coverImageUrlText" class="form-label">Cover Image URL</label>
+                                <input type="text" class="form-control" id="coverImageUrlText"
+                                    value="{{ old('audibleCoverImageUrl', old('coverImageUrl', '')) }}"
+                                    placeholder="https://...">
+                            </div>
+
                             @if (!empty($coverOptions))
                                             <div class="mb-3" id="cover-candidates-group">
                                                 @php
@@ -978,14 +1001,76 @@
             <div id="directory-files-list" class="mt-2 mb-3" style="display:none; border: 1px solid #ddd; padding: 10px; border-radius: 4px;">
                 {{-- Files will be listed here by JavaScript --}}
             </div>
-            <button type="submit" class="btn btn-primary" id="modal-{{ isset($book) ? 'update' : 'create' }}-btn">{{ isset($book) ? 'Update' : 'Create' }}</button>
-            @if(!empty($isModal))
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="modal-cancel-btn">Cancel</button>
+            @if(isset($book))
+                <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                    <div>
+                        <button type="submit" class="btn btn-primary" id="modal-update-btn">Save Changes</button>
+                        @if(!empty($isModal))
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="modal-cancel-btn">Cancel</button>
+                        @else
+                            <a href="{{ $finalReturnUrl ?? route('admin.books.index') }}" class="btn btn-secondary">Cancel</a>
+                        @endif
+                    </div>
+                    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteBookModal">
+                        <i class="fas fa-trash me-2"></i>Delete Book
+                    </button>
+                </div>
             @else
-                <a href="{{ $finalReturnUrl ?? route('admin.books.index') }}" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary" id="modal-create-btn">Create</button>
+                @if(!empty($isModal))
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="modal-cancel-btn">Cancel</button>
+                @else
+                    <a href="{{ $finalReturnUrl ?? route('admin.books.index') }}" class="btn btn-secondary">Cancel</a>
+                @endif
             @endif
         </form>
     </div>
+
+    {{-- Delete Book Modal --}}
+    @if(isset($book))
+    <div class="modal fade" id="deleteBookModal" tabindex="-1" aria-labelledby="deleteBookModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="deleteBookModalLabel">Delete Book?</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2"><strong>{{ $book['title'] }}</strong></p>
+                    @if(!empty($book['directoryPath']))
+                        <p class="text-muted small mb-3">Directory: <code>{{ $book['directoryPath'] }}</code></p>
+                    @endif
+
+                    <div class="form-check mt-3">
+                        <input class="form-check-input" type="checkbox" id="deleteFilesCheckbox" checked>
+                        <label class="form-check-label" for="deleteFilesCheckbox">
+                            Also delete files from disk (moved to trash)
+                        </label>
+                    </div>
+
+                    <div class="alert alert-info mt-3 mb-0">
+                        <small><i class="fas fa-info-circle me-2"></i>Files will be moved to trash and can be restored from the admin trash page.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <form id="deleteBookForm" action="{{ route('admin.books.destroy', $book['id']) }}" method="POST" style="display:inline;">
+                        @csrf
+                        @method('DELETE')
+                        <input type="hidden" name="delete_files" id="deleteFilesInput" value="true">
+                        <button type="submit" class="btn btn-danger">Delete Book</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    document.getElementById('deleteFilesCheckbox')?.addEventListener('change', function() {
+        document.getElementById('deleteFilesInput').value = this.checked ? 'true' : 'false';
+    });
+    </script>
+    @endif
 
     {{-- Series Rename Modal --}}
     <div class="modal fade" id="renameSeriesModal" tabindex="-1" aria-labelledby="renameSeriesModalLabel" aria-hidden="true">
@@ -1176,6 +1261,9 @@
             window.BOOK_FORM_ROUTES.browseDirectories = "{{ route('admin.books.browseDirectories') }}";
             window.BOOK_FORM_ROUTES.parsePath = "{{ route('admin.books.parsePath') }}";
             window.BOOK_FORM_ROUTES.checkDirectoryConflict = "{{ route('admin.books.checkDirectoryConflict') }}";
+            @if(isset($book) && !empty($book['id']))
+                window.BOOK_FORM_ROUTES.plannedActions = "{{ route('admin.books.plannedActions', ['id' => $book['id']]) }}";
+            @endif
 
             // Debug: Confirm jQuery and jQuery UI are loaded
             console.log('window.jQuery:', typeof window.jQuery, window.jQuery ? 'OK' : 'MISSING');
@@ -1184,6 +1272,7 @@
 
         {{-- Include form.js, directory-browser.js, series-rename.js, and directory-conflict.js scripts --}}
         <script src="{{ asset('js/admin/books/form.js') }}?v={{ filemtime(public_path('js/admin/books/form.js')) }}"></script>
+        <script src="{{ asset('js/admin/books/planned-actions.js') }}?v={{ filemtime(public_path('js/admin/books/planned-actions.js')) }}"></script>
         <script src="{{ asset('js/admin/books/directory-browser.js') }}?v={{ filemtime(public_path('js/admin/books/directory-browser.js')) }}"></script>
         <script src="{{ asset('js/admin/books/series-rename.js') }}?v={{ filemtime(public_path('js/admin/books/series-rename.js')) }}"></script>
         <script src="{{ asset('js/admin/books/directory-conflict.js') }}?v={{ filemtime(public_path('js/admin/books/directory-conflict.js')) }}"></script>
@@ -1328,4 +1417,5 @@
     </div>
 
     {{-- Removed duplicate book-autocomplete.js - form.js already handles autocomplete with jQuery UI --}}
+
 @endsection
