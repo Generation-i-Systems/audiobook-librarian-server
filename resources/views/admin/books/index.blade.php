@@ -4,6 +4,8 @@
     <div class="container">
         <h1>Manage Books</h1>
 
+        @include('components.ai-query-prompt')
+
         <form action="{{ route('admin.books.index') }}" method="GET" id="filter-form">
             <div class="input-group mb-3">
                 <input type="text" class="form-control" placeholder="Search title, author, or series" name="search"

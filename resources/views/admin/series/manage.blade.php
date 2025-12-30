@@ -116,6 +116,11 @@
                         <div id="collapse-{{ $loop->index }}" class="accordion-collapse collapse" data-bs-parent="#seriesAccordion">
                             <div class="accordion-body">
                                 <div class="mb-3">
+                                    @if(isset($seriesIds[$seriesName]))
+                                        <a href="{{ route('admin.series.edit', $seriesIds[$seriesName]) }}" class="btn btn-sm btn-primary">
+                                            <i class="fas fa-pencil-alt me-1"></i>Edit Series
+                                        </a>
+                                    @endif
                                     <button class="btn btn-sm btn-secondary" onclick="showRenameForm('{{ $seriesName }}', {{ $loop->index }})">
                                         <i class="fas fa-edit me-1"></i>Rename Series
                                     </button>

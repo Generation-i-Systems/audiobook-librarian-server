@@ -4,6 +4,8 @@
     <div class="container">
         <h1>Genres</h1>
 
+        @include('components.ai-query-prompt')
+
         @if(session('success'))
             <div class="alert alert-success">
                 {{ session('success') }}

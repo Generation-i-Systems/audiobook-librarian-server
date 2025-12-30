@@ -65,6 +65,10 @@ return Application::configure(basePath: dirname(__DIR__))
                  ->appendOutputTo(storage_path('logs/favorite-notifications.log'));
     })
     ->withMiddleware(function (Middleware $middleware) {
+        $middleware->validateCsrfTokens(except: [
+            'admin/adminer*',
+        ]);
+
         $middleware->api([
             \Illuminate\Cookie\Middleware\EncryptCookies::class,
             \Illuminate\Session\Middleware\StartSession::class,

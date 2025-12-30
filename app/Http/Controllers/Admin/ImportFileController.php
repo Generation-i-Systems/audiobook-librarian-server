@@ -207,20 +207,20 @@ class ImportFileController extends Controller
             // Get directories
             $allowedExtensions = Config::get('import.allowed_extensions', []);
             $directories = collect(File::directories($absPath))
-                ->filter(function ($d) use ($allowedExtensions) {
-                    // Check if the directory contains any files with allowed extensions
-                    $hasMatchingFiles = collect(File::files($d))
-                        ->filter(function ($f) use ($allowedExtensions) {
-                            return in_array(strtolower($f->getExtension()), $allowedExtensions);
-                        })
-                        ->isNotEmpty();
+                ->filter(function ($dir) use ($allowedExtensions) {
+                    $dirFiles = File::files($dir);
+                    foreach ($dirFiles as $file) {
+                        if (in_array(strtolower($file->getExtension()), $allowedExtensions, true)) {
+                            return true;
+                        }
+                    }
 
-                    return $hasMatchingFiles;
+                    return false;
                 })
-                ->map(function ($d) {
+                ->map(function ($dir) {
                     return [
                         'type' => 'dir',
-                        'name' => basename($d),
+                        'name' => basename($dir),
                     ];
                 });
 
@@ -1612,11 +1612,19 @@ class ImportFileController extends Controller
             return response()->json(['success' => false, 'message' => 'File or directory does not exist'], 404);
         }
 
-        $destRoot = config('app.book_root')
-            ?? env('BOOK_STORAGE_PATH')
-            ?? Config::get('audiobooks.root')
-            ?? Config::get('import.dest_root')
-            ?? storage_path('audiobooks');
+        $destRoot = (string) config('app.book_root', '');
+        if ($destRoot === '') {
+            $destRoot = (string) env('BOOK_STORAGE_PATH', '');
+        }
+        if ($destRoot === '') {
+            $destRoot = (string) Config::get('audiobooks.root', '');
+        }
+        if ($destRoot === '') {
+            $destRoot = (string) Config::get('import.dest_root', '');
+        }
+        if ($destRoot === '') {
+            $destRoot = storage_path('audiobooks');
+        }
 
         $genrePath = $request->input('genrePath', $request->input('genre'));
 
@@ -1635,21 +1643,15 @@ class ImportFileController extends Controller
             }
         }
 
-        $basename = basename($absPath);
-        $destDirBasename = basename($destDir);
-
-        if ($destDirBasename === $basename) {
-            $target = $destDir;
-        } else {
+        if ($type === 'file') {
+            $basename = basename($absPath);
             $target = $destDir . DIRECTORY_SEPARATOR . $basename;
-        }
-
-        if (realpath($absPath) !== realpath($target)) {
-            if ($type === 'file') {
+            if (realpath($absPath) !== realpath($target)) {
                 File::move($absPath, $target);
-            } else { // $type === 'dir'
-                File::moveDirectory($absPath, $target);
             }
+        } else {
+            $sourceDir = $this->normalizeSourcePathForMoveSelected($absPath);
+            $this->moveDirectoryContentsToTarget($sourceDir, $destDir);
         }
 
         $meta = $this->extract($request)->getData(true);
@@ -1667,6 +1669,66 @@ class ImportFileController extends Controller
         } else {
             // When coming from main site, don't include URL parameters
             return redirect()->route('admin.books.create');
+        }
+    }
+
+    protected function normalizeSourcePathForMoveSelected(string $sourcePath): string
+    {
+        $normalizedPath = rtrim($sourcePath, '/');
+
+        while (File::isDirectory($normalizedPath)) {
+            $files = File::files($normalizedPath);
+            $dirs = File::directories($normalizedPath);
+
+            if (count($files) > 0 || count($dirs) !== 1) {
+                break;
+            }
+
+            $normalizedPath = rtrim($dirs[0], '/');
+        }
+
+        return $normalizedPath;
+    }
+
+    protected function moveDirectoryContentsToTarget(string $sourceDir, string $destDir): void
+    {
+        if (!File::isDirectory($destDir)) {
+            File::makeDirectory($destDir, 0775, true);
+        }
+
+        $files = File::allFiles($sourceDir);
+        foreach ($files as $file) {
+            $sourceFilePath = $file->getPathname();
+            $relativePath = str_replace(rtrim($sourceDir, '/') . '/', '', $sourceFilePath);
+            $targetFile = rtrim($destDir, '/') . '/' . ltrim($relativePath, '/');
+
+            $targetSubDir = dirname($targetFile);
+            if (!File::isDirectory($targetSubDir)) {
+                File::makeDirectory($targetSubDir, 0775, true);
+            }
+
+            if (File::exists($targetFile)) {
+                $pathInfo = pathinfo($targetFile);
+                $counter = 1;
+                while (true) {
+                    $suffix = '_' . str_pad((string) $counter, 2, '0', STR_PAD_LEFT);
+                    $candidate = ($pathInfo['dirname'] ?? '') . '/' . ($pathInfo['filename'] ?? 'file') . $suffix;
+                    if (!empty($pathInfo['extension'])) {
+                        $candidate .= '.' . $pathInfo['extension'];
+                    }
+                    if (!File::exists($candidate)) {
+                        $targetFile = $candidate;
+                        break;
+                    }
+                    $counter++;
+                }
+            }
+
+            File::move($sourceFilePath, $targetFile);
+        }
+
+        if (count(File::allFiles($sourceDir)) === 0) {
+            File::deleteDirectory($sourceDir);
         }
     }
 

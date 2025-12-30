@@ -4,6 +4,8 @@
     <div class="container">
         <h1>Manage Authors</h1>
 
+        @include('components.ai-query-prompt')
+
         <form action="{{ route('admin.authors.index') }}" method="GET" class="mb-3">
             <div class="row g-2 align-items-end">
                 <div class="col-md-4">

@@ -85,14 +85,37 @@ class AuthorController extends Controller
     }
 
 
-    public function edit($id)
+    public function edit($id, Request $request)
     {
         $author = $this->documentStoreService->getAuthor($id);
         if (!$author) {
             abort(404);
         }
 
-        return view('admin.authors.edit', compact('author'));
+        $page = max(1, (int) $request->input('page', 1));
+        $perPage = 25;
+
+        $booksResult = $this->documentStoreService->listBooks(
+            page: $page,
+            perPage: $perPage,
+            filters: ['author' => $author['name']],
+            withRelated: true,
+            sort: 'title',
+            order: 'asc'
+        );
+
+        $books = $booksResult['data'] ?? [];
+        $total = $booksResult['total'] ?? 0;
+        $totalPages = $perPage > 0 ? (int) ceil($total / $perPage) : 1;
+
+        return view('admin.authors.edit', [
+            'author' => $author,
+            'books' => $books,
+            'currentPage' => $page,
+            'totalPages' => $totalPages,
+            'total' => $total,
+            'perPage' => $perPage,
+        ]);
     }
 
 

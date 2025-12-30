@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\Admin;
-use App\Http\Controllers\Admin\AdminerController;
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\AdminNotificationController;
 use App\Http\Controllers\BookController;

@@ -103,14 +103,38 @@ class GenreController extends Controller
     }
 
 
-    public function edit($id)
+    public function edit($id, Request $request)
     {
         try {
             $genre = $this->documentStoreService->getGenre($id);
             if (!$genre) {
                 abort(404, 'Genre not found');
             }
-            return view('admin.genres.edit', compact('genre'));
+
+            $page = max(1, (int) $request->input('page', 1));
+            $perPage = 25;
+
+            $booksResult = $this->documentStoreService->listBooks(
+                page: $page,
+                perPage: $perPage,
+                filters: ['genre' => $genre['name']],
+                withRelated: true,
+                sort: 'title',
+                order: 'asc'
+            );
+
+            $books = $booksResult['data'] ?? [];
+            $total = $booksResult['total'] ?? 0;
+            $totalPages = $perPage > 0 ? (int) ceil($total / $perPage) : 1;
+
+            return view('admin.genres.edit', [
+                'genre' => $genre,
+                'books' => $books,
+                'currentPage' => $page,
+                'totalPages' => $totalPages,
+                'total' => $total,
+                'perPage' => $perPage,
+            ]);
         } catch (\Exception $e) {
             Log::error('Failed to load genre for editing: ' . $e->getMessage());
             return redirect()->route('admin.genres.index')->with('error', 'Failed to load genre for editing.');

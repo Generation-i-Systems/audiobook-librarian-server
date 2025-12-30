@@ -57,6 +57,13 @@ class ManageSeriesController extends Controller
         // Sort series by name
         ksort($seriesGroups);
 
+        // Get series IDs for each series name
+        $seriesIds = [];
+        $allSeriesList = $this->documentStore->listSeries();
+        foreach ($allSeriesList as $series) {
+            $seriesIds[$series['name']] = $series['id'];
+        }
+
         // Identify potential merges (books with similar directory paths)
         foreach ($seriesGroups as $seriesName => $books) {
             if (count($books) <= 1) {
@@ -94,6 +101,7 @@ class ManageSeriesController extends Controller
             'seriesGroups' => $seriesGroups,
             'potentialMerges' => $potentialMerges,
             'search' => $search,
+            'seriesIds' => $seriesIds,
         ]);
     }
 

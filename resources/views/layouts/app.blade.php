@@ -94,6 +94,9 @@ use Illuminate\Support\Facades\Route;
                                     <a class="nav-link" style="color:white" href="{{ route('admin.users.index') }}">User
                                         Management</a>
                                 </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" style="color:white" href="{{ route('admin.database') }}">Database Admin</a>
+                                </li>
                             @else
                                 <!-- Public Links (Show on public pages) -->
                                 <li class="nav-item">
