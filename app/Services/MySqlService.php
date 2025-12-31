@@ -1357,6 +1357,14 @@ class MySqlService implements DocumentStoreServiceInterface
         try {
             $book = Book::findOrFail($id);
 
+            Log::info('MySqlService@updateBook: Starting update', [
+                'book_id' => $id,
+                'has_needsReview' => isset($data['needsReview']) || isset($data['needs_review']),
+                'needsReview_value' => $data['needsReview'] ?? $data['needs_review'] ?? 'NOT SET',
+                'has_needsReviewReasons' => isset($data['needsReviewReasons']) || isset($data['needs_review_reasons']),
+                'needsReviewReasons_value' => $data['needsReviewReasons'] ?? $data['needs_review_reasons'] ?? 'NOT SET',
+            ]);
+
             $normalizedCover = $this->normalizeCoverImageValue($data['cover_image'] ?? $data['coverImage'] ?? null);
 
             // Handle publishedYear -> release_date mapping
