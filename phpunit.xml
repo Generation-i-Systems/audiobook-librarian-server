@@ -38,6 +38,8 @@
     <!-- Firebase support removed - application now uses MySQL only -->
     <server name="DOCUMENT_STORE_DRIVER" value="sqlite"/>
     <server name="LOG_CHANNEL" value="testing"/>
+    <!-- Disable Vite in tests to avoid manifest requirement -->
+    <server name="VITE_ENABLED" value="false"/>
     <!-- Force override of .env file -->
     <server name="DB_HOST" value=""/>
     <server name="DB_PORT" value=""/>
