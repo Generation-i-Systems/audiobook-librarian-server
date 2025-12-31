@@ -7,6 +7,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Mockery;
 use Tests\TestCase;
 
 /**
@@ -38,14 +39,6 @@ class MoveBookDirectoryCriticalTest extends TestCase
             File::deleteDirectory($this->testBookRoot);
         }
 
-        // Restore any dropped tables
-        try {
-            DB::statement('CREATE TABLE IF NOT EXISTS books AS SELECT * FROM books_backup');
-            DB::statement('DROP TABLE IF EXISTS books_backup');
-        } catch (\Exception $e) {
-            // Ignore cleanup errors
-        }
-
         parent::tearDown();
     }
 
@@ -56,28 +49,44 @@ class MoveBookDirectoryCriticalTest extends TestCase
         $sourcePath = 'Fantasy/Author/Book1';
         $destPath = 'Sci-Fi/Author/Book1';
 
+        $this->createTestDirectory($sourcePath);
         $book = $this->createTestBook($sourcePath);
+        $originalBookData = $book->toArray();
 
-        // Force database error by disabling foreign key checks temporarily
-        DB::statement('SET FOREIGN_KEY_CHECKS = 0');
-        DB::statement('DROP TABLE IF EXISTS books_backup');
-        DB::statement('CREATE TABLE books_backup AS SELECT * FROM books');
-        DB::statement('DROP TABLE books');
-        DB::statement('SET FOREIGN_KEY_CHECKS = 1');
+        // Verify source directory exists before test
+        $this->assertDirExists($this->testBookRoot . '/' . $sourcePath);
 
-        // Act - should fail
+        // Mock the DocumentStoreService to simulate a database failure
+        $mockDocumentStore = Mockery::mock(\App\Contracts\DocumentStoreServiceInterface::class);
+
+        // First call to getBookByDirectoryPath should succeed
+        $mockDocumentStore->shouldReceive('getBookByDirectoryPath')
+            ->with($sourcePath)
+            ->andReturn($originalBookData);
+
+        // Update call should fail with an exception
+        $mockDocumentStore->shouldReceive('updateBook')
+            ->with($book->id, Mockery::type('array'))
+            ->andThrow(new \Exception('Database connection failed'));
+
+        // Mock other methods that might be called
+        $mockDocumentStore->shouldReceive('bookExistsByDirectoryPath')->andReturn(true);
+        $mockDocumentStore->shouldReceive('jobExistsByDirectoryPath')->andReturn(false);
+
+        $this->app->instance(\App\Contracts\DocumentStoreServiceInterface::class, $mockDocumentStore);
+
+        // Act - should fail due to mocked database exception
         $result = $this->artisan('books:move', [
             'sources' => [$sourcePath, $destPath],
         ])->run();
 
-        // Restore table
-        DB::statement('SET FOREIGN_KEY_CHECKS = 0');
-        DB::statement('CREATE TABLE books AS SELECT * FROM books_backup');
-        DB::statement('DROP TABLE books_backup');
-        DB::statement('SET FOREIGN_KEY_CHECKS = 1');
-
-        // Assert - source should still exist
+        // Assert - source directory should still exist (no filesystem operations occurred)
         $this->assertDirExists($this->testBookRoot . '/' . $sourcePath);
+
+        // Assert - book data should be unchanged in database
+        $updatedBook = \App\Models\Book::find($book->id);
+        $this->assertEquals($originalBookData['directory_path'], $updatedBook->directory_path);
+        $this->assertEquals($originalBookData['title'], $updatedBook->title);
     }
 
     /** @test */

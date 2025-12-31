@@ -414,6 +414,8 @@ class ImportBooksFromDownloads extends Command
             // Check for specific paths first (files or folders)
             $specificPaths = $this->argument('path');
             if (!empty($specificPaths)) {
+                // Ensure it's an array (Laravel may return string for single argument)
+                $specificPaths = is_array($specificPaths) ? $specificPaths : [$specificPaths];
                 $this->uiService->logMessage("📁 Processing specific paths: " . implode(', ', $specificPaths));
                 $audiobooks = $this->processSpecificPaths($specificPaths);
             } else {
