@@ -1105,7 +1105,7 @@ class ImportUIService
                 return null;
             }, $value);
 
-            $normalized = array_values(array_filter($normalized, static fn ($item) => $item !== null && $item !== ''));
+            $normalized = array_values(array_filter($normalized, static fn($item) => $item !== null && $item !== ''));
 
             return implode(', ', $normalized);
         }

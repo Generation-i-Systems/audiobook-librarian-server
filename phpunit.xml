@@ -34,6 +34,11 @@
     <!-- Firebase support removed - application now uses MySQL only -->
     <server name="DOCUMENT_STORE_DRIVER" value="sqlite"/>
     <server name="LOG_CHANNEL" value="testing"/>
+    <!-- Force override of .env file -->
+    <server name="DB_HOST" value=""/>
+    <server name="DB_PORT" value=""/>
+    <server name="DB_USERNAME" value=""/>
+    <server name="DB_PASSWORD" value=""/>
   </php>
   <source>
     <include>
