@@ -26,6 +26,7 @@ class BookApiAutocompleteAuthorsTest extends TestCase
         $this->app->instance(DocumentStoreServiceInterface::class, $this->documentStoreMock);
 
         $this->actingAs($user, 'api_test');
+        $this->withHeader('Accept', 'application/json');
     }
 
     /** @test */

@@ -27,9 +27,9 @@ class QueueControllerTest extends TestCase
             'permissions' => ['admin.*'],
         ]);
 
-        // Authenticate as admin user and bypass admin middleware
+        // Authenticate as admin user
         $this->actingAs($adminUser);
-        $this->withoutMiddleware(\App\Http\Middleware\CheckAdminRole::class);
+        $this->withHeader('Accept', 'application/json');
     }
 
     public function test_status_returns_worker_and_pending_jobs()
