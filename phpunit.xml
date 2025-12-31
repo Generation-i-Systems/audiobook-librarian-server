@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd" bootstrap="vendor/autoload.php" colors="true" processIsolation="false" stopOnFailure="false" executionOrder="random" failOnWarning="true" failOnRisky="true">
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="./vendor/phpunit/phpunit/phpunit.xsd" bootstrap="vendor/autoload.php" colors="true" executionOrder="depends,defects" stopOnFailure="false" failOnWarning="true" failOnRisky="true" beStrictAboutOutputDuringTests="true" processIsolation="false" backupGlobals="false">
   <testsuites>
+    <testsuite name="Database Safety First">
+      <file>tests/Unit/DatabaseSafetyCheckTest.php</file>
+    </testsuite>
     <testsuite name="Unit">
       <directory suffix="Test.php">./tests/Unit</directory>
+      <exclude>tests/Unit/DatabaseSafetyCheckTest.php</exclude>
     </testsuite>
     <testsuite name="Feature">
       <directory suffix="Test.php">./tests/Feature</directory>
