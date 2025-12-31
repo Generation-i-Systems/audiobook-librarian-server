@@ -1085,9 +1085,34 @@
         </div>
 
         <script>
+        // Handle delete files checkbox
         document.getElementById('deleteFilesCheckbox')?.addEventListener('change', function() {
             document.getElementById('deleteFilesInput').value = this.checked ? 'true' : 'false';
         });
+
+        // Refresh CSRF token when delete modal opens (prevents 419 errors on long-open pages)
+        const deleteModal = document.getElementById('deleteBookModal');
+        if (deleteModal) {
+            deleteModal.addEventListener('show.bs.modal', function() {
+                fetch('/csrf-token', {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    const tokenInput = document.querySelector('#deleteBookForm input[name="_token"]');
+                    if (tokenInput && data.csrf_token) {
+                        tokenInput.value = data.csrf_token;
+                        console.log('Delete form CSRF token refreshed');
+                    }
+                })
+                .catch(error => {
+                    console.error('Failed to refresh CSRF token:', error);
+                });
+            });
+        }
         </script>
         @endif
 
