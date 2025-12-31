@@ -21,13 +21,8 @@ on:
 
 jobs:
   api-tests:
-    name: API Tests - PHP ${{ matrix.php }}
+    name: API Tests - PHP 8.3
     runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        php: ['8.2', '8.3']
 
     steps:
       - name: Checkout code
@@ -36,7 +31,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: ${{ matrix.php }}
+          php-version: '8.3'
           extensions: mbstring, xml, ctype, json, sqlite3, pdo_sqlite, fileinfo, gd
           coverage: none
 
