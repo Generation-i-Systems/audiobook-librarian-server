@@ -2207,6 +2207,7 @@ class MySqlService implements DocumentStoreServiceInterface
             'jobs' => Job::class,
             'bookmarks' => Bookmark::class,
             'external_reads' => ExternalRead::class,
+            'narrators' => Narrator::class,
         ];
 
         if (!isset($modelMap[$collection])) {
