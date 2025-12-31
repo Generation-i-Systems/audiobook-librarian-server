@@ -1,0 +1,21 @@
+#
+# Sample logrotate configuration for Audiobook Librarian
+# Copy or symlink this file into /etc/logrotate.d and update {PROJECT_PATH}
+# to match the absolute path of your deployment.
+#
+
+{PROJECT_PATH}/storage/logs/laravel.log {
+    daily
+    rotate 14
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+    create 0664 www-data www-data
+    sharedscripts
+    postrotate
+        # Warm up Laravel cache/logging to ensure new file permissions stick
+        cd {PROJECT_PATH} && /usr/bin/php artisan schedule:run --once >/dev/null 2>&1 || true
+    endscript
+}

@@ -18,7 +18,7 @@ return [
     |
     */
 
-    'default' => env('LOG_CHANNEL', 'daily'),
+    'default' => env('LOG_CHANNEL', 'single'),
 
     /*
     |--------------------------------------------------------------------------
@@ -80,7 +80,6 @@ return [
             'replace_placeholders' => true,
             'permission' => 0664,
             'locking' => false,
-            'tap' => [App\Logging\CustomizeDailyLogName::class],
         ],
 
         'slack' => [

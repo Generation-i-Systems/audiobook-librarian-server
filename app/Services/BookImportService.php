@@ -701,6 +701,55 @@ class BookImportService
         return null;
     }
 
+    /**
+     * Select the best cover URL based on metadata priority.
+     * Priority: local file flag > Audible cover > Google Books cover > provided cover_url (unknown).
+     */
+    protected function selectBestCoverUrl(array $metadata): array
+    {
+        $coverUrl = $metadata['cover_url'] ?? null;
+
+        if (!empty($coverUrl) && !empty($metadata['cover_is_local_file'])) {
+            return [$coverUrl, 'local'];
+        }
+
+        $audibleCover = null;
+        if (!empty($metadata['audible_raw']) && is_array($metadata['audible_raw'])) {
+            $audibleRaw = $metadata['audible_raw'];
+            $audibleCover = $audibleRaw['coverImageUrl']
+                ?? $audibleRaw['audibleCoverImageUrl']
+                ?? ($audibleRaw['media']['source_url'] ?? null);
+
+            if (!$audibleCover && !empty($coverUrl)) {
+                $audibleCover = $coverUrl;
+            }
+        }
+
+        $googleCover = null;
+        if (!empty($metadata['google_books_raw']) && is_array($metadata['google_books_raw'])) {
+            $googleRaw = $metadata['google_books_raw'];
+            $googleCover = $googleRaw['coverImageUrl']
+                ?? $googleRaw['cover_image_url']
+                ?? ($googleRaw['imageLinks']['large'] ?? null)
+                ?? ($googleRaw['imageLinks']['medium'] ?? null)
+                ?? ($googleRaw['imageLinks']['thumbnail'] ?? null);
+        }
+
+        if (!empty($audibleCover)) {
+            return [$audibleCover, 'audible'];
+        }
+
+        if (!empty($googleCover)) {
+            return [$googleCover, 'googlebooks'];
+        }
+
+        if (!empty($coverUrl)) {
+            return [$coverUrl, 'unknown'];
+        }
+
+        return [null, 'unknown'];
+    }
+
     protected function findOrCreatePublisher(string $name): ?int
     {
         if ($name === '') {
