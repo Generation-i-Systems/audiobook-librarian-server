@@ -1,5 +1,8 @@
 <?php
 
+// CRITICAL: Run database safety check BEFORE Laravel bootstrap
+require_once __DIR__ . '/database-safety-check.php';
+
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -48,7 +51,7 @@ return Application::configure(basePath: dirname(__DIR__))
         //$schedule->command('storage:fix-permissions')
         //         ->hourly()
         //         ->appendOutputTo(storage_path('logs/permissions-fix.log'));
-    
+
         // Validate book directories daily at 3:00 AM
         $schedule->command('books:validate-directories')
             ->dailyAt('03:00')
