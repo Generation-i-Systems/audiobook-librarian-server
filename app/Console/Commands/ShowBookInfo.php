@@ -1244,6 +1244,12 @@ class ShowBookInfo extends Command
 
         $this->info("Opening edit page: {$editUrl}");
 
+        // Skip browser opening when running tests
+        if (app()->environment('testing')) {
+            $this->comment("(Skipped browser opening in test environment)");
+            return;
+        }
+
         // Detect OS and use appropriate browser command
         $os = PHP_OS_FAMILY;
 

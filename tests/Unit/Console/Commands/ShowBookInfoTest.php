@@ -23,8 +23,10 @@ class ShowBookInfoTest extends TestCase
     {
         $book = Book::factory()->create();
 
-        // Run command with --edit flag - it will try to open browser but we just verify it doesn't error
+        // Run command with --edit flag - skips browser opening in test environment
         $this->artisan('books:info', ['directories' => [(string) $book->id], '--edit' => true])
+            ->expectsOutputToContain('Opening edit page:')
+            ->expectsOutputToContain('Skipped browser opening in test environment')
             ->assertSuccessful();
     }
 }
