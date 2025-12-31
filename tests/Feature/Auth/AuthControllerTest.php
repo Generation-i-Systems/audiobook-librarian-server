@@ -35,6 +35,13 @@ class AuthControllerTest extends TestCase
 
     protected function tearDown(): void
     {
+        // Clean up any error handlers to avoid risky test warnings
+        if (function_exists('restore_error_handler')) {
+            restore_error_handler();
+        }
+        if (function_exists('restore_exception_handler')) {
+            restore_exception_handler();
+        }
     }
 
 
@@ -104,17 +111,20 @@ class AuthControllerTest extends TestCase
     #[Test]
     public function testUserCanLogin()
     {
+        // Use unique email to avoid conflicts
+        $testEmail = 'test' . time() . '@example.com';
+
         // Create a test user in the database
         $user = User::create([
             'name' => 'Test User',
-            'username' => 'testuser',
-            'email' => 'test@example.com',
+            'username' => 'testuser' . time(),
+            'email' => $testEmail,
             'password' => Hash::make('password'),
             'role' => 'user',
         ]);
 
         $response = $this->postJson('/api/v1/login', [
-            'email' => 'test@example.com',
+            'email' => $testEmail,
             'password' => 'password',
         ]);
 
@@ -131,7 +141,7 @@ class AuthControllerTest extends TestCase
             ]);
 
         $responseData = $response->json();
-        $this->assertEquals('test@example.com', $responseData['email']);
+        $this->assertEquals($testEmail, $responseData['email']);
         $this->assertNotNull($responseData['token']);
         $this->assertNotNull($responseData['authToken']);
         $this->assertNotNull($responseData['refreshToken']);
@@ -141,17 +151,20 @@ class AuthControllerTest extends TestCase
     #[Test]
     public function testUnverifiedUserCannotLogin(): void
     {
+        // Use unique email to avoid conflicts
+        $testEmail = 'unverified' . time() . '@example.com';
+
         // Create an unverified test user in the database
         User::create([
             'name' => 'Test User',
-            'username' => 'testuser',
-            'email' => 'test@example.com',
+            'username' => 'testuser' . time(),
+            'email' => $testEmail,
             'password' => Hash::make('password'),
             'role' => 'unverified',
         ]);
 
         $response = $this->postJson('/api/v1/login', [
-            'email' => 'test@example.com',
+            'email' => $testEmail,
             'password' => 'password',
         ]);
 
@@ -165,18 +178,21 @@ class AuthControllerTest extends TestCase
     #[Test]
     public function testUserCanLogout(): void
     {
+        // Use unique email to avoid conflicts
+        $testEmail = 'logout' . time() . '@example.com';
+
         // Create a test user in the database
         User::create([
             'name' => 'Test User',
-            'username' => 'testuser',
-            'email' => 'test@example.com',
+            'username' => 'testuser' . time(),
+            'email' => $testEmail,
             'password' => Hash::make('password'),
             'role' => 'standard',
         ]);
 
         // Log in to get a valid token
         $loginResponse = $this->postJson('/api/v1/login', [
-            'email' => 'test@example.com',
+            'email' => $testEmail,
             'password' => 'password',
         ]);
 

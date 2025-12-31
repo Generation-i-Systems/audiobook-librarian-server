@@ -30,6 +30,7 @@ class QueueControllerTest extends TestCase
         // Authenticate as admin user
         $this->actingAs($adminUser);
         $this->withHeader('Accept', 'application/json');
+        $this->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class);
     }
 
     public function test_status_returns_worker_and_pending_jobs()

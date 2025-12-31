@@ -33,9 +33,19 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
     protected function tearDown(): void
     {
-        if (File::exists($this->testBookRoot)) {
+        // Clean up test directory
+        if (is_dir($this->testBookRoot)) {
             File::deleteDirectory($this->testBookRoot);
         }
+
+        // Restore any dropped tables
+        try {
+            DB::statement('CREATE TABLE IF NOT EXISTS books AS SELECT * FROM books_backup');
+            DB::statement('DROP TABLE IF EXISTS books_backup');
+        } catch (\Exception $e) {
+            // Ignore cleanup errors
+        }
+
         parent::tearDown();
     }
 
@@ -46,13 +56,14 @@ class MoveBookDirectoryCriticalTest extends TestCase
         $sourcePath = 'Fantasy/Author/Book1';
         $destPath = 'Sci-Fi/Author/Book1';
 
-        $this->createTestDirectory($sourcePath);
         $book = $this->createTestBook($sourcePath);
 
-        // Force database error by dropping the table
+        // Force database error by disabling foreign key checks temporarily
+        DB::statement('SET FOREIGN_KEY_CHECKS = 0');
         DB::statement('DROP TABLE IF EXISTS books_backup');
         DB::statement('CREATE TABLE books_backup AS SELECT * FROM books');
         DB::statement('DROP TABLE books');
+        DB::statement('SET FOREIGN_KEY_CHECKS = 1');
 
         // Act - should fail
         $result = $this->artisan('books:move', [
@@ -60,8 +71,10 @@ class MoveBookDirectoryCriticalTest extends TestCase
         ])->run();
 
         // Restore table
+        DB::statement('SET FOREIGN_KEY_CHECKS = 0');
         DB::statement('CREATE TABLE books AS SELECT * FROM books_backup');
         DB::statement('DROP TABLE books_backup');
+        DB::statement('SET FOREIGN_KEY_CHECKS = 1');
 
         // Assert - source should still exist
         $this->assertDirExists($this->testBookRoot . '/' . $sourcePath);
