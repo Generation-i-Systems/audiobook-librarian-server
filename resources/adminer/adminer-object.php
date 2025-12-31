@@ -8,12 +8,12 @@ if (!function_exists('Adminer\adminer_object')) {
         if (!class_exists('Adminer\AdminerCustom')) {
             class AdminerCustom extends Adminer
             {
-                function name()
+                public function name()
                 {
                     return 'Librarian Database';
                 }
 
-                function credentials()
+                public function credentials()
                 {
                     return [
                         \config('database.connections.mysql.host'),
@@ -22,23 +22,23 @@ if (!function_exists('Adminer\adminer_object')) {
                     ];
                 }
 
-                function database()
+                public function database()
                 {
                     return \config('database.connections.mysql.database');
                 }
 
-                function login($login, $password)
+                public function login($login, $password)
                 {
                     return true;
                 }
 
-                function loginForm()
+                public function loginForm()
                 {
                     return "";
                 }
             }
         }
 
-        return new AdminerCustom;
+        return new AdminerCustom();
     }
 }

@@ -10,7 +10,7 @@ class AdminerCustom extends Adminer
     /**
      * Set the name displayed in the Adminer interface.
      */
-    function name()
+    public function name()
     {
         return 'Librarian Database';
     }
@@ -18,7 +18,7 @@ class AdminerCustom extends Adminer
     /**
      * Provide database credentials from Laravel's config.
      */
-    function credentials()
+    public function credentials()
     {
         return [
             \config('database.connections.mysql.host'),
@@ -30,7 +30,7 @@ class AdminerCustom extends Adminer
     /**
      * Provide the default database name.
      */
-    function database()
+    public function database()
     {
         return \config('database.connections.mysql.database');
     }
@@ -39,7 +39,7 @@ class AdminerCustom extends Adminer
      * Automatic login: always return true.
      * Access is already restricted to Laravel Admins via middleware.
      */
-    function login($login, $password)
+    public function login($login, $password)
     {
         return true;
     }
@@ -47,7 +47,7 @@ class AdminerCustom extends Adminer
     /**
      * Hide the login form as it's not needed.
      */
-    function loginForm()
+    public function loginForm()
     {
         return "";
     }
