@@ -1,5 +1,12 @@
 ## [Unreleased]
 ### Added
+- GitHub Actions workflow for automated testing on push and pull requests
+  - Runs full test suite with parallel execution
+  - Tests on PHP 8.2 and 8.3
+  - Includes code coverage reporting (70% minimum)
+  - Caches Composer dependencies for faster builds
+- Bootstrap-level database safety check that aborts any PHPUnit/artisan test run unless SQLite in-memory configuration is detected, preventing accidental production wipes
+- MockDocumentStoreService wiring and helpers for feature/unit tests so web auth, queue controllers, and import flows can run entirely in-memory without touching MySQL
 - Book edit page: needs_review_reasons now editable via checkboxes to keep or remove specific review flags
 - Book deletion now moves files to trash instead of permanent deletion
 - BookDeletionService for unified deletion operations across web and CLI
@@ -24,6 +31,12 @@
 - `books:info --delete` command now uses trash system instead of permanent deletion
 
 ### Fixed
+- Fixed `ShowBookInfo` command opening browser during test runs
+  - Added environment detection to skip browser launch when APP_ENV=testing
+  - Tests now verify skipping behavior instead of actually opening browser
+- LoginFeatureTest, QueueControllerTest, BookDeletionServiceTest, and MoveBookDirectoryCriticalTest now mock DocumentStore interactions correctly and cover rollback scenarios without DB facade hacks
+- Authors API pagination tests generate unique author names to avoid SQLite unique-constraint flakes
+- DatabaseSafetyCheckTest updated to camelCase + enforced to run first, ensuring safety assertions gate every test invocation
 - Fixed TUI import preview Directory to always show the destination `directory_path` under `app.book_root` and made it editable during review
 - Fixed TUI prompt area reserving too much vertical space by sizing it dynamically to the current prompt content
 - Fixed `books:info` command not finding books when `BOOK_STORAGE_PATH` is a symlink
