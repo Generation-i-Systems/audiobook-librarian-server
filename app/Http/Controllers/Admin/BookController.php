@@ -1593,27 +1593,15 @@ class BookController extends Controller
             $keptReasons = $request->input('needsReviewReasons', []);
             $clearNeedsReview = $request->input('clearNeedsReview', false);
 
-            Log::info('BookController@update: Processing needs review logic', [
-                'has_needsReviewPresent' => true,
-                'keptReasons' => $keptReasons,
-                'clearNeedsReview' => $clearNeedsReview,
-            ]);
-
             if ($clearNeedsReview || empty($keptReasons)) {
                 // Clear needs review checkbox was checked OR all reasons unchecked
                 $validated['needsReview'] = false;
                 $validated['needsReviewReasons'] = [];
-                Log::info('BookController@update: Clearing needs review flag');
             } else {
                 // Some reasons kept - update reasons
                 $validated['needsReview'] = true;
                 $validated['needsReviewReasons'] = $keptReasons;
-                Log::info('BookController@update: Keeping needs review with reasons', ['reasons' => $keptReasons]);
             }
-        } else {
-            Log::info('BookController@update: needsReviewPresent not found in request', [
-                'request_keys' => array_keys($request->all()),
-            ]);
         }
 
         Log::debug('BookController@update: calling updateBook', [
