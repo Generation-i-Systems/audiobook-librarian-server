@@ -121,14 +121,14 @@ if (app()->environment('local')) {
     Route::get('/debug/auth', [Admin\DebugController::class, 'auth']);
     Route::get('/debug/session', [Admin\DebugController::class, 'session']);
     Route::get('/debug/sessiondb', [Admin\DebugController::class, 'sessiondb']);
-    Route::get('/debug/firestore/{collection}/{docId}', [Admin\DebugController::class, 'showDocument']);
+    Route::get('/debug/document/{collection}/{docId}', [Admin\DebugController::class, 'showDocument']);
 
     Route::get('/debug/logout', [Admin\DebugController::class, 'logout']);
     Route::get('/debug/session-write', [Admin\DebugController::class, 'sessionWrite']);
 
-    // Dump all Firestore users/books via DebugController
-    Route::get('/debug/firestore-users-dump', [Admin\DebugController::class, 'firestoreUsersDump']);
-    Route::get('/debug/firestore-books-dump', [Admin\DebugController::class, 'firestoreBooksDump']);
+    // Dump all users/books via DebugController (now MySQL-based)
+    Route::get('/debug/users-dump', [Admin\DebugController::class, 'usersDump']);
+    Route::get('/debug/books-dump', [Admin\DebugController::class, 'booksDump']);
 
     // Debug database relationships
     Route::get('/debug/relationships', function () {

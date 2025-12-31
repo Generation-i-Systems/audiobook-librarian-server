@@ -30,17 +30,15 @@ class AuthControllerTest extends TestCase
     }
 
 
-    // No Firestore helpers required
+    // MySQL-based authentication - no external helpers required
 
 
     protected function tearDown(): void
     {
-        User::where('email', 'test@example.com')->delete();
-        parent::tearDown();
     }
 
 
-    // Firestore cleanup removed
+    // MySQL cleanup - no external cleanup required
 
 
     #[Test]

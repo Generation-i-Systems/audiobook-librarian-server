@@ -39,9 +39,9 @@ class QueueControllerTest extends TestCase
         Cache::shouldReceive('get')->with('queue_worker_heartbeat')->andReturn(now());
 
         // Mock the DocumentStoreService
-        $mockFirestore = Mockery::mock(DocumentStoreServiceInterface::class);
-        $mockFirestore->shouldReceive('getJobCount')->andReturn(3);
-        $this->app->instance(DocumentStoreServiceInterface::class, $mockFirestore);
+        $mockDocumentStore = Mockery::mock(DocumentStoreServiceInterface::class);
+        $mockDocumentStore->shouldReceive('getJobCount')->andReturn(3);
+        $this->app->instance(DocumentStoreServiceInterface::class, $mockDocumentStore);
 
         $response = $this->get('/admin/queue/status');
         $response->assertStatus(200)
@@ -62,9 +62,9 @@ class QueueControllerTest extends TestCase
 
     public function test_clear_deletes_all_jobs()
     {
-        $mockFirestore = Mockery::mock(DocumentStoreServiceInterface::class);
-        $mockFirestore->shouldReceive('clearJobs')->andReturn(true);
-        $this->app->instance(DocumentStoreServiceInterface::class, $mockFirestore);
+        $mockDocumentStore = Mockery::mock(DocumentStoreServiceInterface::class);
+        $mockDocumentStore->shouldReceive('clearJobs')->andReturn(true);
+        $this->app->instance(DocumentStoreServiceInterface::class, $mockDocumentStore);
 
         $response = $this->post('/admin/queue/clear');
         $response->assertStatus(200)
@@ -75,11 +75,11 @@ class QueueControllerTest extends TestCase
     {
         $this->markTestSkipped('Directory path validation issues in test environment');
         // Mock the DocumentStoreService to return no existing jobs and books
-        $mockFirestore = Mockery::mock(DocumentStoreServiceInterface::class);
-        $mockFirestore->shouldReceive('listJobs')->andReturn([]);
-        $mockFirestore->shouldReceive('bookExistsByDirectoryPath')->andReturn(false);
-        $mockFirestore->shouldReceive('jobExistsByDirectoryPath')->andReturn(false);
-        $this->app->instance(DocumentStoreServiceInterface::class, $mockFirestore);
+        $mockDocumentStore = Mockery::mock(DocumentStoreServiceInterface::class);
+        $mockDocumentStore->shouldReceive('listJobs')->andReturn([]);
+        $mockDocumentStore->shouldReceive('bookExistsByDirectoryPath')->andReturn(false);
+        $mockDocumentStore->shouldReceive('jobExistsByDirectoryPath')->andReturn(false);
+        $this->app->instance(DocumentStoreServiceInterface::class, $mockDocumentStore);
 
         // Create a temporary directory structure for testing within the expected storage path
         $testDir = sys_get_temp_dir() . '/librarian_test_' . uniqid();

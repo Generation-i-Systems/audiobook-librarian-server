@@ -10,8 +10,8 @@ class QueueApiController extends Controller
     public function index()
     {
         $user = Auth::user();
-        $firestore = app(\App\Contracts\DocumentStoreServiceInterface::class);
-        $queue = $firestore->getBookQueue($user->id);
+        $documentStore = app(\App\Contracts\DocumentStoreServiceInterface::class);
+        $queue = $documentStore->getBookQueue($user->id);
 
         return response()->json($queue);
     }
