@@ -3,9 +3,9 @@
 $importConfig = [
     // Root directories allowed for import browsing (absolute paths)
     'roots' => [
-        '/media/download',
-        '/media/download/audiobooks',
-        '/media/audiobooks/unsorted',
+        '/media/downloads',
+        '/media/downloads/audiobooks',
+        '/media/audiobooks/unsorted/*',
         '/media/audiobooks/OpenAudible/books',
     ],
     // Allowed file extensions for import

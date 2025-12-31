@@ -53,25 +53,25 @@ class CompareMongoMysqlBooks extends Command
                 '_id' => 1,
                 'title' => 1,
                 'author' => 1,
-                'directoryPath' => 1
-            ]
+                'directoryPath' => 1,
+            ],
         ]);
 
         $mongoDuplicates = [];
         $seenBooks = [];
 
         foreach ($mongoBooksForDuplicateCheck as $book) {
-            $title = isset($book['title']) ? (is_array($book['title']) || $book['title'] instanceof \MongoDB\Model\BSONArray ? implode(', ', (array)$book['title']) : (string)$book['title']) : 'N/A';
-            $author = isset($book['author']) ? (is_array($book['author']) || $book['author'] instanceof \MongoDB\Model\BSONArray ? implode(', ', (array)$book['author']) : (string)$book['author']) : 'N/A';
-            $directoryPath = isset($book['directoryPath']) ? (is_array($book['directoryPath']) || $book['directoryPath'] instanceof \MongoDB\Model\BSONArray ? implode(', ', (array)$book['directoryPath']) : (string)$book['directoryPath']) : 'N/A';
+            $title = isset($book['title']) ? (is_array($book['title']) || $book['title'] instanceof \MongoDB\Model\BSONArray ? implode(', ', (array) $book['title']) : (string) $book['title']) : 'N/A';
+            $author = isset($book['author']) ? (is_array($book['author']) || $book['author'] instanceof \MongoDB\Model\BSONArray ? implode(', ', (array) $book['author']) : (string) $book['author']) : 'N/A';
+            $directoryPath = isset($book['directoryPath']) ? (is_array($book['directoryPath']) || $book['directoryPath'] instanceof \MongoDB\Model\BSONArray ? implode(', ', (array) $book['directoryPath']) : (string) $book['directoryPath']) : 'N/A';
 
             $keyByPath = md5($directoryPath);
             $keyByTitleAuthor = md5($title . '::' . $author);
 
             if (isset($seenBooks[$keyByPath])) {
                 $mongoDuplicates['by_directory_path'][] = [
-                    'original_id' => (string)$seenBooks[$keyByPath]['_id'],
-                    'duplicate_id' => (string)$book['_id'],
+                    'original_id' => (string) $seenBooks[$keyByPath]['_id'],
+                    'duplicate_id' => (string) $book['_id'],
                     'directoryPath' => $directoryPath,
                     'title' => $title,
                     'author' => $author,
@@ -87,8 +87,8 @@ class CompareMongoMysqlBooks extends Command
 
             if (isset($seenBooks[$keyByTitleAuthor]) && $keyByPath !== $keyByTitleAuthor) { // Avoid double counting if path and title/author are same
                 $mongoDuplicates['by_title_author'][] = [
-                    'original_id' => (string)$seenBooks[$keyByTitleAuthor]['_id'],
-                    'duplicate_id' => (string)$book['_id'],
+                    'original_id' => (string) $seenBooks[$keyByTitleAuthor]['_id'],
+                    'duplicate_id' => (string) $book['_id'],
                     'directoryPath' => $directoryPath,
                     'title' => $title,
                     'author' => $author,
@@ -104,17 +104,17 @@ class CompareMongoMysqlBooks extends Command
         }
 
         if (!empty($mongoDuplicates)) {
-            Log::channel('daily')->info('--- MongoDB Duplicates Report (' . now()->toDateTimeString() . ') ---');
+            Log::info('--- MongoDB Duplicates Report (' . now()->toDateTimeString() . ') ---');
             if (isset($mongoDuplicates['by_directory_path'])) {
-                Log::channel('daily')->info('Duplicates by Directory Path:');
+                Log::info('Duplicates by Directory Path:');
                 foreach ($mongoDuplicates['by_directory_path'] as $duplicate) {
-                    Log::channel('daily')->info("  - Original ID: {$duplicate['original_id']}, Duplicate ID: {$duplicate['duplicate_id']}, Path: {$duplicate['directoryPath']}");
+                    Log::info("  - Original ID: {$duplicate['original_id']}, Duplicate ID: {$duplicate['duplicate_id']}, Path: {$duplicate['directoryPath']}");
                 }
             }
             if (isset($mongoDuplicates['by_title_author'])) {
-                Log::channel('daily')->info('Duplicates by Title and Author:');
+                Log::info('Duplicates by Title and Author:');
                 foreach ($mongoDuplicates['by_title_author'] as $duplicate) {
-                    Log::channel('daily')->info("  - Original ID: {$duplicate['original_id']}, Duplicate ID: {$duplicate['duplicate_id']}, Title: {$duplicate['title']}, Author: {$duplicate['author']}");
+                    Log::info("  - Original ID: {$duplicate['original_id']}, Duplicate ID: {$duplicate['duplicate_id']}, Title: {$duplicate['title']}, Author: {$duplicate['author']}");
                 }
             }
             $this->warn("MongoDB duplicate details logged to {$logPath}");
@@ -146,11 +146,11 @@ class CompareMongoMysqlBooks extends Command
 
         if (!empty($missingMongoIds)) {
             $logPath = storage_path('logs/missing_books.log');
-            Log::channel('daily')->info('--- Missing Books Report (' . now()->toDateTimeString() . ') ---');
-            Log::channel('daily')->info('Total MongoDB Books: ' . count($mongoBookIds));
-            Log::channel('daily')->info('Total MySQL Books (with mongo_id): ' . count($mysqlBookMongoIds));
-            Log::channel('daily')->info('Unmigrated Books Count: ' . count($missingMongoIds));
-            Log::channel('daily')->info('Unmigrated MongoDB Book IDs:');
+            Log::info('--- Missing Books Report (' . now()->toDateTimeString() . ') ---');
+            Log::info('Total MongoDB Books: ' . count($mongoBookIds));
+            Log::info('Total MySQL Books (with mongo_id): ' . count($mysqlBookMongoIds));
+            Log::info('Unmigrated Books Count: ' . count($missingMongoIds));
+            Log::info('Unmigrated MongoDB Book IDs:');
 
             foreach ($missingMongoIds as $mongoId) {
                 // Optionally, fetch more details for the missing book from MongoDB
@@ -162,23 +162,23 @@ class CompareMongoMysqlBooks extends Command
                     try {
                         $bookDetails = $mongoCollection->findOne(['_id' => new \MongoDB\BSON\ObjectId($mongoId)]);
                     } catch (\Exception $e) {
-                        Log::channel('daily')->warning("Could not fetch details for MongoDB ID {$mongoId}: " . $e->getMessage());
+                        Log::warning("Could not fetch details for MongoDB ID {$mongoId}: " . $e->getMessage());
                     }
                 } else {
                     $logMessage .= " | Note: Not a valid ObjectId format.";
                 }
 
                 if ($bookDetails) {
-                    $logMessage .= " | Title: " . (isset($bookDetails['title']) ? (is_array($bookDetails['title']) || $bookDetails['title'] instanceof \MongoDB\Model\BSONArray ? implode(', ', (array)$bookDetails['title']) : (string)$bookDetails['title']) : 'N/A');
-                    $logMessage .= " | Author: " . (isset($bookDetails['author']) ? (is_array($bookDetails['author']) || $bookDetails['author'] instanceof \MongoDB\Model\BSONArray ? implode(', ', (array)$bookDetails['author']) : (string)$bookDetails['author']) : 'N/A');
-                    $logMessage .= " | Directory Path: " . (isset($bookDetails['directoryPath']) ? (is_array($bookDetails['directoryPath']) || $bookDetails['directoryPath'] instanceof \MongoDB\Model\BSONArray ? implode(', ', (array)$bookDetails['directoryPath']) : (string)$bookDetails['directoryPath']) : 'N/A');
+                    $logMessage .= " | Title: " . (isset($bookDetails['title']) ? (is_array($bookDetails['title']) || $bookDetails['title'] instanceof \MongoDB\Model\BSONArray ? implode(', ', (array) $bookDetails['title']) : (string) $bookDetails['title']) : 'N/A');
+                    $logMessage .= " | Author: " . (isset($bookDetails['author']) ? (is_array($bookDetails['author']) || $bookDetails['author'] instanceof \MongoDB\Model\BSONArray ? implode(', ', (array) $bookDetails['author']) : (string) $bookDetails['author']) : 'N/A');
+                    $logMessage .= " | Directory Path: " . (isset($bookDetails['directoryPath']) ? (is_array($bookDetails['directoryPath']) || $bookDetails['directoryPath'] instanceof \MongoDB\Model\BSONArray ? implode(', ', (array) $bookDetails['directoryPath']) : (string) $bookDetails['directoryPath']) : 'N/A');
 
                     // Check for existing books in MySQL with the same directoryPath or title/author
                     $mysqlPotentialMatches = \App\Models\Book::query()
                         ->where('directory_path', $bookDetails['directoryPath'] ?? null)
                         ->orWhere(function ($query) use ($bookDetails) {
-                            $title = isset($bookDetails['title']) ? (is_array($bookDetails['title']) || $bookDetails['title'] instanceof \MongoDB\Model\BSONArray ? implode(', ', (array)$bookDetails['title']) : (string)$bookDetails['title']) : null;
-                            $author = isset($bookDetails['author']) ? (is_array($bookDetails['author']) || $bookDetails['author'] instanceof \MongoDB\Model\BSONArray ? implode(', ', (array)$bookDetails['author']) : (string)$bookDetails['author']) : null;
+                            $title = isset($bookDetails['title']) ? (is_array($bookDetails['title']) || $bookDetails['title'] instanceof \MongoDB\Model\BSONArray ? implode(', ', (array) $bookDetails['title']) : (string) $bookDetails['title']) : null;
+                            $author = isset($bookDetails['author']) ? (is_array($bookDetails['author']) || $bookDetails['author'] instanceof \MongoDB\Model\BSONArray ? implode(', ', (array) $bookDetails['author']) : (string) $bookDetails['author']) : null;
 
                             $query->where('title', $title);
                             if ($author) {
@@ -202,7 +202,7 @@ class CompareMongoMysqlBooks extends Command
                         }
                     }
                 }
-                Log::channel('daily')->info($logMessage);
+                Log::info($logMessage);
             }
             $this->warn("Details logged to {$logPath}");
         } else {
