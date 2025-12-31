@@ -31,14 +31,14 @@ class ImportFileControllerMoveSelectedHelpersTest extends TestCase
     {
         $controller = new ImportFileControllerMoveSelectedHelpersTestDouble($this->createMock(DocumentStoreServiceInterface::class));
 
-        $file1 = new class {
+        $file1 = new class () {
             public function getPathname(): string
             {
                 return '/src/a/book.m4b';
             }
         };
 
-        $file2 = new class {
+        $file2 = new class () {
             public function getPathname(): string
             {
                 return '/src/cover.jpg';
@@ -64,7 +64,6 @@ class ImportFileControllerMoveSelectedHelpersTest extends TestCase
 
         $this->assertTrue(true);
     }
-
 }
 
 class ImportFileControllerMoveSelectedHelpersTestDouble extends ImportFileController

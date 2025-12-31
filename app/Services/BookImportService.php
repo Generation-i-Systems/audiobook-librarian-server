@@ -210,6 +210,11 @@ class BookImportService
             // 3. Cover path (local file)
             // 4. Cover URL (download)
 
+            if (!empty($metadata['cover_data'])) {
+                // Ensure downstream logic does not override embedded cover with URLs
+                unset($metadata['cover_url'], $metadata['cover_is_local_file']);
+            }
+
             $existingCover = $this->findExistingCover($book->directory_path);
 
             if ($existingCover) {
@@ -224,21 +229,15 @@ class BookImportService
                 }
             } elseif (!empty($metadata['cover_path'])) {
                 $book->cover_image = basename((string) $metadata['cover_path']);
-            } elseif (!empty($metadata['cover_url'])) {
-                // Determine source for filename
-                if (!empty($metadata['cover_is_local_file'])) {
-                    $source = 'local';
-                } elseif (isset($metadata['audible_raw'])) {
-                    $source = 'audible';
-                } else {
-                    $source = 'googlebooks';
+            } else {
+                [$coverUrl, $coverSource] = $this->selectBestCoverUrl($metadata);
+                if (!empty($coverUrl)) {
+                    $coverPath = $this->downloadCoverImage($coverUrl, $book->directory_path, $coverSource);
+                    if ($coverPath) {
+                        $book->cover_image = $coverPath;
+                    }
+                    // Do NOT fall back to storing the URL - leave cover_image null if download fails
                 }
-
-                $coverPath = $this->downloadCoverImage($metadata['cover_url'], $book->directory_path, $source);
-                if ($coverPath) {
-                    $book->cover_image = $coverPath;
-                }
-                // Do NOT fall back to storing the URL - leave cover_image null if download fails
             }
 
             // Handle publisher
@@ -437,20 +436,20 @@ class BookImportService
 
             // Update cover if new one provided
             if (!empty($metadata['cover_data'])) {
+                // Ensure downstream logic does not override embedded cover with URLs
+                unset($metadata['cover_url'], $metadata['cover_is_local_file']);
+
                 $coverPath = $this->saveEmbeddedCover($metadata['cover_data'], $book->directory_path);
                 if ($coverPath) {
                     $book->cover_image = $coverPath;
                 }
-            } elseif (!empty($metadata['cover_url'])) {
-                $source = 'googlebooks';
-                if (!empty($metadata['cover_is_local_file'])) {
-                    $source = 'local';
-                } elseif (isset($metadata['audible_raw'])) {
-                    $source = 'audible';
-                }
-                $coverPath = $this->downloadCoverImage($metadata['cover_url'], $book->directory_path, $source);
-                if ($coverPath) {
-                    $book->cover_image = $coverPath;
+            } else {
+                [$coverUrl, $coverSource] = $this->selectBestCoverUrl($metadata);
+                if (!empty($coverUrl)) {
+                    $coverPath = $this->downloadCoverImage($coverUrl, $book->directory_path, $coverSource);
+                    if ($coverPath) {
+                        $book->cover_image = $coverPath;
+                    }
                 }
             }
 
@@ -699,6 +698,59 @@ class BookImportService
         }
 
         return null;
+    }
+
+    /**
+     * Select the best cover URL based on priority:
+     * 1) Explicit local file URL
+     * 2) Audible cover
+     * 3) Google Books cover
+     * 4) Fallback to provided cover_url (unknown source)
+     */
+    protected function selectBestCoverUrl(array $metadata): array
+    {
+        $coverUrl = $metadata['cover_url'] ?? null;
+
+        if (!empty($coverUrl) && !empty($metadata['cover_is_local_file'])) {
+            return [$coverUrl, 'local'];
+        }
+
+        $audibleCover = null;
+        if (!empty($metadata['audible_raw']) && is_array($metadata['audible_raw'])) {
+            $audibleRaw = $metadata['audible_raw'];
+            $audibleCover = $audibleRaw['coverImageUrl']
+                ?? $audibleRaw['audibleCoverImageUrl']
+                ?? ($audibleRaw['media']['source_url'] ?? null);
+
+            // If cover_url exists alongside audible data, treat it as audible-sourced unless overridden above.
+            if (!$audibleCover && !empty($coverUrl)) {
+                $audibleCover = $coverUrl;
+            }
+        }
+
+        $googleCover = null;
+        if (!empty($metadata['google_books_raw']) && is_array($metadata['google_books_raw'])) {
+            $googleRaw = $metadata['google_books_raw'];
+            $googleCover = $googleRaw['coverImageUrl']
+                ?? $googleRaw['cover_image_url']
+                ?? ($googleRaw['imageLinks']['large'] ?? null)
+                ?? ($googleRaw['imageLinks']['medium'] ?? null)
+                ?? ($googleRaw['imageLinks']['thumbnail'] ?? null);
+        }
+
+        if (!empty($audibleCover)) {
+            return [$audibleCover, 'audible'];
+        }
+
+        if (!empty($googleCover)) {
+            return [$googleCover, 'googlebooks'];
+        }
+
+        if (!empty($coverUrl)) {
+            return [$coverUrl, 'unknown'];
+        }
+
+        return [null, 'unknown'];
     }
 
     protected function findOrCreatePublisher(string $name): ?int

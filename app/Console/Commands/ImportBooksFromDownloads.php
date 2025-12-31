@@ -28,7 +28,7 @@ use Illuminate\Support\Facades\File;
 
 class ImportBooksFromDownloads extends Command
 {
-    use GenreMapping;
+    use BookImportTrait;
 
     /**
      * The name and signature of the console command.
@@ -76,8 +76,11 @@ class ImportBooksFromDownloads extends Command
     protected bool $backgroundProcessingEnabled = true;
     protected array $taskQueue = [];
     protected int $maxConcurrentTasks = 3;
-    protected int $runningTaskCount = 0;
+    protected $audioProcessor;
+
     protected bool $inputInterrupted = false;
+
+    protected ?string $embeddedCoverTempFile = null;
 
     // Persistent cache
     protected string $cacheDirectory;
@@ -196,7 +199,8 @@ class ImportBooksFromDownloads extends Command
         }
 
         $fileTags = [];
-        foreach (array_slice($audiobook['files'], 0, 3) as $filePath) {
+        $foundPicture = false;
+        foreach ($audiobook['files'] as $filePath) {
             $ext = strtolower((string) pathinfo($filePath, PATHINFO_EXTENSION));
             if ($ext !== 'm4b' && $ext !== 'mp3') {
                 continue;
@@ -205,7 +209,15 @@ class ImportBooksFromDownloads extends Command
             $tags = $this->aiProcessor->extractFileTags($filePath);
             if (!empty($tags)) {
                 $fileTags[basename((string) $filePath)] = $tags;
-                break;
+                if (!$foundPicture && !empty($tags['picture'])) {
+                    $foundPicture = true;
+                }
+
+                // If we have an embedded cover already, keep scanning only if we want additional tags
+                if ($foundPicture) {
+                    // We can break once we have a picture since cover_data is captured; other tag fields are already collected.
+                    break;
+                }
             }
         }
 
@@ -233,13 +245,35 @@ class ImportBooksFromDownloads extends Command
         $uiMetadata = $metadata;
 
         $coverSource = '';
-        if (!empty($uiMetadata['cover_url'])) {
-            if (isset($uiMetadata['audible_raw'])) {
+
+        // Prefer embedded cover for UI and clear any external URL if present
+        if (!empty($uiMetadata['cover_data'])) {
+            unset($uiMetadata['cover_is_local_file']);
+
+            if (empty($uiMetadata['cover_url'])) {
+                $uiMetadata['cover_url'] = $this->getEmbeddedCoverTempPath($uiMetadata['cover_data']);
+            }
+
+            $coverSource = 'Embedded cover';
+        } else {
+            // If Audible provided a cover, prefer it over any Google/default URL
+            $audibleCover = null;
+            if (!empty($uiMetadata['audible_raw']) && is_array($uiMetadata['audible_raw'])) {
+                $audible = $uiMetadata['audible_raw'];
+                $audibleCover = $audible['coverImageUrl']
+                    ?? $audible['audibleCoverImageUrl']
+                    ?? ($audible['media']['source_url'] ?? null);
+            }
+
+            if (!empty($audibleCover)) {
+                $uiMetadata['cover_url'] = $audibleCover;
                 $coverSource = 'Audible';
-            } elseif (isset($uiMetadata['google_books_raw'])) {
-                $coverSource = 'Google Books';
-            } else {
-                $coverSource = 'Unknown';
+            } elseif (!empty($uiMetadata['cover_url'])) {
+                if (isset($uiMetadata['google_books_raw'])) {
+                    $coverSource = 'Google Books';
+                } else {
+                    $coverSource = 'Unknown';
+                }
             }
         }
 
@@ -289,6 +323,28 @@ class ImportBooksFromDownloads extends Command
         }
 
         parent::error($string, $verbosity);
+    }
+
+    public function __destruct()
+    {
+        if ($this->embeddedCoverTempFile && file_exists($this->embeddedCoverTempFile)) {
+            @unlink($this->embeddedCoverTempFile);
+        }
+    }
+
+    protected function getEmbeddedCoverTempPath(string $coverData): ?string
+    {
+        if ($this->embeddedCoverTempFile && file_exists($this->embeddedCoverTempFile)) {
+            return $this->embeddedCoverTempFile;
+        }
+
+        $tempFile = tempnam(sys_get_temp_dir(), 'embedded_cover_') . '.jpg';
+        if (@file_put_contents($tempFile, $coverData) !== false) {
+            $this->embeddedCoverTempFile = $tempFile;
+            return $tempFile;
+        }
+
+        return null;
     }
 
     public function newLine($count = 1)
@@ -1752,6 +1808,7 @@ class ImportBooksFromDownloads extends Command
     protected function handleUserInterruption(): void
     {
         if ($this->uiService) {
+            $this->uiService->requestInterrupt();
             $this->uiService->restoreTerminalState();
         }
 
@@ -1759,6 +1816,8 @@ class ImportBooksFromDownloads extends Command
         $this->newLine();
         $this->warn("⚠️  [Request interrupted by user] - Ctrl+C detected");
         $this->info('🛑 Quitting import process gracefully...');
+
+        exit(130);
     }
 
     /**
@@ -1786,6 +1845,11 @@ class ImportBooksFromDownloads extends Command
 
         if (is_string($response) && strtolower(trim($response)) === 'q') {
             $this->handleUserQuit();
+        }
+
+        if ($response === false) {
+            $this->inputInterrupted = true;
+            return '';
         }
 
         return $response;
@@ -2524,10 +2588,26 @@ class ImportBooksFromDownloads extends Command
             $writerParts = array_map('trim', explode(',', $firstTags['writer']));
             $writerParts = array_values(array_filter(
                 $writerParts,
-                static fn ($value) => $value !== '' && strtolower($value) !== 'full cast'
+                static fn($value) => $value !== '' && strtolower($value) !== 'full cast'
             ));
             if (!empty($writerParts)) {
                 $metadata['narrator'] = $writerParts;
+            }
+        }
+
+        // Embedded cover image (from ID3/QuickTime picture tag) — search all files to avoid missing covers
+        foreach ($fileTags as $tags) {
+            if (empty($tags) || !is_array($tags)) {
+                continue;
+            }
+            if (empty($tags['picture']) || !is_array($tags['picture'])) {
+                continue;
+            }
+            $picture = $tags['picture'];
+            if (!empty($picture['data']) && is_string($picture['data'])) {
+                $metadata['cover_data'] = $picture['data'];
+                $metadata['cover_source'] = 'Embedded in audio file';
+                break;
             }
         }
 
@@ -2633,6 +2713,37 @@ class ImportBooksFromDownloads extends Command
      */
     protected function displayEnrichedMetadata(array $metadata): void
     {
+        if (!empty($metadata['cover_data'])) {
+            // Prefer embedded cover; clear any external URLs so they are not displayed or chosen
+            unset($metadata['cover_url'], $metadata['cover_is_local_file']);
+            $metadata['cover_source'] = 'Embedded cover';
+        } else {
+            // Prefer Audible cover over Google/default before displaying or offering alternatives
+            $audibleCover = null;
+            if (!empty($metadata['audible_raw']) && is_array($metadata['audible_raw'])) {
+                $audible = $metadata['audible_raw'];
+                $audibleCover = $audible['coverImageUrl']
+                    ?? $audible['audibleCoverImageUrl']
+                    ?? ($audible['media']['source_url'] ?? null);
+            }
+
+            if (!empty($audibleCover)) {
+                $metadata['cover_url'] = $audibleCover;
+                $metadata['cover_source'] = 'Audible';
+            } elseif (!empty($metadata['google_books_raw']) && is_array($metadata['google_books_raw'])) {
+                $google = $metadata['google_books_raw'];
+                $googleCover = $google['coverImageUrl']
+                    ?? $google['cover_image_url']
+                    ?? ($google['imageLinks']['large'] ?? null)
+                    ?? ($google['imageLinks']['medium'] ?? null)
+                    ?? ($google['imageLinks']['thumbnail'] ?? null);
+                if (!empty($googleCover)) {
+                    $metadata['cover_url'] = $googleCover;
+                    $metadata['cover_source'] = 'Google Books';
+                }
+            }
+        }
+
         if ($this->uiService) {
             $this->uiService->setCurrentBook($this->buildUiMetadata($metadata));
             return;
@@ -2702,7 +2813,9 @@ class ImportBooksFromDownloads extends Command
         }
 
         // Add cover source if available
-        if (!empty($metadata['cover_url'])) {
+        if (!empty($metadata['cover_data'])) {
+            $tableData[] = ['Cover Source', 'Embedded cover'];
+        } elseif (!empty($metadata['cover_url'])) {
             $source = 'Unknown';
             if (isset($metadata['audible_raw'])) {
                 $source = 'Audible';
@@ -2718,7 +2831,7 @@ class ImportBooksFromDownloads extends Command
         $this->handleCoverSelection($metadata);
 
         // Display selected cover image if terminal supports it and cover is available
-        if (!empty($metadata['cover_url'])) {
+        if (!empty($metadata['cover_url']) && empty($metadata['cover_data'])) {
             $this->displayCoverImage($metadata['cover_url']);
         }
     }
@@ -3668,6 +3781,24 @@ class ImportBooksFromDownloads extends Command
      */
     protected function handleCoverSelection(array &$metadata): void
     {
+        // If we already have an embedded cover, keep it and skip alternative lookup
+        if (!empty($metadata['cover_data'])) {
+            return;
+        }
+
+        // Prefer Audible cover over Google/default before any analysis/selection
+        if (empty($metadata['cover_url']) && !empty($metadata['audible_raw']) && is_array($metadata['audible_raw'])) {
+            $audible = $metadata['audible_raw'];
+            $audibleCover = $audible['coverImageUrl']
+                ?? $audible['audibleCoverImageUrl']
+                ?? ($audible['media']['source_url'] ?? null);
+
+            if (!empty($audibleCover)) {
+                $metadata['cover_url'] = $audibleCover;
+                $metadata['cover_source'] = 'Audible';
+            }
+        }
+
         $currentCoverUrl = $metadata['cover_url'] ?? '';
         $isInteractive = !$this->option('auto');
         $coverOptions = [];

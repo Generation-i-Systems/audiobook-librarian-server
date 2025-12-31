@@ -8,7 +8,7 @@ use Tests\TestCase;
 class ImportBooksFromDownloadsCoverUrlPromptTest extends TestCase
 {
     #[\PHPUnit\Framework\Attributes\Test]
-    public function promptForCoverUrlDoesNotPrefillAndKeepsCurrentWhenBlank(): void
+    public function promptForCoverUrlPrefillsAndKeepsCurrentWhenBlank(): void
     {
         $command = new ImportBooksFromDownloadsCoverUrlPromptTestDouble();
 
@@ -16,7 +16,7 @@ class ImportBooksFromDownloadsCoverUrlPromptTest extends TestCase
         $result = $command->exposePromptForCoverUrl('https://example.com/old.jpg');
 
         $this->assertSame('https://example.com/old.jpg', $result);
-        $this->assertSame(['Cover URL', ''], $command->lastAskInlineArgs);
+        $this->assertSame(['Cover URL', 'https://example.com/old.jpg'], $command->lastAskInlineArgs);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
@@ -28,7 +28,7 @@ class ImportBooksFromDownloadsCoverUrlPromptTest extends TestCase
         $result = $command->exposePromptForCoverUrl('https://example.com/old.jpg');
 
         $this->assertSame('https://example.com/new.jpg', $result);
-        $this->assertSame(['Cover URL', ''], $command->lastAskInlineArgs);
+        $this->assertSame(['Cover URL', 'https://example.com/old.jpg'], $command->lastAskInlineArgs);
     }
 }
 

@@ -18,7 +18,7 @@ class BookImportServiceMoveNonAudioFilesToDirectoryTest extends TestCase
         $method = $reflection->getMethod('moveNonAudioFilesToDirectory');
         $method->setAccessible(true);
 
-        $coverFile = new class {
+        $coverFile = new class () {
             public function getPathname(): string
             {
                 return '/src/cover_audible.jpg';
@@ -30,7 +30,7 @@ class BookImportServiceMoveNonAudioFilesToDirectoryTest extends TestCase
             }
         };
 
-        $jsonFile = new class {
+        $jsonFile = new class () {
             public function getPathname(): string
             {
                 return '/src/librarian.json';
@@ -42,7 +42,7 @@ class BookImportServiceMoveNonAudioFilesToDirectoryTest extends TestCase
             }
         };
 
-        $audioFile = new class {
+        $audioFile = new class () {
             public function getPathname(): string
             {
                 return '/src/book.m4b';

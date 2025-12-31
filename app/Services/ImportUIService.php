@@ -25,6 +25,78 @@ class ImportUIService
     protected int $inlineCoverRows = 9;
     protected int $inlineCoverPadding = 2;
     protected int $maxCoverDownloadBytes = 10000000;
+    protected $ttyStream = null;
+    protected ?string $lastKeyDebug = null;
+    protected bool $interrupted = false;
+
+    protected function getInputStream()
+    {
+        if (is_resource($this->ttyStream)) {
+            return $this->ttyStream;
+        }
+
+        $tty = @fopen('/dev/tty', 'rb');
+        if (is_resource($tty)) {
+            $this->ttyStream = $tty;
+            if (function_exists('stream_set_blocking')) {
+                @stream_set_blocking($this->ttyStream, true);
+            }
+
+            return $this->ttyStream;
+        }
+
+        return STDIN;
+    }
+
+    protected function isKeyDebugEnabled(): bool
+    {
+        $value = getenv('IMPORT_UI_KEY_DEBUG');
+        if (!is_string($value) || trim($value) === '') {
+            $envValue = $_ENV['IMPORT_UI_KEY_DEBUG'] ?? null;
+            if (is_string($envValue) && trim($envValue) !== '') {
+                $value = $envValue;
+            }
+        }
+
+        if (!is_string($value) || trim($value) === '') {
+            $serverValue = $_SERVER['IMPORT_UI_KEY_DEBUG'] ?? null;
+            if (is_string($serverValue) && trim($serverValue) !== '') {
+                $value = $serverValue;
+            }
+        }
+
+        if (!is_string($value) || trim($value) === '') {
+            return false;
+        }
+
+        $value = strtolower(trim($value));
+        return $value !== '0' && $value !== 'false' && $value !== 'off' && $value !== 'no';
+    }
+
+    protected function formatKeyDebug(string $bytes): string
+    {
+        $hexParts = [];
+        $printableParts = [];
+        $len = strlen($bytes);
+        for ($i = 0; $i < $len; $i++) {
+            $ord = ord($bytes[$i]);
+            $hexParts[] = strtoupper(str_pad(dechex($ord), 2, '0', STR_PAD_LEFT));
+
+            if ($ord >= 32 && $ord <= 126) {
+                $printableParts[] = $bytes[$i];
+            } elseif ($bytes[$i] === "\x1B") {
+                $printableParts[] = 'ESC';
+            } elseif ($bytes[$i] === "\r") {
+                $printableParts[] = 'CR';
+            } elseif ($bytes[$i] === "\n") {
+                $printableParts[] = 'LF';
+            } else {
+                $printableParts[] = '.';
+            }
+        }
+
+        return 'KeyDebug: ' . implode(' ', $hexParts) . ' | ' . implode(' ', $printableParts);
+    }
 
     protected function getDirectoryLabel(): string
     {
@@ -75,6 +147,22 @@ class ImportUIService
         // Switch to alternate screen buffer and hide cursor
         echo "\e[?1049h\e[?25l";
         $this->alternateScreenEnabled = true;
+    }
+
+    public function requestInterrupt(): void
+    {
+        $this->interrupted = true;
+    }
+
+    public function restoreTerminalState(): void
+    {
+        if (function_exists('shell_exec')) {
+            @shell_exec('stty sane < /dev/tty');
+        }
+
+        // Show cursor + restore normal screen buffer
+        echo "\e[?25h\e[?1049l";
+        $this->alternateScreenEnabled = false;
     }
 
     protected function disableAlternateScreen(): void
@@ -211,14 +299,298 @@ class ImportUIService
         return true;
     }
 
+    protected function parseTerminalKeySequence(string $char): array
+    {
+        $rawBytes = $char;
+
+        if ($char === "\r" || $char === "\n") {
+            if ($this->isKeyDebugEnabled()) {
+                $this->lastKeyDebug = $this->formatKeyDebug($rawBytes);
+            }
+            return ['enter'];
+        }
+
+        if ($char === "\x7F" || $char === "\x08") {
+            if ($this->isKeyDebugEnabled()) {
+                $this->lastKeyDebug = $this->formatKeyDebug($rawBytes);
+            }
+            return ['backspace'];
+        }
+
+        if ($char !== "\x1B") {
+            if ($this->isKeyDebugEnabled()) {
+                $this->lastKeyDebug = $this->formatKeyDebug($rawBytes);
+            }
+            return ['char', $char];
+        }
+
+        $stream = $this->getInputStream();
+
+        $intro = fgetc($stream);
+        if ($intro === false) {
+            if ($this->isKeyDebugEnabled()) {
+                $this->lastKeyDebug = $this->formatKeyDebug($rawBytes);
+            }
+            return [];
+        }
+
+        $rawBytes .= $intro;
+
+        // Application cursor mode (common in some terminals)
+        if ($intro === 'O') {
+            $code = fgetc($stream);
+            if ($code === false) {
+                if ($this->isKeyDebugEnabled()) {
+                    $this->lastKeyDebug = $this->formatKeyDebug($rawBytes);
+                }
+                return [];
+            }
+
+            $rawBytes .= $code;
+
+            if ($this->isKeyDebugEnabled()) {
+                $this->lastKeyDebug = $this->formatKeyDebug($rawBytes);
+            }
+
+            return match ($code) {
+                'A' => ['up'],
+                'B' => ['down'],
+                'C' => ['right'],
+                'D' => ['left'],
+                'H' => ['home'],
+                'F' => ['end'],
+                default => [],
+            };
+        }
+
+        // CSI sequences
+        if ($intro !== '[') {
+            if ($this->isKeyDebugEnabled()) {
+                $this->lastKeyDebug = $this->formatKeyDebug($rawBytes);
+            }
+            return [];
+        }
+
+        $sequence = '';
+        for ($i = 0; $i < 8; $i++) {
+            $c = fgetc($stream);
+            if ($c === false) {
+                break;
+            }
+
+            $sequence .= $c;
+
+            // Final byte for CSI is typically in @A-Z[\]^_`a-z{|}~
+            if (preg_match('/[@-~]/', $c) === 1) {
+                break;
+            }
+        }
+
+        $rawBytes .= $sequence;
+
+        if ($this->isKeyDebugEnabled()) {
+            $this->lastKeyDebug = $this->formatKeyDebug($rawBytes);
+        }
+
+        if ($sequence === '') {
+            return [];
+        }
+
+        $final = substr($sequence, -1);
+
+        // Arrow keys (including CSI with modifiers, e.g. "1;5A")
+        if (in_array($final, ['A', 'B', 'C', 'D'], true)) {
+            return match ($final) {
+                'A' => ['up'],
+                'B' => ['down'],
+                'C' => ['right'],
+                'D' => ['left'],
+            };
+        }
+
+        // Home/End variants
+        if ($final === 'H') {
+            return ['home'];
+        }
+        if ($final === 'F') {
+            return ['end'];
+        }
+
+        // Tilde-terminated keys like "3~" (delete), "1~"/"7~" (home), "4~"/"8~" (end)
+        if ($final === '~') {
+            $num = rtrim($sequence, '~');
+            return match ($num) {
+                '3' => ['delete'],
+                '1', '7' => ['home'],
+                '4', '8' => ['end'],
+                default => [],
+            };
+        }
+
+        return [];
+    }
+
+    protected static function applyLineEditorAction(array $state, array $action): array
+    {
+        $buffer = (string) ($state['buffer'] ?? '');
+        $cursor = (int) ($state['cursor'] ?? strlen($buffer));
+
+        if ($cursor < 0) {
+            $cursor = 0;
+        }
+        if ($cursor > strlen($buffer)) {
+            $cursor = strlen($buffer);
+        }
+
+        $type = $action[0] ?? '';
+
+        if ($type === 'char') {
+            $char = (string) ($action[1] ?? '');
+            if ($char !== '' && $char !== "\x1B") {
+                $buffer = substr($buffer, 0, $cursor) . $char . substr($buffer, $cursor);
+                $cursor += strlen($char);
+            }
+        } elseif ($type === 'left') {
+            $cursor = max(0, $cursor - 1);
+        } elseif ($type === 'right') {
+            $cursor = min(strlen($buffer), $cursor + 1);
+        } elseif ($type === 'home') {
+            $cursor = 0;
+        } elseif ($type === 'end') {
+            $cursor = strlen($buffer);
+        } elseif ($type === 'backspace') {
+            if ($cursor > 0) {
+                $buffer = substr($buffer, 0, $cursor - 1) . substr($buffer, $cursor);
+                $cursor -= 1;
+            }
+        } elseif ($type === 'delete') {
+            if ($cursor < strlen($buffer)) {
+                $buffer = substr($buffer, 0, $cursor) . substr($buffer, $cursor + 1);
+            }
+        }
+
+        return ['buffer' => $buffer, 'cursor' => $cursor];
+    }
+
+    protected function renderLineEditorState(int $cursorY, int $cursorX, array $state): void
+    {
+        $buffer = (string) ($state['buffer'] ?? '');
+        $cursor = (int) ($state['cursor'] ?? strlen($buffer));
+
+        echo "\e[{$cursorY};{$cursorX}H\e[K";
+        echo $buffer;
+        echo "\e[{$cursorY};" . ($cursorX + $cursor) . "H";
+    }
+
+    protected static function moveGridSelection(
+        int $selectedIndex,
+        string $direction,
+        int $rows,
+        int $columns,
+        int $count
+    ): int {
+        if ($count <= 0 || $rows <= 0 || $columns <= 0) {
+            return 0;
+        }
+
+        $selectedIndex = max(0, min($count - 1, $selectedIndex));
+
+        $row = $selectedIndex % $rows;
+        $col = (int) floor($selectedIndex / $rows);
+
+        if ($direction === 'up') {
+            $row = max(0, $row - 1);
+        } elseif ($direction === 'down') {
+            $row = min($rows - 1, $row + 1);
+        } elseif ($direction === 'left') {
+            $col = max(0, $col - 1);
+        } elseif ($direction === 'right') {
+            $col = min($columns - 1, $col + 1);
+        }
+
+        $candidate = ($col * $rows) + $row;
+        if ($candidate < $count) {
+            return $candidate;
+        }
+
+        while ($row > 0) {
+            $row--;
+            $candidate = ($col * $rows) + $row;
+            if ($candidate < $count) {
+                return $candidate;
+            }
+        }
+
+        return $selectedIndex;
+    }
+
+    protected static function shouldAutoCommitChoice(string $buffer, array $options): bool
+    {
+        $buffer = strtolower(trim($buffer));
+        if ($buffer === '' || !array_key_exists($buffer, $options)) {
+            return false;
+        }
+
+        foreach (array_keys($options) as $key) {
+            $key = strtolower((string) $key);
+            if ($key !== $buffer && str_starts_with($key, $buffer)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    protected function readLineWithEditableDefault(string $default, int $cursorY, int $cursorX): string
+    {
+        $rawState = $this->enableRawInput();
+
+        $stream = $this->getInputStream();
+
+        try {
+            $state = ['buffer' => $default, 'cursor' => strlen($default)];
+            $this->renderLineEditorState($cursorY, $cursorX, $state);
+
+            while (true) {
+                if ($this->interrupted) {
+                    return '';
+                }
+
+                $char = fgetc($stream);
+                if ($char === false) {
+                    return (string) ($state['buffer'] ?? '');
+                }
+
+                $action = $this->parseTerminalKeySequence($char);
+                if ($action === []) {
+                    continue;
+                }
+
+                if (($action[0] ?? '') === 'enter') {
+                    return (string) ($state['buffer'] ?? '');
+                }
+
+                $state = self::applyLineEditorAction($state, $action);
+                $this->renderLineEditorState($cursorY, $cursorX, $state);
+            }
+        } finally {
+            $this->restoreRawInput($rawState);
+        }
+    }
+
     protected function enableRawInput(): ?string
     {
         if (!function_exists('shell_exec')) {
             return null;
         }
 
-        $state = (string) @shell_exec('stty -g');
-        @shell_exec('stty -icanon -echo min 1 time 0');
+        $state = (string) @shell_exec('stty -g < /dev/tty');
+        @shell_exec('stty -icanon -echo min 1 time 0 < /dev/tty');
+
+        $stream = $this->getInputStream();
+        if (function_exists('stream_set_blocking') && is_resource($stream)) {
+            @stream_set_blocking($stream, true);
+        }
 
         return trim($state) !== '' ? trim($state) : null;
     }
@@ -229,7 +601,7 @@ class ImportUIService
             return;
         }
 
-        @shell_exec('stty ' . escapeshellarg($state));
+        @shell_exec('stty ' . escapeshellarg($state) . ' < /dev/tty');
     }
 
     protected function selectWithArrowKeys(string $question, array $options, string $default = ''): string
@@ -247,29 +619,64 @@ class ImportUIService
         $numericBuffer = '';
         $rawState = $this->enableRawInput();
 
+        $stream = $this->getInputStream();
+
         try {
             while (true) {
-                $lines = ["\e[1;33m{$question}\e[0m", 'Use Up/Down + Enter, or type option key'];
+                if ($this->interrupted) {
+                    $this->promptLines = [];
+                    $this->renderFull();
+                    return false;
+                }
 
+                $desiredColumns = 3;
+                $availableWidth = max(20, $this->width - 8);
+                $maxItemLen = 0;
+                foreach ($options as $key => $val) {
+                    $candidate = '(' . $key . ') ' . $val;
+                    $maxItemLen = max($maxItemLen, strlen($candidate));
+                }
+                $idealColWidth = min($availableWidth, max(10, $maxItemLen + 2));
+                $maxColumnsThatFit = (int) max(1, floor($availableWidth / $idealColWidth));
+                $columns = min(max(1, $desiredColumns), min(4, $maxColumnsThatFit));
+                $rows = (int) ceil(count($keys) / $columns);
+
+                $selectedKey = (string) ($keys[$selectedIndex] ?? '');
+
+                $lines = [
+                    "\e[1;33m{$question}\e[0m",
+                    'Use arrows + Enter (Up/Down/Left/Right), or type option key',
+                ];
+
+                $gridOptions = [];
                 foreach ($keys as $idx => $key) {
                     $label = (string) ($options[$key] ?? '');
-                    if ($idx === $selectedIndex) {
-                        $lines[] = "\e[7m{$key}) {$label}\e[0m";
+                    if ((string) $key === $selectedKey) {
+                        $gridOptions[$key] = "\e[7m{$label}\e[0m";
                     } else {
-                        $lines[] = "{$key}) {$label}";
+                        $gridOptions[$key] = $label;
                     }
                 }
+
+                $lines = array_merge($lines, $this->formatOptionsAsColumns($gridOptions, $columns));
 
                 if ($numericBuffer !== '') {
                     $lines[] = "Typed: {$numericBuffer}";
                 }
 
+                if ($this->isKeyDebugEnabled()) {
+                    $lines[] = 'KeyDebug: ON (set IMPORT_UI_KEY_DEBUG=1)';
+                    if ($this->lastKeyDebug !== null) {
+                        $lines[] = $this->lastKeyDebug;
+                    }
+                }
+
                 $this->promptLines = $lines;
                 $this->renderFull();
 
-                $char = @fread(STDIN, 1);
-                if (!is_string($char) || $char === '') {
-                    if (feof(STDIN)) {
+                $char = fgetc($stream);
+                if ($char === false || $char === '') {
+                    if (feof($stream)) {
                         break;
                     }
                     continue;
@@ -302,22 +709,36 @@ class ImportUIService
                     continue;
                 }
 
-                if ($char === "\e") {
-                    $seq = $char . (string) @fread(STDIN, 2);
-                    if ($seq === "\e[A") {
-                        $selectedIndex = max(0, $selectedIndex - 1);
-                        $numericBuffer = '';
-                        continue;
-                    }
-                    if ($seq === "\e[B") {
-                        $selectedIndex = min(count($keys) - 1, $selectedIndex + 1);
-                        $numericBuffer = '';
-                        continue;
-                    }
+                $action = $this->parseTerminalKeySequence($char);
+                $actionType = (string) ($action[0] ?? '');
+                if ($actionType === 'up' || $actionType === 'down' || $actionType === 'left' || $actionType === 'right') {
+                    $selectedIndex = self::moveGridSelection(
+                        $selectedIndex,
+                        $actionType,
+                        max(1, $rows),
+                        max(1, $columns),
+                        count($keys)
+                    );
+                    $numericBuffer = '';
+                    continue;
                 }
 
                 if (ctype_digit($char) || ctype_alpha($char)) {
                     $numericBuffer .= $char;
+
+                    $choice = strtolower(trim($numericBuffer));
+                    if ($this->isQuitInput($choice)) {
+                        $this->promptLines = [];
+                        $this->renderFull();
+                        return 'q';
+                    }
+
+                    if (self::shouldAutoCommitChoice($choice, $options)) {
+                        $this->promptLines = [];
+                        $this->renderFull();
+                        return $choice;
+                    }
+
                     continue;
                 }
 
@@ -839,10 +1260,24 @@ class ImportUIService
         return true;
     }
 
+    protected function buildPromptLabel(string $question, string $default): string
+    {
+        $label = $question;
+
+        if ($default !== '') {
+            $defaultDisplay = $this->stringifyForDisplay($default);
+            if ($defaultDisplay !== '') {
+                $label .= ' [' . $defaultDisplay . ']';
+            }
+        }
+
+        return $label . ':';
+    }
+
     public function ask(string $question, string $default = '', bool $clearPrompt = true): string
     {
         if (empty($this->promptLines)) {
-            $promptLabel = $question . ':';
+            $promptLabel = $this->buildPromptLabel($question, $default);
             $this->promptLines = ["\e[1;33m{$promptLabel}\e[0m"];
         }
         $this->renderFull();
@@ -856,8 +1291,14 @@ class ImportUIService
         echo "\e[?25h\e[{$cursorY};{$cursorX}H";
 
         while (true) {
-            if (extension_loaded('readline')) {
-                echo "\e[{$cursorY};{$cursorX}H\e[K";
+            echo "\e[{$cursorY};{$cursorX}H\e[K";
+
+            if ($default !== '' && $this->terminalSupportsArrowInput()) {
+                $input = $this->readLineWithEditableDefault($default, $cursorY, $cursorX);
+                if ($this->interrupted) {
+                    return false;
+                }
+            } elseif (extension_loaded('readline')) {
                 $input = $default !== '' ? $this->readLineWithPrefill($default) : (string) readline('');
             } else {
                 $input = trim((string) fgets(STDIN));
@@ -934,7 +1375,12 @@ class ImportUIService
     public function select(string $question, array $options, string $default = ''): string
     {
         if ($this->terminalSupportsArrowInput() && count($options) > 0) {
-            return $this->selectWithArrowKeys($question, $options, $default);
+            $choice = $this->selectWithArrowKeys($question, $options, $default);
+            if ($this->interrupted) {
+                return false;
+            }
+
+            return $choice;
         }
 
         $lines = ["\e[1;33m{$question}\e[0m"];
