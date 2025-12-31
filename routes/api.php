@@ -154,7 +154,11 @@ Route::prefix('v1')->group(function () {
 
         // Favorite Authors routes
         Route::get('/favorites/new-books', [FavoriteAuthorController::class, 'getNewBooks']);
-        Route::apiResource('favorites', FavoriteAuthorController::class);
+        Route::get('/favorites', [FavoriteAuthorController::class, 'index'])->name('api.favorites.index');
+        Route::post('/favorites', [FavoriteAuthorController::class, 'store'])->name('api.favorites.store');
+        Route::get('/favorites/{favorite}', [FavoriteAuthorController::class, 'show'])->name('api.favorites.show');
+        Route::put('/favorites/{favorite}', [FavoriteAuthorController::class, 'update'])->name('api.favorites.update');
+        Route::delete('/favorites/{favorite}', [FavoriteAuthorController::class, 'destroy'])->name('api.favorites.destroy');
 
         // Message Route
         Route::post('/messages', [MessageApiController::class, 'store']);

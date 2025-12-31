@@ -232,7 +232,6 @@ Route::get('/csrf-token', function () {
 // JSON API endpoints for AJAX requests
 Route::get('/api/books/json', [BookController::class, 'jsonIndex'])->name('api.books.json');
 Route::get('/api/books/recent/json', [BookController::class, 'jsonRecent'])->name('api.books.recent.json');
-Route::get('/books/{id}/download', [BookController::class, 'download'])->name('books.download');
 Route::post('/books/set-preference', [BookController::class, 'setPreference'])->name('books.set-preference');
 
 // General image proxy for covers and previews
