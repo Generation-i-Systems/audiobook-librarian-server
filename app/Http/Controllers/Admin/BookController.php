@@ -1591,13 +1591,14 @@ class BookController extends Controller
         // Handle needs_review checkbox logic
         if ($request->has('needsReviewPresent')) {
             $keptReasons = $request->input('needsReviewReasons', []);
+            $clearNeedsReview = $request->input('clearNeedsReview', false);
 
-            if (empty($keptReasons)) {
-                // All unchecked - clear needs review
+            if ($clearNeedsReview || empty($keptReasons)) {
+                // Clear needs review checkbox was checked OR all reasons unchecked
                 $validated['needsReview'] = false;
                 $validated['needsReviewReasons'] = [];
             } else {
-                // Some kept - update reasons
+                // Some reasons kept - update reasons
                 $validated['needsReview'] = true;
                 $validated['needsReviewReasons'] = $keptReasons;
             }

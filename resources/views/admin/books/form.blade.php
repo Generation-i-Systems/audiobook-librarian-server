@@ -134,25 +134,43 @@
                 </div>
             @endif
 
-            @if(isset($book) && !empty($book['needsReview']) && !empty($book['needsReviewReasons']))
+            @if(isset($book) && !empty($book['needsReview']))
                 <div class="card mb-3 border-warning">
                     <div class="card-header bg-warning text-dark">
                         <i class="fas fa-exclamation-triangle me-2"></i>Review Status
                     </div>
                     <div class="card-body">
                         <p class="mb-2"><strong>This book has been flagged for review.</strong></p>
-                        <p class="text-muted small mb-3">Check the boxes below to <strong>KEEP</strong> those reasons. Unchecked reasons will be removed when you save. If all are unchecked, the needs review flag will be cleared.</p>
 
-                        @foreach($book['needsReviewReasons'] as $index => $reason)
+                        @if(!empty($book['needsReviewReasons']) && is_array($book['needsReviewReasons']))
+                            <p class="text-muted small mb-3">Check the boxes below to <strong>KEEP</strong> those reasons. Unchecked reasons will be removed when you save. If all are unchecked, the needs review flag will be cleared.</p>
+
+                            @foreach($book['needsReviewReasons'] as $index => $reason)
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox"
+                                           name="needsReviewReasons[]" value="{{ $reason }}"
+                                           id="reason-{{ $index }}">
+                                    <label class="form-check-label" for="reason-{{ $index }}">
+                                        {{ $reason }}
+                                    </label>
+                                </div>
+                            @endforeach
+                        @else
+                            <p class="text-muted small mb-3">
+                                <em>No specific reasons were recorded for this review flag.</em>
+                            </p>
+                            <p class="text-muted small mb-3">
+                                To clear the review flag, check the box below and save.
+                            </p>
                             <div class="form-check mb-2">
                                 <input class="form-check-input" type="checkbox"
-                                       name="needsReviewReasons[]" value="{{ $reason }}"
-                                       id="reason-{{ $index }}">
-                                <label class="form-check-label" for="reason-{{ $index }}">
-                                    {{ $reason }}
+                                       name="clearNeedsReview" value="1"
+                                       id="clearNeedsReview">
+                                <label class="form-check-label" for="clearNeedsReview">
+                                    <strong>Clear review flag</strong>
                                 </label>
                             </div>
-                        @endforeach
+                        @endif
 
                         <input type="hidden" name="needsReviewPresent" value="1">
                     </div>
