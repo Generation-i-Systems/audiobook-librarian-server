@@ -13,8 +13,10 @@ use App\Services\AudibleService;
 use App\Services\BackgroundProcessingService;
 use App\Services\BookEnrichmentService;
 use App\Services\BookImportService;
+use App\Services\CoverImageAnalysisService;
 use App\Services\ExternalCoverService;
 use App\Services\GoogleBooksApiService;
+use App\Services\GoogleImageSearchService;
 use App\Services\ImportCacheService;
 use App\Services\ImportUIService;
 use App\Traits\GenreMapping;
@@ -56,8 +58,10 @@ class ImportBooksFromDownloads extends Command
     protected ?AIBookProcessor $aiProcessor = null;
     protected ?AudioFileAnalyzer $audioAnalyzer = null;
     protected ?AudibleService $audibleService = null;
+    protected ?CoverImageAnalysisService $coverAnalysisService = null;
     protected ?ExternalCoverService $coverService = null;
     protected ?GoogleBooksApiService $googleBooksService = null;
+    protected ?GoogleImageSearchService $googleImageService = null;
     protected ?ImportUIService $uiService = null;
 
     // New services
@@ -106,6 +110,11 @@ class ImportBooksFromDownloads extends Command
             $aiMetadata = [];
         }
 
+        $tagMetadata = $this->extractTagMetadataFromAudiobook($audiobook);
+        if (!empty($tagMetadata)) {
+            $aiMetadata = $this->mergeMetadataFillMissing($aiMetadata, $tagMetadata);
+        }
+
         $aiMetadata['confidence'] = (int) ($aiMetadata['confidence'] ?? 0);
         $aiMetadata['title'] = $aiMetadata['title'] ?? ($audiobook['name'] ?? '');
         $aiMetadata['source_path'] = $aiMetadata['source_path'] ?? ($audiobook['path'] ?? '');
@@ -113,6 +122,10 @@ class ImportBooksFromDownloads extends Command
         $minConfidence = (int) $this->option('min-confidence');
         $shouldTryAudio = $aiMetadata['confidence'] < $minConfidence
             || (bool) $this->option('force-audio');
+
+        if ($shouldTryAudio && $this->hasCriticalTagMetadata($tagMetadata)) {
+            $shouldTryAudio = false;
+        }
 
         if (!$shouldTryAudio) {
             return false;
@@ -174,6 +187,44 @@ class ImportBooksFromDownloads extends Command
         ];
 
         return true;
+    }
+
+    protected function extractTagMetadataFromAudiobook(array $audiobook): array
+    {
+        if (empty($audiobook['files']) || !$this->aiProcessor) {
+            return [];
+        }
+
+        $fileTags = [];
+        foreach (array_slice($audiobook['files'], 0, 3) as $filePath) {
+            $ext = strtolower((string) pathinfo($filePath, PATHINFO_EXTENSION));
+            if ($ext !== 'm4b' && $ext !== 'mp3') {
+                continue;
+            }
+
+            $tags = $this->aiProcessor->extractFileTags($filePath);
+            if (!empty($tags)) {
+                $fileTags[basename((string) $filePath)] = $tags;
+                break;
+            }
+        }
+
+        return $this->extractMetadataFromFileTags($fileTags);
+    }
+
+    protected function hasCriticalTagMetadata(array $tagMetadata): bool
+    {
+        if (empty($tagMetadata)) {
+            return false;
+        }
+
+        $title = $tagMetadata['title'] ?? '';
+        $author = $tagMetadata['author'] ?? [];
+
+        $hasTitle = is_string($title) && trim($title) !== '';
+        $hasAuthor = is_array($author) && count($author) > 0;
+
+        return $hasTitle && $hasAuthor;
     }
 
 
@@ -1696,17 +1747,18 @@ class ImportBooksFromDownloads extends Command
     }
 
     /**
-     * Handle user interruption (Ctrl+C) - quit gracefully
+     * Handle user interruption (Ctrl+C)
      */
     protected function handleUserInterruption(): void
     {
+        if ($this->uiService) {
+            $this->uiService->restoreTerminalState();
+        }
+
         $this->inputInterrupted = true;
         $this->newLine();
         $this->warn("⚠️  [Request interrupted by user] - Ctrl+C detected");
-        $this->info("🛑 Quitting import process gracefully...");
-
-        // Quit directly without asking for options
-        $this->handleUserQuit();
+        $this->info('🛑 Quitting import process gracefully...');
     }
 
     /**
@@ -2661,7 +2713,11 @@ class ImportBooksFromDownloads extends Command
         }
 
         $this->table(['Field', 'Value'], $tableData);
-        // Display cover image if terminal supports it and cover is available
+
+        // Handle cover selection (analyze current cover and offer alternatives if needed)
+        $this->handleCoverSelection($metadata);
+
+        // Display selected cover image if terminal supports it and cover is available
         if (!empty($metadata['cover_url'])) {
             $this->displayCoverImage($metadata['cover_url']);
         }
@@ -2675,14 +2731,37 @@ class ImportBooksFromDownloads extends Command
         return $this->askWithImmediateInterrupt($question, $default);
     }
 
-    protected function promptForCoverUrl(string $currentCoverUrl): string
+    protected function getFirstNonEmptyMetadataValue(array $metadata, array $keys): mixed
     {
-        $newCoverUrl = $this->askInline('Cover URL', '');
-        if (trim($newCoverUrl) === '') {
-            return $currentCoverUrl;
+        foreach ($keys as $key) {
+            if (!array_key_exists($key, $metadata)) {
+                continue;
+            }
+
+            $value = $metadata[$key];
+            if ($value === null) {
+                continue;
+            }
+
+            if (is_string($value) && trim($value) === '') {
+                continue;
+            }
+
+            if (is_array($value) && count($value) === 0) {
+                continue;
+            }
+
+            return $value;
         }
 
-        return $newCoverUrl;
+        return null;
+    }
+
+    protected function promptForCoverUrl(string $currentCoverUrl): string
+    {
+        $newCoverUrl = $this->askInline('Cover URL', $currentCoverUrl);
+
+        return trim($newCoverUrl) !== '' ? $newCoverUrl : $currentCoverUrl;
     }
 
     /**
@@ -3057,13 +3136,14 @@ class ImportBooksFromDownloads extends Command
     protected function editMetadataFields(array $metadata, array $audiobook): array
     {
         // Edit title
-        $metadata['title'] = $this->askInline("Title", $metadata['title'] ?? '');
+        $currentTitle = $this->getFirstNonEmptyMetadataValue($metadata, ['title', 'book_title', 'name']);
+        $metadata['title'] = $this->askInline('Title', is_string($currentTitle) ? $currentTitle : (string) ($metadata['title'] ?? ''));
         if ($this->inputInterrupted) {
             return $metadata;
         }
 
         // Edit author
-        $currentAuthor = $metadata['author'] ?? '';
+        $currentAuthor = $this->getFirstNonEmptyMetadataValue($metadata, ['author', 'authors', 'authorName', 'author_name']);
         if (is_array($currentAuthor)) {
             $currentAuthor = implode(', ', $currentAuthor);
         }
@@ -3074,11 +3154,11 @@ class ImportBooksFromDownloads extends Command
         $metadata['author'] = array_map('trim', explode(',', $newAuthor));
 
         // Edit narrator
-        $currentNarrator = $metadata['narrator'] ?? '';
+        $currentNarrator = $this->getFirstNonEmptyMetadataValue($metadata, ['narrator', 'narrators', 'narratorName', 'narrator_name']);
         if (is_array($currentNarrator)) {
             $currentNarrator = implode(', ', $currentNarrator);
         }
-        $newNarrator = $this->askInline("Narrator(s) (comma-separated)", $currentNarrator);
+        $newNarrator = $this->askInline('Narrator(s) (comma-separated)', is_string($currentNarrator) ? $currentNarrator : '');
         if ($this->inputInterrupted) {
             return $metadata;
         }
@@ -3091,7 +3171,10 @@ class ImportBooksFromDownloads extends Command
             $genreOptions[$idx + 1] = $g;
         }
 
-        $currentGenre = $metadata['genre'] ?? 'Other';
+        $currentGenre = $this->getFirstNonEmptyMetadataValue($metadata, ['genre', 'genres', 'genreName', 'genre_name']) ?? 'Other';
+        if (is_array($currentGenre)) {
+            $currentGenre = $currentGenre[0] ?? 'Other';
+        }
         $currentGenreIdx = array_search($currentGenre, $validGenres);
         // Default to last (Other) if not found
         $defaultGenreIdx = ($currentGenreIdx !== false) ? $currentGenreIdx + 1 : count($validGenres);
@@ -3103,22 +3186,28 @@ class ImportBooksFromDownloads extends Command
         $metadata['genre'] = $genreOptions[$selectedGenreIdx] ?? $currentGenre;
 
         // Edit series
-        $metadata['series'] = $this->askInline("Series", $metadata['series'] ?? '');
+        $currentSeries = $this->getFirstNonEmptyMetadataValue($metadata, ['series', 'seriesName', 'series_name']);
+        $metadata['series'] = $this->askInline('Series', is_string($currentSeries) ? $currentSeries : (string) ($metadata['series'] ?? ''));
         if ($this->inputInterrupted) {
             return $metadata;
         }
 
         // Edit series number
+        $currentSeriesNumber = $this->getFirstNonEmptyMetadataValue($metadata, ['series_number', 'seriesNumber', 'series_num', 'seriesNum']);
         $metadata['series_number'] = $this->askInline(
             'Series Number',
-            (string) ($metadata['series_number'] ?? '')
+            is_scalar($currentSeriesNumber) ? (string) $currentSeriesNumber : (string) ($metadata['series_number'] ?? '')
         );
         if ($this->inputInterrupted) {
             return $metadata;
         }
 
         // Edit year
-        $metadata['year'] = $this->askInline("Year", (string) ($metadata['year'] ?? ''));
+        $currentYear = $this->getFirstNonEmptyMetadataValue($metadata, ['year', 'publishedYear', 'published_year', 'published_date']);
+        if (is_string($currentYear) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $currentYear)) {
+            $currentYear = substr($currentYear, 0, 4);
+        }
+        $metadata['year'] = $this->askInline('Year', is_scalar($currentYear) ? (string) $currentYear : (string) ($metadata['year'] ?? ''));
         if ($this->inputInterrupted) {
             return $metadata;
         }
@@ -3541,6 +3630,190 @@ class ImportBooksFromDownloads extends Command
             $this->warn("⚠️  Error downloading cover image: " . $result['error']);
             return null;
         }
+    }
+
+    /**
+     * Analyze if a cover image is a low-quality text-on-white cover
+     */
+    protected function isTextOnWhiteCover(string $imagePath): bool
+    {
+        if (!$this->coverAnalysisService) {
+            $this->coverAnalysisService = app(CoverImageAnalysisService::class);
+        }
+
+        return $this->coverAnalysisService->isTextOnWhiteCover($imagePath);
+    }
+
+    /**
+     * Search for alternative book covers using Google Image Search
+     */
+    protected function searchAlternativeCovers(array $metadata, int $limit = 3): array
+    {
+        if (!$this->googleImageService) {
+            $this->googleImageService = app(GoogleImageSearchService::class);
+        }
+
+        $author = is_array($metadata['author']) ? implode(' ', $metadata['author']) : ($metadata['author'] ?? '');
+        $title = $metadata['title'] ?? '';
+
+        if (empty($author) || empty($title)) {
+            return ['success' => false, 'images' => [], 'error' => 'Missing author or title'];
+        }
+
+        return $this->googleImageService->searchBookCovers($author, $title, $limit);
+    }
+
+    /**
+     * Handle cover selection - analyze current cover and offer alternatives if needed
+     */
+    protected function handleCoverSelection(array &$metadata): void
+    {
+        $currentCoverUrl = $metadata['cover_url'] ?? '';
+        $isInteractive = !$this->option('auto');
+        $coverOptions = [];
+
+        // Check if current cover exists and analyze it
+        $hasValidCover = false;
+        if (!empty($currentCoverUrl)) {
+            // Try to download and analyze the current cover
+            $tempCoverPath = null;
+            try {
+                $tempCoverPath = tempnam(sys_get_temp_dir(), 'cover_') . '.jpg';
+                $imageData = @file_get_contents($currentCoverUrl);
+                if ($imageData) {
+                    file_put_contents($tempCoverPath, $imageData);
+
+                    $isTextOnWhite = $this->isTextOnWhiteCover($tempCoverPath);
+                    if ($isTextOnWhite) {
+                        $this->warn('⚠️  Current cover appears to be text-only on white background (low quality)');
+                        // Add it as an option but mark it as low quality
+                        $coverOptions[] = [
+                            'url' => $currentCoverUrl,
+                            'label' => 'Current cover (text-only - low quality)',
+                            'isCurrentLowQuality' => true,
+                        ];
+                    } else {
+                        $hasValidCover = true;
+                        $coverOptions[] = [
+                            'url' => $currentCoverUrl,
+                            'label' => 'Current cover',
+                            'isCurrent' => true,
+                        ];
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::warning('Error analyzing current cover', ['error' => $e->getMessage()]);
+            } finally {
+                if ($tempCoverPath && file_exists($tempCoverPath)) {
+                    @unlink($tempCoverPath);
+                }
+            }
+        }
+
+        // If no valid cover, search for alternatives
+        if (!$hasValidCover) {
+            $this->line('🔍 Searching for alternative book covers...');
+            $searchResults = $this->searchAlternativeCovers($metadata, 3);
+
+            if ($searchResults['success'] && !empty($searchResults['images'])) {
+                $this->info('Found ' . count($searchResults['images']) . ' alternative cover(s)');
+                foreach ($searchResults['images'] as $index => $image) {
+                    $coverOptions[] = [
+                        'url' => $image['url'],
+                        'label' => 'Google Image ' . ($index + 1),
+                        'isGoogle' => true,
+                    ];
+                }
+            } else {
+                if (isset($searchResults['error'])) {
+                    $this->comment('Could not search for alternative covers: ' . $searchResults['error']);
+                }
+            }
+        }
+
+        // Handle cover selection based on mode
+        if (count($coverOptions) === 0) {
+            // No covers available at all
+            if (empty($currentCoverUrl)) {
+                $this->comment('No cover image found');
+            }
+            return;
+        }
+
+        if ($isInteractive && count($coverOptions) > 1) {
+            // Interactive mode with multiple options - let user choose
+            $this->displayCoverOptions($coverOptions, $metadata);
+            $selectedUrl = $this->promptForCoverSelection($coverOptions);
+            if ($selectedUrl) {
+                $metadata['cover_url'] = $selectedUrl;
+            }
+        } elseif (!$isInteractive && !$hasValidCover && !empty($coverOptions)) {
+            // Non-interactive mode - use first Google image if current cover is invalid
+            $googleOption = collect($coverOptions)->first(function ($opt) {
+                return $opt['isGoogle'] ?? false;
+            });
+
+            if ($googleOption) {
+                $this->info('🤖 Auto-selecting first Google Image cover');
+                $metadata['cover_url'] = $googleOption['url'];
+            }
+        }
+    }
+
+    /**
+     * Display available cover options
+     */
+    protected function displayCoverOptions(array $coverOptions, array $metadata): void
+    {
+        $this->newLine();
+        $this->line('📚 Available Cover Options:');
+        $this->newLine();
+
+        foreach ($coverOptions as $index => $option) {
+            $label = ($index + 1) . '. ' . $option['label'];
+            $this->line($label);
+
+            // Display the cover image if supported
+            $this->displayCoverImage($option['url']);
+            $this->newLine();
+        }
+    }
+
+    /**
+     * Prompt user to select a cover from available options
+     */
+    protected function promptForCoverSelection(array $coverOptions): ?string
+    {
+        if (empty($coverOptions)) {
+            return null;
+        }
+
+        $choices = [];
+        foreach ($coverOptions as $index => $option) {
+            $choices[(string) ($index + 1)] = $option['label'];
+        }
+        $choices['0'] = 'None - skip cover';
+        $choices['u'] = 'Enter custom URL';
+
+        $selection = $this->choice('Select a cover image', $choices, '1');
+
+        if ($selection === '0' || $selection === 'None - skip cover') {
+            return '';
+        }
+
+        if ($selection === 'u' || $selection === 'Enter custom URL') {
+            $customUrl = $this->ask('Enter cover URL');
+            return $customUrl ? trim($customUrl) : null;
+        }
+
+        // Find the selected option by matching the label
+        foreach ($coverOptions as $index => $option) {
+            if ($option['label'] === $selection || (string) ($index + 1) === $selection) {
+                return $option['url'];
+            }
+        }
+
+        return null;
     }
 
     /**
