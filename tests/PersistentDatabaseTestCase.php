@@ -25,29 +25,13 @@ abstract class PersistentDatabaseTestCase extends TestCase
     {
         parent::setUp();
 
-        // Define a constant to allow MySQL in this test case
-        if (!defined('ALLOW_MYSQL_IN_TESTS')) {
-            define('ALLOW_MYSQL_IN_TESTS', true);
-        }
-
-        // Use a persistent test database instead of in-memory
-        config(['database.default' => 'mysql']);
-
-        // Make sure we're using a test database, not production
-        $database = config('database.connections.mysql.database');
-        if (!str_contains($database, 'test') && !str_contains($database, 'testing')) {
-            config(['database.connections.mysql.database' => 'testing']);
-        }
-
-        // Only run migrations once for the entire test suite
+        // This project must NEVER run tests against MySQL.
+        // Keep a persistent schema setup (no RefreshDatabase) while still using sqlite.
         if (!static::$databaseConfigured) {
-            // Refresh the database connection to use the test database
-            DB::purge();
+            Artisan::call('migrate:fresh');
+
+            DB::disconnect();
             DB::reconnect();
-
-            // Uncomment to run migrations only once per test suite
-            // Artisan::call('migrate:fresh');
-
             static::$databaseConfigured = true;
         }
     }

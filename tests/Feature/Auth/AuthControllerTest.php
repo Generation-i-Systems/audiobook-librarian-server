@@ -53,8 +53,9 @@ class AuthControllerTest extends TestCase
     {
         // fwrite(STDERR, "\n=== Starting testUserCanRegister ===\n");
 
-        $testEmail = 'test' . time() . '@example.com';
-        $testUsername = 'testuser' . time();
+        $uniqueSuffix = uniqid('', true);
+        $testEmail = 'test' . $uniqueSuffix . '@example.com';
+        $testUsername = 'testuser' . $uniqueSuffix;
 
         $userData = [
             'name' => 'Test User',
@@ -112,12 +113,13 @@ class AuthControllerTest extends TestCase
     public function testUserCanLogin()
     {
         // Use unique email to avoid conflicts
-        $testEmail = 'test' . time() . '@example.com';
+        $uniqueSuffix = uniqid('', true);
+        $testEmail = 'test' . $uniqueSuffix . '@example.com';
 
         // Create a test user in the database
         $user = User::create([
             'name' => 'Test User',
-            'username' => 'testuser' . time(),
+            'username' => 'testuser' . $uniqueSuffix,
             'email' => $testEmail,
             'password' => Hash::make('password'),
             'role' => 'user',
@@ -152,12 +154,13 @@ class AuthControllerTest extends TestCase
     public function testUnverifiedUserCannotLogin(): void
     {
         // Use unique email to avoid conflicts
-        $testEmail = 'unverified' . time() . '@example.com';
+        $uniqueSuffix = uniqid('', true);
+        $testEmail = 'unverified' . $uniqueSuffix . '@example.com';
 
         // Create an unverified test user in the database
         User::create([
             'name' => 'Test User',
-            'username' => 'testuser' . time(),
+            'username' => 'testuser' . $uniqueSuffix,
             'email' => $testEmail,
             'password' => Hash::make('password'),
             'role' => 'unverified',
@@ -179,12 +182,13 @@ class AuthControllerTest extends TestCase
     public function testUserCanLogout(): void
     {
         // Use unique email to avoid conflicts
-        $testEmail = 'logout' . time() . '@example.com';
+        $uniqueSuffix = uniqid('', true);
+        $testEmail = 'logout' . $uniqueSuffix . '@example.com';
 
         // Create a test user in the database
         User::create([
             'name' => 'Test User',
-            'username' => 'testuser' . time(),
+            'username' => 'testuser' . $uniqueSuffix,
             'email' => $testEmail,
             'password' => Hash::make('password'),
             'role' => 'standard',

@@ -12,10 +12,7 @@ on:
       - 'app/Observers/**'
       - 'app/Providers/**'
       - 'database/migrations/**'
-      - 'tests/Unit/Services/**'
-      - 'tests/Unit/Traits/**'
-      - 'tests/Unit/Support/**'
-      - 'tests/Feature/Services/**'
+      - 'tests/Core/**'
       - '.github/workflows/core-tests.yml'
   pull_request:
     branches: [ main, develop ]
@@ -28,10 +25,7 @@ on:
       - 'app/Observers/**'
       - 'app/Providers/**'
       - 'database/migrations/**'
-      - 'tests/Unit/Services/**'
-      - 'tests/Unit/Traits/**'
-      - 'tests/Unit/Support/**'
-      - 'tests/Feature/Services/**'
+      - 'tests/Core/**'
 
 jobs:
   core-tests:
@@ -78,7 +72,7 @@ jobs:
         run: chmod -R 777 storage bootstrap/cache
 
       - name: Run Core/Service Tests
-        run: php artisan test --parallel tests/Unit/Services tests/Unit/Traits tests/Unit/Support tests/Feature/Services
+        run: php artisan test --parallel tests/Core
         env:
           APP_ENV: testing
           DB_CONNECTION: sqlite

@@ -6,8 +6,7 @@ on:
     paths:
       - 'app/Http/Controllers/Api/**'
       - 'routes/api.php'
-      - 'tests/Feature/Api/**'
-      - 'tests/Unit/Controllers/Api/**'
+      - 'tests/Api/**'
       - 'app/Transformers/**'
       - 'app/Http/Resources/**'
       - '.github/workflows/api-tests.yml'
@@ -16,8 +15,7 @@ on:
     paths:
       - 'app/Http/Controllers/Api/**'
       - 'routes/api.php'
-      - 'tests/Feature/Api/**'
-      - 'tests/Unit/Controllers/Api/**'
+      - 'tests/Api/**'
       - 'app/Transformers/**'
       - 'app/Http/Resources/**'
 
@@ -66,7 +64,7 @@ jobs:
         run: chmod -R 777 storage bootstrap/cache
 
       - name: Run API Tests
-        run: php artisan test --parallel tests/Feature/Api tests/Unit/Controllers/Api
+        run: php artisan test --parallel tests/Api
         env:
           APP_ENV: testing
           DB_CONNECTION: sqlite

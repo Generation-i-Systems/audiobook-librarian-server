@@ -83,6 +83,7 @@ class BookControllerTest extends TestCase
     #[Test]
     public function storeCreatesBook(): void
     {
+        $this->withoutExceptionHandling();
         \Illuminate\Support\Facades\Storage::fake('public');
         \Illuminate\Support\Facades\Storage::fake('covers');
         $this->withoutMiddleware(\App\Http\Middleware\CheckAdminRole::class);

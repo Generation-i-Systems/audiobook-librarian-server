@@ -4,37 +4,41 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
-use App\Contracts\DocumentStoreServiceInterface;
 use App\Services\BookDeletionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
+use Tests\Mocks\MockDocumentStoreService;
 
 class BookDeletionServiceTest extends TestCase
 {
     use RefreshDatabase;
 
     private BookDeletionService $service;
-    private DocumentStoreServiceInterface $documentStore;
+    private MockDocumentStoreService $documentStore;
 
     protected function setUp(): void
     {
         parent::setUp();
 
         // Setup fake storage disks for testing
-        config(['filesystems.disks.trash' => [
-            'driver' => 'local',
-            'root' => storage_path('framework/testing/trash'),
-        ]]);
-        config(['filesystems.disks.books' => [
-            'driver' => 'local',
-            'root' => storage_path('framework/testing/books'),
-        ]]);
+        config([
+            'filesystems.disks.trash' => [
+                'driver' => 'local',
+                'root' => storage_path('framework/testing/trash'),
+            ],
+        ]);
+        config([
+            'filesystems.disks.books' => [
+                'driver' => 'local',
+                'root' => storage_path('framework/testing/books'),
+            ],
+        ]);
 
         Storage::fake('trash');
         Storage::fake('books');
 
-        $this->documentStore = $this->app->make(DocumentStoreServiceInterface::class);
+        $this->documentStore = new MockDocumentStoreService();
         $this->service = new BookDeletionService($this->documentStore);
     }
 
@@ -127,6 +131,9 @@ class BookDeletionServiceTest extends TestCase
         $trashResult = $this->service->moveToTrash($book['id'], true);
 
         $conflictBook = $this->createTestBookWithPath($book['directoryPath']);
+        $booksDisk = Storage::disk('books');
+        $booksDisk->makeDirectory($book['directoryPath']);
+        $booksDisk->put($book['directoryPath'] . '/conflict.txt', 'occupied');
 
         $restoreResult = $this->service->restore($trashResult['trash_item_id']);
         $this->assertTrue($restoreResult);
@@ -234,8 +241,11 @@ class BookDeletionServiceTest extends TestCase
             'needs_review_reasons' => [],
         ], $overrides);
 
-        $book = $this->documentStore->createBook($bookData);
-        return $this->documentStore->getBook((string) $book->id);
+        $bookData['directoryPath'] = $bookData['directory_path'];
+
+        $bookId = $this->documentStore->createBook($bookData);
+
+        return $this->documentStore->getBook((string) $bookId);
     }
 
     private function createTestBookWithPath(string $directoryPath): array
@@ -248,13 +258,28 @@ class BookDeletionServiceTest extends TestCase
         $bookData = [
             'title' => 'Test Book with Relationships',
             'directory_path' => 'test/book/relationships',
-            'authors' => ['Test Author'],
-            'genres' => ['Test Genre'],
-            'narrators' => ['Test Narrator'],
+            'authors' => [
+                ['name' => 'Test Author'],
+            ],
+            'genres' => [
+                ['name' => 'Test Genre'],
+            ],
+            'narrators' => [
+                ['name' => 'Test Narrator'],
+            ],
+            'series' => [
+                [
+                    'seriesName' => 'Test Series',
+                    'position' => 1,
+                ],
+            ],
         ];
 
-        $book = $this->documentStore->createBook($bookData);
-        return $this->documentStore->getBook((string) $book->id);
+        $bookData['directoryPath'] = $bookData['directory_path'];
+
+        $bookId = $this->documentStore->createBook($bookData);
+
+        return $this->documentStore->getBook((string) $bookId);
     }
 
     private function createTestBookFiles(string $directoryPath): void

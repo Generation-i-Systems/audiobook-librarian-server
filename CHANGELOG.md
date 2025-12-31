@@ -1,10 +1,20 @@
 ## [Unreleased]
 ### Added
-- GitHub Actions workflow for automated testing on push and pull requests
-  - Runs full test suite with parallel execution
-  - Tests on PHP 8.2 and 8.3
-  - Includes code coverage reporting (70% minimum)
-  - Caches Composer dependencies for faster builds
+- Reorganized test suite by category for better organization and targeted testing
+  - tests/Api/ - API tests (156 tests)
+  - tests/Web/ - Web/Admin UI tests (111 tests)
+  - tests/Cli/ - CLI/command tests (283 tests)
+  - tests/Import/ - Import system tests (190 tests)
+  - tests/Core/ - Core/service tests (224 tests)
+- Added composer test scripts for each category: test:api, test:web, test:cli, test:import, test:core
+- GitHub Actions workflows organized by test category for efficient CI/CD
+  - api-tests.yml - Runs only API tests when API code changes (~30s)
+  - web-tests.yml - Runs only web/admin tests when UI code changes (~25s)
+  - cli-tests.yml - Runs only CLI tests when commands change (~60s)
+  - import-tests.yml - Runs only import tests when import system changes (~75s)
+  - core-tests.yml - Runs only core tests when services/models change (~45s)
+  - full-test-suite.yml - Complete suite for main branch, manual runs, and daily schedule
+- Path-based workflow triggers minimize unnecessary test runs (run 100-300 tests vs all 1100+)
 - Bootstrap-level database safety check that aborts any PHPUnit/artisan test run unless SQLite in-memory configuration is detected, preventing accidental production wipes
 - MockDocumentStoreService wiring and helpers for feature/unit tests so web auth, queue controllers, and import flows can run entirely in-memory without touching MySQL
 - Book edit page: needs_review_reasons now editable via checkboxes to keep or remove specific review flags

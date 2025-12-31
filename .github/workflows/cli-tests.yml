@@ -5,17 +5,13 @@ on:
     branches: [ main, develop ]
     paths:
       - 'app/Console/Commands/**'
-      - 'tests/Feature/Commands/**'
-      - 'tests/Unit/Commands/**'
-      - 'tests/Unit/Console/Commands/**'
+      - 'tests/Cli/**'
       - '.github/workflows/cli-tests.yml'
   pull_request:
     branches: [ main, develop ]
     paths:
       - 'app/Console/Commands/**'
-      - 'tests/Feature/Commands/**'
-      - 'tests/Unit/Commands/**'
-      - 'tests/Unit/Console/Commands/**'
+      - 'tests/Cli/**'
 
 jobs:
   cli-tests:
@@ -62,7 +58,7 @@ jobs:
         run: chmod -R 777 storage bootstrap/cache
 
       - name: Run CLI/Command Tests
-        run: php artisan test --parallel tests/Feature/Commands tests/Unit/Commands tests/Unit/Console/Commands
+        run: php artisan test --parallel tests/Cli
         env:
           APP_ENV: testing
           DB_CONNECTION: sqlite

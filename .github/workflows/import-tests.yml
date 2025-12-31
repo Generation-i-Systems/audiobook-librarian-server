@@ -15,11 +15,7 @@ on:
       - 'app/Console/Commands/PrepareForReprocessing.php'
       - 'app/Console/Commands/ImportBookCommand.php'
       - 'app/Traits/BookImportTrait.php'
-      - 'tests/Feature/*Import*.php'
-      - 'tests/Feature/Admin/*Import*.php'
-      - 'tests/Feature/Commands/*Import*.php'
-      - 'tests/Feature/Services/*Import*.php'
-      - 'tests/Unit/**/*Import*.php'
+      - 'tests/Import/**'
       - '.github/workflows/import-tests.yml'
   pull_request:
     branches: [ main, develop ]
@@ -35,11 +31,7 @@ on:
       - 'app/Console/Commands/PrepareForReprocessing.php'
       - 'app/Console/Commands/ImportBookCommand.php'
       - 'app/Traits/BookImportTrait.php'
-      - 'tests/Feature/*Import*.php'
-      - 'tests/Feature/Admin/*Import*.php'
-      - 'tests/Feature/Commands/*Import*.php'
-      - 'tests/Feature/Services/*Import*.php'
-      - 'tests/Unit/**/*Import*.php'
+      - 'tests/Import/**'
 
 jobs:
   import-tests:
@@ -88,7 +80,7 @@ jobs:
       - name: Run Import System Tests
         run: |
           echo "🧪 Running Import-related tests..."
-          php artisan test --parallel --filter=Import
+          php artisan test --parallel tests/Import
         env:
           APP_ENV: testing
           DB_CONNECTION: sqlite

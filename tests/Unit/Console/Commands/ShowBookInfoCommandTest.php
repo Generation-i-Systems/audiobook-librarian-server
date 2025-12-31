@@ -5,17 +5,28 @@ declare(strict_types=1);
 namespace Tests\Unit\Console\Commands;
 
 use App\Console\Commands\ShowBookInfo;
+use App\Contracts\DocumentStoreServiceInterface;
+use App\Services\BookDeletionService;
+use App\Models\Book;
 use App\Services\TerminalImageService;
+use Mockery;
 use PHPUnit\Framework\Attributes\Test;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class ShowBookInfoCommandTest extends TestCase
 {
+    use RefreshDatabase;
     private ShowBookInfo $command;
+    private DocumentStoreServiceInterface $documentStore;
+    private BookDeletionService $bookDeletionService;
 
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->documentStore = Mockery::mock(DocumentStoreServiceInterface::class);
+        $this->bookDeletionService = new BookDeletionService($this->documentStore);
 
         $terminalImageService = new class () extends TerminalImageService {
             public function supportsImages(): bool
@@ -24,10 +35,13 @@ class ShowBookInfoCommandTest extends TestCase
             }
         };
 
-        $this->command = new class ($terminalImageService) extends ShowBookInfo {
-            public function __construct(TerminalImageService $terminalImageService)
-            {
-                parent::__construct($terminalImageService);
+        $bookDeletionService = $this->bookDeletionService;
+        $this->command = new class ($terminalImageService, $bookDeletionService) extends ShowBookInfo {
+            public function __construct(
+                TerminalImageService $terminalImageService,
+                BookDeletionService $bookDeletionService
+            ) {
+                parent::__construct($terminalImageService, $bookDeletionService);
             }
 
             public function wrapTextPublic(string $text, int $maxWidth): string
@@ -35,6 +49,22 @@ class ShowBookInfoCommandTest extends TestCase
                 return $this->wrapText($text, $maxWidth);
             }
         };
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        parent::tearDown();
+    }
+
+    #[Test]
+    public function itSkipsOpeningBrowserInTestEnvironment(): void
+    {
+        $book = Book::factory()->create();
+
+        $this->artisan('books:info', ['directories' => [$book->id], '--edit' => true])
+            ->expectsOutputToContain('(Skipped browser opening in test environment)')
+            ->assertExitCode(0);
     }
 
     #[Test]

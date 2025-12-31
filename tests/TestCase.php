@@ -3,6 +3,7 @@
 namespace Tests;
 
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Illuminate\Support\Facades\DB;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -17,6 +18,11 @@ abstract class TestCase extends BaseTestCase
         $this->ensureDatabaseSafety();
 
         parent::setUp();
+
+        $connection = DB::connection();
+        while ($connection->transactionLevel() > 0) {
+            $connection->rollBack();
+        }
 
         $compiledPath = sys_get_temp_dir() . '/librarian_framework_views';
         if (!is_dir($compiledPath)) {

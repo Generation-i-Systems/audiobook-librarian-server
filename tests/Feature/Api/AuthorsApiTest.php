@@ -32,8 +32,8 @@ class AuthorsApiTest extends ApiTestCase
                         'biography',
                         'book_count',
                         'image_url',
-                        'genres'
-                    ]
+                        'genres',
+                    ],
                 ],
                 'pagination' => [
                     'current_page',
@@ -41,8 +41,8 @@ class AuthorsApiTest extends ApiTestCase
                     'total',
                     'total_pages',
                     'has_next',
-                    'has_prev'
-                ]
+                    'has_prev',
+                ],
             ]);
 
         $data = $response->json();
@@ -119,7 +119,12 @@ class AuthorsApiTest extends ApiTestCase
     public function test_authors_endpoint_supports_pagination()
     {
         // Create many authors with books
-        $authors = Author::factory()->count(75)->create();
+        $authors = Author::factory()
+            ->count(75)
+            ->sequence(fn (\Illuminate\Database\Eloquent\Factories\Sequence $sequence) => [
+                'name' => 'Pagination Author ' . $sequence->index,
+            ])
+            ->create();
         foreach ($authors as $author) {
             $book = Book::factory()->create();
             $book->authors()->attach($author);

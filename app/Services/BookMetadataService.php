@@ -105,5 +105,14 @@ class BookMetadataService
         }
     }
 
+    public function generateBookId(string $directoryPath): string
+    {
+        $normalized = trim($directoryPath);
+        $normalized = str_replace("\\", '/', $normalized);
+        $normalized = preg_replace('#/+#', '/', $normalized) ?? $normalized;
+
+        return hash('sha256', $normalized);
+    }
+
     // Firestore support removed; BookMetadataService now saves and loads only from local JSON files.
 }

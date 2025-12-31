@@ -3,12 +3,15 @@
 namespace Tests\Feature;
 
 use App\Services\ImportUIService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Mockery\MockInterface;
-use Tests\PersistentDatabaseTestCase;
+use Tests\TestCase;
 
-class ImportBooksFromDownloadsTest extends PersistentDatabaseTestCase
+class ImportBooksFromDownloadsTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_import_command_uses_ui_service(): void
     {
         // Arrange: Create a dummy directory and file to import

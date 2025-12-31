@@ -555,8 +555,7 @@ class ShowBookInfo extends Command
             }
         }
 
-        // Display the table
-        echo $tableOutput;
+        $this->output->write($tableOutput);
 
         // Display image overlaid on upper right of table
         if ($coverPath && $this->terminalImageService->supportsImages()) {

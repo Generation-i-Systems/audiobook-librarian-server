@@ -30,7 +30,11 @@ class QueueControllerTest extends TestCase
         // Authenticate as admin user
         $this->actingAs($adminUser);
         $this->withHeader('Accept', 'application/json');
-        $this->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class);
+        $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class);
+
+        $defaultDocumentStore = Mockery::mock(DocumentStoreServiceInterface::class);
+        $defaultDocumentStore->shouldReceive('isAdmin')->andReturn(true);
+        $this->app->instance(DocumentStoreServiceInterface::class, $defaultDocumentStore);
     }
 
     public function test_status_returns_worker_and_pending_jobs()
@@ -41,6 +45,7 @@ class QueueControllerTest extends TestCase
 
         // Mock the DocumentStoreService
         $mockDocumentStore = Mockery::mock(DocumentStoreServiceInterface::class);
+        $mockDocumentStore->shouldReceive('isAdmin')->andReturn(true);
         $mockDocumentStore->shouldReceive('getJobCount')->andReturn(3);
         $this->app->instance(DocumentStoreServiceInterface::class, $mockDocumentStore);
 
@@ -64,6 +69,7 @@ class QueueControllerTest extends TestCase
     public function test_clear_deletes_all_jobs()
     {
         $mockDocumentStore = Mockery::mock(DocumentStoreServiceInterface::class);
+        $mockDocumentStore->shouldReceive('isAdmin')->andReturn(true);
         $mockDocumentStore->shouldReceive('clearJobs')->andReturn(true);
         $this->app->instance(DocumentStoreServiceInterface::class, $mockDocumentStore);
 

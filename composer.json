@@ -50,7 +50,12 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Tests\\": "tests/"
+            "Tests\\": "tests/",
+            "Tests\\Api\\": "tests/Api/",
+            "Tests\\Web\\": "tests/Web/",
+            "Tests\\Cli\\": "tests/Cli/",
+            "Tests\\Import\\": "tests/Import/",
+            "Tests\\Core\\": "tests/Core/"
         }
     },
     "scripts": {
@@ -82,23 +87,23 @@
         ],
         "test:api": [
             "@php artisan config:clear --ansi",
-            "@php artisan test --parallel tests/Feature/Api tests/Unit/Controllers/Api"
+            "@php artisan test tests/Api"
         ],
         "test:web": [
             "@php artisan config:clear --ansi",
-            "@php artisan test --parallel tests/Feature/Controllers/Admin tests/Feature/Admin tests/Unit/Controllers/Admin tests/Unit/Views"
+            "@php artisan test tests/Web"
         ],
         "test:cli": [
             "@php artisan config:clear --ansi",
-            "@php artisan test --parallel tests/Feature/Commands tests/Unit/Commands tests/Unit/Console/Commands"
+            "@php artisan test tests/Cli"
         ],
         "test:import": [
             "@php artisan config:clear --ansi",
-            "@php artisan test --parallel --filter=Import"
+            "@php artisan test tests/Import"
         ],
         "test:core": [
             "@php artisan config:clear --ansi",
-            "@php artisan test --parallel tests/Unit/Services tests/Feature/Services tests/Unit/Traits tests/Unit/Support"
+            "@php artisan test tests/Core"
         ],
         "test:import-coverage": [
             "@php artisan config:clear --ansi",

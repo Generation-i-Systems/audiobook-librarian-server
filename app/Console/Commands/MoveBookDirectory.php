@@ -796,7 +796,7 @@ class MoveBookDirectory extends Command
                     if (!$bookModel) {
                         $this->logWarning('Book model not found during update', ['book_id' => $book['_id']]);
                         $this->error("  ✗ Book model not found for ID {$book['_id']}");
-                        continue;
+                        throw new \RuntimeException("Book model not found for ID {$book['_id']}");
                     }
 
                     // Update directory path
@@ -929,6 +929,10 @@ class MoveBookDirectory extends Command
                     'message' => $e->getMessage(),
                 ]);
                 $this->error("  ✗ Failed to update book {$book['_id']}: " . $e->getMessage());
+
+                // CRITICAL SAFETY: propagate the exception so the outer handler can
+                // roll back the DB transaction and undo filesystem moves.
+                throw $e;
             }
         }
 

@@ -27,11 +27,11 @@ class BookApiAutocompleteAuthorsTest extends TestCase
 
         $this->actingAs($user, 'api_test');
         $this->withHeader('Accept', 'application/json');
-        $this->withoutMiddleware(\App\Http\Middleware\VerifyCsrfToken::class);
+        $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class);
     }
 
     /** @test */
-    public function it_returns_autocomplete_authors_results()
+    public function testReturnsAutocompleteAuthorsResults()
     {
         $this->documentStoreMock->shouldReceive('autocompleteAuthors')
             ->with('Bran', 5)
@@ -46,7 +46,7 @@ class BookApiAutocompleteAuthorsTest extends TestCase
     }
 
     /** @test */
-    public function it_returns_empty_array_for_empty_query()
+    public function testReturnsEmptyArrayForEmptyQuery()
     {
         $this->documentStoreMock->shouldReceive('autocompleteAuthors')
             ->with('', 5)

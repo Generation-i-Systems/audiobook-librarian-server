@@ -1,7 +1,7 @@
 # Audiobook Librarian Project Blueprint
 
 ## Overview
-Audiobook Librarian is a Laravel-based web app for managing audiobooks, supporting admin CRUD, user management, Google Books autofill, and Firestore-backed autocomplete for authors and series. The backend also provides a REST API that supports integration with an Android app client.
+Audiobook Librarian is a Laravel-based web app for managing audiobooks, supporting admin CRUD, user management, Google Books autofill, and Firestore-backed autocomplete for authors and series. The backend also provides a REST API that supports integration with an Android app client. Recent hardening ensures all automated tests run exclusively against SQLite in-memory via a bootstrap database safety check; any misconfiguration aborts immediately to prevent production MySQL wipes.
 
 ## Reading Progress & Statistics Requirements
 See `docs/requirements/reading-progress-and-stats.md`.
@@ -104,6 +104,7 @@ See `docs/requirements/reading-progress-and-stats.md`.
 - jQuery/jQuery UI loaded globally
 - Removed redundant controllers
 - Linting/code style improvements ongoing
+- DocumentStore integration in tests now uses a dedicated MockDocumentStoreService so feature/unit tests confidently run without real MySQL
 
 ## 8. Known Issues & TODOs
 - Some PHPCS lint errors remain

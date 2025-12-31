@@ -8,7 +8,6 @@ use App\Services\AudibleApiService;
 // Firestore support removed
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\URL;
-use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -32,6 +31,18 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if (app()->runningUnitTests()) {
+            $defaultConnection = (string) config('database.default');
+            $sqliteDatabase = (string) config('database.connections.sqlite.database');
+
+            if ($defaultConnection !== 'sqlite' || $sqliteDatabase !== ':memory:') {
+                throw new \RuntimeException(
+                    "CRITICAL SAFETY FAILURE: Tests must run on in-memory SQLite. " .
+                    "Got database.default='{$defaultConnection}', sqlite.database='{$sqliteDatabase}'."
+                );
+            }
+        }
+
         // Register Book observer for automatic librarian.json updates
         Book::observe(BookObserver::class);
 

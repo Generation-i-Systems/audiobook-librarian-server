@@ -10,10 +10,7 @@ on:
       - 'routes/web.php'
       - 'public/js/**'
       - 'public/css/**'
-      - 'tests/Feature/Controllers/Admin/**'
-      - 'tests/Feature/Admin/**'
-      - 'tests/Unit/Controllers/Admin/**'
-      - 'tests/Unit/Views/**'
+      - 'tests/Web/**'
       - '.github/workflows/web-tests.yml'
   pull_request:
     branches: [ main, develop ]
@@ -24,10 +21,7 @@ on:
       - 'routes/web.php'
       - 'public/js/**'
       - 'public/css/**'
-      - 'tests/Feature/Controllers/Admin/**'
-      - 'tests/Feature/Admin/**'
-      - 'tests/Unit/Controllers/Admin/**'
-      - 'tests/Unit/Views/**'
+      - 'tests/Web/**'
 
 jobs:
   web-tests:
@@ -74,7 +68,7 @@ jobs:
         run: chmod -R 777 storage bootstrap/cache
 
       - name: Run Web/Admin Tests
-        run: php artisan test --parallel tests/Feature/Controllers/Admin tests/Feature/Admin tests/Unit/Controllers/Admin tests/Unit/Views
+        run: php artisan test --parallel tests/Web
         env:
           APP_ENV: testing
           DB_CONNECTION: sqlite

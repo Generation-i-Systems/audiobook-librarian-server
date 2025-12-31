@@ -126,4 +126,3 @@ function firestoreDeleteField()
 
 updateMongoDB();
 // Firestore migration removed - application now uses MySQL only
-
