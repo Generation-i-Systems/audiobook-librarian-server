@@ -80,11 +80,25 @@
             "@php artisan config:clear --ansi",
             "@php artisan test"
         ],
+        "test:api": [
+            "@php artisan config:clear --ansi",
+            "@php artisan test --parallel tests/Feature/Api tests/Unit/Controllers/Api"
+        ],
+        "test:web": [
+            "@php artisan config:clear --ansi",
+            "@php artisan test --parallel tests/Feature/Controllers/Admin tests/Feature/Admin tests/Unit/Controllers/Admin tests/Unit/Views"
+        ],
+        "test:cli": [
+            "@php artisan config:clear --ansi",
+            "@php artisan test --parallel tests/Feature/Commands tests/Unit/Commands tests/Unit/Console/Commands"
+        ],
         "test:import": [
             "@php artisan config:clear --ansi",
-            "@php artisan test --filter=MetadataExtractionTest",
-            "@php artisan test --filter=AuthorNormalizationTest",
-            "@php artisan test --filter=EnrichmentMergeTest"
+            "@php artisan test --parallel --filter=Import"
+        ],
+        "test:core": [
+            "@php artisan config:clear --ansi",
+            "@php artisan test --parallel tests/Unit/Services tests/Feature/Services tests/Unit/Traits tests/Unit/Support"
         ],
         "test:import-coverage": [
             "@php artisan config:clear --ansi",
