@@ -54,6 +54,7 @@
             $currentSort = request('sort', 'recent_desc');
             $showYear = in_array($currentSort, ['year_asc', 'year_desc']);
             $showModified = in_array($currentSort, ['recent_asc', 'recent_desc']);
+            $returnUrl = request()->fullUrl();
 
             // Helper function to get sort URL
             $getSortUrl = function ($field) use ($currentSort) {
@@ -113,8 +114,10 @@
                         } elseif ($loop->iteration % 2 == 0) {
                             $rowClass = 'table-secondary';
                         }
+                        $bookId = $book['id'] ?? ($book['documentId'] ?? 0);
+                        $rowUrl = route('admin.books.show', ['book' => $bookId, 'returnUrl' => $returnUrl]);
                     @endphp
-                    <tr class="{{ $rowClass }}" @if($directoryMissing)
+                    <tr class="{{ $rowClass }} clickable-row" data-href="{{ $rowUrl }}" @if($directoryMissing)
                     title="Directory not found: {{ $book['directoryPath'] ?? 'unknown' }}" @endif>
                         <td style="vertical-align: middle; text-align: center;">
                             @php
@@ -164,10 +167,7 @@
                                 loading="lazy">
                         </td>
                         <td>
-                            @php
-                                $bookId = $book['id'] ?? ($book['documentId'] ?? 0);
-                            @endphp
-                            <a href="{{ route('admin.books.show', $bookId) }}" class="text-decoration-none fw-bold text-dark">
+                            <a href="{{ $rowUrl }}" class="text-decoration-none fw-bold text-dark">
                                 {{ $book['title'] ?? 'Untitled' }}
                             </a>
                             @if($directoryMissing)
@@ -300,8 +300,11 @@
                                 method="POST" style="display: inline;">
                                 @csrf
                                 @method('DELETE')
+                                @php
+                                    $deleteTitle = addslashes($book['title'] ?? 'Untitled');
+                                @endphp
                                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"
-                                    onclick="return confirm('Are you sure you want to delete &quot;{{ $book['title'] ?? 'Untitled' }}&quot;?')"><i
+                                    onclick="return confirm('Are you sure you want to delete {{ $deleteTitle }}?')"><i
                                         class="fas fa-trash-alt"></i></button>
                             </form>
                         </td>
@@ -315,4 +318,21 @@
         </div>
 
     </div>
+    @push('scripts')
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                document.querySelectorAll('.clickable-row').forEach(function (row) {
+                    row.addEventListener('click', function (event) {
+                        if (event.target.closest('a, button, input, select, textarea, label, form')) {
+                            return;
+                        }
+                        const href = row.getAttribute('data-href');
+                        if (href) {
+                            window.location = href;
+                        }
+                    });
+                });
+            });
+        </script>
+    @endpush
 @endsection
