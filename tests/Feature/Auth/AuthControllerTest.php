@@ -25,8 +25,8 @@ class AuthControllerTest extends TestCase
         // Ensure we use MySQL-backed document store
         config(['documentstore.driver' => 'mysql']);
 
-        // Ensure we start with a clean slate; RefreshDatabase will handle migrations.
-        User::where('email', 'test@example.com')->delete();
+        // Clean up is handled by RefreshDatabase trait
+        // No need to manually delete users here
     }
 
 
