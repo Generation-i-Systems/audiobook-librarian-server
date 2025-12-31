@@ -11,7 +11,14 @@ return [
     |
     */
     'extensions' => [
-        'mp3', 'm4b', 'm4a', 'mp4', 'ogg', 'flac', 'aac', 'wav',
+        'mp3',
+        'm4b',
+        'm4a',
+        'mp4',
+        'ogg',
+        'flac',
+        'aac',
+        'wav',
     ],
 
     /*
@@ -50,12 +57,9 @@ return [
     | Metadata Storage
     |--------------------------------------------------------------------------
     |
-    | Configuration for storing book metadata. You can choose between:
-    | - 'local': Stores metadata in a JSON file in the book directory
-    | - 'firestore': Stores metadata in Firestore
+    | Configuration for storing book metadata. Only local JSON storage is supported.
     |
     */
-    'metadata_storage' => env('BOOK_METADATA_STORAGE', 'local'), // 'local' or 'firestore'
     'local_metadata_filename' => 'librarian.json',
 
     /*

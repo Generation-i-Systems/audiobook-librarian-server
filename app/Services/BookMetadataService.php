@@ -10,16 +10,10 @@ use Illuminate\Support\Facades\Storage;
 
 class BookMetadataService
 {
-    protected DocumentStoreServiceInterface $documentStoreService;
-
-    protected string $storageMethod;
-
     protected string $localFilename;
 
     public function __construct(DocumentStoreServiceInterface $documentStoreService)
     {
-        $this->documentStoreService = $documentStoreService;
-        $this->storageMethod = Config::get('bookparser.metadata_storage', 'local');
         $this->localFilename = Config::get('bookparser.local_metadata_filename', 'librarian.json');
     }
 
@@ -33,10 +27,7 @@ class BookMetadataService
      */
     public function saveMetadata(string $bookId, string $directoryPath, array $metadata): bool
     {
-        return match ($this->storageMethod) {
-            'firestore' => $this->saveToFirestore($bookId, $metadata),
-            default => $this->saveToLocalFile($directoryPath, $metadata),
-        };
+        return $this->saveToLocalFile($directoryPath, $metadata);
     }
 
     /**
@@ -48,10 +39,7 @@ class BookMetadataService
      */
     public function loadMetadata(string $bookId, string $directoryPath): array
     {
-        return match ($this->storageMethod) {
-            'firestore' => $this->loadFromFirestore($bookId),
-            default => $this->loadFromLocalFile($directoryPath),
-        };
+        return $this->loadFromLocalFile($directoryPath);
     }
 
     /**
@@ -117,75 +105,5 @@ class BookMetadataService
         }
     }
 
-    /**
-     * Save metadata to Firestore.
-     *
-     * @param  string  $bookId  Unique identifier for the book
-     * @param  array  $metadata  Metadata to save
-     * @return bool True on success, false on failure
-     */
-    protected function saveToFirestore(string $bookId, array $metadata): bool
-    {
-        try {
-            // Ensure we have required fields
-            $metadata['id'] = $bookId;
-            $metadata['updated_at'] = now()->toIso8601String();
-
-            // Check if document exists
-            $existing = $this->documentStoreService->getBook($bookId);
-
-            if ($existing) {
-                // Update existing document
-                $this->documentStoreService->updateBook($bookId, $metadata);
-            } else {
-                // Create new document
-                $metadata['created_at'] = $metadata['updated_at'];
-                $this->documentStoreService->createBook($metadata);
-            }
-
-            return true;
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('Failed to save metadata to Firestore', [
-                'bookId' => $bookId,
-                'error' => $e->getMessage(),
-            ]);
-
-            return false;
-        }
-    }
-
-    /**
-     * Load metadata from Firestore.
-     *
-     * @param  string  $bookId  Unique identifier for the book
-     * @return array Loaded metadata or empty array if not found
-     */
-    protected function loadFromFirestore(string $bookId): array
-    {
-        try {
-            $book = $this->documentStoreService->getBook($bookId);
-
-            return is_array($book) ? $book : [];
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('Failed to load metadata from Firestore', [
-                'bookId' => $bookId,
-                'error' => $e->getMessage(),
-            ]);
-
-            return [];
-        }
-    }
-
-    /**
-     * Generate a unique book ID based on the directory path.
-     * This ensures consistent IDs between local and Firestore storage.
-     */
-    public function generateBookId(string $directoryPath): string
-    {
-        // Remove any trailing slashes and normalize the path
-        $normalizedPath = rtrim(str_replace('\\', '/', $directoryPath), '/');
-
-        // Create a hash of the normalized path
-        return hash('sha256', $normalizedPath);
-    }
+    // Firestore support removed; BookMetadataService now saves and loads only from local JSON files.
 }

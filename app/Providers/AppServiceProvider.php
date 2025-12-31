@@ -5,8 +5,7 @@ namespace App\Providers;
 use App\Models\Book;
 use App\Observers\BookObserver;
 use App\Services\AudibleApiService;
-// FirestoreService has been archived
-use Google\Cloud\Firestore\FirestoreClient;
+// Firestore support removed
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Queue;
@@ -25,17 +24,7 @@ class AppServiceProvider extends ServiceProvider
         // DocumentStoreServiceInterface binding is now handled by DocumentStoreServiceProvider
         // to avoid conflicts and ensure proper driver selection based on documentstore.driver config
 
-        $this->app->singleton(FirestoreClient::class, function ($app) {
-            return new FirestoreClient([
-                'projectId' => env('FIREBASE_PROJECT_ID'),
-                'keyFilePath' => base_path(env('FIREBASE_CREDENTIALS')),
-            ]);
-        });
-
-        // FirestoreService has been archived
-        // $this->app->singleton(FirestoreService::class, function ($app) {
-        //     return new FirestoreService($app->make(FirestoreClient::class));
-        // });
+        // Firestore support removed
     }
 
     /**
@@ -53,10 +42,6 @@ class AppServiceProvider extends ServiceProvider
             );
         });
 
-        // Register Documentstore queue driver
-        Queue::extend('documentstore', function ($app) {
-            return new \App\Queue\DocumentstoreQueueConnector();
-        });
 
         // Force HTTPS scheme for generated links when enabled (but not during unit tests)
         if ((bool) env('FORCE_HTTPS', true) && !app()->runningUnitTests()) {

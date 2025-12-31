@@ -128,7 +128,7 @@ class DebugController extends Controller
 
 
     /**
-     * Dump all Firestore users (debug)
+     * Dump all users (debug)
      */
     public function usersDump(): JsonResponse
     {
@@ -139,11 +139,11 @@ class DebugController extends Controller
 
 
     /**
-     * Dump all Firestore books (debug)
+     * Dump all books (debug)
      */
     public function booksDump(): JsonResponse
     {
-        $result = $this->documentStoreService->getAllBooks();
+        $result = $this->documentStoreService->listBooks(1, 1000);
 
         return response()->json($result);
     }
