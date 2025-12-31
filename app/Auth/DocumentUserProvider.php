@@ -74,7 +74,7 @@ class DocumentUserProvider implements UserProvider
 
     public function updateRememberToken(Authenticatable $user, $token)
     {
-        // Update the "remember me" token in Firestore
+        // Update the "remember me" token in MySQL
         $this->documentStoreService->updateRememberToken($user->getAuthIdentifier(), $token);
     }
 
