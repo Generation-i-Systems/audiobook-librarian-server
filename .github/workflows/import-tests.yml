@@ -80,7 +80,7 @@ jobs:
       - name: Run Import System Tests
         run: |
           echo "🧪 Running Import-related tests..."
-          php artisan test --parallel tests/Import
+          php artisan test tests/Import
         env:
           APP_ENV: testing
           DB_CONNECTION: sqlite

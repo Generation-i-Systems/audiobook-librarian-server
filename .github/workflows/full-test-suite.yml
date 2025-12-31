@@ -54,7 +54,7 @@ jobs:
         run: chmod -R 777 storage bootstrap/cache
 
       - name: Run Full Test Suite
-        run: php artisan test --parallel
+        run: php artisan test
         env:
           APP_ENV: testing
           DB_CONNECTION: sqlite

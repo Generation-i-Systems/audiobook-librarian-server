@@ -64,7 +64,7 @@ jobs:
         run: chmod -R 777 storage bootstrap/cache
 
       - name: Run API Tests
-        run: php artisan test --parallel tests/Api
+        run: php artisan test tests/Api
         env:
           APP_ENV: testing
           DB_CONNECTION: sqlite

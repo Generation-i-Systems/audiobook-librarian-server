@@ -72,7 +72,7 @@ jobs:
         run: chmod -R 777 storage bootstrap/cache
 
       - name: Run Core/Service Tests
-        run: php artisan test --parallel tests/Core
+        run: php artisan test tests/Core
         env:
           APP_ENV: testing
           DB_CONNECTION: sqlite
