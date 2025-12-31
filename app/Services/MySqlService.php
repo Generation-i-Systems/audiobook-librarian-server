@@ -71,6 +71,12 @@ class MySqlService implements DocumentStoreServiceInterface
             }
         }
 
+        // Handle array-type fields that are not relationships
+        // (Book model's toArray already converts to camelCase via CamelCaseAttributeAccess trait)
+        if (isset($bookArray['needsReviewReasons'])) {
+            $camelCasedBook['needsReviewReasons'] = $bookArray['needsReviewReasons'];
+        }
+
         // Then, specifically handle the relationships with the correct keys and structures
         if (!empty($bookArray['authors'])) {
             $camelCasedBook['author'] = collect($bookArray['authors'])->pluck('name')->all();
