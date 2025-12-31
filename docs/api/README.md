@@ -7,8 +7,6 @@ Welcome to the Librarian API documentation. This API provides access to the audi
 This documentation suite provides everything you need to integrate with the Librarian API:
 
 - **[OpenAPI Specification](openapi.yaml)** - Complete API specification in OpenAPI 3.0 format
-- **[Authentication Guide](authentication.md)** - Comprehensive authentication documentation
-- **[Middleware Documentation](middleware.md)** - Technical details about authentication middleware
 - **[Code Examples](examples.md)** - Examples in multiple programming languages
 
 ## 🚀 Quick Start
@@ -240,32 +238,13 @@ For API support:
 - Test with simple cURL commands
 - Verify account status with administrator
 
-## 🔄 Migration from Firebase
-
-If migrating from Firebase authentication:
-
-### Changes
-- Token format changed from JWT to Sanctum
-- User data stored in MySQL instead of Firebase
-- Different authentication middleware
-- New registration/login flow
-
-### Migration Steps
-1. Update API client to use new endpoints
-2. Change token storage/retrieval logic
-3. Update error handling
-4. Test authentication flow
-5. Users must re-authenticate
-
-See [authentication guide](authentication.md#migration-from-firebase) for detailed migration information.
-
 ## 📋 Changelog
 
 ### Version 1.0.0
-- ✅ Replaced Firebase auth with MySQL/Sanctum
-- ✅ Added comprehensive API documentation
-- ✅ Created OpenAPI specification
-- ✅ Added multi-language examples
+- ✅ MySQL-based authentication with Laravel Sanctum
+- ✅ Comprehensive API documentation
+- ✅ OpenAPI specification
+- ✅ Multi-language examples
 - ✅ Implemented proper error handling
 
 ## 📄 License
@@ -275,7 +254,5 @@ This API documentation is part of the Librarian project. See the main project re
 ---
 
 **Need help?** Check the individual documentation files for detailed information:
-- [Authentication Guide](authentication.md) - Complete auth documentation
 - [Code Examples](examples.md) - Working examples in multiple languages
-- [Middleware Docs](middleware.md) - Technical implementation details
 - [OpenAPI Spec](openapi.yaml) - Machine-readable API specification

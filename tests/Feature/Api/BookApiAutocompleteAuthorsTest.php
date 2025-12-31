@@ -16,7 +16,7 @@ class BookApiAutocompleteAuthorsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->withoutMiddleware([\App\Http\Middleware\FirebaseAuth::class, \App\Http\Middleware\RequireStandardRole::class]);
+        $this->withoutMiddleware([\App\Http\Middleware\RequireStandardRole::class]);
 
         $user = new DocumentstoreUser(['id' => 'test-user', 'name' => 'Test User', 'email' => 'test@example.com', 'role' => 'standard']);
 

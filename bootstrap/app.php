@@ -18,51 +18,51 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withSchedule(function ($schedule) {
         // Run database backup nightly at 2:00 AM
         $schedule->command('backup:database --verify')
-                 ->dailyAt('02:00')
-                 ->appendOutputTo(storage_path('logs/backup-cron.log'));
+            ->dailyAt('02:00')
+            ->appendOutputTo(storage_path('logs/backup-cron.log'));
 
         // Run database backup weekly with extra verification on Sundays at 3:00 AM
         $schedule->command('backup:database --verify')
-                 ->weeklyOn(0, '03:00') // Sunday at 3:00 AM
-                 ->appendOutputTo(storage_path('logs/backup-cron.log'));
+            ->weeklyOn(0, '03:00') // Sunday at 3:00 AM
+            ->appendOutputTo(storage_path('logs/backup-cron.log'));
 
         // Compress log files older than 1 day, daily at 1:00 AM
         $schedule->command('logs:compress')
-                 ->dailyAt('01:00')
-                 ->appendOutputTo(storage_path('logs/log-compression.log'));
+            ->dailyAt('01:00')
+            ->appendOutputTo(storage_path('logs/log-compression.log'));
 
         // Rotate logs at midnight
         $schedule->command('log:rotate')
-                 ->dailyAt('00:00')
-                 ->timezone(config('app.timezone'))
-                 ->onOneServer()
-                 ->runInBackground()
-                 ->appendOutputTo(storage_path('logs/log-rotation.log'));
+            ->dailyAt('00:00')
+            ->timezone(config('app.timezone'))
+            ->onOneServer()
+            ->runInBackground()
+            ->appendOutputTo(storage_path('logs/log-rotation.log'));
 
         // Clean up old log files (keep last 14 days)
         $schedule->command('log:clear --keep-last=14')
-                 ->daily()
-                 ->appendOutputTo(storage_path('logs/log-cleanup.log'));
+            ->daily()
+            ->appendOutputTo(storage_path('logs/log-cleanup.log'));
 
         // Fix storage permissions every hour to ensure proper access
         //$schedule->command('storage:fix-permissions')
         //         ->hourly()
         //         ->appendOutputTo(storage_path('logs/permissions-fix.log'));
-
+    
         // Validate book directories daily at 3:00 AM
         $schedule->command('books:validate-directories')
-                 ->dailyAt('03:00')
-                 ->appendOutputTo(storage_path('logs/directory-validation.log'));
+            ->dailyAt('03:00')
+            ->appendOutputTo(storage_path('logs/directory-validation.log'));
 
         // Scrape AudiobookBay categories for favorite authors daily at 4:00 AM
         $schedule->command('abb:scrape-categories')
-                 ->dailyAt('04:00')
-                 ->appendOutputTo(storage_path('logs/abb-scraping.log'));
+            ->dailyAt('04:00')
+            ->appendOutputTo(storage_path('logs/abb-scraping.log'));
 
         // Send daily email notifications for new books by favorite authors at 8:00 AM
         $schedule->command('favorites:send-notifications')
-                 ->dailyAt('08:00')
-                 ->appendOutputTo(storage_path('logs/favorite-notifications.log'));
+            ->dailyAt('08:00')
+            ->appendOutputTo(storage_path('logs/favorite-notifications.log'));
     })
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->validateCsrfTokens(except: [
@@ -83,7 +83,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
             'admin' => \App\Http\Middleware\CheckAdminRole::class,
             'standard' => \App\Http\Middleware\RequireStandardRole::class,
-            'firebase.auth' => \App\Http\Middleware\FirebaseAuth::class,
+            // Firebase auth middleware removed - application now uses MySQL-only authentication
             'api.auth' => \App\Http\Middleware\ApiAuth::class,
         ]);
     })
@@ -109,27 +109,33 @@ return Application::configure(basePath: dirname(__DIR__))
             $file = $e->getFile();
 
             // Handle Monolog StreamHandler exceptions
-            if ($e instanceof \UnexpectedValueException &&
+            if (
+                $e instanceof \UnexpectedValueException &&
                 (strpos($message, 'could not be opened in append mode') !== false ||
-                 strpos($message, 'Permission denied') !== false ||
-                 strpos($message, 'No such file or directory') !== false) &&
-                strpos($message, 'logs') !== false) {
+                    strpos($message, 'Permission denied') !== false ||
+                    strpos($message, 'No such file or directory') !== false) &&
+                strpos($message, 'logs') !== false
+            ) {
                 return false; // Don't report this exception to prevent infinite loop
             }
 
             // Handle general file operation exceptions in logs directory
-            if ((strpos($message, 'fopen') !== false ||
-                 strpos($message, 'Permission denied') !== false ||
-                 strpos($message, 'No such file or directory') !== false) &&
-                (strpos($message, 'logs') !== false || strpos($file, 'logs') !== false)) {
+            if (
+                (strpos($message, 'fopen') !== false ||
+                    strpos($message, 'Permission denied') !== false ||
+                    strpos($message, 'No such file or directory') !== false) &&
+                (strpos($message, 'logs') !== false || strpos($file, 'logs') !== false)
+            ) {
                 return false; // Don't report this exception to prevent infinite loop
             }
 
             // Handle ErrorException for file operations
-            if ($e instanceof \ErrorException &&
+            if (
+                $e instanceof \ErrorException &&
                 (strpos($message, 'Permission denied') !== false ||
-                 strpos($message, 'No such file or directory') !== false) &&
-                (strpos($message, 'logs') !== false || strpos($file, 'logs') !== false)) {
+                    strpos($message, 'No such file or directory') !== false) &&
+                (strpos($message, 'logs') !== false || strpos($file, 'logs') !== false)
+            ) {
                 return false; // Don't report this exception to prevent infinite loop
             }
 
@@ -140,9 +146,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->reportable(function (\Throwable $e) {
             // For critical logging failures, try to report to stderr instead
             $message = $e->getMessage();
-            if ((strpos($message, 'logs') !== false &&
-                 strpos($message, 'Permission denied') !== false) ||
-                (strpos($message, 'could not be opened in append mode') !== false)) {
+            if (
+                (strpos($message, 'logs') !== false &&
+                    strpos($message, 'Permission denied') !== false) ||
+                (strpos($message, 'could not be opened in append mode') !== false)
+            ) {
                 // Try to write to stderr as a last resort
                 try {
                     error_log("Laravel logging failure: " . $message);

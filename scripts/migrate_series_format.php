@@ -1,14 +1,13 @@
 <?php
 
 /**
- * Script to normalize the `series` field for all books in both MongoDB and Firestore.
+ * Script to normalize the `series` field for all books in MySQL.
  * - Converts legacy formats to canonical: array of objects [{seriesName, number}]
  * - If `seriesNumber` and `seriesName` are set but `series` is blank, fills `series` accordingly
  *
  * Usage: php scripts/migrate_series_format.php
  */
 
-use Google\Cloud\Firestore\FirestoreClient;
 use MongoDB\Client as MongoClient;
 
 require_once __DIR__ . '/../vendor/autoload.php';
