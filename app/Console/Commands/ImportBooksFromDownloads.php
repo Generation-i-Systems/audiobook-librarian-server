@@ -20,6 +20,7 @@ use App\Services\GoogleImageSearchService;
 use App\Services\ImportCacheService;
 use App\Services\ImportUIService;
 use App\Traits\GenreMapping;
+use App\Traits\BookImportTrait;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -29,6 +30,8 @@ use Illuminate\Support\Facades\File;
 class ImportBooksFromDownloads extends Command
 {
     use GenreMapping;
+    use BookImportTrait;
+    use ManualEnrichmentTrait;
 
     /**
      * The name and signature of the console command.
@@ -47,7 +50,8 @@ class ImportBooksFromDownloads extends Command
                             {--no-backup : Skip automatic database backup}
                             {--no-cache : Disable background processing cache}
                             {--clear-cache : Clear background processing cache before starting}
-                            {--force-audio : Force audio transcription even when AI confidence is high}';
+                            {--force-audio : Force audio transcription even when AI confidence is high}
+                            {--ui=ncurses : UI layer (ncurses|plain)}';
 
     /**
      * The console command description.
@@ -77,11 +81,15 @@ class ImportBooksFromDownloads extends Command
     protected array $taskQueue = [];
     protected int $maxConcurrentTasks = 3;
     protected int $runningTaskCount = 0;
+    protected $audioProcessor;
+
     protected bool $inputInterrupted = false;
 
+    protected ?string $embeddedCoverTempFile = null;
+
     // Persistent cache
-    protected string $cacheDirectory;
-    protected string $cacheFilePath;
+    protected string $cacheDirectory = 'path/to/cache/directory';
+    protected string $cacheFilePath = 'path/to/cache/file';
     protected array $backgroundCache = [];
     protected int $cacheVersion = 2; // Increment when cache structure changes
     protected bool $cacheEnabled = true;
@@ -102,6 +110,13 @@ class ImportBooksFromDownloads extends Command
     {
         parent::__construct();
         $this->uiService = $uiService;
+    }
+
+    public function __destruct()
+    {
+        if ($this->embeddedCoverTempFile && file_exists($this->embeddedCoverTempFile)) {
+            @unlink($this->embeddedCoverTempFile);
+        }
     }
 
     protected function handleLowConfidenceMetadata(array $audiobook, ?array &$aiMetadata): bool
@@ -205,7 +220,7 @@ class ImportBooksFromDownloads extends Command
             $tags = $this->aiProcessor->extractFileTags($filePath);
             if (!empty($tags)) {
                 $fileTags[basename((string) $filePath)] = $tags;
-                break;
+                // do not break; we want embedded covers even if first file lacks it
             }
         }
 
@@ -227,13 +242,41 @@ class ImportBooksFromDownloads extends Command
         return $hasTitle && $hasAuthor;
     }
 
+    protected function hasCover(array $metadata): bool
+    {
+        return !empty($metadata['cover_data'])
+            || !empty($metadata['cover_image'])
+            || !empty($metadata['cover_path'])
+            || !empty($metadata['cover_url']);
+    }
+
+    protected function hasCriticalMetadata(array $metadata): bool
+    {
+        $hasTitle = isset($metadata['title']) && is_string($metadata['title']) && trim($metadata['title']) !== '';
+        $authors = $metadata['author'] ?? [];
+        $hasAuthor = (is_array($authors) && count($authors) > 0)
+            || (is_string($authors) && trim($authors) !== '');
+        $hasDescription = isset($metadata['description']) && is_string($metadata['description'])
+            && trim($metadata['description']) !== '';
+
+        return $hasTitle && $hasAuthor && $hasDescription && $this->hasCover($metadata);
+    }
+
 
     protected function buildUiMetadata(array $metadata): array
     {
         $uiMetadata = $metadata;
 
         $coverSource = '';
-        if (!empty($uiMetadata['cover_url'])) {
+
+        if (!empty($uiMetadata['cover_data'])) {
+            $tempPath = $this->getEmbeddedCoverTempPath($uiMetadata['cover_data']);
+            if ($tempPath) {
+                $uiMetadata['cover_url'] = $tempPath;
+                $uiMetadata['cover_is_local_file'] = true;
+                $coverSource = 'Embedded';
+            }
+        } elseif (!empty($uiMetadata['cover_url'])) {
             if (isset($uiMetadata['audible_raw'])) {
                 $coverSource = 'Audible';
             } elseif (isset($uiMetadata['google_books_raw'])) {
@@ -323,6 +366,11 @@ class ImportBooksFromDownloads extends Command
     {
         if (!$this->uiService) {
             $this->uiService = app(ImportUIService::class);
+        }
+
+        $uiMode = (string) ($this->option('ui') ?? 'ncurses');
+        if ($uiMode === 'plain') {
+            $this->uiService->setPlainMode(true);
         }
 
         [$width, $height] = $this->getTerminalDimensions();
@@ -1752,6 +1800,9 @@ class ImportBooksFromDownloads extends Command
     protected function handleUserInterruption(): void
     {
         if ($this->uiService) {
+            if (method_exists($this->uiService, 'requestInterrupt')) {
+                $this->uiService->requestInterrupt();
+            }
             $this->uiService->restoreTerminalState();
         }
 
@@ -1759,6 +1810,30 @@ class ImportBooksFromDownloads extends Command
         $this->newLine();
         $this->warn("⚠️  [Request interrupted by user] - Ctrl+C detected");
         $this->info('🛑 Quitting import process gracefully...');
+
+        exit(130);
+    }
+
+    protected function getEmbeddedCoverTempPath(string $coverData): ?string
+    {
+        if ($this->embeddedCoverTempFile && file_exists($this->embeddedCoverTempFile)) {
+            return $this->embeddedCoverTempFile;
+        }
+
+        $binary = base64_decode($coverData, true);
+        if ($binary === false) {
+            $binary = $coverData;
+        }
+
+        $tempFile = tempnam(sys_get_temp_dir(), 'embedded_cover_');
+        if ($tempFile === false) {
+            return null;
+        }
+
+        file_put_contents($tempFile, $binary);
+        $this->embeddedCoverTempFile = $tempFile;
+
+        return $tempFile;
     }
 
     /**
@@ -3020,6 +3095,19 @@ class ImportBooksFromDownloads extends Command
                     continue;
                 }
 
+                if ($choice === '7') {
+                    $metadata = $this->manualEnrichmentWithComparison($metadata, $audiobook);
+                    $currentCoverUrl = (string) ($metadata['cover_url'] ?? '');
+                    $currentGenre = $metadata['genre'] ?? 'Other';
+                    if (is_array($currentGenre)) {
+                        $currentGenre = $currentGenre[0] ?? 'Other';
+                    }
+                    $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
+                    $isGenreValid = in_array($normalizedGenre, $validGenres, true);
+                    $this->uiService->setCurrentBook($this->buildUiMetadata($metadata));
+                    continue;
+                }
+
                 // Case '2' (Edit) continues below
                 break;
             }
@@ -3095,6 +3183,19 @@ class ImportBooksFromDownloads extends Command
                 $this->uiService->setCurrentBook($this->buildUiMetadata($metadata));
                 continue;
             }
+
+            if ($choice === '7') {
+                $metadata = $this->manualEnrichmentWithComparison($metadata, $audiobook);
+                $currentCoverUrl = (string) ($metadata['cover_url'] ?? '');
+                $currentGenre = $metadata['genre'] ?? 'Other';
+                if (is_array($currentGenre)) {
+                    $currentGenre = $currentGenre[0] ?? 'Other';
+                }
+                $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
+                $isGenreValid = in_array($normalizedGenre, $validGenres, true);
+                $this->uiService->setCurrentBook($this->buildUiMetadata($metadata));
+                continue;
+            }
         }
     }
 
@@ -3125,6 +3226,7 @@ class ImportBooksFromDownloads extends Command
             '4' => 'Update cover' . ($currentCoverUrl !== '' ? ' (has URL)' : ''),
             '5' => 'Update genre (' . $displayGenre . ')',
             '6' => 'Update directory',
+            '7' => 'Request enrichment (Audible/Google Books)',
         ];
 
         return $options;
@@ -3607,9 +3709,9 @@ class ImportBooksFromDownloads extends Command
     /**
      * Enrich metadata with external data sources
      */
-    protected function enrichWithExternalData(array $metadata): array
+    protected function enrichWithExternalData(array $metadata, array $options = []): array
     {
-        return $this->getEnrichmentService()->enrichWithExternalData($metadata);
+        return $this->getEnrichmentService()->enrichWithExternalData($metadata, $options);
     }
 
     /**
@@ -3668,6 +3770,11 @@ class ImportBooksFromDownloads extends Command
      */
     protected function handleCoverSelection(array &$metadata): void
     {
+        if (!empty($metadata['cover_data'])) {
+            // Embedded cover present; keep it and skip external searches
+            return;
+        }
+
         $currentCoverUrl = $metadata['cover_url'] ?? '';
         $isInteractive = !$this->option('auto');
         $coverOptions = [];

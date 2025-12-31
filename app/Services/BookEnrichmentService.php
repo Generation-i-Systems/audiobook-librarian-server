@@ -145,24 +145,28 @@ class BookEnrichmentService
         }
         $sources = $options['sources'] ?? ['audible', 'google_books'];
         $maxRetries = $options['max_retries'] ?? 3;
+        $forceEnrichment = $options['force'] ?? false;
 
-        $missingFields = $this->getMissingDataFields($enrichedData);
-        if (empty($missingFields)) {
-            return $enrichedData;
+        // If we already have all critical fields, skip enrichment entirely (unless forced)
+        if (!$forceEnrichment && $this->hasCriticalMetadata($metadata)) {
+            return [];
         }
 
         foreach ($sources as $source) {
             $sourceData = $this->searchFromSource($source, $metadata['title'], $authorName, $maxRetries);
             if ($sourceData) {
-                $enrichedData = array_merge($enrichedData, $sourceData);
+                $enrichedData = $this->mergeFillMissing($enrichedData, $sourceData, $metadata, $forceEnrichment);
                 $enrichmentResults[$source] = 'success';
             } else {
                 $enrichmentResults[$source] = 'no_data';
             }
 
-            $missingFields = $this->getMissingDataFields($enrichedData);
-            if (empty($missingFields)) {
-                break;
+            // After each source, stop if we now have all critical fields (unless forced)
+            if (!$forceEnrichment) {
+                $combined = array_merge($metadata, $enrichedData);
+                if ($this->hasCriticalMetadata($combined)) {
+                    break;
+                }
             }
         }
 
@@ -171,6 +175,59 @@ class BookEnrichmentService
         }
 
         return $enrichedData;
+    }
+
+    protected function hasCover(array $metadata): bool
+    {
+        return !empty($metadata['cover_data'])
+            || !empty($metadata['cover_image'])
+            || !empty($metadata['cover_path'])
+            || !empty($metadata['cover_url']);
+    }
+
+    protected function hasCriticalMetadata(array $metadata): bool
+    {
+        $hasTitle = isset($metadata['title']) && is_string($metadata['title']) && trim($metadata['title']) !== '';
+        $authors = $metadata['author'] ?? [];
+        $hasAuthor = (is_array($authors) && count($authors) > 0)
+            || (is_string($authors) && trim($authors) !== '');
+        $hasDescription = isset($metadata['description']) && is_string($metadata['description'])
+            && trim($metadata['description']) !== '';
+
+        return $hasTitle && $hasAuthor && $hasDescription && $this->hasCover($metadata);
+    }
+
+    protected function mergeFillMissing(array $current, array $incoming, array $original, bool $force = false): array
+    {
+        $result = $current;
+        foreach ($incoming as $key => $value) {
+            if ($value === null) {
+                continue;
+            }
+
+            // When forced, include all enrichment data for comparison
+            if ($force) {
+                $result[$key] = $value;
+                continue;
+            }
+
+            // Do not replace existing original metadata
+            if (array_key_exists($key, $original) && $original[$key] !== null && $original[$key] !== '') {
+                continue;
+            }
+
+            // Do not override an existing cover if we already have one
+            if (in_array($key, ['cover_url', 'cover_image', 'cover_path', 'cover_data'], true) && $this->hasCover($original)) {
+                continue;
+            }
+
+            // Only fill if not already present in result
+            if (!array_key_exists($key, $result) || $result[$key] === null || $result[$key] === '') {
+                $result[$key] = $value;
+            }
+        }
+
+        return $result;
     }
 
     protected function normalizeAuthorForExternalLookup(string $authorName): string

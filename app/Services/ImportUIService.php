@@ -7,6 +7,7 @@ use SoloTerm\Screen\Screen;
 class ImportUIService
 {
     protected ?Screen $screen = null;
+    protected bool $plainMode = false;
     protected int $width = 120;
     protected int $height = 40;
     protected array $logs = [];
@@ -28,6 +29,11 @@ class ImportUIService
     protected $ttyStream = null;
     protected ?string $lastKeyDebug = null;
     protected bool $interrupted = false;
+
+    public function setPlainMode(bool $plainMode): void
+    {
+        $this->plainMode = $plainMode;
+    }
 
     protected function getInputStream()
     {
@@ -123,10 +129,15 @@ class ImportUIService
 
     public function initialize(int $width, int $height): void
     {
+        if ($this->plainMode) {
+            $this->width = $width;
+            $this->height = $height;
+            return;
+        }
         // Avoid writing to the last row/column of the terminal.
         // Many terminals will auto-wrap when drawing the bottom-right corner, which causes a scroll.
         $this->width = max(40, $width - 1);
-        $this->height = max(20, $height);
+        $this->height = max(20, $height - 1);
         $this->maxLogs = max(5, $this->height - 25);
         $this->screen = new Screen($this->width, $this->height);
 
@@ -190,7 +201,11 @@ class ImportUIService
 
     public function drawInitialLayout(): void
     {
-        $this->renderFull();
+        if ($this->plainMode) {
+            return;
+        }
+        $this->enableAlternateScreen();
+        $this->render();
     }
 
     protected function renderFull(): void
@@ -405,6 +420,7 @@ class ImportUIService
                 'B' => ['down'],
                 'C' => ['right'],
                 'D' => ['left'],
+                default => ['interrupt'],
             };
         }
 
@@ -1118,8 +1134,12 @@ class ImportUIService
 
     public function logMessage(string $message): void
     {
-        $this->logs[] = "[" . date('H:i:s') . "] " . $this->sanitizeLogMessage($message);
-        if (count($this->logs) > 100) {
+        if ($this->plainMode) {
+            echo $message . PHP_EOL;
+            return;
+        }
+        $this->logs[] = $message;
+        if (count($this->logs) > $this->maxLogs) {
             array_shift($this->logs);
         }
         $this->renderFull();
