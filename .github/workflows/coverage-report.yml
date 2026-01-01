@@ -1,17 +1,13 @@
-name: Full Test Suite
+name: Code Coverage Report (Disabled)
 
+# This workflow is disabled by default - only runs on manual trigger
+# Re-enable by adding appropriate 'on:' triggers when coverage improves
 on:
-  workflow_dispatch:
-  schedule:
-    - cron: '0 2 * * *'  # Run daily at 2 AM UTC
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch:  # Manual trigger only
 
 jobs:
-  full-tests:
-    name: Full Suite - PHP 8.3
+  coverage:
+    name: Coverage Report - PHP 8.3
     runs-on: ubuntu-latest
 
     steps:
@@ -23,7 +19,7 @@ jobs:
         with:
           php-version: '8.3'
           extensions: mbstring, xml, ctype, json, sqlite3, pdo_sqlite, fileinfo, gd, getid3
-          coverage: none
+          coverage: xdebug
 
       - name: Get Composer Cache Directory
         id: composer-cache
@@ -37,7 +33,7 @@ jobs:
           restore-keys: ${{ runner.os }}-composer-
 
       - name: Install Dependencies
-        run: composer install --prefer-dist --no-progress --no-interaction --ignore-platform-req=ext-xdebug
+        run: composer install --prefer-dist --no-progress --no-interaction
 
       - name: Copy .env
         run: php -r "file_exists('.env') || copy('.env.example', '.env');"
@@ -48,17 +44,17 @@ jobs:
       - name: Directory Permissions
         run: chmod -R 777 storage bootstrap/cache
 
-      - name: Run Full Test Suite
-        run: php artisan test
+      - name: Generate Coverage Report
+        run: php artisan test --coverage --min=70
         env:
           APP_ENV: testing
           DB_CONNECTION: sqlite
           DB_DATABASE: ':memory:'
+          XDEBUG_MODE: coverage
 
-      - name: Run Code Style Check
-        run: ./vendor/bin/phpcbf --standard=PSR12 app/ tests/ || true
-        continue-on-error: true
-
-      - name: Run Static Analysis
-        run: ./vendor/bin/phpstan analyse --memory-limit=2G || true
-        continue-on-error: true
+      - name: Upload Coverage Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: tests/coverage/
