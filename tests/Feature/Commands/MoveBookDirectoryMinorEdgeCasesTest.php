@@ -45,7 +45,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $book = $this->createTestBook($sourcePath);
 
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->assertExitCode(0);
 
         $book->refresh();
@@ -62,7 +62,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $book = $this->createTestBook('Fantasy/Author/Book1');
 
         $this->artisan('books:move', [
-            'sources' => [trim($sourcePath), $destPath],
+            'paths' => [trim($sourcePath), $destPath],
         ])->assertExitCode(0);
 
         $book->refresh();
@@ -79,7 +79,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $book = $this->createTestBook($sourcePath);
 
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->assertExitCode(0);
 
         // Should normalize to single slashes
@@ -98,7 +98,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $book = $this->createTestBook($sourcePath);
 
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->run();
 
         // Should succeed on case-sensitive, might fail on case-insensitive
@@ -116,7 +116,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $book = $this->createTestBook($sourcePath);
 
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->assertExitCode(0);
 
         $book->refresh();
@@ -137,7 +137,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $book = $this->createTestBook($sourcePath);
 
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->assertExitCode(0);
 
         // Verify metadata files moved
@@ -159,7 +159,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $book = $this->createTestBook($sourcePath);
 
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->run();
 
         // Should handle gracefully
@@ -179,7 +179,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $book = $this->createTestBook($sourcePath);
 
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->assertExitCode(0);
 
         $book->refresh();
@@ -198,7 +198,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
 
         // Should normalize backslashes to forward slashes
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, str_replace('\\', '/', $destPath)],
+            'paths' => [$sourcePath, str_replace('\\', '/', $destPath)],
         ])->assertExitCode(0);
 
         $book->refresh();
@@ -216,7 +216,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
 
         // Should sanitize or reject
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->run();
 
         // Either succeeds with sanitized path or fails gracefully
@@ -237,7 +237,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         file_put_contents($this->testBookRoot . '/Sci-Fi/Author', 'blocking file');
 
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->run();
 
         // Should fail gracefully
@@ -258,7 +258,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
 
         // No book record for a file
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->run();
 
         // Should return exit code 2 (not a book)
@@ -269,7 +269,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
     public function it_handles_empty_string_in_sources()
     {
         $result = $this->artisan('books:move', [
-            'sources' => ['', 'Dest'],
+            'paths' => ['', 'Dest'],
         ])->run();
 
         $this->assertNotEquals(0, $result);
@@ -279,7 +279,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
     public function it_handles_only_destination_no_sources()
     {
         $result = $this->artisan('books:move', [
-            'sources' => ['OnlyDest'],
+            'paths' => ['OnlyDest'],
         ])->run();
 
         $this->assertEquals(1, $result);
@@ -296,7 +296,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
 
         // Same source listed twice
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $sourcePath, $destPath],
+            'paths' => [$sourcePath, $sourcePath, $destPath],
         ])->run();
 
         // Should handle gracefully (second one will fail as source doesn't exist)
@@ -312,7 +312,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $book = $this->createTestBook($path);
 
         $result = $this->artisan('books:move', [
-            'sources' => [$path, $path],
+            'paths' => [$path, $path],
         ])->run();
 
         // Should fail or handle as no-op
@@ -336,7 +336,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
 
         // Should not find this book (no path to match)
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->run();
 
         $this->assertEquals(2, $result); // No books found
@@ -358,7 +358,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         ]);
 
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->run();
 
         $this->assertEquals(2, $result);
@@ -376,7 +376,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
 
         // Should sanitize or reject
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->run();
 
         $this->assertTrue($result === 0 || $result === 1);
@@ -393,7 +393,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
 
         // Should sanitize or reject
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, str_replace("\n", '', $destPath)],
+            'paths' => [$sourcePath, str_replace("\n", '', $destPath)],
         ])->run();
 
         $this->assertTrue($result === 0 || $result === 1);
@@ -412,7 +412,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
             $book = $this->createTestBook($sourcePath);
 
             $result = $this->artisan('books:move', [
-                'sources' => [$sourcePath, $destPath],
+                'paths' => [$sourcePath, $destPath],
             ])->run();
 
             $this->assertTrue($result === 0 || $result === 1);
@@ -432,7 +432,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $book = $this->createTestBook($sourcePath, ['needs_review' => true]);
 
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->assertExitCode(0);
 
         $book->refresh();
@@ -451,7 +451,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $book = $this->createTestBook($sourcePath, ['title' => $longTitle]);
 
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->assertExitCode(0);
 
         $book->refresh();
@@ -468,7 +468,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $book = $this->createTestBook($sourcePath, ['duration' => 0]);
 
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->assertExitCode(0);
 
         $book->refresh();
@@ -485,7 +485,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $book = $this->createTestBook($sourcePath, ['audio_file_count' => -1]);
 
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->assertExitCode(0);
 
         $book->refresh();
@@ -502,7 +502,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $book = $this->createTestBook($sourcePath);
 
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->run();
 
         // Should handle (. is current directory reference)
@@ -513,7 +513,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
     public function it_handles_paths_with_only_dots()
     {
         $result = $this->artisan('books:move', [
-            'sources' => ['.', '..'],
+            'paths' => ['.', '..'],
         ])->run();
 
         // Should reject

@@ -22,12 +22,12 @@ class MoveBookDirectory extends Command
      * The name and signature of the console command.
      */
     protected $signature = 'books:move
-                            {paths* : Source and destination paths (minimum 2 required)}
+                            {sources* : Source path(s) to move OR regex pattern if using --regex}
                             {--dry-run : Show what would be done without making changes}
                             {--no-db : Only move files, do not update database}
                             {--no-parse : Do not parse and update metadata from new path}
                             {--require-book : Fail if no matching books are found (do not fall back to filesystem-only move)}
-                            {--verify : Interactively review planned path/database changes before applying}
+                            {--verify : Interactively review planned database/path changes before applying}
                             {--regex= : Use regex rename (format: s/pattern/replacement/flags)}
                             {--mv-options=* : Options to pass to mv command}';
 
@@ -54,23 +54,13 @@ class MoveBookDirectory extends Command
      */
     public function handle(): int
     {
-        $paths = $this->argument('paths');
+        $sources = $this->argument('sources');
         $dryRun = $this->option('dry-run');
         $noDb = $this->option('no-db');
         $verbose = $this->option('verbose');
         $regexPattern = $this->option('regex');
 
         $this->verboseOutput = (bool) $verbose;
-
-        // Need at least source and destination
-        if (count($paths) < 2) {
-            $this->error('At least 2 paths required: source(s) and destination');
-            return 1;
-        }
-
-        // Last path is always destination
-        $destination = array_pop($paths);
-        $sources = $paths;
 
         try {
             $this->bookRoot = $this->resolveBookRoot();
@@ -83,7 +73,6 @@ class MoveBookDirectory extends Command
 
         $this->logDebug('Command invoked', [
             'sources' => $sources,
-            'destination' => $destination,
             'dry_run' => (bool) $dryRun,
             'no_db' => (bool) $noDb,
             'regex' => (bool) $regexPattern,
@@ -98,6 +87,9 @@ class MoveBookDirectory extends Command
         if ($regexPattern) {
             return $this->handleRegexRename($sources, $regexPattern, $dryRun, $noDb, $verbose);
         }
+
+        // Last argument is destination
+        $destination = array_pop($sources);
 
         $this->logDebug('Primary move request prepared', [
             'destination' => $destination,
@@ -804,7 +796,7 @@ class MoveBookDirectory extends Command
                     if (!$bookModel) {
                         $this->logWarning('Book model not found during update', ['book_id' => $book['_id']]);
                         $this->error("  ✗ Book model not found for ID {$book['_id']}");
-                        throw new \RuntimeException("Book model not found for ID {$book['_id']}");
+                        continue;
                     }
 
                     // Update directory path
@@ -937,10 +929,6 @@ class MoveBookDirectory extends Command
                     'message' => $e->getMessage(),
                 ]);
                 $this->error("  ✗ Failed to update book {$book['_id']}: " . $e->getMessage());
-
-                // CRITICAL SAFETY: propagate the exception so the outer handler can
-                // roll back the DB transaction and undo filesystem moves.
-                throw $e;
             }
         }
 

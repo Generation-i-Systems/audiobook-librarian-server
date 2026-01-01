@@ -56,7 +56,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         $this->assertEquals(1, DB::table('books')->where('directory_path', $sourcePath)->count());
 
         $dryRunResult = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
             '--dry-run' => true,
         ])->run();
         $this->assertEquals(0, $dryRunResult);
@@ -78,7 +78,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act - should fail due to mocked database exception
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->run();
 
         $this->assertEquals(1, $result);
@@ -114,7 +114,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Move all books
         $this->artisan('books:move', [
-            'sources' => array_merge($paths, ['Sci-Fi/']),
+            'paths' => array_merge($paths, ['Sci-Fi/']),
         ])->assertExitCode(0);
 
         // Assert - same number of books (no duplicates or deletions)
@@ -137,7 +137,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->run();
 
         // Cleanup
@@ -164,7 +164,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act - should fail
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->run();
 
         // Assert - both books still exist
@@ -195,7 +195,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->run();
 
         // Assert - source unchanged, database unchanged
@@ -216,7 +216,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->run();
 
         // Assert - move should fail or be contained
@@ -243,7 +243,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, 'Sci-Fi/Book1'],
+            'paths' => [$sourcePath, 'Sci-Fi/Book1'],
         ])->run();
 
         // Cleanup
@@ -271,7 +271,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->run();
 
         // Assert - should handle gracefully (exit code 2 for no books)
@@ -290,7 +290,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act - should not execute SQL injection
         $result = $this->artisan('books:move', [
-            'sources' => [$maliciousPath, $destPath],
+            'paths' => [$maliciousPath, $destPath],
         ])->run();
 
         // Assert - books table still exists
@@ -310,7 +310,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->run();
 
         // Assert - should handle safely
@@ -334,7 +334,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act - move all
         $this->artisan('books:move', [
-            'sources' => array_merge($paths, ['Sci-Fi/']),
+            'paths' => array_merge($paths, ['Sci-Fi/']),
         ])->run();
 
         // Assert - all books still exist in DB
@@ -356,12 +356,12 @@ class MoveBookDirectoryCriticalTest extends TestCase
         // But we can verify the book ends up in only ONE location
 
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath1],
+            'paths' => [$sourcePath, $destPath1],
         ])->assertExitCode(0);
 
         // Second move should fail (source doesn't exist)
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath2],
+            'paths' => [$sourcePath, $destPath2],
         ])->run();
 
         // Assert - book only in one location
@@ -379,7 +379,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // This should fail gracefully, not crash
         $result = $this->artisan('books:move', [
-            'sources' => [$longPath, $destPath],
+            'paths' => [$longPath, $destPath],
         ])->run();
 
         // Assert - should handle gracefully
@@ -401,7 +401,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, 'Sci-Fi/Author/Book1'],
+            'paths' => [$sourcePath, 'Sci-Fi/Author/Book1'],
         ])->run();
 
         // Cleanup
@@ -430,7 +430,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act
         $this->artisan('books:move', [
-            'sources' => array_merge($paths, ['Sci-Fi/']),
+            'paths' => array_merge($paths, ['Sci-Fi/']),
         ])->run();
 
         // Assert - if any move failed, check DB consistency
@@ -455,7 +455,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act - should handle both forms correctly
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath2, 'Sci-Fi/Café/Book1'],
+            'paths' => [$sourcePath2, 'Sci-Fi/Café/Book1'],
         ])->run();
 
         // Assert - should find the book regardless of normalization
@@ -475,7 +475,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->run();
 
         // Assert - should not escape book root
@@ -500,7 +500,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act in separate process (simulated)
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->run();
 
         DB::rollBack();
@@ -527,7 +527,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act
         $result = $this->artisan('books:move', [
-            'sources' => array_merge($paths, ['Sci-Fi/']),
+            'paths' => array_merge($paths, ['Sci-Fi/']),
         ])->run();
 
         // Assert - NO books should have moved
@@ -543,7 +543,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
     {
         // CRITICAL: Never allow moving the entire book root
         $result = $this->artisan('books:move', [
-            'sources' => [$this->testBookRoot, '/tmp/books'],
+            'paths' => [$this->testBookRoot, '/tmp/books'],
         ])->run();
 
         // Assert - should fail
@@ -568,7 +568,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
 
         // Act
         $result = $this->artisan('books:move', [
-            'sources' => [$sourcePath, 'Sci-Fi/Author/LargeBook'],
+            'paths' => [$sourcePath, 'Sci-Fi/Author/LargeBook'],
         ])->run();
 
         // Assert - all files moved

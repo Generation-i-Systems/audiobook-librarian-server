@@ -71,7 +71,7 @@ class MoveBookDirectoryTest extends TestCase
 
         // Act
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->assertExitCode(0);
 
         // Assert
@@ -122,7 +122,7 @@ class MoveBookDirectoryTest extends TestCase
             $book = $this->createTestBook($sourcePath);
 
             $this->artisan('books:move', [
-                'sources' => [$sourcePath, $destPath],
+                'paths' => [$sourcePath, $destPath],
             ])->assertExitCode(0);
 
             $this->assertDirDoesNotExist($realRoot . '/' . $sourcePath);
@@ -166,7 +166,7 @@ class MoveBookDirectoryTest extends TestCase
 
         // Act
         $this->artisan('books:move', [
-            'sources' => [$source1, $source2, $dest],
+            'paths' => [$source1, $source2, $dest],
         ])->assertExitCode(0);
 
         // Assert
@@ -196,7 +196,7 @@ class MoveBookDirectoryTest extends TestCase
 
         // Act
         $this->artisan('books:move', [
-            'sources' => [$parentPath, 'Sci-Fi/Author'],
+            'paths' => [$parentPath, 'Sci-Fi/Author'],
         ])->assertExitCode(0);
 
         // Assert
@@ -219,7 +219,7 @@ class MoveBookDirectoryTest extends TestCase
 
         // Act
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->assertExitCode(0);
 
         // Assert
@@ -242,7 +242,7 @@ class MoveBookDirectoryTest extends TestCase
 
         // Act
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->assertExitCode(0);
 
         // Assert
@@ -263,7 +263,7 @@ class MoveBookDirectoryTest extends TestCase
         $book = $this->createTestBook($sourcePath);
 
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destDir],
+            'paths' => [$sourcePath, $destDir],
         ])->assertExitCode(0);
 
         $this->assertDirDoesNotExist($this->testBookRoot . '/' . $sourcePath);
@@ -285,7 +285,7 @@ class MoveBookDirectoryTest extends TestCase
 
         // Act & Assert
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->assertExitCode(2);
     }
 
@@ -298,7 +298,7 @@ class MoveBookDirectoryTest extends TestCase
         $this->createTestDirectory($sourcePath);
 
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
             '--require-book' => true,
         ])
             ->expectsOutputToContain('No matching books were found')
@@ -315,7 +315,7 @@ class MoveBookDirectoryTest extends TestCase
         $book = $this->createTestBook($sourcePath);
 
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
             '--verify' => true,
         ])
             ->expectsOutputToContain('=== VERIFY MODE ===')
@@ -336,7 +336,7 @@ class MoveBookDirectoryTest extends TestCase
         $book = $this->createTestBook($sourcePath);
 
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
             '--verify' => true,
         ])
             ->expectsConfirmation('Proceed with filesystem move and database updates?', 'no')
@@ -360,7 +360,7 @@ class MoveBookDirectoryTest extends TestCase
 
         // Act
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
             '--dry-run' => true,
         ])->assertExitCode(0);
 
@@ -385,7 +385,7 @@ class MoveBookDirectoryTest extends TestCase
 
         // Act
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
             '--no-db' => true,
         ])->assertExitCode(0);
 
@@ -414,7 +414,7 @@ class MoveBookDirectoryTest extends TestCase
 
         try {
             $this->artisan('books:move', [
-                'sources' => [$sourcePath, $destinationPath],
+                'paths' => [$sourcePath, $destinationPath],
             ])
                 ->expectsConfirmation('Destination is outside the configured book root. Continue with filesystem move only (database will not be updated)?', 'yes')
                 ->expectsOutputToContain('Skipping database updates because the destination is outside the book root.')
@@ -447,7 +447,7 @@ class MoveBookDirectoryTest extends TestCase
 
         // Act
         $this->artisan('books:move', [
-            'sources' => [$absoluteSource, $absoluteDest],
+            'paths' => [$absoluteSource, $absoluteDest],
         ])->assertExitCode(0);
 
         // Assert
@@ -467,7 +467,7 @@ class MoveBookDirectoryTest extends TestCase
 
         // Act
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->assertExitCode(0);
 
         // Assert
@@ -480,7 +480,7 @@ class MoveBookDirectoryTest extends TestCase
     {
         // Act & Assert
         $this->artisan('books:move', [
-            'sources' => ['NonExistent/Path', 'Dest/Path'],
+            'paths' => ['NonExistent/Path', 'Dest/Path'],
         ])->assertExitCode(2);
     }
 
@@ -502,7 +502,7 @@ class MoveBookDirectoryTest extends TestCase
 
         // Act - Move entire genre
         $this->artisan('books:move', [
-            'sources' => ['Fantasy', 'Epic-Fantasy'],
+            'paths' => ['Fantasy', 'Epic-Fantasy'],
         ])->assertExitCode(0);
 
         // Assert - All books updated
@@ -525,7 +525,7 @@ class MoveBookDirectoryTest extends TestCase
 
         // Act
         $this->artisan('books:move', [
-            'sources' => [$wrongPath, $correctPath],
+            'paths' => [$wrongPath, $correctPath],
         ])->assertExitCode(0);
 
         // Assert
@@ -551,7 +551,7 @@ class MoveBookDirectoryTest extends TestCase
 
         // Act - Move entire series
         $this->artisan('books:move', [
-            'sources' => ['Fantasy/Author/Series', 'Sci-Fi/Author/Series'],
+            'paths' => ['Fantasy/Author/Series', 'Sci-Fi/Author/Series'],
         ])->assertExitCode(0);
 
         // Assert
@@ -579,7 +579,7 @@ class MoveBookDirectoryTest extends TestCase
 
         // Act
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->assertExitCode(0);
 
         // Assert - Only path changed
@@ -603,7 +603,7 @@ class MoveBookDirectoryTest extends TestCase
 
         // Act
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->assertExitCode(0);
 
         // Assert
@@ -623,7 +623,7 @@ class MoveBookDirectoryTest extends TestCase
 
         // Act
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->assertExitCode(0);
 
         // Assert
@@ -647,7 +647,7 @@ class MoveBookDirectoryTest extends TestCase
 
         // Act
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->assertExitCode(0);
 
         // Assert
@@ -661,7 +661,7 @@ class MoveBookDirectoryTest extends TestCase
     {
         // Act & Assert
         $this->artisan('books:move', [
-            'sources' => ['OnlyDestination'],
+            'paths' => ['OnlyDestination'],
         ])->assertExitCode(1);
     }
 
@@ -677,7 +677,7 @@ class MoveBookDirectoryTest extends TestCase
 
         // Act
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->assertExitCode(0);
 
         // Assert
@@ -696,7 +696,7 @@ class MoveBookDirectoryTest extends TestCase
 
         // Act - Move to same location should fail at filesystem level
         $result = $this->artisan('books:move', [
-            'sources' => [$path, $path],
+            'paths' => [$path, $path],
         ]);
 
         // Assert - Should fail or handle gracefully
@@ -719,7 +719,7 @@ class MoveBookDirectoryTest extends TestCase
 
         // Act
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->assertExitCode(0);
 
         // Assert - Path updated, title preserved
@@ -744,7 +744,7 @@ class MoveBookDirectoryTest extends TestCase
 
         // Act
         $this->artisan('books:move', [
-            'sources' => [$sourcePath, $destPath],
+            'paths' => [$sourcePath, $destPath],
         ])->assertExitCode(0);
 
         // Assert - Relationships preserved
