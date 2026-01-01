@@ -61,7 +61,7 @@ jobs:
           restore-keys: ${{ runner.os }}-composer-
 
       - name: Install Dependencies
-        run: composer install --prefer-dist --no-progress --no-interaction
+        run: composer install --prefer-dist --no-progress --no-interaction --ignore-platform-req=ext-xdebug
 
       - name: Copy .env
         run: php -r "file_exists('.env') || copy('.env.example', '.env');"
