@@ -1194,11 +1194,16 @@ class ShowBookInfo extends Command
 
     protected function getCursorPosition(): ?array
     {
+        // Skip if no TTY available (e.g., in testing or CI environments)
+        if (!is_resource(STDIN) || !@posix_isatty(STDIN) || app()->environment('testing')) {
+            return null;
+        }
+
         // Save current terminal settings
-        $sttySettings = shell_exec('stty -g 2>&1 < /dev/tty');
+        $sttySettings = @shell_exec('stty -g 2>/dev/null < /dev/tty');
 
         // Set terminal to raw mode to read response
-        shell_exec('stty -icanon -echo 2>&1 < /dev/tty');
+        @shell_exec('stty -icanon -echo 2>/dev/null < /dev/tty');
 
         // Request cursor position using ANSI escape sequence
         fwrite(STDOUT, "\033[6n");
@@ -1223,7 +1228,7 @@ class ShowBookInfo extends Command
         fclose($stdin);
 
         // Restore terminal settings
-        shell_exec("stty {$sttySettings} 2>&1 < /dev/tty");
+        @shell_exec("stty {$sttySettings} 2>/dev/null < /dev/tty");
 
         // Parse response (format: ESC[row;colR)
         if (preg_match('/\033\[(\d+);(\d+)R/', $response, $matches)) {

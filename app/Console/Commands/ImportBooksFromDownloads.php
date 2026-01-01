@@ -528,7 +528,7 @@ class ImportBooksFromDownloads extends Command
         }
 
         try {
-            $size = shell_exec('stty size');
+            $size = @shell_exec('stty size 2>/dev/null');
             if ($size) {
                 $dimensions = explode(' ', trim($size));
                 if (count($dimensions) === 2) {
