@@ -16,7 +16,6 @@
   <groups>
     <exclude>
       <group>slow</group>
-      <group>broken</group>
     </exclude>
   </groups>
   <coverage includeUncoveredFiles="true">
