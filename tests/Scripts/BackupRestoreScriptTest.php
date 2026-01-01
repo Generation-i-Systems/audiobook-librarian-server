@@ -18,19 +18,19 @@ class BackupRestoreScriptTest extends TestCase
         $this->restoreScript = $this->projectRoot . '/scripts/restore-mysql-backup.sh';
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function backupScriptExists()
     {
         $this->assertFileExists($this->backupScript);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function restoreScriptExists()
     {
         $this->assertFileExists($this->restoreScript);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function backupScriptHasValidSyntax()
     {
         $output = [];
@@ -40,7 +40,7 @@ class BackupRestoreScriptTest extends TestCase
         $this->assertEquals(0, $returnCode, 'Backup script has syntax errors: ' . implode("\n", $output));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function restoreScriptHasValidSyntax()
     {
         $output = [];
@@ -50,7 +50,7 @@ class BackupRestoreScriptTest extends TestCase
         $this->assertEquals(0, $returnCode, 'Restore script has syntax errors: ' . implode("\n", $output));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function backupScriptIncludesCompleteInsertFlag()
     {
         $content = file_get_contents($this->backupScript);
@@ -62,7 +62,7 @@ class BackupRestoreScriptTest extends TestCase
         );
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function backupScriptIncludesExtendedInsertFalseFlag()
     {
         $content = file_get_contents($this->backupScript);
@@ -74,7 +74,7 @@ class BackupRestoreScriptTest extends TestCase
         );
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function restoreScriptChecksUsersTableCount()
     {
         $content = file_get_contents($this->restoreScript);
@@ -86,7 +86,7 @@ class BackupRestoreScriptTest extends TestCase
         );
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function restoreScriptChecksBooksTableCount()
     {
         $content = file_get_contents($this->restoreScript);
@@ -98,7 +98,7 @@ class BackupRestoreScriptTest extends TestCase
         );
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function restoreScriptSkipsConfirmationWhenTablesEmpty()
     {
         $content = file_get_contents($this->restoreScript);
@@ -110,7 +110,7 @@ class BackupRestoreScriptTest extends TestCase
         );
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function restoreScriptHandlesTableCountErrors()
     {
         $content = file_get_contents($this->restoreScript);
@@ -123,7 +123,7 @@ class BackupRestoreScriptTest extends TestCase
         );
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function backupScriptHasProperMysqldumpOptions()
     {
         $content = file_get_contents($this->backupScript);
@@ -136,7 +136,7 @@ class BackupRestoreScriptTest extends TestCase
         $this->assertStringContainsString('--add-drop-database', $content);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function restoreScriptValidatesBackupFileExtension()
     {
         $content = file_get_contents($this->restoreScript);
@@ -148,7 +148,7 @@ class BackupRestoreScriptTest extends TestCase
         );
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function restoreScriptChecksBackupFileExists()
     {
         $content = file_get_contents($this->restoreScript);
@@ -160,7 +160,7 @@ class BackupRestoreScriptTest extends TestCase
         );
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function scriptsHaveExecutablePermissions()
     {
         $this->assertTrue(

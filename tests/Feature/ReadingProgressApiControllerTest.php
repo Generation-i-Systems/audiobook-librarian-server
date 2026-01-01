@@ -19,7 +19,7 @@ class ReadingProgressApiControllerTest extends TestCase
         $this->withoutMiddleware();
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function reset_reading_progress_success()
     {
         $userId = 1;
@@ -41,7 +41,7 @@ class ReadingProgressApiControllerTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function reset_reading_progress_failure()
     {
         $userId = 2;

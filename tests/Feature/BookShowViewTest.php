@@ -103,7 +103,7 @@ class BookShowViewTest extends TestCase
         $this->actingAs($this->user);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function itDisplaysSeriesInformationCorrectly()
     {
         // Set up the mock to return our test book with series when getBook is called
@@ -123,7 +123,7 @@ class BookShowViewTest extends TestCase
         $response->assertSee('Book 1');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function itHandlesBooksWithoutSeries()
     {
         // Set up the mock to return our test book without series when getBook is called

@@ -30,7 +30,7 @@ class BookApiAutocompleteAuthorsTest extends TestCase
         $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function testReturnsAutocompleteAuthorsResults()
     {
         $this->documentStoreMock->shouldReceive('autocompleteAuthors')
@@ -45,7 +45,7 @@ class BookApiAutocompleteAuthorsTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function testReturnsEmptyArrayForEmptyQuery()
     {
         $this->documentStoreMock->shouldReceive('autocompleteAuthors')

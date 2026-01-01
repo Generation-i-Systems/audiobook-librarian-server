@@ -27,7 +27,7 @@ class BookApiAutocompleteSeriesTest extends TestCase
         $this->actingAs($user, 'api_test');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_returns_autocomplete_series_results()
     {
         $this->documentStoreMock->shouldReceive('autocompleteSeries')
@@ -42,7 +42,7 @@ class BookApiAutocompleteSeriesTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_returns_empty_array_for_empty_query()
     {
         $this->documentStoreMock->shouldReceive('autocompleteSeries')

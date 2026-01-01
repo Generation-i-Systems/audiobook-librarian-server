@@ -28,7 +28,7 @@ class BookApiAutocompleteNarratorsTest extends TestCase
         $this->actingAs($user, 'api_test');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_returns_autocomplete_narrators_results()
     {
         $this->documentStoreMock->shouldReceive('autocompleteNarrators')
@@ -43,7 +43,7 @@ class BookApiAutocompleteNarratorsTest extends TestCase
             ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_returns_empty_array_for_empty_query()
     {
         $this->documentStoreMock->shouldReceive('autocompleteNarrators')

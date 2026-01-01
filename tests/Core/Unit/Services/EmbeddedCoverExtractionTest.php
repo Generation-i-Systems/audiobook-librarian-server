@@ -35,7 +35,7 @@ class EmbeddedCoverExtractionTest extends TestCase
         parent::tearDown();
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function embedded_cover_data_is_saved_to_directory()
     {
         // Create fake cover data (1x1 red pixel JPEG)
@@ -74,7 +74,7 @@ class EmbeddedCoverExtractionTest extends TestCase
         $this->assertEquals($coverData, $savedData, 'Saved cover data should match original');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function embedded_cover_has_priority_over_download()
     {
         $coverData = base64_decode('/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCwAA8A/9k=');
@@ -107,7 +107,7 @@ class EmbeddedCoverExtractionTest extends TestCase
         $this->assertEquals($coverData, $savedData, 'Should use embedded cover, not download');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function existing_cover_has_priority_over_embedded()
     {
         // Create existing cover file

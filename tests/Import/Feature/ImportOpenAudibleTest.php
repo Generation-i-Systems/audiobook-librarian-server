@@ -47,7 +47,7 @@ class ImportOpenAudibleTest extends TestCase
         parent::tearDown();
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_imports_single_book_with_full_metadata()
     {
         // Arrange
@@ -72,7 +72,7 @@ class ImportOpenAudibleTest extends TestCase
         $this->assertStringContainsString('Test Author', $book->directory_path);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_creates_author_relationships()
     {
         // Arrange
@@ -92,7 +92,7 @@ class ImportOpenAudibleTest extends TestCase
         $this->assertTrue($book->authors->contains('name', 'Jane Smith'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_creates_narrator_relationships()
     {
         // Arrange
@@ -112,7 +112,7 @@ class ImportOpenAudibleTest extends TestCase
         $this->assertTrue($book->narrators->contains('name', 'Voice Actor Two'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_creates_series_relationships()
     {
         // Arrange
@@ -135,7 +135,7 @@ class ImportOpenAudibleTest extends TestCase
         $this->assertEquals('1', $book->series->first()->pivot->series_number);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_creates_genre_relationships()
     {
         // Arrange
@@ -158,7 +158,7 @@ class ImportOpenAudibleTest extends TestCase
         $this->assertTrue($book->genres->contains('name', 'Military'));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_marks_first_genre_as_primary()
     {
         // Arrange
@@ -186,7 +186,7 @@ class ImportOpenAudibleTest extends TestCase
         $this->assertCount(2, $secondaryGenres);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_uses_primary_genre_for_directory_organization()
     {
         // Arrange
@@ -208,7 +208,7 @@ class ImportOpenAudibleTest extends TestCase
         $this->assertStringStartsWith('Science Fiction/', $book->directory_path);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_organizes_series_books_in_subdirectories()
     {
         // Arrange
@@ -233,7 +233,7 @@ class ImportOpenAudibleTest extends TestCase
         $this->assertStringContainsString('02 Book Two', $book->directory_path);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_copies_cover_images()
     {
         // Arrange
@@ -259,7 +259,7 @@ class ImportOpenAudibleTest extends TestCase
         $this->assertFileExists($this->testBookRoot . '/' . $book->cover_image);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_supports_dry_run_mode()
     {
         // Arrange
@@ -277,7 +277,7 @@ class ImportOpenAudibleTest extends TestCase
         $this->assertEquals(0, Book::count());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_skips_existing_books_by_default()
     {
         // Arrange
@@ -306,7 +306,7 @@ class ImportOpenAudibleTest extends TestCase
         $this->assertEquals($initialCount, Book::count());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_updates_existing_books_with_force_flag()
     {
         $this->markTestSkipped('Test needs investigation - force flag not updating existing books');
@@ -338,7 +338,7 @@ class ImportOpenAudibleTest extends TestCase
         $this->assertNotEquals(1000, $existingBook->duration);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_imports_from_books_old_directory()
     {
         // Arrange
@@ -359,7 +359,7 @@ class ImportOpenAudibleTest extends TestCase
         $this->assertEquals(1, Book::count());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_limits_import_count()
     {
         // Arrange
@@ -384,7 +384,7 @@ class ImportOpenAudibleTest extends TestCase
         $this->assertEquals(2, Book::count());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_missing_audio_files_gracefully()
     {
         // Arrange
@@ -401,7 +401,7 @@ class ImportOpenAudibleTest extends TestCase
         $this->assertEquals(0, Book::count());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_sanitizes_directory_paths()
     {
         // Arrange
@@ -424,7 +424,7 @@ class ImportOpenAudibleTest extends TestCase
         $this->assertStringNotContainsString("\x00", $book->directory_path);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_rolls_back_on_database_error()
     {
         // Arrange
@@ -442,7 +442,7 @@ class ImportOpenAudibleTest extends TestCase
         ])->assertExitCode(0);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_validates_source_directory_exists()
     {
         // Act & Assert
@@ -451,7 +451,7 @@ class ImportOpenAudibleTest extends TestCase
         ])->assertExitCode(1);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_validates_books_json_exists()
     {
         // Arrange - directory exists but no books.json
@@ -461,7 +461,7 @@ class ImportOpenAudibleTest extends TestCase
         ])->assertExitCode(1);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_validates_book_root_is_writable()
     {
         // Arrange
@@ -484,7 +484,7 @@ class ImportOpenAudibleTest extends TestCase
         $this->assertEquals(1, $result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_parses_duration_from_seconds()
     {
         // Arrange
@@ -502,7 +502,7 @@ class ImportOpenAudibleTest extends TestCase
         $this->assertEquals(7200, $book->duration);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_parses_duration_from_hhmmss_format()
     {
         // Arrange

@@ -35,7 +35,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         parent::tearDown();
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_paths_with_trailing_whitespace()
     {
         $sourcePath = 'Fantasy/Author/Book1';
@@ -52,7 +52,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $this->assertEquals('Sci-Fi/Author/Book1', trim($book->directory_path));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_paths_with_leading_whitespace()
     {
         $sourcePath = '   Fantasy/Author/Book1'; // Leading spaces
@@ -69,7 +69,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $this->assertEquals($destPath, $book->directory_path);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_paths_with_multiple_consecutive_slashes()
     {
         $sourcePath = 'Fantasy/Author/Book1';
@@ -87,7 +87,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $this->assertStringNotContainsString('//', $book->directory_path);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_case_sensitive_filesystems()
     {
         // On case-sensitive filesystems, Book1 != book1
@@ -105,7 +105,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $this->assertTrue($result === 0 || $result === 1);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_books_with_no_audio_files()
     {
         $sourcePath = 'Fantasy/Author/Book1';
@@ -123,7 +123,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $this->assertEquals($destPath, $book->directory_path);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_books_with_only_metadata_files()
     {
         $sourcePath = 'Fantasy/Author/Book1';
@@ -145,7 +145,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $this->assertFileExists($this->testBookRoot . '/' . $destPath . '/cover.jpg');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_read_only_files_in_source()
     {
         $sourcePath = 'Fantasy/Author/Book1';
@@ -169,7 +169,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         @chmod($readOnlyFile, 0644);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_hidden_directories()
     {
         $sourcePath = 'Fantasy/Author/.HiddenBook';
@@ -186,7 +186,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $this->assertEquals($destPath, $book->directory_path);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_paths_with_backslashes()
     {
         // Windows-style paths
@@ -205,7 +205,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $this->assertStringNotContainsString('\\', $book->directory_path);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_paths_with_control_characters()
     {
         $sourcePath = 'Fantasy/Author/Book1';
@@ -223,7 +223,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $this->assertTrue($result === 0 || $result === 1);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_destination_parent_is_file_not_directory()
     {
         $sourcePath = 'Fantasy/Author/Book1';
@@ -246,7 +246,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $this->assertEquals($sourcePath, $book->directory_path);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_source_is_file_not_directory()
     {
         // Edge case: source is a file, not a directory
@@ -265,7 +265,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $this->assertEquals(2, $result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_empty_string_in_sources()
     {
         $result = $this->artisan('books:move', [
@@ -275,7 +275,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $this->assertNotEquals(0, $result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_only_destination_no_sources()
     {
         $result = $this->artisan('books:move', [
@@ -285,7 +285,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $this->assertEquals(1, $result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_duplicate_sources()
     {
         $sourcePath = 'Fantasy/Author/Book1';
@@ -303,7 +303,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $this->assertTrue($result === 0 || $result === 1);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_source_equals_destination()
     {
         $path = 'Fantasy/Author/Book1';
@@ -319,7 +319,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $this->assertNotEquals(0, $result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_books_with_null_directory_path()
     {
         $sourcePath = 'Fantasy/Author/Book1';
@@ -342,7 +342,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $this->assertEquals(2, $result); // No books found
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_books_with_empty_string_directory_path()
     {
         $sourcePath = 'Fantasy/Author/Book1';
@@ -364,7 +364,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $this->assertEquals(2, $result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_destination_with_query_string()
     {
         // Edge case: destination looks like URL
@@ -382,7 +382,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $this->assertTrue($result === 0 || $result === 1);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_paths_with_newlines()
     {
         $sourcePath = 'Fantasy/Author/Book1';
@@ -399,7 +399,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $this->assertTrue($result === 0 || $result === 1);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_extremely_nested_source()
     {
         $parts = array_fill(0, 50, 'Level');
@@ -422,7 +422,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_books_marked_as_needs_review()
     {
         $sourcePath = 'Fantasy/Author/Book1';
@@ -440,7 +440,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $this->assertTrue($book->needs_review); // Flag preserved
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_books_with_very_long_titles()
     {
         $sourcePath = 'Fantasy/Author/Book1';
@@ -458,7 +458,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $this->assertEquals($longTitle, $book->title); // Title preserved
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_zero_duration_books()
     {
         $sourcePath = 'Fantasy/Author/Book1';
@@ -475,7 +475,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $this->assertEquals(0, $book->duration);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_negative_audio_file_count()
     {
         $sourcePath = 'Fantasy/Author/Book1';
@@ -492,7 +492,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $this->assertEquals(-1, $book->audio_file_count); // Preserved even if invalid
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_paths_ending_with_dot()
     {
         $sourcePath = 'Fantasy/Author/Book1';
@@ -509,7 +509,7 @@ class MoveBookDirectoryMinorEdgeCasesTest extends TestCase
         $this->assertTrue($result === 0 || $result === 1);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_paths_with_only_dots()
     {
         $result = $this->artisan('books:move', [

@@ -14,7 +14,7 @@ class BookControllerImportFileTest extends TestCase
     use RefreshDatabase;
     use WithFaker;
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function import_file_route_renders_view_for_admin()
     {
         $admin = new DocumentstoreUser(['id' => 'admin-user', 'role' => 'admin']);
@@ -29,7 +29,7 @@ class BookControllerImportFileTest extends TestCase
         $response->assertSee('Import Book from File or Audio');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function import_file_route_redirects_for_non_admin()
     {
         $user = new DocumentstoreUser(['id' => 'non-admin-user', 'role' => 'user']);

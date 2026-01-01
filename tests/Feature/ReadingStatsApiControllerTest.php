@@ -55,7 +55,7 @@ class ReadingStatsApiControllerTest extends TestCase
         $this->withoutMiddleware();
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_records_a_reading_session()
     {
         $userId = 100;
@@ -76,7 +76,7 @@ class ReadingStatsApiControllerTest extends TestCase
             ->assertJsonPath('session.duration_seconds', 3600);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function record_session_validates_input()
     {
         $userId = 101;
@@ -93,7 +93,7 @@ class ReadingStatsApiControllerTest extends TestCase
             ->assertJsonStructure(['message', 'errors']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_gets_daily_stats()
     {
         $userId = 102;
@@ -105,7 +105,7 @@ class ReadingStatsApiControllerTest extends TestCase
             ->assertJsonPath('data.0.sessions', 2);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_gets_book_stats()
     {
         $userId = 103;
@@ -118,7 +118,7 @@ class ReadingStatsApiControllerTest extends TestCase
             ->assertJsonPath('data.total_duration_seconds', 7200);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_gets_user_stats()
     {
         $userId = 104;
@@ -130,7 +130,7 @@ class ReadingStatsApiControllerTest extends TestCase
             ->assertJsonPath('data.active_days', 5);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_gets_streaks()
     {
         $userId = 105;

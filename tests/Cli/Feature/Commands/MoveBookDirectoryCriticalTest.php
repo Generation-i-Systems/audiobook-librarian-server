@@ -41,7 +41,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         parent::tearDown();
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_never_deletes_source_if_database_update_fails()
     {
         // CRITICAL: Files must not be deleted if DB update fails
@@ -95,7 +95,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         $this->assertEquals($originalTitle, $updatedBook->title);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_uses_database_transaction_for_multiple_books()
     {
         // CRITICAL: All-or-nothing for multiple books
@@ -121,7 +121,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         $this->assertEquals($initialCount, Book::count());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_validates_destination_is_writable_before_moving()
     {
         // CRITICAL: Check permissions before any operations
@@ -149,7 +149,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         $this->assertEquals($sourcePath, $book->directory_path);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_data_loss_on_destination_collision()
     {
         // CRITICAL: Never overwrite existing data
@@ -178,7 +178,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         $this->assertEquals('Dest Book', $destBook->title);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_partial_filesystem_failure_gracefully()
     {
         // CRITICAL: Handle disk full, permission errors, etc.
@@ -204,7 +204,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         $this->assertEquals($sourcePath, $book->directory_path);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_moving_outside_book_root()
     {
         // CRITICAL: Security - never allow escaping book root
@@ -224,7 +224,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         $this->assertFileDoesNotExist('/etc/passwd/Book1');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_symlink_attacks()
     {
         // CRITICAL: Security - prevent symlink attacks
@@ -255,7 +255,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         $this->assertDirDoesNotExist('/tmp/attack-target/Book1');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_validates_book_id_exists_before_update()
     {
         // CRITICAL: Never update non-existent records
@@ -278,7 +278,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         $this->assertEquals(2, $result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_sql_injection_in_path_queries()
     {
         // CRITICAL: Security - SQL injection prevention
@@ -298,7 +298,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         $this->assertDatabaseHas('books', ['id' => $book->id]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_null_byte_injection()
     {
         // CRITICAL: Security - null byte injection
@@ -318,7 +318,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         $this->assertEquals('Fantasy/Book1', $book->directory_path);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_preserves_data_on_out_of_memory_error()
     {
         // CRITICAL: Handle OOM gracefully
@@ -341,7 +341,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         $this->assertEquals(count($initialBooks), Book::count());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_race_condition_on_same_source()
     {
         // CRITICAL: Prevent race conditions
@@ -370,7 +370,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         $this->assertDirDoesNotExist($this->testBookRoot . '/' . $destPath2);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_validates_path_length_limits()
     {
         // CRITICAL: Filesystem path length limits (usually 4096 bytes)
@@ -386,7 +386,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         $this->assertNotEquals(0, $result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_circular_symlinks()
     {
         // CRITICAL: Prevent infinite loops
@@ -411,7 +411,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         $this->assertTrue(true); // If we get here, we didn't hang
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_preserves_database_on_filesystem_rollback()
     {
         // CRITICAL: If filesystem fails mid-operation, DB should rollback
@@ -443,7 +443,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         $this->assertTrue($allMoved || $noneMoved, 'Move must be atomic');
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_unicode_normalization_attacks()
     {
         // CRITICAL: Unicode normalization (é vs é)
@@ -463,7 +463,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         $this->assertTrue(true);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_directory_traversal_in_relative_paths()
     {
         // CRITICAL: Security - directory traversal
@@ -484,7 +484,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         $this->assertStringStartsWith('Fantasy/', $book->directory_path);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_database_deadlock()
     {
         // CRITICAL: Handle deadlocks gracefully
@@ -510,7 +510,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         $this->assertNotNull($book->directory_path);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_validates_all_sources_exist_before_any_moves()
     {
         // CRITICAL: Atomic - validate ALL before moving ANY
@@ -538,7 +538,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         $this->assertEquals($paths[1], $book2->directory_path);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prevents_moving_book_root_itself()
     {
         // CRITICAL: Never allow moving the entire book root
@@ -551,7 +551,7 @@ class MoveBookDirectoryCriticalTest extends TestCase
         $this->assertDirExists($this->testBookRoot);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_extremely_large_file_counts()
     {
         // CRITICAL: Handle books with thousands of files

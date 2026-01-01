@@ -61,7 +61,7 @@ class BookControllerIndexTest extends TestCase
         parent::tearDown();
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function testItDisplaysBooksWithArrayAndStringProperties()
     {
         try {

@@ -6,7 +6,7 @@ use PHPUnit\Framework\TestCase;
 
 class EnrichmentMergeTest extends TestCase
 {
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function enrichment_does_not_override_existing_author()
     {
         $metadata = [
@@ -31,7 +31,7 @@ class EnrichmentMergeTest extends TestCase
         $this->assertEquals('Good description', $metadata['description']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function enrichment_does_not_override_existing_year()
     {
         $metadata = [
@@ -60,7 +60,7 @@ class EnrichmentMergeTest extends TestCase
         $this->assertArrayNotHasKey('published_year', $metadata);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function enrichment_fills_in_missing_fields()
     {
         $metadata = [
@@ -85,7 +85,7 @@ class EnrichmentMergeTest extends TestCase
         $this->assertEquals('1234567890', $metadata['isbn']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function enrichment_does_not_override_genre()
     {
         $metadata = [
@@ -107,7 +107,7 @@ class EnrichmentMergeTest extends TestCase
         $this->assertEquals('Science Fiction & Fantasy:Fantasy:Epic', $metadata['genre']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function enrichment_does_not_override_publisher()
     {
         $metadata = [

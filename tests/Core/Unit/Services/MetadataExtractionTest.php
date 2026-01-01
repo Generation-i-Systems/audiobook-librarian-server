@@ -36,7 +36,7 @@ class MetadataExtractionTest extends TestCase
         };
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_extracts_author_from_artist_tag()
     {
         // Skip this test for now as it requires more setup
@@ -46,9 +46,7 @@ class MetadataExtractionTest extends TestCase
         $this->assertTrue(true);
     }
 
-    /**
-     * @test
-     */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function test_placeholder()
     {
         $this->assertTrue(true);

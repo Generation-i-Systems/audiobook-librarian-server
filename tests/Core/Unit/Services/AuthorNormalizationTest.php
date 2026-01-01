@@ -36,7 +36,7 @@ class AuthorNormalizationTest extends TestCase
         };
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_extracts_author_from_graphic_audio_bracket_pattern()
     {
         $invoke = $this->invokeMethod;
@@ -44,7 +44,7 @@ class AuthorNormalizationTest extends TestCase
         $this->assertEquals('Alex Archer', $result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_extracts_author_from_graphicaudio_bracket_pattern()
     {
         $invoke = $this->invokeMethod;
@@ -52,7 +52,7 @@ class AuthorNormalizationTest extends TestCase
         $this->assertEquals('John Smith', $result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_rejects_graphic_audio_as_author()
     {
         $invoke = $this->invokeMethod;
@@ -60,7 +60,7 @@ class AuthorNormalizationTest extends TestCase
         $this->assertSame('', $result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_rejects_graphicaudio_as_author()
     {
         $invoke = $this->invokeMethod;
@@ -68,7 +68,7 @@ class AuthorNormalizationTest extends TestCase
         $this->assertSame('', $result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_rejects_any_name_containing_graphic_and_audio()
     {
         $invoke = $this->invokeMethod;
@@ -76,7 +76,7 @@ class AuthorNormalizationTest extends TestCase
         $this->assertSame('', $result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_rejects_full_cast_as_author()
     {
         $invoke = $this->invokeMethod;
@@ -84,7 +84,7 @@ class AuthorNormalizationTest extends TestCase
         $this->assertSame('', $result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_preserves_normal_author_names()
     {
         $invoke = $this->invokeMethod;
@@ -92,7 +92,7 @@ class AuthorNormalizationTest extends TestCase
         $this->assertEquals('J.K. Rowling', $result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_normalizes_initials()
     {
         $invoke = $this->invokeMethod;

@@ -59,7 +59,7 @@ class MoveBookDirectoryTest extends TestCase
         parent::tearDown();
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_moves_single_book_directory_and_updates_database()
     {
         // Arrange
@@ -149,7 +149,7 @@ class MoveBookDirectoryTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_moves_multiple_books_to_directory()
     {
         // Arrange
@@ -180,7 +180,7 @@ class MoveBookDirectoryTest extends TestCase
         $this->assertEquals('Sci-Fi/Book2', $book2->directory_path);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_updates_nested_book_paths_when_moving_parent_directory()
     {
         // Arrange
@@ -207,7 +207,7 @@ class MoveBookDirectoryTest extends TestCase
         $this->assertEquals('Sci-Fi/Author/Series/Book2', $book2->directory_path);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_creates_parent_directories_automatically()
     {
         // Arrange
@@ -229,7 +229,7 @@ class MoveBookDirectoryTest extends TestCase
         $this->assertEquals($destPath, $book->directory_path);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_trailing_slash_on_destination()
     {
         // Arrange
@@ -273,7 +273,7 @@ class MoveBookDirectoryTest extends TestCase
         $this->assertEquals($destDir . '/' . basename($sourcePath), $book->directory_path);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_returns_exit_code_2_when_no_books_found()
     {
         // Arrange
@@ -348,7 +348,7 @@ class MoveBookDirectoryTest extends TestCase
         $this->assertDirDoesNotExist($this->testBookRoot . '/' . $destPath);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_supports_dry_run_mode()
     {
         // Arrange
@@ -372,7 +372,7 @@ class MoveBookDirectoryTest extends TestCase
         $this->assertEquals($sourcePath, $book->directory_path);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_supports_no_db_mode()
     {
         // Arrange
@@ -397,7 +397,7 @@ class MoveBookDirectoryTest extends TestCase
         $this->assertEquals($originalPath, $book->directory_path);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_prompts_when_destination_outside_book_root_and_skips_database_updates()
     {
         // Arrange
@@ -432,7 +432,7 @@ class MoveBookDirectoryTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_absolute_paths()
     {
         // Arrange
@@ -455,7 +455,7 @@ class MoveBookDirectoryTest extends TestCase
         $this->assertEquals($destPath, $book->directory_path);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_relative_paths()
     {
         // Arrange
@@ -475,7 +475,7 @@ class MoveBookDirectoryTest extends TestCase
         $this->assertEquals($destPath, $book->directory_path);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_fails_when_source_does_not_exist()
     {
         // Act & Assert
@@ -484,7 +484,7 @@ class MoveBookDirectoryTest extends TestCase
         ])->assertExitCode(2);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_genre_reorganization()
     {
         // Arrange - Create multiple books in a genre
@@ -513,7 +513,7 @@ class MoveBookDirectoryTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_author_name_correction()
     {
         // Arrange
@@ -533,7 +533,7 @@ class MoveBookDirectoryTest extends TestCase
         $this->assertEquals($correctPath, $book->directory_path);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_series_reorganization()
     {
         // Arrange
@@ -562,7 +562,7 @@ class MoveBookDirectoryTest extends TestCase
         }
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_preserves_book_metadata_during_move()
     {
         // Arrange
@@ -591,7 +591,7 @@ class MoveBookDirectoryTest extends TestCase
         $this->assertEquals(5, $book->audio_file_count);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_special_characters_in_paths()
     {
         // Arrange
@@ -611,7 +611,7 @@ class MoveBookDirectoryTest extends TestCase
         $this->assertEquals($destPath, $book->directory_path);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_unicode_characters_in_paths()
     {
         // Arrange
@@ -631,7 +631,7 @@ class MoveBookDirectoryTest extends TestCase
         $this->assertEquals($destPath, $book->directory_path);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_updates_timestamps_on_book_records()
     {
         // Arrange
@@ -656,7 +656,7 @@ class MoveBookDirectoryTest extends TestCase
         $this->assertTrue($book->updated_at->isAfter($originalUpdatedAt));
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_empty_source_list()
     {
         // Act & Assert
@@ -665,7 +665,7 @@ class MoveBookDirectoryTest extends TestCase
         ])->assertExitCode(1);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_very_deep_directory_structures()
     {
         // Arrange
@@ -685,7 +685,7 @@ class MoveBookDirectoryTest extends TestCase
         $this->assertEquals($destPath, $book->directory_path);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_moving_to_same_location()
     {
         // Arrange
@@ -703,7 +703,7 @@ class MoveBookDirectoryTest extends TestCase
         $this->assertNotEquals(0, $result);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_concurrent_book_updates()
     {
         // Arrange
@@ -728,7 +728,7 @@ class MoveBookDirectoryTest extends TestCase
         $this->assertEquals('Updated Title', $book->title);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_books_with_relationships()
     {
         // Arrange

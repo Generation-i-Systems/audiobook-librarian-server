@@ -19,7 +19,7 @@ class AudiobookBayApiServiceCacheTest extends TestCase
         Cache::flush();
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function search_audiobooks_handles_invalid_cache_value_gracefully(): void
     {
         $cacheSpy = Cache::spy();
