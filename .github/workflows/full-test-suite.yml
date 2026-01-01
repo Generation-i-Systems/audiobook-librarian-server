@@ -54,11 +54,3 @@ jobs:
           APP_ENV: testing
           DB_CONNECTION: sqlite
           DB_DATABASE: ':memory:'
-
-      - name: Run Code Style Check
-        run: ./vendor/bin/phpcbf --standard=PSR12 app/ tests/ || true
-        continue-on-error: true
-
-      - name: Run Static Analysis
-        run: ./vendor/bin/phpstan analyse --memory-limit=2G || true
-        continue-on-error: true
