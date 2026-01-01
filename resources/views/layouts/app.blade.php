@@ -39,7 +39,9 @@ use Illuminate\Support\Facades\Route;
     <link rel="stylesheet" href="/css/bootstrap-dropdown-zfix.css">
 
     <!-- Scripts -->
-    @vite(['resources/sass/app.scss', 'resources/js/app.js'])
+    @if (!app()->environment('testing'))
+        @vite(['resources/sass/app.scss', 'resources/js/app.js'])
+    @endif
 
     <link rel="stylesheet" href="/css/pagination-fix.css">
 
