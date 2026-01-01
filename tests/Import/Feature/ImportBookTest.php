@@ -35,7 +35,7 @@ class ImportBookTest extends TestCase
         parent::tearDown();
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_shows_help_when_no_paths_and_no_audio_files()
     {
         $this->artisan('books:import')
@@ -43,7 +43,7 @@ class ImportBookTest extends TestCase
             ->assertExitCode(1);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_imports_book_from_directory()
     {
         // Arrange
@@ -71,7 +71,7 @@ ABS;
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_dry_run_mode()
     {
         // Arrange
@@ -97,7 +97,7 @@ ABS;
         ]);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_skips_existing_books()
     {
         // Arrange
@@ -125,7 +125,7 @@ ABS;
         $this->assertEquals(1, Book::where('title', 'Existing Book')->count());
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_updates_existing_books_with_force()
     {
         // Arrange
@@ -157,7 +157,7 @@ ABS;
         $this->assertEquals('New description', $book->description);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_multiple_paths()
     {
         // Arrange
@@ -183,7 +183,7 @@ ABS;
         $this->assertDatabaseHas('books', ['title' => 'Book Two']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_audio_file_path()
     {
         // Arrange
@@ -203,7 +203,7 @@ ABS;
         $this->assertDatabaseHas('books', ['title' => 'Audio File Book']);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_displays_summary()
     {
         // Arrange
@@ -219,7 +219,7 @@ ABS;
             ->assertExitCode(0);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_handles_invalid_paths()
     {
         // Act & Assert
@@ -228,7 +228,7 @@ ABS;
             ->assertExitCode(1);
     }
 
-    /** @test */
+    #[\PHPUnit\Framework\Attributes\Test]
     public function it_skips_non_audio_files()
     {
         // Arrange
