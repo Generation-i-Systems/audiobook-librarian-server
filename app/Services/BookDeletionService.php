@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Models\Book;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -40,6 +41,14 @@ class BookDeletionService
 
             $fileCount = 0;
             $movedFiles = false;
+
+            if ($deleteFiles && !empty($book['directoryPath']) && $this->isDirectoryShared($bookId, $book['directoryPath'])) {
+                Log::warning('Refusing to delete/move files for book because directory is shared', [
+                    'book_id' => $bookId,
+                    'directory_path' => $book['directoryPath'],
+                ]);
+                $deleteFiles = false;
+            }
 
             if ($deleteFiles && !empty($book['directoryPath'])) {
                 $result = $this->moveFilesToTrash($book['directoryPath'], $trashItemId);
@@ -93,6 +102,20 @@ class BookDeletionService
                 'error' => $e->getMessage(),
             ];
         }
+    }
+
+    private function isDirectoryShared(string $bookId, string $directoryPath): bool
+    {
+        $directoryPath = trim($directoryPath);
+
+        if ($directoryPath === '') {
+            return false;
+        }
+
+        return Book::query()
+            ->where('directory_path', $directoryPath)
+            ->where('id', '!=', $bookId)
+            ->exists();
     }
 
     public function restore(string $trashItemId): bool

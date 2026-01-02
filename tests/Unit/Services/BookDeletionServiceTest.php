@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Services;
 
 use App\Services\BookDeletionService;
+use App\Models\Book;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -103,6 +104,43 @@ class BookDeletionServiceTest extends TestCase
         $result = $service->moveToTrash('1', false);
 
         $this->assertTrue($result['success']);
+    }
+
+    public function testMoveToTrashDoesNotMoveFilesWhenDirectoryIsShared(): void
+    {
+        $directoryPath = 'shared/book/path';
+
+        Book::factory()->create([
+            'directory_path' => $directoryPath,
+        ]);
+
+        Book::factory()->create([
+            'directory_path' => $directoryPath,
+        ]);
+
+        $documentStore = $this->createMock(MockDocumentStoreService::class);
+
+        $documentStore->expects($this->once())
+            ->method('getBook')
+            ->willReturn([
+                'id' => '1',
+                'title' => 'Test Book',
+                'directoryPath' => $directoryPath,
+            ]);
+
+        $documentStore->expects($this->once())
+            ->method('deleteBook')
+            ->with('1', false)
+            ->willReturn(true);
+
+        $service = new BookDeletionService($documentStore);
+
+        $result = $service->moveToTrash('1', true);
+
+        $this->assertTrue($result['success']);
+
+        $trashDisk = Storage::disk('trash');
+        $this->assertFalse($trashDisk->exists($result['trash_item_id'] . '/files'));
     }
 
     public function testMoveToTrashHandlesMissingDirectory(): void
