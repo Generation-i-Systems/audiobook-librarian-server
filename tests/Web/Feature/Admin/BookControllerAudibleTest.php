@@ -8,11 +8,12 @@ use App\Services\MongoService;
 use Illuminate\Foundation\Testing\WithFaker;
 use Illuminate\Support\Facades\Auth;
 use Mockery;
+use PHPUnit\Framework\Attributes\CoversClass;
 use Tests\TestCase;
 
 /**
- * @covers \App\Http\Controllers\Admin\BookController
  */
+#[CoversClass(\App\Http\Controllers\Admin\BookController::class)]
 class BookControllerAudibleTest extends TestCase
 {
     use WithFaker;
