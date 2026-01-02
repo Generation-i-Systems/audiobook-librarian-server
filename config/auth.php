@@ -82,10 +82,10 @@ return [
             // 'model' => env('AUTH_MODEL', App\Models\User::class), // No longer needed
         ],
 
-        // 'users' => [
-        //     'driver' => 'database',
-        //     'table' => 'users',
-        // ],
+        'users' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\User::class,
+        ],
     ],
 
     /*

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\ApiHealthController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\BadgeController;
 use App\Http\Controllers\Api\BookApiController;
 use App\Http\Controllers\Api\BookmarkApiController;
@@ -170,5 +171,7 @@ Route::prefix('v1')->group(function () {
     // Authentication Routes (outside the auth:sanctum middleware)
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword']);
+    Route::post('/reset-password', [PasswordResetController::class, 'resetPassword']);
     Route::post('/auth/google', [AuthController::class, 'googleLogin']);
 });
