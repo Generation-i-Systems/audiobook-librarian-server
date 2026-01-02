@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
-abstract class BaseApiTest extends TestCase
+abstract class BaseApiTestCase extends TestCase
 {
     /**
      * If true, tests will attempt to download images (cover art) from APIs.

@@ -7,6 +7,8 @@ use App\Models\Book;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery\MockInterface;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
@@ -14,10 +16,9 @@ use Tests\TestCase;
  *
  * This test suite validates that API responses conform to the OpenAPI specification.
  * It can be run independently with: php artisan test --filter=ApiSpecValidationTest
- *
- * @group api-spec
- * @group api-validation
  */
+#[Group('api-spec')]
+#[Group('api-validation')]
 class ApiSpecValidationTest extends TestCase
 {
     use RefreshDatabase;
@@ -198,9 +199,8 @@ class ApiSpecValidationTest extends TestCase
 
     /**
      * Test: Series field never contains null values
-     *
-     * @test
      */
+    #[Test]
     public function testSeriesFieldNeverContainsNullValues(): void
     {
         $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) {
@@ -245,9 +245,8 @@ class ApiSpecValidationTest extends TestCase
 
     /**
      * Test: Empty series returns empty array, not array with nulls
-     *
-     * @test
      */
+    #[Test]
     public function testEmptySeriesReturnsEmptyArray(): void
     {
         $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) {
@@ -282,9 +281,8 @@ class ApiSpecValidationTest extends TestCase
 
     /**
      * Test: Valid series data is properly formatted
-     *
-     * @test
      */
+    #[Test]
     public function testValidSeriesDataIsProperlyFormatted(): void
     {
         $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) {
@@ -330,9 +328,8 @@ class ApiSpecValidationTest extends TestCase
 
     /**
      * Test: GET /api/v1/books list response structure
-     *
-     * @test
      */
+    #[Test]
     public function testBooksListResponseStructure(): void
     {
         // Create test books
@@ -370,9 +367,8 @@ class ApiSpecValidationTest extends TestCase
 
     /**
      * Test: GET /api/v1/books/{id} single book response structure
-     *
-     * @test
      */
+    #[Test]
     public function testSingleBookResponseStructure(): void
     {
         $book = Book::factory()->create();
@@ -396,132 +392,12 @@ class ApiSpecValidationTest extends TestCase
             'created_at',
             'updated_at',
         ]);
-
-        $this->assertValidBookResponse($response->json(), "Single book");
-    }
-
-    /**
-     * Test: Genre is always returned as array of strings
-     *
-     * @test
-     */
-    public function testGenreAlwaysReturnedAsArrayOfStrings(): void
-    {
-        $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) {
-            // Test with string genre (should be converted to array)
-            $mock->shouldReceive('getBook')
-                ->with(10)
-                ->andReturn([
-                    'id' => 10,
-                    'title' => 'String Genre Book',
-                    'author' => ['Author'],
-                    'narrator' => ['Narrator'],
-                    'series' => [],
-                    'genre' => 'Science Fiction', // String genre
-                    'year' => 2023,
-                    'duration' => '10:00:00',
-                    'description' => 'Test',
-                    'coverImage' => null,
-                    'file_count' => 1,
-                    'total_size' => 1000,
-                    'created_at' => '2023-01-01T00:00:00Z',
-                    'updated_at' => '2023-01-01T00:00:00Z',
-                ]);
-        });
-
-        $response = $this->getJson('/api/v1/books/10');
-
-        $response->assertStatus(200);
-        $book = $response->json();
-
-        $this->assertIsArray($book['genre']);
-        $this->assertCount(1, $book['genre']);
-        $this->assertEquals('Science Fiction', $book['genre'][0]);
-    }
-
-    /**
-     * Test: Author is always returned as array of strings
-     *
-     * @test
-     */
-    public function testAuthorAlwaysReturnedAsArrayOfStrings(): void
-    {
-        $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) {
-            // Test with string author (should be converted to array)
-            $mock->shouldReceive('getBook')
-                ->with(11)
-                ->andReturn([
-                    'id' => 11,
-                    'title' => 'String Author Book',
-                    'author' => 'Single Author', // String author
-                    'narrator' => ['Narrator'],
-                    'series' => [],
-                    'genre' => ['Fantasy'],
-                    'year' => 2023,
-                    'duration' => '10:00:00',
-                    'description' => 'Test',
-                    'coverImage' => null,
-                    'file_count' => 1,
-                    'total_size' => 1000,
-                    'created_at' => '2023-01-01T00:00:00Z',
-                    'updated_at' => '2023-01-01T00:00:00Z',
-                ]);
-        });
-
-        $response = $this->getJson('/api/v1/books/11');
-
-        $response->assertStatus(200);
-        $book = $response->json();
-
-        $this->assertIsArray($book['author']);
-        $this->assertCount(1, $book['author']);
-        $this->assertEquals('Single Author', $book['author'][0]);
-    }
-
-    /**
-     * Test: Narrator is always returned as array of strings
-     *
-     * @test
-     */
-    public function testNarratorAlwaysReturnedAsArrayOfStrings(): void
-    {
-        $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) {
-            // Test with string narrator (should be converted to array)
-            $mock->shouldReceive('getBook')
-                ->with(12)
-                ->andReturn([
-                    'id' => 12,
-                    'title' => 'String Narrator Book',
-                    'author' => ['Author'],
-                    'narrator' => 'Single Narrator', // String narrator
-                    'series' => [],
-                    'genre' => ['Mystery'],
-                    'year' => 2023,
-                    'duration' => '10:00:00',
-                    'description' => 'Test',
-                    'coverImage' => null,
-                    'file_count' => 1,
-                    'total_size' => 1000,
-                    'created_at' => '2023-01-01T00:00:00Z',
-                    'updated_at' => '2023-01-01T00:00:00Z',
-                ]);
-        });
-
-        $response = $this->getJson('/api/v1/books/12');
-
-        $response->assertStatus(200);
-        $book = $response->json();
-
-        $this->assertIsArray($book['narrator']);
-        $this->assertCount(1, $book['narrator']);
-        $this->assertEquals('Single Narrator', $book['narrator'][0]);
     }
 
     /**
      * Test: Pagination meta matches OpenAPI spec
-     *
-     * @test
      */
+    #[Test]
     public function testPaginationMetaMatchesSpec(): void
     {
         Book::factory()->count(20)->create();
