@@ -41,6 +41,7 @@
 - `books:info --delete` command now uses trash system instead of permanent deletion
 
 ### Fixed
+- Updated API authentication documentation to match the current bearer token implementation (email or username login; opaque token; logout revokes token)
 - Fixed `ShowBookInfo` command opening browser during test runs
   - Added environment detection to skip browser launch when APP_ENV=testing
   - Tests now verify skipping behavior instead of actually opening browser

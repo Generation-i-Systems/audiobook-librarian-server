@@ -51,14 +51,15 @@ Example series document:
 
 ### Authentication
 
-Most API endpoints require authentication using a JWT token. You can obtain a token by registering or logging in using the authentication endpoints.
+Most API endpoints require authentication using a Bearer token. You can obtain a token by logging in using the authentication endpoints.
+Login supports either `email` + `password` or `username` + `password`.
 
 #### OAuth Authentication
 
 Google OAuth authentication will soon be available through the `/api/v1/auth/google` endpoint. This will allow users to authenticate using their Google accounts.
 
-- API Key authentication
-- OAuth2 with JWT tokens
+- Bearer token authentication
+- OAuth2 (Google login endpoint)
 
 For details on authentication, please refer to the OpenAPI specification security schemes section.
 

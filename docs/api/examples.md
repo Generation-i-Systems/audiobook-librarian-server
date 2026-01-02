@@ -76,9 +76,9 @@ curl -X POST http://localhost:8000/api/v1/login \
   "username": "johndoe",
   "email": "john@example.com",
   "role": "user",
-  "authToken": "1|abc123def456ghi789jkl012mno345pqr678stu901vwx234yz",
-  "refreshToken": "1|abc123def456ghi789jkl012mno345pqr678stu901vwx234yz",
-  "token": "1|abc123def456ghi789jkl012mno345pqr678stu901vwx234yz"
+  "authToken": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "refreshToken": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "token": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 }
 ```
 
@@ -86,7 +86,7 @@ curl -X POST http://localhost:8000/api/v1/login \
 
 ```bash
 # Save token from login response
-TOKEN="1|abc123def456ghi789jkl012mno345pqr678stu901vwx234yz"
+TOKEN="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 
 # Get current user info
 curl -X GET http://localhost:8000/api/v1/user \
@@ -158,7 +158,7 @@ class LibrarianAPI {
     const data = await response.json();
     this.token = data.authToken;
     localStorage.setItem('librarian_token', this.token); // Use secure storage in production
-    
+
     return data;
   }
 
@@ -208,7 +208,7 @@ class LibrarianAPI {
         localStorage.removeItem('librarian_token');
         throw new Error('Authentication required');
       }
-      
+
       const error = await response.json();
       throw new Error(error.message || 'Request failed');
     }
@@ -274,7 +274,7 @@ const registerUser = async () => {
       password: 'securepassword123'
     })
   });
-  
+
   return await response.json();
 };
 
@@ -288,7 +288,7 @@ const loginUser = async () => {
       password: 'securepassword123'
     })
   });
-  
+
   const data = await response.json();
   localStorage.setItem('token', data.authToken);
   return data;
@@ -303,7 +303,7 @@ const getBooks = async () => {
       'Accept': 'application/json'
     }
   });
-  
+
   return await response.json();
 };
 ```
@@ -339,23 +339,23 @@ class LibrarianAPI:
             json=credentials
         )
         response.raise_for_status()
-        
+
         data = response.json()
         self.token = data["authToken"]
-        
+
         # Update session headers
         self.session.headers.update({
             "Authorization": f"Bearer {self.token}",
             "Accept": "application/json"
         })
-        
+
         return data
 
     def logout(self) -> bool:
         """Logout and clear authentication token."""
         if not self.token:
             return True
-            
+
         try:
             response = self.session.post(f"{self.base_url}/logout")
             response.raise_for_status()
@@ -364,7 +364,7 @@ class LibrarianAPI:
         finally:
             self.token = None
             self.session.headers.pop("Authorization", None)
-        
+
         return True
 
     def get_user(self) -> Dict[str, Any]:
@@ -379,25 +379,25 @@ class LibrarianAPI:
         """Make an authenticated request."""
         if not self.token:
             raise ValueError("No authentication token available")
-        
+
         response = self.session.request(
             method,
             f"{self.base_url}{endpoint}",
             **kwargs
         )
-        
+
         if response.status_code == 401:
             self.token = None
             self.session.headers.pop("Authorization", None)
             raise ValueError("Authentication required")
-        
+
         response.raise_for_status()
         return response.json()
 
 # Usage examples
 def main():
     api = LibrarianAPI()
-    
+
     try:
         # Register
         register_result = api.register({
@@ -407,26 +407,26 @@ def main():
             "password": "securepassword123"
         })
         print("Registration:", register_result)
-        
+
         # Login
         user_data = api.login({
             "email": "john@example.com",
             "password": "securepassword123"
         })
         print(f"Logged in as: {user_data['name']}")
-        
+
         # Get user info
         user_info = api.get_user()
         print("User info:", user_info)
-        
+
         # Get books
         books = api.get_books()
         print(f"Found {len(books)} books")
-        
+
         # Logout
         api.logout()
         print("Logged out successfully")
-        
+
     except requests.RequestException as e:
         print(f"Request error: {e}")
     except ValueError as e:
@@ -450,25 +450,25 @@ login_response = requests.post("http://localhost:8000/api/v1/login", json={
 if login_response.status_code == 200:
     auth_data = login_response.json()
     token = auth_data["authToken"]
-    
+
     # Use token for authenticated requests
     headers = {
         "Authorization": f"Bearer {token}",
         "Accept": "application/json"
     }
-    
+
     # Get books
     books_response = requests.get(
-        "http://localhost:8000/api/v1/books", 
+        "http://localhost:8000/api/v1/books",
         headers=headers
     )
-    
+
     if books_response.status_code == 200:
         books = books_response.json()
         print(f"Found {len(books)} books")
     else:
         print("Failed to get books")
-        
+
     # Logout
     logout_response = requests.post(
         "http://localhost:8000/api/v1/logout",
@@ -509,7 +509,7 @@ class LibrarianAPI
             $response = $this->client->post('/register', [
                 'json' => $userData
             ]);
-            
+
             return json_decode($response->getBody(), true);
         } catch (RequestException $e) {
             throw new Exception('Registration failed: ' . $e->getMessage());
@@ -522,10 +522,10 @@ class LibrarianAPI
             $response = $this->client->post('/login', [
                 'json' => $credentials
             ]);
-            
+
             $data = json_decode($response->getBody(), true);
             $this->token = $data['authToken'];
-            
+
             return $data;
         } catch (RequestException $e) {
             throw new Exception('Login failed: ' . $e->getMessage());
@@ -588,7 +588,7 @@ class LibrarianAPI
 // Usage
 try {
     $api = new LibrarianAPI();
-    
+
     // Register
     $registerResult = $api->register([
         'name' => 'John Doe',
@@ -597,22 +597,22 @@ try {
         'password' => 'securepassword123'
     ]);
     echo "Registration: " . json_encode($registerResult) . "\n";
-    
+
     // Login
     $userData = $api->login([
         'email' => 'john@example.com',
         'password' => 'securepassword123'
     ]);
     echo "Logged in as: " . $userData['name'] . "\n";
-    
+
     // Get books
     $books = $api->getBooks();
     echo "Found " . count($books) . " books\n";
-    
+
     // Logout
     $api->logout();
     echo "Logged out successfully\n";
-    
+
 } catch (Exception $e) {
     echo "Error: " . $e->getMessage() . "\n";
 }
@@ -849,11 +849,11 @@ export const AuthProvider = ({ children }) => {
 
       const data = await response.json();
       const newToken = data.authToken;
-      
+
       setToken(newToken);
       setUser(data);
       localStorage.setItem('authToken', newToken);
-      
+
       return data;
     } catch (error) {
       throw error;
@@ -954,7 +954,7 @@ const LoginForm = () => {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  
+
   const { login } = useAuth();
 
   const handleSubmit = async (e) => {
@@ -986,7 +986,7 @@ const LoginForm = () => {
           required
         />
       </div>
-      
+
       <div>
         <label>Password:</label>
         <input
@@ -1001,7 +1001,7 @@ const LoginForm = () => {
       </div>
 
       {error && <div style={{color: 'red'}}>{error}</div>}
-      
+
       <button type="submit" disabled={loading}>
         {loading ? 'Logging in...' : 'Login'}
       </button>
@@ -1111,7 +1111,7 @@ class APIClient {
 
     try {
       const response = await fetch(url, config);
-      
+
       if (!response.ok) {
         await this.handleError(response);
       }
@@ -1127,10 +1127,10 @@ class APIClient {
 
   async handleError(response) {
     const status = response.status;
-    
+
     try {
       const errorData = await response.json();
-      
+
       switch (status) {
         case 400:
           throw new ValidationError(errorData);

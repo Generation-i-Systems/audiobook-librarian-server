@@ -1,12 +1,12 @@
 # Librarian API Documentation
 
-Welcome to the Librarian API documentation. This API provides access to the audiobook management system with MySQL-based authentication using Laravel Sanctum.
+Welcome to the Librarian API documentation. This API provides access to the audiobook management system with Bearer token authentication.
 
 ## 📚 Documentation Overview
 
 This documentation suite provides everything you need to integrate with the Librarian API:
 
-- **[OpenAPI Specification](openapi.yaml)** - Complete API specification in OpenAPI 3.0 format
+- **[OpenAPI Specification](../openapi.json)** - Complete API specification in OpenAPI 3.0 format
 - **[Code Examples](examples.md)** - Examples in multiple programming languages
 
 ## 🚀 Quick Start
@@ -35,12 +35,12 @@ curl -X GET http://localhost:8000/api/v1/books \
 
 ## 🔐 Authentication
 
-The API uses **Laravel Sanctum** for token-based authentication:
+The API uses **Bearer tokens** for authentication.
 
-- **Token Type**: Bearer tokens
-- **Expiration**: 30 days
-- **Storage**: MySQL database
-- **Format**: `{id}|{hash}`
+- **Token Type**: Bearer token in `Authorization` header
+- **Login identifiers**: `email` or `username`
+- **Storage**: MySQL `api_tokens` table (issued via the document store service)
+- **Expiration**: No automatic expiration is currently enforced for `api_tokens` (tokens are revoked on logout)
 
 ### Authentication Endpoints
 
@@ -92,7 +92,7 @@ Badge fields include:
 - `key`, `name`, `description`, `category`, `tier`, `points`
 - User context fields where applicable: `earned`, `earned_at`, `times_earned`
 
-*See [OpenAPI specification](openapi.yaml) for complete endpoint documentation.*
+*See [OpenAPI specification](../openapi.json) for complete endpoint documentation.*
 
 ## 🔧 User Roles
 
@@ -181,7 +181,7 @@ curl -X GET $BASE_URL/books \
 Import the [Postman collection](examples.md#postman-collection) for easy testing.
 
 ### OpenAPI Tools
-Use the [OpenAPI specification](openapi.yaml) with tools like:
+Use the [OpenAPI specification](../openapi.json) with tools like:
 - Swagger UI
 - Postman
 - Insomnia
@@ -205,7 +205,7 @@ See the [examples documentation](examples.md) for complete code samples.
 
 **"Unauthorized" Error**
 - Check token format: `Bearer {token}`
-- Verify token hasn't expired (30 days)
+- Verify the token is still valid (tokens are revoked on logout)
 - Ensure user account is approved
 
 **"Account pending admin approval"**
@@ -241,7 +241,7 @@ For API support:
 ## 📋 Changelog
 
 ### Version 1.0.0
-- ✅ MySQL-based authentication with Laravel Sanctum
+- ✅ Bearer token authentication
 - ✅ Comprehensive API documentation
 - ✅ OpenAPI specification
 - ✅ Multi-language examples
@@ -255,4 +255,4 @@ This API documentation is part of the Librarian project. See the main project re
 
 **Need help?** Check the individual documentation files for detailed information:
 - [Code Examples](examples.md) - Working examples in multiple languages
-- [OpenAPI Spec](openapi.yaml) - Machine-readable API specification
+- [OpenAPI Spec](../openapi.json) - Machine-readable API specification

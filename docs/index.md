@@ -8,8 +8,6 @@ Welcome to the comprehensive documentation for the Audiobook Librarian API and s
 - **[OpenAPI JSON Specification](openapi.json)** - Machine-readable API specification (authoritative)
 
 ### Authentication Documentation
-- **[Authentication Guide](api/authentication.md)** - Complete guide to API authentication using Laravel Sanctum
-- **[Middleware Documentation](api/middleware.md)** - Technical details about authentication middleware implementation
 - **[Code Examples](api/examples.md)** - Working examples in multiple programming languages (JavaScript, Python, PHP, cURL, React)
 
 ### API Overview
@@ -20,7 +18,7 @@ Welcome to the comprehensive documentation for the Audiobook Librarian API and s
 ### For Developers
 - **Base URL**: `https://books.thelin.org/api/v1`
 - **Local URL**: `http://localhost:8000/api/v1`
-- **Authentication**: Bearer Token (Laravel Sanctum)
+- **Authentication**: Bearer Token
 - **Format**: JSON
 
 ### Key Endpoints
@@ -54,9 +52,7 @@ curl -X GET https://books.thelin.org/api/v1/books \
 ## 📖 Documentation Categories
 
 ### API Reference
-- [Authentication Guide](api/authentication.md) - Login, registration, user management
 - [Code Examples](api/examples.md) - Copy-paste examples for integration
-- [Middleware Technical Docs](api/middleware.md) - Implementation details
 
 ### Specifications
 - [OpenAPI JSON](openapi.json) - Complete API specification with examples
@@ -66,7 +62,7 @@ curl -X GET https://books.thelin.org/api/v1/books \
 ### API Testing
 - **Swagger UI**: Import the [OpenAPI specification](openapi.json)
 - **Postman**: Use the [collection examples](api/examples.md#postman-collection)
-- **cURL**: Copy examples from the [authentication guide](api/authentication.md)
+- **cURL**: Copy examples from the [code examples](api/examples.md)
 
 ### Code Generation
 The [OpenAPI specification](openapi.json) can be used with code generators like:
@@ -76,10 +72,10 @@ The [OpenAPI specification](openapi.json) can be used with code generators like:
 
 ## 🔐 Authentication System
 
-**Type**: Laravel Sanctum with MySQL backend  
-**Token Format**: `{id}|{hash}` (e.g., `1|abc123...`)  
-**Expiration**: 30 days  
-**Supported Logins**: Email or username + password  
+**Type**: Bearer token authentication
+**Token Format**: Opaque token string returned by `POST /api/v1/login` (use as `Authorization: Bearer {token}`)
+**Expiration**: No automatic expiration is currently enforced (tokens are revoked on logout)
+**Supported Logins**: Email or username + password
 
 ### User Roles
 - **admin** - Full API access
@@ -119,14 +115,13 @@ The [OpenAPI specification](openapi.json) can be used with code generators like:
 
 ## 📝 Additional Resources
 
-- [Laravel Sanctum Documentation](https://laravel.com/docs/sanctum)
 - [OpenAPI 3.0 Specification](https://swagger.io/specification/)
 - [JSON API Standard](https://jsonapi.org/)
 
 ---
 
-**Need Help?** Check the specific documentation sections above or review the comprehensive [authentication guide](api/authentication.md) for detailed implementation instructions.
+**Need Help?** Check the specific documentation sections above or review the [code examples](api/examples.md) for detailed implementation instructions.
 
-**API Version**: 1.0.0  
-**Last Updated**: August 2025  
+**API Version**: 1.0.0
+**Last Updated**: August 2025
 **Base URL**: `https://books.thelin.org/api/v1`

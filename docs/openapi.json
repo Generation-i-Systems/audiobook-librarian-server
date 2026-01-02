@@ -3,7 +3,7 @@
   "info": {
     "title": "Audiobook Librarian API",
     "version": "1.0.0",
-    "description": "API documentation for the Audiobook Librarian application.\n\nThis specification covers all endpoints available in the Audiobook Librarian API v1. Authentication uses Laravel Sanctum with MySQL backend.",
+    "description": "API documentation for the Audiobook Librarian application.\n\nThis specification covers all endpoints available in the Audiobook Librarian API v1. Authentication uses opaque Bearer tokens returned by the login endpoint.",
     "contact": {
       "name": "API Support",
       "email": "support@librarian.local"
@@ -124,17 +124,17 @@
           "authToken": {
             "type": "string",
             "description": "Authentication token for API requests",
-            "example": "1|abc123def456ghi789jkl012mno345pqr678stu901vwx234yz"
+            "example": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
           },
           "refreshToken": {
             "type": "string",
             "description": "Refresh token (same as authToken in this implementation)",
-            "example": "1|abc123def456ghi789jkl012mno345pqr678stu901vwx234yz"
+            "example": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
           },
           "token": {
             "type": "string",
             "description": "Legacy token field (same as authToken)",
-            "example": "1|abc123def456ghi789jkl012mno345pqr678stu901vwx234yz"
+            "example": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
           }
         }
       },
@@ -1254,7 +1254,7 @@
           }
         }
       },
-      "ValidationError": {
+      "ApiValidationError": {
         "type": "object",
         "properties": {
           "error": {
@@ -1539,7 +1539,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ValidationError"
+                  "$ref": "#/components/schemas/ApiValidationError"
                 },
                 "examples": {
                   "validation_error": {
@@ -1647,7 +1647,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ValidationError"
+                  "$ref": "#/components/schemas/ApiValidationError"
                 },
                 "examples": {
                   "missing_password": {
@@ -3158,7 +3158,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ValidationError"
+                  "$ref": "#/components/schemas/ApiValidationError"
                 }
               }
             }
@@ -3370,7 +3370,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ValidationError"
+                  "$ref": "#/components/schemas/ApiValidationError"
                 }
               }
             }
