@@ -44,6 +44,10 @@
 - Fixed `ShowBookInfo` command opening browser during test runs
   - Added environment detection to skip browser launch when APP_ENV=testing
   - Tests now verify skipping behavior instead of actually opening browser
+- Fixed CI failures in Web/Admin and Import test workflows
+  - Replaced PHPUnit doc-comment metadata usage with PHP 8 attributes to avoid PHPUnit warnings
+  - Added `APP_KEY` to `.env.example` so `php artisan key:generate` works in CI
+  - Improved Import test PSR-4 autoloading to prevent Composer from skipping test classes
 - LoginFeatureTest, QueueControllerTest, BookDeletionServiceTest, and MoveBookDirectoryCriticalTest now mock DocumentStore interactions correctly and cover rollback scenarios without DB facade hacks
 - Authors API pagination tests generate unique author names to avoid SQLite unique-constraint flakes
 - DatabaseSafetyCheckTest updated to camelCase + enforced to run first, ensuring safety assertions gate every test invocation
