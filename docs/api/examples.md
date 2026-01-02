@@ -82,6 +82,43 @@ curl -X POST http://localhost:8000/api/v1/login \
 }
 ```
 
+### Forgot Password
+
+```bash
+curl -X POST http://localhost:8000/api/v1/forgot-password \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "john@example.com"
+  }'
+```
+
+**Response:**
+```json
+{
+  "message": "If an account exists for that email, a password reset link has been sent."
+}
+```
+
+### Reset Password
+
+```bash
+curl -X POST http://localhost:8000/api/v1/reset-password \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "john@example.com",
+    "token": "token-from-email",
+    "password": "new-password-123",
+    "password_confirmation": "new-password-123"
+  }'
+```
+
+**Response:**
+```json
+{
+  "message": "Password has been reset successfully."
+}
+```
+
 ### Access Protected Endpoint
 
 ```bash

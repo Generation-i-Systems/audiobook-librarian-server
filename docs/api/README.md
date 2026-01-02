@@ -48,6 +48,8 @@ The API uses **Bearer tokens** for authentication.
 |--------|----------|-------------|
 | POST | `/register` | Create new account |
 | POST | `/login` | Get access token |
+| POST | `/forgot-password` | Request password reset email |
+| POST | `/reset-password` | Reset password using token |
 | POST | `/logout` | Invalidate token |
 | GET | `/user` | Get current user |
 
@@ -63,6 +65,8 @@ Content-Type: application/json
 ### Authentication
 - `POST /api/v1/register` - Register new user
 - `POST /api/v1/login` - Authenticate user
+- `POST /api/v1/forgot-password` - Request password reset email
+- `POST /api/v1/reset-password` - Reset password using token
 - `POST /api/v1/logout` - Logout user
 - `GET /api/v1/user` - Get current user object
 - `GET /api/v1/me` - Get current user profile (name and email only)
