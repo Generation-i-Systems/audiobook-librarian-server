@@ -135,6 +135,37 @@ class LibraryJsonUpdateTest extends TestCase
         $this->assertEquals('Genre Two', $jsonContent['genres'][0]['name']);
     }
 
+    public function testLibraryJsonIsUpdatedWhenPivotRelationshipsChangeDirectly(): void
+    {
+        $author1 = Author::factory()->create(['name' => 'Author One']);
+        $author2 = Author::factory()->create(['name' => 'Author Two']);
+
+        $bookDir = 'test-author/pivot-change-book';
+        $this->createBookDirectory($bookDir);
+
+        $book = Book::factory()->create([
+            'title' => 'Pivot Change Book',
+            'directory_path' => $bookDir,
+        ]);
+
+        $book->authors()->attach($author1->id);
+
+        $jsonPath = Storage::disk('books')->path($bookDir . '/librarian.json');
+        $this->assertFileExists($jsonPath);
+
+        $jsonContent = json_decode(file_get_contents($jsonPath), true);
+        $this->assertIsArray($jsonContent);
+        $this->assertCount(1, $jsonContent['authors']);
+        $this->assertEquals('Author One', $jsonContent['authors'][0]['name']);
+
+        $book->authors()->sync([$author2->id]);
+
+        $jsonContentAfter = json_decode(file_get_contents($jsonPath), true);
+        $this->assertIsArray($jsonContentAfter);
+        $this->assertCount(1, $jsonContentAfter['authors']);
+        $this->assertEquals('Author Two', $jsonContentAfter['authors'][0]['name']);
+    }
+
     public function testLibraryJsonIsNotCreatedWhenDirectoryPathMissing()
     {
         $author = Author::factory()->create(['name' => 'Test Author']);

@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Builder;
+use App\Relations\TouchesParentBelongsToMany;
 use App\Traits\CamelCaseAttributeAccess;
 use App\Traits\Auditable;
 
@@ -13,6 +15,19 @@ class Book extends Model
     use HasFactory;
     use CamelCaseAttributeAccess;
     use Auditable;
+
+    protected $observables = [
+        'pivotAttached',
+        'pivotDetached',
+        'pivotUpdated',
+    ];
+
+    protected $touches = [
+        'authors',
+        'narrators',
+        'genres',
+        'series',
+    ];
 
     protected $fillable = [
         'title',
@@ -81,6 +96,28 @@ class Book extends Model
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class)->withPivot('progress', 'last_listened')->withTimestamps();
+    }
+
+    protected function newBelongsToMany(
+        Builder $query,
+        Model $parent,
+        $table,
+        $foreignPivotKey,
+        $relatedPivotKey,
+        $parentKey,
+        $relatedKey,
+        $relationName = null
+    ): BelongsToMany {
+        return new TouchesParentBelongsToMany(
+            $query,
+            $parent,
+            $table,
+            $foreignPivotKey,
+            $relatedPivotKey,
+            $parentKey,
+            $relatedKey,
+            $relationName
+        );
     }
 
     public function chapters()
