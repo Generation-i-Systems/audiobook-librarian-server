@@ -17,6 +17,7 @@ use Tests\TestCase;
 class ShowBookInfoCommandTest extends TestCase
 {
     use RefreshDatabase;
+
     private ShowBookInfo $command;
     private DocumentStoreServiceInterface $documentStore;
     private BookDeletionService $bookDeletionService;

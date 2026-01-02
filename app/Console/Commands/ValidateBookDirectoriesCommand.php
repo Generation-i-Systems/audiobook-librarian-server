@@ -100,8 +100,10 @@ class ValidateBookDirectoriesCommand extends Command
             $genreName = basename($genreDir);
 
             // Skip system directories and ebook directories
-            if (in_array($genreName, ['.', '..', 'lost+found', '.Trash-1000']) ||
-                stripos($genreName, 'ebook') !== false) {
+            if (
+                in_array($genreName, ['.', '..', 'lost+found', '.Trash-1000']) ||
+                stripos($genreName, 'ebook') !== false
+            ) {
                 continue;
             }
 

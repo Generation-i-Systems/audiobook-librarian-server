@@ -9,6 +9,7 @@ use Illuminate\Console\Command;
 class UpdateBookInfo extends Command
 {
     use HandlesLibraryJson;
+
     protected $signature = 'books:update {directory}
                             {--cover= : Path to cover image file or URL}
                             {--title= : Book title}

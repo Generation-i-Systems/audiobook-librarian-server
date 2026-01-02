@@ -512,10 +512,12 @@ class AudiobookBayApiService
                 if ($img instanceof \DOMElement && $img->hasAttribute('src')) {
                     $src = $img->getAttribute('src');
                     // Skip search icons, logos, and other common non-cover images
-                    if (!str_contains($src, '/images/search.gif') &&
+                    if (
+                        !str_contains($src, '/images/search.gif') &&
                         !str_contains($src, 'logo') &&
                         !str_contains($src, 'icon') &&
-                        !str_contains($src, 'banner')) {
+                        !str_contains($src, 'banner')
+                    ) {
                         $imgNode = $img;
                         break;
                     }

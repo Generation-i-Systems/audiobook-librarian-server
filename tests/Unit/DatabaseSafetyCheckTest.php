@@ -16,12 +16,10 @@ use PHPUnit\Framework\TestCase as BaseTestCase;
  */
 class DatabaseSafetyCheckTest extends BaseTestCase
 {
-    /**
-     * @test
-     * @group critical
-     * @group database-safety
-     */
-    public function test_ensures_tests_use_sqlite_not_mysql()
+    #[\PHPUnit\Framework\Attributes\Test]
+    #[\PHPUnit\Framework\Attributes\Group('critical')]
+    #[\PHPUnit\Framework\Attributes\Group('database-safety')]
+    public function testEnsuresTestsUseSqliteNotMysql()
     {
         // Check .env.testing file exists and has correct settings
         $envTestingPath = __DIR__ . '/../../.env.testing';
@@ -88,12 +86,10 @@ class DatabaseSafetyCheckTest extends BaseTestCase
         );
     }
 
-    /**
-     * @test
-     * @group critical
-     * @group database-safety
-     */
-    public function test_verifies_test_environment_isolation()
+    #[\PHPUnit\Framework\Attributes\Test]
+    #[\PHPUnit\Framework\Attributes\Group('critical')]
+    #[\PHPUnit\Framework\Attributes\Group('database-safety')]
+    public function testVerifiesTestEnvironmentIsolation()
     {
         // Check that .env.testing has array drivers
         $envTestingPath = __DIR__ . '/../../.env.testing';

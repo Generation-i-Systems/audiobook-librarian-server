@@ -18,6 +18,7 @@ use Tests\TestCase;
 class ApiHealthTest extends TestCase
 {
     use RefreshDatabase;
+
     /**
      * Test: Ping endpoint returns OK
      *
