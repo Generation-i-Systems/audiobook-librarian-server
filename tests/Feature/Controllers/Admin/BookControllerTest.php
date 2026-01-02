@@ -4,7 +4,9 @@ namespace Tests\Feature\Controllers\Admin;
 
 use App\Auth\DocumentstoreUser;
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Models\Book;
 use App\Services\ExternalCoverService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Http\UploadedFile;
 use Mockery;
@@ -15,6 +17,8 @@ use Tests\TestCase;
 
 class BookControllerTest extends TestCase
 {
+    use RefreshDatabase;
+
     private MockInterface|LegacyMockInterface|DocumentStoreServiceInterface $documentStoreServiceMock;
     private MockInterface|LegacyMockInterface|ExternalCoverService $externalCoverServiceMock;
     protected $admin;
@@ -178,6 +182,32 @@ class BookControllerTest extends TestCase
         $this->documentStoreServiceMock->shouldReceive('updateBook')->once();
 
         $response = $this->put(route('admin.books.update', $bookId), $updateData);
+
+        $response->assertRedirect(route('admin.books.index'));
+    }
+
+    #[Test]
+    public function destroyPreservesFilesWhenDirectoryIsShared(): void
+    {
+        $directoryPath = 'shared/book/path';
+
+        Book::factory()->create([
+            'directory_path' => $directoryPath,
+        ]);
+
+        Book::factory()->create([
+            'directory_path' => $directoryPath,
+        ]);
+
+        $bookId = 'existing-book-id';
+        $this->documentStoreServiceMock->shouldReceive('getBook')->with($bookId)->andReturn([
+            'id' => $bookId,
+            'directoryPath' => $directoryPath,
+        ]);
+
+        $this->documentStoreServiceMock->shouldReceive('deleteBook')->with($bookId, false)->once()->andReturn(true);
+
+        $response = $this->delete(route('admin.books.destroy', $bookId));
 
         $response->assertRedirect(route('admin.books.index'));
     }
