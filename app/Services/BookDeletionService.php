@@ -67,7 +67,7 @@ class BookDeletionService
                 json_encode($book, JSON_PRETTY_PRINT)
             );
 
-            $this->documentStore->deleteBook($bookId);
+            $this->documentStore->deleteBook($bookId, $deleteFiles);
 
             Log::info('Book moved to trash', [
                 'book_id' => $bookId,

@@ -81,6 +81,30 @@ class BookDeletionServiceTest extends TestCase
         $this->assertTrue($booksDisk->exists($book['directoryPath']));
     }
 
+    public function testMoveToTrashWithoutFilesDoesNotDeleteBookFilesInDocumentStore(): void
+    {
+        $documentStore = $this->createMock(MockDocumentStoreService::class);
+
+        $documentStore->expects($this->once())
+            ->method('getBook')
+            ->willReturn([
+                'id' => '1',
+                'title' => 'Test Book',
+                'directoryPath' => 'test/book/path',
+            ]);
+
+        $documentStore->expects($this->once())
+            ->method('deleteBook')
+            ->with('1', false)
+            ->willReturn(true);
+
+        $service = new BookDeletionService($documentStore);
+
+        $result = $service->moveToTrash('1', false);
+
+        $this->assertTrue($result['success']);
+    }
+
     public function testMoveToTrashHandlesMissingDirectory(): void
     {
         $book = $this->createTestBook();
