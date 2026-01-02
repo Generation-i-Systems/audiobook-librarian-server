@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests\Import\Feature\Admin;
+namespace Tests\Import\Feature;
 
 use App\Services\AudiobookBayApiService;
 use App\Services\DocumentStoreServiceInterface;
@@ -10,14 +10,15 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
  * @internal
  *
- * @coversNothing
  */
+#[CoversNothing]
 class ImportFileControllerTest extends TestCase
 {
     use RefreshDatabase;

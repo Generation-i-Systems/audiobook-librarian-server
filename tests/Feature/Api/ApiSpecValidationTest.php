@@ -201,7 +201,7 @@ class ApiSpecValidationTest extends TestCase
     /**
      * Test: Series field never contains null values
      *
-     * 
+     *
      */
     #[Test]
     public function testSeriesFieldNeverContainsNullValues(): void
@@ -249,7 +249,7 @@ class ApiSpecValidationTest extends TestCase
     /**
      * Test: Empty series returns empty array, not array with nulls
      *
-     * 
+     *
      */
     #[Test]
     public function testEmptySeriesReturnsEmptyArray(): void
@@ -287,7 +287,7 @@ class ApiSpecValidationTest extends TestCase
     /**
      * Test: Valid series data is properly formatted
      *
-     * 
+     *
      */
     #[Test]
     public function testValidSeriesDataIsProperlyFormatted(): void
@@ -336,7 +336,7 @@ class ApiSpecValidationTest extends TestCase
     /**
      * Test: GET /api/v1/books list response structure
      *
-     * 
+     *
      */
     #[Test]
     public function testBooksListResponseStructure(): void
@@ -377,7 +377,7 @@ class ApiSpecValidationTest extends TestCase
     /**
      * Test: GET /api/v1/books/{id} single book response structure
      *
-     * 
+     *
      */
     #[Test]
     public function testSingleBookResponseStructure(): void
@@ -410,7 +410,7 @@ class ApiSpecValidationTest extends TestCase
     /**
      * Test: Genre is always returned as array of strings
      *
-     * 
+     *
      */
     #[Test]
     public function testGenreAlwaysReturnedAsArrayOfStrings(): void
@@ -450,7 +450,7 @@ class ApiSpecValidationTest extends TestCase
     /**
      * Test: Author is always returned as array of strings
      *
-     * 
+     *
      */
     #[Test]
     public function testAuthorAlwaysReturnedAsArrayOfStrings(): void
@@ -490,7 +490,7 @@ class ApiSpecValidationTest extends TestCase
     /**
      * Test: Narrator is always returned as array of strings
      *
-     * 
+     *
      */
     #[Test]
     public function testNarratorAlwaysReturnedAsArrayOfStrings(): void
@@ -530,7 +530,7 @@ class ApiSpecValidationTest extends TestCase
     /**
      * Test: Pagination meta matches OpenAPI spec
      *
-     * 
+     *
      */
     #[Test]
     public function testPaginationMetaMatchesSpec(): void

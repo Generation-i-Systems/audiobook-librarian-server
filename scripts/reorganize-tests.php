@@ -1,5 +1,6 @@
 #!/usr/bin/env php
 <?php
+
 /**
  * Reorganize tests by category into separate folders
  *

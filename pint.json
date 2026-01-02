@@ -1,5 +1,8 @@
 {
     "preset": "psr12",
+    "notPath": [
+        "resources/adminer/adminer-5.4.1-en.php"
+    ],
     "rules": {
         "new_with_braces": true,
         "not_operator_with_successor_space": false,
