@@ -18,11 +18,6 @@
       <group>slow</group>
     </exclude>
   </groups>
-  <coverage includeUncoveredFiles="true">
-    <report>
-      <html outputDirectory="tests/coverage"/>
-    </report>
-  </coverage>
   <php>
     <ini name="memory_limit" value="-1"/>
     <server name="APP_ENV" value="testing"/>
