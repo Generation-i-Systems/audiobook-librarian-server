@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests\Import\Feature\Admin;
+namespace Tests\Import\Feature;
 
 use App\Auth\DocumentstoreUser;
 use Illuminate\Foundation\Testing\RefreshDatabase;

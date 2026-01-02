@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Import\Feature\Commands;
+namespace Tests\Import\Feature;
 
 use App\Models\Book;
 use App\Models\Genre;

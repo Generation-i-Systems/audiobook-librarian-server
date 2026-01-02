@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Import\Unit\Controllers\Admin;
+namespace Tests\Import\Unit;
 
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Admin\ImportFileController;

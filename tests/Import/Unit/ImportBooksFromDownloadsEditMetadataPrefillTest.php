@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Import\Unit\Commands;
+namespace Tests\Import\Unit;
 
 use App\Console\Commands\ImportBooksFromDownloads;
 use App\Services\BookImportService;

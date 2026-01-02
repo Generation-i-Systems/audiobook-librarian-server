@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Import\Feature\Services;
+namespace Tests\Import\Feature;
 
 use App\Services\BookImportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;

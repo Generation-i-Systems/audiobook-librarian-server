@@ -55,6 +55,15 @@
             "Tests\\Web\\": "tests/Web/",
             "Tests\\Cli\\": "tests/Cli/",
             "Tests\\Import\\": "tests/Import/",
+            "Tests\\Import\\Feature\\": "tests/Import/Feature/",
+            "Tests\\Import\\Feature\\Admin\\": "tests/Import/Feature/",
+            "Tests\\Import\\Feature\\Commands\\": "tests/Import/Feature/",
+            "Tests\\Import\\Feature\\Services\\": "tests/Import/Feature/",
+            "Tests\\Import\\Unit\\": "tests/Import/Unit/",
+            "Tests\\Import\\Unit\\Commands\\": "tests/Import/Unit/",
+            "Tests\\Import\\Unit\\Controllers\\Admin\\": "tests/Import/Unit/",
+            "Tests\\Import\\Unit\\Services\\": "tests/Import/Unit/",
+            "Tests\\Import\\Unit\\Traits\\": "tests/Import/Unit/",
             "Tests\\Core\\": "tests/Core/"
         }
     },
