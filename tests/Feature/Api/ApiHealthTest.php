@@ -5,24 +5,25 @@ namespace Tests\Feature\Api;
 use App\Contracts\DocumentStoreServiceInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery\MockInterface;
+use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
  * API Health Check Tests
  *
  * Tests for the unauthenticated health check endpoints used by uptime monitors.
- *
- * @group api-health
- * @group api-spec
  */
+#[Group('api-health')]
+#[Group('api-spec')]
 class ApiHealthTest extends TestCase
 {
     use RefreshDatabase;
+
     /**
      * Test: Ping endpoint returns OK
-     *
-     * @test
      */
+    #[Test]
     public function testPingEndpointReturnsOk(): void
     {
         $response = $this->getJson('/api/v1/health/ping');
@@ -41,9 +42,8 @@ class ApiHealthTest extends TestCase
 
     /**
      * Test: Health endpoint returns healthy status
-     *
-     * @test
      */
+    #[Test]
     public function testHealthEndpointReturnsHealthyStatus(): void
     {
         $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) {
@@ -94,9 +94,8 @@ class ApiHealthTest extends TestCase
 
     /**
      * Test: Health endpoint detects series format issues
-     *
-     * @test
      */
+    #[Test]
     public function testHealthEndpointDetectsSeriesFormatIssues(): void
     {
         $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) {
@@ -139,9 +138,8 @@ class ApiHealthTest extends TestCase
 
     /**
      * Test: Validate spec endpoint checks API compliance
-     *
-     * @test
      */
+    #[Test]
     public function testValidateSpecEndpointChecksApiCompliance(): void
     {
         $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) {
@@ -209,9 +207,8 @@ class ApiHealthTest extends TestCase
 
     /**
      * Test: Health endpoints are accessible without authentication
-     *
-     * @test
      */
+    #[Test]
     public function testHealthEndpointsAccessibleWithoutAuth(): void
     {
         // Ping should work without auth

@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
+use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 
 /**
- * @coversNothing
- *
  * Tests for scripts/rename_to_roman.php
  */
+#[CoversNothing]
 class RenameToRomanScriptTest extends TestCase
 {
     private string $testDir;

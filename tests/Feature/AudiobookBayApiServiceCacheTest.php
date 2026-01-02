@@ -7,10 +7,9 @@ namespace Tests\Feature;
 use App\Services\AudiobookBayApiService;
 use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
 
-/**
- * @covers \App\Services\AudiobookBayApiService
- */
+#[CoversClass(\App\Services\AudiobookBayApiService::class)]
 class AudiobookBayApiServiceCacheTest extends TestCase
 {
     protected function setUp(): void

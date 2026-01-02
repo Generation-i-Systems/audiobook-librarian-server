@@ -7,14 +7,13 @@ use App\Http\Middleware\CheckAdminRole;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Mockery;
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
- * @covers \App\Http\Controllers\Admin\BookController
- *
  * @phpstan-ignore-next-line
- *
  * @psalm-suppress all
  */
+#[CoversClass(\App\Http\Controllers\Admin\BookController::class)]
 class BookControllerNarratorAutocompleteTest extends TestCase
 {
     protected function setUp(): void

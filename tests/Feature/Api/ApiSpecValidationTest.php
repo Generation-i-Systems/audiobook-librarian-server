@@ -8,6 +8,8 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery\MockInterface;
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\Attributes\Group;
 
 /**
  * API Specification Validation Test Suite
@@ -15,9 +17,9 @@ use Tests\TestCase;
  * This test suite validates that API responses conform to the OpenAPI specification.
  * It can be run independently with: php artisan test --filter=ApiSpecValidationTest
  *
- * @group api-spec
- * @group api-validation
  */
+#[Group('api-spec')]
+#[Group('api-validation')]
 class ApiSpecValidationTest extends TestCase
 {
     use RefreshDatabase;
@@ -199,8 +201,9 @@ class ApiSpecValidationTest extends TestCase
     /**
      * Test: Series field never contains null values
      *
-     * @test
+     * 
      */
+    #[Test]
     public function testSeriesFieldNeverContainsNullValues(): void
     {
         $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) {
@@ -246,8 +249,9 @@ class ApiSpecValidationTest extends TestCase
     /**
      * Test: Empty series returns empty array, not array with nulls
      *
-     * @test
+     * 
      */
+    #[Test]
     public function testEmptySeriesReturnsEmptyArray(): void
     {
         $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) {
@@ -283,8 +287,9 @@ class ApiSpecValidationTest extends TestCase
     /**
      * Test: Valid series data is properly formatted
      *
-     * @test
+     * 
      */
+    #[Test]
     public function testValidSeriesDataIsProperlyFormatted(): void
     {
         $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) {
@@ -331,8 +336,9 @@ class ApiSpecValidationTest extends TestCase
     /**
      * Test: GET /api/v1/books list response structure
      *
-     * @test
+     * 
      */
+    #[Test]
     public function testBooksListResponseStructure(): void
     {
         // Create test books
@@ -371,8 +377,9 @@ class ApiSpecValidationTest extends TestCase
     /**
      * Test: GET /api/v1/books/{id} single book response structure
      *
-     * @test
+     * 
      */
+    #[Test]
     public function testSingleBookResponseStructure(): void
     {
         $book = Book::factory()->create();
@@ -403,8 +410,9 @@ class ApiSpecValidationTest extends TestCase
     /**
      * Test: Genre is always returned as array of strings
      *
-     * @test
+     * 
      */
+    #[Test]
     public function testGenreAlwaysReturnedAsArrayOfStrings(): void
     {
         $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) {
@@ -442,8 +450,9 @@ class ApiSpecValidationTest extends TestCase
     /**
      * Test: Author is always returned as array of strings
      *
-     * @test
+     * 
      */
+    #[Test]
     public function testAuthorAlwaysReturnedAsArrayOfStrings(): void
     {
         $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) {
@@ -481,8 +490,9 @@ class ApiSpecValidationTest extends TestCase
     /**
      * Test: Narrator is always returned as array of strings
      *
-     * @test
+     * 
      */
+    #[Test]
     public function testNarratorAlwaysReturnedAsArrayOfStrings(): void
     {
         $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) {
@@ -520,8 +530,9 @@ class ApiSpecValidationTest extends TestCase
     /**
      * Test: Pagination meta matches OpenAPI spec
      *
-     * @test
+     * 
      */
+    #[Test]
     public function testPaginationMetaMatchesSpec(): void
     {
         Book::factory()->count(20)->create();

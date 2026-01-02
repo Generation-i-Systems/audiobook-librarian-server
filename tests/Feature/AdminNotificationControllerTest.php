@@ -10,10 +10,9 @@ use Illuminate\Support\Facades\Log;
 use Mockery;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
 
-/**
- * @covers \App\Http\Controllers\AdminNotificationController
- */
+#[CoversClass(\App\Http\Controllers\AdminNotificationController::class)]
 class AdminNotificationControllerTest extends TestCase
 {
     use RefreshDatabase;
