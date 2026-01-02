@@ -1743,13 +1743,14 @@ class MySqlService implements DocumentStoreServiceInterface
      */
     public function getAdminUsers(): array
     {
-        return User::where('role', 'admin')->get()->toArray();
+        return User::whereIn('role', ['admin', 'super-admin'])->get()->toArray();
     }
 
     public function isAdmin(string $userId): bool
     {
         $user = User::find($userId);
-        return $user && $user->role === 'admin';
+
+        return $user && in_array($user->role, ['admin', 'super-admin'], true);
     }
 
     public function updateRememberToken(string $identifier, string $token): void

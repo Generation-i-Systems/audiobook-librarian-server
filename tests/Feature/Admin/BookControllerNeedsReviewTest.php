@@ -19,7 +19,7 @@ class BookControllerNeedsReviewTest extends TestCase
     {
         parent::setUp();
 
-        $this->user = User::factory()->create(['is_admin' => true]);
+        $this->user = User::factory()->create(['role' => 'admin']);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]

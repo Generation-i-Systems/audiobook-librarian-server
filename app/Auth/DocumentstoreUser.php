@@ -158,7 +158,9 @@ class DocumentstoreUser implements Authenticatable
      */
     public function isAdmin(): bool
     {
-        return ($this->userData['role'] ?? 'user') === 'admin';
+        $role = $this->userData['role'] ?? 'user';
+
+        return in_array($role, ['admin', 'super-admin'], true);
     }
 
     /**

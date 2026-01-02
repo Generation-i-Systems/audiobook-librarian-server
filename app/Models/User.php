@@ -54,6 +54,13 @@ class User extends Authenticatable
         'password' => 'hashed',
     ];
 
+    public function getIsAdminAttribute(): bool
+    {
+        $role = $this->role ?? 'user';
+
+        return in_array($role, ['admin', 'super-admin'], true);
+    }
+
     public function books(): BelongsToMany
     {
         return $this->belongsToMany(Book::class)->withPivot('progress', 'last_listened')->withTimestamps();

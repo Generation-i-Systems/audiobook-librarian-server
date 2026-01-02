@@ -14,10 +14,13 @@ abstract class TestCase extends BaseTestCase
      */
     protected function setUp(): void
     {
-        // CRITICAL: Run database safety check BEFORE any test
-        $this->ensureDatabaseSafety();
+        // CRITICAL: Run database safety check BEFORE any test (pre-bootstrap)
+        $this->ensureDatabaseSafetyPreBootstrap();
 
         parent::setUp();
+
+        // CRITICAL: Verify runtime DB connection is safe (post-bootstrap)
+        $this->ensureDatabaseSafetyRuntime();
 
         $connection = DB::connection();
         while ($connection->transactionLevel() > 0) {
@@ -56,7 +59,7 @@ abstract class TestCase extends BaseTestCase
      * This method runs before EVERY test to ensure tests are using SQLite,
      * not MySQL. This prevents database wipes even when running tests by name.
      */
-    private function ensureDatabaseSafety(): void
+    private function ensureDatabaseSafetyPreBootstrap(): void
     {
         // Check .env.testing file exists and has correct settings
         $envTestingPath = __DIR__ . '/../.env.testing';
@@ -97,6 +100,25 @@ abstract class TestCase extends BaseTestCase
             throw new \RuntimeException(
                 "CRITICAL SAFETY FAILURE: .env.testing does not contain DOCUMENT_STORE_DRIVER=sqlite! " .
                 "DocumentStore should use SQLite in tests. Database wipe prevented."
+            );
+        }
+    }
+
+    private function ensureDatabaseSafetyRuntime(): void
+    {
+        $dbConnection = config('database.default');
+        if ($dbConnection !== 'sqlite') {
+            throw new \RuntimeException(
+                "CRITICAL SAFETY FAILURE: runtime database.default is not sqlite (got '{$dbConnection}'). " .
+                'Tests must never use MySQL. Database wipe prevented.'
+            );
+        }
+
+        $driverName = DB::connection()->getDriverName();
+        if ($driverName !== 'sqlite') {
+            throw new \RuntimeException(
+                "CRITICAL SAFETY FAILURE: runtime DB driver is not sqlite (got '{$driverName}'). " .
+                'Tests must never use MySQL. Database wipe prevented.'
             );
         }
     }
