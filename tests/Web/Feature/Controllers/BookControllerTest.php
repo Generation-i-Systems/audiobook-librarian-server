@@ -187,7 +187,7 @@ class BookControllerTest extends TestCase
     {
         $bookId = 'existing-book-id';
         $this->documentStoreServiceMock->shouldReceive('getBook')->with($bookId)->andReturn(['id' => $bookId]);
-        $this->documentStoreServiceMock->shouldReceive('deleteBook')->with($bookId)->once()->andReturn(true);
+        $this->documentStoreServiceMock->shouldReceive('deleteBook')->with($bookId, true)->once()->andReturn(true);
 
         $response = $this->delete(route('admin.books.destroy', $bookId));
 
