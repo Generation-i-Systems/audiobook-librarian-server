@@ -948,6 +948,8 @@ class BookImportService
         if (!isset($options['include_title_in_path']) || $options['include_title_in_path'] !== false) {
             $title = $book->title;
 
+            $plainTitle = $book->title;
+
             // If we have a series number, prefix it to the title
             if (!empty($seriesNumber)) {
                 $formattedNumber = str_pad($seriesNumber, 2, '0', STR_PAD_LEFT);
@@ -957,12 +959,49 @@ class BookImportService
             $segments = explode('/', trim($path, '/'));
             $lastSegment = end($segments) ?: '';
 
-            if (strcasecmp($lastSegment, $title) !== 0) {
-                $path .= "/{$title}";
+            if (strcasecmp($lastSegment, $title) === 0) {
+                return $path;
             }
+
+            if (!empty($seriesNumber) && $this->lastPathSegmentMatchesTitle($lastSegment, $plainTitle)) {
+                array_pop($segments);
+                $segments[] = $title;
+
+                return '/' . implode('/', $segments);
+            }
+
+            if ($this->lastPathSegmentMatchesTitle($lastSegment, $plainTitle)) {
+                return $path;
+            }
+
+            $path .= "/{$title}";
         }
 
         return $path;
+    }
+
+    private function lastPathSegmentMatchesTitle(string $lastSegment, string $title): bool
+    {
+        $lastSegment = trim($lastSegment);
+        $title = trim($title);
+
+        if ($lastSegment === '' || $title === '') {
+            return false;
+        }
+
+        if (strcasecmp($lastSegment, $title) === 0) {
+            return true;
+        }
+
+        $normalize = static function (string $value): string {
+            $value = trim($value);
+            $value = preg_replace('/^0*\d+\s+/', '', $value) ?? $value;
+            $value = preg_replace('/\s+/', ' ', $value) ?? $value;
+
+            return mb_strtolower($value);
+        };
+
+        return $normalize($lastSegment) === $normalize($title);
     }
 
     /**

@@ -196,6 +196,31 @@ class BookImportServiceTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
+    public function generateTargetDirectoryDoesNotNestWhenDirectoryPathAlreadyEndsWithNumberedTitle(): void
+    {
+        $author = Author::create(['name' => 'Test Author']);
+        $genre = Genre::create(['name' => 'Science Fiction']);
+
+        $book = Book::create([
+            'title' => 'Neutron Solstice',
+            'directory_path' => 'Science Fiction/Test Author/03 Neutron Solstice',
+            'language' => 'en',
+        ]);
+
+        $book->authors()->attach($author);
+        $book->genres()->attach($genre);
+
+        $reflection = new \ReflectionClass($this->service);
+        $method = $reflection->getMethod('generateTargetDirectory');
+        $method->setAccessible(true);
+
+        $basePath = '/test/path';
+        $targetPath = $method->invoke($this->service, $book, $basePath);
+
+        $this->assertSame('/test/path/Science Fiction/Test Author/03 Neutron Solstice', $targetPath);
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
     public function getAuthorPreferredGenreHandlesCommaSeparatedAuthorString(): void
     {
         $author1 = Author::create(['name' => 'First Author']);
