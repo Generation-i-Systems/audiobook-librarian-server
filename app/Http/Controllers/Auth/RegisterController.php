@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Http\Controllers\Auth;
 
 use App\Auth\DocumentstoreUser;
@@ -32,21 +34,16 @@ class RegisterController extends Controller
      */
     protected $redirectTo = '/home';
 
-
     /**
      * Create a new controller instance.
-     *
-     * @return void
      */
     protected NewUserRegistrationNotifier $registrationNotifier;
-
 
     public function __construct(NewUserRegistrationNotifier $registrationNotifier)
     {
         $this->middleware('guest');
         $this->registrationNotifier = $registrationNotifier;
     }
-
 
     /**
      * Get a validator for an incoming registration request.
@@ -62,8 +59,9 @@ class RegisterController extends Controller
                 'string',
                 'email',
                 'max:255',
-                function ($attribute, $value, $fail) {
+                function ($attribute, $value, $fail): void {
                     $documentStore = app(\App\Contracts\DocumentStoreServiceInterface::class);
+
                     if ($documentStore->userExistsByEmail($value)) {
                         $fail('The email has already been taken.');
                     }
@@ -74,8 +72,9 @@ class RegisterController extends Controller
                 'string',
                 'max:255',
                 'unique:users,username',
-                function ($attribute, $value, $fail) {
+                function ($attribute, $value, $fail): void {
                     $documentStore = app(\App\Contracts\DocumentStoreServiceInterface::class);
+
                     if ($documentStore->userExistsByUsername($value)) {
                         $fail('The username has already been taken.');
                     }
@@ -84,7 +83,6 @@ class RegisterController extends Controller
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
     }
-
 
     /**
      * Create a new user instance after a valid registration.
@@ -121,17 +119,15 @@ class RegisterController extends Controller
             return new DocumentstoreUser($completeUserData);
         } catch (\Exception $e) {
             Log::error('Error creating user: ' . $e->getMessage());
+
             throw $e; // Let the exception bubble up to be handled by Laravel
         }
     }
 
-
     /**
-     * Notify admins about a new user registration
-     *
-     * @return void
+     * Notify admins about a new user registration.
      */
-    protected function notifyAdminsAboutNewUser(DocumentStoreServiceInterface $documentStore, array $userData)
+    protected function notifyAdminsAboutNewUser(DocumentStoreServiceInterface $documentStore, array $userData): void
     {
         try {
             // Get all admin users

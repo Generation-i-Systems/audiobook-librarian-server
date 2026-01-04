@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Http\Controllers\Auth;
 
 use App\Auth\DocumentstoreUser;
@@ -30,7 +32,6 @@ class LoginController extends Controller
 
     protected NewUserRegistrationNotifier $registrationNotifier;
 
-
     public function __construct(DocumentStoreServiceInterface $documentStoreService, NewUserRegistrationNotifier $registrationNotifier)
     {
         $this->documentStoreService = $documentStoreService;
@@ -39,7 +40,6 @@ class LoginController extends Controller
         $this->middleware('auth')->only('logout');
     }
 
-
     /**
      * Allow login with either email or username.
      */
@@ -47,7 +47,6 @@ class LoginController extends Controller
     {
         return 'login';
     }
-
 
     /**
      * Get the needed authorization credentials from the request.
@@ -65,7 +64,6 @@ class LoginController extends Controller
         ];
     }
 
-
     /**
      * Where to redirect users after login.
      *
@@ -76,14 +74,14 @@ class LoginController extends Controller
     /**
      * Create a new controller instance.
      *
-     * @return void
+     * @param mixed $user
      */
-
 
     /**
      * Called after user is authenticated.
      *
-     * @param  mixed  $user
+     * @param mixed $user
+     *
      * @return \Illuminate\Http\Response|\Illuminate\Http\RedirectResponse
      */
     protected function authenticated(\Illuminate\Http\Request $request, $user)
@@ -101,7 +99,6 @@ class LoginController extends Controller
         return redirect()->intended($this->redirectPath());
     }
 
-
     /**
      * Redirect the user to the Google authentication page.
      */
@@ -109,7 +106,6 @@ class LoginController extends Controller
     {
         return Socialite::driver('google')->redirect();
     }
-
 
     /**
      * Obtain the user information from Google.
@@ -126,7 +122,7 @@ class LoginController extends Controller
             return redirect('/login')->withErrors(['google' => 'Unable to login with Google. Please try again.']);
         }
 
-        if (!$googleUser->getEmail()) {
+        if (! $googleUser->getEmail()) {
             return redirect('/login')->withErrors(['google' => 'No email provided by Google.']);
         }
 
@@ -137,7 +133,7 @@ class LoginController extends Controller
             $isNewUser = false;
 
             // Create or update user
-            if (!$existingUserArr) {
+            if (! $existingUserArr) {
                 // Create new unverified user treated as a registration
                 $baseName = $googleUser->getName() ?? $googleUser->getNickname() ?? explode('@', $googleUser->getEmail())[0];
                 $username = explode('@', $googleUser->getEmail())[0];
@@ -170,7 +166,7 @@ class LoginController extends Controller
                 Log::info('Existing user updated via Google login', ['user_id' => $userId]);
             }
 
-            if (!$userId) {
+            if (! $userId) {
                 throw new \Exception('Failed to get user ID after create/update.');
             }
 
@@ -195,9 +191,8 @@ class LoginController extends Controller
 
             Log::debug('Auth state immediately after login', [
                 'auth_check' => Auth::check(),
-                'auth_user_data' => Auth::user() ? Auth::user()->getRawUser() : null
+                'auth_user_data' => Auth::user() ? Auth::user()->getRawUser() : null,
             ]);
-
 
             Log::info('User logged in via Google', [
                 'user_id' => $user->getAuthIdentifier(),
@@ -215,10 +210,10 @@ class LoginController extends Controller
             return redirect('/login')
                 ->withErrors([
                     'google' => 'An error occurred during authentication. Please try again or contact support.',
-                ]);
+                ])
+            ;
         }
     }
-
 
     /**
      * Log the user out of the application.
