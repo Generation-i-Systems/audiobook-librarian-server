@@ -44,7 +44,7 @@ return [
     ],
 
     'audiobook_bay' => [
-        'base_url' => env('AUDIOBOOK_BAY_BASE_URL', 'https://audiobookbay.lu'),
+        'base_url' => env('AUDIOBOOK_BAY_BASE_URL'),
         'username' => env('AUDIOBOOK_BAY_USERNAME'),
         'password' => env('AUDIOBOOK_BAY_PASSWORD'),
         'user_agent' => env('AUDIOBOOK_BAY_USER_AGENT', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' .
