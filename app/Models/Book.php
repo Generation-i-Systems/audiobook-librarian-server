@@ -10,6 +10,34 @@ use App\Relations\TouchesParentBelongsToMany;
 use App\Traits\CamelCaseAttributeAccess;
 use App\Traits\Auditable;
 
+/**
+ * @property int $id
+ * @property string|null $title
+ * @property string|null $description
+ * @property string|null $directoryPath
+ * @property string|null $coverImage
+ * @property string|null $language
+ * @property string|null $source
+ * @property string|null $asin
+ * @property bool $needsReview
+ * @property array|null $needsReviewReasons
+ * @property int|null $duration
+ * @property int|null $audioFileCount
+ * @property array|null $audibleInfo
+ * @property array|null $googleBooksInfo
+ * @property array|null $hardcoverInfo
+ * @property array|null $audiobookBayInfo
+ * @property \App\Models\Publisher|null $publisher
+ * @property \Carbon\CarbonInterface|null $releaseDate
+ * @property \Carbon\CarbonInterface|null $createdAt
+ * @property \Carbon\CarbonInterface|null $updatedAt
+ * @property-read \Illuminate\Support\Collection|\Illuminate\Database\Eloquent\Collection<int, \App\Models\Author> $authors
+ * @property-read \Illuminate\Support\Collection|\Illuminate\Database\Eloquent\Collection<int, \App\Models\Narrator> $narrators
+ * @property-read \Illuminate\Support\Collection|\Illuminate\Database\Eloquent\Collection<int, \App\Models\Genre> $genres
+ * @property-read \Illuminate\Support\Collection|\Illuminate\Database\Eloquent\Collection<int, \App\Models\Series> $series
+ * @method static Book|null find(int|string $id)
+ * @method static \Illuminate\Database\Eloquent\Builder|Book where(string $column, $operator = null, $value = null, $boolean = 'and')
+ */
 class Book extends Model
 {
     use HasFactory;
