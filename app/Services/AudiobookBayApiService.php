@@ -657,6 +657,11 @@ class AudiobookBayApiService
         return $this;
     }
 
+    public function getBaseUrl(): string
+    {
+        return $this->baseUrl;
+    }
+
     /**
      * Set the cache TTL in seconds (inlined from BaseApiTrait)
      */
@@ -701,7 +706,7 @@ class AudiobookBayApiService
     public function __construct(array $config = [])
     {
         $this->serviceName = 'AudiobookBay';
-        $this->baseUrl = config('services.audiobook_bay.base_url', 'https://audiobookbay.lu');
+        $this->baseUrl = config('services.audiobook_bay.base_url');
 
         $this->username = $config['username'] ?? config('services.audiobook_bay.username');
         $this->password = $config['password'] ?? config('services.audiobook_bay.password');

@@ -12,20 +12,31 @@ class AudiobookBayCategoryScraperService
 {
     protected AudiobookBayApiService $apiService;
 
+    protected AudiobookBayService $audiobookBayService;
+
+    /**
+     * Map of category slugs to relative paths.
+     *
+     * @var array<string,string>
+     */
     protected array $categories = [
-        'sci-fi' => 'https://audiobookbay.lu/audio-books/sci-fi/',
-        'fantasy' => 'https://audiobookbay.lu/audio-books/fantasy/',
-        'litrpg' => 'https://audiobookbay.lu/audio-books/litrpg/',
+        'sci-fi' => 'audio-books/sci-fi',
+        'fantasy' => 'audio-books/fantasy',
+        'litrpg' => 'audio-books/litrpg',
     ];
 
-    public function __construct(AudiobookBayApiService $apiService)
-    {
+    public function __construct(
+        AudiobookBayApiService $apiService,
+        AudiobookBayService $audiobookBayService
+    ) {
         $this->apiService = $apiService;
+        $this->audiobookBayService = $audiobookBayService;
     }
 
     public function scrapeCategoryUntilLastSeen(string $category, ?string $lastSeenAbbId = null): array
     {
-        $categoryUrl = $this->categories[$category] ?? null;
+        $path = $this->categories[$category] ?? null;
+        $categoryUrl = $path ? $this->audiobookBayService->buildCategoryUrl($path) : null;
 
         if (!$categoryUrl) {
             Log::error('Invalid ABB category', ['category' => $category]);

@@ -19,6 +19,44 @@ class AudiobookBayService extends BaseBookService implements BookServiceInterfac
         $this->apiService = $apiService;
     }
 
+    public function getBaseUrl(): string
+    {
+        return $this->apiService->getBaseUrl();
+    }
+
+    public function buildSearchUrl(string $query): string
+    {
+        $normalized = trim(mb_strtolower($query));
+
+        if ($normalized === '') {
+            $normalized = 'audiobook';
+        }
+
+        return rtrim($this->getBaseUrl(), '/') . '/?s=' . urlencode($normalized);
+    }
+
+    public function buildDetailsUrl(string $identifier): string
+    {
+        if (filter_var($identifier, FILTER_VALIDATE_URL)) {
+            return $identifier;
+        }
+
+        $slug = trim($identifier, '/');
+
+        if ($slug === '') {
+            return rtrim($this->getBaseUrl(), '/');
+        }
+
+        return rtrim($this->getBaseUrl(), '/') . '/audiobook/' . $slug;
+    }
+
+    public function buildCategoryUrl(string $path): string
+    {
+        $trimmed = trim($path, '/');
+
+        return rtrim($this->getBaseUrl(), '/') . '/' . $trimmed . '/';
+    }
+
     /**
      * {@inheritDoc}
      */
