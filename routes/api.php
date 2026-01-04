@@ -14,7 +14,9 @@ use App\Http\Controllers\Api\MessageApiController;
 use App\Http\Controllers\Api\ProgressController;
 use App\Http\Controllers\Api\ReadingProgressApiController;
 use App\Http\Controllers\Api\ReadingStatsApiController;
+use App\Http\Controllers\Api\SkinController;
 use App\Http\Controllers\Api\StatisticsController;
+use App\Http\Controllers\Api\ThemeController;
 use App\Http\Controllers\Api\UserApiController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -26,6 +28,16 @@ Route::prefix('v1')->group(function () {
     Route::get('/health/validate', [ApiHealthController::class, 'validateSpec']);
 
     Route::get('/books/{book}/cover', [BookApiController::class, 'cover']);
+
+    // Public Skin Routes (no authentication required)
+    Route::get('/skins', [SkinController::class, 'index']);
+    Route::get('/skins/{id}', [SkinController::class, 'show']);
+    Route::get('/skins/{id}/download', [SkinController::class, 'download']);
+
+    // Public Theme Routes (no authentication required)
+    Route::get('/themes', [ThemeController::class, 'index']);
+    Route::get('/themes/{id}', [ThemeController::class, 'show']);
+    Route::get('/themes/{id}/download', [ThemeController::class, 'download']);
 
     Route::middleware(['api.auth', 'standard'])->group(function () {
         Route::get('/user', function (Request $request) {
@@ -160,6 +172,22 @@ Route::prefix('v1')->group(function () {
         Route::get('/favorites/{favorite}', [FavoriteAuthorController::class, 'show'])->name('api.favorites.show');
         Route::put('/favorites/{favorite}', [FavoriteAuthorController::class, 'update'])->name('api.favorites.update');
         Route::delete('/favorites/{favorite}', [FavoriteAuthorController::class, 'destroy'])->name('api.favorites.destroy');
+
+        // Skin Routes (authenticated)
+        Route::post('/skins/upload', [SkinController::class, 'store']);
+        Route::post('/skins/{id}/rate', [SkinController::class, 'rate']);
+        Route::get('/skins/my-skins', [SkinController::class, 'mySkins']);
+        Route::post('/skins/{id}/fork', [SkinController::class, 'fork']);
+        Route::patch('/skins/{id}', [SkinController::class, 'update']);
+        Route::delete('/skins/{id}', [SkinController::class, 'destroy']);
+
+        // Theme Routes (authenticated)
+        Route::post('/themes/upload', [ThemeController::class, 'store']);
+        Route::post('/themes/{id}/rate', [ThemeController::class, 'rate']);
+        Route::get('/themes/my-themes', [ThemeController::class, 'myThemes']);
+        Route::post('/themes/{id}/fork', [ThemeController::class, 'fork']);
+        Route::patch('/themes/{id}', [ThemeController::class, 'update']);
+        Route::delete('/themes/{id}', [ThemeController::class, 'destroy']);
 
         // Message Route
         Route::post('/messages', [MessageApiController::class, 'store']);

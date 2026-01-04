@@ -1,7 +1,8 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Http\Controllers\Admin;
-use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\AdminNotificationController;
 use App\Http\Controllers\BookController;
 use App\Http\Controllers\FollowController;
@@ -10,13 +11,17 @@ use App\Http\Controllers\MessageController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReadingProgressController;
 use App\Http\Controllers\ReviewController;
+use App\Http\Controllers\SkinWebController;
+use App\Http\Controllers\ThemeWebController;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
 // --- EMERGENCY ROUTES ---
 // Emergency book routes that bypass memory-intensive models
 Route::get('/emergency/books', [App\Http\Controllers\EmergencyBookController::class, 'index'])
-    ->name('emergency.books.index');
+    ->name('emergency.books.index')
+;
 
 // --- DEBUG ROUTES (local only) ---
 if (app()->environment('local')) {
@@ -80,12 +85,13 @@ if (app()->environment('local')) {
             'user_provider' => config('auth.providers.users.driver'),
             'auth_guards' => config('auth.guards'),
             'auth_providers' => config('auth.providers'),
-            'user_model' => get_class($user),
+            'user_model' => $user::class,
             'user_attributes' => $user->toArray(),
         ];
 
         if (Auth::attempt($credentials)) {
             $user = Auth::user();
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Authentication successful',
@@ -98,22 +104,21 @@ if (app()->environment('local')) {
                 'session' => session()->all(),
                 'debug' => $debugInfo,
             ]);
-        } else {
-            // Add more detailed error information
-            $errorInfo = [
-                'auth_check' => Auth::check(),
-                'auth_user' => Auth::user() ? Auth::user()->only(['id', 'name', 'email']) : null,
-                'session_data' => session()->all(),
-                'debug' => $debugInfo,
-            ];
-
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Authentication failed',
-                'error' => 'Invalid credentials',
-                'details' => $errorInfo,
-            ], 401);
         }
+        // Add more detailed error information
+        $errorInfo = [
+            'auth_check' => Auth::check(),
+            'auth_user' => Auth::user() ? Auth::user()->only(['id', 'name', 'email']) : null,
+            'session_data' => session()->all(),
+            'debug' => $debugInfo,
+        ];
+
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Authentication failed',
+            'error' => 'Invalid credentials',
+            'details' => $errorInfo,
+        ], 401);
     });
 
     // Move all /debug/ routes to DebugController
@@ -131,14 +136,12 @@ if (app()->environment('local')) {
     Route::get('/debug/books-dump', [Admin\DebugController::class, 'booksDump']);
 
     // Debug database relationships
-    Route::get('/debug/relationships', function () {
-        return [
-            'author_book' => DB::table('author_book')->get(),
-            'book_narrator' => DB::table('book_narrator')->get(),
-            'book_genre' => DB::table('book_genre')->get(),
-            'books' => \App\Models\Book::with(['authors', 'narrators', 'genres'])->limit(5)->get(),
-        ];
-    });
+    Route::get('/debug/relationships', fn () => [
+        'author_book' => DB::table('author_book')->get(),
+        'book_narrator' => DB::table('book_narrator')->get(),
+        'book_genre' => DB::table('book_genre')->get(),
+        'books' => \App\Models\Book::with(['authors', 'narrators', 'genres'])->limit(5)->get(),
+    ]);
 }
 
 Route::get('/', function () {
@@ -146,6 +149,7 @@ Route::get('/', function () {
         if (Auth::user()->is_admin) {
             return redirect()->route('admin.books.index')->with('status', 'Welcome to Audiobook Librarian!');
         }
+
         return redirect()->route('books.index')->with('status', 'Welcome to Audiobook Librarian!');
     }
 
@@ -164,23 +168,21 @@ Route::get(
     [App\Http\Controllers\Auth\LoginController::class, 'handleGoogleCallback']
 );
 
-Route::get('/home', function () {
-    return redirect()->route('books.index')->with('status', 'Welcome to Audiobook Librarian!');
-})->name('home');
+Route::get('/home', fn () => redirect()->route('books.index')->with('status', 'Welcome to Audiobook Librarian!'))->name('home');
 
 // Documentation routes (public access)
-Route::prefix('docs')->group(function () {
+Route::prefix('docs')->group(function (): void {
     Route::get('/', [App\Http\Controllers\DocsController::class, 'index'])->name('docs.index');
     Route::get('/openapi.json', [App\Http\Controllers\DocsController::class, 'openapi'])->name('docs.openapi');
     Route::get('/{path?}', [App\Http\Controllers\DocsController::class, 'show'])->where('path', '.*')->name('docs.show');
 });
 
 // API docs routes (aliases)
-Route::prefix('api-docs')->group(function () {
+Route::prefix('api-docs')->group(function (): void {
     Route::get('/openapi.json', [App\Http\Controllers\DocsController::class, 'openapi'])->name('api-docs.openapi');
 });
 
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['auth'])->group(function (): void {
     Route::resource('books', BookController::class)->only(['index', 'show']);
     Route::get('/books/create', [
         \App\Http\Controllers\Admin\BookController::class,
@@ -223,9 +225,7 @@ Route::middleware(['auth'])->group(function () {
 Route::post('/messages', [MessageController::class, 'store'])->name('messages.store');
 
 // CSRF token refresh endpoint
-Route::get('/csrf-token', function () {
-    return response()->json(['csrf_token' => csrf_token()]);
-})->name('csrf.token');
+Route::get('/csrf-token', fn () => response()->json(['csrf_token' => csrf_token()]))->name('csrf.token');
 
 // Regular book routes (handled by the auth middleware group above)
 
@@ -250,48 +250,104 @@ Route::get('/google-books-cover/{encodedUrl}', [
 // Admin series autocomplete endpoint for book form (accessible to admin users)
 Route::get('/admin/series-autocomplete', [Admin\BookController::class, 'autocompleteSeries'])
     ->name('admin.series.autocomplete')
-    ->middleware(['auth', 'admin']);
+    ->middleware(['auth', 'admin'])
+;
 
-Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(function () {
+// Gallery Routes (Skins & Themes)
+Route::name('gallery.')->prefix('gallery')->group(function (): void {
+    // Skins
+    Route::name('skins.')->prefix('skins')->group(function (): void {
+        Route::get('/', [\App\Http\Controllers\SkinWebController::class, 'index'])->name('index');
+        Route::get('/create', [\App\Http\Controllers\SkinWebController::class, 'create'])->name('create');
+        Route::post('/', [\App\Http\Controllers\SkinWebController::class, 'store'])->name('store');
+        Route::get('/my-skins', [\App\Http\Controllers\SkinWebController::class, 'mySkins'])->name('my-skins');
+        Route::get('/{id}', [\App\Http\Controllers\SkinWebController::class, 'show'])->name('show');
+        Route::get('/{id}/edit', [\App\Http\Controllers\SkinWebController::class, 'edit'])->name('edit');
+        Route::put('/{id}', [\App\Http\Controllers\SkinWebController::class, 'update'])->name('update');
+        Route::delete('/{id}', [\App\Http\Controllers\SkinWebController::class, 'destroy'])->name('destroy');
+        Route::post('/{id}/fork', [\App\Http\Controllers\SkinWebController::class, 'fork'])->name('fork');
+        Route::post('/{id}/rate', [\App\Http\Controllers\SkinWebController::class, 'rate'])->name('rate');
+    });
+
+    // Themes
+    Route::name('themes.')->prefix('themes')->group(function (): void {
+        Route::get('/', [\App\Http\Controllers\ThemeWebController::class, 'index'])->name('index');
+        Route::get('/create', [\App\Http\Controllers\ThemeWebController::class, 'create'])->name('create');
+        Route::post('/', [\App\Http\Controllers\ThemeWebController::class, 'store'])->name('store');
+        Route::get('/my-themes', [\App\Http\Controllers\ThemeWebController::class, 'myThemes'])->name('my-themes');
+        Route::get('/{id}', [\App\Http\Controllers\ThemeWebController::class, 'show'])->name('show');
+        Route::get('/{id}/edit', [\App\Http\Controllers\ThemeWebController::class, 'edit'])->name('edit');
+        Route::put('/{id}', [\App\Http\Controllers\ThemeWebController::class, 'update'])->name('update');
+        Route::delete('/{id}', [\App\Http\Controllers\ThemeWebController::class, 'destroy'])->name('destroy');
+        Route::post('/{id}/fork', [\App\Http\Controllers\ThemeWebController::class, 'fork'])->name('fork');
+        Route::post('/{id}/rate', [\App\Http\Controllers\ThemeWebController::class, 'rate'])->name('rate');
+    });
+});
+
+Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(function (): void {
     Route::any('/adminer/{any?}', [Admin\AdminerController::class, 'handle'])->where('any', '.*')->name('adminer');
     // NEW ROUTE FOR DATABASE ADMIN PAGE
     Route::get('/database', [Admin\AdminerController::class, 'index'])->name('database');
-    Route::get('/', function () {
-        return redirect()->route('admin.books.index');
-    });
-    // Needs review books listing
+    Route::get('/', fn () => redirect()->route('admin.books.index'));
+    // Library repair + needs review dashboards
     Route::get('/needs-review', [Admin\NeedsReviewController::class, 'index'])
-        ->name('needs_review.index');
+        ->name('needs_review.index')
+    ;
+    Route::get('/library-repair', [Admin\LibraryRepairController::class, 'index'])
+        ->name('library-repair.index')
+    ;
+    Route::post('/library-repair/{issue}/resolve', [Admin\LibraryRepairController::class, 'resolve'])
+        ->name('library-repair.resolve')
+    ;
+    Route::post('/library-repair/{issue}/rescan', [Admin\LibraryRepairController::class, 'rescan'])
+        ->name('library-repair.rescan')
+    ;
+    Route::post('/library-repair/{issue}/import-missing', [Admin\LibraryRepairController::class, 'importMissingDirectory'])
+        ->name('library-repair.import-missing')
+    ;
     Route::post('/books/resync-from-path', [Admin\BookController::class, 'resyncFromPath'])
-        ->name('books.resyncFromPath');
+        ->name('books.resyncFromPath')
+    ;
 
     // AI Query routes
     Route::post('/ai-query/process', [Admin\AIQueryController::class, 'process'])
-        ->name('ai-query.process');
+        ->name('ai-query.process')
+    ;
     Route::get('/ai-query/results/{queryId}', [Admin\AIQueryController::class, 'results'])
-        ->name('ai-query.results');
+        ->name('ai-query.results')
+    ;
     Route::post('/ai-query/apply-bulk-update', [Admin\AIQueryController::class, 'applyBulkUpdate'])
-        ->name('ai-query.apply-bulk-update');
+        ->name('ai-query.apply-bulk-update')
+    ;
     Route::post('/ai-query/execute-custom', [Admin\AIQueryController::class, 'executeCustom'])
-        ->name('ai-query.execute-custom');
+        ->name('ai-query.execute-custom')
+    ;
     Route::post('/ai-query/edit-prompt', [Admin\AIQueryController::class, 'editPrompt'])
-        ->name('ai-query.edit-prompt');
+        ->name('ai-query.edit-prompt')
+    ;
 
     // Directory validation routes
     Route::get('/directory-validation', [Admin\DirectoryValidationController::class, 'index'])
-        ->name('directory-validation');
+        ->name('directory-validation')
+    ;
     Route::post('/directory-validation/rescan', [Admin\DirectoryValidationController::class, 'rescan'])
-        ->name('directory-validation.rescan');
+        ->name('directory-validation.rescan')
+    ;
     Route::post('/directory-validation/rename', [Admin\DirectoryValidationController::class, 'renameDirectory'])
-        ->name('directory-validation.rename');
+        ->name('directory-validation.rename')
+    ;
     Route::delete('/directory-validation/delete-book', [Admin\DirectoryValidationController::class, 'deleteBook'])
-        ->name('directory-validation.delete-book');
+        ->name('directory-validation.delete-book')
+    ;
     Route::post('/directory-validation/import', [Admin\DirectoryValidationController::class, 'importOrphanedDirectory'])
-        ->name('directory-validation.import');
+        ->name('directory-validation.import')
+    ;
     Route::delete('/directory-validation/delete-orphan', [Admin\DirectoryValidationController::class, 'deleteOrphanedDirectory'])
-        ->name('directory-validation.delete-orphan');
+        ->name('directory-validation.delete-orphan')
+    ;
     Route::post('/directory-validation/rename-orphan', [Admin\DirectoryValidationController::class, 'renameOrphanedDirectory'])
-        ->name('directory-validation.rename-orphan');
+        ->name('directory-validation.rename-orphan')
+    ;
 
     Route::post(
         '/users/{user}/update-role',
@@ -301,7 +357,7 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::get('/books/import-file', [Admin\BookController::class, 'importFile'])->name('books.importFile');
 
     // Import file browser routes
-    Route::prefix('import')->group(function () {
+    Route::prefix('import')->group(function (): void {
         Route::get('roots', [
             \App\Http\Controllers\Admin\ImportFileController::class,
             'roots',
@@ -464,10 +520,11 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     // User management
     Route::resource('users', Admin\UserController::class);
     Route::post('users/{id}/verify', [Admin\UserController::class, 'verify'])
-        ->name('users.verify');
+        ->name('users.verify')
+    ;
 
     // Queue management (admin only)
-    Route::middleware(['auth', 'admin'])->group(function () {
+    Route::middleware(['auth', 'admin'])->group(function (): void {
         Route::get('/queue', [Admin\QueueController::class, 'index'])->name('queue.index');
         Route::get('/queue/list', [Admin\QueueController::class, 'list']);
         Route::post('/queue/remove/{id}', [Admin\QueueController::class, 'remove']);
@@ -495,7 +552,6 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         '/messages/{messageId}/acknowledge',
         [Admin\MessageController::class, 'acknowledge']
     )->name('messages.acknowledge');
-
 
     // Job management
     Route::get('/jobs', [
@@ -544,4 +600,35 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::delete('/trash/{id}', [Admin\TrashController::class, 'destroy'])->name('trash.destroy');
     Route::delete('/trash', [Admin\TrashController::class, 'destroyAll'])->name('trash.destroyAll');
     Route::post('/trash/cleanup', [Admin\TrashController::class, 'applyAutoCleanup'])->name('trash.cleanup');
+});
+
+// Gallery Routes (Skins & Themes)
+Route::name('gallery.')->prefix('gallery')->group(function (): void {
+    // Skin Routes
+    Route::name('skins.')->prefix('skins')->group(function (): void {
+        Route::get('/', [SkinWebController::class, 'index'])->name('index');
+        Route::get('/create', [SkinWebController::class, 'create'])->name('create');
+        Route::post('/', [SkinWebController::class, 'store'])->name('store');
+        Route::get('/my-skins', [SkinWebController::class, 'mySkins'])->name('my-skins');
+        Route::get('/{id}', [SkinWebController::class, 'show'])->name('show');
+        Route::get('/{id}/edit', [SkinWebController::class, 'edit'])->name('edit');
+        Route::put('/{id}', [SkinWebController::class, 'update'])->name('update');
+        Route::delete('/{id}', [SkinWebController::class, 'destroy'])->name('destroy');
+        Route::post('/{id}/fork', [SkinWebController::class, 'fork'])->name('fork');
+        Route::post('/{id}/rate', [SkinWebController::class, 'rate'])->name('rate');
+    });
+
+    // Theme Routes
+    Route::name('themes.')->prefix('themes')->group(function (): void {
+        Route::get('/', [ThemeWebController::class, 'index'])->name('index');
+        Route::get('/create', [ThemeWebController::class, 'create'])->name('create');
+        Route::post('/', [ThemeWebController::class, 'store'])->name('store');
+        Route::get('/my-themes', [ThemeWebController::class, 'myThemes'])->name('my-themes');
+        Route::get('/{id}', [ThemeWebController::class, 'show'])->name('show');
+        Route::get('/{id}/edit', [ThemeWebController::class, 'edit'])->name('edit');
+        Route::put('/{id}', [ThemeWebController::class, 'update'])->name('update');
+        Route::delete('/{id}', [ThemeWebController::class, 'destroy'])->name('destroy');
+        Route::post('/{id}/fork', [ThemeWebController::class, 'fork'])->name('fork');
+        Route::post('/{id}/rate', [ThemeWebController::class, 'rate'])->name('rate');
+    });
 });

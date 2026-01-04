@@ -36,7 +36,7 @@ class CheckAdminRole
         $user = Auth::user();
         $documentStore = app(\App\Contracts\DocumentStoreServiceInterface::class);
 
-        if (!$documentStore->isAdmin(Auth::id())) {
+        if (!$documentStore->isAdmin((string) Auth::id())) {
             Log::warning('Admin access denied: User lacks admin role', [
                 'ip' => $clientIp,
                 'user_agent' => $userAgent,

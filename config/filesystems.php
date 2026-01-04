@@ -69,6 +69,23 @@ return [
             'throw' => false,
         ],
 
+        'skins' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private/skins'),
+            'visibility' => 'private',
+            'throw' => false,
+            'report' => false,
+        ],
+
+        'skin_previews' => [
+            'driver' => 'local',
+            'root' => storage_path('app/public/skin-previews'),
+            'url' => env('APP_URL') . '/storage/skin-previews',
+            'visibility' => 'public',
+            'throw' => false,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

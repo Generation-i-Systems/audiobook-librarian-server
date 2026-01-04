@@ -1,5 +1,4 @@
 <?php
-use Illuminate\Support\Facades\Route;
 ?>
 <!doctype html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
@@ -83,6 +82,9 @@ use Illuminate\Support\Facades\Route;
                                     <a class="nav-link" style="color:white" href="{{ route('admin.books.index') }}">Books</a>
                                 </li>
                                 <li class="nav-item">
+                                    <a class="nav-link" style="color:white" href="{{ route('admin.library-repair.index') }}">Library Repair</a>
+                                </li>
+                                <li class="nav-item">
                                     <a class="nav-link" style="color:white" href="{{ route('admin.series.manage') }}">Manage Series</a>
                                 </li>
                                 <li class="nav-item">
@@ -105,6 +107,14 @@ use Illuminate\Support\Facades\Route;
                                     <a class="nav-link" style="color:white"
                                         href="{{ route('books.index') }}">{{ __('Books') }}</a>
                                 </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" style="color:white"
+                                        href="{{ route('gallery.skins.index') }}">{{ __('Skins') }}</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" style="color:white"
+                                        href="{{ route('gallery.themes.index') }}">{{ __('Themes') }}</a>
+                                </li>
                             @endif
                         @endauth
                     </ul>
@@ -113,13 +123,13 @@ use Illuminate\Support\Facades\Route;
                     <ul class="navbar-nav ms-auto">
                         <!-- Authentication Links -->
                         @guest
-                            @if (Route::has('login'))
+                            @if (\Illuminate\Support\Facades\Route::has('login'))
                                 <li class="nav-item">
                                     <a class="nav-link" style="color:white" href="{{ route('login') }}">{{ __('Login') }}</a>
                                 </li>
                             @endif
 
-                            @if (Route::has('register'))
+                            @if (\Illuminate\Support\Facades\Route::has('register'))
                                 <li class="nav-item">
                                     <a class="nav-link" style="color:white"
                                         href="{{ route('register') }}">{{ __('Register') }}</a>
