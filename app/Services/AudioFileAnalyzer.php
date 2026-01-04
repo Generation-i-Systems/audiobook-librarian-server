@@ -2,12 +2,15 @@
 
 namespace App\Services;
 
+use App\Traits\IsolatesErrorHandlers;
 use getID3;
 use getid3_lib;
 use Illuminate\Support\Facades\Log;
 
 class AudioFileAnalyzer
 {
+    use IsolatesErrorHandlers;
+
     /**
      * @var getID3
      */
@@ -229,10 +232,7 @@ class AudioFileAnalyzer
                 }
 
                 // Use 'album_artist' for series if available, otherwise use 'album' only if we didn't use it for title
-                if (isset($comments['album_artist'][0])) {
-                    $metadata['series'] = $comments['album_artist'][0];
-                } elseif (isset($comments['album'][0]) && !isset($metadata['title'])) {
-                    // Only use album for series if we didn't already use it for title
+                if (isset($comments['album'][0])) {
                     $metadata['series'] = $comments['album'][0];
                 }
 
@@ -300,7 +300,7 @@ class AudioFileAnalyzer
 
             return null;
         } catch (\Exception $e) {
-            \Log::error('AudioFileAnalyzer: Failed to analyze audio file', [
+            Log::error('AudioFileAnalyzer: Failed to analyze audio file', [
                 'file' => $audioFile ?? $directory,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),

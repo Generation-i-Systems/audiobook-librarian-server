@@ -24,11 +24,13 @@ use App\Traits\BookImportTrait;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use App\Traits\IsolatesErrorHandlers;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\File;
 
 class ImportBooksFromDownloads extends Command
 {
+    use IsolatesErrorHandlers;
     use GenreMapping;
     use BookImportTrait;
     use ManualEnrichmentTrait;
@@ -1104,8 +1106,7 @@ class ImportBooksFromDownloads extends Command
             // Extract basic file metadata
             if (function_exists('getid3_analyze')) {
                 try {
-                    $getID3 = new \getID3();
-                    $fileInfo = $getID3->analyze($firstAudioFile);
+                    $fileInfo = $this->withHandlerIsolation(fn () => (new \getID3())->analyze($firstAudioFile));
 
                     $metadata = [
                         'title' => $fileInfo['tags']['id3v2']['title'][0] ?? basename($audiobook['path']),
@@ -5567,8 +5568,7 @@ class ImportBooksFromDownloads extends Command
         }
 
         try {
-            $getID3 = new \getID3();
-            $fileInfo = $getID3->analyze($filePath);
+            $fileInfo = $this->withHandlerIsolation(fn () => (new \getID3())->analyze($filePath));
 
             // Get duration from playtime_seconds if available
             if (isset($fileInfo['playtime_seconds'])) {

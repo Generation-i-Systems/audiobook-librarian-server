@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Services\AIBookProcessor;
+use App\Traits\IsolatesErrorHandlers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
@@ -12,6 +13,8 @@ use Illuminate\Support\Facades\Log;
 
 class ImportFileController extends Controller
 {
+    use IsolatesErrorHandlers;
+
     protected DocumentStoreServiceInterface $documentStoreService;
 
     public function __construct(DocumentStoreServiceInterface $documentStoreService)
@@ -858,8 +861,7 @@ class ImportFileController extends Controller
     {
         if (class_exists('getID3')) {
             try {
-                $getID3 = new \getID3();
-                $info = $getID3->analyze($filePath);
+                $info = $this->withHandlerIsolation(fn () => (new \getID3())->analyze($filePath));
 
                 Log::debug("[ImportFile] Analyzing file: {$filePath}");
 
