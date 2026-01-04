@@ -14,6 +14,9 @@ use App\Models\Narrator;
 use App\Models\Series;
 use App\Models\User;
 use App\Traits\HandlesLibraryJson;
+use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
@@ -24,6 +27,8 @@ use Illuminate\Support\Str;
 class MySqlService implements DocumentStoreServiceInterface
 {
     use HandlesLibraryJson;
+
+    private ?bool $libraryRepairIssuesTableExists = null;
 
     private function buildCoverImageOutput(?string $coverImage, ?string $directoryPath): ?string
     {
@@ -196,6 +201,222 @@ class MySqlService implements DocumentStoreServiceInterface
                 'trace' => $e->getTraceAsString(),
             ]);
             return [];
+        }
+    }
+
+    public function listLibraryRepairIssues(array $filters = [], int $limit = 50, int $page = 1): array
+    {
+        $query = $this->libraryRepairIssuesQuery();
+
+        if ($query === null) {
+            return [];
+        }
+
+        $limit = max(1, min($limit, 200));
+        $page = max(1, $page);
+
+        $issues = $this->applyLibraryRepairFilters(clone $query, $filters)
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->offset(($page - 1) * $limit)
+            ->get();
+
+        if ($issues->isEmpty()) {
+            return [];
+        }
+
+        $bookMap = $this->mapLibraryRepairBooks($issues);
+
+        return $issues
+            ->map(fn ($issue) => $this->formatLibraryRepairIssue($issue, $bookMap))
+            ->all();
+    }
+
+    public function countLibraryRepairIssues(array $filters = []): int
+    {
+        $query = $this->libraryRepairIssuesQuery();
+
+        if ($query === null) {
+            return 0;
+        }
+
+        return (int) $this->applyLibraryRepairFilters(clone $query, $filters)->count();
+    }
+
+    public function getLibraryRepairIssue(int $issueId): ?array
+    {
+        $query = $this->libraryRepairIssuesQuery();
+
+        if ($query === null) {
+            return null;
+        }
+
+        $record = $query->where('id', $issueId)->first();
+
+        if ($record === null) {
+            return null;
+        }
+
+        $bookMap = $this->mapLibraryRepairBooks(collect([$record]));
+
+        return $this->formatLibraryRepairIssue($record, $bookMap);
+    }
+
+    public function resolveLibraryRepairIssue(int $issueId, ?string $resolutionNotes = null): bool
+    {
+        $query = $this->libraryRepairIssuesQuery();
+
+        if ($query === null) {
+            return false;
+        }
+
+        $updated = DB::table('library_repair_issues')
+            ->where('id', $issueId)
+            ->update([
+                'status' => 'resolved',
+                'resolution_notes' => $resolutionNotes,
+                'resolved_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+        return $updated > 0;
+    }
+
+    private function libraryRepairIssuesQuery(): ?Builder
+    {
+        if ($this->libraryRepairIssuesTableExists === false) {
+            return null;
+        }
+
+        if ($this->libraryRepairIssuesTableExists === null) {
+            $this->libraryRepairIssuesTableExists = Schema::hasTable('library_repair_issues');
+
+            if (!$this->libraryRepairIssuesTableExists) {
+                Log::notice('library_repair_issues table is missing; skipping library repair queries.');
+
+                return null;
+            }
+        }
+
+        return DB::table('library_repair_issues');
+    }
+
+    private function applyLibraryRepairFilters(Builder $query, array $filters): Builder
+    {
+        if (!empty($filters['issue_type'])) {
+            $query->where('issue_type', $filters['issue_type']);
+        }
+
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        if (array_key_exists('auto_resolved', $filters) && $filters['auto_resolved'] !== '') {
+            $query->where('auto_resolved', (bool) $filters['auto_resolved']);
+        }
+
+        if (!empty($filters['book_id'])) {
+            $query->where('book_id', $filters['book_id']);
+        }
+
+        if (!empty($filters['search'])) {
+            $search = '%' . $filters['search'] . '%';
+            $query->where(function (Builder $builder) use ($search): void {
+                $builder
+                    ->where('directory_path', 'like', $search)
+                    ->orWhere('metadata', 'like', $search);
+            });
+        }
+
+        return $query;
+    }
+
+    private function mapLibraryRepairBooks(Collection $issues): array
+    {
+        $bookIds = $issues
+            ->map(fn ($issue) => $issue->book_id ?? $issue->bookId ?? null)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($bookIds)) {
+            return [];
+        }
+
+        return Book::query()
+            ->with(['authors:id,name'])
+            ->whereIn('id', $bookIds)
+            ->get()
+            ->mapWithKeys(function (Book $book): array {
+                return [
+                    $book->id => [
+                        'id' => (string) $book->id,
+                        'title' => $book->title ?? '',
+                        'directoryPath' => $book->directory_path,
+                        'authors' => $book->authors->pluck('name')->values()->all(),
+                    ],
+                ];
+            })
+            ->all();
+    }
+
+    private function formatLibraryRepairIssue(object|array $issue, array $bookMap): array
+    {
+        $issueArray = is_array($issue) ? $issue : (array) $issue;
+        $bookId = $issueArray['book_id'] ?? $issueArray['bookId'] ?? null;
+
+        return [
+            'id' => (int) ($issueArray['id'] ?? 0),
+            'issueType' => (string) ($issueArray['issue_type'] ?? $issueArray['issueType'] ?? 'unknown'),
+            'status' => (string) ($issueArray['status'] ?? 'pending'),
+            'directoryPath' => $issueArray['directory_path'] ?? $issueArray['directoryPath'] ?? null,
+            'metadata' => $this->parseLibraryRepairMetadata($issueArray['metadata'] ?? []),
+            'autoResolved' => (bool) ($issueArray['auto_resolved'] ?? $issueArray['autoResolved'] ?? false),
+            'createdAt' => $this->convertToIsoString($issueArray['created_at'] ?? $issueArray['createdAt'] ?? null),
+            'updatedAt' => $this->convertToIsoString($issueArray['updated_at'] ?? $issueArray['updatedAt'] ?? null),
+            'resolvedAt' => $this->convertToIsoString($issueArray['resolved_at'] ?? $issueArray['resolvedAt'] ?? null),
+            'resolutionNotes' => $issueArray['resolution_notes'] ?? $issueArray['resolutionNotes'] ?? null,
+            'book' => $bookId !== null ? ($bookMap[$bookId] ?? null) : null,
+        ];
+    }
+
+    private function parseLibraryRepairMetadata(mixed $metadata): array
+    {
+        if (is_array($metadata)) {
+            return $metadata;
+        }
+
+        if (is_string($metadata) && $metadata !== '') {
+            $decoded = json_decode($metadata, true);
+
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return [];
+    }
+
+    private function convertToIsoString(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if ($value instanceof Carbon) {
+            return $value->toIso8601String();
+        }
+
+        try {
+            return Carbon::parse($value)->toIso8601String();
+        } catch (\Throwable $throwable) {
+            Log::debug('Failed to parse date for library repair issue', [
+                'value' => $value,
+                'error' => $throwable->getMessage(),
+            ]);
+
+            return null;
         }
     }
 

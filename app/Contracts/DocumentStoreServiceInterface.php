@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Contracts;
 
 interface DocumentStoreServiceInterface
@@ -28,19 +30,20 @@ interface DocumentStoreServiceInterface
     public function findBookByDirectoryPath(string $directoryPath): ?array;
 
     /**
-     * List books with pagination and optional filtering
+     * List books with pagination and optional filtering.
      *
      * @param int $page Page number (1-based)
      * @param int $perPage Number of items per page
      * @param array $filters Optional filters (e.g., ['author' => 'John Doe', 'genre' => 'Fiction'])
      * @param bool $withRelated Whether to load related data (authors, series)
+     *
      * @return array [
-     *     'data' => array,  // The paginated list of books
-     *     'total' => int,   // Total number of books matching filters
-     *     'per_page' => int,// Number of items per page
-     *     'current_page' => int, // Current page number
-     *     'last_page' => int,    // Last available page number
-     * ]
+     *               'data' => array,  // The paginated list of books
+     *               'total' => int,   // Total number of books matching filters
+     *               'per_page' => int,// Number of items per page
+     *               'current_page' => int, // Current page number
+     *               'last_page' => int,    // Last available page number
+     *               ]
      */
     public function listBooks(int $page = 1, int $perPage = 24, array $filters = [], bool $withRelated = true, string $sort = 'title', string $order = 'asc', bool $includeAllBooks = false): array;
 
@@ -51,6 +54,7 @@ interface DocumentStoreServiceInterface
      * @param string|null $reason
      * @param int $limit
      * @param int $page
+     *
      * @return array
      */
     public function listNeedsReviewBooks(?string $reason = null, int $limit = 100, int $page = 1): array;
@@ -59,6 +63,7 @@ interface DocumentStoreServiceInterface
      * Count books needing review, optionally filtered by reason.
      *
      * @param string|null $reason
+     *
      * @return int
      */
     public function countNeedsReviewBooks(?string $reason = null): int;
@@ -71,28 +76,70 @@ interface DocumentStoreServiceInterface
     public function listNeedsReviewReasons(): array;
 
     /**
-     * Rename a series across all books
+     * List library repair issues with optional filters.
+     *
+     * @param array $filters
+     * @param int $limit
+     * @param int $page
+     *
+     * @return array
+     */
+    public function listLibraryRepairIssues(array $filters = [], int $limit = 50, int $page = 1): array;
+
+    /**
+     * Count the number of library repair issues that match the filters.
+     *
+     * @param array $filters
+     *
+     * @return int
+     */
+    public function countLibraryRepairIssues(array $filters = []): int;
+
+    /**
+     * Retrieve a single library repair issue.
+     *
+     * @param int $issueId
+     *
+     * @return array|null
+     */
+    public function getLibraryRepairIssue(int $issueId): ?array;
+
+    /**
+     * Resolve a library repair issue.
+     *
+     * @param int $issueId
+     * @param string|null $resolutionNotes
+     *
+     * @return bool
+     */
+    public function resolveLibraryRepairIssue(int $issueId, ?string $resolutionNotes = null): bool;
+
+    /**
+     * Rename a series across all books.
      *
      * @param string $oldName
      * @param string $newName
+     *
      * @return int Number of books updated
      */
     public function renameSeries(string $oldName, string $newName): int;
 
     /**
-     * Get recently added books
+     * Get recently added books.
      *
      * @param int $limit Maximum number of recent books to return
      * @param int $days Number of days to look back for recent books
+     *
      * @return array Array of recent books with related data
      */
     public function getRecentBooks(int $limit = 10, int $days = 30);
 
     /**
-     * Get unique values for a specific field across all books
+     * Get unique values for a specific field across all books.
      *
      * @param string $field The field to get unique values for (e.g., 'genre', 'author')
      * @param string $subField Optional subfield for nested data (e.g., 'seriesName' when field is 'series')
+     *
      * @return array Array of unique values
      */
     public function getUniqueValues(string $field, string $subField = null): array;
@@ -119,38 +166,43 @@ interface DocumentStoreServiceInterface
      *
      * @param mixed $user The user object
      * @param array $credentials The credentials to validate
+     *
      * @return bool
      */
     public function validateUserCredentials($user, array $credentials): bool;
 
     /**
-     * Get a user by their username
+     * Get a user by their username.
      *
      * @param string $username The username to search for
+     *
      * @return array|null The user data or null if not found
      */
     public function getUserByUsername(string $username): ?array;
 
     /**
-     * Get a user by their email address
+     * Get a user by their email address.
      *
      * @param string $email The email address to search for
+     *
      * @return array|null The user data or null if not found
      */
     public function getUserByEmail(string $email): ?array;
 
     /**
-     * Check if a user with the given email exists
+     * Check if a user with the given email exists.
      *
      * @param string $email The email address to check
+     *
      * @return bool True if a user with this email exists
      */
     public function userExistsByEmail(string $email): bool;
 
     /**
-     * Check if a user with the given username exists
+     * Check if a user with the given username exists.
      *
      * @param string $username The username to check
+     *
      * @return bool True if a user with this username exists
      */
     public function userExistsByUsername(string $username): bool;
@@ -170,12 +222,11 @@ interface DocumentStoreServiceInterface
      *
      * @param string $identifier The user's identifier
      * @param string $token The new remember token
-     * @return void
      */
     public function updateRememberToken(string $identifier, string $token): void;
 
     /**
-     * Get all users in the system
+     * Get all users in the system.
      *
      * @return array List of all users
      */
@@ -185,9 +236,10 @@ interface DocumentStoreServiceInterface
     public function createGenre(array $data);
 
     /**
-     * Get a genre by ID
+     * Get a genre by ID.
      *
      * @param string $id The genre ID
+     *
      * @return array|null The genre data or null if not found
      */
     public function getGenre(string $id): ?array;
@@ -197,10 +249,11 @@ interface DocumentStoreServiceInterface
     public function deleteGenre(string $id);
 
     /**
-     * Update a genre
+     * Update a genre.
      *
      * @param string $id The genre ID
      * @param array $data The updated genre data
+     *
      * @return bool True if the update was successful
      */
     public function updateGenre(string $id, array $data): bool;
@@ -239,18 +292,20 @@ interface DocumentStoreServiceInterface
     public function createAuthor(array $data);
 
     /**
-     * Get an author by ID
+     * Get an author by ID.
      *
      * @param string $id The author ID
+     *
      * @return array|null The author data or null if not found
      */
     public function getAuthor(string $id): ?array;
 
     /**
-     * Update an author
+     * Update an author.
      *
      * @param string $id The author ID
      * @param array $data The updated author data
+     *
      * @return bool True if the update was successful
      */
     public function updateAuthor(string $id, array $data): bool;
@@ -314,6 +369,7 @@ interface DocumentStoreServiceInterface
      *
      * @param string $primaryAuthorId
      * @param array $secondaryAuthorIds
+     *
      * @return int Number of affected books or relationships
      */
     public function mergeAuthors(string $primaryAuthorId, array $secondaryAuthorIds): int;
@@ -327,22 +383,23 @@ interface DocumentStoreServiceInterface
      *
      * @param string $primaryGenreId
      * @param array $secondaryGenreIds
+     *
      * @return int Number of affected books or relationships
      */
     public function mergeGenres(string $primaryGenreId, array $secondaryGenreIds): int;
 
     /**
-     * Search for authors by name
+     * Search for authors by name.
      */
     public function searchAuthorsByName(string $term): array;
 
     /**
-     * Search for narrators by name
+     * Search for narrators by name.
      */
     public function searchNarratorsByName(string $term): array;
 
     /**
-     * Search for genres by name
+     * Search for genres by name.
      */
     public function searchGenresByName(string $term): array;
 
@@ -350,54 +407,59 @@ interface DocumentStoreServiceInterface
     public function createMessage(array $messageData): ?string;
 
     /**
-     * Create an API token for a user
+     * Create an API token for a user.
      *
-     * @param array $tokenData The token data including user_id, token, etc.
+     * @param array $tokenData the token data including user_id, token, etc
+     *
      * @return string|null The token ID or null on failure
      */
     public function createApiToken(array $tokenData): ?string;
 
     /**
-     * Delete an API token by its value
+     * Delete an API token by its value.
      *
      * @param string $tokenValue The token value to delete
+     *
      * @return bool True if token was deleted, false otherwise
      */
     public function deleteApiTokenByValue(string $tokenValue): bool;
 
     /**
-     * Get all admin users
+     * Get all admin users.
      *
      * @return array List of admin users
      */
     public function getAdminUsers(): array;
 
     /**
-     * Check if a follow relationship exists
+     * Check if a follow relationship exists.
      *
      * @param string $userId The user ID
      * @param string $followableType The type of entity being followed (e.g., 'author', 'series')
      * @param string $followableId The ID of the entity being followed
+     *
      * @return bool True if the follow relationship exists, false otherwise
      */
     public function followExists(string $userId, string $followableType, string $followableId): bool;
 
     /**
-     * Create a new follow relationship
+     * Create a new follow relationship.
      *
      * @param string $userId The user ID who is following
      * @param string $followableType The type of entity being followed (e.g., 'author', 'series')
      * @param string $followableId The ID of the entity being followed
+     *
      * @return bool True if the follow was created successfully, false otherwise
      */
     public function createFollow(string $userId, string $followableType, string $followableId): bool;
 
     /**
-     * Delete a follow relationship
+     * Delete a follow relationship.
      *
      * @param string $userId The user ID who is following
      * @param string $followableType The type of entity being unfollowed (e.g., 'author', 'series')
      * @param string $followableId The ID of the entity being unfollowed
+     *
      * @return bool True if the unfollow was successful, false otherwise
      */
     public function deleteFollow(string $userId, string $followableType, string $followableId): bool;
@@ -407,23 +469,25 @@ interface DocumentStoreServiceInterface
     /**
      * Update a document in a specific collection.
      *
-     * @param string $collection The collection name.
-     * @param string $id The document ID.
-     * @param array $data The data to update.
-     * @return bool True on success, false on failure.
+     * @param string $collection the collection name
+     * @param string $id the document ID
+     * @param array $data the data to update
+     *
+     * @return bool true on success, false on failure
      */
     public function updateDocument(string $collection, string $id, array $data): bool;
 
     // JOBS
     /**
-     * List jobs with optional filtering and pagination
+     * List jobs with optional filtering and pagination.
      *
-     * @param  string|null  $type  Job type filter
-     * @param  string|null  $status  Job status filter
-     * @param  int  $limit  Maximum number of jobs to return
-     * @param  string  $orderBy  Field to order by
-     * @param  string  $direction  Sort direction (ASC or DESC)
-     * @param  string|null  $startAfterId  ID to start after (for pagination)
+     * @param string|null $type Job type filter
+     * @param string|null $status Job status filter
+     * @param int $limit Maximum number of jobs to return
+     * @param string $orderBy Field to order by
+     * @param string $direction Sort direction (ASC or DESC)
+     * @param string|null $startAfterId ID to start after (for pagination)
+     *
      * @return array List of jobs
      */
     public function listJobs(
@@ -435,58 +499,62 @@ interface DocumentStoreServiceInterface
         ?string $startAfterId = null
     ): array;
 
-
     /**
-     * Get the count of pending jobs
+     * Get the count of pending jobs.
      *
      * @return int Number of pending jobs
      */
     public function getJobCount(): int;
 
     /**
-     * Delete all jobs
+     * Delete all jobs.
      *
      * @return bool Success status
      */
     public function clearJobs(): bool;
 
     /**
-     * Check if a job exists for a specific directory path
+     * Check if a job exists for a specific directory path.
      *
      * @param string $directoryPath The directory path to check
+     *
      * @return bool True if a job exists for this directory path
      */
     public function jobExistsByDirectoryPath(string $directoryPath): bool;
 
     /**
-     * Check if a book exists with a specific directory path
+     * Check if a book exists with a specific directory path.
      *
      * @param string $directoryPath The directory path to check
+     *
      * @return bool True if a book exists with this directory path
      */
     public function bookExistsByDirectoryPath(string $directoryPath): bool;
 
     /**
-     * Delete a job by ID
+     * Delete a job by ID.
      *
      * @param string $jobId The job ID to delete
+     *
      * @return bool Success status
      */
     public function deleteJob(string $jobId): bool;
 
     /**
-     * Get a job by ID
+     * Get a job by ID.
      *
      * @param string $jobId The job ID
+     *
      * @return array|null The job data or null if not found
      */
     public function getJob(string $jobId): ?array;
 
     /**
-     * Update a job
+     * Update a job.
      *
      * @param string $jobId The job ID
      * @param array $data The updated job data
+     *
      * @return bool Success status
      */
     public function updateJob(string $jobId, array $data): bool;
@@ -494,7 +562,8 @@ interface DocumentStoreServiceInterface
     /**
      * Clean up old completed/failed jobs.
      *
-     * @param  int  $daysOld
+     * @param int $daysOld
+     *
      * @return int Number of deleted jobs
      */
     public function cleanupOldJobs(int $daysOld): int;
@@ -503,19 +572,21 @@ interface DocumentStoreServiceInterface
     public function getBookQueue(string $userId): array;
 
     /**
-     * Add a book to a user's queue
+     * Add a book to a user's queue.
      *
      * @param string $userId The user ID
      * @param string $bookId The book ID to add
+     *
      * @return bool Success status
      */
     public function addBookToQueue(string $userId, string $bookId): bool;
 
     /**
-     * Remove a book from a user's queue
+     * Remove a book from a user's queue.
      *
      * @param string $userId The user ID
      * @param string $bookId The book ID to remove
+     *
      * @return bool Success status
      */
     public function removeBookFromQueue(string $userId, string $bookId): bool;
@@ -526,7 +597,7 @@ interface DocumentStoreServiceInterface
     public function getBooksInSeries(string $seriesId): array;
 
     /**
-     * Get the manifest of contents for a book download
+     * Get the manifest of contents for a book download.
      */
     public function getManifestForBook(string $bookId): array;
 
@@ -540,61 +611,64 @@ interface DocumentStoreServiceInterface
 
     // BOOKMARKS
     /**
-     * Get all bookmarks for a user and book
+     * Get all bookmarks for a user and book.
      */
     public function getBookmarks(string $userId, string $bookId): array;
 
     /**
-     * Get a specific bookmark by ID, filtered by user and book
+     * Get a specific bookmark by ID, filtered by user and book.
      */
     public function getBookmark(string $bookmarkId, string $userId, string $bookId): ?array;
 
     /**
-     * Create a new bookmark
+     * Create a new bookmark.
      *
      * @return string Bookmark ID
      */
     public function createBookmark(array $data): string;
 
     /**
-     * Update a bookmark
+     * Update a bookmark.
      */
     public function updateBookmark(string $bookmarkId, array $data): bool;
 
     /**
-     * Delete a bookmark
+     * Delete a bookmark.
      */
     public function deleteBookmark(string $bookmarkId, string $userId, string $bookId): bool;
 
     // ACCOUNT REQUESTS
 
     /**
-     * Get pending account requests
+     * Get pending account requests.
      *
      * @return array List of pending account requests
      */
     public function getPendingAccountRequests(): array;
 
     /**
-     * Get a specific account request by ID
+     * Get a specific account request by ID.
      *
      * @param string $id The account request ID
+     *
      * @return array|null The account request data or null if not found
      */
     public function getAccountRequest(string $id): ?array;
 
     /**
-     * Approve an account request
+     * Approve an account request.
      *
      * @param string $id The account request ID
+     *
      * @return bool True if the request was approved successfully
      */
     public function approveAccountRequest(string $id): bool;
 
     /**
-     * Reject an account request
+     * Reject an account request.
      *
      * @param string $id The account request ID
+     *
      * @return bool True if the request was rejected successfully
      */
     public function rejectAccountRequest(string $id): bool;
@@ -604,9 +678,10 @@ interface DocumentStoreServiceInterface
     /**
      * Find or create multiple documents in a collection by name.
      *
-     * @param  string  $collection The collection name (e.g., 'authors', 'genres').
-     * @param  array  $names An array of names to find or create.
-     * @return array An array of document IDs.
+     * @param string $collection The collection name (e.g., 'authors', 'genres').
+     * @param array $names an array of names to find or create
+     *
+     * @return array an array of document IDs
      */
     public function findOrCreateMany(string $collection, array $names): array;
 

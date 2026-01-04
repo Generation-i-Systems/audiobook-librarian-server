@@ -8,6 +8,7 @@ use App\Console\Commands\ShowBookInfo;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Services\BookDeletionService;
 use App\Models\Book;
+use App\Models\Publisher;
 use App\Services\TerminalImageService;
 use Mockery;
 use PHPUnit\Framework\Attributes\Test;
@@ -37,12 +38,17 @@ class ShowBookInfoCommandTest extends TestCase
         };
 
         $bookDeletionService = $this->bookDeletionService;
-        $this->command = new class ($terminalImageService, $bookDeletionService) extends ShowBookInfo {
+        $bookModel = new Book();
+        $publisherModel = new Publisher();
+
+        $this->command = new class ($terminalImageService, $bookDeletionService, $bookModel, $publisherModel) extends ShowBookInfo {
             public function __construct(
                 TerminalImageService $terminalImageService,
-                BookDeletionService $bookDeletionService
+                BookDeletionService $bookDeletionService,
+                Book $bookModel,
+                Publisher $publisherModel
             ) {
-                parent::__construct($terminalImageService, $bookDeletionService);
+                parent::__construct($terminalImageService, $bookDeletionService, $bookModel, $publisherModel);
             }
 
             public function wrapTextPublic(string $text, int $maxWidth): string
