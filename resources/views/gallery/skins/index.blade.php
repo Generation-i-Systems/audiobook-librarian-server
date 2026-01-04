@@ -63,8 +63,8 @@
             @foreach($skins as $skin)
                 <div class="col-md-3 mb-4">
                     <div class="card h-100">
-                        @if(!empty($skin['preview_path']))
-                            <img src="{{ asset('storage/' . $skin['preview_path']) }}"
+                        @if(!empty($skin['previewPath'] ?? $skin['preview_path']))
+                            <img src="{{ asset('storage/' . ($skin['previewPath'] ?? $skin['preview_path'])) }}"
                                  class="card-img-top" alt="{{ $skin['name'] }}"
                                  style="height: 200px; object-fit: cover;">
                         @else
@@ -87,12 +87,12 @@
 
                             <div class="d-flex justify-content-between align-items-center mt-2">
                                 <small class="text-muted">
-                                    <i class="fas fa-download"></i> {{ $skin['download_count'] ?? 0 }}
+                                    <i class="fas fa-download"></i> {{ $skin['downloadCount'] ?? $skin['download_count'] ?? 0 }}
                                 </small>
                                 <small class="text-muted">
                                     <i class="fas fa-star"></i>
-                                    {{ number_format($skin['average_rating'] ?? 0, 1) }}
-                                    ({{ $skin['rating_count'] ?? 0 }})
+                                    {{ number_format($skin['averageRating'] ?? $skin['average_rating'] ?? 0, 1) }}
+                                    ({{ $skin['ratingCount'] ?? $skin['rating_count'] ?? 0 }})
                                 </small>
                             </div>
                         </div>

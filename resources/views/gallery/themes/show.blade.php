@@ -19,10 +19,10 @@
                 <p>{{ $theme['description'] }}</p>
             @endif
 
-            @if(!empty($theme['theme_data']))
+            @if(!empty($theme['themeData'] ?? $theme['theme_data']))
                 <h4>Theme Colors</h4>
                 <div class="row">
-                    @foreach($theme['theme_data'] as $key => $value)
+                    @foreach(($theme['themeData'] ?? $theme['theme_data']) as $key => $value)
                         @if(is_string($value) && str_starts_with($value, '#'))
                             <div class="col-md-4 mb-3">
                                 <div class="d-flex align-items-center">
@@ -44,7 +44,7 @@
                 </a>
 
                 @auth
-                    @if($theme['user_id'] == Auth::id())
+                    @if(($theme['user_id'] ?? $theme['userId'] ?? null) == Auth::id())
                         <a href="{{ route('gallery.themes.edit', $theme['id']) }}" class="btn btn-warning">
                             <i class="fas fa-edit"></i> Edit
                         </a>
@@ -68,10 +68,10 @@
             <div class="card mb-4">
                 <div class="card-body">
                     <h5>Stats</h5>
-                    <p><strong>Downloads:</strong> {{ $theme['download_count'] ?? 0 }}</p>
+                    <p><strong>Downloads:</strong> {{ $theme['downloadCount'] ?? $theme['download_count'] ?? 0 }}</p>
                     <p><strong>Rating:</strong>
-                        {{ number_format($theme['average_rating'] ?? 0, 1) }}/5.0
-                        ({{ $theme['rating_count'] ?? 0 }} ratings)
+                        {{ number_format($theme['averageRating'] ?? $theme['average_rating'] ?? 0, 1) }}/5.0
+                        ({{ $theme['ratingCount'] ?? $theme['rating_count'] ?? 0 }} ratings)
                     </p>
                 </div>
             </div>

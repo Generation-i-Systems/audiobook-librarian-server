@@ -14,8 +14,8 @@
                 </div>
             @endif
 
-            @if(!empty($skin['preview_path']))
-                <img src="{{ asset('storage/' . $skin['preview_path']) }}"
+            @if(!empty($skin['previewPath'] ?? $skin['preview_path']))
+                <img src="{{ asset('storage/' . ($skin['previewPath'] ?? $skin['preview_path'])) }}"
                      class="img-fluid mb-4" alt="{{ $skin['name'] }}">
             @endif
 
@@ -30,7 +30,7 @@
                 </a>
 
                 @auth
-                    @if($skin['user_id'] == Auth::id())
+                    @if(($skin['user_id'] ?? $skin['userId'] ?? null) == Auth::id())
                         <a href="{{ route('gallery.skins.edit', $skin['id']) }}" class="btn btn-warning">
                             <i class="fas fa-edit"></i> Edit
                         </a>
@@ -54,12 +54,12 @@
             <div class="card mb-4">
                 <div class="card-body">
                     <h5>Stats</h5>
-                    <p><strong>Downloads:</strong> {{ $skin['download_count'] ?? 0 }}</p>
+                    <p><strong>Downloads:</strong> {{ $skin['downloadCount'] ?? $skin['download_count'] ?? 0 }}</p>
                     <p><strong>Rating:</strong>
-                        {{ number_format($skin['average_rating'] ?? 0, 1) }}/5.0
-                        ({{ $skin['rating_count'] ?? 0 }} ratings)
+                        {{ number_format($skin['averageRating'] ?? $skin['average_rating'] ?? 0, 1) }}/5.0
+                        ({{ $skin['ratingCount'] ?? $skin['rating_count'] ?? 0 }} ratings)
                     </p>
-                    <p><strong>File Size:</strong> {{ number_format(($skin['file_size'] ?? 0) / 1024 / 1024, 2) }} MB</p>
+                    <p><strong>File Size:</strong> {{ number_format(($skin['fileSize'] ?? $skin['file_size'] ?? 0) / 1024 / 1024, 2) }} MB</p>
                 </div>
             </div>
         </div>

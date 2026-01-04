@@ -74,28 +74,31 @@
                                 <p class="card-text">{{ Str::limit($theme['description'], 100) }}</p>
                             @endif
 
-                            @if(!empty($theme['theme_data']))
+                            @php
+                                $themeData = $theme['themeData'] ?? $theme['theme_data'] ?? null;
+                            @endphp
+                            @if(!empty($themeData))
                                 <div class="d-flex gap-1 mb-2">
-                                    @if(!empty($theme['theme_data']['primary']))
-                                        <div style="width:20px;height:20px;background:{{ $theme['theme_data']['primary'] }};border:1px solid #ccc;"></div>
+                                    @if(!empty($themeData['primary']))
+                                        <div style="width:20px;height:20px;background:{{ $themeData['primary'] }};border:1px solid #ccc;"></div>
                                     @endif
-                                    @if(!empty($theme['theme_data']['accent']))
-                                        <div style="width:20px;height:20px;background:{{ $theme['theme_data']['accent'] }};border:1px solid #ccc;"></div>
+                                    @if(!empty($themeData['accent']))
+                                        <div style="width:20px;height:20px;background:{{ $themeData['accent'] }};border:1px solid #ccc;"></div>
                                     @endif
-                                    @if(!empty($theme['theme_data']['background']))
-                                        <div style="width:20px;height:20px;background:{{ $theme['theme_data']['background'] }};border:1px solid #ccc;"></div>
+                                    @if(!empty($themeData['background']))
+                                        <div style="width:20px;height:20px;background:{{ $themeData['background'] }};border:1px solid #ccc;"></div>
                                     @endif
                                 </div>
                             @endif
 
                             <div class="d-flex justify-content-between align-items-center mt-2">
                                 <small class="text-muted">
-                                    <i class="fas fa-download"></i> {{ $theme['download_count'] ?? 0 }}
+                                    <i class="fas fa-download"></i> {{ $theme['downloadCount'] ?? $theme['download_count'] ?? 0 }}
                                 </small>
                                 <small class="text-muted">
                                     <i class="fas fa-star"></i>
-                                    {{ number_format($theme['average_rating'] ?? 0, 1) }}
-                                    ({{ $theme['rating_count'] ?? 0 }})
+                                    {{ number_format($theme['averageRating'] ?? $theme['average_rating'] ?? 0, 1) }}
+                                    ({{ $theme['ratingCount'] ?? $theme['rating_count'] ?? 0 }})
                                 </small>
                             </div>
                         </div>
