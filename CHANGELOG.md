@@ -19,6 +19,10 @@
 - MockDocumentStoreService wiring and helpers for feature/unit tests so web auth, queue controllers, and import flows can run entirely in-memory without touching MySQL
 - Book edit page: needs_review_reasons now editable via checkboxes to keep or remove specific review flags
 - Book deletion now moves files to trash instead of permanent deletion
+- Library Repair enhancements:
+  - Added `NUMBERED_SUFFIX_DIRECTORY` detection plus per-issue rescans/imports and stale-issue cleanup
+  - Library Repair UI now defaults to pending issues, includes a “Show resolved” toggle, inline AudiobookBay links generated at render time, and replaces “Mark resolved” with targeted Rescan/Import actions
+  - MySqlService + controller/view now emit only minimal issue metadata and rebuild presentation details dynamically
 - BookDeletionService for unified deletion operations across web and CLI
 - Admin trash management page at /admin/trash with restore and permanent delete functionality
 - Trash auto-cleanup by age feature with configurable days threshold
@@ -31,6 +35,12 @@
 - Added `--no-multi-book` flag to `books:import-downloads` command to disable multi-book directory detection for the entire run
 - Added `^` suffix support for book directories to disable multi-book detection for specific directories (e.g., "Series Books 1-3^" won't be treated as multi-book)
 - Title parsing now automatically strips trailing colons from parsed directory names (manual edits preserve colons)
+- Introduced **Library Repair** system:
+  - `library:repair-scan` command detects missing/orphan/duplicate/nested directories (JSON output, per-issue filters, optional auto-fixes)
+  - Nightly scheduler entry runs the scan and logs to `storage/logs/library-repair.log`
+  - `/admin/library-repair` dashboard (linked in admin navbar) surfaces issues with filtering, pagination, AudiobookBay links, and resolve actions
+  - Library Repair issues automatically flag books for Needs Review; edit form now lets staff keep/clear reasons individually
+  - Comprehensive unit tests for `LibraryRepairService` + command ensure regressions are caught
 - User edit prompts now support single space (' ') input to clear a field instead of using the default value
 - Added `DocumentStoreServiceInterface::findBookByDirectoryPath()` for consistent directory-based lookups.
 

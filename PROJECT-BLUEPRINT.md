@@ -69,8 +69,12 @@ See `docs/requirements/reading-progress-and-stats.md`.
 - `Admin\BookFilesystemController`: admin filesystem AJAX endpoints (rename/move directory path helpers, directory browser helpers)
 - `BookFilesystemService`: filesystem operations for book directories (rename/list/browse) with document store updates
 - `FirestoreService`: list/search authors/series
+- `LibraryRepairService`: nightly scanner that detects missing/orphan/duplicate/nested/numbered-suffix directories, auto-fixes safe cases, and records issues with minimal metadata
+- `LibraryRepairScanCommand` (`library:repair-scan`): CLI entry point for manual or scheduled scans (JSON mode, selective issue filters, optional auto-fixes)
+- `Admin\LibraryRepairController` + `/admin/library-repair`: paginated UI for reviewing Library Repair Issues, defaulting to pending issues with a “Show resolved” toggle, inline book edit shortcuts, AudiobookBay search links, per-issue rescans, and missing-directory import helpers
 - **Web Routes:**
   - `/admin/books` (CRUD)
+  - `/admin/library-repair` (issue triage dashboard)
   - `/admin/books/create`, `/admin/books/{book}/edit`
   - `/admin/books/autocomplete/authors` (AJAX autocomplete)
   - `/admin/books/autocomplete/series` (AJAX autocomplete)
