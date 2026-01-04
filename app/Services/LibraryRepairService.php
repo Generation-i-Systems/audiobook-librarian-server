@@ -434,7 +434,7 @@ class LibraryRepairService
             ->having('total', '>', 1)
             ->pluck('total', 'directory_path');
 
-        $duplicatePaths = $duplicates->keys()->filter(fn($path) => (string) $path !== '');
+        $duplicatePaths = $duplicates->keys()->filter(fn ($path) => (string) $path !== '');
 
         foreach ($duplicatePaths as $path) {
             $books = Book::query()
@@ -462,7 +462,7 @@ class LibraryRepairService
         // Resolve duplicate issues that no longer apply
         $resolved += $this->resolveIssuesWhere(
             LibraryRepairIssueType::DUPLICATE_DIRECTORY,
-            fn(LibraryRepairIssue $issue) => !$duplicatePaths->contains($issue->directory_path),
+            fn (LibraryRepairIssue $issue) => !$duplicatePaths->contains($issue->directory_path),
             'Directory no longer referenced by multiple books.'
         );
 
@@ -482,7 +482,7 @@ class LibraryRepairService
         $dbPaths = Book::query()
             ->whereNotNull('directory_path')
             ->pluck('directory_path')
-            ->map(fn($path) => trim((string) $path, '/'))
+            ->map(fn ($path) => trim((string) $path, '/'))
             ->filter()
             ->values()
             ->all();
@@ -517,7 +517,7 @@ class LibraryRepairService
         // Resolve orphan issues for directories that no longer exist
         $resolved += $this->resolveIssuesWhere(
             LibraryRepairIssueType::ORPHAN_DIRECTORY,
-            fn(LibraryRepairIssue $issue) => !array_key_exists($issue->directory_path, $directoriesWithAudio),
+            fn (LibraryRepairIssue $issue) => !array_key_exists($issue->directory_path, $directoriesWithAudio),
             'Directory removed from disk or referenced by a book.'
         );
 
@@ -681,7 +681,7 @@ class LibraryRepairService
 
         $resolved += $this->resolveIssuesWhere(
             LibraryRepairIssueType::NUMBERED_SUFFIX_DIRECTORY,
-            fn(LibraryRepairIssue $issue) => !$activePaths->contains($issue->directory_path),
+            fn (LibraryRepairIssue $issue) => !$activePaths->contains($issue->directory_path),
             'Suffix directory no longer present.'
         );
 

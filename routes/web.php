@@ -135,7 +135,7 @@ if (app()->environment('local')) {
     Route::get('/debug/books-dump', [Admin\DebugController::class, 'booksDump']);
 
     // Debug database relationships
-    Route::get('/debug/relationships', fn() => [
+    Route::get('/debug/relationships', fn () => [
         'author_book' => DB::table('author_book')->get(),
         'book_narrator' => DB::table('book_narrator')->get(),
         'book_genre' => DB::table('book_genre')->get(),
@@ -167,7 +167,7 @@ Route::get(
     [App\Http\Controllers\Auth\LoginController::class, 'handleGoogleCallback']
 );
 
-Route::get('/home', fn() => redirect()
+Route::get('/home', fn () => redirect()
     ->route('books.index')
     ->with('status', 'Welcome to Audiobook Librarian!'))
     ->name('home');
@@ -237,7 +237,7 @@ Route::middleware(['auth'])->group(function (): void {
 Route::post('/messages', [MessageController::class, 'store'])->name('messages.store');
 
 // CSRF token refresh endpoint
-Route::get('/csrf-token', fn() => response()->json(['csrf_token' => csrf_token()]))->name('csrf.token');
+Route::get('/csrf-token', fn () => response()->json(['csrf_token' => csrf_token()]))->name('csrf.token');
 
 // Regular book routes (handled by the auth middleware group above)
 
@@ -299,7 +299,7 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::any('/adminer/{any?}', [Admin\AdminerController::class, 'handle'])->where('any', '.*')->name('adminer');
     // NEW ROUTE FOR DATABASE ADMIN PAGE
     Route::get('/database', [Admin\AdminerController::class, 'index'])->name('database');
-    Route::get('/', fn() => redirect()->route('admin.books.index'));
+    Route::get('/', fn () => redirect()->route('admin.books.index'));
     // Library repair + needs review dashboards
     Route::get('/needs-review', [Admin\NeedsReviewController::class, 'index'])
         ->name('needs_review.index');

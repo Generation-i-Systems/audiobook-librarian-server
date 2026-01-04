@@ -206,7 +206,7 @@ class LibraryRepairControllerTest extends TestCase
         $this->libraryRepairService->shouldReceive('rescanIssue')
             ->once()
             ->with(42)
-            ->andReturnUsing(fn() => [
+            ->andReturnUsing(fn () => [
                 'status' => 'resolved',
                 'message' => 'Issue resolved.',
             ])
@@ -227,7 +227,7 @@ class LibraryRepairControllerTest extends TestCase
         $this->libraryRepairService->shouldReceive('importMissingDirectoryIssue')
             ->once()
             ->with(55, '/tmp/example')
-            ->andReturnUsing(fn() => [
+            ->andReturnUsing(fn () => [
                 'status' => 'pending',
                 'message' => 'Import queued.',
             ])
