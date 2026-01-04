@@ -14,7 +14,6 @@ use Illuminate\Support\Facades\Log;
 class ImportFileController extends Controller
 {
     use IsolatesErrorHandlers;
-
     protected DocumentStoreServiceInterface $documentStoreService;
 
     public function __construct(DocumentStoreServiceInterface $documentStoreService)

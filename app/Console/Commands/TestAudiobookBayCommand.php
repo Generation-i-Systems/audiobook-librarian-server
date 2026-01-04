@@ -233,8 +233,7 @@ class TestAudiobookBayCommand extends Command
     protected function handleBookDetails(string $bookIdOrUrl, bool $debug = false): int
     {
         $getImages = $this->option('get-images');
-        // If it's not a full URL, assume it's just the ID
-        $url = filter_var($bookIdOrUrl, FILTER_VALIDATE_URL) ? $bookIdOrUrl : 'https://audiobookbay.lu/audiobook/' . $bookIdOrUrl;
+        $url = $this->audiobookBayService->buildDetailsUrl($bookIdOrUrl);
 
         $this->info('Fetching details from: ' . $url);
 

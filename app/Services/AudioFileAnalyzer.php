@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\Log;
 class AudioFileAnalyzer
 {
     use IsolatesErrorHandlers;
-
     /**
      * @var getID3
      */

@@ -15,7 +15,7 @@ class IsolatesErrorHandlersTest extends TestCase
     {
         $before = $this->peekErrorHandler();
 
-        $subject = new class {
+        $subject = new class () {
             use IsolatesErrorHandlers;
 
             public function run(callable $callback)
@@ -24,7 +24,7 @@ class IsolatesErrorHandlersTest extends TestCase
             }
         };
 
-        $leakyHandler = static fn(): bool => false;
+        $leakyHandler = static fn (): bool => false;
 
         $subject->run(static function () use ($leakyHandler): void {
             set_error_handler($leakyHandler);
@@ -40,7 +40,7 @@ class IsolatesErrorHandlersTest extends TestCase
     {
         $before = $this->peekExceptionHandler();
 
-        $subject = new class {
+        $subject = new class () {
             use IsolatesErrorHandlers;
 
             public function run(callable $callback)
@@ -49,7 +49,7 @@ class IsolatesErrorHandlersTest extends TestCase
             }
         };
 
-        $leakyHandler = static fn(\Throwable $throwable): never => throw $throwable;
+        $leakyHandler = static fn (\Throwable $throwable): never => throw $throwable;
 
         $subject->run(static function () use ($leakyHandler): void {
             set_exception_handler($leakyHandler);
@@ -62,7 +62,7 @@ class IsolatesErrorHandlersTest extends TestCase
 
     private function peekErrorHandler(): mixed
     {
-        $probe = static fn(): bool => false;
+        $probe = static fn (): bool => false;
         $previous = set_error_handler($probe);
         restore_error_handler();
 

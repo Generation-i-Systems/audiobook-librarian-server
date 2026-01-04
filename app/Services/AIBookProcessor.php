@@ -237,9 +237,6 @@ class AIBookProcessor
     {
         $this->client = new Client([
             'timeout' => 30,
-            'headers' => [
-                'Content-Type' => 'application/json',
-            ],
         ]);
 
         // Set default model and determine provider

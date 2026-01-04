@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
 use App\Contracts\DocumentStoreServiceInterface;
@@ -9,14 +11,13 @@ use App\Models\Bookmark;
 use App\Models\ExternalRead;
 use App\Models\Genre;
 use App\Models\Job;
+use App\Models\LibraryRepairIssue;
 use App\Models\Message;
 use App\Models\Narrator;
 use App\Models\Series;
 use App\Models\User;
 use App\Traits\HandlesLibraryJson;
-use Illuminate\Database\Query\Builder;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
@@ -37,6 +38,7 @@ class MySqlService implements DocumentStoreServiceInterface
         }
 
         $coverImage = trim($coverImage);
+
         if ($coverImage === '') {
             return null;
         }
@@ -46,11 +48,13 @@ class MySqlService implements DocumentStoreServiceInterface
         }
 
         $baseName = basename($coverImage);
+
         if ($baseName === '') {
             return null;
         }
 
         $directoryPath = is_string($directoryPath) ? trim($directoryPath, '/') : '';
+
         if ($directoryPath === '') {
             return $baseName;
         }
@@ -96,13 +100,11 @@ class MySqlService implements DocumentStoreServiceInterface
         }
 
         if (!empty($bookArray['series'])) {
-            $camelCasedBook['series'] = collect($bookArray['series'])->map(function ($series) {
-                return [
-                    'seriesName' => $series['name'] ?? null,
-                    'number' => $series['pivot']['series_number'] ?? null,
-                    'isCollection' => $series['is_collection'] ?? false,
-                ];
-            })->all();
+            $camelCasedBook['series'] = collect($bookArray['series'])->map(fn ($series) => [
+                'seriesName' => $series['name'] ?? null,
+                'number' => $series['pivot']['series_number'] ?? null,
+                'isCollection' => $series['is_collection'] ?? false,
+            ])->all();
         }
 
         // Handle cover image separately to ensure the key is correct
@@ -116,6 +118,7 @@ class MySqlService implements DocumentStoreServiceInterface
         // Map release_date to publishedYear (extract year if date is YYYY-01-01, otherwise keep full date)
         if (isset($bookArray['release_date'])) {
             $releaseDate = $bookArray['release_date'];
+
             if ($releaseDate && preg_match('/^(\d{4})-01-01(?:\s|T|$)/', $releaseDate, $matches)) {
                 // If the date is YYYY-01-01 (with or without time), just use the year
                 $camelCasedBook['publishedYear'] = (int) $matches[1];
@@ -131,6 +134,7 @@ class MySqlService implements DocumentStoreServiceInterface
     public function findBookByDirectoryPath(string $directoryPath): ?array
     {
         $directoryPath = trim($directoryPath, '/');
+
         if ($directoryPath === '') {
             return null;
         }
@@ -138,7 +142,8 @@ class MySqlService implements DocumentStoreServiceInterface
         $book = Book::query()
             ->select(['id', 'title', 'directory_path'])
             ->where('directory_path', $directoryPath)
-            ->first();
+            ->first()
+        ;
 
         if (!$book) {
             return null;
@@ -152,10 +157,11 @@ class MySqlService implements DocumentStoreServiceInterface
     }
 
     /**
-     * Get unique values for a specific field across all books
+     * Get unique values for a specific field across all books.
      *
      * @param string $field The field to get unique values for (e.g., 'genre', 'author')
      * @param string|null $subField Optional subfield for nested data (e.g., 'seriesName' when field is 'series')
+     *
      * @return array Array of unique values
      */
     public function getUniqueValues(string $field, ?string $subField = null): array
@@ -169,7 +175,8 @@ class MySqlService implements DocumentStoreServiceInterface
                         ->pluck('name')
                         ->filter()
                         ->values()
-                        ->toArray();
+                        ->toArray()
+                    ;
 
                 case 'genre':
                     return Genre::select('name')
@@ -178,7 +185,8 @@ class MySqlService implements DocumentStoreServiceInterface
                         ->pluck('name')
                         ->filter()
                         ->values()
-                        ->toArray();
+                        ->toArray()
+                    ;
 
                 case 'series':
                     if ($subField === 'seriesName') {
@@ -188,8 +196,10 @@ class MySqlService implements DocumentStoreServiceInterface
                             ->pluck('name')
                             ->filter()
                             ->values()
-                            ->toArray();
+                            ->toArray()
+                        ;
                     }
+
                     return [];
 
                 default:
@@ -200,92 +210,139 @@ class MySqlService implements DocumentStoreServiceInterface
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
+
             return [];
         }
     }
 
     public function listLibraryRepairIssues(array $filters = [], int $limit = 50, int $page = 1): array
     {
-        $query = $this->libraryRepairIssuesQuery();
-
-        if ($query === null) {
+        if (!$this->ensureLibraryRepairIssuesTable()) {
             return [];
         }
 
-        $limit = max(1, min($limit, 200));
-        $page = max(1, $page);
+        try {
+            $query = LibraryRepairIssue::query()
+                ->with([
+                    'book.authors' => function ($q): void {
+                        $q->select('authors.id', 'authors.name');
+                    },
+                ])
+            ;
 
-        $issues = $this->applyLibraryRepairFilters(clone $query, $filters)
-            ->orderByDesc('created_at')
-            ->limit($limit)
-            ->offset(($page - 1) * $limit)
-            ->get();
+            $this->applyLibraryRepairIssueFilters($query, $filters);
 
-        if ($issues->isEmpty()) {
+            return $query
+                ->orderByDesc('created_at')
+                ->forPage(max(1, $page), max(1, $limit))
+                ->get()
+                ->map(fn (LibraryRepairIssue $issue) => $this->transformLibraryRepairIssue($issue))
+                ->toArray()
+            ;
+        } catch (\Throwable $e) {
+            Log::error('listLibraryRepairIssues failed: ' . $e->getMessage());
+
             return [];
         }
-
-        $bookMap = $this->mapLibraryRepairBooks($issues);
-
-        return $issues
-            ->map(fn ($issue) => $this->formatLibraryRepairIssue($issue, $bookMap))
-            ->all();
     }
 
     public function countLibraryRepairIssues(array $filters = []): int
     {
-        $query = $this->libraryRepairIssuesQuery();
-
-        if ($query === null) {
+        if (!$this->ensureLibraryRepairIssuesTable()) {
             return 0;
         }
 
-        return (int) $this->applyLibraryRepairFilters(clone $query, $filters)->count();
+        try {
+            $query = LibraryRepairIssue::query();
+            $this->applyLibraryRepairIssueFilters($query, $filters);
+
+            return $query->count();
+        } catch (\Throwable $e) {
+            Log::error('countLibraryRepairIssues failed: ' . $e->getMessage());
+
+            return 0;
+        }
     }
 
     public function getLibraryRepairIssue(int $issueId): ?array
     {
-        $query = $this->libraryRepairIssuesQuery();
-
-        if ($query === null) {
+        if (!$this->ensureLibraryRepairIssuesTable()) {
             return null;
         }
 
-        $record = $query->where('id', $issueId)->first();
+        try {
+            $issue = LibraryRepairIssue::with([
+                'book.authors' => function ($q): void {
+                    $q->select('authors.id', 'authors.name');
+                },
+            ])->find($issueId);
 
-        if ($record === null) {
+            if (!$issue) {
+                return null;
+            }
+
+            return $this->transformLibraryRepairIssue($issue);
+        } catch (\Throwable $e) {
+            Log::error('getLibraryRepairIssue failed: ' . $e->getMessage());
+
             return null;
         }
-
-        $bookMap = $this->mapLibraryRepairBooks(collect([$record]));
-
-        return $this->formatLibraryRepairIssue($record, $bookMap);
     }
 
-    public function resolveLibraryRepairIssue(int $issueId, ?string $resolutionNotes = null): bool
+    /**
+     * @param Builder|\Illuminate\Database\Eloquent\Relations\Relation $query
+     */
+    private function applyLibraryRepairIssueFilters($query, array $filters): void
     {
-        $query = $this->libraryRepairIssuesQuery();
+        if (!empty($filters['issue_type'])) {
+            $query->where('issue_type', $filters['issue_type']);
+        }
 
-        if ($query === null) {
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function ($q) use ($search): void {
+                $q->where('directory_path', 'like', '%' . $search . '%')
+                    ->orWhereHas('book', function ($bookQuery) use ($search): void {
+                        $bookQuery->where('title', 'like', '%' . $search . '%');
+                    })
+                ;
+            });
+        }
+
+        if (!empty($filters['book_id'])) {
+            $query->where('book_id', $filters['book_id']);
+        }
+
+        $showResolved = $this->normalizeBooleanFilter($filters['show_resolved'] ?? null);
+
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        } elseif (!$showResolved) {
+            $query->where('status', 'pending');
+        }
+
+        if (array_key_exists('auto_resolved', $filters)) {
+            $query->where('auto_resolved', $this->normalizeBooleanFilter($filters['auto_resolved']));
+        }
+    }
+
+    private function normalizeBooleanFilter(mixed $value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if ($value === null) {
             return false;
         }
 
-        $updated = DB::table('library_repair_issues')
-            ->where('id', $issueId)
-            ->update([
-                'status' => 'resolved',
-                'resolution_notes' => $resolutionNotes,
-                'resolved_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-        return $updated > 0;
+        return filter_var($value, FILTER_VALIDATE_BOOLEAN);
     }
 
-    private function libraryRepairIssuesQuery(): ?Builder
+    private function ensureLibraryRepairIssuesTable(): bool
     {
         if ($this->libraryRepairIssuesTableExists === false) {
-            return null;
+            return false;
         }
 
         if ($this->libraryRepairIssuesTableExists === null) {
@@ -294,134 +351,91 @@ class MySqlService implements DocumentStoreServiceInterface
             if (!$this->libraryRepairIssuesTableExists) {
                 Log::notice('library_repair_issues table is missing; skipping library repair queries.');
 
-                return null;
+                return false;
             }
         }
 
-        return DB::table('library_repair_issues');
+        return true;
     }
 
-    private function applyLibraryRepairFilters(Builder $query, array $filters): Builder
+    public function resolveLibraryRepairIssue(int $issueId, ?string $resolutionNotes = null): bool
     {
-        if (!empty($filters['issue_type'])) {
-            $query->where('issue_type', $filters['issue_type']);
-        }
-
-        if (!empty($filters['status'])) {
-            $query->where('status', $filters['status']);
-        }
-
-        if (array_key_exists('auto_resolved', $filters) && $filters['auto_resolved'] !== '') {
-            $query->where('auto_resolved', (bool) $filters['auto_resolved']);
-        }
-
-        if (!empty($filters['book_id'])) {
-            $query->where('book_id', $filters['book_id']);
-        }
-
-        if (!empty($filters['search'])) {
-            $search = '%' . $filters['search'] . '%';
-            $query->where(function (Builder $builder) use ($search): void {
-                $builder
-                    ->where('directory_path', 'like', $search)
-                    ->orWhere('metadata', 'like', $search);
-            });
-        }
-
-        return $query;
-    }
-
-    private function mapLibraryRepairBooks(Collection $issues): array
-    {
-        $bookIds = $issues
-            ->map(fn ($issue) => $issue->book_id ?? $issue->bookId ?? null)
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
-
-        if (empty($bookIds)) {
-            return [];
-        }
-
-        return Book::query()
-            ->with(['authors:id,name'])
-            ->whereIn('id', $bookIds)
-            ->get()
-            ->mapWithKeys(function (Book $book): array {
-                return [
-                    $book->id => [
-                        'id' => (string) $book->id,
-                        'title' => $book->title ?? '',
-                        'directoryPath' => $book->directory_path,
-                        'authors' => $book->authors->pluck('name')->values()->all(),
-                    ],
-                ];
-            })
-            ->all();
-    }
-
-    private function formatLibraryRepairIssue(object|array $issue, array $bookMap): array
-    {
-        $issueArray = is_array($issue) ? $issue : (array) $issue;
-        $bookId = $issueArray['book_id'] ?? $issueArray['bookId'] ?? null;
-
-        return [
-            'id' => (int) ($issueArray['id'] ?? 0),
-            'issueType' => (string) ($issueArray['issue_type'] ?? $issueArray['issueType'] ?? 'unknown'),
-            'status' => (string) ($issueArray['status'] ?? 'pending'),
-            'directoryPath' => $issueArray['directory_path'] ?? $issueArray['directoryPath'] ?? null,
-            'metadata' => $this->parseLibraryRepairMetadata($issueArray['metadata'] ?? []),
-            'autoResolved' => (bool) ($issueArray['auto_resolved'] ?? $issueArray['autoResolved'] ?? false),
-            'createdAt' => $this->convertToIsoString($issueArray['created_at'] ?? $issueArray['createdAt'] ?? null),
-            'updatedAt' => $this->convertToIsoString($issueArray['updated_at'] ?? $issueArray['updatedAt'] ?? null),
-            'resolvedAt' => $this->convertToIsoString($issueArray['resolved_at'] ?? $issueArray['resolvedAt'] ?? null),
-            'resolutionNotes' => $issueArray['resolution_notes'] ?? $issueArray['resolutionNotes'] ?? null,
-            'book' => $bookId !== null ? ($bookMap[$bookId] ?? null) : null,
-        ];
-    }
-
-    private function parseLibraryRepairMetadata(mixed $metadata): array
-    {
-        if (is_array($metadata)) {
-            return $metadata;
-        }
-
-        if (is_string($metadata) && $metadata !== '') {
-            $decoded = json_decode($metadata, true);
-
-            if (is_array($decoded)) {
-                return $decoded;
-            }
-        }
-
-        return [];
-    }
-
-    private function convertToIsoString(mixed $value): ?string
-    {
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        if ($value instanceof Carbon) {
-            return $value->toIso8601String();
+        if (!$this->ensureLibraryRepairIssuesTable()) {
+            return false;
         }
 
         try {
-            return Carbon::parse($value)->toIso8601String();
-        } catch (\Throwable $throwable) {
-            Log::debug('Failed to parse date for library repair issue', [
-                'value' => $value,
-                'error' => $throwable->getMessage(),
+            /** @var LibraryRepairIssue|null $issue */
+            $issue = LibraryRepairIssue::with('book')->find($issueId);
+
+            if (!$issue) {
+                return false;
+            }
+
+            $issue->status = 'resolved';
+            $issue->resolution_notes = $resolutionNotes;
+            $issue->resolved_at = now();
+            $issue->auto_resolved = false;
+            $issue->save();
+
+            $this->clearLibraryRepairReason($issue->book);
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('resolveLibraryRepairIssue failed: ' . $e->getMessage(), [
+                'issueId' => $issueId,
             ]);
 
-            return null;
+            return false;
         }
     }
 
+    private function transformLibraryRepairIssue(LibraryRepairIssue $issue): array
+    {
+        return [
+            'id' => $issue->id,
+            'issueType' => $issue->issue_type,
+            'status' => $issue->status,
+            'directoryPath' => $issue->directory_path,
+            'metadata' => $issue->metadata ?? [],
+            'autoResolved' => (bool) $issue->auto_resolved,
+            'resolvedAt' => $issue->resolved_at ? $issue->resolved_at->toIso8601String() : null,
+            'resolutionNotes' => $issue->resolution_notes,
+            'createdAt' => $issue->created_at ? $issue->created_at->toIso8601String() : null,
+            'updatedAt' => $issue->updated_at ? $issue->updated_at->toIso8601String() : null,
+            'book' => $issue->book ? [
+                'id' => $issue->book->id,
+                'title' => $issue->book->title,
+                'directoryPath' => $issue->book->directory_path,
+                'authors' => $issue->book->authors->pluck('name')->all(),
+                'needsReview' => (bool) $issue->book->needs_review,
+                'needsReviewReasons' => (array) ($issue->book->needs_review_reasons ?? []),
+            ] : null,
+        ];
+    }
+
+    private function clearLibraryRepairReason(?Book $book): void
+    {
+        if (!$book) {
+            return;
+        }
+
+        $reasons = collect($book->needs_review_reasons ?? [])
+            ->reject(fn ($reason) => $reason === 'library_repair')
+            ->values()
+            ->all()
+        ;
+
+        $book->needs_review_reasons = $reasons;
+
+        if (empty($reasons)) {
+            $book->needs_review = false;
+        }
+        $book->save();
+    }
+
     /**
-     * Ultra minimal books listing to prevent memory exhaustion
+     * Ultra minimal books listing to prevent memory exhaustion.
      */
     public function listBooksMinimal(
         int $page = 1,
@@ -429,6 +443,7 @@ class MySqlService implements DocumentStoreServiceInterface
         array $filters = []
     ): array {
         $perPage = min($perPage, 10); // Hard limit to 10 items
+
         try {
             // Raw SQL to avoid Eloquent overhead
             $offset = ($page - 1) * $perPage;
@@ -457,6 +472,7 @@ class MySqlService implements DocumentStoreServiceInterface
 
             // Minimal transformation
             $data = [];
+
             foreach ($books as $book) {
                 $data[] = [
                     'id' => $book->id,
@@ -513,22 +529,23 @@ class MySqlService implements DocumentStoreServiceInterface
         // Exclude books flagged for review from API listings by default
         // Allow override via filters['include_needs_review'] === true
         $includeNeedsReview = (bool) ($filters['include_needs_review'] ?? false);
+
         if (!$includeNeedsReview) {
             $query->where('needs_review', false);
         }
 
         // Eager load all relationships required by the OpenAPI spec
         $query->with([
-            'authors' => function ($q) {
+            'authors' => function ($q): void {
                 $q->select('authors.id', 'authors.name');
             },
-            'narrators' => function ($q) {
+            'narrators' => function ($q): void {
                 $q->select('narrators.id', 'narrators.name');
             },
-            'genres' => function ($q) {
+            'genres' => function ($q): void {
                 $q->select('genres.id', 'genres.name');
             },
-            'series' => function ($q) {
+            'series' => function ($q): void {
                 $q->select('series.id', 'series.name', 'series.is_collection')->withPivot('series_number');
             },
         ]);
@@ -536,18 +553,19 @@ class MySqlService implements DocumentStoreServiceInterface
         // Apply filters
         if (!empty($filters['search'])) {
             $searchTerm = $filters['search'];
-            $query->where(function ($q) use ($searchTerm) {
+            $query->where(function ($q) use ($searchTerm): void {
                 $q->where('title', 'like', '%' . $searchTerm . '%')
                     ->orWhere('description', 'like', '%' . $searchTerm . '%')
-                    ->orWhereHas('authors', function ($authorQuery) use ($searchTerm) {
+                    ->orWhereHas('authors', function ($authorQuery) use ($searchTerm): void {
                         $authorQuery->where('name', 'like', '%' . $searchTerm . '%');
                     })
-                    ->orWhereHas('narrators', function ($narratorQuery) use ($searchTerm) {
+                    ->orWhereHas('narrators', function ($narratorQuery) use ($searchTerm): void {
                         $narratorQuery->where('name', 'like', '%' . $searchTerm . '%');
                     })
-                    ->orWhereHas('series', function ($seriesQuery) use ($searchTerm) {
+                    ->orWhereHas('series', function ($seriesQuery) use ($searchTerm): void {
                         $seriesQuery->where('name', 'like', '%' . $searchTerm . '%');
-                    });
+                    })
+                ;
             });
         }
 
@@ -556,19 +574,19 @@ class MySqlService implements DocumentStoreServiceInterface
         }
 
         if (!empty($filters['author'])) {
-            $query->whereHas('authors', function ($q) use ($filters) {
+            $query->whereHas('authors', function ($q) use ($filters): void {
                 $q->where('name', 'like', '%' . $filters['author'] . '%');
             });
         }
 
         if (!empty($filters['genre'])) {
-            $query->whereHas('genres', function ($q) use ($filters) {
+            $query->whereHas('genres', function ($q) use ($filters): void {
                 $q->where('name', $filters['genre']);
             });
         }
 
         if (!empty($filters['series'])) {
-            $query->whereHas('series', function ($q) use ($filters) {
+            $query->whereHas('series', function ($q) use ($filters): void {
                 $q->where('name', 'like', '%' . $filters['series'] . '%');
             });
         }
@@ -609,27 +627,31 @@ class MySqlService implements DocumentStoreServiceInterface
                     ->leftJoin('authors', 'author_book.author_id', '=', 'authors.id')
                     ->orderBy('authors.name', $order)
                     ->select('books.*')
-                    ->distinct();
+                    ->distinct()
+                ;
                 break;
             case 'series':
                 $query->leftJoin('book_series', 'books.id', '=', 'book_series.book_id')
                     ->leftJoin('series', 'book_series.series_id', '=', 'series.id')
                     ->orderBy('series.name', $order)
                     ->select('books.*')
-                    ->distinct();
+                    ->distinct()
+                ;
                 break;
             case 'series_number':
                 $query->leftJoin('book_series', 'books.id', '=', 'book_series.book_id')
                     ->orderByRaw('CAST(book_series.series_number AS DECIMAL(10,2)) ' . $order)
                     ->select('books.*')
-                    ->distinct();
+                    ->distinct()
+                ;
                 break;
             case 'genre':
                 $query->leftJoin('book_genre', 'books.id', '=', 'book_genre.book_id')
                     ->leftJoin('genres', 'book_genre.genre_id', '=', 'genres.id')
                     ->orderBy('genres.name', $order)
                     ->select('books.*')
-                    ->distinct();
+                    ->distinct()
+                ;
                 break;
             case 'created_at':
             case 'date_added':
@@ -650,11 +672,13 @@ class MySqlService implements DocumentStoreServiceInterface
         // Apply pagination
         $books = $query->skip(($page - 1) * $perPage)
             ->take($perPage)
-            ->get();
+            ->get()
+        ;
 
         // Transform data to match OpenAPI Book schema
         $transformedData = $books->map(function ($book) {
             $coverUrl = null;
+
             if ($book->cover_image) {
                 // Use the current request's hostname and protocol for the cover URL
                 // This ensures URLs match the original request (e.g., https://books.thelin.org)
@@ -663,6 +687,7 @@ class MySqlService implements DocumentStoreServiceInterface
             }
 
             $durationFormatted = null;
+
             if ($book->duration) {
                 // Assuming duration is stored in seconds
                 $durationFormatted = gmdate('H:i:s', $book->duration);
@@ -670,6 +695,7 @@ class MySqlService implements DocumentStoreServiceInterface
 
             // Format series data as an array of objects with name, series_number, and is_collection
             $seriesData = [];
+
             if ($book->series->isNotEmpty()) {
                 foreach ($book->series as $series) {
                     $seriesData[] = [
@@ -727,6 +753,7 @@ class MySqlService implements DocumentStoreServiceInterface
             // Transform series to match MongoDB format
             if (!empty($bookArray['series'])) {
                 $series = [];
+
                 foreach ($bookArray['series'] as $s) {
                     $series[$s['name']] = $s['pivot']['series_number'] ?? null;
                 }
@@ -744,10 +771,11 @@ class MySqlService implements DocumentStoreServiceInterface
     }
 
     /**
-     * Get recently added books
+     * Get recently added books.
      *
      * @param int $limit Maximum number of recent books to return
      * @param int $days Number of days to look back for recent books
+     *
      * @return array
      */
     public function getRecentBooks(int $limit = 5, int $days = 7): array
@@ -768,10 +796,10 @@ class MySqlService implements DocumentStoreServiceInterface
                 ])
                 ->where('needs_review', false)
                 ->with([
-                    'authors' => function ($q) {
+                    'authors' => function ($q): void {
                         $q->select('id', 'name');
                     },
-                    'narrators' => function ($q) {
+                    'narrators' => function ($q): void {
                         $q->select('id', 'name');
                     },
                 ])
@@ -781,6 +809,7 @@ class MySqlService implements DocumentStoreServiceInterface
                 ->get()
                 ->map(function (Book $book) {
                     $releaseDate = null;
+
                     if ($book->release_date) {
                         if (is_object($book->release_date) && method_exists($book->release_date, 'toDateString')) {
                             $releaseDate = $book->release_date->toDateString();
@@ -804,9 +833,11 @@ class MySqlService implements DocumentStoreServiceInterface
                         'narrators' => $book->narrators->pluck('name')->values()->all(),
                     ];
                 })
-                ->toArray();
+                ->toArray()
+            ;
         } catch (\Exception $e) {
             Log::error('Error fetching recent books: ' . $e->getMessage());
+
             return [];
         }
     }
@@ -817,6 +848,7 @@ class MySqlService implements DocumentStoreServiceInterface
      * @param string|null $reason
      * @param int $limit
      * @param int $page
+     *
      * @return array
      */
     public function listNeedsReviewBooks(?string $reason = null, int $limit = 100, int $page = 1): array
@@ -825,10 +857,11 @@ class MySqlService implements DocumentStoreServiceInterface
             $query = Book::query()
                 ->select('id', 'title', 'directory_path', 'needs_review_reasons', 'created_at')
                 ->where('needs_review', true)
-                ->orderBy('created_at', 'desc');
+                ->orderBy('created_at', 'desc')
+            ;
 
             if ($reason !== null && $reason !== '') {
-                $query->where(function ($q) use ($reason) {
+                $query->where(function ($q) use ($reason): void {
                     try {
                         $q->whereJsonContains('needs_review_reasons', $reason);
                     } catch (\Throwable $t) {
@@ -840,18 +873,18 @@ class MySqlService implements DocumentStoreServiceInterface
             return $query
                 ->forPage(max(1, $page), max(1, $limit))
                 ->get()
-                ->map(function (Book $book) {
-                    return [
-                        'id' => (string) $book->id,
-                        'title' => (string) $book->title,
-                        'directoryPath' => (string) ($book->directory_path ?? ''),
-                        'needsReviewReasons' => (array) ($book->needs_review_reasons ?? []),
-                        'createdAt' => $book->created_at ? $book->created_at->toIso8601String() : null,
-                    ];
-                })
-                ->toArray();
+                ->map(fn (Book $book) => [
+                    'id' => (string) $book->id,
+                    'title' => (string) $book->title,
+                    'directoryPath' => (string) ($book->directory_path ?? ''),
+                    'needsReviewReasons' => (array) ($book->needs_review_reasons ?? []),
+                    'createdAt' => $book->created_at ? $book->created_at->toIso8601String() : null,
+                ])
+                ->toArray()
+            ;
         } catch (\Exception $e) {
             Log::error('MySqlService listNeedsReviewBooks failed: ' . $e->getMessage());
+
             return [];
         }
     }
@@ -860,6 +893,7 @@ class MySqlService implements DocumentStoreServiceInterface
      * Count books needing review, optionally filtered by reason.
      *
      * @param string|null $reason
+     *
      * @return int
      */
     public function countNeedsReviewBooks(?string $reason = null): int
@@ -868,7 +902,7 @@ class MySqlService implements DocumentStoreServiceInterface
             $query = Book::query()->where('needs_review', true);
 
             if ($reason !== null && $reason !== '') {
-                $query->where(function ($q) use ($reason) {
+                $query->where(function ($q) use ($reason): void {
                     try {
                         $q->whereJsonContains('needs_review_reasons', $reason);
                     } catch (\Throwable $t) {
@@ -880,6 +914,7 @@ class MySqlService implements DocumentStoreServiceInterface
             return $query->count();
         } catch (\Exception $e) {
             Log::error('MySqlService countNeedsReviewBooks failed: ' . $e->getMessage());
+
             return 0;
         }
     }
@@ -895,17 +930,21 @@ class MySqlService implements DocumentStoreServiceInterface
             $all = Book::query()
                 ->where('needs_review', true)
                 ->pluck('needs_review_reasons')
-                ->all();
+                ->all()
+            ;
 
             $reasons = [];
+
             foreach ($all as $arr) {
                 if (is_string($arr)) {
                     $decoded = json_decode($arr, true);
+
                     if (is_array($decoded)) {
                         $reasons = array_merge($reasons, $decoded);
                         continue;
                     }
                 }
+
                 if (is_array($arr)) {
                     $reasons = array_merge($reasons, $arr);
                 }
@@ -913,11 +952,13 @@ class MySqlService implements DocumentStoreServiceInterface
 
             // Extract base reason (before any "Parsed:" or "Document:" details)
             $baseReasons = [];
+
             foreach ($reasons as $reason) {
-                $reasonStr = strval($reason);
+                $reasonStr = (string) $reason;
                 // Split on "Parsed:" or "Document:" and take the first part
                 $parts = preg_split('/(Parsed:|Document:)/', $reasonStr);
                 $baseReason = trim($parts[0]);
+
                 if (!empty($baseReason)) {
                     $baseReasons[] = $baseReason;
                 }
@@ -925,18 +966,21 @@ class MySqlService implements DocumentStoreServiceInterface
 
             $baseReasons = array_values(array_unique(array_filter($baseReasons)));
             sort($baseReasons, SORT_NATURAL | SORT_FLAG_CASE);
+
             return $baseReasons;
         } catch (\Exception $e) {
             Log::error('MySqlService listNeedsReviewReasons failed: ' . $e->getMessage());
+
             return [];
         }
     }
 
     /**
-     * Rename a series across all books
+     * Rename a series across all books.
      *
      * @param string $oldName
      * @param string $newName
+     *
      * @return int Number of books updated
      */
     public function renameSeries(string $oldName, string $newName): int
@@ -963,7 +1007,8 @@ class MySqlService implements DocumentStoreServiceInterface
                         ->where('series.id', $oldSeries->id)
                         ->first()
                         ->pivot
-                        ->series_number ?? null;
+                        ->series_number ?? null
+                    ;
 
                     // Detach from old series
                     $book->series()->detach($oldSeries->id);
@@ -986,15 +1031,15 @@ class MySqlService implements DocumentStoreServiceInterface
                 }
 
                 return $count;
-            } else {
-                // Rename: just update the series name
-                $oldSeries->name = $newName;
-                $oldSeries->save();
-
-                return $oldSeries->books()->count();
             }
+            // Rename: just update the series name
+            $oldSeries->name = $newName;
+            $oldSeries->save();
+
+            return $oldSeries->books()->count();
         } catch (\Exception $e) {
             Log::error('MySqlService renameSeries failed: ' . $e->getMessage());
+
             throw $e;
         }
     }
@@ -1024,16 +1069,15 @@ class MySqlService implements DocumentStoreServiceInterface
                     DB::raw('COUNT(DISTINCT books.id) as book_count'),
                     DB::raw('COUNT(DISTINCT author_book.author_id) as author_count')
                 )
-                ->get();
+                ->get()
+            ;
 
-            return $rows->map(function ($row) {
-                return [
-                    'id' => (string) $row->id,
-                    'name' => (string) $row->name,
-                    'bookCount' => (int) $row->book_count,
-                    'authorCount' => (int) $row->author_count,
-                ];
-            })->toArray();
+            return $rows->map(fn ($row) => [
+                'id' => (string) $row->id,
+                'name' => (string) $row->name,
+                'bookCount' => (int) $row->book_count,
+                'authorCount' => (int) $row->author_count,
+            ])->toArray();
         } catch (\Exception $e) {
             Log::error('MySqlService listGenresWithStats failed: ' . $e->getMessage());
 
@@ -1054,15 +1098,14 @@ class MySqlService implements DocumentStoreServiceInterface
                     'authors.name',
                     DB::raw('COUNT(DISTINCT books.id) as book_count')
                 )
-                ->get();
+                ->get()
+            ;
 
-            return $rows->map(function ($row) {
-                return [
-                    'id' => (string) $row->id,
-                    'name' => (string) $row->name,
-                    'bookCount' => (int) $row->book_count,
-                ];
-            })->toArray();
+            return $rows->map(fn ($row) => [
+                'id' => (string) $row->id,
+                'name' => (string) $row->name,
+                'bookCount' => (int) $row->book_count,
+            ])->toArray();
         } catch (\Exception $e) {
             Log::error('MySqlService listAuthorsWithStats failed: ' . $e->getMessage());
 
@@ -1074,6 +1117,7 @@ class MySqlService implements DocumentStoreServiceInterface
     {
         try {
             $genre = Genre::find($genreId);
+
             if (!$genre) {
                 return [
                     'genre' => null,
@@ -1092,15 +1136,14 @@ class MySqlService implements DocumentStoreServiceInterface
                     'authors.name',
                     DB::raw('COUNT(DISTINCT author_book.book_id) as book_count')
                 )
-                ->get();
+                ->get()
+            ;
 
-            $authors = $rows->map(function ($row) {
-                return [
-                    'id' => (string) $row->id,
-                    'name' => (string) $row->name,
-                    'bookCount' => (int) $row->book_count,
-                ];
-            })->toArray();
+            $authors = $rows->map(fn ($row) => [
+                'id' => (string) $row->id,
+                'name' => (string) $row->name,
+                'bookCount' => (int) $row->book_count,
+            ])->toArray();
 
             return [
                 'genre' => [
@@ -1123,6 +1166,7 @@ class MySqlService implements DocumentStoreServiceInterface
     {
         try {
             $author = Author::find($authorId);
+
             if (!$author) {
                 return [
                     'author' => null,
@@ -1133,8 +1177,10 @@ class MySqlService implements DocumentStoreServiceInterface
             }
 
             $genreData = null;
+
             if ($genreId) {
                 $genre = Genre::find($genreId);
+
                 if ($genre) {
                     $genreData = [
                         'id' => (string) $genre->id,
@@ -1147,11 +1193,13 @@ class MySqlService implements DocumentStoreServiceInterface
                 ->join('book_series', 'series.id', '=', 'book_series.series_id')
                 ->join('books', 'book_series.book_id', '=', 'books.id')
                 ->join('author_book', 'books.id', '=', 'author_book.book_id')
-                ->where('author_book.author_id', $authorId);
+                ->where('author_book.author_id', $authorId)
+            ;
 
             if ($genreId) {
                 $seriesQuery->join('book_genre', 'books.id', '=', 'book_genre.book_id')
-                    ->where('book_genre.genre_id', $genreId);
+                    ->where('book_genre.genre_id', $genreId)
+                ;
             }
 
             $seriesRows = $seriesQuery
@@ -1162,25 +1210,25 @@ class MySqlService implements DocumentStoreServiceInterface
                     'series.name',
                     DB::raw('COUNT(DISTINCT books.id) as book_count')
                 )
-                ->get();
+                ->get()
+            ;
 
-            $series = $seriesRows->map(function ($row) {
-                return [
-                    'id' => (string) $row->id,
-                    'name' => (string) $row->name,
-                    'bookCount' => (int) $row->book_count,
-                ];
-            })->toArray();
+            $series = $seriesRows->map(fn ($row) => [
+                'id' => (string) $row->id,
+                'name' => (string) $row->name,
+                'bookCount' => (int) $row->book_count,
+            ])->toArray();
 
             $booksQuery = Book::query()
                 ->select('id', 'title', 'directory_path')
-                ->whereHas('authors', function ($q) use ($authorId) {
+                ->whereHas('authors', function ($q) use ($authorId): void {
                     $q->where('authors.id', $authorId);
                 })
-                ->whereDoesntHave('series');
+                ->whereDoesntHave('series')
+            ;
 
             if ($genreId) {
-                $booksQuery->whereHas('genres', function ($q) use ($genreId) {
+                $booksQuery->whereHas('genres', function ($q) use ($genreId): void {
                     $q->where('genres.id', $genreId);
                 });
             }
@@ -1188,14 +1236,13 @@ class MySqlService implements DocumentStoreServiceInterface
             $standaloneBooks = $booksQuery
                 ->orderBy('title')
                 ->get()
-                ->map(function (Book $book) {
-                    return [
-                        'id' => (string) $book->id,
-                        'title' => (string) $book->title,
-                        'directoryPath' => $book->directory_path,
-                    ];
-                })
-                ->toArray();
+                ->map(fn (Book $book) => [
+                    'id' => (string) $book->id,
+                    'title' => (string) $book->title,
+                    'directoryPath' => $book->directory_path,
+                ])
+                ->toArray()
+            ;
 
             return [
                 'author' => [
@@ -1222,9 +1269,7 @@ class MySqlService implements DocumentStoreServiceInterface
     {
         $secondaryAuthorIds = array_values(array_unique(array_filter(
             $secondaryAuthorIds,
-            function ($id) use ($primaryAuthorId) {
-                return $id !== $primaryAuthorId;
-            }
+            fn ($id) => $id !== $primaryAuthorId
         )));
 
         if (empty($secondaryAuthorIds)) {
@@ -1236,13 +1281,15 @@ class MySqlService implements DocumentStoreServiceInterface
                 $bookIds = DB::table('author_book')
                     ->whereIn('author_id', $secondaryAuthorIds)
                     ->pluck('book_id')
-                    ->unique();
+                    ->unique()
+                ;
 
                 foreach ($bookIds as $bookId) {
                     $exists = DB::table('author_book')
                         ->where('book_id', $bookId)
                         ->where('author_id', $primaryAuthorId)
-                        ->exists();
+                        ->exists()
+                    ;
 
                     if (!$exists) {
                         DB::table('author_book')->insert([
@@ -1271,9 +1318,7 @@ class MySqlService implements DocumentStoreServiceInterface
     {
         $secondaryGenreIds = array_values(array_unique(array_filter(
             $secondaryGenreIds,
-            function ($id) use ($primaryGenreId) {
-                return $id !== $primaryGenreId;
-            }
+            fn ($id) => $id !== $primaryGenreId
         )));
 
         if (empty($secondaryGenreIds)) {
@@ -1285,13 +1330,15 @@ class MySqlService implements DocumentStoreServiceInterface
                 $bookIds = DB::table('book_genre')
                     ->whereIn('genre_id', $secondaryGenreIds)
                     ->pluck('book_id')
-                    ->unique();
+                    ->unique()
+                ;
 
                 foreach ($bookIds as $bookId) {
                     $exists = DB::table('book_genre')
                         ->where('book_id', $bookId)
                         ->where('genre_id', $primaryGenreId)
-                        ->exists();
+                        ->exists()
+                    ;
 
                     if (!$exists) {
                         DB::table('book_genre')->insert([
@@ -1317,9 +1364,10 @@ class MySqlService implements DocumentStoreServiceInterface
     }
 
     /**
-     * Get a genre by ID
+     * Get a genre by ID.
      *
      * @param string $id The genre ID
+     *
      * @return array|null The genre data or null if not found
      */
     public function getGenre(string $id): ?array
@@ -1327,6 +1375,7 @@ class MySqlService implements DocumentStoreServiceInterface
         try {
             // First check if this is a built-in genre from config
             $configGenres = config('genres', []);
+
             foreach ($configGenres as $genre) {
                 if (($genre['id'] ?? '') === $id) {
                     return $genre;
@@ -1339,6 +1388,7 @@ class MySqlService implements DocumentStoreServiceInterface
             return $genre ? $genre->toArray() : null;
         } catch (\Exception $e) {
             Log::error('MySqlService getGenre failed: ' . $e->getMessage());
+
             return null;
         }
     }
@@ -1360,7 +1410,8 @@ class MySqlService implements DocumentStoreServiceInterface
 
         $query = Book::where('series_id', $seriesId)
             ->with(['authors', 'narrators', 'genres', 'series'])
-            ->orderBy($orderBy, $direction);
+            ->orderBy($orderBy, $direction)
+        ;
 
         if ($startAfter) {
             $query->where('id', $direction === 'asc' ? '>' : '<', $startAfter);
@@ -1398,18 +1449,21 @@ class MySqlService implements DocumentStoreServiceInterface
         }
 
         $coverImage = trim($coverImage);
+
         if ($coverImage === '') {
             return null;
         }
 
         if (str_starts_with($coverImage, 'file://')) {
             $parsedPath = parse_url($coverImage, PHP_URL_PATH);
+
             if (is_string($parsedPath) && $parsedPath !== '') {
                 $coverImage = $parsedPath;
             }
         }
 
         $parsedUrl = parse_url($coverImage);
+
         if (
             is_array($parsedUrl)
             && isset($parsedUrl['scheme'])
@@ -1421,6 +1475,7 @@ class MySqlService implements DocumentStoreServiceInterface
         $coverImage = str_replace('\\', '/', $coverImage);
 
         $baseName = basename($coverImage);
+
         if ($baseName === '') {
             return null;
         }
@@ -1431,6 +1486,7 @@ class MySqlService implements DocumentStoreServiceInterface
     private function normalizeRelatedIds(array $items): array
     {
         $ids = [];
+
         foreach ($items as $item) {
             if (is_array($item) && isset($item['id'])) {
                 $ids[] = $item['id'];
@@ -1439,6 +1495,7 @@ class MySqlService implements DocumentStoreServiceInterface
 
             if (is_string($item) || is_int($item)) {
                 $value = trim((string) $item);
+
                 if ($value !== '') {
                     $ids[] = $value;
                 }
@@ -1455,6 +1512,7 @@ class MySqlService implements DocumentStoreServiceInterface
         }
 
         $ids = $this->normalizeRelatedIds($items);
+
         if (empty($ids)) {
             return false;
         }
@@ -1497,14 +1555,17 @@ class MySqlService implements DocumentStoreServiceInterface
 
             // Handle authors (support both IDs and names)
             $authorData = $data['authors'] ?? $data['author'] ?? null;
+
             if (is_array($authorData)) {
                 if ($this->isLikelyIdList($authorData)) {
                     $book->authors()->sync($this->normalizeRelatedIds($authorData));
                 } else {
                     $authorIds = [];
+
                     foreach ($authorData as $authorName) {
                         if (is_string($authorName) || is_int($authorName)) {
                             $name = trim((string) $authorName);
+
                             if ($name === '') {
                                 continue;
                             }
@@ -1518,14 +1579,17 @@ class MySqlService implements DocumentStoreServiceInterface
 
             // Handle narrators (support both IDs and names)
             $narratorData = $data['narrators'] ?? $data['narrator'] ?? null;
+
             if (is_array($narratorData)) {
                 if ($this->isLikelyIdList($narratorData)) {
                     $book->narrators()->sync($this->normalizeRelatedIds($narratorData));
                 } else {
                     $narratorIds = [];
+
                     foreach ($narratorData as $narratorName) {
                         if (is_string($narratorName) || is_int($narratorName)) {
                             $name = trim((string) $narratorName);
+
                             if ($name === '') {
                                 continue;
                             }
@@ -1539,14 +1603,17 @@ class MySqlService implements DocumentStoreServiceInterface
 
             // Handle genres (support both IDs and names)
             $genreData = $data['genres'] ?? $data['genre'] ?? null;
+
             if (is_array($genreData)) {
                 if ($this->isLikelyIdList($genreData)) {
                     $book->genres()->sync($this->normalizeRelatedIds($genreData));
                 } else {
                     $genreIds = [];
+
                     foreach ($genreData as $genreName) {
                         if (is_string($genreName) || is_int($genreName)) {
                             $name = trim((string) $genreName);
+
                             if ($name === '') {
                                 continue;
                             }
@@ -1569,6 +1636,7 @@ class MySqlService implements DocumentStoreServiceInterface
             Log::error(
                 'MySqlService createBook failed: ' . $e->getMessage() . ' for book ' . ($data['title'] ?? 'Unknown')
             );
+
             throw $e; // Re-throw the exception to be caught by the calling command
         }
     }
@@ -1610,20 +1678,24 @@ class MySqlService implements DocumentStoreServiceInterface
 
             // Handle authors (support both 'authors' and 'author' keys)
             $authorData = $data['authors'] ?? $data['author'] ?? null;
+
             if (is_array($authorData)) {
                 if ($this->isLikelyIdList($authorData)) {
                     $book->authors()->sync($this->normalizeRelatedIds($authorData));
                 } else {
                     $authorIds = [];
+
                     foreach ($authorData as $authorName) {
                         if (is_string($authorName) || is_int($authorName)) {
                             $name = trim((string) $authorName);
+
                             if ($name === '') {
                                 continue;
                             }
 
                             if (is_numeric($name)) {
                                 $existingAuthor = Author::find($name);
+
                                 if ($existingAuthor) {
                                     $authorIds[] = $existingAuthor->id;
                                     continue;
@@ -1640,20 +1712,24 @@ class MySqlService implements DocumentStoreServiceInterface
 
             // Handle narrators (support both 'narrators' and 'narrator' keys)
             $narratorData = $data['narrators'] ?? $data['narrator'] ?? null;
+
             if (is_array($narratorData)) {
                 if ($this->isLikelyIdList($narratorData)) {
                     $book->narrators()->sync($this->normalizeRelatedIds($narratorData));
                 } else {
                     $narratorIds = [];
+
                     foreach ($narratorData as $narratorName) {
                         if (is_string($narratorName) || is_int($narratorName)) {
                             $name = trim((string) $narratorName);
+
                             if ($name === '') {
                                 continue;
                             }
 
                             if (is_numeric($name)) {
                                 $existingNarrator = Narrator::find($name);
+
                                 if ($existingNarrator) {
                                     $narratorIds[] = $existingNarrator->id;
                                     continue;
@@ -1670,20 +1746,24 @@ class MySqlService implements DocumentStoreServiceInterface
 
             // Handle genres (support both 'genres' and 'genre' keys)
             $genreData = $data['genres'] ?? $data['genre'] ?? null;
+
             if (is_array($genreData)) {
                 if ($this->isLikelyIdList($genreData)) {
                     $book->genres()->sync($this->normalizeRelatedIds($genreData));
                 } else {
                     $genreIds = [];
+
                     foreach ($genreData as $genreName) {
                         if (is_string($genreName) || is_int($genreName)) {
                             $name = trim((string) $genreName);
+
                             if ($name === '') {
                                 continue;
                             }
 
                             if (is_numeric($name)) {
                                 $existingGenre = Genre::find($name);
+
                                 if ($existingGenre) {
                                     $genreIds[] = $existingGenre->id;
                                     continue;
@@ -1702,12 +1782,14 @@ class MySqlService implements DocumentStoreServiceInterface
             if (isset($data['series']) && is_array($data['series'])) {
                 // Handle new series array structure from BookController
                 $seriesSyncData = [];
+
                 foreach ($data['series'] as $seriesEntry) {
                     $seriesName = $seriesEntry['seriesName'] ?? $seriesEntry['name'] ?? null;
+
                     if ($seriesName) {
                         $series = Series::firstOrCreate(['name' => $seriesName]);
                         $seriesSyncData[$series->id] = [
-                            'series_number' => $seriesEntry['number'] ?? null
+                            'series_number' => $seriesEntry['number'] ?? null,
                         ];
                     }
                 }
@@ -1724,6 +1806,7 @@ class MySqlService implements DocumentStoreServiceInterface
 
             if (isset($data['chapters'])) {
                 $book->chapters()->delete();
+
                 foreach ($data['chapters'] as $chapterData) {
                     $book->chapters()->create($chapterData);
                 }
@@ -1741,6 +1824,7 @@ class MySqlService implements DocumentStoreServiceInterface
             Log::error(
                 'MySqlService updateBook failed: ' . $e->getMessage() . ' for book ' . ($data['title'] ?? 'Unknown')
             );
+
             throw $e; // Re-throw the exception to be caught by the calling command
         }
     }
@@ -1755,12 +1839,13 @@ class MySqlService implements DocumentStoreServiceInterface
     ): array {
         // Validate order direction
         $direction = in_array(strtolower($direction), ['asc', 'desc']) ? strtolower($direction) : 'asc';
-        $query = Book::whereHas('authors', function ($q) use ($author) {
+        $query = Book::whereHas('authors', function ($q) use ($author): void {
             $q->where('name', $author);
-        })->whereHas('genres', function ($q) use ($genre) {
+        })->whereHas('genres', function ($q) use ($genre): void {
             $q->where('name', $genre);
         })->with(['authors', 'narrators', 'genres', 'series'])
-            ->orderBy($orderBy, $direction);
+            ->orderBy($orderBy, $direction)
+        ;
 
         if ($startAfter) {
             $query->where('id', $direction === 'asc' ? '>' : '<', $startAfter);
@@ -1813,11 +1898,13 @@ class MySqlService implements DocumentStoreServiceInterface
 
         // Handle camelCase attribute naming from CamelCaseAttributeAccess trait
         $photoUrl = $user->photo_url ?? $user->photoUrl ?? null;
+
         if ($photoUrl) {
             $result['photo_url'] = $photoUrl;
         }
 
         $googleId = $user->google_id ?? $user->googleId ?? null;
+
         if ($googleId) {
             $result['google_id'] = $googleId;
         }
@@ -1843,6 +1930,7 @@ class MySqlService implements DocumentStoreServiceInterface
     public function getUserByRememberToken($identifier, $token)
     {
         $user = User::where('id', $identifier)->where('remember_token', $token)->first();
+
         return $user ? $user->toArray() : null;
     }
 
@@ -1854,6 +1942,7 @@ class MySqlService implements DocumentStoreServiceInterface
         // Ensure username is unique
         $originalUsername = $username;
         $counter = 1;
+
         while (User::where('username', $username)->exists()) {
             $username = $originalUsername . $counter;
             $counter++;
@@ -1885,9 +1974,10 @@ class MySqlService implements DocumentStoreServiceInterface
     }
 
     /**
-     * Get a user by their email address
+     * Get a user by their email address.
      *
      * @param string $email The email address to search for
+     *
      * @return array|null The user data or null if not found
      */
     public function getUserByEmail(string $email): ?array
@@ -1903,9 +1993,10 @@ class MySqlService implements DocumentStoreServiceInterface
     }
 
     /**
-     * Check if a user with the given email exists
+     * Check if a user with the given email exists.
      *
      * @param string $email The email address to check
+     *
      * @return bool True if a user with this email exists
      */
     public function userExistsByEmail(string $email): bool
@@ -1914,9 +2005,10 @@ class MySqlService implements DocumentStoreServiceInterface
     }
 
     /**
-     * Check if a user with the given username exists
+     * Check if a user with the given username exists.
      *
      * @param string $username The username to check
+     *
      * @return bool True if a user with this username exists
      */
     public function userExistsByUsername(string $username): bool
@@ -1933,6 +2025,7 @@ class MySqlService implements DocumentStoreServiceInterface
         // If $user is an array (from getUserByCredentials), convert it to a model
         if (is_array($user)) {
             $user = User::find($user['id'] ?? null);
+
             if (!$user) {
                 return false;
             }
@@ -1943,22 +2036,25 @@ class MySqlService implements DocumentStoreServiceInterface
     }
 
     /**
-     * Get a user by their username
+     * Get a user by their username.
      *
      * @param string $username The username to search for
+     *
      * @return array|null The user data or null if not found
      */
     public function getUserByUsername(string $username): ?array
     {
         $user = User::where('username', $username)->first();
+
         if (!$user) {
             return null;
         }
+
         return $user->makeVisible(['password'])->toArray();
     }
 
     /**
-     * Get all admin users
+     * Get all admin users.
      *
      * @return array List of admin users
      */
@@ -1977,6 +2073,7 @@ class MySqlService implements DocumentStoreServiceInterface
     public function updateRememberToken(string $identifier, string $token): void
     {
         $user = User::find($identifier);
+
         if ($user) {
             $user->setRememberToken($token);
             $user->save();
@@ -2010,6 +2107,7 @@ class MySqlService implements DocumentStoreServiceInterface
 
         if ($startAfterId) {
             $startJob = Job::find($startAfterId);
+
             if ($startJob) {
                 $query->where('created_at', '<', $startJob->created_at);
             }
@@ -2018,12 +2116,14 @@ class MySqlService implements DocumentStoreServiceInterface
         return $query->orderBy($orderBy, $direction)
             ->limit($limit)
             ->get()
-            ->toArray();
+            ->toArray()
+        ;
     }
 
     public function updateJob(string $jobId, array $data): bool
     {
         $job = Job::findOrFail($jobId);
+
         return $job->update($data);
     }
 
@@ -2048,16 +2148,18 @@ class MySqlService implements DocumentStoreServiceInterface
     }
 
     /**
-     * Update a genre
+     * Update a genre.
      *
      * @param string $id The genre ID
      * @param array $data The updated genre data
+     *
      * @return bool True if the update was successful
      */
     public function updateGenre(string $id, array $data): bool
     {
         try {
             $genre = Genre::find($id);
+
             if (!$genre) {
                 return false;
             }
@@ -2065,6 +2167,7 @@ class MySqlService implements DocumentStoreServiceInterface
             return $genre->update($data);
         } catch (\Exception $e) {
             Log::error('MySqlService updateGenre failed: ' . $e->getMessage());
+
             return false;
         }
     }
@@ -2079,6 +2182,7 @@ class MySqlService implements DocumentStoreServiceInterface
     public function findOrCreateSeriesByName(string $name)
     {
         $series = $this->getSeriesByName($name);
+
         if ($series) {
             return $series;
         }
@@ -2123,7 +2227,8 @@ class MySqlService implements DocumentStoreServiceInterface
             ->orderBy('name')
             ->limit(20)
             ->pluck('name')
-            ->toArray();
+            ->toArray()
+        ;
 
         return $genres;
     }
@@ -2144,7 +2249,8 @@ class MySqlService implements DocumentStoreServiceInterface
             ->limit($limit)
             ->orderBy('created_at', 'desc')
             ->get()
-            ->toArray();
+            ->toArray()
+        ;
     }
 
     public function getUsersForMessaging(): array
@@ -2153,7 +2259,7 @@ class MySqlService implements DocumentStoreServiceInterface
     }
 
     /**
-     * Get all users in the system
+     * Get all users in the system.
      *
      * @return array List of all users
      */
@@ -2174,31 +2280,31 @@ class MySqlService implements DocumentStoreServiceInterface
             ]);
 
             // Convert to array and ensure consistent attribute naming
-            return $users->map(function ($user) {
-                return [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'username' => $user->username,
-                    'email' => $user->email,
-                    'photo_url' => $user->photo_url, // This will use the accessor
-                    'role' => $user->role,
-                    'email_verified_at' => $user->email_verified_at,
-                    'created_at' => $user->created_at,
-                    'updated_at' => $user->updated_at,
-                    // Add google_id if it exists
-                    'google_id' => $user->google_id ?? null,
-                ];
-            })->toArray();
+            return $users->map(fn ($user) => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'username' => $user->username,
+                'email' => $user->email,
+                'photo_url' => $user->photo_url, // This will use the accessor
+                'role' => $user->role,
+                'email_verified_at' => $user->email_verified_at,
+                'created_at' => $user->created_at,
+                'updated_at' => $user->updated_at,
+                // Add google_id if it exists
+                'google_id' => $user->google_id ?? null,
+            ])->toArray();
         } catch (\Exception $e) {
             Log::error('MySqlService getAllUsers failed: ' . $e->getMessage());
+
             return [];
         }
     }
 
     /**
-     * Get a user's book queue
+     * Get a user's book queue.
      *
      * @param string $userId The user ID
+     *
      * @return array List of books in the user's queue
      */
     public function getBookQueue(string $userId): array
@@ -2213,26 +2319,30 @@ class MySqlService implements DocumentStoreServiceInterface
             return $user->queuedBooks()->with(['authors', 'narrators', 'genres', 'series'])->get()->toArray();
         } catch (\Exception $e) {
             Log::error('MySqlService getBookQueue failed: ' . $e->getMessage());
+
             return [];
         }
     }
 
     /**
-     * Add a book to a user's queue
+     * Add a book to a user's queue.
      *
      * @param string $userId The user ID
      * @param string $bookId The book ID to add
+     *
      * @return bool Success status
      */
     public function addBookToQueue(string $userId, string $bookId): bool
     {
         try {
             $user = User::find($userId);
+
             if (!$user) {
                 return false;
             }
 
             $book = Book::find($bookId);
+
             if (!$book) {
                 return false;
             }
@@ -2254,26 +2364,30 @@ class MySqlService implements DocumentStoreServiceInterface
             return true;
         } catch (\Exception $e) {
             Log::error('MySqlService addBookToQueue failed: ' . $e->getMessage());
+
             return false;
         }
     }
 
     /**
-     * Remove a book from a user's queue
+     * Remove a book from a user's queue.
      *
      * @param string $userId The user ID
      * @param string $bookId The book ID to remove
+     *
      * @return bool Success status
      */
     public function removeBookFromQueue(string $userId, string $bookId): bool
     {
         try {
             $user = User::find($userId);
+
             if (!$user) {
                 return false;
             }
 
             $book = Book::find($bookId);
+
             if (!$book) {
                 return false;
             }
@@ -2283,21 +2397,24 @@ class MySqlService implements DocumentStoreServiceInterface
             return true;
         } catch (\Exception $e) {
             Log::error('MySqlService removeBookFromQueue failed: ' . $e->getMessage());
+
             return false;
         }
     }
 
     /**
-     * Update a user's book queue with a new list of book IDs
+     * Update a user's book queue with a new list of book IDs.
      *
      * @param string $userId The user ID
      * @param array $bookIds List of book IDs for the queue
+     *
      * @return bool Success status
      */
     public function updateBookQueue(string $userId, array $bookIds): bool
     {
         try {
             $user = User::find($userId);
+
             if (!$user) {
                 return false;
             }
@@ -2305,6 +2422,7 @@ class MySqlService implements DocumentStoreServiceInterface
             // Sync will remove all existing relationships and create new ones
             // The second parameter allows adding pivot data if needed
             $pivotData = [];
+
             foreach ($bookIds as $index => $bookId) {
                 $pivotData[$bookId] = [
                     'position' => $index,
@@ -2317,6 +2435,7 @@ class MySqlService implements DocumentStoreServiceInterface
             return true;
         } catch (\Exception $e) {
             Log::error('MySqlService updateBookQueue failed: ' . $e->getMessage());
+
             return false;
         }
     }
@@ -2328,11 +2447,13 @@ class MySqlService implements DocumentStoreServiceInterface
             DB::table('reading_progress')
                 ->where('user_id', $userId)
                 ->where('book_id', $bookId)
-                ->delete();
+                ->delete()
+            ;
 
             return true;
         } catch (\Exception $e) {
             Log::error('MySqlService resetReadingProgress failed: ' . $e->getMessage());
+
             return false;
         }
     }
@@ -2368,7 +2489,8 @@ class MySqlService implements DocumentStoreServiceInterface
         $bookmark = Bookmark::where('id', $bookmarkId)
             ->where('user_id', $userId)
             ->where('book_id', $bookId)
-            ->firstOrFail();
+            ->firstOrFail()
+        ;
 
         return $bookmark->delete();
     }
@@ -2380,7 +2502,8 @@ class MySqlService implements DocumentStoreServiceInterface
             ->where('book_id', $bookId)
             ->orderBy('started_at')
             ->get()
-            ->toArray();
+            ->toArray()
+        ;
     }
 
     public function getExternalRead(string $externalReadId, string $userId, string $bookId): ?array
@@ -2388,7 +2511,8 @@ class MySqlService implements DocumentStoreServiceInterface
         $entry = ExternalRead::where('id', $externalReadId)
             ->where('user_id', $userId)
             ->where('book_id', $bookId)
-            ->first();
+            ->first()
+        ;
 
         return $entry ? $entry->toArray() : null;
     }
@@ -2412,7 +2536,8 @@ class MySqlService implements DocumentStoreServiceInterface
         $entry = ExternalRead::where('id', $externalReadId)
             ->where('user_id', $userId)
             ->where('book_id', $bookId)
-            ->firstOrFail();
+            ->firstOrFail()
+        ;
 
         return $entry->delete();
     }
@@ -2440,11 +2565,13 @@ class MySqlService implements DocumentStoreServiceInterface
 
         try {
             $instance = $modelClass::find($docId);
+
             return $instance ? $instance->toArray() : null;
         } catch (\Exception $e) {
             Log::error(
                 "Failed to get document from {$collection} (ID: {$docId}): " . $e->getMessage()
             );
+
             return null;
         }
     }
@@ -2471,16 +2598,16 @@ class MySqlService implements DocumentStoreServiceInterface
 
         try {
             $instance = $modelClass::findOrFail($id);
+
             return $instance->update($data);
         } catch (\Exception $e) {
             Log::error(
                 "Failed to update document in {$collection} (ID: {$id}): " . $e->getMessage()
             );
+
             return false;
         }
     }
-
-
 
     public function followExists(string $userId, string $followableType, string $followableId): bool
     {
@@ -2501,7 +2628,8 @@ class MySqlService implements DocumentStoreServiceInterface
     {
         $deletedCount = Job::where('created_at', '<=', now()->subDays($daysOld))
             ->whereIn('status', ['completed', 'failed', 'cancelled'])
-            ->delete();
+            ->delete()
+        ;
 
         return $deletedCount;
     }
@@ -2509,19 +2637,22 @@ class MySqlService implements DocumentStoreServiceInterface
     public function findOrCreateMany(string $type, array $items): array
     {
         $createdIds = [];
+
         foreach ($items as $item) {
             $method = 'findOrCreate' . ucfirst($type);
+
             if (is_array($item) && isset($item['name'])) {
                 $model = $this->$method(['name' => $item['name']]);
             } elseif (is_string($item)) {
                 $model = $this->$method(['name' => $item]);
             } else {
                 // Log a warning or throw an exception if this case should not happen
-                Log::warning("Unexpected item format in findOrCreateMany: " . json_encode($item));
+                Log::warning('Unexpected item format in findOrCreateMany: ' . json_encode($item));
                 continue;
             }
             $createdIds[] = $model->id;
         }
+
         return $createdIds;
     }
 
@@ -2535,48 +2666,56 @@ class MySqlService implements DocumentStoreServiceInterface
     public function findOrCreateAuthors(array $data): Author
     {
         $name = trim((string) ($data['name'] ?? ''));
+
         return Author::firstOrCreate(['name' => $name]);
     }
 
     public function findOrCreateGenres(array $data): Genre
     {
         $name = trim((string) ($data['name'] ?? ''));
+
         return Genre::firstOrCreate(['name' => $name]);
     }
 
     public function findOrCreateNarrators(array $data): Narrator
     {
         $name = trim((string) ($data['name'] ?? ''));
+
         return Narrator::firstOrCreate(['name' => $name]);
     }
 
     public function findOrCreateSeries(array $data): Series
     {
         $name = trim((string) ($data['name'] ?? ''));
+
         return Series::firstOrCreate(['name' => $name]);
     }
 
     /**
-     * Create an API token for a user
+     * Create an API token for a user.
      *
-     * @param array $tokenData The token data including user_id, token, etc.
+     * @param array $tokenData the token data including user_id, token, etc
+     *
      * @return string|null The token ID or null on failure
      */
     public function createApiToken(array $tokenData): ?string
     {
         try {
             $id = DB::table('api_tokens')->insertGetId($tokenData);
+
             return (string) $id;
         } catch (\Exception $e) {
             Log::error('MySqlService createApiToken failed: ' . $e->getMessage());
+
             return null;
         }
     }
 
     /**
-     * Delete an API token by its value
+     * Delete an API token by its value.
      *
      * @param string $tokenValue The token value to delete
+     *
      * @return bool True if token was deleted, false otherwise
      */
     public function deleteApiTokenByValue(string $tokenValue): bool
@@ -2584,38 +2723,44 @@ class MySqlService implements DocumentStoreServiceInterface
         try {
             $deleted = DB::table('api_tokens')
                 ->where('token', $tokenValue)
-                ->delete();
+                ->delete()
+            ;
 
             return $deleted > 0;
         } catch (\Exception $e) {
             Log::error('MySqlService deleteApiTokenByValue failed: ' . $e->getMessage());
+
             return false;
         }
     }
 
     /**
-     * Get an author by ID
+     * Get an author by ID.
      *
      * @param string $id The author ID
+     *
      * @return array|null The author data or null if not found
      */
     public function getAuthor(string $id): ?array
     {
         $author = Author::find($id);
+
         return $author ? $author->toArray() : null;
     }
 
     /**
-     * Update an author
+     * Update an author.
      *
      * @param string $id The author ID
      * @param array $data The updated author data
+     *
      * @return bool True if the update was successful
      */
     public function updateAuthor(string $id, array $data): bool
     {
         try {
             $author = Author::find($id);
+
             if (!$author) {
                 return false;
             }
@@ -2623,12 +2768,13 @@ class MySqlService implements DocumentStoreServiceInterface
             return $author->update($data);
         } catch (\Exception $e) {
             Log::error('MySqlService updateAuthor failed: ' . $e->getMessage());
+
             return false;
         }
     }
 
     /**
-     * Get pending account requests
+     * Get pending account requests.
      *
      * @return array List of pending account requests
      */
@@ -2639,34 +2785,40 @@ class MySqlService implements DocumentStoreServiceInterface
                 ->where('status', 'pending')
                 ->orderBy('created_at', 'desc')
                 ->get()
-                ->toArray();
+                ->toArray()
+            ;
         } catch (\Exception $e) {
             Log::error('MySqlService getPendingAccountRequests failed: ' . $e->getMessage());
+
             return [];
         }
     }
 
     /**
-     * Get a specific account request by ID
+     * Get a specific account request by ID.
      *
      * @param string $id The account request ID
+     *
      * @return array|null The account request data or null if not found
      */
     public function getAccountRequest(string $id): ?array
     {
         try {
             $request = DB::table('account_requests')->where('id', $id)->first();
+
             return $request ? (array) $request : null;
         } catch (\Exception $e) {
             Log::error('MySqlService getAccountRequest failed: ' . $e->getMessage());
+
             return null;
         }
     }
 
     /**
-     * Approve an account request
+     * Approve an account request.
      *
      * @param string $id The account request ID
+     *
      * @return bool True if the request was approved successfully
      */
     public function approveAccountRequest(string $id): bool
@@ -2676,15 +2828,18 @@ class MySqlService implements DocumentStoreServiceInterface
 
             // Get the account request
             $request = DB::table('account_requests')->where('id', $id)->first();
+
             if (!$request) {
                 DB::rollBack();
+
                 return false;
             }
 
             // Update the status to approved
             DB::table('account_requests')
                 ->where('id', $id)
-                ->update(['status' => 'approved', 'updated_at' => now()]);
+                ->update(['status' => 'approved', 'updated_at' => now()])
+            ;
 
             // Create a new user from the account request data
             $userData = [
@@ -2699,18 +2854,21 @@ class MySqlService implements DocumentStoreServiceInterface
             User::create($userData);
 
             DB::commit();
+
             return true;
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('MySqlService approveAccountRequest failed: ' . $e->getMessage());
+
             return false;
         }
     }
 
     /**
-     * Reject an account request
+     * Reject an account request.
      *
      * @param string $id The account request ID
+     *
      * @return bool True if the request was rejected successfully
      */
     public function rejectAccountRequest(string $id): bool
@@ -2721,16 +2879,16 @@ class MySqlService implements DocumentStoreServiceInterface
                 ->update([
                     'status' => 'rejected',
                     'updated_at' => now(),
-                ]);
+                ])
+            ;
 
             return $updated > 0;
         } catch (\Exception $e) {
             Log::error('MySqlService rejectAccountRequest failed: ' . $e->getMessage());
+
             return false;
         }
     }
-
-
 
     public function createFollow(string $userId, string $followableType, string $followableId): bool
     {
@@ -2740,9 +2898,11 @@ class MySqlService implements DocumentStoreServiceInterface
                 'followable_type' => $followableType,
                 'followable_id' => $followableId,
             ]);
+
             return $follow ? true : false;
         } catch (\Exception $e) {
             Log::error('MySqlService createFollow failed: ' . $e->getMessage());
+
             return false;
         }
     }
@@ -2761,9 +2921,11 @@ class MySqlService implements DocumentStoreServiceInterface
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
+
             return $message ? true : false;
         } catch (\Exception $e) {
             Log::error('MySqlService createMessage failed: ' . $e->getMessage());
+
             return false;
         }
     }
@@ -2780,9 +2942,11 @@ class MySqlService implements DocumentStoreServiceInterface
                 'name' => $name,
                 'is_collection' => $isCollection,
             ]);
+
             return $series->id;
         } catch (\Exception $e) {
             Log::error('MySqlService createSeries failed: ' . $e->getMessage());
+
             return null;
         }
     }
@@ -2791,13 +2955,16 @@ class MySqlService implements DocumentStoreServiceInterface
     {
         try {
             $series = Series::find($id);
+
             if (!$series) {
                 return false;
             }
             $series->update($data);
+
             return true;
         } catch (\Exception $e) {
             Log::error('MySqlService updateSeries failed: ' . $e->getMessage());
+
             return false;
         }
     }
@@ -2811,9 +2978,11 @@ class MySqlService implements DocumentStoreServiceInterface
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
+
             return $job ? true : false;
         } catch (\Exception $e) {
             Log::error('MySqlService createJob failed: ' . $e->getMessage());
+
             return false;
         }
     }
@@ -2824,14 +2993,18 @@ class MySqlService implements DocumentStoreServiceInterface
             $follow = Follow::where('user_id', $userId)
                 ->where('followable_type', $followableType)
                 ->where('followable_id', $followableId)
-                ->first();
+                ->first()
+            ;
+
             if (!$follow) {
                 return false;
             }
             $follow->delete();
+
             return true;
         } catch (\Exception $e) {
             Log::error('MySqlService deleteFollow failed: ' . $e->getMessage());
+
             return false;
         }
     }
@@ -2840,13 +3013,16 @@ class MySqlService implements DocumentStoreServiceInterface
     {
         try {
             $job = Job::where('id', $jobId)->first();
+
             if (!$job) {
                 return false;
             }
             $job->delete();
+
             return true;
         } catch (\Exception $e) {
             Log::error('MySqlService deleteJob failed: ' . $e->getMessage());
+
             return false;
         }
     }
@@ -2855,13 +3031,16 @@ class MySqlService implements DocumentStoreServiceInterface
     {
         try {
             $message = Message::where('id', $messageId)->first();
+
             if (!$message) {
                 return false;
             }
             $message->delete();
+
             return true;
         } catch (\Exception $e) {
             Log::error('MySqlService deleteMessage failed: ' . $e->getMessage());
+
             return false;
         }
     }
@@ -2870,13 +3049,16 @@ class MySqlService implements DocumentStoreServiceInterface
     {
         try {
             $narrator = Narrator::where('id', $narratorId)->first();
+
             if (!$narrator) {
                 return false;
             }
             $narrator->delete();
+
             return true;
         } catch (\Exception $e) {
             Log::error('MySqlService deleteNarrator failed: ' . $e->getMessage());
+
             return false;
         }
     }
@@ -2885,13 +3067,16 @@ class MySqlService implements DocumentStoreServiceInterface
     {
         try {
             $series = Series::where('id', $seriesId)->first();
+
             if (!$series) {
                 return false;
             }
             $series->delete();
+
             return true;
         } catch (\Exception $e) {
             Log::error('MySqlService deleteSeries failed: ' . $e->getMessage());
+
             return false;
         }
     }
@@ -2900,13 +3085,16 @@ class MySqlService implements DocumentStoreServiceInterface
     {
         try {
             $genre = Genre::where('id', $genreId)->first();
+
             if (!$genre) {
                 return false;
             }
             $genre->delete();
+
             return true;
         } catch (\Exception $e) {
             Log::error('MySqlService deleteGenre failed: ' . $e->getMessage());
+
             return false;
         }
     }
@@ -2915,6 +3103,7 @@ class MySqlService implements DocumentStoreServiceInterface
     {
         try {
             $author = Author::where('id', $authorId)->first();
+
             if (!$author) {
                 return;
             }
@@ -2928,6 +3117,7 @@ class MySqlService implements DocumentStoreServiceInterface
     {
         try {
             $book = Book::where('id', $bookId)->first();
+
             if (!$book) {
                 return false;
             }
@@ -2935,6 +3125,7 @@ class MySqlService implements DocumentStoreServiceInterface
             // Delete physical files if requested
             if ($deleteFiles && $book->directory_path) {
                 $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
+
                 if ($bookStoragePath) {
                     $directoryPath = $book->directory_path;
 
@@ -2962,9 +3153,11 @@ class MySqlService implements DocumentStoreServiceInterface
             }
 
             $book->delete();
+
             return true;
         } catch (\Exception $e) {
             Log::error('MySqlService deleteBook failed: ' . $e->getMessage());
+
             return false;
         }
     }
@@ -2973,13 +3166,16 @@ class MySqlService implements DocumentStoreServiceInterface
     {
         try {
             $queue = Queue::where('id', $queueId)->first();
+
             if (!$queue) {
                 return false;
             }
             $queue->delete();
+
             return true;
         } catch (\Exception $e) {
             Log::error('MySqlService deleteQueue failed: ' . $e->getMessage());
+
             return false;
         }
     }

@@ -15,6 +15,8 @@ class AudiobookBayTest extends TestCase
 
     protected AudiobookBayService $service;
 
+    protected string $baseUrl;
+
     protected $audiobookBayApiServiceMock; // Mockery objects don't always play nice with strict typing here
 
     /**
@@ -23,6 +25,9 @@ class AudiobookBayTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->baseUrl = 'https://audiobookbay.test';
+        config(['services.audiobook_bay.base_url' => $this->baseUrl]);
 
         // Config values for AudiobookBayApiService are typically loaded from config/services.php
         // Ensure your test environment has necessary stubs or actual config if service relies on it.
@@ -65,7 +70,7 @@ class AudiobookBayTest extends TestCase
                 'title' => 'Test Book 1 from API',
                 'authors' => [['name' => 'Author A']],
                 'narrators' => [['name' => 'Narrator X']],
-                'url' => 'https://audiobookbay.lu/ab/test-book-1-slug',
+                'url' => rtrim($this->baseUrl, '/') . '/ab/test-book-1-slug',
                 'info_hash' => 'hash1',
                 'cover_image_url' => 'http://example.com/cover1.jpg',
                 'description' => 'Description for book 1.',
@@ -82,7 +87,7 @@ class AudiobookBayTest extends TestCase
                 'title' => 'Test Book 2 from API',
                 'authors' => [['name' => 'Author B']],
                 'narrators' => [['name' => 'Narrator Y']],
-                'url' => 'https://audiobookbay.lu/ab/test-book-2-slug',
+                'url' => rtrim($this->baseUrl, '/') . '/ab/test-book-2-slug',
                 'info_hash' => 'hash2',
                 'cover_image_url' => 'http://example.com/cover2.jpg',
                 'description' => 'Description for book 2.',
@@ -167,7 +172,7 @@ class AudiobookBayTest extends TestCase
             'categories' => ['Mystery', 'Thriller'], // This might be $mockApiDetails['metadata']['categories'] too
             'language' => 'French',
             'series' => ['name' => 'Detailed Series', 'number' => '3'],
-            'url' => 'https://audiobookbay.lu/ab/test-book-detailed-slug',
+            'url' => rtrim($this->baseUrl, '/') . '/ab/test-book-detailed-slug',
             'metadata' => [
                 'source' => 'audiobookbay', // Added by parser
                 'format' => 'M4B - HQ',
