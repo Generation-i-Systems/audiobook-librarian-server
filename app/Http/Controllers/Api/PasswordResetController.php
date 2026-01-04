@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
@@ -49,7 +51,7 @@ class PasswordResetController extends Controller
                 'password' => $request->input('password'),
                 'password_confirmation' => $request->input('password_confirmation'),
             ],
-            function ($user) use ($request) {
+            function ($user) use ($request): void {
                 $user->forceFill([
                     'password' => Hash::make((string) $request->input('password')),
                     'remember_token' => Str::random(60),
