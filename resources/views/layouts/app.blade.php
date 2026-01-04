@@ -101,6 +101,12 @@
                                 <li class="nav-item">
                                     <a class="nav-link" style="color:white" href="{{ route('admin.database') }}">Database Admin</a>
                                 </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" style="color:white" href="{{ route('gallery.skins.index') }}">Skins</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" style="color:white" href="{{ route('gallery.themes.index') }}">Themes</a>
+                                </li>
                             @else
                                 <!-- Public Links (Show on public pages) -->
                                 <li class="nav-item">

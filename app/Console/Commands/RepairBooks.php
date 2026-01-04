@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types = 1);
+
 namespace App\Console\Commands;
 
 use App\Models\Book;
@@ -26,7 +28,7 @@ class RepairBooks extends Command
     public function handle()
     {
         // Create a database backup unless --no-backup is specified
-        if (!$this->option('no-backup')) {
+        if (! $this->option('no-backup')) {
             $this->info('Creating a database backup before repairing books...');
             $this->call('backup:database');
             $this->info('Database backup created.');
@@ -38,8 +40,9 @@ class RepairBooks extends Command
         $repairSeries = $this->option('series') || $this->option('all');
         $repairTitles = $this->option('title') || $this->option('all');
 
-        if (!$repairCovers && !$repairSeries && !$repairTitles) {
+        if (! $repairCovers && ! $repairSeries && ! $repairTitles) {
             $this->error('Please specify at least one repair action (--cover, --series, --title, or --all)');
+
             return Command::FAILURE;
         }
 
@@ -48,6 +51,7 @@ class RepairBooks extends Command
 
         if ($books->isEmpty()) {
             $this->info('No books found to repair.');
+
             return Command::SUCCESS;
         }
 
@@ -95,6 +99,7 @@ class RepairBooks extends Command
 
         if (empty($directoryPath)) {
             $this->warn("Book ID: {$book->id} has no directoryPath. Cannot repair cover.");
+
             return false;
         }
 
@@ -110,9 +115,10 @@ class RepairBooks extends Command
             } else {
                 $this->error("  -> Could not find a suitable cover image for Book ID: {$book->id} in directory: {$directoryPath}");
             }
-        } elseif (!Str::startsWith($originalCoverImage, $directoryPath)) {
+        } elseif (! Str::startsWith($originalCoverImage, $directoryPath)) {
             // Case 2: coverImage exists but doesn't contain the directory_path prefix
             $expectedCoverPath = rtrim($directoryPath, '/') . '/' . basename($originalCoverImage);
+
             if (Storage::disk('books')->exists($expectedCoverPath)) {
                 $book->coverImage = $expectedCoverPath;
                 $changesMade = true;
@@ -121,6 +127,7 @@ class RepairBooks extends Command
                 $this->warn("  -> Book ID: {$book->id} - coverImage '{$originalCoverImage}' does not match directoryPath and expected path '{$expectedCoverPath}' does not exist.");
                 // Fallback to finding best image if the expected path doesn't exist
                 $bestImage = $this->findBestCoverImage($book, 'books');
+
                 if ($bestImage) {
                     $book->coverImage = $bestImage;
                     $changesMade = true;
@@ -132,19 +139,21 @@ class RepairBooks extends Command
         if ($changesMade) {
             $book->save();
         }
+
         return $changesMade;
     }
 
     protected function findBestCoverImage(Book $book, string $diskName): ?string
     {
         $directoryPath = $book->directoryPath;
+
         if (empty($directoryPath)) {
             return null;
         }
 
         $fullBookDirPath = rtrim($directoryPath, '/');
 
-        if (!Storage::disk($diskName)->exists($fullBookDirPath)) {
+        if (! Storage::disk($diskName)->exists($fullBookDirPath)) {
             return null;
         }
 
@@ -159,7 +168,8 @@ class RepairBooks extends Command
 
         foreach ($filesInDir as $filePath) {
             $extension = pathinfo($filePath, PATHINFO_EXTENSION);
-            if (!in_array(strtolower($extension), $this->imageExtensions)) {
+
+            if (! in_array(strtolower($extension), $this->imageExtensions)) {
                 continue;
             }
 
@@ -177,7 +187,7 @@ class RepairBooks extends Command
                 }
             }
 
-            if (!empty($normalizedBookTitle) && Str::contains($normalizedFileName, $normalizedBookTitle)) {
+            if (! empty($normalizedBookTitle) && Str::contains($normalizedFileName, $normalizedBookTitle)) {
                 if (empty($bestTitleMatchCandidate)) {
                     $bestTitleMatchCandidate = $filePath;
                 }
@@ -203,6 +213,7 @@ class RepairBooks extends Command
 
         // 1. Clean leading spaces and dashes
         $cleanedTitle = preg_replace('/^[\s\-]+/', '', trim($newTitle));
+
         if ($cleanedTitle !== $newTitle) {
             $newTitle = $cleanedTitle;
             $changesMade = true;
@@ -211,7 +222,7 @@ class RepairBooks extends Command
 
         // 2. Extract leading numbers as series number
         if (preg_match('/^(\d+)[\s\-]* (.*)$/', $newTitle, $matches)) {
-            $extractedNumber = (int)$matches[1];
+            $extractedNumber = (int) $matches[1];
             $remainingTitle = $matches[2];
 
             // Only apply if it looks like a series number and not just a year or part of title
@@ -248,6 +259,7 @@ class RepairBooks extends Command
         if ($changesMade) {
             $book->save();
         }
+
         return $changesMade;
     }
 
