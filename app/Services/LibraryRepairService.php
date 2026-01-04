@@ -627,8 +627,12 @@ class LibraryRepairService
 
         $suffixBooks = Book::query()
             ->whereNotNull('directory_path')
-            ->where('directory_path', 'REGEXP', '_[0-9]{2}$')
-            ->get();
+            ->get()
+            ->filter(function (Book $book) {
+                $path = (string) ($book->directory_path ?? '');
+
+                return $path !== '' && preg_match('/_[0-9]{2}$/', $path) === 1;
+            });
 
         $activePaths = collect();
 
