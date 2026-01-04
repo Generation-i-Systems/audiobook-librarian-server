@@ -10,7 +10,9 @@ use App\Models\Series;
 use App\Services\BookDeletionService;
 use App\Services\TerminalImageService;
 use App\Traits\BookImportTrait;
+use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Builder;
 
 class ShowBookInfo extends Command
 {
@@ -38,7 +40,9 @@ class ShowBookInfo extends Command
 
     public function __construct(
         protected TerminalImageService $terminalImageService,
-        protected BookDeletionService $deletionService
+        protected BookDeletionService $deletionService,
+        protected Book $bookModel,
+        protected Publisher $publisherModel
     ) {
         parent::__construct();
     }
@@ -128,8 +132,16 @@ class ShowBookInfo extends Command
             $realPath = realpath($directory);
 
             if ($this->option('verbose')) {
-                $this->line("<fg=blue>[DEBUG]</> realpath() returned: " . ($realPath ?: 'false'));
-                $this->line("<fg=blue>[DEBUG]</> is_dir() returned: " . (is_dir($realPath ?: $directory) ? 'true' : 'false'));
+                $resolvedPath = $realPath ?: 'false';
+                $this->line(sprintf(
+                    '<fg=blue>[DEBUG]</> realpath() returned: %s',
+                    $resolvedPath
+                ));
+                $isDirectory = is_dir($realPath ?: $directory) ? 'true' : 'false';
+                $this->line(sprintf(
+                    '<fg=blue>[DEBUG]</> is_dir() returned: %s',
+                    $isDirectory
+                ));
             }
 
             // If not found as absolute path, try relative to book root (only if not already absolute)
@@ -198,9 +210,21 @@ class ShowBookInfo extends Command
         return Command::SUCCESS;
     }
 
+    /**
+     * Centralized builder for Book queries with eager-loaded relations.
+     *
+     * @return Builder<Book>
+     */
+    private function queryBook(): Builder
+    {
+        return $this->bookModel->newQuery()
+            ->with(['authors', 'narrators', 'genres', 'series', 'publisher']);
+    }
+
     protected function showBookById(string $bookId): void
     {
-        $book = Book::find($bookId);
+        /** @var Book|null $book */
+        $book = $this->queryBook()->find($bookId);
 
         if (!$book) {
             $this->error("Book not found with ID: {$bookId}");
@@ -233,11 +257,13 @@ class ShowBookInfo extends Command
             $searchPath = ltrim(substr($directory, strlen($bookRoot)), '/');
         }
 
-        $book = Book::where('directory_path', $searchPath)->first();
+        /** @var Book|null $book */
+        $book = $this->queryBook()->where('directory_path', $searchPath)->first();
         $exactMatch = (bool) $book;
 
         if (!$book) {
-            $book = Book::where('directory_path', $directory)->first();
+            /** @var Book|null $book */
+            $book = $this->queryBook()->where('directory_path', $directory)->first();
             $exactMatch = (bool) $book;
         }
 
@@ -257,11 +283,14 @@ class ShowBookInfo extends Command
             return;
         }
 
-        $books = Book::where('directory_path', 'LIKE', $searchPath . '%')->get();
+        /** @var \Illuminate\Support\Collection<int, Book> $books */
+        $books = $this->queryBook()->where('directory_path', 'LIKE', $searchPath . '%')->get();
         $isFuzzyMatch = false;
 
         if ($books->isEmpty()) {
-            $books = Book::where('directory_path', 'LIKE', '%' . basename($searchPath) . '%')
+            /** @var \Illuminate\Support\Collection<int, Book> $books */
+            $books = $this->queryBook()
+                ->where('directory_path', 'LIKE', '%' . basename($searchPath) . '%')
                 ->where('directory_path', 'LIKE', dirname($searchPath) . '%')
                 ->get();
             $isFuzzyMatch = $books->isNotEmpty();
@@ -279,7 +308,8 @@ class ShowBookInfo extends Command
                     $this->newLine();
 
                     // Try to find the book again
-                    $book = Book::where('directory_path', $searchPath)->first();
+                    /** @var Book|null $book */
+                    $book = $this->queryBook()->where('directory_path', $searchPath)->first();
                     if ($book) {
                         $this->info("Book imported successfully!");
                         $this->newLine();
@@ -302,6 +332,7 @@ class ShowBookInfo extends Command
         }
 
         if ($books->count() === 1 && $isFuzzyMatch) {
+            /** @var Book $book */
             $book = $books->first();
             $this->warn("Found book with mismatched path:");
             $this->line("  Database: {$book->directoryPath}");
@@ -336,6 +367,7 @@ class ShowBookInfo extends Command
         }
 
         foreach ($books as $book) {
+            /** @var Book $book */
             // Update book if any options were provided (only if there's exactly one book)
             if ($books->count() === 1 && $this->hasUpdateOptions()) {
                 $this->updateBookFields($book, $directory);
@@ -389,34 +421,50 @@ class ShowBookInfo extends Command
         $maxWidth = $this->getTerminalWidth();
 
         // If we have a cover image, the first 7 rows need shorter wrapping to avoid the image
-        $shortWidth = $coverPath ? max($maxWidth - 16, 40) : $maxWidth;
+        $hasCoverImage = (bool) $coverPath;
+        $shortWidth = $hasCoverImage ? max($maxWidth - 16, 40) : $maxWidth;
         $imageCoverageRows = 7; // Number of data rows that the image will overlay
 
         $tableData = [];
-        $rowCount = 0; // Track how many data rows we've added
 
         $tableData[] = ['ID', $book->id];
-        $rowCount++;
-
-        $titleWidth = $rowCount <= $imageCoverageRows ? $shortWidth : $maxWidth;
-        $wrappedTitle = $this->wrapText($book->title ?? 'N/A', $titleWidth);
-        $tableData[] = ['Title', $wrappedTitle];
-        $rowCount++;
+        $this->addRow(
+            $tableData,
+            'Title',
+            $book->title ?? 'N/A',
+            true,
+            $hasCoverImage,
+            $shortWidth,
+            $maxWidth,
+            $imageCoverageRows
+        );
 
         if ($book->authors()->count() > 0) {
             $authors = $book->authors()->pluck('name')->join(', ');
-            $authorsWidth = $rowCount <= $imageCoverageRows ? $shortWidth : $maxWidth;
-            $wrappedAuthors = $this->wrapText($authors, $authorsWidth);
-            $tableData[] = ['Authors', $wrappedAuthors];
-            $rowCount++;
+            $this->addRow(
+                $tableData,
+                'Authors',
+                $authors,
+                true,
+                $hasCoverImage,
+                $shortWidth,
+                $maxWidth,
+                $imageCoverageRows
+            );
         }
 
         if ($book->narrators()->count() > 0) {
             $narrators = $book->narrators()->pluck('name')->join(', ');
-            $narratorsWidth = $rowCount <= $imageCoverageRows ? $shortWidth : $maxWidth;
-            $wrappedNarrators = $this->wrapText($narrators, $narratorsWidth);
-            $tableData[] = ['Narrators', $wrappedNarrators];
-            $rowCount++;
+            $this->addRow(
+                $tableData,
+                'Narrators',
+                $narrators,
+                true,
+                $hasCoverImage,
+                $shortWidth,
+                $maxWidth,
+                $imageCoverageRows
+            );
         }
 
         if ($book->series()->count() > 0) {
@@ -424,46 +472,103 @@ class ShowBookInfo extends Command
                 $number = $series->pivot->series_number;
                 return "{$series->name}" . ($number ? " #{$number}" : '');
             })->join(', ');
-            $seriesWidth = $rowCount <= $imageCoverageRows ? $shortWidth : $maxWidth;
-            $wrappedSeries = $this->wrapText($seriesInfo, $seriesWidth);
-            $tableData[] = ['Series', $wrappedSeries];
-            $rowCount++;
+            $this->addRow(
+                $tableData,
+                'Series',
+                $seriesInfo,
+                true,
+                $hasCoverImage,
+                $shortWidth,
+                $maxWidth,
+                $imageCoverageRows
+            );
         }
 
         if ($book->genres()->count() > 0) {
             $genres = $book->genres()->pluck('name')->join(', ');
-            $genresWidth = $rowCount <= $imageCoverageRows ? $shortWidth : $maxWidth;
-            $wrappedGenres = $this->wrapText($genres, $genresWidth);
-            $tableData[] = ['Genres', $wrappedGenres];
-            $rowCount++;
+            $this->addRow(
+                $tableData,
+                'Genres',
+                $genres,
+                true,
+                $hasCoverImage,
+                $shortWidth,
+                $maxWidth,
+                $imageCoverageRows
+            );
         }
 
-        $publisherWidth = $rowCount <= $imageCoverageRows ? $shortWidth : $maxWidth;
-        $wrappedPublisher = $this->wrapText($book->publisher ?? 'N/A', $publisherWidth);
-        $tableData[] = ['Publisher', $wrappedPublisher];
-        $rowCount++;
+        $this->addRow(
+            $tableData,
+            'Publisher',
+            $book->publisher ?? 'N/A',
+            true,
+            $hasCoverImage,
+            $shortWidth,
+            $maxWidth,
+            $imageCoverageRows
+        );
 
-        $tableData[] = ['Release Date', $book->releaseDate?->format('Y-m-d') ?? 'N/A'];
-        $rowCount++;
+        $this->addRow(
+            $tableData,
+            'Release Date',
+            $book->releaseDate?->format('Y-m-d') ?? 'N/A',
+            false,
+            $hasCoverImage,
+            $shortWidth,
+            $maxWidth,
+            $imageCoverageRows
+        );
 
-        $tableData[] = ['Language', $book->language ?? 'N/A'];
-        $rowCount++;
+        $this->addRow(
+            $tableData,
+            'Language',
+            $book->language ?? 'N/A',
+            false,
+            $hasCoverImage,
+            $shortWidth,
+            $maxWidth,
+            $imageCoverageRows
+        );
 
         if ($book->duration) {
             $hours = floor($book->duration / 3600);
             $minutes = floor(($book->duration % 3600) / 60);
             $durationStr = "{$hours}h {$minutes}m";
-            $tableData[] = ['Duration', $durationStr];
-            $rowCount++;
+            $this->addRow(
+                $tableData,
+                'Duration',
+                $durationStr,
+                false,
+                $hasCoverImage,
+                $shortWidth,
+                $maxWidth,
+                $imageCoverageRows
+            );
         }
 
-        $tableData[] = ['Audio Files', $book->audioFileCount ?? 0];
-        $rowCount++;
+        $this->addRow(
+            $tableData,
+            'Audio Files',
+            (string) ($book->audioFileCount ?? 0),
+            false,
+            $hasCoverImage,
+            $shortWidth,
+            $maxWidth,
+            $imageCoverageRows
+        );
 
-        $tableData[] = ['Source', $book->source ?? 'N/A'];
-        $rowCount++;
+        $this->addRow(
+            $tableData,
+            'Source',
+            $book->source ?? 'N/A',
+            false,
+            $hasCoverImage,
+            $shortWidth,
+            $maxWidth,
+            $imageCoverageRows
+        );
 
-        $directoryWidth = $rowCount <= $imageCoverageRows ? $shortWidth : $maxWidth;
         $directoryPath = $book->directoryPath ?? 'N/A';
 
         // Check if directory exists on disk
@@ -474,58 +579,122 @@ class ShowBookInfo extends Command
         // Use file_exists and is_dir together, and check that it's readable
         $directoryExists = file_exists($fullPath) && is_dir($fullPath) && is_readable($fullPath);
 
-        $wrappedDirectory = $this->wrapText($directoryPath, $directoryWidth);
+        $directoryValue = $directoryPath;
 
         // Add debug info if requested
         if ($this->option('show-paths')) {
             if (!$directoryExists && $directoryPath !== 'N/A') {
-                $wrappedDirectory .= "\n  (Missing: {$fullPath})";
+                $directoryValue .= "\n  (Missing: {$fullPath})";
             } elseif ($directoryPath !== 'N/A') {
-                $wrappedDirectory .= "\n  (Exists: {$fullPath})";
+                $directoryValue .= "\n  (Exists: {$fullPath})";
             }
         }
 
         // Apply color styling using OutputFormatterStyle
         if (!$directoryExists && $directoryPath !== 'N/A') {
-            $wrappedDirectory = "<fg=red>{$wrappedDirectory}</>";
+            $directoryValue = "<fg=red>{$directoryValue}</>";
         }
 
-        $tableData[] = ['Directory', $wrappedDirectory];
-        $rowCount++;
+        $this->addRow(
+            $tableData,
+            'Directory',
+            $directoryValue,
+            true,
+            $hasCoverImage,
+            $shortWidth,
+            $maxWidth,
+            $imageCoverageRows
+        );
 
         if ($book->needsReview) {
             $reasons = $book->needsReviewReasons ? implode(', ', $book->needsReviewReasons) : 'Unknown';
-            $needsReviewText = "Yes ({$reasons})";
-            $needsReviewWidth = $rowCount <= $imageCoverageRows ? $shortWidth : $maxWidth;
-            $wrappedNeedsReview = $this->wrapText($needsReviewText, $needsReviewWidth);
-            $tableData[] = ['Needs Review', $wrappedNeedsReview];
-            $rowCount++;
+            $this->addRow(
+                $tableData,
+                'Needs Review',
+                "Yes ({$reasons})",
+                true,
+                $hasCoverImage,
+                $shortWidth,
+                $maxWidth,
+                $imageCoverageRows
+            );
         }
 
         if ($book->description) {
             $description = strip_tags($book->description);
             $description = preg_replace('/\s+/', ' ', $description);
             $description = trim($description);
-            $descriptionWidth = $rowCount <= $imageCoverageRows ? $shortWidth : $maxWidth;
-            $wrappedDescription = $this->wrapText($description, $descriptionWidth);
-            $tableData[] = ['Description', $wrappedDescription];
-            $rowCount++;
+            $this->addRow(
+                $tableData,
+                'Description',
+                $description,
+                true,
+                $hasCoverImage,
+                $shortWidth,
+                $maxWidth,
+                $imageCoverageRows
+            );
         }
 
         if ($book->audibleInfo) {
-            $tableData[] = ['Audible ASIN', $book->audibleInfo['asin'] ?? 'N/A'];
+            $this->addRow(
+                $tableData,
+                'Audible ASIN',
+                $book->audibleInfo['asin'] ?? 'N/A',
+                false,
+                $hasCoverImage,
+                $shortWidth,
+                $maxWidth,
+                $imageCoverageRows
+            );
         }
 
         if ($book->googleBooksInfo) {
-            $tableData[] = ['Google Books ID', $book->googleBooksInfo['id'] ?? 'N/A'];
+            $this->addRow(
+                $tableData,
+                'Google Books ID',
+                $book->googleBooksInfo['id'] ?? 'N/A',
+                false,
+                $hasCoverImage,
+                $shortWidth,
+                $maxWidth,
+                $imageCoverageRows
+            );
         }
 
         if ($book->hardcoverInfo) {
-            $tableData[] = ['Hardcover ID', $book->hardcoverInfo['id'] ?? 'N/A'];
+            $this->addRow(
+                $tableData,
+                'Hardcover ID',
+                $book->hardcoverInfo['id'] ?? 'N/A',
+                false,
+                $hasCoverImage,
+                $shortWidth,
+                $maxWidth,
+                $imageCoverageRows
+            );
         }
 
-        $tableData[] = ['Created', $book->createdAt?->format('Y-m-d H:i:s') ?? 'N/A'];
-        $tableData[] = ['Updated', $book->updatedAt?->format('Y-m-d H:i:s') ?? 'N/A'];
+        $this->addRow(
+            $tableData,
+            'Created',
+            $book->createdAt?->format('Y-m-d H:i:s') ?? 'N/A',
+            false,
+            $hasCoverImage,
+            $shortWidth,
+            $maxWidth,
+            $imageCoverageRows
+        );
+        $this->addRow(
+            $tableData,
+            'Updated',
+            $book->updatedAt?->format('Y-m-d H:i:s') ?? 'N/A',
+            false,
+            $hasCoverImage,
+            $shortWidth,
+            $maxWidth,
+            $imageCoverageRows
+        );
 
         // Capture table output to count lines using Symfony's BufferedOutput
         // Enable decoration to preserve color tags
@@ -596,6 +765,24 @@ class ShowBookInfo extends Command
                 echo "\r";
             }
         }
+    }
+
+    private function addRow(
+        array &$rows,
+        string $label,
+        string $value,
+        bool $wrap,
+        bool $hasCoverImage,
+        int $shortWidth,
+        int $maxWidth,
+        int $imageCoverageRows
+    ): void {
+        $rowIndex = count($rows) + 1;
+        $preferredWidth = $hasCoverImage && $rowIndex <= $imageCoverageRows ? $shortWidth : $maxWidth;
+        $rows[] = [
+            $label,
+            $wrap ? $this->wrapText($value, $preferredWidth) : $value,
+        ];
     }
 
     protected function displayCompactInfo(Book $book): void
@@ -772,11 +959,7 @@ class ShowBookInfo extends Command
 
     protected function wrapText(string $text, int $maxWidth): string
     {
-        if (empty($text)) {
-            return $text;
-        }
-
-        if ($maxWidth <= 0) {
+        if (empty($text) || $maxWidth <= 0) {
             return $text;
         }
 
@@ -794,10 +977,6 @@ class ShowBookInfo extends Command
         };
 
         foreach ($tokens as $token) {
-            if ($token === '') {
-                continue;
-            }
-
             if ($token[0] === '<' && str_ends_with($token, '>')) {
                 $currentLine .= $token;
                 continue;
@@ -838,10 +1017,6 @@ class ShowBookInfo extends Command
 
                 $chunk = mb_substr($remaining, 0, $available);
                 $chunkLength = mb_strlen($chunk);
-
-                if ($chunkLength === 0) {
-                    break;
-                }
 
                 $currentLine .= $chunk;
                 $visibleLength += $chunkLength;
@@ -1048,7 +1223,8 @@ class ShowBookInfo extends Command
         // Update publisher
         if ($this->option('publisher')) {
             $publisherName = trim((string) $this->option('publisher'));
-            $publisher = Publisher::firstOrCreate(['name' => $publisherName]);
+            /** @var Publisher $publisher */
+            $publisher = $this->publisherModel->newQuery()->firstOrCreate(['name' => $publisherName]);
             $book->publisher()->associate($publisher);
             $this->info("✓ Updated publisher: {$publisher->name}");
             $updated = true;
@@ -1065,10 +1241,10 @@ class ShowBookInfo extends Command
         if ($this->option('release-date')) {
             $date = $this->option('release-date');
             try {
-                $book->releaseDate = new \DateTime($date);
+                $book->releaseDate = CarbonImmutable::parse($date);
                 $this->info("✓ Updated release date: {$book->releaseDate->format('Y-m-d')}");
                 $updated = true;
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 $this->error("Invalid date format: {$date}");
                 return;
             }
@@ -1289,7 +1465,7 @@ class ShowBookInfo extends Command
     protected function handleDelete(string $bookId): int
     {
         // Find the book
-        $book = Book::find($bookId);
+        $book = $this->queryBook()->find($bookId);
 
         if (!$book) {
             $this->error("Book not found with ID: {$bookId}");
@@ -1314,7 +1490,8 @@ class ShowBookInfo extends Command
             $this->line("  Directory exists: <fg=green>Yes</>");
 
             // Check if any other books use this directory
-            $otherBooks = Book::where('directory_path', $book->directoryPath)
+            $otherBooks = $this->queryBook()
+                ->where('directory_path', $book->directoryPath)
                 ->where('id', '!=', $book->id)
                 ->get();
 
