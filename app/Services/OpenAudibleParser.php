@@ -190,9 +190,7 @@ class OpenAudibleParser
         }
 
         if (!empty($bookData['authors'])) {
-            return is_array($bookData['authors'])
-                ? $bookData['authors']
-                : [$bookData['authors']];
+            return is_array($bookData['authors']) ? $bookData['authors'] : [$bookData['authors']];
         }
 
         if (!empty($bookData['author_name'])) {
@@ -216,9 +214,7 @@ class OpenAudibleParser
         }
 
         if (!empty($bookData['narrators'])) {
-            return is_array($bookData['narrators'])
-                ? $bookData['narrators']
-                : [$bookData['narrators']];
+            return is_array($bookData['narrators']) ? $bookData['narrators'] : [$bookData['narrators']];
         }
 
         return null;

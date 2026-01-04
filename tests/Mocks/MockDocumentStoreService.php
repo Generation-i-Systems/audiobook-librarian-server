@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Mocks;
 
 use App\Contracts\DocumentStoreServiceInterface;
@@ -44,13 +46,19 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     protected $apiTokens = [];
 
     protected $accountRequests = [];
+
     protected $follows = [];
 
+    protected array $libraryRepairIssues = [];
+
+    protected int $libraryRepairIssueAutoIncrement = 1;
+
     /**
-     * Get unique values for a specific field across all books
+     * Get unique values for a specific field across all books.
      *
      * @param string $field The field to get unique values for (e.g., 'genre', 'author')
      * @param string|null $subField Optional subfield for nested data (e.g., 'seriesName' when field is 'series')
+     *
      * @return array Array of unique values
      */
     public function getUniqueValues(string $field, ?string $subField = null): array
@@ -60,6 +68,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         switch ($field) {
             case 'author':
                 $values = [];
+
                 foreach ($this->books as $book) {
                     if (isset($book['authors']) && is_array($book['authors'])) {
                         foreach ($book['authors'] as $author) {
@@ -75,6 +84,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
 
             case 'genre':
                 $values = [];
+
                 foreach ($this->books as $book) {
                     if (isset($book['genres']) && is_array($book['genres'])) {
                         foreach ($book['genres'] as $genre) {
@@ -91,6 +101,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
             case 'series':
                 if ($subField === 'seriesName') {
                     $values = [];
+
                     foreach ($this->books as $book) {
                         if (isset($book['series']) && is_array($book['series'])) {
                             foreach ($book['series'] as $series) {
@@ -114,13 +125,13 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         $email = $credentials['email'] ?? null;
         $password = $credentials['password'] ?? null;
 
-        if (!$email || !$password) {
+        if (! $email || ! $password) {
             return false;
         }
 
         $user = collect($this->users)->firstWhere('email', $email);
 
-        if (!$user) {
+        if (! $user) {
             return false;
         }
 
@@ -133,6 +144,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
             if ($u['id'] === $identifier || $u['email'] === $identifier) {
                 $u['remember_token'] = $token;
             }
+
             return $u;
         }, $this->users);
     }
@@ -145,17 +157,19 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     public function findBookByDirectoryPath(string $directoryPath): ?array
     {
         $directoryPath = trim($directoryPath, '/');
+
         if ($directoryPath === '') {
             return null;
         }
 
         foreach ($this->books as $book) {
-            if (!is_array($book)) {
+            if (! is_array($book)) {
                 continue;
             }
 
             $bookPath = $book['directoryPath'] ?? ($book['directory_path'] ?? ($book['path'] ?? null));
-            if (!is_string($bookPath)) {
+
+            if (! is_string($bookPath)) {
                 continue;
             }
 
@@ -178,7 +192,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
 
     public function updateBook($id, array $data)
     {
-        if (!isset($this->books[$id])) {
+        if (! isset($this->books[$id])) {
             return false;
         }
 
@@ -189,7 +203,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
 
     public function deleteBook($id, bool $deleteFiles = true)
     {
-        if (!isset($this->books[$id])) {
+        if (! isset($this->books[$id])) {
             return false;
         }
 
@@ -201,6 +215,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     public function searchBooks($query, $limit = 10, $offset = 0)
     {
         $results = [];
+
         foreach ($this->books as $book) {
             if (
                 stripos($book['title'] ?? '', $query) !== false ||
@@ -231,6 +246,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     public function getBooksByIds(array $ids)
     {
         $results = [];
+
         foreach ($ids as $id) {
             if (isset($this->books[$id])) {
                 $results[] = $this->books[$id];
@@ -243,6 +259,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     public function getBooksBySeries($seriesName)
     {
         $results = [];
+
         foreach ($this->books as $book) {
             if (isset($book['series']) && is_array($book['series'])) {
                 foreach ($book['series'] as $series) {
@@ -260,6 +277,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     public function getBooksByAuthor($author)
     {
         $results = [];
+
         foreach ($this->books as $book) {
             if (isset($book['author']) && $book['author'] === $author) {
                 $results[] = $book;
@@ -272,6 +290,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     public function getBooksByGenre($genre)
     {
         $results = [];
+
         foreach ($this->books as $book) {
             if (isset($book['genres']) && in_array($genre, $book['genres'])) {
                 $results[] = $book;
@@ -291,38 +310,41 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         // Apply filters
         $filteredBooks = array_filter($this->books, function ($book) use ($filters) {
             // Filter by author
-            if (!empty($filters['author'])) {
+            if (! empty($filters['author'])) {
                 $authorMatch = false;
                 $authors = is_array($book['author'] ?? null) ? $book['author'] : [$book['author'] ?? ''];
 
                 foreach ($authors as $author) {
                     $authorName = is_array($author) ? ($author['name'] ?? '') : $author;
+
                     if (stripos($authorName, $filters['author']) !== false) {
                         $authorMatch = true;
                         break;
                     }
                 }
 
-                if (!$authorMatch) {
+                if (! $authorMatch) {
                     return false;
                 }
             }
 
             // Filter by genre
-            if (!empty($filters['genre'])) {
+            if (! empty($filters['genre'])) {
                 $genres = is_array($book['genre'] ?? null) ? $book['genre'] : [$book['genre'] ?? ''];
-                if (!in_array($filters['genre'], $genres, true)) {
+
+                if (! in_array($filters['genre'], $genres, true)) {
                     return false;
                 }
             }
 
             // Filter by series
-            if (!empty($filters['series'])) {
+            if (! empty($filters['series'])) {
                 $seriesMatch = false;
                 $seriesList = is_array($book['series'] ?? null) ? $book['series'] : ($book['series'] ? [$book['series']] : []);
 
                 foreach ($seriesList as $series) {
                     $seriesName = '';
+
                     if (is_array($series)) {
                         $seriesName = $series['seriesName'] ?? $series['name'] ?? '';
                     } elseif (is_string($series)) {
@@ -335,7 +357,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
                     }
                 }
 
-                if (!$seriesMatch) {
+                if (! $seriesMatch) {
                     return false;
                 }
             }
@@ -352,6 +374,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
 
         // Ensure all book fields are properly formatted
         $result = [];
+
         foreach ($paginatedBooks as $book) {
             $formattedBook = $this->ensureBookFields($book);
 
@@ -382,6 +405,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         usort($sortedBooks, function ($a, $b) {
             $aTime = strtotime($a['created_at'] ?? 'now');
             $bTime = strtotime($b['created_at'] ?? 'now');
+
             return $bTime - $aTime;
         });
 
@@ -389,6 +413,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         $cutoffDate = strtotime("-$days days");
         $recentBooks = array_filter($sortedBooks, function ($book) use ($cutoffDate) {
             $bookTime = strtotime($book['created_at'] ?? 'now');
+
             return $bookTime >= $cutoffDate;
         });
 
@@ -397,6 +422,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
 
         // Format the books and load related data
         $result = [];
+
         foreach ($recentBooks as $book) {
             $formattedBook = $this->ensureBookFields($book);
             $formattedBook = $this->loadRelatedData($formattedBook);
@@ -407,9 +433,10 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     }
 
     /**
-     * Ensure all required book fields are present and properly formatted
+     * Ensure all required book fields are present and properly formatted.
      *
      * @param array $book
+     *
      * @return array
      */
     protected function ensureBookFields(array $book): array
@@ -429,34 +456,37 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         $book = array_merge($defaults, $book);
 
         // Ensure author is an array of arrays with name
-        if (!empty($book['author'])) {
+        if (! empty($book['author'])) {
             $authors = is_array($book['author']) ? $book['author'] : [$book['author']];
             $book['author'] = array_map(function ($author) {
                 if (is_array($author) && isset($author['name'])) {
                     return $author;
                 }
+
                 return ['name' => (string) $author];
             }, $authors);
         }
 
         // Ensure series is an array of arrays with seriesName
-        if (!empty($book['series'])) {
+        if (! empty($book['series'])) {
             $seriesList = is_array($book['series']) ? $book['series'] : [$book['series']];
             $book['series'] = array_map(function ($series) {
                 if (is_array($series)) {
                     // Convert 'name' to 'seriesName' if needed
-                    if (isset($series['name']) && !isset($series['seriesName'])) {
+                    if (isset($series['name']) && ! isset($series['seriesName'])) {
                         $series['seriesName'] = $series['name'];
                         unset($series['name']);
                     }
+
                     return $series;
                 }
+
                 return ['seriesName' => (string) $series];
             }, $seriesList);
         }
 
         // Ensure genre is an array of strings
-        if (!empty($book['genre'])) {
+        if (! empty($book['genre'])) {
             $book['genre'] = is_array($book['genre']) ? $book['genre'] : [$book['genre']];
         }
 
@@ -464,9 +494,10 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     }
 
     /**
-     * Load related data for a book
+     * Load related data for a book.
      *
      * @param array $book
+     *
      * @return array
      */
     protected function loadRelatedData(array $book): array
@@ -475,13 +506,13 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         // For the mock, we'll just ensure the structure is correct
 
         // Ensure authors have all required fields
-        if (!empty($book['author'])) {
+        if (! empty($book['author'])) {
             $book['authors'] = $book['author'];
             unset($book['author']);
         }
 
         // Ensure series have all required fields
-        if (!empty($book['series'])) {
+        if (! empty($book['series'])) {
             $book['series'] = array_map(function ($series) {
                 if (is_array($series)) {
                     return [
@@ -489,6 +520,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
                         'position' => $series['position'] ?? null,
                     ];
                 }
+
                 return ['seriesName' => (string) $series];
             }, $book['series']);
         }
@@ -499,6 +531,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     public function getBooksByAuthorAndGenre($author, $genre)
     {
         $results = [];
+
         foreach ($this->books as $book) {
             if (
                 (isset($book['author']) && $book['author'] === $author) &&
@@ -542,6 +575,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     public function getUserByRememberToken($identifier, $token)
     {
         $user = $this->getUserById($identifier);
+
         if ($user && isset($user['remember_token']) && $user['remember_token'] === $token) {
             return $user;
         }
@@ -560,7 +594,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
 
     public function updateUser(string $id, array $data)
     {
-        if (!isset($this->users[$id])) {
+        if (! isset($this->users[$id])) {
             return false;
         }
 
@@ -571,7 +605,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
 
     public function deleteUser(string $id)
     {
-        if (!isset($this->users[$id])) {
+        if (! isset($this->users[$id])) {
             return false;
         }
 
@@ -581,9 +615,10 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     }
 
     /**
-     * Get a user by their email address
+     * Get a user by their email address.
      *
      * @param string $email The email address to search for
+     *
      * @return array|null The user data or null if not found
      */
     public function getUserByEmail(string $email): ?array
@@ -598,9 +633,10 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     }
 
     /**
-     * Check if a user with the given email exists
+     * Check if a user with the given email exists.
      *
      * @param string $email The email address to check
+     *
      * @return bool True if a user with this email exists
      */
     public function userExistsByEmail(string $email): bool
@@ -615,9 +651,10 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     }
 
     /**
-     * Check if a user with the given username exists
+     * Check if a user with the given username exists.
      *
      * @param string $username The username to check
+     *
      * @return bool True if a user with this username exists
      */
     public function userExistsByUsername(string $username): bool
@@ -631,10 +668,106 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         return false;
     }
 
+    public function listLibraryRepairIssues(array $filters = [], int $limit = 50, int $page = 1): array
+    {
+        $filtered = $this->filterLibraryRepairIssues($this->libraryRepairIssues, $filters);
+
+        usort($filtered, fn ($a, $b) => strcmp($b['createdAt'], $a['createdAt']));
+
+        $offset = max(0, ($page - 1) * $limit);
+
+        return array_slice($filtered, $offset, $limit);
+    }
+
+    public function countLibraryRepairIssues(array $filters = []): int
+    {
+        return count($this->filterLibraryRepairIssues($this->libraryRepairIssues, $filters));
+    }
+
+    public function getLibraryRepairIssue(int $issueId): ?array
+    {
+        return $this->libraryRepairIssues[$issueId] ?? null;
+    }
+
+    public function resolveLibraryRepairIssue(int $issueId, ?string $resolutionNotes = null): bool
+    {
+        if (! isset($this->libraryRepairIssues[$issueId])) {
+            return false;
+        }
+
+        $issue = $this->libraryRepairIssues[$issueId];
+        $issue['status'] = 'resolved';
+        $issue['resolvedAt'] = now()->toIso8601String();
+        $issue['resolutionNotes'] = $resolutionNotes;
+        $issue['updatedAt'] = $issue['resolvedAt'];
+        $issue['autoResolved'] ??= false;
+
+        $this->libraryRepairIssues[$issueId] = $issue;
+
+        return true;
+    }
+
+    public function addLibraryRepairIssue(array $issue): array
+    {
+        $issue = $this->ensureLibraryRepairIssueFields($issue);
+        $this->libraryRepairIssues[$issue['id']] = $issue;
+
+        return $issue;
+    }
+
+    protected function ensureLibraryRepairIssueFields(array $issue): array
+    {
+        $issue['id'] ??= $this->libraryRepairIssueAutoIncrement++;
+        $issue['issueType'] ??= 'missing_directory';
+        $issue['status'] ??= 'pending';
+        $issue['directoryPath'] ??= null;
+        $issue['metadata'] ??= [];
+        $issue['autoResolved'] = (bool) ($issue['autoResolved'] ?? false);
+        $issue['createdAt'] ??= now()->toIso8601String();
+        $issue['updatedAt'] ??= $issue['createdAt'];
+        $issue['resolvedAt'] ??= null;
+        $issue['resolutionNotes'] ??= null;
+        $issue['book'] ??= null;
+
+        return $issue;
+    }
+
+    protected function filterLibraryRepairIssues(array $issues, array $filters): array
+    {
+        return array_values(array_filter($issues, function ($issue) use ($filters) {
+            if (! empty($filters['issue_type']) && $issue['issueType'] !== $filters['issue_type']) {
+                return false;
+            }
+
+            if (! empty($filters['status']) && $issue['status'] !== $filters['status']) {
+                return false;
+            }
+
+            if (array_key_exists('auto_resolved', $filters) && $filters['auto_resolved'] !== '') {
+                if ((bool) $issue['autoResolved'] !== (bool) $filters['auto_resolved']) {
+                    return false;
+                }
+            }
+
+            if (! empty($filters['search'])) {
+                $search = strtolower($filters['search']);
+                $directoryMatches = is_string($issue['directoryPath']) && str_contains(strtolower($issue['directoryPath']), $search);
+                $bookMatches = ! empty($issue['book']['title']) && str_contains(strtolower($issue['book']['title']), $search);
+
+                if (! $directoryMatches && ! $bookMatches) {
+                    return false;
+                }
+            }
+
+            return true;
+        }));
+    }
+
     /**
-     * Get a user by their username
+     * Get a user by their username.
      *
      * @param string $username The username to search for
+     *
      * @return array|null The user data or null if not found
      */
     public function getUserByUsername(string $username): ?array
@@ -649,13 +782,14 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     }
 
     /**
-     * Get all admin users
+     * Get all admin users.
      *
      * @return array List of admin users
      */
     public function getAdminUsers(): array
     {
         $admins = [];
+
         foreach ($this->users as $id => $user) {
             if (isset($user['role']) && $user['role'] === 'admin') {
                 $userData = $user;
@@ -668,13 +802,14 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     }
 
     /**
-     * Get all users in the system
+     * Get all users in the system.
      *
      * @return array List of all users
      */
     public function getAllUsers(): array
     {
         $allUsers = [];
+
         foreach ($this->users as $id => $user) {
             $userData = $user;
             $userData['id'] = $id;
@@ -716,26 +851,26 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     {
         $genres = $this->listGenres();
 
-        return array_map(function (array $genre) {
-            return [
-                'id' => (string) ($genre['id'] ?? ''),
-                'name' => (string) ($genre['name'] ?? ''),
-                'bookCount' => 0,
-                'authorCount' => 0,
-            ];
-        }, $genres);
+        return array_map(fn (array $genre) => [
+            'id' => (string) ($genre['id'] ?? ''),
+            'name' => (string) ($genre['name'] ?? ''),
+            'bookCount' => 0,
+            'authorCount' => 0,
+        ], $genres);
     }
 
     /**
-     * Get a genre by ID
+     * Get a genre by ID.
      *
      * @param string $id The genre ID
+     *
      * @return array|null The genre data or null if not found
      */
     public function getGenre(string $id): ?array
     {
         // First check if this is a built-in genre from config
         $configGenres = config('genres', []);
+
         foreach ($configGenres as $genre) {
             if (($genre['id'] ?? '') === $id) {
                 return $genre;
@@ -748,7 +883,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
 
     public function deleteGenre(string $id)
     {
-        if (!isset($this->genres[$id])) {
+        if (! isset($this->genres[$id])) {
             return false;
         }
 
@@ -771,9 +906,11 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         foreach ($this->series as $key => $series) {
             if ($series['id'] === $id || $series['id'] === 'series_' . $id) {
                 $this->series[$key] = array_merge($series, $data);
+
                 return true;
             }
         }
+
         return false;
     }
 
@@ -813,7 +950,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
 
     public function deleteSeries(string $id)
     {
-        if (!isset($this->series[$id])) {
+        if (! isset($this->series[$id])) {
             return false;
         }
 
@@ -830,6 +967,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     public function searchSeriesByName(string $term): array
     {
         $results = [];
+
         foreach ($this->series as $series) {
             if (isset($series['seriesName']) && stripos($series['seriesName'], $term) !== false) {
                 $results[] = $series;
@@ -857,13 +995,11 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     {
         $authors = $this->listAuthors();
 
-        return array_map(function (array $author) {
-            return [
-                'id' => (string) ($author['id'] ?? ''),
-                'name' => (string) ($author['name'] ?? ''),
-                'bookCount' => 0,
-            ];
-        }, $authors);
+        return array_map(fn (array $author) => [
+            'id' => (string) ($author['id'] ?? ''),
+            'name' => (string) ($author['name'] ?? ''),
+            'bookCount' => 0,
+        ], $authors);
     }
 
     public function deleteAuthor(string $id): void
@@ -875,13 +1011,15 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
 
     public function findOrCreateMany(string $collection, array $names): array
     {
-        if (!property_exists($this, $collection)) {
+        if (! property_exists($this, $collection)) {
             return [];
         }
 
         $ids = [];
+
         foreach ($names as $name) {
             $existingId = null;
+
             foreach ($this->{$collection} as $docId => $doc) {
                 if (isset($doc['name']) && $doc['name'] === $name) {
                     $existingId = $docId;
@@ -904,6 +1042,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     public function searchAuthorsByName(string $term): array
     {
         $results = [];
+
         foreach ($this->authors as $author) {
             if (isset($author['name']) && stripos($author['name'], $term) !== false) {
                 $results[] = $author;
@@ -916,6 +1055,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     public function searchNarratorsByName(string $term): array
     {
         $results = [];
+
         foreach ($this->narrators as $narrator) {
             if (isset($narrator['name']) && stripos($narrator['name'], $term) !== false) {
                 $results[] = $narrator;
@@ -928,6 +1068,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     public function searchGenresByName(string $term): array
     {
         $results = [];
+
         foreach ($this->genres as $genre) {
             if (isset($genre['name']) && stripos($genre['name'], $term) !== false) {
                 $results[] = $genre;
@@ -944,15 +1085,18 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     public function listNeedsReviewBooks(?string $reason = null, int $limit = 100, int $page = 1): array
     {
         $items = [];
+
         foreach ($this->books as $book) {
             $needsReview = (bool) ($book['needs_review'] ?? false);
-            if (!$needsReview) {
+
+            if (! $needsReview) {
                 continue;
             }
 
             $reasons = $book['needs_review_reasons'] ?? [];
+
             if ($reason !== null) {
-                if (!is_array($reasons) || !in_array($reason, $reasons, true)) {
+                if (! is_array($reasons) || ! in_array($reason, $reasons, true)) {
                     continue;
                 }
             }
@@ -968,6 +1112,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
 
         // Basic pagination on the array
         $offset = max(0, ($page - 1) * $limit);
+
         return array_slice($items, $offset, $limit);
     }
 
@@ -977,8 +1122,9 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     public function listNeedsReviewReasons(): array
     {
         $set = [];
+
         foreach ($this->books as $book) {
-            if (!empty($book['needs_review'])) {
+            if (! empty($book['needs_review'])) {
                 foreach (($book['needs_review_reasons'] ?? []) as $r) {
                     $set[$r] = true;
                 }
@@ -986,6 +1132,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         }
         $reasons = array_keys($set);
         sort($reasons);
+
         return $reasons;
     }
 
@@ -1005,9 +1152,10 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         }
 
         $results = [];
+
         foreach ($this->messages as $message) {
             if (isset($message['userId']) && $message['userId'] === $userId) {
-                if ($includeAcknowledged || !($message['acknowledged'] ?? false)) {
+                if ($includeAcknowledged || ! ($message['acknowledged'] ?? false)) {
                     $results[] = $message;
                 }
             }
@@ -1023,6 +1171,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     public function listJobs(?string $type = null, ?string $status = null, int $limit = 50, string $orderBy = 'updated_at', string $direction = 'DESC', ?string $startAfterId = null): array
     {
         $results = [];
+
         foreach ($this->jobs as $job) {
             if (
                 ($type === null || ($job['type'] ?? '') === $type) &&
@@ -1041,7 +1190,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
 
     public function deleteJob(string $jobId): bool
     {
-        if (!isset($this->jobs[$jobId])) {
+        if (! isset($this->jobs[$jobId])) {
             return false;
         }
 
@@ -1063,6 +1212,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     public function resetReadingProgress(string $userId, string $bookId): bool
     {
         $key = $userId . '_' . $bookId;
+
         if (isset($this->readingProgress[$key])) {
             unset($this->readingProgress[$key]);
 
@@ -1130,9 +1280,10 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     }
 
     /**
-     * Get an author by ID
+     * Get an author by ID.
      *
      * @param string $id The author ID
+     *
      * @return array|null The author data or null if not found
      */
     public function getAuthor(string $id): ?array
@@ -1141,19 +1292,21 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     }
 
     /**
-     * Update an author
+     * Update an author.
      *
      * @param string $id The author ID
      * @param array $data The updated author data
+     *
      * @return bool True if the update was successful
      */
     public function updateAuthor(string $id, array $data): bool
     {
-        if (!isset($this->authors[$id])) {
+        if (! isset($this->authors[$id])) {
             return false;
         }
 
         $this->authors[$id] = array_merge($this->authors[$id], $data);
+
         return true;
     }
 
@@ -1175,6 +1328,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     public function createBookmark(array $data): string
     {
         $id = uniqid('bookmark_');
+
         return $id;
     }
 
@@ -1194,15 +1348,16 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     }
 
     /**
-     * Add a book to a user's queue
+     * Add a book to a user's queue.
      *
      * @param string $userId The user ID
      * @param string $bookId The book ID to add
+     *
      * @return bool Success status
      */
     public function addBookToQueue(string $userId, string $bookId): bool
     {
-        if (!isset($this->queues[$userId])) {
+        if (! isset($this->queues[$userId])) {
             $this->queues[$userId] = [];
         }
 
@@ -1213,23 +1368,26 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
 
         // Add book to queue
         $this->queues[$userId][] = $bookId;
+
         return true;
     }
 
     /**
-     * Remove a book from a user's queue
+     * Remove a book from a user's queue.
      *
      * @param string $userId The user ID
      * @param string $bookId The book ID to remove
+     *
      * @return bool Success status
      */
     public function removeBookFromQueue(string $userId, string $bookId): bool
     {
-        if (!isset($this->queues[$userId])) {
+        if (! isset($this->queues[$userId])) {
             return false; // Queue doesn't exist
         }
 
         $key = array_search($bookId, $this->queues[$userId]);
+
         if ($key === false) {
             return false; // Book not in queue
         }
@@ -1237,6 +1395,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         // Remove book from queue
         unset($this->queues[$userId][$key]);
         $this->queues[$userId] = array_values($this->queues[$userId]); // Re-index array
+
         return true;
     }
 
@@ -1249,8 +1408,10 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     {
         if (isset($this->jobs[$jobId])) {
             $this->jobs[$jobId] = array_merge($this->jobs[$jobId], $data);
+
             return true;
         }
+
         return false;
     }
 
@@ -1277,8 +1438,10 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     {
         if (isset($this->genres[$id])) {
             $this->genres[$id] = array_merge($this->genres[$id], $data);
+
             return true;
         }
+
         return false;
     }
 
@@ -1287,7 +1450,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
      */
     public function followExists(string $userId, string $followableType, string $followableId): bool
     {
-        if (!isset($this->follows[$userId])) {
+        if (! isset($this->follows[$userId])) {
             return false;
         }
 
@@ -1303,14 +1466,15 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
      */
     public function createFollow(string $userId, string $followableType, string $followableId): bool
     {
-        if (!isset($this->follows[$userId])) {
+        if (! isset($this->follows[$userId])) {
             $this->follows[$userId] = [];
         }
 
         $follow = ['type' => $followableType, 'id' => $followableId];
 
-        if (!in_array($follow, $this->follows[$userId], true)) {
+        if (! in_array($follow, $this->follows[$userId], true)) {
             $this->follows[$userId][] = $follow;
+
             return true;
         }
 
@@ -1322,7 +1486,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
      */
     public function deleteFollow(string $userId, string $followableType, string $followableId): bool
     {
-        if (!isset($this->follows[$userId])) {
+        if (! isset($this->follows[$userId])) {
             return false;
         }
 
@@ -1332,6 +1496,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
             if ($existingFollow === $follow) {
                 unset($this->follows[$userId][$key]);
                 $this->follows[$userId] = array_values($this->follows[$userId]);
+
                 return true;
             }
         }
@@ -1361,7 +1526,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
      */
     public function getFollowing(string $userId, string $followableType = null): array
     {
-        if (!isset($this->follows[$userId])) {
+        if (! isset($this->follows[$userId])) {
             return [];
         }
 
@@ -1398,8 +1563,9 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
      */
     public function clearJobs(): bool
     {
-        $hadJobs = !empty($this->jobs);
+        $hadJobs = ! empty($this->jobs);
         $this->jobs = [];
+
         return $hadJobs;
     }
 
@@ -1410,15 +1576,16 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     {
         $collection = strtolower($collection);
 
-        if (!property_exists($this, $collection) || !is_array($this->$collection)) {
+        if (! property_exists($this, $collection) || ! is_array($this->$collection)) {
             return false;
         }
 
-        if (!isset($this->{$collection}[$id])) {
+        if (! isset($this->{$collection}[$id])) {
             return false;
         }
 
         $this->{$collection}[$id] = array_merge($this->{$collection}[$id], $data);
+
         return true;
     }
 
@@ -1432,6 +1599,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
                 return true;
             }
         }
+
         return false;
     }
 
@@ -1445,6 +1613,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
                 return true;
             }
         }
+
         return false;
     }
 
@@ -1454,9 +1623,10 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     }
 
     /**
-     * Create an API token for a user
+     * Create an API token for a user.
      *
-     * @param array $tokenData The token data including user_id, token, etc.
+     * @param array $tokenData the token data including user_id, token, etc
+     *
      * @return string|null The token ID or null on failure
      */
     public function createApiToken(array $tokenData): ?string
@@ -1469,9 +1639,10 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     }
 
     /**
-     * Delete an API token by its value
+     * Delete an API token by its value.
      *
      * @param string $tokenValue The token value to delete
+     *
      * @return bool True if token was deleted, false otherwise
      */
     public function deleteApiTokenByValue(string $tokenValue): bool
@@ -1479,6 +1650,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         foreach ($this->apiTokens as $id => $token) {
             if (isset($token['token']) && $token['token'] === $tokenValue) {
                 unset($this->apiTokens[$id]);
+
                 return true;
             }
         }
@@ -1487,7 +1659,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     }
 
     /**
-     * Get pending account requests
+     * Get pending account requests.
      *
      * @return array List of pending account requests
      */
@@ -1505,9 +1677,10 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     }
 
     /**
-     * Get a specific account request by ID
+     * Get a specific account request by ID.
      *
      * @param string $id The account request ID
+     *
      * @return array|null The account request data or null if not found
      */
     public function getAccountRequest(string $id): ?array
@@ -1516,14 +1689,15 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     }
 
     /**
-     * Approve an account request
+     * Approve an account request.
      *
      * @param string $id The account request ID
+     *
      * @return bool True if the request was approved successfully
      */
     public function approveAccountRequest(string $id): bool
     {
-        if (!isset($this->accountRequests[$id])) {
+        if (! isset($this->accountRequests[$id])) {
             return false;
         }
 
@@ -1546,14 +1720,15 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     }
 
     /**
-     * Reject an account request
+     * Reject an account request.
      *
      * @param string $id The account request ID
+     *
      * @return bool True if the request was rejected successfully
      */
     public function rejectAccountRequest(string $id): bool
     {
-        if (!isset($this->accountRequests[$id])) {
+        if (! isset($this->accountRequests[$id])) {
             return false;
         }
 
@@ -1564,23 +1739,27 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     }
 
     /**
-     * Count books that need review, optionally filtered by reason
+     * Count books that need review, optionally filtered by reason.
      *
      * @param string|null $reason
+     *
      * @return int
      */
     public function countNeedsReviewBooks(?string $reason = null): int
     {
         $count = 0;
+
         foreach ($this->books as $book) {
             $needsReview = (bool) ($book['needs_review'] ?? false);
-            if (!$needsReview) {
+
+            if (! $needsReview) {
                 continue;
             }
 
             if ($reason !== null) {
                 $reasons = $book['needs_review_reasons'] ?? [];
-                if (!is_array($reasons) || !in_array($reason, $reasons, true)) {
+
+                if (! is_array($reasons) || ! in_array($reason, $reasons, true)) {
                     continue;
                 }
             }
@@ -1595,7 +1774,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     {
         $genre = $this->genres[$genreId] ?? null;
 
-        if (!$genre) {
+        if (! $genre) {
             return [
                 'genre' => null,
                 'authors' => [],
@@ -1615,7 +1794,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     {
         $author = $this->authors[$authorId] ?? null;
 
-        if (!$author) {
+        if (! $author) {
             return [
                 'author' => null,
                 'genre' => null,
@@ -1625,6 +1804,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         }
 
         $genre = null;
+
         if ($genreId !== null && isset($this->genres[$genreId])) {
             $g = $this->genres[$genreId];
             $genre = [
@@ -1645,10 +1825,11 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     }
 
     /**
-     * Rename a series across all books
+     * Rename a series across all books.
      *
      * @param string $oldName
      * @param string $newName
+     *
      * @return int Number of books updated
      */
     public function renameSeries(string $oldName, string $newName): int
@@ -1656,13 +1837,15 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         $updated = 0;
 
         foreach ($this->books as $id => $book) {
-            if (!isset($book['series']) || !is_array($book['series'])) {
+            if (! isset($book['series']) || ! is_array($book['series'])) {
                 continue;
             }
 
             $changed = false;
+
             foreach ($book['series'] as $key => $series) {
                 $seriesName = is_array($series) ? ($series['seriesName'] ?? '') : $series;
+
                 if ($seriesName === $oldName) {
                     if (is_array($book['series'][$key])) {
                         $book['series'][$key]['seriesName'] = $newName;

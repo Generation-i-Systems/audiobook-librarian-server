@@ -244,9 +244,7 @@ class AuthController extends Controller
 
             if ($isNewUser) {
                 $userIdForNotification = (string) ($user['id'] ?? $createdId ?? '');
-                $completeUserData = $userIdForNotification !== ''
-                    ? $this->documentStoreService->getUserById($userIdForNotification) ?? $user
-                    : $user;
+                $completeUserData = $userIdForNotification !== '' ? $this->documentStoreService->getUserById($userIdForNotification) ?? $user : $user;
 
                 $this->registrationNotifier->send((array) $completeUserData, 'api-google', $request);
             }

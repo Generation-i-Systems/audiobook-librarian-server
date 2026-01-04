@@ -1195,9 +1195,11 @@ class ShowBookInfo extends Command
     protected function getCursorPosition(): ?array
     {
         // Skip if no TTY available (e.g., in testing or CI environments)
-        if (app()->environment('testing') ||
+        if (
+            app()->environment('testing') ||
             !is_resource(STDIN) ||
-            (function_exists('posix_isatty') && !@posix_isatty(STDIN))) {
+            (function_exists('posix_isatty') && !@posix_isatty(STDIN))
+        ) {
             return null;
         }
 

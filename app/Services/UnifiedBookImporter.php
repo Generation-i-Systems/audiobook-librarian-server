@@ -258,9 +258,7 @@ class UnifiedBookImporter
             if ($this->genreMapper) {
                 $genre = $this->genreMapper->mapToPrimaryGenre($genreValue);
             } else {
-                $genreParts = is_array($genreValue)
-                    ? $genreValue
-                    : explode(':', (string) $genreValue);
+                $genreParts = is_array($genreValue) ? $genreValue : explode(':', (string) $genreValue);
                 $genre = trim($genreParts[0]);
             }
         }
@@ -455,9 +453,7 @@ class UnifiedBookImporter
     {
         // Authors
         if (!empty($bookData['author'])) {
-            $authorNames = is_array($bookData['author'])
-                ? $bookData['author']
-                : explode(',', $bookData['author']);
+            $authorNames = is_array($bookData['author']) ? $bookData['author'] : explode(',', $bookData['author']);
 
             $authorIds = [];
             foreach ($authorNames as $authorName) {
@@ -473,9 +469,7 @@ class UnifiedBookImporter
         // Narrators
         if (!empty($bookData['narrated_by']) || !empty($bookData['narrator'])) {
             $narratorField = $bookData['narrated_by'] ?? $bookData['narrator'];
-            $narratorNames = is_array($narratorField)
-                ? $narratorField
-                : explode(',', $narratorField);
+            $narratorNames = is_array($narratorField) ? $narratorField : explode(',', $narratorField);
 
             $narratorIds = [];
             foreach ($narratorNames as $narratorName) {

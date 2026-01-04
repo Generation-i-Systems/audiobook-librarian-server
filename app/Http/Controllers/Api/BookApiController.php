@@ -1596,14 +1596,10 @@ class BookApiController extends Controller
 
                 if (is_array($series)) {
                     $name = $series['name'] ?? null;
-                    $seriesNumber = $series['pivot']['series_number']
-                        ?? $series['series_number']
-                        ?? null;
+                    $seriesNumber = $series['pivot']['series_number'] ?? $series['series_number'] ?? null;
                 } elseif (is_object($series)) {
                     $name = $series->name ?? null;
-                    $seriesNumber = $series->pivot->series_number
-                        ?? $series->series_number
-                        ?? null;
+                    $seriesNumber = $series->pivot->series_number ?? $series->series_number ?? null;
                 }
 
                 // Only include entries with valid series names (not null or empty)

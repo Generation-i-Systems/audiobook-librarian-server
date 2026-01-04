@@ -72,9 +72,7 @@ class CheckCoverImages extends Command
             $directoryPath = $book->directoryPath;
             // Handle needs_review_reasons as an array per model casts; tolerate legacy string JSON
             $rawReasons = $book->needs_review_reasons;
-            $needsReviewReasons = is_array($rawReasons)
-                ? $rawReasons
-                : (is_string($rawReasons) ? (json_decode($rawReasons, true) ?? []) : []);
+            $needsReviewReasons = is_array($rawReasons) ? $rawReasons : (is_string($rawReasons) ? (json_decode($rawReasons, true) ?? []) : []);
             $originalNeedsReview = $book->needs_review;
 
             $needsFix = false;

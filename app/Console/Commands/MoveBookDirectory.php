@@ -370,9 +370,7 @@ class MoveBookDirectory extends Command
                 }
             }
 
-            $confirmPrompt = $noDb
-                ? 'Proceed with filesystem move?'
-                : 'Proceed with filesystem move and database updates?';
+            $confirmPrompt = $noDb ? 'Proceed with filesystem move?' : 'Proceed with filesystem move and database updates?';
 
             if (!$this->confirm($confirmPrompt, false)) {
                 $this->info('Operation cancelled.');

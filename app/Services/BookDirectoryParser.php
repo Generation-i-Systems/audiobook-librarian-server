@@ -397,17 +397,7 @@ class BookDirectoryParser
                         'author' => array_key_exists('author', $metadata) ? (is_array($metadata['author']) ? $metadata['author'] : [$metadata['author']]) : [],
                         'narrator' => array_key_exists('narrator', $metadata) ? $metadata['narrator'] : '',
                         'series' => array_key_exists('series', $metadata) ? $metadata['series'] : '',
-                        'seriesNumber' => array_key_exists('seriesNumber', $metadata)
-                            ? (is_numeric($metadata['seriesNumber'])
-                                ? (str_contains((string) $metadata['seriesNumber'], '.') ? (float) $metadata['seriesNumber'] : (int) $metadata['seriesNumber'])
-                                : null)
-                            : (array_key_exists('series_number', $metadata)
-                                ? (is_numeric($metadata['series_number'])
-                                    ? (str_contains((string) $metadata['series_number'], '.') ? (float) $metadata['series_number'] : (int) $metadata['series_number'])
-                                    : null)
-                                : (array_key_exists('seriesIndex', $metadata) && is_numeric($metadata['seriesIndex'])
-                                    ? (str_contains((string) $metadata['seriesIndex'], '.') ? (float) $metadata['seriesIndex'] : (int) $metadata['seriesIndex'])
-                                    : null)),
+                        'seriesNumber' => array_key_exists('seriesNumber', $metadata) ? (is_numeric($metadata['seriesNumber']) ? (str_contains((string) $metadata['seriesNumber'], '.') ? (float) $metadata['seriesNumber'] : (int) $metadata['seriesNumber']) : null) : (array_key_exists('series_number', $metadata) ? (is_numeric($metadata['series_number']) ? (str_contains((string) $metadata['series_number'], '.') ? (float) $metadata['series_number'] : (int) $metadata['series_number']) : null) : (array_key_exists('seriesIndex', $metadata) && is_numeric($metadata['seriesIndex']) ? (str_contains((string) $metadata['seriesIndex'], '.') ? (float) $metadata['seriesIndex'] : (int) $metadata['seriesIndex']) : null)),
                         'year' => (
                             (array_key_exists('year', $metadata) && is_numeric($metadata['year'])) ? (int) $metadata['year'] : ((array_key_exists('publishedYear', $metadata) && is_numeric($metadata['publishedYear'])) ? (int) $metadata['publishedYear'] : null)
                         ),

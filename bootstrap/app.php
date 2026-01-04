@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 // CRITICAL: Run database safety check BEFORE Laravel bootstrap
 require_once __DIR__ . '/database-safety-check.php';

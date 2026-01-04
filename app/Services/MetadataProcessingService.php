@@ -318,9 +318,7 @@ class MetadataProcessingService
     {
         // AUTHOR from artist/album_artist (raw, do NOT normalize here; tests expect raw value)
         if (!empty($fileTags['artist']) || !empty($fileTags['album_artist'])) {
-            $artist = !empty($fileTags['artist'])
-                ? (is_array($fileTags['artist']) ? (string) $fileTags['artist'][0] : (string) $fileTags['artist'])
-                : (is_array($fileTags['album_artist']) ? (string) $fileTags['album_artist'][0] : (string) $fileTags['album_artist']);
+            $artist = !empty($fileTags['artist']) ? (is_array($fileTags['artist']) ? (string) $fileTags['artist'][0] : (string) $fileTags['artist']) : (is_array($fileTags['album_artist']) ? (string) $fileTags['album_artist'][0] : (string) $fileTags['album_artist']);
 
             $artistLower = strtolower($artist);
             $hasGraphicAudio = str_contains($artistLower, 'graphic') && str_contains($artistLower, 'audio');

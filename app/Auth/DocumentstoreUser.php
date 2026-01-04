@@ -30,16 +30,12 @@ class DocumentstoreUser implements Authenticatable
      */
     public function __construct(array $user)
     {
-        \Illuminate\Support\Facades\Log::debug('DocumentstoreUser constructor called', ['input' => $user]);
-
         $this->userData['id'] = $user['id'] ?? null;
         $this->userData['name'] = $user['name'] ?? null;
         $this->userData['email'] = $user['email'] ?? null;
         $this->userData['password'] = $user['password'] ?? null;
         $this->userData['remember_token'] = $user['remember_token'] ?? null;
         $this->userData['role'] = $user['role'] ?? 'user';
-
-        \Illuminate\Support\Facades\Log::debug('DocumentstoreUser constructed with data', ['userData' => $this->userData]);
     }
 
     public function getAuthIdentifierName()

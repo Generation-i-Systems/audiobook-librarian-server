@@ -716,9 +716,7 @@ class BookImportService
         $audibleCover = null;
         if (!empty($metadata['audible_raw']) && is_array($metadata['audible_raw'])) {
             $audibleRaw = $metadata['audible_raw'];
-            $audibleCover = $audibleRaw['coverImageUrl']
-                ?? $audibleRaw['audibleCoverImageUrl']
-                ?? ($audibleRaw['media']['source_url'] ?? null);
+            $audibleCover = $audibleRaw['coverImageUrl'] ?? $audibleRaw['audibleCoverImageUrl'] ?? ($audibleRaw['media']['source_url'] ?? null);
 
             if (!$audibleCover && !empty($coverUrl)) {
                 $audibleCover = $coverUrl;
@@ -728,11 +726,7 @@ class BookImportService
         $googleCover = null;
         if (!empty($metadata['google_books_raw']) && is_array($metadata['google_books_raw'])) {
             $googleRaw = $metadata['google_books_raw'];
-            $googleCover = $googleRaw['coverImageUrl']
-                ?? $googleRaw['cover_image_url']
-                ?? ($googleRaw['imageLinks']['large'] ?? null)
-                ?? ($googleRaw['imageLinks']['medium'] ?? null)
-                ?? ($googleRaw['imageLinks']['thumbnail'] ?? null);
+            $googleCover = $googleRaw['coverImageUrl'] ?? $googleRaw['cover_image_url'] ?? ($googleRaw['imageLinks']['large'] ?? null) ?? ($googleRaw['imageLinks']['medium'] ?? null) ?? ($googleRaw['imageLinks']['thumbnail'] ?? null);
         }
 
         if (!empty($audibleCover)) {

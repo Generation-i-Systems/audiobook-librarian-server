@@ -22,9 +22,7 @@ class NewFavoriteBooksNotification extends Mailable
     public function envelope(): Envelope
     {
         $count = count($this->books);
-        $subject = $count === 1
-            ? 'New Audiobook by Your Favorite Author'
-            : "New Audiobooks by Your Favorite Authors ($count)";
+        $subject = $count === 1 ? 'New Audiobook by Your Favorite Author' : "New Audiobooks by Your Favorite Authors ($count)";
 
         return new Envelope(
             subject: $subject,
