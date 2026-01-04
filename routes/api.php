@@ -114,10 +114,22 @@ Route::prefix('v1')->group(function () {
         // External/Previously Read Routes
         Route::get('/books/{book}/external-reads', [ExternalReadApiController::class, 'getExternalReads']);
         Route::post('/books/{book}/external-reads', [ExternalReadApiController::class, 'createExternalRead']);
-        Route::get('/books/{book}/external-reads/{externalRead}', [ExternalReadApiController::class, 'getExternalRead']);
-        Route::put('/books/{book}/external-reads/{externalRead}', [ExternalReadApiController::class, 'updateExternalRead']);
-        Route::patch('/books/{book}/external-reads/{externalRead}', [ExternalReadApiController::class, 'updateExternalRead']);
-        Route::delete('/books/{book}/external-reads/{externalRead}', [ExternalReadApiController::class, 'deleteExternalRead']);
+        Route::get('/books/{book}/external-reads/{externalRead}', [
+            ExternalReadApiController::class,
+            'getExternalRead',
+        ]);
+        Route::put('/books/{book}/external-reads/{externalRead}', [
+            ExternalReadApiController::class,
+            'updateExternalRead',
+        ]);
+        Route::patch('/books/{book}/external-reads/{externalRead}', [
+            ExternalReadApiController::class,
+            'updateExternalRead',
+        ]);
+        Route::delete('/books/{book}/external-reads/{externalRead}', [
+            ExternalReadApiController::class,
+            'deleteExternalRead',
+        ]);
 
         // Reading Stats Routes
         Route::post('/books/{book}/reading-stats/sessions', [ReadingStatsApiController::class, 'recordSession']);
@@ -171,7 +183,8 @@ Route::prefix('v1')->group(function () {
         Route::post('/favorites', [FavoriteAuthorController::class, 'store'])->name('api.favorites.store');
         Route::get('/favorites/{favorite}', [FavoriteAuthorController::class, 'show'])->name('api.favorites.show');
         Route::put('/favorites/{favorite}', [FavoriteAuthorController::class, 'update'])->name('api.favorites.update');
-        Route::delete('/favorites/{favorite}', [FavoriteAuthorController::class, 'destroy'])->name('api.favorites.destroy');
+        Route::delete('/favorites/{favorite}', [FavoriteAuthorController::class, 'destroy'])
+            ->name('api.favorites.destroy');
 
         // Skin Routes (authenticated)
         Route::post('/skins/upload', [SkinController::class, 'store']);

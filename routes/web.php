@@ -20,8 +20,7 @@ use Illuminate\Support\Facades\Route;
 // --- EMERGENCY ROUTES ---
 // Emergency book routes that bypass memory-intensive models
 Route::get('/emergency/books', [App\Http\Controllers\EmergencyBookController::class, 'index'])
-    ->name('emergency.books.index')
-;
+    ->name('emergency.books.index');
 
 // --- DEBUG ROUTES (local only) ---
 if (app()->environment('local')) {
@@ -136,7 +135,7 @@ if (app()->environment('local')) {
     Route::get('/debug/books-dump', [Admin\DebugController::class, 'booksDump']);
 
     // Debug database relationships
-    Route::get('/debug/relationships', fn () => [
+    Route::get('/debug/relationships', fn() => [
         'author_book' => DB::table('author_book')->get(),
         'book_narrator' => DB::table('book_narrator')->get(),
         'book_genre' => DB::table('book_genre')->get(),
@@ -168,13 +167,18 @@ Route::get(
     [App\Http\Controllers\Auth\LoginController::class, 'handleGoogleCallback']
 );
 
-Route::get('/home', fn () => redirect()->route('books.index')->with('status', 'Welcome to Audiobook Librarian!'))->name('home');
+Route::get('/home', fn() => redirect()
+    ->route('books.index')
+    ->with('status', 'Welcome to Audiobook Librarian!'))
+    ->name('home');
 
 // Documentation routes (public access)
 Route::prefix('docs')->group(function (): void {
     Route::get('/', [App\Http\Controllers\DocsController::class, 'index'])->name('docs.index');
     Route::get('/openapi.json', [App\Http\Controllers\DocsController::class, 'openapi'])->name('docs.openapi');
-    Route::get('/{path?}', [App\Http\Controllers\DocsController::class, 'show'])->where('path', '.*')->name('docs.show');
+    Route::get('/{path?}', [App\Http\Controllers\DocsController::class, 'show'])
+        ->where('path', '.*')
+        ->name('docs.show');
 });
 
 // API docs routes (aliases)
@@ -194,10 +198,16 @@ Route::middleware(['auth'])->group(function (): void {
     Route::delete('/reviews/{review}', [ReviewController::class, 'destroy'])->name('reviews.destroy');
 
     // Favorite Authors routes
-    Route::get('/favorites', [\App\Http\Controllers\FavoriteAuthorWebController::class, 'index'])->name('favorites.index');
-    Route::post('/favorites', [\App\Http\Controllers\FavoriteAuthorWebController::class, 'store'])->name('favorites.store');
-    Route::delete('/favorites/{favorite}', [\App\Http\Controllers\FavoriteAuthorWebController::class, 'destroy'])->name('favorites.destroy');
-    Route::patch('/favorites/{favorite}/toggle-notifications', [\App\Http\Controllers\FavoriteAuthorWebController::class, 'toggleNotifications'])->name('favorites.toggle-notifications');
+    Route::get('/favorites', [\App\Http\Controllers\FavoriteAuthorWebController::class, 'index'])
+        ->name('favorites.index');
+    Route::post('/favorites', [\App\Http\Controllers\FavoriteAuthorWebController::class, 'store'])
+        ->name('favorites.store');
+    Route::delete('/favorites/{favorite}', [\App\Http\Controllers\FavoriteAuthorWebController::class, 'destroy'])
+        ->name('favorites.destroy');
+    Route::patch(
+        '/favorites/{favorite}/toggle-notifications',
+        [\App\Http\Controllers\FavoriteAuthorWebController::class, 'toggleNotifications']
+    )->name('favorites.toggle-notifications');
     Route::post(
         '/follow/{followableType}/{followableId}',
         [FollowController::class, 'follow']
@@ -218,14 +228,16 @@ Route::middleware(['auth'])->group(function (): void {
     // Profile routes (require authentication)
     Route::get('/profile', [ProfileController::class, 'index'])->name('profile.index');
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::put('/profile/change-password', [ProfileController::class, 'changePassword'])->name('profile.changePassword');
-    Route::post('/profile/request-admin', [ProfileController::class, 'requestAdminPermissions'])->name('profile.requestAdminPermissions');
+    Route::put('/profile/change-password', [ProfileController::class, 'changePassword'])
+        ->name('profile.changePassword');
+    Route::post('/profile/request-admin', [ProfileController::class, 'requestAdminPermissions'])
+        ->name('profile.requestAdminPermissions');
 });
 
 Route::post('/messages', [MessageController::class, 'store'])->name('messages.store');
 
 // CSRF token refresh endpoint
-Route::get('/csrf-token', fn () => response()->json(['csrf_token' => csrf_token()]))->name('csrf.token');
+Route::get('/csrf-token', fn() => response()->json(['csrf_token' => csrf_token()]))->name('csrf.token');
 
 // Regular book routes (handled by the auth middleware group above)
 
@@ -250,8 +262,7 @@ Route::get('/google-books-cover/{encodedUrl}', [
 // Admin series autocomplete endpoint for book form (accessible to admin users)
 Route::get('/admin/series-autocomplete', [Admin\BookController::class, 'autocompleteSeries'])
     ->name('admin.series.autocomplete')
-    ->middleware(['auth', 'admin'])
-;
+    ->middleware(['auth', 'admin']);
 
 // Gallery Routes (Skins & Themes)
 Route::name('gallery.')->prefix('gallery')->group(function (): void {
@@ -288,66 +299,54 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::any('/adminer/{any?}', [Admin\AdminerController::class, 'handle'])->where('any', '.*')->name('adminer');
     // NEW ROUTE FOR DATABASE ADMIN PAGE
     Route::get('/database', [Admin\AdminerController::class, 'index'])->name('database');
-    Route::get('/', fn () => redirect()->route('admin.books.index'));
+    Route::get('/', fn() => redirect()->route('admin.books.index'));
     // Library repair + needs review dashboards
     Route::get('/needs-review', [Admin\NeedsReviewController::class, 'index'])
-        ->name('needs_review.index')
-    ;
+        ->name('needs_review.index');
     Route::get('/library-repair', [Admin\LibraryRepairController::class, 'index'])
-        ->name('library-repair.index')
-    ;
+        ->name('library-repair.index');
     Route::post('/library-repair/{issue}/resolve', [Admin\LibraryRepairController::class, 'resolve'])
-        ->name('library-repair.resolve')
-    ;
+        ->name('library-repair.resolve');
     Route::post('/library-repair/{issue}/rescan', [Admin\LibraryRepairController::class, 'rescan'])
-        ->name('library-repair.rescan')
-    ;
-    Route::post('/library-repair/{issue}/import-missing', [Admin\LibraryRepairController::class, 'importMissingDirectory'])
-        ->name('library-repair.import-missing')
-    ;
+        ->name('library-repair.rescan');
+    Route::post(
+        '/library-repair/{issue}/import-missing',
+        [Admin\LibraryRepairController::class, 'importMissingDirectory']
+    )->name('library-repair.import-missing');
     Route::post('/books/resync-from-path', [Admin\BookController::class, 'resyncFromPath'])
-        ->name('books.resyncFromPath')
-    ;
+        ->name('books.resyncFromPath');
 
     // AI Query routes
     Route::post('/ai-query/process', [Admin\AIQueryController::class, 'process'])
-        ->name('ai-query.process')
-    ;
+        ->name('ai-query.process');
     Route::get('/ai-query/results/{queryId}', [Admin\AIQueryController::class, 'results'])
-        ->name('ai-query.results')
-    ;
+        ->name('ai-query.results');
     Route::post('/ai-query/apply-bulk-update', [Admin\AIQueryController::class, 'applyBulkUpdate'])
-        ->name('ai-query.apply-bulk-update')
-    ;
+        ->name('ai-query.apply-bulk-update');
     Route::post('/ai-query/execute-custom', [Admin\AIQueryController::class, 'executeCustom'])
-        ->name('ai-query.execute-custom')
-    ;
+        ->name('ai-query.execute-custom');
     Route::post('/ai-query/edit-prompt', [Admin\AIQueryController::class, 'editPrompt'])
-        ->name('ai-query.edit-prompt')
-    ;
+        ->name('ai-query.edit-prompt');
 
     // Directory validation routes
     Route::get('/directory-validation', [Admin\DirectoryValidationController::class, 'index'])
-        ->name('directory-validation')
-    ;
+        ->name('directory-validation');
     Route::post('/directory-validation/rescan', [Admin\DirectoryValidationController::class, 'rescan'])
-        ->name('directory-validation.rescan')
-    ;
+        ->name('directory-validation.rescan');
     Route::post('/directory-validation/rename', [Admin\DirectoryValidationController::class, 'renameDirectory'])
-        ->name('directory-validation.rename')
-    ;
+        ->name('directory-validation.rename');
     Route::delete('/directory-validation/delete-book', [Admin\DirectoryValidationController::class, 'deleteBook'])
-        ->name('directory-validation.delete-book')
-    ;
+        ->name('directory-validation.delete-book');
     Route::post('/directory-validation/import', [Admin\DirectoryValidationController::class, 'importOrphanedDirectory'])
-        ->name('directory-validation.import')
-    ;
-    Route::delete('/directory-validation/delete-orphan', [Admin\DirectoryValidationController::class, 'deleteOrphanedDirectory'])
-        ->name('directory-validation.delete-orphan')
-    ;
-    Route::post('/directory-validation/rename-orphan', [Admin\DirectoryValidationController::class, 'renameOrphanedDirectory'])
-        ->name('directory-validation.rename-orphan')
-    ;
+        ->name('directory-validation.import');
+    Route::delete(
+        '/directory-validation/delete-orphan',
+        [Admin\DirectoryValidationController::class, 'deleteOrphanedDirectory']
+    )->name('directory-validation.delete-orphan');
+    Route::post(
+        '/directory-validation/rename-orphan',
+        [Admin\DirectoryValidationController::class, 'renameOrphanedDirectory']
+    )->name('directory-validation.rename-orphan');
 
     Route::post(
         '/users/{user}/update-role',
@@ -384,7 +383,8 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         ])->name('import.move');
     });
     // Unified search endpoint for all book APIs
-    Route::get('/books/search', action: [Admin\BookController::class, 'searchBooks'])->name('books.search');
+    Route::get('/books/search', action: [Admin\BookController::class, 'searchBooks'])
+        ->name('books.search');
 
     // Legacy endpoints (deprecated)
     Route::get('/books/googleBooks', action: [Admin\BookController::class, 'googleBooks'])->name('books.googleBooks');
@@ -402,19 +402,23 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::get('books/files-ajax', [Admin\BookFilesystemController::class, 'filesAjax'])->name('books.filesAjax');
 
     // AJAX: Get audio file metadata
-    Route::get('books/audio-metadata', [Admin\AudioMetadataController::class, 'getMetadata'])->name('books.audioMetadata');
+    Route::get('books/audio-metadata', [Admin\AudioMetadataController::class, 'getMetadata'])
+        ->name('books.audioMetadata');
 
     // AJAX: Browse directories for path selection
-    Route::get('books/browse-directories', [Admin\BookFilesystemController::class, 'browseDirectories'])->name('books.browseDirectories');
+    Route::get('books/browse-directories', [Admin\BookFilesystemController::class, 'browseDirectories'])
+        ->name('books.browseDirectories');
 
     // AJAX: Rename series across all books
     Route::post('books/rename-series', [Admin\BookController::class, 'renameSeries'])->name('books.renameSeries');
 
     // AJAX: Check for directory path conflicts
-    Route::post('books/check-directory-conflict', [Admin\BookController::class, 'checkDirectoryConflict'])->name('books.checkDirectoryConflict');
+    Route::post('books/check-directory-conflict', [Admin\BookController::class, 'checkDirectoryConflict'])
+        ->name('books.checkDirectoryConflict');
 
     // AJAX: Planned actions preview for edit form
-    Route::post('books/{id}/planned-actions', [Admin\BookController::class, 'plannedActions'])->name('books.plannedActions');
+    Route::post('books/{id}/planned-actions', [Admin\BookController::class, 'plannedActions'])
+        ->name('books.plannedActions');
 
     Route::get('genres/{genre}/authors', [Admin\GenreController::class, 'authors'])->name('genres.authors');
     Route::post('genres/merge', [Admin\GenreController::class, 'merge'])->name('genres.merge');
@@ -520,8 +524,7 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     // User management
     Route::resource('users', Admin\UserController::class);
     Route::post('users/{id}/verify', [Admin\UserController::class, 'verify'])
-        ->name('users.verify')
-    ;
+        ->name('users.verify');
 
     // Queue management (admin only)
     Route::middleware(['auth', 'admin'])->group(function (): void {
