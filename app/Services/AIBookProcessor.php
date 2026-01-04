@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Traits\IsolatesErrorHandlers;
+use App\Traits\NormalizesSeriesNames;
+use App\Traits\NormalizesStrings;
 use GuzzleHttp\Client;
-use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Mozex\Anthropic\Facades\Anthropic;
@@ -11,8 +13,12 @@ use OpenAI;
 
 class AIBookProcessor
 {
+    use NormalizesStrings;
+    use NormalizesSeriesNames;
+    use IsolatesErrorHandlers;
+
     protected Client $client;
-    protected ?string $apiKey;
+    protected string $apiKey;
     protected ?string $claudeApiKey;
     protected ?string $openaiApiKey;
     protected string $model;
@@ -897,8 +903,7 @@ class AIBookProcessor
         }
 
         try {
-            $getID3 = new \getID3();
-            $fileInfo = $getID3->analyze($filePath);
+            $fileInfo = $this->withHandlerIsolation(fn () => (new \getID3())->analyze($filePath));
 
             $tags = [];
 
