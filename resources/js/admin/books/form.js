@@ -221,7 +221,12 @@ $(function () {
 
 // Helper function to initialize jQuery UI Autocomplete
 function initializeAutocomplete($container, selector, sourceUrl) {
-    console.log("[DEBUG] initializeAutocomplete called for selector:", selector, "with URL:", sourceUrl);
+    console.log(
+        "[DEBUG] initializeAutocomplete called for selector:",
+        selector,
+        "with URL:",
+        sourceUrl,
+    );
 
     // Check if jQuery UI autocomplete is available
     if (!$.fn.autocomplete) {
@@ -237,17 +242,27 @@ function initializeAutocomplete($container, selector, sourceUrl) {
     $container.on("focus", selector, function () {
         const $inputField = $(this); // Capture 'this' to use in callbacks
 
-        console.log("[DEBUG] Focus event on", selector, "- checking initialization");
+        console.log(
+            "[DEBUG] Focus event on",
+            selector,
+            "- checking initialization",
+        );
 
         // Check if autocomplete has already been initialized on this element
         if (!$inputField.data("autocomplete-initialized")) {
-            console.log("[DEBUG] Initializing autocomplete for field:", $inputField.attr('name'));
+            console.log(
+                "[DEBUG] Initializing autocomplete for field:",
+                $inputField.attr("name"),
+            );
 
             try {
                 $inputField.autocomplete({
                     minLength: 2,
                     source: function (request, responseCallback) {
-                        console.log("[DEBUG] Autocomplete source called for term:", request.term);
+                        console.log(
+                            "[DEBUG] Autocomplete source called for term:",
+                            request.term,
+                        );
                         $.ajax({
                             url: sourceUrl,
                             dataType: "json",
@@ -256,7 +271,10 @@ function initializeAutocomplete($container, selector, sourceUrl) {
                             },
                             async: true, // Explicitly ensure the request is asynchronous
                             success: function (data) {
-                                console.log("[DEBUG] Autocomplete response:", data);
+                                console.log(
+                                    "[DEBUG] Autocomplete response:",
+                                    data,
+                                );
 
                                 // Transform data to ensure it's in the correct format for jQuery UI
                                 // jQuery UI expects either an array of strings or objects with {label, value}
@@ -264,24 +282,42 @@ function initializeAutocomplete($container, selector, sourceUrl) {
 
                                 if (Array.isArray(data) && data.length > 0) {
                                     // Check if first item is an object (not a string)
-                                    if (typeof data[0] === 'object' && data[0] !== null) {
-                                        console.log("[DEBUG] Transforming object response to strings");
+                                    if (
+                                        typeof data[0] === "object" &&
+                                        data[0] !== null
+                                    ) {
+                                        console.log(
+                                            "[DEBUG] Transforming object response to strings",
+                                        );
                                         // Extract the name/value from objects
-                                        transformedData = data.map(item => {
-                                            if (typeof item === 'string') {
+                                        transformedData = data.map((item) => {
+                                            if (typeof item === "string") {
                                                 return item;
                                             }
                                             // Try common property names
-                                            return item.name || item.value || item.label || item.title || JSON.stringify(item);
+                                            return (
+                                                item.name ||
+                                                item.value ||
+                                                item.label ||
+                                                item.title ||
+                                                JSON.stringify(item)
+                                            );
                                         });
-                                        console.log("[DEBUG] Transformed data:", transformedData);
+                                        console.log(
+                                            "[DEBUG] Transformed data:",
+                                            transformedData,
+                                        );
                                     }
                                 }
 
                                 responseCallback(transformedData); // Provide the data to jQuery UI
                             },
                             error: function (jqXHR, textStatus, errorThrown) {
-                                console.error("[ERROR] Autocomplete AJAX failed:", textStatus, errorThrown);
+                                console.error(
+                                    "[ERROR] Autocomplete AJAX failed:",
+                                    textStatus,
+                                    errorThrown,
+                                );
                                 responseCallback([]); // Call with empty array on error
                             },
                         });
@@ -289,17 +325,28 @@ function initializeAutocomplete($container, selector, sourceUrl) {
                     select: function (event, ui) {
                         event.preventDefault(); // Prevent any default behavior that might trigger form submission
                         $inputField.val(ui.item.value); // Set the input field's value to the selected item
-                        console.log("[DEBUG] Autocomplete item selected:", ui.item.value);
+                        console.log(
+                            "[DEBUG] Autocomplete item selected:",
+                            ui.item.value,
+                        );
                         return false; // Prevent the default behavior of setting the value, as we did it manually
                     },
                 });
                 $inputField.data("autocomplete-initialized", true); // Mark as initialized
-                console.log("[DEBUG] Autocomplete successfully initialized for", $inputField.attr('name'));
+                console.log(
+                    "[DEBUG] Autocomplete successfully initialized for",
+                    $inputField.attr("name"),
+                );
             } catch (error) {
-                console.error("[ERROR] Failed to initialize autocomplete:", error);
+                console.error(
+                    "[ERROR] Failed to initialize autocomplete:",
+                    error,
+                );
             }
         } else {
-            console.log("[DEBUG] Autocomplete already initialized for this field");
+            console.log(
+                "[DEBUG] Autocomplete already initialized for this field",
+            );
         }
     });
 }
@@ -448,11 +495,11 @@ window.googleBooksProxyUrl = googleBooksProxyUrl;
 
 // Helper function to format file size
 function formatFileSize(bytes) {
-    if (bytes === 0) return '0 B';
+    if (bytes === 0) return "0 B";
     const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const sizes = ["B", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 }
 
 function loadDirectoryFiles($container) {
@@ -537,7 +584,8 @@ function loadDirectoryFiles($container) {
 
             // Check if directory exists
             if (response.exists === false) {
-                html = '<div class="p-3 text-danger"><i class="fas fa-exclamation-triangle me-2"></i>Directory not found</div>';
+                html =
+                    '<div class="p-3 text-danger"><i class="fas fa-exclamation-triangle me-2"></i>Directory not found</div>';
                 filesList.html(html);
                 return;
             }
@@ -549,47 +597,83 @@ function loadDirectoryFiles($container) {
                 files.forEach(function (file) {
                     if (!file) return;
                     const filename = file.name || file.filename || "Unknown";
-                    const size = file.size ? formatFileSize(file.size) : '';
-                    const ext = file.extension || '';
+                    const size = file.size ? formatFileSize(file.size) : "";
+                    const ext = file.extension || "";
 
                     // Choose icon based on file type
-                    let icon = 'fa-file';
+                    let icon = "fa-file";
                     let isImage = false;
                     let isAudio = false;
-                    if (['mp3', 'm4b', 'm4a', 'aac', 'flac', 'ogg', 'wav'].includes(ext.toLowerCase())) {
-                        icon = 'fa-file-audio text-primary';
+                    if (
+                        [
+                            "mp3",
+                            "m4b",
+                            "m4a",
+                            "aac",
+                            "flac",
+                            "ogg",
+                            "wav",
+                        ].includes(ext.toLowerCase())
+                    ) {
+                        icon = "fa-file-audio text-primary";
                         isAudio = true;
-                    } else if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext.toLowerCase())) {
-                        icon = 'fa-file-image text-success';
+                    } else if (
+                        ["jpg", "jpeg", "png", "gif", "webp"].includes(
+                            ext.toLowerCase(),
+                        )
+                    ) {
+                        icon = "fa-file-image text-success";
                         isImage = true;
-                    } else if (['txt', 'nfo', 'md'].includes(ext.toLowerCase())) {
-                        icon = 'fa-file-alt text-info';
-                    } else if (['json', 'xml'].includes(ext.toLowerCase())) {
-                        icon = 'fa-file-code text-warning';
+                    } else if (
+                        ["txt", "nfo", "md"].includes(ext.toLowerCase())
+                    ) {
+                        icon = "fa-file-alt text-info";
+                    } else if (["json", "xml"].includes(ext.toLowerCase())) {
+                        icon = "fa-file-code text-warning";
                     }
 
-                    const itemClass = isImage ? 'list-group-item-action cursor-pointer' : '';
-                    const dataAttrs = isImage ? 'data-cover-file="' + filename + '"' : '';
+                    const itemClass = isImage
+                        ? "list-group-item-action cursor-pointer"
+                        : "";
+                    const dataAttrs = isImage
+                        ? 'data-cover-file="' + filename + '"'
+                        : "";
 
-                    html += '<div class="list-group-item py-1 px-2 small d-flex justify-content-between align-items-center ' + itemClass + '" ' + dataAttrs + '>';
-                    html += '<span><i class="fas ' + icon + ' me-2"></i>' + filename;
+                    html +=
+                        '<div class="list-group-item py-1 px-2 small d-flex justify-content-between align-items-center ' +
+                        itemClass +
+                        '" ' +
+                        dataAttrs +
+                        ">";
+                    html +=
+                        '<span><i class="fas ' +
+                        icon +
+                        ' me-2"></i>' +
+                        filename;
                     if (isImage) {
-                        html += ' <small class="text-muted">(click to set as cover)</small>';
+                        html +=
+                            ' <small class="text-muted">(click to set as cover)</small>';
                     }
-                    html += '</span>';
+                    html += "</span>";
                     html += '<span class="d-flex align-items-center gap-2">';
                     if (size) {
-                        html += '<span class="text-muted">' + size + '</span>';
+                        html += '<span class="text-muted">' + size + "</span>";
                     }
                     if (isAudio) {
-                        html += '<a href="#" class="btn btn-sm btn-outline-primary view-metadata" data-file="' + dirPath + '/' + filename + '" title="View Metadata"><i class="fas fa-info-circle"></i></a>';
+                        html +=
+                            '<a href="#" class="btn btn-sm btn-outline-primary view-metadata" data-file="' +
+                            dirPath +
+                            "/" +
+                            filename +
+                            '" title="View Metadata"><i class="fas fa-info-circle"></i></a>';
                     }
-                    html += '</span>';
-                    html += '</div>';
+                    html += "</span>";
+                    html += "</div>";
                 });
                 html += "</div>";
             } else {
-                html = '<div class="p-3 text-muted">No files found in this directory.</div>';
+                html =
+                    '<div class="p-3 text-muted">No files found in this directory.</div>';
                 html =
                     '<div class="p-3 text-muted text-center">No files found in this directory.</div>';
             }
@@ -634,8 +718,14 @@ window.initBookForm = function (formContainerSelector) {
 
     // Initialize autocomplete for all author, narrator, and series fields on page load
     if (typeof initializeAutocomplete === "function") {
-        console.log("[DEBUG] Initializing autocomplete with routes:", window.BOOK_FORM_ROUTES);
-        console.log("[DEBUG] jQuery UI autocomplete available:", typeof $.fn.autocomplete);
+        console.log(
+            "[DEBUG] Initializing autocomplete with routes:",
+            window.BOOK_FORM_ROUTES,
+        );
+        console.log(
+            "[DEBUG] jQuery UI autocomplete available:",
+            typeof $.fn.autocomplete,
+        );
 
         initializeAutocomplete(
             $container,
@@ -779,8 +869,12 @@ window.initBookForm = function (formContainerSelector) {
             if (rowIndex === 0) {
                 if (rows.length > 1) {
                     const secondRow = rows[1];
-                    const secondSelect = secondRow.querySelector('select[name="genre[]"]');
-                    const firstSelect = row.querySelector('select[name="genre[]"]');
+                    const secondSelect = secondRow.querySelector(
+                        'select[name="genre[]"]',
+                    );
+                    const firstSelect = row.querySelector(
+                        'select[name="genre[]"]',
+                    );
                     firstSelect.value = secondSelect.value;
                     secondRow.remove();
                 } else {
@@ -814,7 +908,9 @@ window.initBookForm = function (formContainerSelector) {
             const dirPath = $container.find("#directoryPath").val();
 
             if (!filename || !dirPath) {
-                alert("Unable to set cover - missing filename or directory path");
+                alert(
+                    "Unable to set cover - missing filename or directory path",
+                );
                 return;
             }
 
@@ -855,10 +951,12 @@ window.initBookForm = function (formContainerSelector) {
         if (newPath && coverFilename) {
             // Update cover preview with new path
             const coverUrl = "/cover/" + newPath + "/" + coverFilename;
-            const $coverPreview = $container.find(".cover-preview img, img[alt='cover'], .cover-option img");
+            const $coverPreview = $container.find(
+                ".cover-preview img, img[alt='cover'], .cover-option img",
+            );
 
             if ($coverPreview.length) {
-                $coverPreview.each(function() {
+                $coverPreview.each(function () {
                     const $img = $(this);
                     // Only update if it's showing a cover from the directory (not external URLs)
                     const currentSrc = $img.attr("src");
@@ -881,39 +979,50 @@ window.initBookForm = function (formContainerSelector) {
             if (!value) return;
 
             // Check for any separators: &, ,, or "and"
-            const hasSeparators = value.includes('&') || value.includes(',') || / and /i.test(value);
+            const hasSeparators =
+                value.includes("&") ||
+                value.includes(",") ||
+                / and /i.test(value);
 
             if (hasSeparators) {
                 // Replace all separator types with a uniform delimiter (|) for easy splitting
                 // Handle word boundaries for "and" to avoid matching words like "Andrew" or "Brandon"
                 let normalized = value
-                    .replace(/\s*&\s*/g, '|')           // Replace & with |
-                    .replace(/\s*,\s*/g, '|')           // Replace , with |
-                    .replace(/\s+and\s+/gi, '|');       // Replace " and " with | (case insensitive)
+                    .replace(/\s*&\s*/g, "|") // Replace & with |
+                    .replace(/\s*,\s*/g, "|") // Replace , with |
+                    .replace(/\s+and\s+/gi, "|"); // Replace " and " with | (case insensitive)
 
                 // Split by the delimiter and clean up
                 const authors = normalized
-                    .split('|')
-                    .map(a => a.trim())
-                    .filter(a => a.length > 0);
+                    .split("|")
+                    .map((a) => a.trim())
+                    .filter((a) => a.length > 0);
 
                 // Only offer to split if we actually have multiple authors
                 if (authors.length > 1) {
-                    const authorList = authors.map((a, idx) => `${idx + 1}. ${a}`).join('\n');
+                    const authorList = authors
+                        .map((a, idx) => `${idx + 1}. ${a}`)
+                        .join("\n");
 
-                    if (confirm(`Split into ${authors.length} separate authors?\n\n${authorList}\n\nClick OK to split, or Cancel to keep as-is.`)) {
+                    if (
+                        confirm(
+                            `Split into ${authors.length} separate authors?\n\n${authorList}\n\nClick OK to split, or Cancel to keep as-is.`,
+                        )
+                    ) {
                         // Clear the current input
-                        $input.val('');
+                        $input.val("");
 
                         // Get the current row
-                        const $currentRow = $input.closest('.author-row');
-                        const $authorsGroup = $container.find('#authors-group');
+                        const $currentRow = $input.closest(".author-row");
+                        const $authorsGroup = $container.find("#authors-group");
 
                         // Remove all existing author rows except the first one
-                        $authorsGroup.find('.author-row:not(:first)').remove();
+                        $authorsGroup.find(".author-row:not(:first)").remove();
 
                         // Set first author in the first row
-                        $authorsGroup.find('.author-row:first input[name="author[]"]').val(authors[0]);
+                        $authorsGroup
+                            .find('.author-row:first input[name="author[]"]')
+                            .val(authors[0]);
 
                         // Add remaining authors
                         for (let i = 1; i < authors.length; i++) {
@@ -925,7 +1034,7 @@ window.initBookForm = function (formContainerSelector) {
                             $container,
                             "#authors-group",
                             ".author-row",
-                            ".add-author-row"
+                            ".add-author-row",
                         );
 
                         console.log("[DEBUG] Split authors:", authors);
@@ -933,7 +1042,6 @@ window.initBookForm = function (formContainerSelector) {
                 }
             }
         });
-
 };
 
 // Attach event handler for Autofill Modal button (globally, outside form)
@@ -958,8 +1066,7 @@ $(document).on("click", "#autofill-modal-btn", function (e) {
     if (bootstrapRef && typeof bootstrapRef.Modal !== "undefined") {
         var modalEl = document.getElementById("autofillModal");
         if (modalEl) {
-            var bsModal =
-                bootstrapRef.Modal.getOrCreateInstance(modalEl);
+            var bsModal = bootstrapRef.Modal.getOrCreateInstance(modalEl);
             bsModal.show();
         } else {
             console.error("[DEBUG] #autofillModal element not found");
@@ -973,8 +1080,14 @@ $("#autofillModal").on("shown.bs.modal", function () {
 
     // Pre-populate search fields from the current form
     const currentTitle = $("#title").val();
-    const currentAuthor = $("#authors-group").find('input[name="author[]"]').first().val();
-    const currentSeries = $("#series-group").find('input[name="series[]"]').first().val();
+    const currentAuthor = $("#authors-group")
+        .find('input[name="author[]"]')
+        .first()
+        .val();
+    const currentSeries = $("#series-group")
+        .find('input[name="series[]"]')
+        .first()
+        .val();
 
     if (currentTitle) {
         $("#autofill-title").val(currentTitle);
@@ -988,7 +1101,11 @@ $("#autofillModal").on("shown.bs.modal", function () {
 
     // Automatically trigger search for all sources if any search criteria exists
     if (currentTitle || currentAuthor || currentSeries) {
-        console.log("[DEBUG] Auto-triggering search with criteria:", { title: currentTitle, author: currentAuthor, series: currentSeries });
+        console.log("[DEBUG] Auto-triggering search with criteria:", {
+            title: currentTitle,
+            author: currentAuthor,
+            series: currentSeries,
+        });
         performAutofillSearch(["audible", "google", "hardcover"], false);
     }
 });
@@ -1027,30 +1144,40 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // Handle cover image radio button selection
-    const coverRadios = document.querySelectorAll('input[name="coverImageCandidate"]');
+    const coverRadios = document.querySelectorAll(
+        'input[name="coverImageCandidate"]',
+    );
     coverRadios.forEach((radio) => {
         radio.addEventListener("change", function () {
             console.log("Cover image selected: " + this.value);
             console.log("Cover source: " + this.dataset.source);
 
             // Set the hidden coverImageSource field
-            const coverImageSourceField = document.getElementById('coverImageSource');
+            const coverImageSourceField =
+                document.getElementById("coverImageSource");
             if (coverImageSourceField) {
-                coverImageSourceField.value = this.dataset.source || '';
-                console.log("Set coverImageSource to: " + coverImageSourceField.value);
+                coverImageSourceField.value = this.dataset.source || "";
+                console.log(
+                    "Set coverImageSource to: " + coverImageSourceField.value,
+                );
             }
 
             // Preserve cover URL in hidden fields for validation failure recovery
-            const source = this.dataset.source || '';
+            const source = this.dataset.source || "";
             const coverUrl = this.value;
-            if (source === 'audible') {
-                const audibleUrlField = document.getElementById('audibleCoverImageUrl');
+            if (source === "audible") {
+                const audibleUrlField = document.getElementById(
+                    "audibleCoverImageUrl",
+                );
                 if (audibleUrlField) {
                     audibleUrlField.value = coverUrl;
-                    console.log("[DEBUG] Set audibleCoverImageUrl to:", coverUrl);
+                    console.log(
+                        "[DEBUG] Set audibleCoverImageUrl to:",
+                        coverUrl,
+                    );
                 }
-            } else if (source === 'google') {
-                const googleUrlField = document.getElementById('coverImageUrl');
+            } else if (source === "google") {
+                const googleUrlField = document.getElementById("coverImageUrl");
                 if (googleUrlField) {
                     googleUrlField.value = coverUrl;
                     console.log("[DEBUG] Set coverImageUrl to:", coverUrl);
@@ -1061,40 +1188,57 @@ document.addEventListener("DOMContentLoaded", function () {
             const $cornerPreview = $("#cover-preview-trigger img");
             if ($cornerPreview.length) {
                 // Find the image associated with this radio button
-                const $radioLabel = $(this).closest('label');
-                const $coverImg = $radioLabel.find('img');
+                const $radioLabel = $(this).closest("label");
+                const $coverImg = $radioLabel.find("img");
                 if ($coverImg.length) {
-                    const newSrc = $coverImg.attr('src');
-                    $cornerPreview.attr('src', newSrc);
-                    console.log("[DEBUG] Updated corner preview to show selected cover:", newSrc);
+                    const newSrc = $coverImg.attr("src");
+                    $cornerPreview.attr("src", newSrc);
+                    console.log(
+                        "[DEBUG] Updated corner preview to show selected cover:",
+                        newSrc,
+                    );
                 }
             }
         });
     });
 
     // Set initial value for coverImageSource if a radio is already checked
-    const checkedCoverRadio = document.querySelector('input[name="coverImageCandidate"]:checked');
+    const checkedCoverRadio = document.querySelector(
+        'input[name="coverImageCandidate"]:checked',
+    );
     if (checkedCoverRadio) {
-        const coverImageSourceField = document.getElementById('coverImageSource');
+        const coverImageSourceField =
+            document.getElementById("coverImageSource");
         if (coverImageSourceField) {
             // Ensure we're getting the correct source value
-            const source = checkedCoverRadio.dataset.source || '';
+            const source = checkedCoverRadio.dataset.source || "";
             console.log("[DEBUG] Initial checked radio data-source:", source);
-            console.log("[DEBUG] Initial checked radio value:", checkedCoverRadio.value);
+            console.log(
+                "[DEBUG] Initial checked radio value:",
+                checkedCoverRadio.value,
+            );
 
             coverImageSourceField.value = source;
-            console.log("Initial coverImageSource set to: " + coverImageSourceField.value);
+            console.log(
+                "Initial coverImageSource set to: " +
+                    coverImageSourceField.value,
+            );
         }
     }
 
     // Force update the coverImageSource field now to ensure it's set correctly
     setTimeout(() => {
-        const checkedRadio = document.querySelector('input[name="coverImageCandidate"]:checked');
+        const checkedRadio = document.querySelector(
+            'input[name="coverImageCandidate"]:checked',
+        );
         if (checkedRadio) {
-            const sourceField = document.getElementById('coverImageSource');
+            const sourceField = document.getElementById("coverImageSource");
             if (sourceField) {
-                sourceField.value = checkedRadio.dataset.source || '';
-                console.log("[DEBUG] Forced coverImageSource update to:", sourceField.value);
+                sourceField.value = checkedRadio.dataset.source || "";
+                console.log(
+                    "[DEBUG] Forced coverImageSource update to:",
+                    sourceField.value,
+                );
             }
         }
     }, 100);
@@ -1104,7 +1248,9 @@ document.addEventListener("DOMContentLoaded", function () {
     if (form) {
         form.addEventListener("submit", function (e) {
             function removeValidationSummary() {
-                const existingSummary = document.getElementById("book-form-validation-summary");
+                const existingSummary = document.getElementById(
+                    "book-form-validation-summary",
+                );
                 if (existingSummary) {
                     existingSummary.remove();
                 }
@@ -1124,7 +1270,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 const heading = document.createElement("div");
                 heading.className = "fw-bold";
-                heading.textContent = "Cannot save because there are validation errors:";
+                heading.textContent =
+                    "Cannot save because there are validation errors:";
                 summary.appendChild(heading);
 
                 const list = document.createElement("ul");
@@ -1172,13 +1319,19 @@ document.addEventListener("DOMContentLoaded", function () {
             }
 
             // CRITICAL: Update coverImageSource right before form submission
-            const checkedRadioButton = document.querySelector('input[name="coverImageCandidate"]:checked');
+            const checkedRadioButton = document.querySelector(
+                'input[name="coverImageCandidate"]:checked',
+            );
             if (checkedRadioButton) {
-                const coverSourceField = document.getElementById('coverImageSource');
+                const coverSourceField =
+                    document.getElementById("coverImageSource");
                 if (coverSourceField) {
-                    const sourceValue = checkedRadioButton.dataset.source || '';
+                    const sourceValue = checkedRadioButton.dataset.source || "";
                     coverSourceField.value = sourceValue;
-                    console.log("[SUBMIT] Setting coverImageSource to:", sourceValue);
+                    console.log(
+                        "[SUBMIT] Setting coverImageSource to:",
+                        sourceValue,
+                    );
 
                     // Force a data attribute to the form to ensure it's used
                     form.dataset.coverSource = sourceValue;
@@ -1199,7 +1352,8 @@ document.addEventListener("DOMContentLoaded", function () {
             const submitBtn = form.querySelector('button[type="submit"]');
             const originalBtnText = submitBtn.innerHTML;
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
+            submitBtn.innerHTML =
+                '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
 
             let hasError = false;
 
@@ -1211,64 +1365,99 @@ document.addEventListener("DOMContentLoaded", function () {
             }
 
             // Check if an external cover image is selected
-            const selectedCoverRadio = form.querySelector('input[name="coverImageCandidate"]:checked');
-            console.log("[DEBUG] Selected cover radio data-source:", selectedCoverRadio ? selectedCoverRadio.dataset.source : "none");
+            const selectedCoverRadio = form.querySelector(
+                'input[name="coverImageCandidate"]:checked',
+            );
+            console.log(
+                "[DEBUG] Selected cover radio data-source:",
+                selectedCoverRadio ? selectedCoverRadio.dataset.source : "none",
+            );
 
             const validationMessages = [];
 
-            if (selectedCoverRadio && (selectedCoverRadio.dataset.source === "audible" || selectedCoverRadio.dataset.source === "google")) {
-                console.log("[DEBUG] External cover image selected: " + selectedCoverRadio.dataset.source);
+            if (
+                selectedCoverRadio &&
+                (selectedCoverRadio.dataset.source === "audible" ||
+                    selectedCoverRadio.dataset.source === "google")
+            ) {
+                console.log(
+                    "[DEBUG] External cover image selected: " +
+                        selectedCoverRadio.dataset.source,
+                );
 
                 // Check if the cover has already been downloaded (filename starts with cover_audible_ or cover_google_)
                 const coverValue = selectedCoverRadio.value;
-                const normalizedCoverValue = (coverValue || '').toString();
+                const normalizedCoverValue = (coverValue || "").toString();
                 const isAlreadyDownloaded =
-                    normalizedCoverValue !== '' &&
-                    (
-                        normalizedCoverValue.startsWith('cover_audible_') ||
+                    normalizedCoverValue !== "" &&
+                    (normalizedCoverValue.startsWith("cover_audible_") ||
                         // Current naming (ExternalCoverService::normalizeSourceName => googlebooks)
-                        normalizedCoverValue.startsWith('cover_googlebooks_') ||
+                        normalizedCoverValue.startsWith("cover_googlebooks_") ||
                         // Legacy naming used elsewhere in the UI
-                        normalizedCoverValue.startsWith('cover_google_') ||
+                        normalizedCoverValue.startsWith("cover_google_") ||
                         // Some older/current covers are stored as googlebooks_*.jpg (without cover_ prefix)
-                        normalizedCoverValue.startsWith('googlebooks_')
-                    );
+                        normalizedCoverValue.startsWith("googlebooks_"));
 
                 if (!isAlreadyDownloaded) {
                     // Only validate IDs and URLs if we need to download the cover
                     // Verify we have the corresponding ID for the external source
                     if (selectedCoverRadio.dataset.source === "audible") {
-                        const audibleIdInput = form.querySelector('#audibleId');
+                        const audibleIdInput = form.querySelector("#audibleId");
                         if (!audibleIdInput || !audibleIdInput.value.trim()) {
-                            addFieldError(audibleIdInput, "Audible ID is missing. Cannot download Audible cover image.");
+                            addFieldError(
+                                audibleIdInput,
+                                "Audible ID is missing. Cannot download Audible cover image.",
+                            );
                             hasError = true;
                             validationMessages.push("Audible ID is missing.");
-                            console.log("[DEBUG] (error) Audible ID is missing");
+                            console.log(
+                                "[DEBUG] (error) Audible ID is missing",
+                            );
                         }
                     } else if (selectedCoverRadio.dataset.source === "google") {
-                        const googleBooksIdInput = form.querySelector('#googleBooksId');
-                        if (!googleBooksIdInput || !googleBooksIdInput.value.trim()) {
-                            addFieldError(googleBooksIdInput, "Google Books ID is missing. Cannot download Google Books cover image.");
+                        const googleBooksIdInput =
+                            form.querySelector("#googleBooksId");
+                        if (
+                            !googleBooksIdInput ||
+                            !googleBooksIdInput.value.trim()
+                        ) {
+                            addFieldError(
+                                googleBooksIdInput,
+                                "Google Books ID is missing. Cannot download Google Books cover image.",
+                            );
                             hasError = true;
-                            validationMessages.push("Google Books ID is missing.");
-                            console.log("[DEBUG] (error) Google Books ID is missing");
+                            validationMessages.push(
+                                "Google Books ID is missing.",
+                            );
+                            console.log(
+                                "[DEBUG] (error) Google Books ID is missing",
+                            );
                         }
                     }
 
                     // Verify we have a cover URL if using external cover
-                    const coverUrlInput = form.querySelector('#coverImageUrl');
+                    const coverUrlInput = form.querySelector("#coverImageUrl");
                     if (!coverUrlInput || !coverUrlInput.value.trim()) {
                         const coverGroup =
-                            selectedCoverRadio.closest('.form-group') ||
-                            document.getElementById('cover-candidates-group') ||
+                            selectedCoverRadio.closest(".form-group") ||
+                            document.getElementById("cover-candidates-group") ||
                             selectedCoverRadio;
-                        addFieldError(coverGroup, "External cover image URL is missing. Cannot download cover image.");
+                        addFieldError(
+                            coverGroup,
+                            "External cover image URL is missing. Cannot download cover image.",
+                        );
                         hasError = true;
-                        validationMessages.push("External cover image URL is missing.");
-                        console.log("[DEBUG] (error) External cover image URL is missing");
+                        validationMessages.push(
+                            "External cover image URL is missing.",
+                        );
+                        console.log(
+                            "[DEBUG] (error) External cover image URL is missing",
+                        );
                     }
                 } else {
-                    console.log("[DEBUG] Cover already downloaded, skipping validation");
+                    console.log(
+                        "[DEBUG] Cover already downloaded, skipping validation",
+                    );
                 }
             }
 
@@ -1288,7 +1477,10 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (input.value.trim()) hasAuthor = true;
             });
             if (!hasAuthor && authorInputs.length > 0) {
-                addFieldError(authorInputs[0], "At least one author is required.");
+                addFieldError(
+                    authorInputs[0],
+                    "At least one author is required.",
+                );
                 hasError = true;
                 validationMessages.push("At least one author is required.");
                 console.log("[DEBUG] (error) No author selected");
@@ -1309,7 +1501,10 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (select.value) hasGenre = true;
             });
             if (!hasGenre && genreSelects.length > 0) {
-                addFieldError(genreSelects[0], "At least one genre is required.");
+                addFieldError(
+                    genreSelects[0],
+                    "At least one genre is required.",
+                );
                 console.log("[DEBUG] (error) No genre selected");
                 hasError = true;
                 validationMessages.push("At least one genre is required.");
@@ -1323,8 +1518,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
             // Log the selected cover image value for debugging
             if (selectedCoverRadio) {
-                console.log("[DEBUG] Selected cover image value before submission:", selectedCoverRadio.value);
-                console.log("[DEBUG] Selected cover image data-source:", selectedCoverRadio.dataset.source);
+                console.log(
+                    "[DEBUG] Selected cover image value before submission:",
+                    selectedCoverRadio.value,
+                );
+                console.log(
+                    "[DEBUG] Selected cover image data-source:",
+                    selectedCoverRadio.dataset.source,
+                );
             }
 
             if (hasError) {
@@ -1429,27 +1630,40 @@ document.addEventListener("DOMContentLoaded", function () {
                             msg = xhr.responseJSON.message;
 
                         // Check specifically for external cover image download errors
-                        if (xhr.responseJSON && xhr.responseJSON.error_type === "external_cover_download_failed") {
-                            console.log("[DEBUG] External cover download failed: " + msg);
+                        if (
+                            xhr.responseJSON &&
+                            xhr.responseJSON.error_type ===
+                                "external_cover_download_failed"
+                        ) {
+                            console.log(
+                                "[DEBUG] External cover download failed: " +
+                                    msg,
+                            );
 
                             // Find the selected cover image radio button
-                            const selectedCoverRadio = form.querySelector('input[name="coverImageCandidate"]:checked');
+                            const selectedCoverRadio = form.querySelector(
+                                'input[name="coverImageCandidate"]:checked',
+                            );
                             if (selectedCoverRadio) {
-                                const coverGroup = selectedCoverRadio.closest('.form-group') ||
-                                                  document.getElementById('cover-candidates-group');
+                                const coverGroup =
+                                    selectedCoverRadio.closest(".form-group") ||
+                                    document.getElementById(
+                                        "cover-candidates-group",
+                                    );
 
                                 if (coverGroup) {
                                     $(coverGroup).addClass("is-invalid");
                                     $(coverGroup).after(
                                         '<span class="invalid-feedback d-block alert alert-danger">' +
-                                        '<strong>Cover Image Error:</strong> ' + msg +
-                                        '</span>'
+                                            "<strong>Cover Image Error:</strong> " +
+                                            msg +
+                                            "</span>",
                                     );
 
                                     // Scroll to the error
                                     coverGroup.scrollIntoView({
                                         behavior: "smooth",
-                                        block: "center"
+                                        block: "center",
                                     });
                                     return;
                                 }
@@ -1561,7 +1775,7 @@ function performAutofillSearch(sources, autoApplyFirst) {
     var allResults = [];
     var completedRequests = 0;
 
-    sourcesToSearch.forEach(function(source) {
+    sourcesToSearch.forEach(function (source) {
         // Map the source value to the API source parameter
         var apiSource = "";
         if (source === "google") {
@@ -1592,15 +1806,16 @@ function performAutofillSearch(sources, autoApplyFirst) {
             .done(function (response) {
                 var results = Array.isArray(response) ? response : [];
                 // Add source to each result
-                results.forEach(function(item) {
-                    item.source = source.charAt(0).toUpperCase() + source.slice(1);
+                results.forEach(function (item) {
+                    item.source =
+                        source.charAt(0).toUpperCase() + source.slice(1);
                 });
                 allResults = allResults.concat(results);
             })
             .fail(function (xhr) {
                 console.error("[DEBUG] Search failed for " + source + ":", xhr);
             })
-            .always(function() {
+            .always(function () {
                 completedRequests++;
                 if (completedRequests === sourcesToSearch.length) {
                     displayAutofillResults(allResults, autoApplyFirst);
@@ -1615,13 +1830,13 @@ function displayAutofillResults(results, autoApplyFirst) {
     var $applyBtn = $modal.find("#autofill-apply-btn");
 
     // Sort results by relevance/quality
-    results.sort(function(a, b) {
+    results.sort(function (a, b) {
         // Source priority scoring (higher is better)
         var sourcePriority = {
-            'Audible': 100,
-            'Hardcover': 80,
-            'Google': 60,
-            'Audiobookbay': 40
+            Audible: 100,
+            Hardcover: 80,
+            Google: 60,
+            Audiobookbay: 40,
         };
 
         var aSourceScore = sourcePriority[a.source] || 0;
@@ -1665,13 +1880,15 @@ function displayAutofillResults(results, autoApplyFirst) {
             } else if (item.authors && Array.isArray(item.authors)) {
                 // Nested array: [{author: {name: "Eoin Colfer", id: "..."}}]
                 authors = item.authors
-                    .map(function(a) {
+                    .map(function (a) {
                         if (a.author && a.author.name) {
                             return a.author.name;
                         }
                         return a.name || a;
                     })
-                    .filter(function(a) { return a; })
+                    .filter(function (a) {
+                        return a;
+                    })
                     .join(", ");
             } else if (item.author) {
                 authors = item.author;
@@ -1685,13 +1902,15 @@ function displayAutofillResults(results, autoApplyFirst) {
             } else if (item.narrators && Array.isArray(item.narrators)) {
                 // Nested array: [{narrator: {name: "Nathaniel Parker", id: "..."}}]
                 narrators = item.narrators
-                    .map(function(n) {
+                    .map(function (n) {
                         if (n.narrator && n.narrator.name) {
                             return n.narrator.name;
                         }
                         return n.name || n;
                     })
-                    .filter(function(n) { return n; })
+                    .filter(function (n) {
+                        return n;
+                    })
                     .join(", ");
             } else if (item.narratorList && Array.isArray(item.narratorList)) {
                 // Alternative spelling
@@ -1702,10 +1921,7 @@ function displayAutofillResults(results, autoApplyFirst) {
                     : item.narrator;
             }
 
-            var coverUrl =
-                item.coverImageUrl ||
-                item.cover_image_url ||
-                "";
+            var coverUrl = item.coverImageUrl || item.cover_image_url || "";
             var publishedYear =
                 item.publishedYear ||
                 (item.published_date
@@ -1716,7 +1932,9 @@ function displayAutofillResults(results, autoApplyFirst) {
                 "<tr>" +
                 '<td><input type="radio" name="autofill_result_select" value="' +
                 idx +
-                '" ' + (idx === 0 ? 'checked' : '') + '></td>' +
+                '" ' +
+                (idx === 0 ? "checked" : "") +
+                "></td>" +
                 "<td>" +
                 (coverUrl
                     ? '<img src="' +
@@ -1763,14 +1981,8 @@ function displayAutofillResults(results, autoApplyFirst) {
                     var idx = $(this).val();
                     var item = window.autofillMatches[idx];
                     if (!item) return;
-                    $("#autofill-apply-btn").prop(
-                        "disabled",
-                        false,
-                    );
-                    $("#autofill-apply-btn").data(
-                        "selectedIdx",
-                        idx,
-                    );
+                    $("#autofill-apply-btn").prop("disabled", false);
+                    $("#autofill-apply-btn").data("selectedIdx", idx);
                 },
             );
 
@@ -1778,7 +1990,7 @@ function displayAutofillResults(results, autoApplyFirst) {
         if (autoApplyFirst && results.length > 0) {
             console.log("[DEBUG] Auto-applying first result");
             applyAutofillResult(0);
-            $modal.modal('hide');
+            $modal.modal("hide");
         }
     } else {
         $resultsTable.html(
@@ -1795,28 +2007,28 @@ $(function () {
         $autofillForm.off("submit");
 
         // Handle individual source buttons
-        $("#search-audible-btn").on("click", function(e) {
+        $("#search-audible-btn").on("click", function (e) {
             e.preventDefault();
             performAutofillSearch("audible", false);
         });
 
-        $("#search-google-btn").on("click", function(e) {
+        $("#search-google-btn").on("click", function (e) {
             e.preventDefault();
             performAutofillSearch("google", false);
         });
 
-        $("#search-audiobookbay-btn").on("click", function(e) {
+        $("#search-audiobookbay-btn").on("click", function (e) {
             e.preventDefault();
             performAutofillSearch("audiobookbay", false);
         });
 
-        $("#search-hardcover-btn").on("click", function(e) {
+        $("#search-hardcover-btn").on("click", function (e) {
             e.preventDefault();
             performAutofillSearch("hardcover", false);
         });
 
         // Handle search all button (excludes AudiobookBay due to performance)
-        $("#search-all-btn").on("click", function(e) {
+        $("#search-all-btn").on("click", function (e) {
             e.preventDefault();
             performAutofillSearch(["audible", "google", "hardcover"], false);
         });
@@ -1837,264 +2049,303 @@ function applyAutofillResult(idx) {
     var item = window.autofillMatches[idx];
     if (!item) return;
 
-                                // Set title
-                                $("#title").val(item.title || "");
+    // Set title
+    $("#title").val(item.title || "");
 
-                                // Set description
-                                if (item.description) {
-                                    $("#description").val(item.description);
-                                }
+    // Set description
+    if (item.description) {
+        $("#description").val(item.description);
+    }
 
-                                // Authors - handle multiple formats
-                                $("#authors-group").html("");
-                                if (item.author && Array.isArray(item.author)) {
-                                    // Simple array: ["Eoin Colfer"]
-                                    item.author.forEach(function (author) {
-                                        addAuthorRow($("#book-form"), author);
-                                    });
-                                } else if (item.authors && Array.isArray(item.authors)) {
-                                    // Nested array: [{author: {name: "Eoin Colfer", id: "..."}}]
-                                    item.authors.forEach(function (a) {
-                                        var authorName = a.author && a.author.name ? a.author.name : (a.name || a);
-                                        if (authorName) {
-                                            addAuthorRow($("#book-form"), authorName);
-                                        }
-                                    });
-                                } else if (item.author) {
-                                    // Single string
-                                    addAuthorRow($("#book-form"), item.author);
-                                } else {
-                                    // Add empty author row
-                                    addAuthorRow($("#book-form"), "");
-                                }
+    // Authors - handle multiple formats
+    $("#authors-group").html("");
+    if (item.author && Array.isArray(item.author)) {
+        // Simple array: ["Eoin Colfer"]
+        item.author.forEach(function (author) {
+            addAuthorRow($("#book-form"), author);
+        });
+    } else if (item.authors && Array.isArray(item.authors)) {
+        // Nested array: [{author: {name: "Eoin Colfer", id: "..."}}]
+        item.authors.forEach(function (a) {
+            var authorName =
+                a.author && a.author.name ? a.author.name : a.name || a;
+            if (authorName) {
+                addAuthorRow($("#book-form"), authorName);
+            }
+        });
+    } else if (item.author) {
+        // Single string
+        addAuthorRow($("#book-form"), item.author);
+    } else {
+        // Add empty author row
+        addAuthorRow($("#book-form"), "");
+    }
 
-                                // Narrators - handle multiple formats
-                                $("#narrators-group").html("");
-                                if (item.narratorsList && Array.isArray(item.narratorsList) && item.narratorsList.length > 0) {
-                                    // Simple array: ["Nathaniel Parker"]
-                                    item.narratorsList.forEach(function (narrator) {
-                                        addNarratorRow($("#book-form"), narrator);
-                                    });
-                                } else if (item.narrators && Array.isArray(item.narrators) && item.narrators.length > 0) {
-                                    // Nested array: [{narrator: {name: "Nathaniel Parker", id: "..."}}]
-                                    item.narrators.forEach(function (n) {
-                                        var narratorName = n.narrator && n.narrator.name ? n.narrator.name : (n.name || n);
-                                        if (narratorName) {
-                                            addNarratorRow($("#book-form"), narratorName);
-                                        }
-                                    });
-                                } else if (item.narratorList && Array.isArray(item.narratorList) && item.narratorList.length > 0) {
-                                    // Alternative spelling
-                                    item.narratorList.forEach(function (narrator) {
-                                        addNarratorRow($("#book-form"), narrator);
-                                    });
-                                } else if (item.narrator) {
-                                    // Single narrator (string or array)
-                                    if (typeof item.narrator === "string") {
-                                        addNarratorRow($("#book-form"), item.narrator);
-                                    } else if (Array.isArray(item.narrator)) {
-                                        item.narrator.forEach(function (narrator) {
-                                            addNarratorRow($("#book-form"), narrator);
-                                        });
-                                    }
-                                } else {
-                                    // Add empty narrator row if no narrators
-                                    addNarratorRow($("#book-form"), "");
-                                }
+    // Narrators - handle multiple formats
+    $("#narrators-group").html("");
+    if (
+        item.narratorsList &&
+        Array.isArray(item.narratorsList) &&
+        item.narratorsList.length > 0
+    ) {
+        // Simple array: ["Nathaniel Parker"]
+        item.narratorsList.forEach(function (narrator) {
+            addNarratorRow($("#book-form"), narrator);
+        });
+    } else if (
+        item.narrators &&
+        Array.isArray(item.narrators) &&
+        item.narrators.length > 0
+    ) {
+        // Nested array: [{narrator: {name: "Nathaniel Parker", id: "..."}}]
+        item.narrators.forEach(function (n) {
+            var narratorName =
+                n.narrator && n.narrator.name ? n.narrator.name : n.name || n;
+            if (narratorName) {
+                addNarratorRow($("#book-form"), narratorName);
+            }
+        });
+    } else if (
+        item.narratorList &&
+        Array.isArray(item.narratorList) &&
+        item.narratorList.length > 0
+    ) {
+        // Alternative spelling
+        item.narratorList.forEach(function (narrator) {
+            addNarratorRow($("#book-form"), narrator);
+        });
+    } else if (item.narrator) {
+        // Single narrator (string or array)
+        if (typeof item.narrator === "string") {
+            addNarratorRow($("#book-form"), item.narrator);
+        } else if (Array.isArray(item.narrator)) {
+            item.narrator.forEach(function (narrator) {
+                addNarratorRow($("#book-form"), narrator);
+            });
+        }
+    } else {
+        // Add empty narrator row if no narrators
+        addNarratorRow($("#book-form"), "");
+    }
 
-                                // Series - handle both formats
-                                var series = item.series || "";
-                                var seriesNumber =
-                                    item.seriesNumber ||
-                                    item.series_number ||
-                                    "";
-                                if (series) {
-                                    var seriesGroup = $("#series-group");
-                                    seriesGroup.html("");
-                                    addSeriesRow(
-                                        $("#book-form"),
-                                        series,
-                                        seriesNumber,
-                                    );
-                                }
+    // Series - handle both formats
+    var series = item.series || "";
+    var seriesNumber = item.seriesNumber || item.series_number || "";
+    if (series) {
+        var seriesGroup = $("#series-group");
+        seriesGroup.html("");
+        addSeriesRow($("#book-form"), series, seriesNumber);
+    }
 
-                                // Release Date - handle both formats
-                                var releaseDateInput = $("#release_date");
-                                var publishedYear =
-                                    item.publishedYear ||
-                                    (item.published_date
-                                        ? item.published_date.substring(0, 4)
-                                        : "");
-                                if (releaseDateInput.length && publishedYear) {
-                                    // Convert year to date format
-                                    releaseDateInput.val(publishedYear + '-01-01');
-                                }
+    // Release Date - handle both formats
+    var releaseDateInput = $("#release_date");
+    var publishedYear =
+        item.publishedYear ||
+        (item.published_date ? item.published_date.substring(0, 4) : "");
+    if (releaseDateInput.length && publishedYear) {
+        // Convert year to date format
+        releaseDateInput.val(publishedYear + "-01-01");
+    }
 
-                                // Cover - handle both formats
-                                var coverUrl =
-                                    item.coverImageUrl ||
-                                    item.cover_image_url ||
-                                    "";
-                                if (coverUrl) {
-                                    // Instead of setting file input value, create/update a hidden input for the cover URL
-                                    var coverUrlInput = $("#coverImageUrl");
-                                    if (!coverUrlInput.length) {
-                                        // Create hidden input if not present
-                                        $("<input>")
-                                            .attr({
-                                                type: "hidden",
-                                                id: "coverImageUrl",
-                                                name: "coverImageUrl",
-                                                value: coverUrl,
-                                            })
-                                            .appendTo("#book-form");
-                                    } else {
-                                        coverUrlInput.val(coverUrl);
-                                    }
+    // Cover - handle both formats
+    var coverUrl = item.coverImageUrl || item.cover_image_url || "";
+    if (coverUrl) {
+        // Instead of setting file input value, create/update a hidden input for the cover URL
+        var coverUrlInput = $("#coverImageUrl");
+        if (!coverUrlInput.length) {
+            // Create hidden input if not present
+            $("<input>")
+                .attr({
+                    type: "hidden",
+                    id: "coverImageUrl",
+                    name: "coverImageUrl",
+                    value: coverUrl,
+                })
+                .appendTo("#book-form");
+        } else {
+            coverUrlInput.val(coverUrl);
+        }
 
-                                    // If we're in the cover selection UI, add this cover to the options
-                                    var $coverCandidatesList = $("#cover-candidates-list");
-                                    if ($coverCandidatesList.length) {
-                                        // Check if we already have a radio button for this source
-                                        var sourceType = item.source === "Audible" ? "audible" : "googlebooks";
-                                        var existingRadio = $('input[name="coverImageCandidate"][data-source="' + sourceType + '"]');
+        // If we're in the cover selection UI, add this cover to the options
+        var $coverCandidatesList = $("#cover-candidates-list");
+        if ($coverCandidatesList.length) {
+            // Check if we already have a radio button for this source
+            var sourceType =
+                item.source === "Audible" ? "audible" : "googlebooks";
+            var existingRadio = $(
+                'input[name="coverImageCandidate"][data-source="' +
+                    sourceType +
+                    '"]',
+            );
 
-                                        if (existingRadio.length) {
-                                            // Update existing radio button's image
-                                            existingRadio.closest('label').find('img').attr('src', coverUrl);
-                                            // Select this radio button
-                                            existingRadio.prop('checked', true);
-                                            console.log("[DEBUG] Updated existing " + sourceType + " cover radio button and selected it");
-                                        } else {
-                                            // Create a new radio button option
-                                            var sourceLabel = item.source === "Audible" ? "Audible Cover" : "Google Books Cover";
-                                            var newOption = $('<div class="text-center">' +
-                                                '<label class="d-flex flex-column align-items-center">' +
-                                                '<input type="radio" name="coverImageCandidate" value="' + sourceType + '" ' +
-                                                'data-source="' + sourceType + '" checked class="mb-2">' +
-                                                '<img src="' + coverUrl + '" alt="' + sourceLabel + '" ' +
-                                                'style="max-width:100px;max-height:140px;border:1px solid #ccc;">' +
-                                                '</label>' +
-                                                '<div class="mt-1" style="font-size:12px;word-break:break-all;">' +
-                                                sourceLabel + '<br>' +
-                                                '<small class="text-muted">External Cover</small>' +
-                                                '</div>' +
-                                                '</div>');
+            if (existingRadio.length) {
+                // Update existing radio button's image
+                existingRadio
+                    .closest("label")
+                    .find("img")
+                    .attr("src", coverUrl);
+                // Select this radio button
+                existingRadio.prop("checked", true);
+                console.log(
+                    "[DEBUG] Updated existing " +
+                        sourceType +
+                        " cover radio button and selected it",
+                );
+            } else {
+                // Create a new radio button option
+                var sourceLabel =
+                    item.source === "Audible"
+                        ? "Audible Cover"
+                        : "Google Books Cover";
+                var newOption = $(
+                    '<div class="text-center">' +
+                        '<label class="d-flex flex-column align-items-center">' +
+                        '<input type="radio" name="coverImageCandidate" value="' +
+                        sourceType +
+                        '" ' +
+                        'data-source="' +
+                        sourceType +
+                        '" checked class="mb-2">' +
+                        '<img src="' +
+                        coverUrl +
+                        '" alt="' +
+                        sourceLabel +
+                        '" ' +
+                        'style="max-width:100px;max-height:140px;border:1px solid #ccc;">' +
+                        "</label>" +
+                        '<div class="mt-1" style="font-size:12px;word-break:break-all;">' +
+                        sourceLabel +
+                        "<br>" +
+                        '<small class="text-muted">External Cover</small>' +
+                        "</div>" +
+                        "</div>",
+                );
 
-                                            $coverCandidatesList.append(newOption);
-                                            console.log("[DEBUG] Added new " + sourceType + " cover radio button and selected it");
+                $coverCandidatesList.append(newOption);
+                console.log(
+                    "[DEBUG] Added new " +
+                        sourceType +
+                        " cover radio button and selected it",
+                );
 
-                                            // If this is the first cover option, make the container visible
-                                            if ($coverCandidatesList.children().length === 1) {
-                                                $("#cover-candidates-group").show();
-                                            }
-                                        }
+                // If this is the first cover option, make the container visible
+                if ($coverCandidatesList.children().length === 1) {
+                    $("#cover-candidates-group").show();
+                }
+            }
 
-                                        // Ensure the cover candidates group is visible
-                                        $("#cover-candidates-group").show();
+            // Ensure the cover candidates group is visible
+            $("#cover-candidates-group").show();
 
-                                        // Update the corner preview image to show the newly selected cover
-                                        var $cornerPreview = $("#cover-preview-trigger img");
-                                        if ($cornerPreview.length) {
-                                            $cornerPreview.attr("src", coverUrl);
-                                            $("#cover-preview-container").show();
-                                            console.log("[DEBUG] Updated corner preview to show autofilled cover");
-                                        }
-                                    } else {
-                                        // If no cover candidates list, still update corner preview
-                                        var $cornerPreview = $("#cover-preview-trigger img");
-                                        if ($cornerPreview.length && coverUrl) {
-                                            $cornerPreview.attr("src", coverUrl);
-                                            $("#cover-preview-container").show();
-                                            console.log("[DEBUG] Updated corner preview to show autofilled cover");
-                                        }
-                                    }
-                                }
+            // Update the corner preview image to show the newly selected cover
+            const $cornerPreview = document.querySelector(
+                "#cover-preview-trigger img",
+            );
+            if ($cornerPreview) {
+                $cornerPreview.src = coverUrl;
+                document.getElementById(
+                    "cover-preview-container",
+                ).style.display = "block";
+            }
+        } else {
+            // If no cover candidates list, still update corner preview
+            const $previewContainer = document.querySelector(
+                "#cover-preview-trigger",
+            );
+            const $cornerPreview =
+                $previewContainer && $previewContainer.querySelector("img");
+            if ($cornerPreview.length && coverUrl) {
+                $cornerPreview.attr("src", coverUrl);
+                $("#cover-preview-container").show();
+                console.log(
+                    "[DEBUG] Updated corner preview to show autofilled cover",
+                );
+            }
+        }
+    }
 
-                                // Handle source-specific IDs and fields
-                                console.log("[DEBUG] Processing source-specific IDs and fields for " + item.source);
-                                if (item.source === "Audible") {
-                                    console.log("[DEBUG] Processing Audible-specific IDs and fields");
-                                    console.log("[DEBUG] item: ", item);
-                                    // Set Audible ID
-                                    var audibleIdInput = $("#audibleId");
-                                    var audibleId =
-                                        item.audibleId || item.asin || item.id || "";
-                                    console.log("[DEBUG] Audible ID: " + audibleId);
-                                    if (!audibleIdInput.length) {
-                                        // Create hidden input if not present
-                                        $("<input>")
-                                            .attr({
-                                                type: "hidden",
-                                                id: "audibleId",
-                                                name: "audibleId",
-                                                value: audibleId,
-                                            })
-                                            .appendTo("#book-form");
-                                        console.log("[DEBUG] Created hidden input for Audible ID (value: " + audibleId + ")");
-                                    } else {
-                                        audibleIdInput.val(audibleId);
-                                        console.log("[DEBUG] Updated hidden input for Audible ID (value: " + audibleId + ")");
-                                    }
+    // Handle source-specific IDs and fields
+    console.log(
+        "[DEBUG] Processing source-specific IDs and fields for " + item.source,
+    );
+    if (item.source === "Audible") {
+        console.log("[DEBUG] Processing Audible-specific IDs and fields");
+        console.log("[DEBUG] item: ", item);
+        // Set Audible ID
+        var audibleIdInput = $("#audibleId");
+        var audibleId = item.audibleId || item.asin || item.id || "";
+        console.log("[DEBUG] Audible ID: " + audibleId);
+        if (!audibleIdInput.length) {
+            // Create hidden input if not present
+            $("<input>")
+                .attr({
+                    type: "hidden",
+                    id: "audibleId",
+                    name: "audibleId",
+                    value: audibleId,
+                })
+                .appendTo("#book-form");
+            console.log(
+                "[DEBUG] Created hidden input for Audible ID (value: " +
+                    audibleId +
+                    ")",
+            );
+        } else {
+            audibleIdInput.val(audibleId);
+            console.log(
+                "[DEBUG] Updated hidden input for Audible ID (value: " +
+                    audibleId +
+                    ")",
+            );
+        }
 
-                                    // Narrators are now handled globally above
-                                } else {
-                                    // Set Google Books ID
-                                    var gbIdInput = $("#googleBooksId");
-                                    var googleBooksId =
-                                        item.googleBooksId || "";
-                                    if (!gbIdInput.length) {
-                                        // Create hidden input if not present
-                                        $("<input>")
-                                            .attr({
-                                                type: "hidden",
-                                                id: "googleBooksId",
-                                                name: "googleBooksId",
-                                                value: googleBooksId,
-                                            })
-                                            .appendTo("#book-form");
-                                    } else {
-                                        gbIdInput.val(googleBooksId);
-                                    }
+        // Narrators are now handled globally above
+    } else {
+        // Set Google Books ID
+        var gbIdInput = $("#googleBooksId");
+        var googleBooksId = item.googleBooksId || "";
+        if (!gbIdInput.length) {
+            // Create hidden input if not present
+            $("<input>")
+                .attr({
+                    type: "hidden",
+                    id: "googleBooksId",
+                    name: "googleBooksId",
+                    value: googleBooksId,
+                })
+                .appendTo("#book-form");
+        } else {
+            gbIdInput.val(googleBooksId);
+        }
 
-                                    // For Google Books, we may not have narrators, so add an empty row if needed
-                                    $("#narrators-group").html("");
-                                    if (item.narrator) {
-                                        if (typeof item.narrator === "string") {
-                                            addNarratorRow(
-                                                $("#book-form"),
-                                                item.narrator
-                                            );
-                                        } else if (
-                                            Array.isArray(item.narrator)
-                                        ) {
-                                            item.narrator.forEach(
-                                                function (narrator) {
-                                                    addNarratorRow(
-                                                        $("#book-form"),
-                                                        narrator
-                                                    );
-                                                }
-                                            );
-                                        }
-                                    } else {
-                                        // Add an empty narrator row
-                                        addNarratorRow($("#book-form"), "");
-                                    }
-                                }
+        // For Google Books, we may not have narrators, so add an empty row if needed
+        $("#narrators-group").html("");
+        if (item.narrator) {
+            if (typeof item.narrator === "string") {
+                addNarratorRow($("#book-form"), item.narrator);
+            } else if (Array.isArray(item.narrator)) {
+                item.narrator.forEach(function (narrator) {
+                    addNarratorRow($("#book-form"), narrator);
+                });
+            }
+        } else {
+            // Add an empty narrator row
+            addNarratorRow($("#book-form"), "");
+        }
+    }
 }
 
 // Magic Autofill Button - Auto-search Audible and apply first result
-$(document).on("click", "#magic-autofill-btn", function(e) {
+$(document).on("click", "#magic-autofill-btn", function (e) {
     e.preventDefault();
     console.log("[DEBUG] Magic autofill button clicked");
 
     // Get current form values
-    var title = $('input[name="title"]').val() || '';
-    var author = '';
+    var title = $('input[name="title"]').val() || "";
+    var author = "";
     var authorInputs = $('input[name="authors[]"]');
     if (authorInputs.length > 0) {
-        author = $(authorInputs[0]).val() || '';
+        author = $(authorInputs[0]).val() || "";
     }
 
     // Set autofill modal fields
@@ -2111,11 +2362,18 @@ function ensureCoverImageSelected() {
     const $coverRadios = $('input[name="coverImageCandidate"]');
 
     // If we have cover image radio buttons but none are selected
-    if ($coverRadios.length > 0 && $coverRadios.filter(":checked").length === 0) {
-        console.log("[DEBUG] Found cover radio buttons but none selected, selecting first one");
+    if (
+        $coverRadios.length > 0 &&
+        $coverRadios.filter(":checked").length === 0
+    ) {
+        console.log(
+            "[DEBUG] Found cover radio buttons but none selected, selecting first one",
+        );
 
         // First try to select external covers (Audible or Google Books) if available
-        const $externalCoverRadios = $coverRadios.filter('[data-source="audible"], [data-source="googlebooks"]');
+        const $externalCoverRadios = $coverRadios.filter(
+            '[data-source="audible"], [data-source="googlebooks"]',
+        );
         if ($externalCoverRadios.length > 0) {
             $externalCoverRadios.first().prop("checked", true);
             console.log("[DEBUG] Selected external cover radio button");
@@ -2125,169 +2383,227 @@ function ensureCoverImageSelected() {
             console.log("[DEBUG] Selected first available cover radio button");
         }
     } else if ($coverRadios.length > 0) {
-        console.log("[DEBUG] Cover radio button already selected:", $coverRadios.filter(":checked").val());
+        console.log(
+            "[DEBUG] Cover radio button already selected:",
+            $coverRadios.filter(":checked").val(),
+        );
     } else {
         console.log("[DEBUG] No cover radio buttons found");
     }
 }
 
 // Toast notification helper
-function showToast(message, type = 'success') {
-    const toast = $('<div>')
-        .addClass('alert alert-' + type)
+function showToast(message, type = "success") {
+    const toast = $("<div>")
+        .addClass("alert alert-" + type)
         .css({
-            position: 'fixed',
-            top: '20px',
-            left: '50%',
-            transform: 'translateX(-50%)',
+            position: "fixed",
+            top: "20px",
+            left: "50%",
+            transform: "translateX(-50%)",
             zIndex: 9999,
-            minWidth: '250px',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+            minWidth: "250px",
+            boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
         })
         .text(message);
 
-    $('body').append(toast);
+    $("body").append(toast);
 
-    setTimeout(function() {
-        toast.fadeOut(300, function() {
+    setTimeout(function () {
+        toast.fadeOut(300, function () {
             $(this).remove();
         });
     }, 2000);
 }
 
 // Resync fields from directory path - reads current directoryPath value
-$(document).off('click.resyncPath', '#resync-path-btn').on('click.resyncPath', '#resync-path-btn', function() {
-    const directoryPath = $('input[name="directoryPath"]:not(#directoryPathHidden)').val();
-    if (!directoryPath) {
-        showToast('Please enter a directory path first', 'warning');
-        return;
-    }
-
-    $.ajax({
-        url: window.BOOK_FORM_ROUTES.parsePath,
-        method: 'POST',
-        data: {
-            path: directoryPath,
-            _token: $('meta[name="csrf-token"]').attr('content')
-        },
-        success: function(data) {
-            if (data.title) {
-                $('#title').val(data.title);
-            }
-            if (data.author) {
-                const firstAuthorInput = $('#authors-group .author-row:first input[name="author[]"]');
-                if (firstAuthorInput.length) {
-                    firstAuthorInput.val(data.author);
-                }
-            }
-            if (data.genre) {
-                const firstGenreSelect = $('#genres-group .genre-row:first select[name="genre[]"]');
-                if (firstGenreSelect.length) {
-                    firstGenreSelect.val(data.genre);
-                }
-            }
-            if (data.series) {
-                const firstSeriesNameInput = $('#series-group .series-row:first input[name*="[seriesName]"]');
-                if (firstSeriesNameInput.length) {
-                    firstSeriesNameInput.val(data.series);
-                }
-            }
-            if (data.seriesNumber) {
-                const firstSeriesNumberInput = $('#series-group .series-row:first input[name*="[number]"]');
-                if (firstSeriesNumberInput.length) {
-                    firstSeriesNumberInput.val(data.seriesNumber);
-                }
-            }
-            showToast('Fields updated from path!', 'success');
-        },
-        error: function(xhr) {
-            showToast('Error parsing path: ' + (xhr.responseJSON?.error || 'Unknown error'), 'danger');
+$(document)
+    .off("click.resyncPath", "#resync-path-btn")
+    .on("click.resyncPath", "#resync-path-btn", function () {
+        const directoryPath = $(
+            'input[name="directoryPath"]:not(#directoryPathHidden)',
+        ).val();
+        if (!directoryPath) {
+            showToast("Please enter a directory path first", "warning");
+            return;
         }
+
+        $.ajax({
+            url: window.BOOK_FORM_ROUTES.parsePath,
+            method: "POST",
+            data: {
+                path: directoryPath,
+                _token: $('meta[name="csrf-token"]').attr("content"),
+            },
+            success: function (data) {
+                if (data.title) {
+                    $("#title").val(data.title);
+                }
+                if (data.author) {
+                    const firstAuthorInput = $(
+                        '#authors-group .author-row:first input[name="author[]"]',
+                    );
+                    if (firstAuthorInput.length) {
+                        firstAuthorInput.val(data.author);
+                    }
+                }
+                if (data.genre) {
+                    const firstGenreSelect = $(
+                        '#genres-group .genre-row:first select[name="genre[]"]',
+                    );
+                    if (firstGenreSelect.length) {
+                        firstGenreSelect.val(data.genre);
+                    }
+                }
+                if (data.series) {
+                    const firstSeriesNameInput = $(
+                        '#series-group .series-row:first input[name*="[seriesName]"]',
+                    );
+                    if (firstSeriesNameInput.length) {
+                        firstSeriesNameInput.val(data.series);
+                    }
+                }
+                if (data.seriesNumber) {
+                    const firstSeriesNumberInput = $(
+                        '#series-group .series-row:first input[name*="[number]"]',
+                    );
+                    if (firstSeriesNumberInput.length) {
+                        firstSeriesNumberInput.val(data.seriesNumber);
+                    }
+                }
+                showToast("Fields updated from path!", "success");
+            },
+            error: function (xhr) {
+                showToast(
+                    "Error parsing path: " +
+                        (xhr.responseJSON?.error || "Unknown error"),
+                    "danger",
+                );
+            },
+        });
     });
-});
 
 // Update path from fields - constructs path from current field values
-$(document).off('click.updatePathFromFields', '#update-path-from-fields-btn').on('click.updatePathFromFields', '#update-path-from-fields-btn', function() {
-    const genre = $('#genres-group .genre-row:first select[name="genre[]"]').val();
-    const author = $('#authors-group .author-row:first input[name="author[]"]').val();
-    const title = $('#title').val();
-    const seriesName = $('#series-group .series-row:first input[name*="[seriesName]"]').val();
-    const seriesNumber = $('#series-group .series-row:first input[name*="[number]"]').val();
+$(document)
+    .off("click.updatePathFromFields", "#update-path-from-fields-btn")
+    .on(
+        "click.updatePathFromFields",
+        "#update-path-from-fields-btn",
+        function () {
+            const genre = $(
+                '#genres-group .genre-row:first select[name="genre[]"]',
+            ).val();
+            const author = $(
+                '#authors-group .author-row:first input[name="author[]"]',
+            ).val();
+            const title = $("#title").val();
+            const seriesName = $(
+                '#series-group .series-row:first input[name*="[seriesName]"]',
+            ).val();
+            const seriesNumber = $(
+                '#series-group .series-row:first input[name*="[number]"]',
+            ).val();
 
-    if (!genre || !author || !title) {
-        showToast('Please fill in at least Genre, Author, and Title fields', 'warning');
-        return;
-    }
+            if (!genre || !author || !title) {
+                showToast(
+                    "Please fill in at least Genre, Author, and Title fields",
+                    "warning",
+                );
+                return;
+            }
 
-    let path;
+            let path;
 
-    if (seriesName && seriesName.trim() !== '') {
-        // Series book: Genre/Author/Series/## Title
-        let finalDir = title;
-        if (seriesNumber && seriesNumber.toString().trim() !== '') {
-            // Zero-pad the series number to 2 digits
-            const paddedNumber = String(seriesNumber).padStart(2, '0');
-            finalDir = `${paddedNumber} ${title}`;
-        }
-        path = `${genre}/${author}/${seriesName}/${finalDir}`;
-    } else {
-        // Standalone book: Genre/Author/Title
-        path = `${genre}/${author}/${title}`;
-    }
+            if (seriesName && seriesName.trim() !== "") {
+                // Series book: Genre/Author/Series/## Title
+                let finalDir = title;
+                if (seriesNumber && seriesNumber.toString().trim() !== "") {
+                    // Zero-pad the series number to 2 digits
+                    const paddedNumber = String(seriesNumber).padStart(2, "0");
+                    finalDir = `${paddedNumber} ${title}`;
+                }
+                path = `${genre}/${author}/${seriesName}/${finalDir}`;
+            } else {
+                // Standalone book: Genre/Author/Title
+                path = `${genre}/${author}/${title}`;
+            }
 
-    $('input[name="directoryPath"]:not(#directoryPathHidden)').val(path);
-    showToast('Directory path updated from fields!', 'success');
-});
+            $('input[name="directoryPath"]:not(#directoryPathHidden)').val(
+                path,
+            );
+            showToast("Directory path updated from fields!", "success");
+        },
+    );
 
 // Update path from genre change - replaces the genre portion of the path
-$(document).off('click.updatePathFromGenre', '.update-path-from-genre').on('click.updatePathFromGenre', '.update-path-from-genre', function() {
-    const currentPath = $('input[name="directoryPath"]:not(#directoryPathHidden)').val();
-    const newGenre = $('#genres-group .genre-row:first select[name="genre[]"]').val();
+$(document)
+    .off("click.updatePathFromGenre", ".update-path-from-genre")
+    .on("click.updatePathFromGenre", ".update-path-from-genre", function () {
+        const currentPath = $(
+            'input[name="directoryPath"]:not(#directoryPathHidden)',
+        ).val();
+        const newGenre = $(
+            '#genres-group .genre-row:first select[name="genre[]"]',
+        ).val();
 
-    if (!currentPath) {
-        showToast('No directory path to update', 'warning');
-        return;
-    }
+        if (!currentPath) {
+            showToast("No directory path to update", "warning");
+            return;
+        }
 
-    if (!newGenre) {
-        showToast('Please select a genre first', 'warning');
-        return;
-    }
+        if (!newGenre) {
+            showToast("Please select a genre first", "warning");
+            return;
+        }
 
-    const pathParts = currentPath.split('/');
-    if (pathParts.length > 0) {
-        pathParts[0] = newGenre;
-        const newPath = pathParts.join('/');
-        $('input[name="directoryPath"]:not(#directoryPathHidden)').val(newPath);
+        const pathParts = currentPath.split("/");
+        if (pathParts.length > 0) {
+            pathParts[0] = newGenre;
+            const newPath = pathParts.join("/");
+            $('input[name="directoryPath"]:not(#directoryPathHidden)').val(
+                newPath,
+            );
 
-        $(this).hide();
-        const firstGenreRow = $('#genres-group .genre-row:first');
-        firstGenreRow.attr('data-original-genre', newGenre);
+            $(this).hide();
+            const firstGenreRow = $("#genres-group .genre-row:first");
+            firstGenreRow.attr("data-original-genre", newGenre);
 
-        showToast('Directory path updated to new genre!', 'success');
-    }
-});
+            showToast("Directory path updated to new genre!", "success");
+        }
+    });
 
 // Monitor first genre select for changes to show/hide the update path button
-$(document).off('change.genrePathUpdate', '#genres-group').on('change.genrePathUpdate', '#genres-group .genre-row:first select[name="genre[]"]', function() {
-    const firstGenreRow = $(this).closest('.genre-row');
-    const originalGenre = firstGenreRow.attr('data-original-genre');
-    const currentGenre = $(this).val();
-    const updateBtn = firstGenreRow.find('.update-path-from-genre');
+$(document)
+    .off("change.genrePathUpdate", "#genres-group")
+    .on(
+        "change.genrePathUpdate",
+        '#genres-group .genre-row:first select[name="genre[]"]',
+        function () {
+            const firstGenreRow = $(this).closest(".genre-row");
+            const originalGenre = firstGenreRow.attr("data-original-genre");
+            const currentGenre = $(this).val();
+            const updateBtn = firstGenreRow.find(".update-path-from-genre");
 
-    if (currentGenre && currentGenre !== originalGenre && currentGenre !== '') {
-        updateBtn.show();
-    } else {
-        updateBtn.hide();
-    }
-});
+            if (
+                currentGenre &&
+                currentGenre !== originalGenre &&
+                currentGenre !== ""
+            ) {
+                updateBtn.show();
+            } else {
+                updateBtn.hide();
+            }
+        },
+    );
 
 // Handle metadata button clicks
-$(document).on('click', '.view-metadata', function(e) {
+$(document).on("click", ".view-metadata", function (e) {
     e.preventDefault();
-    const filePath = $(this).data('file');
-    const modal = new bootstrap.Modal(document.getElementById('audioMetadataModal'));
-    const metadataContent = $('#metadata-content');
+    const filePath = $(this).data("file");
+    const modal = new bootstrap.Modal(
+        document.getElementById("audioMetadataModal"),
+    );
+    const metadataContent = $("#metadata-content");
 
     // Show loading state
     metadataContent.html(`
@@ -2303,10 +2619,12 @@ $(document).on('click', '.view-metadata', function(e) {
 
     // Fetch metadata
     $.ajax({
-        url: window.BOOK_FORM_ROUTES.audioMetadata || '/admin/books/audio-metadata',
-        method: 'GET',
+        url:
+            window.BOOK_FORM_ROUTES.audioMetadata ||
+            "/admin/books/audio-metadata",
+        method: "GET",
         data: { file: filePath },
-        success: function(response) {
+        success: function (response) {
             if (response.success && response.metadata) {
                 displayMetadata(response.metadata, response.file);
             } else {
@@ -2318,15 +2636,15 @@ $(document).on('click', '.view-metadata', function(e) {
                 `);
             }
         },
-        error: function(xhr) {
-            const error = xhr.responseJSON?.error || 'Unknown error';
+        error: function (xhr) {
+            const error = xhr.responseJSON?.error || "Unknown error";
             metadataContent.html(`
                 <div class="alert alert-danger">
                     <i class="fas fa-exclamation-triangle me-2"></i>
                     Error: ${error}
                 </div>
             `);
-        }
+        },
     });
 });
 
@@ -2335,72 +2653,122 @@ function displayMetadata(metadata, filename) {
 
     // File info
     if (metadata.file) {
-        html += '<h6 class="border-bottom pb-2 mb-3"><i class="fas fa-file me-2"></i>File Information</h6>';
+        html +=
+            '<h6 class="border-bottom pb-2 mb-3"><i class="fas fa-file me-2"></i>File Information</h6>';
         html += '<table class="table table-sm table-bordered mb-4">';
-        html += '<tr><th style="width: 30%">Filename</th><td>' + filename + '</td></tr>';
+        html +=
+            '<tr><th style="width: 30%">Filename</th><td>' +
+            filename +
+            "</td></tr>";
         if (metadata.file.size_formatted) {
-            html += '<tr><th>Size</th><td>' + metadata.file.size_formatted + '</td></tr>';
+            html +=
+                "<tr><th>Size</th><td>" +
+                metadata.file.size_formatted +
+                "</td></tr>";
         }
         if (metadata.file.modified) {
-            html += '<tr><th>Modified</th><td>' + metadata.file.modified + '</td></tr>';
+            html +=
+                "<tr><th>Modified</th><td>" +
+                metadata.file.modified +
+                "</td></tr>";
         }
         if (metadata.file.extension) {
-            html += '<tr><th>Extension</th><td>' + metadata.file.extension.toUpperCase() + '</td></tr>';
+            html +=
+                "<tr><th>Extension</th><td>" +
+                metadata.file.extension.toUpperCase() +
+                "</td></tr>";
         }
-        html += '</table>';
+        html += "</table>";
     }
 
     // Format info
     if (metadata.format) {
-        html += '<h6 class="border-bottom pb-2 mb-3"><i class="fas fa-info-circle me-2"></i>Format Information</h6>';
+        html +=
+            '<h6 class="border-bottom pb-2 mb-3"><i class="fas fa-info-circle me-2"></i>Format Information</h6>';
         html += '<table class="table table-sm table-bordered mb-4">';
         if (metadata.format.format_long_name) {
-            html += '<tr><th style="width: 30%">Format</th><td>' + metadata.format.format_long_name + '</td></tr>';
+            html +=
+                '<tr><th style="width: 30%">Format</th><td>' +
+                metadata.format.format_long_name +
+                "</td></tr>";
         }
         if (metadata.format.duration_formatted) {
-            html += '<tr><th>Duration</th><td>' + metadata.format.duration_formatted + '</td></tr>';
+            html +=
+                "<tr><th>Duration</th><td>" +
+                metadata.format.duration_formatted +
+                "</td></tr>";
         }
         if (metadata.format.bit_rate_formatted) {
-            html += '<tr><th>Bit Rate</th><td>' + metadata.format.bit_rate_formatted + '</td></tr>';
+            html +=
+                "<tr><th>Bit Rate</th><td>" +
+                metadata.format.bit_rate_formatted +
+                "</td></tr>";
         }
-        html += '</table>';
+        html += "</table>";
     }
 
     // Stream info
     if (metadata.streams && metadata.streams.length > 0) {
-        html += '<h6 class="border-bottom pb-2 mb-3"><i class="fas fa-stream me-2"></i>Audio Streams</h6>';
-        metadata.streams.forEach(function(stream, index) {
+        html +=
+            '<h6 class="border-bottom pb-2 mb-3"><i class="fas fa-stream me-2"></i>Audio Streams</h6>';
+        metadata.streams.forEach(function (stream, index) {
             html += '<table class="table table-sm table-bordered mb-3">';
-            html += '<tr><th colspan="2" class="bg-light">Stream ' + (index + 1) + '</th></tr>';
+            html +=
+                '<tr><th colspan="2" class="bg-light">Stream ' +
+                (index + 1) +
+                "</th></tr>";
             if (stream.codec_long_name) {
-                html += '<tr><th style="width: 30%">Codec</th><td>' + stream.codec_long_name + '</td></tr>';
+                html +=
+                    '<tr><th style="width: 30%">Codec</th><td>' +
+                    stream.codec_long_name +
+                    "</td></tr>";
             }
             if (stream.sample_rate_formatted) {
-                html += '<tr><th>Sample Rate</th><td>' + stream.sample_rate_formatted + '</td></tr>';
+                html +=
+                    "<tr><th>Sample Rate</th><td>" +
+                    stream.sample_rate_formatted +
+                    "</td></tr>";
             }
             if (stream.channels) {
-                html += '<tr><th>Channels</th><td>' + stream.channels + (stream.channel_layout ? ' (' + stream.channel_layout + ')' : '') + '</td></tr>';
+                html +=
+                    "<tr><th>Channels</th><td>" +
+                    stream.channels +
+                    (stream.channel_layout
+                        ? " (" + stream.channel_layout + ")"
+                        : "") +
+                    "</td></tr>";
             }
             if (stream.bit_rate_formatted) {
-                html += '<tr><th>Bit Rate</th><td>' + stream.bit_rate_formatted + '</td></tr>';
+                html +=
+                    "<tr><th>Bit Rate</th><td>" +
+                    stream.bit_rate_formatted +
+                    "</td></tr>";
             }
-            html += '</table>';
+            html += "</table>";
         });
     }
 
     // Tags
     if (metadata.tags && Object.keys(metadata.tags).length > 0) {
-        html += '<h6 class="border-bottom pb-2 mb-3"><i class="fas fa-tags me-2"></i>Metadata Tags</h6>';
+        html +=
+            '<h6 class="border-bottom pb-2 mb-3"><i class="fas fa-tags me-2"></i>Metadata Tags</h6>';
         html += '<table class="table table-sm table-bordered mb-3">';
-        Object.keys(metadata.tags).forEach(function(key) {
-            const displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-            html += '<tr><th style="width: 30%">' + displayKey + '</th><td>' + metadata.tags[key] + '</td></tr>';
+        Object.keys(metadata.tags).forEach(function (key) {
+            const displayKey = key
+                .replace(/_/g, " ")
+                .replace(/\b\w/g, (l) => l.toUpperCase());
+            html +=
+                '<tr><th style="width: 30%">' +
+                displayKey +
+                "</th><td>" +
+                metadata.tags[key] +
+                "</td></tr>";
         });
-        html += '</table>';
+        html += "</table>";
     }
 
-    html += '</div>';
-    $('#metadata-content').html(html);
+    html += "</div>";
+    $("#metadata-content").html(html);
 }
 
 console.log("Form JS loaded 6");

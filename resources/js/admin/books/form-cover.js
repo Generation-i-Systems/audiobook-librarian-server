@@ -1,10 +1,8 @@
-(function (window, $) {
+(function (window) {
     "use strict";
 
-    if (!$) {
-        console.error("form-cover.js requires jQuery");
-        return;
-    }
+    // Note: This file is being migrated from jQuery to vanilla JS
+    // Some jQuery functionality may still be present for backward compatibility during transition
 
     const bookForm = (window.BookForm = window.BookForm || {});
 
@@ -15,25 +13,35 @@
         }
 
         if ($coverRadios.filter(":checked").length === 0) {
-            const $preferred = $coverRadios.filter('[data-source="audible"], [data-source="googlebooks"]');
-            const $radioToCheck = $preferred.length ? $preferred.first() : $coverRadios.first();
+            const $preferred = $coverRadios.filter(
+                '[data-source="audible"], [data-source="googlebooks"]',
+            );
+            const $radioToCheck = $preferred.length
+                ? $preferred.first()
+                : $coverRadios.first();
             $radioToCheck.prop("checked", true).trigger("change");
         }
     }
 
     function setCornerPreviewFromRadio($radio) {
-        const $cornerPreview = $("#cover-preview-trigger img");
-        if (!$cornerPreview.length) {
+        const $previewContainer = document.querySelector(
+            "#cover-preview-trigger",
+        );
+        const $cornerPreview =
+            $previewContainer && $previewContainer.querySelector("img");
+        if (!$cornerPreview) {
             return;
         }
         const $labelImage = $radio.closest("label").find("img");
         if ($labelImage.length) {
-            $cornerPreview.attr("src", $labelImage.attr("src"));
+            $cornerPreview.src = $labelImage.getAttribute("src");
         }
     }
 
     function updateCoverSourceField() {
-        const checked = document.querySelector('input[name="coverImageCandidate"]:checked');
+        const checked = document.querySelector(
+            'input[name="coverImageCandidate"]:checked',
+        );
         const coverSourceField = document.getElementById("coverImageSource");
         if (checked && coverSourceField) {
             coverSourceField.value = checked.dataset.source || "";
@@ -41,13 +49,25 @@
     }
 
     function registerCoverRadioHandlers($container) {
-        $container
-            .off("change.coverRadios", 'input[name="coverImageCandidate"]')
-            .on("change.coverRadios", 'input[name="coverImageCandidate"]', function () {
-                const $radio = $(this);
-                setCornerPreviewFromRadio($radio);
-                updateCoverSourceField();
-            });
+        const radioButtons = $container.querySelectorAll(
+            'input[name="coverImageCandidate"]',
+        );
+
+        // Remove existing event listeners
+        radioButtons.forEach((radio) => {
+            radio.removeEventListener("change", handleRadioChange);
+        });
+
+        // Add new event listeners
+        radioButtons.forEach((radio) => {
+            radio.addEventListener("change", handleRadioChange);
+        });
+    }
+
+    function handleRadioChange() {
+        const $radio = this;
+        setCornerPreviewFromRadio($radio);
+        updateCoverSourceField();
     }
 
     function syncCornerPreview() {

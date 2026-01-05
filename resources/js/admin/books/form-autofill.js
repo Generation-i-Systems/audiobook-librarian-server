@@ -12,7 +12,7 @@
         if (url && url.match(/^https?:\/\/books\.google\.com\//)) {
             try {
                 // Ensure HTTPS for Google Books URLs
-                const httpsUrl = url.replace(/^http:\/\//, 'https://');
+                const httpsUrl = url.replace(/^http:\/\//, "https://");
                 const encodedUrl = btoa(httpsUrl);
                 return `/google-books-cover/${encodedUrl}`;
             } catch (error) {
@@ -39,7 +39,11 @@
             return score;
         }
 
-        if (result.title && result.title.toLowerCase() === normalizeTitleForAutofill($("#title").val()).toLowerCase()) {
+        if (
+            result.title &&
+            result.title.toLowerCase() ===
+                normalizeTitleForAutofill($("#title").val()).toLowerCase()
+        ) {
             score += 10;
         }
         if (Array.isArray(result.author) && result.author.length) {
@@ -72,14 +76,19 @@
             '<tr><td colspan="7" class="text-center text-muted"><i class="fas fa-spinner fa-spin me-2"></i>Searching...</td></tr>',
         );
 
-        const normalizedTitle = normalizeTitleForAutofill($("#autofill-title").val());
+        const normalizedTitle = normalizeTitleForAutofill(
+            $("#autofill-title").val(),
+        );
         document.getElementById("autofill-title").value = normalizedTitle;
-        document.getElementById("autofill-author").value = $("#autofill-author").val();
-        document.getElementById("autofill-series").value = $("#autofill-series").val();
+        document.getElementById("autofill-author").value =
+            $("#autofill-author").val();
+        document.getElementById("autofill-series").value =
+            $("#autofill-series").val();
 
         $("#autofill-results-wrapper").show();
 
-        const endpoint = window.BOOK_FORM_ROUTES.search || "/admin/books/search";
+        const endpoint =
+            window.BOOK_FORM_ROUTES.search || "/admin/books/search";
         const sourcesToSearch = Array.isArray(sources) ? sources : [sources];
         const allResults = [];
         let completedRequests = 0;
@@ -114,12 +123,16 @@
                 .done(function (response) {
                     const results = Array.isArray(response) ? response : [];
                     results.forEach(function (item) {
-                        item.source = source.charAt(0).toUpperCase() + source.slice(1);
+                        item.source =
+                            source.charAt(0).toUpperCase() + source.slice(1);
                     });
                     Array.prototype.push.apply(allResults, results);
                 })
                 .fail(function (xhr) {
-                    console.error("[DEBUG] Search failed for " + source + ":", xhr);
+                    console.error(
+                        "[DEBUG] Search failed for " + source + ":",
+                        xhr,
+                    );
                 })
                 .always(function () {
                     completedRequests += 1;
@@ -143,9 +156,7 @@
                         ? item.author.join(", ")
                         : item.author || "";
                     const coverUrl =
-                        item.coverImageUrl ||
-                        item.cover_image_url ||
-                        "";
+                        item.coverImageUrl || item.cover_image_url || "";
                     const publishedYear =
                         item.publishedYear ||
                         (item.published_date
@@ -156,7 +167,9 @@
                         "<tr>" +
                         '<td><input type="radio" name="autofill_result_select" value="' +
                         idx +
-                        '" ' + (idx === 0 ? "checked" : "") + "></td>" +
+                        '" ' +
+                        (idx === 0 ? "checked" : "") +
+                        "></td>" +
                         "<td>" +
                         (coverUrl
                             ? '<img src="' +
@@ -210,7 +223,9 @@
                     },
                 );
             if (!autoSelectFirst) {
-                $resultsTable.find('input[name="autofill_result_select"]').prop("checked", false);
+                $resultsTable
+                    .find('input[name="autofill_result_select"]')
+                    .prop("checked", false);
             }
         } else {
             $resultsTable.html(
@@ -225,9 +240,10 @@
             return;
         }
 
-        const $form = (window.BookForm?.activeForm && window.BookForm.activeForm.length)
-            ? window.BookForm.activeForm
-            : $("#book-form");
+        const $form =
+            window.BookForm?.activeForm && window.BookForm.activeForm.length
+                ? window.BookForm.activeForm
+                : $("#book-form");
         if (!$form.length) {
             console.warn("applyAutofillResult: unable to locate target form");
             return;
@@ -238,8 +254,11 @@
 
             if (item.author) {
                 const authorsGroup = $form.find("#authors-group");
-                const addAuthor = (window.BookForm?.addAuthorRow) || window.addAuthorRow;
-                const authors = Array.isArray(item.author) ? item.author : [item.author];
+                const addAuthor =
+                    window.BookForm?.addAuthorRow || window.addAuthorRow;
+                const authors = Array.isArray(item.author)
+                    ? item.author
+                    : [item.author];
 
                 if (authorsGroup.length) {
                     authorsGroup.empty();
@@ -250,7 +269,7 @@
                             authorsGroup.append(
                                 '<div class="author-row mb-2"><input type="text" name="author[]" class="form-control" value="' +
                                     (author || "") +
-                                    '"></div>'
+                                    '"></div>',
                             );
                         });
                     }
@@ -261,7 +280,8 @@
             const seriesNumber = item.seriesNumber || item.series_number || "";
             if (series) {
                 const seriesGroup = $form.find("#series-group");
-                const addSeries = (window.BookForm?.addSeriesRow) || window.addSeriesRow;
+                const addSeries =
+                    window.BookForm?.addSeriesRow || window.addSeriesRow;
                 if (seriesGroup.length) {
                     seriesGroup.empty();
                     if (typeof addSeries === "function") {
@@ -280,7 +300,7 @@
                                 '][seriesName]" class="form-control ms-2" value="' +
                                 series +
                                 '">' +
-                                "</div>"
+                                "</div>",
                         );
                     }
                 }
@@ -289,7 +309,9 @@
             const releaseDateInput = $form.find("#release_date");
             const publishedYear =
                 item.publishedYear ||
-                (item.published_date ? item.published_date.substring(0, 4) : "");
+                (item.published_date
+                    ? item.published_date.substring(0, 4)
+                    : "");
             if (releaseDateInput.length && publishedYear) {
                 releaseDateInput.val(publishedYear + "-01-01");
             }
@@ -309,11 +331,15 @@
                 } else {
                     coverUrlInput.val(coverUrl);
                 }
-                const coverPreview = document.querySelector('#cover-preview-trigger img');
+                const coverPreview = document.querySelector(
+                    "#cover-preview-trigger",
+                );
                 if (coverPreview) {
                     coverPreview.src = googleBooksProxyUrl(coverUrl);
                 }
-                const cornerRadio = $form.find('input[name="coverImageCandidate"][data-source="googlebooks"]');
+                const cornerRadio = $form.find(
+                    'input[name="coverImageCandidate"][data-source="googlebooks"]',
+                );
                 if (cornerRadio.length) {
                     cornerRadio.prop("checked", true).trigger("change");
                 }
@@ -403,7 +429,9 @@
                 }
 
                 if (idx === undefined || idx === null || Number.isNaN(idx)) {
-                    console.warn("autofill apply requested without a selection");
+                    console.warn(
+                        "autofill apply requested without a selection",
+                    );
                     return;
                 }
 
@@ -419,20 +447,29 @@
         if (autofillModal) {
             autofillModal.addEventListener("show.bs.modal", function () {
                 const titleInput = document.getElementById("title");
-                const normalized = normalizeTitleForAutofill(titleInput ? titleInput.value : "");
+                const normalized = normalizeTitleForAutofill(
+                    titleInput ? titleInput.value : "",
+                );
                 document.getElementById("autofill-title").value = normalized;
 
-                const authorField = document.querySelector("input[name='author[]']");
+                const authorField = document.querySelector(
+                    "input[name='author[]']",
+                );
                 document.getElementById("autofill-author").value = authorField
                     ? authorField.value
                     : "";
 
-                const seriesField = document.querySelector("#series-group input[name*='[seriesName]']");
+                const seriesField = document.querySelector(
+                    "#series-group input[name*='[seriesName]']",
+                );
                 document.getElementById("autofill-series").value = seriesField
                     ? seriesField.value
                     : "";
 
-                performAutofillSearch(["audible", "google", "audiobookbay", "hardcover"], true);
+                performAutofillSearch(
+                    ["audible", "google", "audiobookbay", "hardcover"],
+                    true,
+                );
             });
         }
     }
