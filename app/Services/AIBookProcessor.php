@@ -18,7 +18,7 @@ class AIBookProcessor
     use IsolatesErrorHandlers;
 
     protected Client $client;
-    protected string $apiKey;
+    protected ?string $apiKey;
     protected ?string $claudeApiKey;
     protected ?string $openaiApiKey;
     protected string $model;
