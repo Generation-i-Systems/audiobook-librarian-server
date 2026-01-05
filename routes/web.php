@@ -313,6 +313,8 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         '/library-repair/{issue}/import-missing',
         [Admin\LibraryRepairController::class, 'importMissingDirectory']
     )->name('library-repair.import-missing');
+    Route::post('/library-repair/refresh', [Admin\LibraryRepairController::class, 'refresh'])
+        ->name('library-repair.refresh');
     Route::post('/books/resync-from-path', [Admin\BookController::class, 'resyncFromPath'])
         ->name('books.resyncFromPath');
 

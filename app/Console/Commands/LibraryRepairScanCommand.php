@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Models\SystemSetting;
 use App\Services\LibraryRepairService;
 use Illuminate\Console\Command;
 
@@ -28,6 +29,14 @@ class LibraryRepairScanCommand extends Command
 
         try {
             $summary = $this->repairService->scan($attemptFixes, $issueFilters);
+
+            // Record the last run date after successful scan
+            try {
+                SystemSetting::set('library_repair_last_run', now()->toIso8601String());
+            } catch (\Throwable $e) {
+                // Log error but don't fail the command
+                $this->warn('Could not record last run date: ' . $e->getMessage());
+            }
         } catch (\Throwable $e) {
             $this->error('Library repair scan failed: ' . $e->getMessage());
 

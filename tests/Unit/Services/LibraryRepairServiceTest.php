@@ -43,6 +43,9 @@ class LibraryRepairServiceTest extends TestCase
     #[Test]
     public function it_creates_missing_directory_issues_and_marks_books_for_review(): void
     {
+        // Set a non-existent sync path to avoid interference in tests
+        config(['app.library_repair_sync_path' => '/non/existent/sync/path']);
+
         $service = $this->makeService();
 
         $missing = Book::factory()->create([

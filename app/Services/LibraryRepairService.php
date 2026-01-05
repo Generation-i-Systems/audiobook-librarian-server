@@ -415,6 +415,9 @@ class LibraryRepairService
             }
         }
 
+        // Also scan for missing books in /media/audiobooks/sync
+        $created += $this->scanMissingDirectoriesInSync();
+
         return [
             'created' => $created,
             'resolved' => $resolved,
@@ -860,11 +863,11 @@ class LibraryRepairService
         return null;
     }
 
-    private function collectDirectoriesWithAudio(string $root): array
+    private function collectDirectoriesWithAudio(string $root, bool $bypassExcludes = false): array
     {
         $results = [];
         $extensions = $this->getAudioExtensions();
-        $excludePatterns = (array) config('bookparser.exclude_dirs', []);
+        $excludePatterns = $bypassExcludes ? [] : (array) config('bookparser.exclude_dirs', []);
 
         if (!is_dir($root)) {
             return [];
@@ -887,7 +890,7 @@ class LibraryRepairService
             $dirPath = $item->getPath();
             $normalizedRelative = trim(Str::after($dirPath, $root), '/');
 
-            if ($this->shouldExcludeDirectory($normalizedRelative, $excludePatterns)) {
+            if (!$bypassExcludes && $this->shouldExcludeDirectory($normalizedRelative, $excludePatterns)) {
                 continue;
             }
 
@@ -1040,5 +1043,45 @@ class LibraryRepairService
         }
 
         return array_values($normalized);
+    }
+
+    private function scanMissingDirectoriesInSync(): int
+    {
+        $created = 0;
+        $syncPath = config('app.library_repair_sync_path', '/media/audiobooks/sync');
+
+        if (!is_dir($syncPath)) {
+            return 0;
+        }
+
+        // Get all directories with audio files in the sync directory, bypassing excludes
+        $syncDirectories = $this->collectDirectoriesWithAudio($syncPath, true);
+
+        foreach ($syncDirectories as $relativePath => $metadata) {
+            $fullPath = $metadata['full_path'];
+
+            // Check if this directory already exists in the main library
+            $existingBook = Book::query()
+                ->where('directory_path', $relativePath)
+                ->first();
+
+            if (!$existingBook) {
+                // Create an orphan directory issue for books found in sync
+                $this->createOrUpdateIssue(
+                    null,
+                    LibraryRepairIssueType::ORPHAN_DIRECTORY,
+                    $relativePath,
+                    [
+                        'full_path' => $fullPath,
+                        'audio_files' => $metadata['audio_files'],
+                        'size' => $metadata['size'],
+                        'source' => 'sync_directory',
+                    ]
+                );
+                $created++;
+            }
+        }
+
+        return $created;
     }
 }

@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Admin;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Enums\LibraryRepairIssueType;
 use App\Http\Controllers\Controller;
+use App\Models\SystemSetting;
 use App\Services\LibraryRepairService;
 use App\Services\AudiobookBayService;
 use Illuminate\Http\RedirectResponse;
@@ -48,9 +49,13 @@ class LibraryRepairController extends Controller
             ]
         );
 
+        // Get the last run date for library repair scan
+        $lastRunDate = SystemSetting::get('library_repair_last_run');
+
         return view('admin.library-repair.index', [
             'issues' => $paginator,
             'issueTypes' => $this->issueTypeOptions(),
+            'lastRunDate' => $lastRunDate,
             'filters' => [
                 'issue_type' => $filters['issue_type'] ?? '',
                 'search' => $filters['search'] ?? '',
@@ -129,6 +134,30 @@ class LibraryRepairController extends Controller
             return redirect()
                 ->back()
                 ->with('error', 'Unable to import directory: ' . $e->getMessage())
+            ;
+        }
+    }
+
+    public function refresh(): RedirectResponse
+    {
+        try {
+            // Dispatch the library repair scan command to run in the background
+            \Illuminate\Support\Facades\Artisan::call('library:repair-scan', [
+                '--no-attempt-fixes' => false,
+            ]);
+
+            return redirect()
+                ->route('admin.library-repair.index')
+                ->with('success', 'Library repair scan has been started. The page will refresh automatically to show updated results.')
+            ;
+        } catch (\Throwable $e) {
+            Log::error('Library repair refresh failed', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return redirect()
+                ->back()
+                ->with('error', 'Unable to start library repair scan: ' . $e->getMessage())
             ;
         }
     }
