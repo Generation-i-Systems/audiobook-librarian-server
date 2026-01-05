@@ -12,7 +12,7 @@ use Illuminate\Support\Str;
 class AudiobookBayApiService
 {
     // --- Begin inlined BaseApiTrait properties ---
-    protected string $baseUrl = '';
+    protected ?string $baseUrl = null;
 
     protected ?string $apiKey = null;
 
