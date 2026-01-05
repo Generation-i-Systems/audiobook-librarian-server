@@ -215,4 +215,13 @@ Route::prefix('v1')->group(function () {
     Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword']);
     Route::post('/reset-password', [PasswordResetController::class, 'resetPassword']);
     Route::post('/auth/google', [AuthController::class, 'googleLogin']);
+
+    // Backwards compatible auth-prefixed routes (mobile clients expect /auth/* paths)
+    Route::prefix('auth')->group(function () {
+        Route::post('/register', [AuthController::class, 'register']);
+        Route::post('/login', [AuthController::class, 'login']);
+        Route::post('/forgot-password', [PasswordResetController::class, 'forgotPassword']);
+        Route::post('/reset-password', [PasswordResetController::class, 'resetPassword']);
+        Route::post('/google', [AuthController::class, 'googleLogin']);
+    });
 });

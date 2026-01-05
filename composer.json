@@ -16,10 +16,12 @@
         "intervention/image": "^3.11",
         "james-heinrich/getid3": "^1.9",
         "laravel/framework": "^12.0",
+        "laravel/horizon": "^5.41",
         "laravel/ui": "^4.6",
         "league/flysystem-aws-s3-v3": "^3.29",
         "mozex/anthropic-php": "^1.1",
         "openai-php/client": "^0.14.0",
+        "predis/predis": "^3.3",
         "soloterm/screen": "^1.1"
     },
     "require-dev": {

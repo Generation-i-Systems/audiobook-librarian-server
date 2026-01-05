@@ -538,6 +538,11 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         Route::post('/queue/clear', [Admin\QueueController::class, 'clear'])->name('queue.clear');
     });
 
+    // Horizon dashboard route (admin only)
+    Route::get('/horizon', fn () => view('horizon'))
+        ->name('horizon')
+        ->middleware(['auth', 'admin']);
+
     // Admin messaging system
     Route::get('messages', [Admin\MessageController::class, 'index'])->name('messages.index');
     Route::get('messages/create', [Admin\MessagesController::class, 'create'])->name('messages.create');

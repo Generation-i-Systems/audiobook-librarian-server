@@ -1314,12 +1314,14 @@
                 console.log('$.fn.autocomplete:', typeof $.fn.autocomplete, $.fn.autocomplete ? 'OK' : 'MISSING');
             </script>
 
-            {{-- Include form.js, directory-browser.js, series-rename.js, and directory-conflict.js scripts --}}
-            <script src="{{ asset('js/admin/books/form.js') }}?v={{ filemtime(public_path('js/admin/books/form.js')) }}"></script>
-            <script src="{{ asset('js/admin/books/planned-actions.js') }}?v={{ filemtime(public_path('js/admin/books/planned-actions.js')) }}"></script>
-            <script src="{{ asset('js/admin/books/directory-browser.js') }}?v={{ filemtime(public_path('js/admin/books/directory-browser.js')) }}"></script>
-            <script src="{{ asset('js/admin/books/series-rename.js') }}?v={{ filemtime(public_path('js/admin/books/series-rename.js')) }}"></script>
-            <script src="{{ asset('js/admin/books/directory-conflict.js') }}?v={{ filemtime(public_path('js/admin/books/directory-conflict.js')) }}"></script>
+            {{-- Include form.js, directory-browser.js, series-rename.js, and directory-conflict.js scripts via Vite --}}
+            @vite([
+                'resources/js/admin/books/form.js',
+                'resources/js/admin/books/planned-actions.js',
+                'resources/js/admin/books/directory-browser.js',
+                'resources/js/admin/books/series-rename.js',
+                'resources/js/admin/books/directory-conflict.js'
+            ])
             <script type="text/javascript">
             $(function() {
                 var formSelector = '#book-form';

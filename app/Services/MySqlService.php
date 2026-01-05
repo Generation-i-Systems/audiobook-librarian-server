@@ -750,7 +750,7 @@ class MySqlService implements DocumentStoreServiceInterface
             $bookArray = $book->toArray();
             $bookArray['_id'] = (string) $book->id;
 
-            // Transform series to match MongoDB format
+            // Transform series to canonical format
             if (!empty($bookArray['series'])) {
                 $series = [];
 
@@ -1953,7 +1953,7 @@ class MySqlService implements DocumentStoreServiceInterface
             'username' => $username,
             'email' => $data['email'],
             'password' => $data['password'], // Hashed automatically by model cast
-            'role' => $data['role'] ?? 'user',
+            'role' => $data['role'] ?? 'library-user',
             'email_verified_at' => $data['email_verified_at'] ?? null,
         ]);
 

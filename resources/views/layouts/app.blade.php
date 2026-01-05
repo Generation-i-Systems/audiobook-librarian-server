@@ -39,7 +39,11 @@
 
     <!-- Scripts -->
     @if (!app()->environment('testing'))
-        @vite(['resources/sass/app.scss', 'resources/js/app.js'])
+        @vite([
+            'resources/sass/app.scss', 
+            'resources/js/app.js',
+            'resources/js/global-ajax-auth.js'
+        ])
     @endif
 
     <link rel="stylesheet" href="/css/pagination-fix.css">
@@ -199,7 +203,7 @@
             @yield('content')
         </main>
     </div>
-    <script src="{{ asset('js/global-ajax-auth.js') }}"></script>
+    
     @stack('scripts')
 
     <!-- Force re-initialize Bootstrap dropdowns after DOM ready to fix event delegation conflicts -->

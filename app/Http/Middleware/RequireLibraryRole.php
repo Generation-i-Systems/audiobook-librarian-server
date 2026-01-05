@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
-class RequireStandardRole
+class RequireLibraryRole
 {
     /**
      * Handle an incoming request.
@@ -24,7 +24,7 @@ class RequireStandardRole
 
         // If not logged in or role is not set, block
         if (!$user || !isset($user->role)) {
-            Log::warning('Standard role access denied: User not authenticated or missing role', [
+            Log::warning('Library role access denied: User not authenticated or missing role', [
                 'ip' => $clientIp,
                 'user_agent' => $userAgent,
                 'uri' => $requestUri,
@@ -37,10 +37,10 @@ class RequireStandardRole
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        // Only allow if role is standard or higher
-        $allowedRoles = ['standard', 'admin', 'superadmin'];
-        if (!in_array($user->role, $allowedRoles)) {
-            Log::warning('Standard role access denied: Insufficient role', [
+        // Only allow if role is library-level or higher
+        $allowedRoles = ['library-user', 'admin', 'super-admin'];
+        if (!in_array($user->role, $allowedRoles, true)) {
+            Log::warning('Library role access denied: Insufficient role', [
                 'ip' => $clientIp,
                 'user_agent' => $userAgent,
                 'uri' => $requestUri,

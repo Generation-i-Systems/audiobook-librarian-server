@@ -13,7 +13,7 @@
         <a href="{{ route('admin.books.index') }}" class="btn btn-secondary">Back to Books</a>
     </div>
 </div>
-    <script src="/js/admin/books/import_file.js"></script>
+    @vite(['resources/js/admin/books/import_file.js'])
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             if (window.initImportFileBrowser) {

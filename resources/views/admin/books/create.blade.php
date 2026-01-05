@@ -124,4 +124,6 @@
             </div>
         </div>
     </div>
+
+@vite(['resources/js/admin/book-create.js'])
 @endsection

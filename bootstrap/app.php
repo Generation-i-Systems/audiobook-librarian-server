@@ -101,7 +101,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
             'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
             'admin' => \App\Http\Middleware\CheckAdminRole::class,
-            'standard' => \App\Http\Middleware\RequireStandardRole::class,
+            'standard' => \App\Http\Middleware\RequireLibraryRole::class,
+            'library' => \App\Http\Middleware\RequireLibraryRole::class,
+            'active' => \App\Http\Middleware\EnsureActiveUser::class,
             // Firebase auth middleware removed - application now uses MySQL-only authentication
             'api.auth' => \App\Http\Middleware\ApiAuth::class,
         ]);

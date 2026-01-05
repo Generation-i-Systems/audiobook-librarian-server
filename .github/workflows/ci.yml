@@ -1,0 +1,160 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: librarian_test
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: --health-cmd="redis-cli ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    strategy:
+      matrix:
+        php-version: [8.2, 8.3]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, intl, gd, exif, iconv, imagick, redis
+          coverage: xdebug
+
+      - name: Copy .env.testing to .env
+        run: cp .env.testing .env
+
+      - name: Get Composer Cache Directory
+        id: composer-cache
+        run: |
+          echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-
+
+      - name: Install Composer dependencies
+        run: composer install --no-progress --prefer-dist --optimize-autoloader
+
+      - name: Get Node.js version
+        id: node-version
+        run: echo "NODE_VERSION=$(node -v)" >> $GITHUB_OUTPUT
+
+      - name: Cache Node.js dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ steps.node-version.outputs.NODE_VERSION }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ steps.node-version.outputs.NODE_VERSION }}-
+
+      - name: Install Node.js dependencies
+        run: npm ci
+
+      - name: Set up database
+        run: |
+          mysql -h 127.0.0.1 -u root -ppassword -e "CREATE DATABASE IF NOT EXISTS librarian_test;"
+          php artisan migrate --force
+
+      - name: Build frontend assets
+        run: npm run build
+
+      - name: Run PHPStan
+        run: ./vendor/bin/phpstan analyse --memory-limit=2G
+
+      - name: Run PHP CodeSniffer
+        run: ./vendor/bin/phpcs --standard=PSR12 app/ --report=full --show-sniffs
+
+      - name: Run tests
+        run: |
+          XDEBUG_MODE=coverage vendor/bin/phpunit --coverage-clover=coverage.xml
+        env:
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: librarian_test
+          DB_USERNAME: root
+          DB_PASSWORD: password
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
+          CACHE_DRIVER: redis
+          QUEUE_CONNECTION: redis
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.3
+
+      - name: Install Composer dependencies
+        run: composer install --no-progress --prefer-dist --optimize-autoloader
+
+      - name: Run security audit
+        run: composer audit
+
+      - name: Run npm audit
+        run: npm audit --audit-level=moderate
+
+  deploy:
+    needs: [test, security]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.3
+
+      - name: Install Composer dependencies
+        run: composer install --no-dev --optimize-autoloader
+
+      - name: Install Node.js dependencies
+        run: npm ci --production
+
+      - name: Build frontend assets
+        run: npm run build
+
+      - name: Deploy to production
+        run: |
+          echo "Deploy step would go here"
+          # Add your deployment script here
+          # Example: rsync, scp, deploy to server, etc.
