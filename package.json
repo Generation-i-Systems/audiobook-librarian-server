@@ -26,6 +26,7 @@
         "vite": "^6.3.2"
     },
     "dependencies": {
+        "alpinejs": "^3.15.3",
         "jquery": "^3.7.1"
     }
 }

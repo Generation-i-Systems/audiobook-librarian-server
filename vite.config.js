@@ -34,6 +34,7 @@ export default defineConfig({
     resolve: {
         alias: {
             "~bootstrap": path.resolve(__dirname, "node_modules/bootstrap"),
+            "~alpinejs": path.resolve(__dirname, "node_modules/alpinejs"),
         },
     },
 });
