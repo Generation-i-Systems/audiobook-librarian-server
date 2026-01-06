@@ -541,18 +541,6 @@ parameters:
 			path: app/Console/Commands/ImportBooksFromDownloads.php
 
 		-
-			message: '#^Method App\\Console\\Commands\\ImportBooksFromDownloads\:\:newLine\(\) should return \$this\(App\\Console\\Commands\\ImportBooksFromDownloads\) but empty return statement found\.$#'
-			identifier: return.empty
-			count: 1
-			path: app/Console/Commands/ImportBooksFromDownloads.php
-
-		-
-			message: '#^Method App\\Console\\Commands\\ImportBooksFromDownloads\:\:newLine\(\) should return \$this\(App\\Console\\Commands\\ImportBooksFromDownloads\) but return statement is missing\.$#'
-			identifier: return.missing
-			count: 1
-			path: app/Console/Commands/ImportBooksFromDownloads.php
-
-		-
 			message: '#^Offset ''cover_url'' on non\-empty\-array on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
 			count: 2

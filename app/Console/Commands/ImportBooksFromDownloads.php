@@ -339,10 +339,12 @@ class ImportBooksFromDownloads extends Command
     public function newLine($count = 1)
     {
         if ($this->uiService) {
-            return;
+            return $this;
         }
 
         parent::newLine($count);
+
+        return $this;
     }
 
     public function table($headers, $rows, $tableStyle = 'default', array $columnStyles = [])
