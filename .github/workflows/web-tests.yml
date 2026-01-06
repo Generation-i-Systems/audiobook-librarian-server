@@ -2,26 +2,26 @@ name: Web/Admin Tests
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
     paths:
-      - 'app/Http/Controllers/Admin/**'
-      - 'app/Http/Controllers/*Controller.php'
-      - 'resources/views/**'
-      - 'routes/web.php'
-      - 'public/js/**'
-      - 'public/css/**'
-      - 'tests/Web/**'
-      - '.github/workflows/web-tests.yml'
+      - "app/Http/Controllers/Admin/**"
+      - "app/Http/Controllers/*Controller.php"
+      - "resources/views/**"
+      - "routes/web.php"
+      - "public/js/**"
+      - "public/css/**"
+      - "tests/Web/**"
+      - ".github/workflows/web-tests.yml"
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
     paths:
-      - 'app/Http/Controllers/Admin/**'
-      - 'app/Http/Controllers/*Controller.php'
-      - 'resources/views/**'
-      - 'routes/web.php'
-      - 'public/js/**'
-      - 'public/css/**'
-      - 'tests/Web/**'
+      - "app/Http/Controllers/Admin/**"
+      - "app/Http/Controllers/*Controller.php"
+      - "resources/views/**"
+      - "routes/web.php"
+      - "public/js/**"
+      - "public/css/**"
+      - "tests/Web/**"
 
 jobs:
   web-tests:
@@ -35,7 +35,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: "8.3"
           extensions: mbstring, xml, ctype, json, sqlite3, pdo_sqlite, fileinfo, gd
           coverage: none
 
@@ -59,6 +59,28 @@ jobs:
       - name: Generate application key
         run: php artisan key:generate
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Get npm cache directory
+        id: npm-cache-dir
+        run: echo "dir=$(npm config get cache)" >> $GITHUB_OUTPUT
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.npm-cache-dir.outputs.dir }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-node-
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build frontend assets
+        run: npm run build
+
       - name: Directory Permissions
         run: chmod -R 777 storage bootstrap/cache
 
@@ -67,4 +89,4 @@ jobs:
         env:
           APP_ENV: testing
           DB_CONNECTION: sqlite
-          DB_DATABASE: ':memory:'
+          DB_DATABASE: ":memory:"
