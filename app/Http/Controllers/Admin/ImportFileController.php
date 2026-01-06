@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Services\AIBookProcessor;
+use App\Traits\IsolatesErrorHandlers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\Log;
 
 class ImportFileController extends Controller
 {
+    use IsolatesErrorHandlers;
     protected DocumentStoreServiceInterface $documentStoreService;
 
     public function __construct(DocumentStoreServiceInterface $documentStoreService)

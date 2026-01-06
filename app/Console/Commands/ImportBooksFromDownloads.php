@@ -1100,9 +1100,6 @@ class ImportBooksFromDownloads extends Command
 
         if (!empty($audioFiles)) {
             $audioFileValues = array_values($audioFiles);
-            if (empty($audioFileValues)) {
-                return ['confidence' => 0];
-            }
             $firstAudioFile = $audioFileValues[0];
 
             // Extract basic file metadata
@@ -2510,11 +2507,6 @@ class ImportBooksFromDownloads extends Command
             $sortedFiles = $audiobook['files'];
             sort($sortedFiles, SORT_STRING);
 
-            if (empty($sortedFiles)) {
-                $this->warn("⚠️  No audio files found for transcription");
-                return null;
-            }
-
             $firstAudioFile = $sortedFiles[0];
 
             $this->line("📁 Using first audio file: " . basename($firstAudioFile));
@@ -3859,7 +3851,7 @@ class ImportBooksFromDownloads extends Command
             if ($selectedUrl) {
                 $metadata['cover_url'] = $selectedUrl;
             }
-        } elseif (!$isInteractive && !$hasValidCover && !empty($coverOptions)) {
+        } elseif (!$isInteractive && !$hasValidCover) {
             // Non-interactive mode - use first Google image if current cover is invalid
             $googleOption = collect($coverOptions)->first(function ($opt) {
                 return $opt['isGoogle'] ?? false;
