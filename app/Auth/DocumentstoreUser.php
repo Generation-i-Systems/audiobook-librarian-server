@@ -127,6 +127,17 @@ class DocumentstoreUser implements Authenticatable
     }
 
     /**
+     * Determine if an attribute exists.
+     *
+     * @param  string  $key
+     * @return bool
+     */
+    public function __isset($key)
+    {
+        return array_key_exists($key, $this->userData);
+    }
+
+    /**
      * Dynamically access the user's attributes.
      *
      * @param  string  $key

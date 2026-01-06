@@ -12,50 +12,56 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (!Schema::hasTable('books')) {
+            return;
+        }
+
         Schema::table('books', function (Blueprint $table) {
-            // Index for book searches (only if not exists)
+            // Individual indexes requested by user
+            if (!$this->indexExists('idx_books_created_at')) {
+                $table->index('created_at', 'idx_books_created_at');
+            }
+            
+            if (!$this->indexExists('idx_books_needs_review')) {
+                $table->index('needs_review', 'idx_books_needs_review');
+            }
+
+            if (!$this->indexExists('idx_books_cover_image')) {
+                $table->index('cover_image', 'idx_books_cover_image');
+            }
+
+            if (!$this->indexExists('idx_books_directory_path')) {
+                $table->index('directory_path', 'idx_books_directory_path');
+            }
+
+            // Other performance indexes
             if (!$this->indexExists('idx_books_title')) {
                 $table->index('title', 'idx_books_title');
             }
             
-            // Index for directory path lookups
-            if (!$this->indexExists('idx_books_directory_path')) {
-                $table->index('directory_path', 'idx_books_directory_path');
-            }
-            
-            // Composite index for recent books listings
-            if (!$this->indexExists('idx_books_created_title')) {
-                $table->index(['created_at', 'title'], 'idx_books_created_title');
-            }
-            
-            // Index for release date queries
             if (!$this->indexExists('idx_books_release_date')) {
                 $table->index('release_date', 'idx_books_release_date');
             }
             
-            // Index for cover image lookups
-            if (!$this->indexExists('idx_books_cover_image')) {
-                $table->index('cover_image', 'idx_books_cover_image');
-            }
-            
-            // Index for ISBN lookups
             if (!$this->indexExists('idx_books_isbn')) {
                 $table->index('isbn', 'idx_books_isbn');
             }
             
-            // Index for needs review filtering
-            if (!$this->indexExists('idx_books_needs_review')) {
-                $table->index(['needs_review', 'created_at'], 'idx_books_needs_review');
-            }
-            
-            // Index for language filtering
             if (!$this->indexExists('idx_books_language')) {
                 $table->index('language', 'idx_books_language');
             }
             
-            // Index for source filtering
             if (!$this->indexExists('idx_books_source')) {
                 $table->index('source', 'idx_books_source');
+            }
+
+            // Composite indexes for specific query patterns
+            if (!$this->indexExists('idx_books_created_title')) {
+                $table->index(['created_at', 'title'], 'idx_books_created_title');
+            }
+
+            if (!$this->indexExists('idx_books_needs_review_composite')) {
+                $table->index(['needs_review', 'created_at'], 'idx_books_needs_review_composite');
             }
         });
     }
@@ -65,34 +71,14 @@ return new class extends Migration
      */
     private function indexExists(string $indexName): bool
     {
-        $indexes = collect(DB::select("SHOW INDEX FROM books WHERE Key_name = ?", [$indexName]));
-        return $indexes->isNotEmpty();
-    }
-            
-            // Index for directory path lookups
-            $table->index('directory_path', 'idx_books_directory_path');
-            
-            // Composite index for recent books listings
-            $table->index(['created_at', 'title'], 'idx_books_created_title');
-            
-            // Index for release date queries
-            $table->index('release_date', 'idx_books_release_date');
-            
-            // Index for cover image lookups
-            $table->index('cover_image', 'idx_books_cover_image');
-            
-            // Index for ISBN lookups
-            $table->index('isbn', 'idx_books_isbn');
-            
-            // Index for needs review filtering
-            $table->index(['needs_review', 'created_at'], 'idx_books_needs_review');
-            
-            // Index for language filtering
-            $table->index('language', 'idx_books_language');
-            
-            // Index for source filtering
-            $table->index('source', 'idx_books_source');
-        });
+        try {
+            // This works for MySQL. For SQLite (tests), we'd need a different approach 
+            // but Schema::table handles things gracefully or we can just catch exceptions.
+            $indexes = collect(DB::select("SHOW INDEX FROM books WHERE Key_name = ?", [$indexName]));
+            return $indexes->isNotEmpty();
+        } catch (\Exception $e) {
+            return false;
+        }
     }
 
     /**
@@ -100,16 +86,22 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (!Schema::hasTable('books')) {
+            return;
+        }
+
         Schema::table('books', function (Blueprint $table) {
-            $table->dropIndex('idx_books_title');
-            $table->dropIndex('idx_books_directory_path');
-            $table->dropIndex('idx_books_created_title');
-            $table->dropIndex('idx_books_release_date');
-            $table->dropIndex('idx_books_cover_image');
-            $table->dropIndex('idx_books_isbn');
+            $table->dropIndex('idx_books_created_at');
             $table->dropIndex('idx_books_needs_review');
+            $table->dropIndex('idx_books_cover_image');
+            $table->dropIndex('idx_books_directory_path');
+            $table->dropIndex('idx_books_title');
+            $table->dropIndex('idx_books_release_date');
+            $table->dropIndex('idx_books_isbn');
             $table->dropIndex('idx_books_language');
             $table->dropIndex('idx_books_source');
+            $table->dropIndex('idx_books_created_title');
+            $table->dropIndex('idx_books_needs_review_composite');
         });
     }
 };

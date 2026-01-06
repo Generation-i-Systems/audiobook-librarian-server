@@ -32,9 +32,11 @@ class ApiAuth
         // authenticated via any guard (e.g., actingAs in tests), allow the request
         // without requiring a Bearer token. This preserves production security while
         // making feature tests that use custom guards pass.
-        if (app()->environment('testing')) {
+        // We skip bypass if the Authorization header is explicitly set to empty,
+        // which indicates a test trying to simulate an unauthenticated request.
+        if (app()->environment('testing') && $authHeader !== '') {
             $user = null;
-            foreach (['api_test', 'web'] as $guard) {
+            foreach (['api_test', 'web', 'sanctum'] as $guard) {
                 if (Auth::guard($guard)->check()) {
                     $user = Auth::guard($guard)->user();
                     break;

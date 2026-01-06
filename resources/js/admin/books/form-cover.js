@@ -1,8 +1,10 @@
-(function (window) {
+(function (window, $) {
     "use strict";
 
-    // Note: This file is being migrated from jQuery to vanilla JS
-    // Some jQuery functionality may still be present for backward compatibility during transition
+    if (!$) {
+        console.error("form-cover.js requires jQuery");
+        return;
+    }
 
     const bookForm = (window.BookForm = window.BookForm || {});
 
@@ -24,17 +26,13 @@
     }
 
     function setCornerPreviewFromRadio($radio) {
-        const $previewContainer = document.querySelector(
-            "#cover-preview-trigger",
-        );
-        const $cornerPreview =
-            $previewContainer && $previewContainer.querySelector("img");
-        if (!$cornerPreview) {
+        const $cornerPreview = $("#cover-preview-trigger img");
+        if (!$cornerPreview.length) {
             return;
         }
         const $labelImage = $radio.closest("label").find("img");
         if ($labelImage.length) {
-            $cornerPreview.src = $labelImage.getAttribute("src");
+            $cornerPreview.attr("src", $labelImage.attr("src"));
         }
     }
 
@@ -49,25 +47,18 @@
     }
 
     function registerCoverRadioHandlers($container) {
-        const radioButtons = $container.querySelectorAll(
-            'input[name="coverImageCandidate"]',
-        );
-
-        // Remove existing event listeners
-        radioButtons.forEach((radio) => {
-            radio.removeEventListener("change", handleRadioChange);
-        });
-
-        // Add new event listeners
-        radioButtons.forEach((radio) => {
-            radio.addEventListener("change", handleRadioChange);
-        });
-    }
-
-    function handleRadioChange() {
-        const $radio = this;
-        setCornerPreviewFromRadio($radio);
-        updateCoverSourceField();
+        // Use delegated events if $container is a jQuery object
+        const $cont = $($container);
+        $cont
+            .off("change.coverRadios", 'input[name="coverImageCandidate"]')
+            .on(
+                "change.coverRadios",
+                'input[name="coverImageCandidate"]',
+                function () {
+                    setCornerPreviewFromRadio($(this));
+                    updateCoverSourceField();
+                },
+            );
     }
 
     function syncCornerPreview() {
