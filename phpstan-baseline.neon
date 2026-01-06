@@ -805,12 +805,6 @@ parameters:
 			path: app/Console/Commands/MoveBookDirectory.php
 
 		-
-			message: '#^Variable \$fullPath on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.variable
-			count: 1
-			path: app/Console/Commands/MoveBookDirectory.php
-
-		-
 			message: '#^Call to an undefined method App\\Console\\Commands\\ParseBooksCommand\:\:extractAuthorFromPath\(\)\.$#'
 			identifier: method.notFound
 			count: 1
@@ -1360,12 +1354,6 @@ parameters:
 			message: '#^If condition is always true\.$#'
 			identifier: if.alwaysTrue
 			count: 1
-			path: app/Console/Commands/VerifyBookDirectories.php
-
-		-
-			message: '#^Variable \$bookId on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.variable
-			count: 3
 			path: app/Console/Commands/VerifyBookDirectories.php
 
 		-
@@ -3375,12 +3363,6 @@ parameters:
 		-
 			message: '#^Offset 0 on non\-empty\-list\<string\> on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
-			count: 1
-			path: app/Services/AIQueryService.php
-
-		-
-			message: '#^Variable \$oldPath on left side of \?\? is never defined\.$#'
-			identifier: nullCoalesce.variable
 			count: 1
 			path: app/Services/AIQueryService.php
 

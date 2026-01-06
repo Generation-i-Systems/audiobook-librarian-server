@@ -1272,9 +1272,10 @@ PROMPT;
 
     protected function moveBookFiles(Book $book, string $newPath): array
     {
+        $oldPath = $book->directory_path;
+
         try {
             $disk = Storage::disk('books');
-            $oldPath = $book->directory_path;
 
             if (!$disk->exists($oldPath)) {
                 return [
@@ -1305,7 +1306,7 @@ PROMPT;
         } catch (\Exception $e) {
             Log::error('File move failed', [
                 'book_id' => $book->id,
-                'old_path' => $oldPath ?? null,
+                'old_path' => $oldPath,
                 'new_path' => $newPath,
                 'error' => $e->getMessage(),
             ]);
