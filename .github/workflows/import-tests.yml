@@ -2,36 +2,36 @@ name: Import System Tests
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
     paths:
-      - 'app/Services/BookImportService.php'
-      - 'app/Services/BookEnrichmentService.php'
-      - 'app/Services/MetadataProcessingService.php'
-      - 'app/Services/GoogleBooksApiService.php'
-      - 'app/Services/AIBookProcessor.php'
-      - 'app/Services/AudioFileAnalyzer.php'
-      - 'app/Services/ImportUIService.php'
-      - 'app/Console/Commands/ImportBooksFromDownloads.php'
-      - 'app/Console/Commands/PrepareForReprocessing.php'
-      - 'app/Console/Commands/ImportBookCommand.php'
-      - 'app/Traits/BookImportTrait.php'
-      - 'tests/Import/**'
-      - '.github/workflows/import-tests.yml'
+      - "app/Services/BookImportService.php"
+      - "app/Services/BookEnrichmentService.php"
+      - "app/Services/MetadataProcessingService.php"
+      - "app/Services/GoogleBooksApiService.php"
+      - "app/Services/AIBookProcessor.php"
+      - "app/Services/AudioFileAnalyzer.php"
+      - "app/Services/ImportUIService.php"
+      - "app/Console/Commands/ImportBooksFromDownloads.php"
+      - "app/Console/Commands/PrepareForReprocessing.php"
+      - "app/Console/Commands/ImportBookCommand.php"
+      - "app/Traits/BookImportTrait.php"
+      - "tests/Import/**"
+      - ".github/workflows/import-tests.yml"
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
     paths:
-      - 'app/Services/BookImportService.php'
-      - 'app/Services/BookEnrichmentService.php'
-      - 'app/Services/MetadataProcessingService.php'
-      - 'app/Services/GoogleBooksApiService.php'
-      - 'app/Services/AIBookProcessor.php'
-      - 'app/Services/AudioFileAnalyzer.php'
-      - 'app/Services/ImportUIService.php'
-      - 'app/Console/Commands/ImportBooksFromDownloads.php'
-      - 'app/Console/Commands/PrepareForReprocessing.php'
-      - 'app/Console/Commands/ImportBookCommand.php'
-      - 'app/Traits/BookImportTrait.php'
-      - 'tests/Import/**'
+      - "app/Services/BookImportService.php"
+      - "app/Services/BookEnrichmentService.php"
+      - "app/Services/MetadataProcessingService.php"
+      - "app/Services/GoogleBooksApiService.php"
+      - "app/Services/AIBookProcessor.php"
+      - "app/Services/AudioFileAnalyzer.php"
+      - "app/Services/ImportUIService.php"
+      - "app/Console/Commands/ImportBooksFromDownloads.php"
+      - "app/Console/Commands/PrepareForReprocessing.php"
+      - "app/Console/Commands/ImportBookCommand.php"
+      - "app/Traits/BookImportTrait.php"
+      - "tests/Import/**"
 
 jobs:
   import-tests:
@@ -45,7 +45,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: "8.3"
           extensions: mbstring, xml, ctype, json, sqlite3, pdo_sqlite, fileinfo, gd, getid3
           coverage: none
 
@@ -69,6 +69,28 @@ jobs:
       - name: Generate application key
         run: php artisan key:generate
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Get npm cache directory
+        id: npm-cache-dir
+        run: echo "dir=$(npm config get cache)" >> $GITHUB_OUTPUT
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.npm-cache-dir.outputs.dir }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-node-
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build frontend assets
+        run: npm run build
+
       - name: Directory Permissions
         run: chmod -R 777 storage bootstrap/cache
 
@@ -79,4 +101,4 @@ jobs:
         env:
           APP_ENV: testing
           DB_CONNECTION: sqlite
-          DB_DATABASE: ':memory:'
+          DB_DATABASE: ":memory:"
