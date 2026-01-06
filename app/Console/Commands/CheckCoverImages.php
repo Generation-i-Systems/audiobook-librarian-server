@@ -284,8 +284,8 @@ class CheckCoverImages extends Command
 
         // 1) Try using audible_info if present
         $audibleInfo = $book->audibleInfo ?? [];
-        $audibleCoverUrl = is_array($audibleInfo) ? ($audibleInfo['coverImageUrl'] ?? null) : null;
-        $audibleId = is_array($audibleInfo) ? ($audibleInfo['id'] ?? null) : null;
+        $audibleCoverUrl = $audibleInfo['coverImageUrl'] ?? null;
+        $audibleId = $audibleInfo['id'] ?? null;
 
         if ($audibleCoverUrl && $audibleId) {
             if ($dryRun) {
@@ -308,7 +308,7 @@ class CheckCoverImages extends Command
         }
 
         $searchResults = $audible->searchBooksWithFiltering($title, $authorName, ['limit' => 3]);
-        if (!empty($searchResults) && is_array($searchResults)) {
+        if (!empty($searchResults)) {
             $best = $searchResults[0];
             $coverUrl = $best['coverImageUrl'] ?? ($best['audibleCoverImageUrl'] ?? null);
             $asin = $best['id'] ?? null;

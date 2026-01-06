@@ -30,9 +30,14 @@ class CheckRelationships extends Command
         foreach ($books as $book) {
             $this->line("<fg=blue>Book:</> {$book->title} (ID: {$book->id}, Mongo ID: {$book->mongo_id})");
 
-            $this->line("  Authors: " . $book->authors->pluck('name')->join(', ') ?: 'None');
-            $this->line("  Narrators: " . $book->narrators->pluck('name')->join(', ') ?: 'None');
-            $this->line("  Genres: " . $book->genres->pluck('name')->join(', ') ?: 'None');
+            $authors = $book->authors->isNotEmpty() ? $book->authors->pluck('name')->join(', ') : 'None';
+            $this->line("  Authors: " . $authors);
+
+            $narrators = $book->narrators->isNotEmpty() ? $book->narrators->pluck('name')->join(', ') : 'None';
+            $this->line("  Narrators: " . $narrators);
+
+            $genres = $book->genres->isNotEmpty() ? $book->genres->pluck('name')->join(', ') : 'None';
+            $this->line("  Genres: " . $genres);
             $this->line("");
         }
 

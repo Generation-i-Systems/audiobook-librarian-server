@@ -565,7 +565,6 @@ class ApiServiceClient extends Command
      * @param array $headers
      * @param string $tempToken
      * @param string|null $host
-     * @param bool $includeToken
      * @return string
      */
     protected function generateCurlCommand(string $uri, string $method, ?string $data, array $headers, string $tempToken, ?string $host = null): string

@@ -26,7 +26,7 @@ class DocumentstoreUser implements Authenticatable
     ];
 
     /**
-     * @param array|object $user User data as array or object with arrayable interface
+     * @param array $user User data as array
      */
     public function __construct(array $user)
     {

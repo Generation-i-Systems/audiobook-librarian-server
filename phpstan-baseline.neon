@@ -1,12 +1,6 @@
 parameters:
 	ignoreErrors:
 		-
-			message: '#^PHPDoc tag @param for parameter \$user with type array\|object is not subtype of native type array\.$#'
-			identifier: parameter.phpDocType
-			count: 1
-			path: app/Auth/DocumentstoreUser.php
-
-		-
 			message: '#^Access to an undefined property App\\Auth\\DocumentstoreUser\:\:\$name\.$#'
 			identifier: property.notFound
 			count: 1
@@ -21,12 +15,6 @@ parameters:
 		-
 			message: '#^Call to an undefined static method Laravel\\Sanctum\\PersonalAccessToken\:\:where\(\)\.$#'
 			identifier: staticMethod.notFound
-			count: 1
-			path: app/Console/Commands/ApiServiceClient.php
-
-		-
-			message: '#^PHPDoc tag @param references unknown parameter\: \$includeToken$#'
-			identifier: parameter.notFound
 			count: 1
 			path: app/Console/Commands/ApiServiceClient.php
 
@@ -77,24 +65,6 @@ parameters:
 			identifier: staticMethod.notFound
 			count: 2
 			path: app/Console/Commands/AutoFavoriteExistingAuthors.php
-
-		-
-			message: '#^Call to function is_array\(\) with array will always evaluate to true\.$#'
-			identifier: function.alreadyNarrowedType
-			count: 2
-			path: app/Console/Commands/CheckCoverImages.php
-
-		-
-			message: '#^Call to function is_array\(\) with non\-empty\-array will always evaluate to true\.$#'
-			identifier: function.alreadyNarrowedType
-			count: 1
-			path: app/Console/Commands/CheckCoverImages.php
-
-		-
-			message: '#^Ternary operator condition is always true\.$#'
-			identifier: ternary.alwaysTrue
-			count: 3
-			path: app/Console/Commands/CheckRelationships.php
 
 		-
 			message: '#^Call to an undefined static method App\\Models\\Book\:\:whereNotNull\(\)\.$#'
