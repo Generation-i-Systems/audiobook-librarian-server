@@ -10,7 +10,6 @@ use Tests\TestCase;
 use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
- * @phpstan-ignore-next-line
  * @psalm-suppress all
  */
 #[CoversClass(\App\Http\Controllers\Admin\BookController::class)]
