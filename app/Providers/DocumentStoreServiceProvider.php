@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Contracts\DocumentStatsServiceInterface;
 use App\Services\MySqlService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
@@ -26,6 +27,11 @@ class DocumentStoreServiceProvider extends ServiceProvider
 
             return $this->createMysqlService();
         });
+
+        // Bind MySqlService to DocumentStatsServiceInterface if it implements it, 
+        // or provide a default if needed. For now, we bind MySqlService 
+        // and will ensure it has the necessary methods.
+        $this->app->bind(DocumentStatsServiceInterface::class, MySqlService::class);
     }
 
     /**

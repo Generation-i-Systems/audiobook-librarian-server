@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\SimpleCDNService;
 use GuzzleHttp\Client;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -37,19 +36,7 @@ if (!file_exists($fullPath)) {
 
         $mime = mime_content_type($fullPath);
 
-        // Use CDN if available
-        $url = CDNService::coverUrl($fullPath);
-        $localUrl = asset($fullPath);
-        
-        // CDN will be used if enabled and file is not local (images)
-        if (CDNService::isEnabled() && !str_starts_with($fullPath, 'storage/app/public')) {
-            return response()->file($url, [
-                'Content-Type' => $mime,
-                'X-CDN-Cache' => 'HIT',
-            ]);
-        }
-        
-        return response()->file($localUrl, [
+        return response()->file($fullPath, [
             'Content-Type' => $mime,
         ]);
     }

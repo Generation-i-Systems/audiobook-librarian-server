@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Contracts\DocumentStoreServiceInterface;
+use App\Contracts\DocumentStatsServiceInterface;
 use App\Models\Author;
 use App\Models\Book;
 use App\Models\Bookmark;
@@ -22,10 +23,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
-class MySqlService implements DocumentStoreServiceInterface
+class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServiceInterface
 {
     use HandlesLibraryJson;
 
@@ -3178,5 +3178,45 @@ class MySqlService implements DocumentStoreServiceInterface
 
             return false;
         }
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function recordReadingSession(string $userId, string $bookId, array $data): array
+    {
+        return [];
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getDailyStats(string $userId, ?string $from = null, ?string $to = null): array
+    {
+        return [];
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getBookStats(string $userId, string $bookId): array
+    {
+        return [];
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getUserStats(string $userId): array
+    {
+        return [];
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function getStreaks(string $userId): array
+    {
+        return [];
     }
 }
