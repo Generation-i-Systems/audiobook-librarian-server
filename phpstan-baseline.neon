@@ -229,12 +229,6 @@ parameters:
 			path: app/Console/Commands/FixRemoteImageUrlsCommand.php
 
 		-
-			message: '#^Property Illuminate\\Console\\Command\:\:\$input \(Symfony\\Component\\Console\\Input\\InputInterface\) in isset\(\) is not nullable\.$#'
-			identifier: isset.property
-			count: 1
-			path: app/Console/Commands/FixRemoteImageUrlsCommand.php
-
-		-
 			message: '#^Result of && is always false\.$#'
 			identifier: booleanAnd.alwaysFalse
 			count: 1

@@ -459,7 +459,7 @@ class FixRemoteImageUrlsCommand extends Command
             return false;
         }
 
-        $isInteractive = isset($this->input) && $this->input->isInteractive();
+        $isInteractive = $this->input->isInteractive();
         if (!$isInteractive || app()->environment('testing')) {
             $this->warn("Non-interactive mode: skipping book {$bookId} due to invalid directory path");
             return false;
