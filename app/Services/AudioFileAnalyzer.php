@@ -2,14 +2,12 @@
 
 namespace App\Services;
 
-use App\Traits\IsolatesErrorHandlers;
 use getID3;
 use getid3_lib;
 use Illuminate\Support\Facades\Log;
 
 class AudioFileAnalyzer
 {
-    use IsolatesErrorHandlers;
     /**
      * @var getID3
      */

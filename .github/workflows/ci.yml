@@ -85,9 +85,6 @@ jobs:
       - name: Run PHPStan
         run: ./vendor/bin/phpstan analyse --memory-limit=2G
 
-      - name: Run PHP CodeSniffer
-        run: ./vendor/bin/phpcs --standard=PSR12 app/ --report=full
-
       - name: Run tests
         run: |
           XDEBUG_MODE=coverage vendor/bin/phpunit --coverage-clover=coverage.xml

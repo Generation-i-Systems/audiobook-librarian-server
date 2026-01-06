@@ -28,8 +28,8 @@ class DocumentStoreServiceProvider extends ServiceProvider
             return $this->createMysqlService();
         });
 
-        // Bind MySqlService to DocumentStatsServiceInterface if it implements it, 
-        // or provide a default if needed. For now, we bind MySqlService 
+        // Bind MySqlService to DocumentStatsServiceInterface if it implements it,
+        // or provide a default if needed. For now, we bind MySqlService
         // and will ensure it has the necessary methods.
         $this->app->bind(DocumentStatsServiceInterface::class, MySqlService::class);
     }

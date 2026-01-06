@@ -30,7 +30,7 @@ class ImageProxyController extends Controller
             abort(404);
         }
         $fullPath = rtrim($storagePath, '/') . '/' . ltrim($file, '/');
-if (!file_exists($fullPath)) {
+        if (!file_exists($fullPath)) {
             abort(404);
         }
 

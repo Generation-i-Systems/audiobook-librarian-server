@@ -2,8 +2,6 @@
 
 namespace App\Services\AI;
 
-use App\Services\AI\ToolDefinitions;
-use App\Services\AI\ToolExecutor;
 use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Log;
 

@@ -7,10 +7,8 @@ use App\Models\Book;
 use App\Models\Genre;
 use App\Models\Narrator;
 use App\Models\Series;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class ToolExecutor
@@ -78,8 +76,8 @@ class ToolExecutor
             $searchTerm = $params['query'];
             $query->where(function ($q) use ($searchTerm) {
                 $q->where('title', 'like', "%{$searchTerm}%")
-                    ->orWhereHas('authors', fn($q) => $q->where('name', 'like', "%{$searchTerm}%"))
-                    ->orWhereHas('series', fn($q) => $q->where('name', 'like', "%{$searchTerm}%"));
+                    ->orWhereHas('authors', fn ($q) => $q->where('name', 'like', "%{$searchTerm}%"))
+                    ->orWhereHas('series', fn ($q) => $q->where('name', 'like', "%{$searchTerm}%"));
             });
         }
 
@@ -88,19 +86,19 @@ class ToolExecutor
         }
 
         if (isset($params['author'])) {
-            $query->whereHas('authors', fn($q) => $q->where('name', 'like', "%{$params['author']}%"));
+            $query->whereHas('authors', fn ($q) => $q->where('name', 'like', "%{$params['author']}%"));
         }
 
         if (isset($params['series'])) {
-            $query->whereHas('series', fn($q) => $q->where('name', 'like', "%{$params['series']}%"));
+            $query->whereHas('series', fn ($q) => $q->where('name', 'like', "%{$params['series']}%"));
         }
 
         if (isset($params['genre'])) {
-            $query->whereHas('genres', fn($q) => $q->where('name', 'like', "%{$params['genre']}%"));
+            $query->whereHas('genres', fn ($q) => $q->where('name', 'like', "%{$params['genre']}%"));
         }
 
         if (isset($params['narrator'])) {
-            $query->whereHas('narrators', fn($q) => $q->where('name', 'like', "%{$params['narrator']}%"));
+            $query->whereHas('narrators', fn ($q) => $q->where('name', 'like', "%{$params['narrator']}%"));
         }
 
         $limit = $params['limit'] ?? 100;
@@ -116,7 +114,7 @@ class ToolExecutor
                     'authors' => $book->authors->pluck('name')->toArray(),
                     'genres' => $book->genres->pluck('name')->toArray(),
                     'narrators' => $book->narrators->pluck('name')->toArray(),
-                    'series' => $book->series->map(fn($s) => [
+                    'series' => $book->series->map(fn ($s) => [
                         'name' => $s->name,
                         'number' => $s->pivot->series_number,
                     ])->toArray(),
@@ -145,7 +143,7 @@ class ToolExecutor
             ];
         }
 
-        $books = Book::whereHas('series', fn($q) => $q->where('series_id', $series->id))
+        $books = Book::whereHas('series', fn ($q) => $q->where('series_id', $series->id))
             ->with(['authors', 'series'])
             ->get()
             ->map(function ($book) use ($series) {
@@ -368,10 +366,10 @@ class ToolExecutor
                 'id' => $book->id,
                 'title' => $book->title,
                 'description' => $book->description,
-                'authors' => $book->authors->map(fn($a) => ['id' => $a->id, 'name' => $a->name])->toArray(),
-                'genres' => $book->genres->map(fn($g) => ['id' => $g->id, 'name' => $g->name])->toArray(),
-                'narrators' => $book->narrators->map(fn($n) => ['id' => $n->id, 'name' => $n->name])->toArray(),
-                'series' => $book->series->map(fn($s) => [
+                'authors' => $book->authors->map(fn ($a) => ['id' => $a->id, 'name' => $a->name])->toArray(),
+                'genres' => $book->genres->map(fn ($g) => ['id' => $g->id, 'name' => $g->name])->toArray(),
+                'narrators' => $book->narrators->map(fn ($n) => ['id' => $n->id, 'name' => $n->name])->toArray(),
+                'series' => $book->series->map(fn ($s) => [
                     'id' => $s->id,
                     'name' => $s->name,
                     'number' => $s->pivot->series_number,
@@ -675,7 +673,7 @@ class ToolExecutor
             'preview_id' => $previewId,
             'moves' => $preview,
             'total' => count($preview),
-            'can_proceed' => collect($preview)->every(fn($m) => $m['can_proceed']),
+            'can_proceed' => collect($preview)->every(fn ($m) => $m['can_proceed']),
         ];
     }
 
@@ -760,7 +758,7 @@ class ToolExecutor
         $books = collect();
 
         if (isset($params['series_id'])) {
-            $books = Book::whereHas('series', fn($q) => $q->where('series_id', $params['series_id']))
+            $books = Book::whereHas('series', fn ($q) => $q->where('series_id', $params['series_id']))
                 ->with(['authors', 'series'])
                 ->get();
         } elseif (isset($params['book_ids'])) {
