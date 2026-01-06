@@ -1015,9 +1015,31 @@ class ImportFileController extends Controller
         return trim($value);
     }
 
+    /**
+     * Check if a title is a generic filename (chapter, part, section, etc.)
+     */
+    private function isGenericFilenameTitle(string $title): bool
+    {
+        $genericPatterns = [
+            '/^chapter$/i',
+            '/^part$/i',
+            '/^section$/i',
+            '/^\d+$/i',
+            '/^track$/i',
+            '/^cd$/i',
+        ];
+
+        foreach ($genericPatterns as $pattern) {
+            if (preg_match($pattern, $title)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     /**
-     * Recursively sanitize all string values in an array to ensure valid UTF-8 encoding.
+      * Recursively sanitize all string values in an array to ensure valid UTF-8 encoding.
      *
      * @param  mixed  $data  The data to sanitize (array or scalar value)
      * @return mixed Sanitized data with the same structure
