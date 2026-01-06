@@ -5,11 +5,12 @@ namespace App\Http\Controllers\Admin;
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Services\AIBookProcessor;
-use App\Traits\IsolatesErrorHandlers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
+
+use App\Traits\IsolatesErrorHandlers;
 
 class ImportFileController extends Controller
 {
@@ -1066,10 +1067,7 @@ class ImportFileController extends Controller
                             break;
                         }
                     }
-                    // If we didn't find a good title, use the first one
-                    if (empty($tags['title'])) {
-                        $tags['title'] = $this->sanitizeString($qt['title'][0]);
-                    }
+                    // If we didn't find a good title, don't use filename as title (let directory name take precedence)
                 } else {
                     $tags['title'] = $this->sanitizeString($qt['title']);
                 }

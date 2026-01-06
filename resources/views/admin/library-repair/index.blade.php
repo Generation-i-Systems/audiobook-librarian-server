@@ -204,6 +204,15 @@
                                 <td class="text-end">
                                     @if(empty($issue['isResolved']))
                                         <div class="d-flex flex-column gap-2 align-items-end">
+                                            @if(
+                                                $issue['issueType'] === \App\Enums\LibraryRepairIssueType::NUMBERED_SUFFIX_DIRECTORY->value
+                                                && !empty($issue['book'])
+                                            )
+                                                <a href="{{ route('admin.books.edit', $issue['book']['id']) }}"
+                                                    class="btn btn-sm btn-outline-secondary w-100">
+                                                    Edit book
+                                                </a>
+                                            @endif
                                             <form method="POST" action="{{ route('admin.library-repair.rescan', $issue['id']) }}">
                                                 @csrf
                                                 <button type="submit" class="btn btn-sm btn-outline-primary">
