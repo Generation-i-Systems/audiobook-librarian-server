@@ -19,8 +19,6 @@ class ShowBookInfo extends Command
 {
     use BookImportTrait;
 
-    private ?string $resolvedBookRoot = null;
-
     private array $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'opus', 'aac', 'wav', 'wma'];
 
     protected $signature = 'books:info {directories?*}
@@ -1067,7 +1065,6 @@ class ShowBookInfo extends Command
 
     protected function hasAudioFiles(string $directory): bool
     {
-        $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'opus', 'wav'];
         $files = new \RecursiveIteratorIterator(
             new \RecursiveDirectoryIterator($directory, \RecursiveDirectoryIterator::SKIP_DOTS),
             \RecursiveIteratorIterator::SELF_FIRST
@@ -1076,7 +1073,7 @@ class ShowBookInfo extends Command
         foreach ($files as $file) {
             if ($file->isFile()) {
                 $extension = strtolower($file->getExtension());
-                if (in_array($extension, $audioExtensions)) {
+                if (in_array($extension, $this->audioExtensions)) {
                     return true;
                 }
             }
