@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Services\AIQueryService;
+use App\Services\AI\AIToolService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\Log;
 class AIQueryController extends Controller
 {
     protected AIQueryService $aiQueryService;
+    protected AIToolService $aiToolService;
 
     public function __construct()
     {
@@ -21,6 +23,7 @@ class AIQueryController extends Controller
         $model = config('services.ai.default_model', 'claude-3-5-sonnet');
         $paidTier = config('services.ai.paid_tier', true);
         $this->aiQueryService = new AIQueryService($model, $paidTier);
+        $this->aiToolService = new AIToolService('gemini-2.5-flash');
     }
 
     public function process(Request $request)
@@ -324,5 +327,89 @@ class AIQueryController extends Controller
 
         return redirect()->route('admin.ai-query.results', ['queryId' => $conversationId])
             ->with('success', 'Prompt updated and conversation reset to this point.');
+    }
+
+    public function processWithTools(Request $request)
+    {
+        $request->validate([
+            'prompt' => 'required|string|min:3',
+            'context' => 'nullable|array',
+        ]);
+
+        $userQuery = $request->input('prompt');
+        $context = $request->input('context', []);
+
+        Log::info('Processing tool-based AI query', [
+            'user_id' => Auth::id(),
+            'prompt' => $userQuery,
+        ]);
+
+        $result = $this->aiToolService->processQuery($userQuery, $context);
+
+        if (!$result['success']) {
+            return response()->json([
+                'success' => false,
+                'error' => $result['error'],
+            ], 400);
+        }
+
+        $queryRecord = DB::table('ai_tool_queries')->insertGetId([
+            'user_id' => Auth::id(),
+            'prompt' => $userQuery,
+            'context' => json_encode($context),
+            'response' => $result['response'],
+            'conversation_history' => json_encode($result['conversation']),
+            'iterations' => $result['iterations'],
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'query_id' => $queryRecord,
+            'response' => $result['response'],
+            'iterations' => $result['iterations'],
+        ]);
+    }
+
+    public function toolQueryHistory(Request $request)
+    {
+        $limit = $request->input('limit', 20);
+
+        $history = DB::table('ai_tool_queries')
+            ->where('user_id', Auth::id())
+            ->orderBy('created_at', 'desc')
+            ->limit($limit)
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'history' => $history,
+        ]);
+    }
+
+    public function toolQueryDetails($queryId)
+    {
+        $query = DB::table('ai_tool_queries')
+            ->where('id', $queryId)
+            ->where('user_id', Auth::id())
+            ->first();
+
+        if (!$query) {
+            abort(404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'query' => [
+                'id' => $query->id,
+                'prompt' => $query->prompt,
+                'context' => json_decode($query->context, true),
+                'response' => $query->response,
+                'conversation_history' => json_decode($query->conversation_history, true),
+                'iterations' => $query->iterations,
+                'created_at' => $query->created_at,
+            ],
+        ]);
     }
 }

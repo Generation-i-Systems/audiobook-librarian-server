@@ -318,7 +318,7 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::post('/books/resync-from-path', [Admin\BookController::class, 'resyncFromPath'])
         ->name('books.resyncFromPath');
 
-    // AI Query routes
+    // AI Query routes (SQL-based)
     Route::post('/ai-query/process', [Admin\AIQueryController::class, 'process'])
         ->name('ai-query.process');
     Route::get('/ai-query/results/{queryId}', [Admin\AIQueryController::class, 'results'])
@@ -329,6 +329,14 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         ->name('ai-query.execute-custom');
     Route::post('/ai-query/edit-prompt', [Admin\AIQueryController::class, 'editPrompt'])
         ->name('ai-query.edit-prompt');
+
+    // AI Query routes (Tool-based - new flexible system)
+    Route::post('/ai-query/tools/process', [Admin\AIQueryController::class, 'processWithTools'])
+        ->name('ai-query.tools.process');
+    Route::get('/ai-query/tools/history', [Admin\AIQueryController::class, 'toolQueryHistory'])
+        ->name('ai-query.tools.history');
+    Route::get('/ai-query/tools/{queryId}', [Admin\AIQueryController::class, 'toolQueryDetails'])
+        ->name('ai-query.tools.details');
 
     // Directory validation routes
     Route::get('/directory-validation', [Admin\DirectoryValidationController::class, 'index'])
