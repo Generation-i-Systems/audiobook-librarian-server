@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\SimpleCDNService;
 use GuzzleHttp\Client;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -30,12 +31,25 @@ class ImageProxyController extends Controller
             abort(404);
         }
         $fullPath = rtrim($storagePath, '/') . '/' . ltrim($file, '/');
-        if (!file_exists($fullPath)) {
+if (!file_exists($fullPath)) {
             abort(404);
         }
+
         $mime = mime_content_type($fullPath);
 
-        return response()->file($fullPath, [
+        // Use CDN if available
+        $url = CDNService::coverUrl($fullPath);
+        $localUrl = asset($fullPath);
+        
+        // CDN will be used if enabled and file is not local (images)
+        if (CDNService::isEnabled() && !str_starts_with($fullPath, 'storage/app/public')) {
+            return response()->file($url, [
+                'Content-Type' => $mime,
+                'X-CDN-Cache' => 'HIT',
+            ]);
+        }
+        
+        return response()->file($localUrl, [
             'Content-Type' => $mime,
         ]);
     }

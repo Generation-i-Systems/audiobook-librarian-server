@@ -25,6 +25,13 @@ return [
         'token' => env('POSTMARK_TOKEN'),
     ],
 
+    'cdn' => [
+        'enabled' => env('CDN_ENABLED', false),
+        'url' => env('CDN_URL', 'https://cdn.example.com'),
+        'path' => env('CDN_PATH', 'assets'),
+        'cache_ttl' => env('CDN_CACHE_TTL', 86400), // 24 hours in seconds
+    ],
+
     'ses' => [
         'key' => env('AWS_ACCESS_KEY_ID'),
         'secret' => env('AWS_SECRET_ACCESS_KEY'),
