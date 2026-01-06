@@ -873,7 +873,9 @@ class ImportFileController extends Controller
 
                 // Extract title
                 if (empty($meta['title'])) {
-                    $meta['title'] = $tags['title'] ?? null;
+                    if (!empty($tags['title']) && !$this->isGenericFilenameTitle($tags['title'])) {
+                        $meta['title'] = $tags['title'];
+                    }
 
                     // If title contains book/series info in parentheses, extract it
                     if (!empty($meta['title']) && preg_match('/^(.*?)(?:\s*[:\-]*\s*(.*))?$/', $meta['title'], $matches)) {
