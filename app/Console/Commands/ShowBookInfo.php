@@ -13,10 +13,15 @@ use App\Traits\BookImportTrait;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\File;
 
 class ShowBookInfo extends Command
 {
     use BookImportTrait;
+
+    private ?string $resolvedBookRoot = null;
+
+    private array $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'opus', 'aac', 'wav', 'wma'];
 
     protected $signature = 'books:info {directories?*}
                             {--compact : Use compact view instead of table}
@@ -32,7 +37,8 @@ class ShowBookInfo extends Command
                             {--r|release-date= : Update release date (YYYY-MM-DD)}
                             {--d|description= : Update book description}
                             {--S|source= : Update source of the book data}
-                            {--e|edit : Open book edit page in browser}';
+                            {--e|edit : Open book edit page in browser}
+                            {--merge-directories : Merge multiple directories (or subdirectories) into one before displaying details}';
 
     protected $description = 'Display and optionally update book information from database';
 

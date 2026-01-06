@@ -9,7 +9,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
-
 use App\Traits\IsolatesErrorHandlers;
 
 class ImportFileController extends Controller
@@ -1667,13 +1666,13 @@ class ImportFileController extends Controller
         }
 
         if ($type === 'file') {
-            $basename = basename($absPath);
-            $target = $destDir . DIRECTORY_SEPARATOR . $basename;
-            if (realpath($absPath) !== realpath($target)) {
-                File::move($absPath, $target);
+            $sourceDir = dirname($absPath);
+            $targetFile = $destDir . DIRECTORY_SEPARATOR . basename($absPath);
+            if (realpath($absPath) !== realpath($targetFile)) {
+                File::move($absPath, $targetFile);
             }
         } else {
-            $sourceDir = $this->normalizeSourcePathForMoveSelected($absPath);
+            $sourceDir = $absPath;
             $this->moveDirectoryContentsToTarget($sourceDir, $destDir);
         }
 
