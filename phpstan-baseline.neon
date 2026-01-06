@@ -295,12 +295,6 @@ parameters:
 			path: app/Console/Commands/GenerateLibraryJson.php
 
 		-
-			message: '#^Property App\\Console\\Commands\\ImportBook\:\:\$bookRoot is never read, only written\.$#'
-			identifier: property.onlyWritten
-			count: 1
-			path: app/Console/Commands/ImportBook.php
-
-		-
 			message: '#^Access to an undefined property \$this\(App\\Console\\Commands\\ImportBooksFromDownloads\)\:\:\$app\.$#'
 			identifier: property.notFound
 			count: 1

@@ -16,7 +16,6 @@ class ImportBook extends Command
 
     protected $description = 'Import books from filesystem locations into the library';
 
-    private string $bookRoot;
     private UnifiedBookImporter $importer;
     private BookDirectoryParser $parser;
     private array $stats = [
@@ -34,10 +33,6 @@ class ImportBook extends Command
         parent::__construct();
         $this->importer = $importer;
         $this->parser = $parser;
-        $this->bookRoot = rtrim(
-            (string) config('app.book_root', env('BOOK_STORAGE_PATH') ?: '/media/lyra_data1/audiobooks/books'),
-            '/'
-        );
     }
 
     public function handle(): int
