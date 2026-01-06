@@ -3,11 +3,11 @@ name: Full Test Suite
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 2 * * *'  # Run daily at 2 AM UTC
+    - cron: "0 2 * * *" # Run daily at 2 AM UTC
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   full-tests:
@@ -21,7 +21,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: "8.3"
           extensions: mbstring, xml, ctype, json, sqlite3, pdo_sqlite, fileinfo, gd, getid3
           coverage: none
 
@@ -45,6 +45,28 @@ jobs:
       - name: Generate application key
         run: php artisan key:generate
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Get npm cache directory
+        id: npm-cache-dir
+        run: echo "dir=$(npm config get cache)" >> $GITHUB_OUTPUT
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.npm-cache-dir.outputs.dir }}
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-node-
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build frontend assets
+        run: npm run build
+
       - name: Directory Permissions
         run: chmod -R 777 storage bootstrap/cache
 
@@ -53,4 +75,4 @@ jobs:
         env:
           APP_ENV: testing
           DB_CONNECTION: sqlite
-          DB_DATABASE: ':memory:'
+          DB_DATABASE: ":memory:"
