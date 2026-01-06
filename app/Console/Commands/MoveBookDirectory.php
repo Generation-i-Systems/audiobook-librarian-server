@@ -904,7 +904,7 @@ class MoveBookDirectory extends Command
                             }
                         } catch (\Exception $e) {
                             $this->logWarning('Could not parse new path metadata', [
-                                'path' => $fullPath ?? $newPath,
+                                'path' => $fullPath,
                                 'message' => $e->getMessage(),
                             ]);
                             $this->warn("    ⚠ Could not parse new path metadata: " . $e->getMessage());

@@ -86,7 +86,7 @@ jobs:
         run: ./vendor/bin/phpstan analyse --memory-limit=2G
 
       - name: Run PHP CodeSniffer
-        run: ./vendor/bin/phpcs --standard=PSR12 app/ --report=full --show-sniffs
+        run: ./vendor/bin/phpcs --standard=PSR12 app/ --report=full
 
       - name: Run tests
         run: |

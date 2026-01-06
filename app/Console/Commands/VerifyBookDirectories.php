@@ -583,7 +583,7 @@ class VerifyBookDirectories extends Command
                     $book->delete();
                     $this->info("🗑️ Successfully permanently deleted book: {$bookTitle}");
                     SafeLoggingService::safeLog('info', "Book permanently deleted", [
-                        'book_id' => $bookId ?? 'N/A',
+                        'book_id' => $bookId,
                         'book_title' => $bookTitle,
                         'deleted_from_command' => true,
                         'permanent' => true,
@@ -595,7 +595,7 @@ class VerifyBookDirectories extends Command
                         $this->info("🗑️ Successfully moved book to trash: {$bookTitle}");
                         $this->line("   Trash ID: {$result['trash_item_id']}");
                         SafeLoggingService::safeLog('info', "Book moved to trash", [
-                            'book_id' => $bookId ?? 'N/A',
+                            'book_id' => $bookId,
                             'book_title' => $bookTitle,
                             'deleted_from_command' => true,
                             'trash_item_id' => $result['trash_item_id'],
@@ -603,7 +603,7 @@ class VerifyBookDirectories extends Command
                     } else {
                         $this->error("❌ Failed to move book to trash: " . ($result['error'] ?? 'Unknown error'));
                         SafeLoggingService::safeLog('error', "Failed to move book to trash", [
-                            'book_id' => $bookId ?? 'N/A',
+                            'book_id' => $bookId,
                             'book_title' => $bookTitle,
                             'error' => $result['error'] ?? 'Unknown error',
                         ]);
@@ -614,7 +614,7 @@ class VerifyBookDirectories extends Command
             } catch (\Exception $e) {
                 $this->error("❌ Failed to delete book {$book->title}: " . $e->getMessage());
                 SafeLoggingService::safeLog('error', "Failed to delete book", [
-                    'book_id' => $book->id ?? 'N/A',
+                    'book_id' => $book->id,
                     'book_title' => $book->title,
                     'error' => $e->getMessage(),
                 ]);
