@@ -69,7 +69,7 @@ class FixRemoteImageUrlsCommand extends Command
         $this->info('Starting to fix remote image URLs...');
 
         $limit = $this->option('limit') ? (int) $this->option('limit') : null;
-        $dryRun = $this->option('dry-run');
+        $dryRun = (bool) $this->option('dry-run');
         $cleanPaths = $this->option('clean-paths');
 
         if ($dryRun) {

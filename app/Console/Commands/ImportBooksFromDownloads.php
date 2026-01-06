@@ -2908,8 +2908,8 @@ class ImportBooksFromDownloads extends Command
                 $this->line("  (Could not read image dimensions)");
                 return;
             }
-            $width = $imageInfo[0] ?? 200;
-            $height = $imageInfo[1] ?? 300;
+            $width = $imageInfo[0];
+            $height = $imageInfo[1];
 
             // Calculate thumbnail size (max 200px wide, maintain aspect ratio)
             $maxWidth = 200;
