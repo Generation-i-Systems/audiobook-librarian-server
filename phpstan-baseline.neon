@@ -607,12 +607,6 @@ parameters:
 			path: app/Console/Commands/ImportBooksFromDownloads.php
 
 		-
-			message: '#^Strict comparison using \=\=\= between string and false will always evaluate to false\.$#'
-			identifier: identical.alwaysFalse
-			count: 1
-			path: app/Console/Commands/ImportBooksFromDownloads.php
-
-		-
 			message: '#^Variable \$audioFileValues in empty\(\) always exists and is not falsy\.$#'
 			identifier: empty.variable
 			count: 1

@@ -1826,7 +1826,7 @@ class ImportBooksFromDownloads extends Command
         }
 
         $binary = base64_decode($coverData, true);
-        if ($binary === false) {
+        if (!is_string($binary)) {
             $binary = $coverData;
         }
 
@@ -1848,13 +1848,13 @@ class ImportBooksFromDownloads extends Command
     {
         $response = $this->uiService->ask($question, $default ?? '');
 
-        if (is_string($response) && strtolower(trim($response)) === 'q') {
-            $this->handleUserQuit();
-        }
-
-        if ($response === false) {
+        if (!is_string($response)) {
             $this->inputInterrupted = true;
             return '';
+        }
+
+        if (strtolower(trim($response)) === 'q') {
+            $this->handleUserQuit();
         }
 
         return $response;
@@ -2906,7 +2906,7 @@ class ImportBooksFromDownloads extends Command
             file_put_contents($tempOriginal, $imageData);
 
             $imageInfo = getimagesize($tempOriginal);
-            if ($imageInfo === false) {
+            if (!$imageInfo) {
                 $this->line("  (Could not read image dimensions)");
                 return;
             }
