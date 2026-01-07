@@ -1994,63 +1994,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function isAlreadyImported(string $path, array $metadata = []): bool
     {
-        $baseName = basename($path);
-
-        // First check by ISBN if available (most reliable)
-        if (!empty($metadata['isbn'])) {
-            $existingBook = Book::where('isbn', $metadata['isbn'])->first();
-            if ($existingBook) {
-                return true;
-            }
-        }
-
-        // Then check by exact title and author combination (if available)
-        if (!empty($metadata['title']) && !empty($metadata['author'])) {
-            $title = $metadata['title'];
-            $author = is_array($metadata['author']) ? $metadata['author'][0] : $metadata['author'];
-
-            $existingBook = Book::where('title', '=', $title)
-                ->whereHas('authors', function ($query) use ($author) {
-                    $query->where('name', $author);
-                })
-                ->first();
-
-            if ($existingBook) {
-                // Double-check that titles are truly identical (case-insensitive)
-                if (strtolower(trim($existingBook->title)) === strtolower(trim($title))) {
-                    // Critical check: if either book has series info, compare series numbers
-                    // Books with different series numbers should NEVER match, even with same title
-                    $existingSeries = $existingBook->series ?? '';
-                    $existingSeriesNumber = $existingBook->series_number ?? 0;
-                    $newSeries = $metadata['series'] ?? '';
-                    $newSeriesNumber = $metadata['series_number'] ?? 0;
-
-                    // If either book has series number info, they must match exactly
-                    if ($existingSeriesNumber > 0 || $newSeriesNumber > 0) {
-                        if ($existingSeriesNumber != $newSeriesNumber) {
-                            return false; // Different series numbers = different books
-                        }
-                    }
-
-                    // If both have series names, they must match
-                    if (!empty($existingSeries) && !empty($newSeries)) {
-                        if ($existingSeries !== $newSeries) {
-                            return false; // Different series = different books
-                        }
-                    }
-
-                    return true;
-                }
-            }
-        }
-
-        // Fallback to exact directory basename match only (much more restrictive)
-        // Only match if the final directory name is exactly the same
-        // REMOVED: LIKE pattern matching to prevent false positives between series books
-        $existingBook = Book::where('directory_path', '=', $baseName)
-            ->first();
-
-        return $existingBook !== null;
+        return $this->getImportService()->isAlreadyImported($path, $metadata);
     }
 
     /**

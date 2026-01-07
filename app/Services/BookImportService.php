@@ -2350,6 +2350,59 @@ class BookImportService
     }
 
     /**
+     * Check if audiobook is already imported
+     */
+    public function isAlreadyImported(string $path, array $metadata = []): bool
+    {
+        $baseName = basename($path);
+
+        if (!empty($metadata['isbn'])) {
+            $existingBook = Book::where('isbn', $metadata['isbn'])->first();
+            if ($existingBook) {
+                return true;
+            }
+        }
+
+        if (!empty($metadata['title']) && !empty($metadata['author'])) {
+            $title = $metadata['title'];
+            $author = is_array($metadata['author']) ? $metadata['author'][0] : $metadata['author'];
+
+            $existingBook = Book::where('title', '=', $title)
+                ->whereHas('authors', function ($query) use ($author) {
+                    $query->where('name', $author);
+                })
+                ->first();
+
+            if ($existingBook) {
+                if (strtolower(trim($existingBook->title)) === strtolower(trim($title))) {
+                    $existingSeries = $existingBook->series ?? '';
+                    $existingSeriesNumber = $existingBook->series_number ?? 0;
+                    $newSeries = $metadata['series'] ?? '';
+                    $newSeriesNumber = $metadata['series_number'] ?? 0;
+
+                    if ($existingSeriesNumber > 0 || $newSeriesNumber > 0) {
+                        if ($existingSeriesNumber != $newSeriesNumber) {
+                            return false;
+                        }
+                    }
+
+                    if (!empty($existingSeries) && !empty($newSeries)) {
+                        if ($existingSeries !== $newSeries) {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                }
+            }
+        }
+
+        $existingBook = Book::where('directory_path', '=', $baseName)->first();
+
+        return $existingBook !== null;
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void
