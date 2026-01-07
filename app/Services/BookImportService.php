@@ -4279,4 +4279,51 @@ class BookImportService
         // Map to valid primary genre using GenreMappingService
         return $this->genreMappingService->mapToPrimaryGenre($genreName);
     }
+
+    /**
+     * Display available cover options
+     */
+    public function displayCoverOptions(array $coverOptions, callable $displayCoverImageCallback): void
+    {
+        foreach ($coverOptions as $index => $option) {
+            $label = ($index + 1) . '. ' . $option['label'];
+            $displayCoverImageCallback($option['url']);
+        }
+    }
+
+    /**
+     * Prompt user to select a cover from available options
+     */
+    public function promptForCoverSelection(array $coverOptions, callable $choiceCallback, callable $askCallback): ?string
+    {
+        if (empty($coverOptions)) {
+            return null;
+        }
+
+        $choices = [];
+        foreach ($coverOptions as $index => $option) {
+            $choices[(string) ($index + 1)] = $option['label'];
+        }
+        $choices['0'] = 'None - skip cover';
+        $choices['u'] = 'Enter custom URL';
+
+        $selection = $choiceCallback('Select a cover image', $choices, '1');
+
+        if ($selection === '0' || $selection === 'None - skip cover') {
+            return '';
+        }
+
+        if ($selection === 'u' || $selection === 'Enter custom URL') {
+            $customUrl = $askCallback('Enter cover URL');
+            return $customUrl ? trim($customUrl) : null;
+        }
+
+        foreach ($coverOptions as $index => $option) {
+            if ($option['label'] === $selection || (string) ($index + 1) === $selection) {
+                return $option['url'];
+            }
+        }
+
+        return null;
+    }
 }

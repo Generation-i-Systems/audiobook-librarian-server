@@ -2515,14 +2515,10 @@ class ImportBooksFromDownloads extends Command
         $this->line('📚 Available Cover Options:');
         $this->newLine();
 
-        foreach ($coverOptions as $index => $option) {
-            $label = ($index + 1) . '. ' . $option['label'];
-            $this->line($label);
-
-            // Display the cover image if supported
-            $this->displayCoverImage($option['url']);
-            $this->newLine();
-        }
+        $this->getImportService()->displayCoverOptions(
+            $coverOptions,
+            fn ($url) => $this->displayCoverImage($url)
+        );
     }
 
     /**
@@ -2530,36 +2526,11 @@ class ImportBooksFromDownloads extends Command
      */
     protected function promptForCoverSelection(array $coverOptions): ?string
     {
-        if (empty($coverOptions)) {
-            return null;
-        }
-
-        $choices = [];
-        foreach ($coverOptions as $index => $option) {
-            $choices[(string) ($index + 1)] = $option['label'];
-        }
-        $choices['0'] = 'None - skip cover';
-        $choices['u'] = 'Enter custom URL';
-
-        $selection = $this->choice('Select a cover image', $choices, '1');
-
-        if ($selection === '0' || $selection === 'None - skip cover') {
-            return '';
-        }
-
-        if ($selection === 'u' || $selection === 'Enter custom URL') {
-            $customUrl = $this->ask('Enter cover URL');
-            return $customUrl ? trim($customUrl) : null;
-        }
-
-        // Find the selected option by matching the label
-        foreach ($coverOptions as $index => $option) {
-            if ($option['label'] === $selection || (string) ($index + 1) === $selection) {
-                return $option['url'];
-            }
-        }
-
-        return null;
+        return $this->getImportService()->promptForCoverSelection(
+            $coverOptions,
+            fn ($question, $choices, $default) => $this->choice($question, $choices, $default),
+            fn ($question) => $this->ask($question)
+        );
     }
 
     /**
