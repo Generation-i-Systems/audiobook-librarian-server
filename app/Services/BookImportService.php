@@ -2297,6 +2297,59 @@ class BookImportService
     }
 
     /**
+     * Find existing book in database (returns Book model instead of boolean)
+     */
+    public function findExistingBook(string $path, array $metadata = []): ?Book
+    {
+        $baseName = basename($path);
+
+        if (!empty($metadata['isbn'])) {
+            $existingBook = Book::where('isbn', $metadata['isbn'])->first();
+            if ($existingBook) {
+                return $existingBook;
+            }
+        }
+
+        if (!empty($metadata['title']) && !empty($metadata['author'])) {
+            $title = $metadata['title'];
+            $author = is_array($metadata['author']) ? $metadata['author'][0] : $metadata['author'];
+
+            $existingBook = Book::where('title', '=', $title)
+                ->whereHas('authors', function ($query) use ($author) {
+                    $query->where('name', $author);
+                })
+                ->first();
+
+            if ($existingBook) {
+                if (strtolower(trim($existingBook->title)) === strtolower(trim($title))) {
+                    $existingSeries = $existingBook->series ?? '';
+                    $existingSeriesNumber = $existingBook->series_number ?? 0;
+                    $newSeries = $metadata['series'] ?? '';
+                    $newSeriesNumber = $metadata['series_number'] ?? 0;
+
+                    if ($existingSeriesNumber > 0 || $newSeriesNumber > 0) {
+                        if ($existingSeriesNumber != $newSeriesNumber) {
+                            return null;
+                        }
+                    }
+
+                    if (!empty($existingSeries) && !empty($newSeries)) {
+                        if ($existingSeries !== $newSeries) {
+                            return null;
+                        }
+                    }
+
+                    return $existingBook;
+                }
+            }
+        }
+
+        $existingBook = Book::where('directory_path', '=', $baseName)->first();
+
+        return $existingBook;
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void
