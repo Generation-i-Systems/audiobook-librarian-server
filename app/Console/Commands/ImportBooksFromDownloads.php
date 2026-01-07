@@ -2191,9 +2191,6 @@ class ImportBooksFromDownloads extends Command
      */
     protected function promptForDuplicateAction(array $audiobook, $existingBook): bool
     {
-        $this->uiService->logMessage("🔍 Duplicate book detected:");
-        $this->uiService->logMessage("  Existing: '{$existingBook->title}' (ID: {$existingBook->id})");
-
         $options = [
             '1' => 'Skip import (keep both)',
             '2' => 'Delete source directory',
@@ -2202,34 +2199,15 @@ class ImportBooksFromDownloads extends Command
 
         $action = $this->getImportService()->promptForDuplicateAction(
             $options,
-            fn ($question, $options, $default) => $this->uiService->select($question, $options, $default)
+            fn ($question, $options, $default) => $this->uiService->select($question, $options, $default),
+            fn ($message) => $this->uiService->logMessage($message),
+            fn ($audiobook, $force) => $this->cleanupSourceDirectory($audiobook, $force),
+            $audiobook,
+            $this->skippedBooks,
+            $existingBook
         );
 
-        if ($action === 'skip') {
-            $this->uiService->logMessage("📁 Skipping import, keeping both");
-            $this->skippedBooks[] = [
-                'path' => $audiobook['path'],
-                'reason' => 'User chose to skip (duplicate detected)',
-            ];
-            return false;
-        }
-
-        if ($action === 'delete') {
-            $this->uiService->logMessage("🗑️ Removing source directory");
-            $this->cleanupSourceDirectory($audiobook, true);
-            $this->skippedBooks[] = [
-                'path' => $audiobook['path'],
-                'reason' => 'User chose to delete source (duplicate detected)',
-            ];
-            return false;
-        }
-
-        if ($action === 'continue') {
-            $this->uiService->logMessage("⚠️ Continuing with import despite duplicate detection");
-            return true;
-        }
-
-        return false;
+        return $action === 'continue';
     }
 
     /**

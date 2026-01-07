@@ -3236,20 +3236,56 @@ class BookImportService
      * Prompt user for action when duplicate is detected but can't be compared
      * Returns action result: 'skip', 'delete', 'continue', or 'skip'
      */
-    public function promptForDuplicateAction(array $options, callable $selectCallback): string
-    {
+    public function promptForDuplicateAction(
+        array $options,
+        callable $selectCallback,
+        ?callable $logMessageCallback = null,
+        ?callable $cleanupSourceDirectoryCallback = null,
+        array $audiobook = null,
+        array &$skippedBooks = null,
+        $existingBook = null
+    ): string {
+        if ($logMessageCallback && $existingBook) {
+            $logMessageCallback("🔍 Duplicate book detected:");
+            $logMessageCallback("  Existing: '{$existingBook->title}' (ID: {$existingBook->id})");
+        }
+
         $choice = $selectCallback("Duplicate detected - choose action", $options, '1');
 
         $choice = strtolower(trim($choice));
         if (in_array($choice, ['1', 's', 'skip'])) {
+            if ($logMessageCallback) {
+                $logMessageCallback("📁 Skipping import, keeping both");
+            }
+            if ($skippedBooks !== null && $audiobook !== null) {
+                $skippedBooks[] = [
+                    'path' => $audiobook['path'],
+                    'reason' => 'User chose to skip (duplicate detected)',
+                ];
+            }
             return 'skip';
         }
 
         if (in_array($choice, ['2', 'd', 'delete'])) {
+            if ($logMessageCallback) {
+                $logMessageCallback("🗑️ Removing source directory");
+            }
+            if ($cleanupSourceDirectoryCallback && $audiobook !== null) {
+                $cleanupSourceDirectoryCallback($audiobook, true);
+            }
+            if ($skippedBooks !== null && $audiobook !== null) {
+                $skippedBooks[] = [
+                    'path' => $audiobook['path'],
+                    'reason' => 'User chose to delete source (duplicate detected)',
+                ];
+            }
             return 'delete';
         }
 
         if (in_array($choice, ['3', 'c', 'continue'])) {
+            if ($logMessageCallback) {
+                $logMessageCallback("⚠️ Continuing with import despite duplicate detection");
+            }
             return 'continue';
         }
 
