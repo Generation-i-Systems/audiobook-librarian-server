@@ -1797,7 +1797,7 @@ class BookImportService
     /**
      * Get duration of audio file in seconds
      */
-    protected function getAudioFileDuration(string $filePath): int
+    public function getAudioFileDuration(string $filePath): int
     {
         try {
             // Try ffprobe first (most reliable)
@@ -2341,6 +2341,125 @@ class BookImportService
         }
 
         return (int) $seconds;
+    }
+
+    /**
+     * Merge metadata arrays, filling missing fields from fill into base
+     */
+    public function mergeMetadataFillMissing(array $base, array $fill): array
+    {
+        $merged = $base;
+
+        foreach ($fill as $key => $value) {
+            $current = $merged[$key] ?? null;
+
+            $isEmpty = $current === null
+                || $current === ''
+                || (is_array($current) && count($current) === 0);
+
+            $hasValue = $value !== null
+                && $value !== ''
+                && (!is_array($value) || count($value) > 0);
+
+            if ($isEmpty && $hasValue) {
+                $merged[$key] = $value;
+            }
+        }
+
+        return $merged;
+    }
+
+    /**
+     * Check if tag metadata has critical fields
+     */
+    public function hasCriticalTagMetadata(array $tagMetadata): bool
+    {
+        if (empty($tagMetadata)) {
+            return false;
+        }
+
+        $hasTitle = isset($tagMetadata['title']) && is_string($tagMetadata['title']) && trim($tagMetadata['title']) !== '';
+        $hasAuthor = isset($tagMetadata['author']) && !empty($tagMetadata['author']);
+
+        return $hasTitle && $hasAuthor;
+    }
+
+    /**
+     * Check if metadata has cover
+     */
+    public function hasCover(array $metadata): bool
+    {
+        return !empty($metadata['cover_data'])
+            || !empty($metadata['cover_image'])
+            || !empty($metadata['cover_path'])
+            || !empty($metadata['cover_url']);
+    }
+
+    /**
+     * Check if metadata has critical fields
+     */
+    public function hasCriticalMetadata(array $metadata): bool
+    {
+        $hasTitle = isset($metadata['title']) && is_string($metadata['title']) && trim($metadata['title']) !== '';
+        $authors = $metadata['author'] ?? [];
+        $hasAuthor = !empty($authors) && (is_string($authors) ? trim($authors) !== '' : count($authors) > 0);
+        $hasDescription = isset($metadata['description']) && is_string($metadata['description']) && trim($metadata['description']) !== '';
+
+        return $hasTitle && $hasAuthor && $hasDescription && $this->hasCover($metadata);
+    }
+
+    /**
+     * Check if filename is a torrent/piracy tracking file
+     */
+    public function isTorrentTrackingFile(string $filename): bool
+    {
+        $filename = strtolower($filename);
+
+        // Common torrent/piracy tracking file patterns
+        $patterns = [
+            '/torrent.*download.*from/i',
+            '/downloaded.*from.*\.txt$/i',
+            '/\.torrent$/i',
+            '/read.*me.*first.*\.txt$/i',
+            '/please.*seed.*\.txt$/i',
+            '/visit.*for.*more.*\.txt$/i',
+            '/source.*\.txt$/i',
+            '/magnet.*link.*\.txt$/i',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $filename)) {
+                return true;
+            }
+        }
+
+        // Check for specific known tracking file names
+        $knownTrackingFiles = [
+            'demonoid.me.txt',
+            'piratebay.txt',
+            'kickass.txt',
+            'extratorrent.txt',
+            'thepiratebay.org.txt',
+            'rarbg.txt',
+            'torrentday.txt',
+            'iptorrents.txt',
+            'what.cd.txt',
+            'passthepopcorn.txt',
+            'redacted.ch.txt',
+            'orpheus.network.txt',
+            'source.txt',
+            'readme.txt',
+            'read me.txt',
+            'info.txt',
+        ];
+
+        foreach ($knownTrackingFiles as $trackingFile) {
+            if (str_contains($filename, $trackingFile)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
