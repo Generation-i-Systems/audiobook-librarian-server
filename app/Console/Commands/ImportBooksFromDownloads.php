@@ -3966,85 +3966,16 @@ class ImportBooksFromDownloads extends Command
      */
     protected function extractNfoData(string $directoryPath): ?array
     {
-        $nfoFiles = glob($directoryPath . '/*.nfo');
-        if (empty($nfoFiles)) {
-            return null;
-        }
-
-        $nfoFile = $nfoFiles[0]; // Use first .nfo file found
-        $nfoContent = file_get_contents($nfoFile);
-
-        if (!$nfoContent) {
-            return null;
-        }
-
-        $nfoData = [];
-
-        // Parse XML-style NFO files (common format)
-        if (strpos($nfoContent, '<') !== false) {
-            $nfoData = $this->parseXmlNfo($nfoContent);
-        } else {
-            // Parse plain text NFO files
-            $nfoData = $this->parsePlainTextNfo($nfoContent);
-        }
-
+        $nfoData = $this->getImportService()->extractNfoData($directoryPath);
         if (!empty($nfoData)) {
-            $this->info("📄 Found .nfo file with metadata: " . basename($nfoFile));
+            $this->info("📄 Found .nfo file with metadata");
         }
-
         return $nfoData;
     }
 
-    /**
-     * Parse XML-format NFO files
-     */
     protected function parseXmlNfo(string $content): array
     {
-        $data = [];
-
-        try {
-            $xml = simplexml_load_string($content);
-
-            if ($xml) {
-                if (isset($xml->title)) {
-                    $data['title'] = (string) $xml->title;
-                }
-                if (isset($xml->author)) {
-                    $data['author'] = (string) $xml->author;
-                }
-                if (isset($xml->narrator)) {
-                    $data['narrator'] = (string) $xml->narrator;
-                }
-                if (isset($xml->series)) {
-                    $data['series'] = (string) $xml->series;
-                }
-                if (isset($xml->seriesNumber)) {
-                    $data['series_number'] = (string) $xml->seriesNumber;
-                }
-                if (isset($xml->genre)) {
-                    $data['genre'] = (string) $xml->genre;
-                }
-                if (isset($xml->year)) {
-                    $data['year'] = (string) $xml->year;
-                }
-                if (isset($xml->publisher)) {
-                    $data['publisher'] = (string) $xml->publisher;
-                }
-                if (isset($xml->isbn)) {
-                    $data['isbn'] = (string) $xml->isbn;
-                }
-                if (isset($xml->plot)) {
-                    $data['description'] = (string) $xml->plot;
-                }
-                if (isset($xml->description)) {
-                    $data['description'] = (string) $xml->description;
-                }
-            }
-        } catch (\Exception $e) {
-            Log::warning("Failed to parse XML NFO: " . $e->getMessage());
-        }
-
-        return $data;
+        return $this->getImportService()->parseXmlNfo($content);
     }
 
     /**

@@ -2055,6 +2055,86 @@ class BookImportService
     }
 
     /**
+     * Extract metadata from .nfo files if present
+     */
+    public function extractNfoData(string $directoryPath): ?array
+    {
+        $nfoFiles = glob($directoryPath . '/*.nfo');
+        if (empty($nfoFiles)) {
+            return null;
+        }
+
+        $nfoFile = $nfoFiles[0];
+        $nfoContent = file_get_contents($nfoFile);
+
+        if (!$nfoContent) {
+            return null;
+        }
+
+        $nfoData = [];
+
+        if (strpos($nfoContent, '<') !== false) {
+            $nfoData = $this->parseXmlNfo($nfoContent);
+        } else {
+            $nfoData = $this->parsePlainTextNfo($nfoContent);
+        }
+
+        return $nfoData ?: null;
+    }
+
+    /**
+     * Parse XML-format NFO files
+     */
+    public function parseXmlNfo(string $content): array
+    {
+        $data = [];
+
+        try {
+            $xml = simplexml_load_string($content);
+
+            if ($xml) {
+                if (isset($xml->title)) {
+                    $data['title'] = (string) $xml->title;
+                }
+                if (isset($xml->author)) {
+                    $data['author'] = (string) $xml->author;
+                }
+                if (isset($xml->narrator)) {
+                    $data['narrator'] = (string) $xml->narrator;
+                }
+                if (isset($xml->series)) {
+                    $data['series'] = (string) $xml->series;
+                }
+                if (isset($xml->seriesNumber)) {
+                    $data['series_number'] = (string) $xml->seriesNumber;
+                }
+                if (isset($xml->genre)) {
+                    $data['genre'] = (string) $xml->genre;
+                }
+                if (isset($xml->year)) {
+                    $data['year'] = (string) $xml->year;
+                }
+                if (isset($xml->publisher)) {
+                    $data['publisher'] = (string) $xml->publisher;
+                }
+                if (isset($xml->isbn)) {
+                    $data['isbn'] = (string) $xml->isbn;
+                }
+                if (isset($xml->plot)) {
+                    $data['description'] = (string) $xml->plot;
+                }
+                if (isset($xml->description)) {
+                    $data['description'] = (string) $xml->description;
+                }
+            }
+        } catch (\Exception $e) {
+            Log::warning("Failed to parse XML NFO: " . $e->getMessage());
+        }
+
+        return $data;
+    }
+
+    /**
      * Get duration of audio file in seconds
      */
     public function getAudioFileDuration(string $filePath): int
