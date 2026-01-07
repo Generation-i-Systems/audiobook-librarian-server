@@ -585,20 +585,12 @@ class ImportBooksFromDownloads extends Command
      */
     protected function maintainConcurrentTasks(): void
     {
-        // Count currently running tasks
-        $runningTasks = 0;
-        foreach ($this->backgroundTasks as $task) {
-            if ($task['status'] === 'processing') {
-                $runningTasks++;
-            }
-        }
-        $this->runningTaskCount = $runningTasks;
-
-        // Start new tasks to maintain minimum concurrent count
-        while ($this->runningTaskCount < $this->maxConcurrentTasks && !empty($this->taskQueue)) {
-            $nextTask = array_shift($this->taskQueue);
-            $this->startBackgroundTask($nextTask);
-        }
+        $this->runningTaskCount = $this->getImportService()->maintainConcurrentTasks(
+            $this->backgroundTasks,
+            $this->taskQueue,
+            $this->maxConcurrentTasks,
+            fn ($task) => $this->startBackgroundTask($task)
+        );
     }
 
     /**
@@ -606,19 +598,8 @@ class ImportBooksFromDownloads extends Command
      */
     protected function startBackgroundTask(array $taskInfo): void
     {
-        $taskId = md5(serialize($taskInfo));
-
-        if (!isset($this->backgroundTasks[$taskId])) {
-            $this->backgroundTasks[$taskId] = [
-                'type' => $taskInfo['type'],
-                'data' => $taskInfo['data'],
-                'status' => 'processing',
-                'result' => null,
-                'start_time' => microtime(true),
-                'priority' => $taskInfo['priority'] ?? 'normal'
-            ];
-            $this->runningTaskCount++;
-        }
+        $this->getImportService()->startBackgroundTask($taskInfo, $this->backgroundTasks);
+        $this->runningTaskCount++;
     }
 
     /**
@@ -637,18 +618,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function queueBackgroundTask(string $type, array $data, string $priority = 'normal'): void
     {
-        $taskInfo = [
-            'type' => $type,
-            'data' => $data,
-            'priority' => $priority,
-        ];
-
-        // Insert based on priority (high priority tasks go first)
-        if ($priority === 'high') {
-            array_unshift($this->taskQueue, $taskInfo);
-        } else {
-            array_push($this->taskQueue, $taskInfo);
-        }
+        $this->getImportService()->queueBackgroundTask($type, $data, $this->taskQueue, $priority);
     }
 
     /**

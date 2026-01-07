@@ -4955,6 +4955,73 @@ class BookImportService
     }
 
     /**
+     * Maintain at least 3 concurrent background tasks
+     */
+    public function maintainConcurrentTasks(
+        array $backgroundTasks,
+        array $taskQueue,
+        int $maxConcurrentTasks,
+        callable $startBackgroundTaskCallback
+    ): int {
+        // Count currently running tasks
+        $runningTasks = 0;
+        foreach ($backgroundTasks as $task) {
+            if ($task['status'] === 'processing') {
+                $runningTasks++;
+            }
+        }
+
+        // Start new tasks to maintain minimum concurrent count
+        while ($runningTasks < $maxConcurrentTasks && !empty($taskQueue)) {
+            $nextTask = array_shift($taskQueue);
+            $startBackgroundTaskCallback($nextTask);
+            $runningTasks++;
+        }
+
+        return $runningTasks;
+    }
+
+    /**
+     * Start a background task immediately
+     */
+    public function startBackgroundTask(array $taskInfo, array &$backgroundTasks): string
+    {
+        $taskId = md5(serialize($taskInfo));
+
+        if (!isset($backgroundTasks[$taskId])) {
+            $backgroundTasks[$taskId] = [
+                'type' => $taskInfo['type'],
+                'data' => $taskInfo['data'],
+                'status' => 'processing',
+                'result' => null,
+                'start_time' => microtime(true),
+                'priority' => $taskInfo['priority'] ?? 'normal'
+            ];
+        }
+
+        return $taskId;
+    }
+
+    /**
+     * Queue a background task with priority
+     */
+    public function queueBackgroundTask(string $type, array $data, array &$taskQueue, string $priority = 'normal'): void
+    {
+        $taskInfo = [
+            'type' => $type,
+            'data' => $data,
+            'priority' => $priority,
+        ];
+
+        // Insert based on priority (high priority tasks go first)
+        if ($priority === 'high') {
+            array_unshift($taskQueue, $taskInfo);
+        } else {
+            array_push($taskQueue, $taskInfo);
+        }
+    }
+
+    /**
      * Get cached result for a background task
      */
     public function getCachedResult(array $backgroundCache, array $audiobook, string $taskType, bool $cacheEnabled): ?array
