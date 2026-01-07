@@ -1216,22 +1216,6 @@ class ImportBooksFromDownloads extends Command
     }
 
     /**
-     * Download cover image to book directory using ExternalCoverService
-     */
-    protected function downloadCoverImage(string $imageUrl, string $directoryPath, string $source = 'unknown'): ?string
-    {
-        return $this->getImportService()->downloadCoverImage($imageUrl, $directoryPath, $source, $this->coverService);
-    }
-
-    /**
-     * Analyze if a cover image is a low-quality text-on-white cover
-     */
-    protected function isTextOnWhiteCover(string $imagePath): bool
-    {
-        return $this->getImportService()->isTextOnWhiteCover($imagePath, $this->coverAnalysisService);
-    }
-
-    /**
      * Search for alternative book covers using Google Image Search
      */
     protected function searchAlternativeCovers(array $metadata, int $limit = 3): array
@@ -1283,14 +1267,6 @@ class ImportBooksFromDownloads extends Command
             fn ($question, $choices, $default) => $this->choice($question, $choices, $default),
             fn ($question) => $this->ask($question)
         );
-    }
-
-    /**
-     * Clean description text (remove HTML, limit length, etc.)
-     */
-    protected function cleanDescription(string $description): string
-    {
-        return $this->getImportService()->cleanDescription($description);
     }
 
     /**
