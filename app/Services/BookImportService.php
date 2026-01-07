@@ -960,9 +960,25 @@ class BookImportService
                 $cleanRelativeLast = preg_replace('/\s*\(Graphic\s*Audio\)\s*$/i', '', $relativeLastSegment);
                 $cleanTitle = preg_replace('/\s*\(Graphic\s*Audio\)\s*$/i', '', $title);
 
+                Log::debug('BookImportService::generateTargetDirectory - Checking relative path', [
+                    'book_id' => $book->id,
+                    'relativePath' => $relativePath,
+                    'relativeLastSegment' => $relativeLastSegment,
+                    'cleanRelativeLast' => $cleanRelativeLast,
+                    'title' => $title,
+                    'cleanTitle' => $cleanTitle,
+                    'plainTitle' => $plainTitle,
+                    'seriesNumber' => $seriesNumber,
+                    'path' => $path,
+                ]);
+
                 // Check if the last segment of the relative path matches the title
                 if (strcasecmp($cleanRelativeLast, $cleanTitle) === 0 ||
                     $this->lastPathSegmentMatchesTitle($cleanRelativeLast, $plainTitle)) {
+                    Log::debug('BookImportService::generateTargetDirectory - Title already in path, returning as-is', [
+                        'book_id' => $book->id,
+                        'path' => $path,
+                    ]);
                     return $path;
                 }
             }
@@ -1002,6 +1018,10 @@ class BookImportService
             // Only append title if it's not already in the path
             // This prevents creating nested directories like "Title/Title"
             $path .= "/{$title}";
+            Log::debug('BookImportService::generateTargetDirectory - Appending title to path', [
+                'book_id' => $book->id,
+                'finalPath' => $path,
+            ]);
         }
 
         return $path;
