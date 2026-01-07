@@ -3202,6 +3202,37 @@ class BookImportService
     }
 
     /**
+     * Display directory comparison information
+     */
+    public function displayDirectoryComparison(array $comparison, callable $formatBytesCallback, callable $formatFileTypesCallback): ?array
+    {
+        if (isset($comparison['source']) && isset($comparison['target'])) {
+            return [
+                [
+                    'Location',
+                    'Files',
+                    'Total Size',
+                    'File Types',
+                ],
+                [
+                    'Source (New)',
+                    $comparison['source']['count'] ?? 0,
+                    $formatBytesCallback($comparison['source']['total_size'] ?? 0),
+                    $formatFileTypesCallback($comparison['source']['file_types'] ?? []),
+                ],
+                [
+                    'Target (Existing)',
+                    $comparison['target']['count'] ?? 0,
+                    $formatBytesCallback($comparison['target']['total_size'] ?? 0),
+                    $formatFileTypesCallback($comparison['target']['file_types'] ?? []),
+                ],
+            ];
+        }
+
+        return null;
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void

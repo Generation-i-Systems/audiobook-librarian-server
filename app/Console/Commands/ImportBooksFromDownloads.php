@@ -3035,34 +3035,20 @@ class ImportBooksFromDownloads extends Command
         $this->line("🔍 Debug: displayDirectoryComparison called");
         $this->line("🔍 Debug: Comparison keys: " . implode(', ', array_keys($comparison)));
 
-        // Show the full paths first
         $this->line("");
         $this->line("📁 Directory Comparison:");
         $this->line("   Source:  " . ($comparison['source_path'] ?? 'N/A'));
         $this->line("   Target:  " . ($comparison['target_path'] ?? 'N/A'));
         $this->line("");
 
-        if (isset($comparison['source']) && isset($comparison['target'])) {
-            $this->line("🔍 Debug: Source data: " . json_encode($comparison['source']));
-            $this->line("🔍 Debug: Target data: " . json_encode($comparison['target']));
+        $tableData = $this->getImportService()->displayDirectoryComparison(
+            $comparison,
+            fn ($bytes) => $this->formatBytes($bytes),
+            fn ($fileTypes) => $this->formatFileTypes($fileTypes)
+        );
 
-            $this->table(
-                ['Location', 'Files', 'Total Size', 'File Types'],
-                [
-                    [
-                        'Source (New)',
-                        $comparison['source']['count'] ?? 0,
-                        $this->formatBytes($comparison['source']['total_size'] ?? 0),
-                        $this->formatFileTypes($comparison['source']['file_types'] ?? []),
-                    ],
-                    [
-                        'Target (Existing)',
-                        $comparison['target']['count'] ?? 0,
-                        $this->formatBytes($comparison['target']['total_size'] ?? 0),
-                        $this->formatFileTypes($comparison['target']['file_types'] ?? []),
-                    ],
-                ]
-            );
+        if ($tableData) {
+            $this->table($tableData[0], array_slice($tableData, 1));
         } else {
             $this->line("❌ Missing source or target data in comparison");
         }
