@@ -1946,6 +1946,43 @@ class BookImportService
     }
 
     /**
+     * Create directory name in format "title (narrator)"
+     */
+    public function createNarratorDirectoryName(string $title, string $narrator): string
+    {
+        $cleanTitle = $this->removeSeriesFromTitle($title);
+
+        $cleanTitle = preg_replace('/\[[^\]]*\]/', '', $cleanTitle);
+        $cleanTitle = preg_replace('/\{[^}]*\}/', '', $cleanTitle);
+        $cleanTitle = trim($cleanTitle);
+
+        $cleanTitle = str_replace(['<', '>', ':', '"', '/', '\\', '|', '?', '*'], '', $cleanTitle);
+        $cleanNarrator = str_replace(['<', '>', ':', '"', '/', '\\', '|', '?', '*'], '', $narrator);
+
+        $cleanTitle = preg_replace('/\s+/', ' ', trim($cleanTitle));
+        $cleanNarrator = preg_replace('/\s+/', ' ', trim($cleanNarrator));
+
+        if (empty($cleanNarrator) || $cleanNarrator === 'Unknown Narrator') {
+            return $cleanTitle;
+        }
+
+        $maxLength = 100;
+        $combined = "{$cleanTitle} ({$cleanNarrator})";
+
+        if (strlen($combined) > $maxLength) {
+            $availableForTitle = $maxLength - strlen($cleanNarrator) - 3;
+            if ($availableForTitle > 10) {
+                $cleanTitle = substr($cleanTitle, 0, $availableForTitle) . '...';
+                $combined = "{$cleanTitle} ({$cleanNarrator})";
+            } else {
+                return substr($cleanTitle, 0, $maxLength);
+            }
+        }
+
+        return $combined;
+    }
+
+    /**
      * Get duration of audio file in seconds
      */
     public function getAudioFileDuration(string $filePath): int

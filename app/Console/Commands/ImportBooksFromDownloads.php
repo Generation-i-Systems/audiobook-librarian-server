@@ -4189,42 +4189,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function createNarratorDirectoryName(string $title, string $narrator): string
     {
-        // Remove series names from title if they contain colons
-        $cleanTitle = $this->removeSeriesFromTitle($title);
-
-        // Simplify title - remove extra metadata like [05], [1986], etc.
-        $cleanTitle = preg_replace('/\[[^\]]*\]/', '', $cleanTitle);
-        $cleanTitle = preg_replace('/\{[^}]*\}/', '', $cleanTitle);
-        $cleanTitle = trim($cleanTitle);
-
-        // Clean up title and narrator for directory name (remove invalid filesystem characters)
-        $cleanTitle = str_replace(['<', '>', ':', '"', '/', '\\', '|', '?', '*'], '', $cleanTitle);
-        $cleanNarrator = str_replace(['<', '>', ':', '"', '/', '\\', '|', '?', '*'], '', $narrator);
-
-        // Trim extra whitespace and normalize spaces
-        $cleanTitle = preg_replace('/\s+/', ' ', trim($cleanTitle));
-        $cleanNarrator = preg_replace('/\s+/', ' ', trim($cleanNarrator));
-
-        if (empty($cleanNarrator) || $cleanNarrator === 'Unknown Narrator') {
-            return $cleanTitle;
-        }
-
-        // Limit total directory name length to avoid filesystem issues
-        $maxLength = 100; // Conservative limit for directory names
-        $combined = "{$cleanTitle} ({$cleanNarrator})";
-
-        if (strlen($combined) > $maxLength) {
-            $availableForTitle = $maxLength - strlen($cleanNarrator) - 3; // 3 for " ()"
-            if ($availableForTitle > 10) { // Ensure minimum title length
-                $cleanTitle = substr($cleanTitle, 0, $availableForTitle) . '...';
-                $combined = "{$cleanTitle} ({$cleanNarrator})";
-            } else {
-                // If narrator name is too long, just use title
-                return substr($cleanTitle, 0, $maxLength);
-            }
-        }
-
-        return $combined;
+        return $this->getImportService()->createNarratorDirectoryName($title, $narrator);
     }
 
     /**
