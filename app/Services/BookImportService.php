@@ -2151,6 +2151,50 @@ class BookImportService
     }
 
     /**
+     * Map genre to valid genre name
+     */
+    public function mapToValidGenre(string $genre): string
+    {
+        $genreMap = [
+            'sci-fi' => 'Science Fiction',
+            'scifi' => 'Science Fiction',
+            'science fiction' => 'Science Fiction',
+            'fantasy' => 'Fantasy',
+            'mystery' => 'Mystery',
+            'thriller' => 'Thriller',
+            'romance' => 'Romance',
+            'horror' => 'Horror',
+            'adventure' => 'Adventure',
+            'action' => 'Action',
+            'historical' => 'Historical',
+            'contemporary' => 'Contemporary',
+            'literary' => 'Literary',
+            'non-fiction' => 'Non-Fiction',
+            'nonfiction' => 'Non-Fiction',
+            'biography' => 'Biography',
+            'autobiography' => 'Autobiography',
+            'self-help' => 'Self-Help',
+            'business' => 'Business',
+            'history' => 'History',
+            'politics' => 'Politics',
+            'philosophy' => 'Philosophy',
+            'psychology' => 'Psychology',
+            'science' => 'Science',
+            'technology' => 'Technology',
+            'health' => 'Health',
+            'fitness' => 'Fitness',
+            'cooking' => 'Cooking',
+            'travel' => 'Travel',
+            'children' => 'Children',
+            'young adult' => 'Young Adult',
+            'ya' => 'Young Adult',
+        ];
+
+        $normalizedGenre = strtolower(trim($genre));
+        return $genreMap[$normalizedGenre] ?? ucfirst($genre);
+    }
+
+    /**
      * Get duration of audio file in seconds
      */
     public function getAudioFileDuration(string $filePath): int

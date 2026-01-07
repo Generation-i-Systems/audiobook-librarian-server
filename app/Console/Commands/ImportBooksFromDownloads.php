@@ -4184,7 +4184,6 @@ class ImportBooksFromDownloads extends Command
      */
     protected function hasEnrichmentData(array $metadata): bool
     {
-        // Check for data that typically comes from external sources
         $enrichmentFields = [
             'audible_raw',
             'google_books_raw',
@@ -4198,12 +4197,16 @@ class ImportBooksFromDownloads extends Command
             }
         }
 
-        // Also check if we have a detailed description (usually from external sources)
         if (!empty($metadata['description']) && strlen($metadata['description']) > 100) {
             return true;
         }
 
         return false;
+    }
+
+    protected function mapToValidGenre(string $genre): string
+    {
+        return $this->getImportService()->mapToValidGenre($genre);
     }
 
     /**
