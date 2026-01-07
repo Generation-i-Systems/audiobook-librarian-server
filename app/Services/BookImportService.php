@@ -3667,6 +3667,15 @@ class BookImportService
     }
 
     /**
+     * Get file operation type (copy or move)
+     */
+    public function getFileOperation(?callable $getCopyFilesOptionCallback = null): string
+    {
+        $copyFiles = $getCopyFilesOptionCallback ? $getCopyFilesOptionCallback() : false;
+        return $copyFiles ? 'copy' : 'move';
+    }
+
+    /**
      * Process multi-book directory by splitting into individual books
      */
     public function processMultiBookSplit(

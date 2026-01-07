@@ -102,7 +102,7 @@ class ImportBooksFromDownloads extends Command
 
     protected function getFileOperation(): string
     {
-        return (bool) $this->option('copy-files') ? 'copy' : 'move';
+        return $this->getImportService()->getFileOperation(fn () => $this->option('copy-files'));
     }
 
     public function __construct(?ImportUIService $uiService = null)
