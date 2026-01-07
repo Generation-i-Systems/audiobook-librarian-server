@@ -3761,70 +3761,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function generateDirectoryPath(array $metadata): string
     {
-        $parts = [];
-
-        // Check for author's preferred genre first
-        $authorGenre = $this->getImportService()->getAuthorPreferredGenre($metadata['author']);
-        if ($authorGenre) {
-            $parts[] = $authorGenre;
-        } elseif (!empty($metadata['genre'])) {
-            $genre = is_array($metadata['genre']) ? $metadata['genre'][0] : $metadata['genre'];
-            $parts[] = $genre;
-        } else {
-            $parts[] = 'Other';
-        }
-
-        if (!empty($metadata['author'])) {
-            $authors = is_array($metadata['author']) ? $metadata['author'] : [$metadata['author']];
-            // If the single author string contains commas, split it into array
-            if (count($authors) === 1 && strpos($authors[0], ',') !== false) {
-                $authors = array_map('trim', explode(',', $authors[0]));
-            }
-
-            // Check for existing author directory first (use cleaned series name)
-            $cleanedSeries = null;
-            if (!empty($metadata['series'])) {
-                $cleanedSeries = $this->getImportService()->cleanSeriesName($metadata['series'], $authors);
-            }
-
-            $existingAuthorDir = $this->getImportService()->findExistingAuthorDirectory($authors, $cleanedSeries);
-
-            if ($existingAuthorDir) {
-                $this->info("📁 Found existing author directory: {$existingAuthorDir}");
-                $parts[] = $existingAuthorDir;
-            } else {
-                // Use formatted author names with & separator and normalized initials
-                $authorDir = $this->getImportService()->formatAuthorsForDirectory($authors);
-                $parts[] = $authorDir;
-            }
-        }
-
-        if (!empty($metadata['series'])) {
-            // Clean series name by removing author names for directory path
-            $authors = is_array($metadata['author']) ? $metadata['author'] : [$metadata['author']];
-            // Handle comma-separated authors here too
-            if (count($authors) === 1 && strpos($authors[0], ',') !== false) {
-                $authors = array_map('trim', explode(',', $authors[0]));
-            }
-            $cleanedSeriesName = $this->getImportService()->cleanSeriesName($metadata['series'], $authors);
-            $parts[] = $cleanedSeriesName;
-        }
-
-        if (!empty($metadata['title'])) {
-            $title = $metadata['title'];
-            // If we have a series number, prefix it to the title
-            if (!empty($metadata['series_number'])) {
-                $seriesNumber = str_pad($metadata['series_number'], 2, '0', STR_PAD_LEFT);
-                $title = $seriesNumber . ' ' . $title;
-            }
-
-            // Add GraphicAudio marker if detected from source directory or narrator
-            $title = $this->getImportService()->addGraphicAudioMarker($title, $metadata);
-
-            $parts[] = $title;
-        }
-
-        return implode('/', $parts);
+        return $this->getImportService()->generateDirectoryPath($metadata);
     }
 
     /**
