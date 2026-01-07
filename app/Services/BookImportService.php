@@ -1860,6 +1860,30 @@ class BookImportService
     }
 
     /**
+     * Get all files from a directory recursively
+     */
+    public function getAllFilesFromDirectory(string $path): array
+    {
+        $files = [];
+
+        if (!File::isDirectory($path)) {
+            return $files;
+        }
+
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($path, \RecursiveDirectoryIterator::SKIP_DOTS)
+        );
+
+        foreach ($iterator as $file) {
+            if ($file->isFile()) {
+                $files[] = $file->getPathname();
+            }
+        }
+
+        return $files;
+    }
+
+    /**
      * Get duration of audio file in seconds
      */
     public function getAudioFileDuration(string $filePath): int

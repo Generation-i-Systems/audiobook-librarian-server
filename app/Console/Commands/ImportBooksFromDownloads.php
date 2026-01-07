@@ -3840,23 +3840,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function getAllFilesFromDirectory(string $path): array
     {
-        $files = [];
-
-        if (!File::isDirectory($path)) {
-            return $files;
-        }
-
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($path, \RecursiveDirectoryIterator::SKIP_DOTS)
-        );
-
-        foreach ($iterator as $file) {
-            if ($file->isFile()) {
-                $files[] = $file->getPathname();
-            }
-        }
-
-        return $files;
+        return $this->getImportService()->getAllFilesFromDirectory($path);
     }
 
     /**
