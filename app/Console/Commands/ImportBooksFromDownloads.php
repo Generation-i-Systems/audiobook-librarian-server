@@ -357,6 +357,7 @@ class ImportBooksFromDownloads extends Command
                         }
                     }
                 }
+                $this->processBackgroundTasks();
             }
 
             // Show summary
@@ -494,44 +495,6 @@ class ImportBooksFromDownloads extends Command
     }
 
     /**
-     * Process pending background tasks (enhanced with concurrent task management)
-     */
-    protected function processBackgroundTasks(): void
-    {
-        // Maintain at least 3 concurrent background tasks
-        $this->maintainConcurrentTasks();
-
-        // Process currently running tasks
-        foreach ($this->backgroundTasks as $taskId => &$task) {
-            if ($task['status'] === 'processing') {
-                // Check if task should be completed (simulated async processing)
-                if (!isset($task['start_time'])) {
-                    $task['start_time'] = microtime(true);
-                }
-
-                // Simulate processing time (remove this in real async implementation)
-                $processingTime = microtime(true) - $task['start_time'];
-                if ($processingTime > 0.1) { // 100ms simulation
-                    try {
-                        $task['result'] = $this->executeBackgroundTask($task);
-                        $task['status'] = 'completed';
-                        $task['end_time'] = microtime(true);
-                        $this->runningTaskCount--;
-                    } catch (\Exception $e) {
-                        $task['status'] = 'failed';
-                        $task['error'] = $e->getMessage();
-                        $task['end_time'] = microtime(true);
-                        $this->runningTaskCount--;
-                    }
-                }
-            }
-        }
-
-        // Start new tasks if we have capacity
-        $this->startQueuedTasks();
-    }
-
-    /**
      * Execute a specific background task (with caching)
      */
     protected function executeBackgroundTask(array $task): array
@@ -558,6 +521,19 @@ class ImportBooksFromDownloads extends Command
             fn ($data) => $this->extractMetadataInBackground($data),
             fn ($data) => $this->analyzeAudioFilesInBackground($data),
             fn ($data) => $this->prepareCoverImageInBackground($data)
+        );
+    }
+
+    /**
+     * Process pending background tasks (enhanced with concurrent task management)
+     */
+    protected function processBackgroundTasks(): void
+    {
+        $this->getImportService()->processBackgroundTasks(
+            $this->backgroundTasks,
+            fn () => $this->maintainConcurrentTasks(),
+            fn ($task) => $this->executeBackgroundTask($task),
+            $this->runningTaskCount
         );
     }
 

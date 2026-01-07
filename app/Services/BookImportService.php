@@ -4955,6 +4955,45 @@ class BookImportService
     }
 
     /**
+     * Process pending background tasks (enhanced with concurrent task management)
+     */
+    public function processBackgroundTasks(
+        array &$backgroundTasks,
+        callable $maintainConcurrentTasksCallback,
+        callable $executeBackgroundTaskCallback,
+        int &$runningTaskCount
+    ): void {
+        // Maintain at least 3 concurrent background tasks
+        $runningTaskCount = $maintainConcurrentTasksCallback();
+
+        // Process currently running tasks
+        foreach ($backgroundTasks as $taskId => &$task) {
+            if ($task['status'] === 'processing') {
+                // Check if task should be completed (simulated async processing)
+                if (!isset($task['start_time'])) {
+                    $task['start_time'] = microtime(true);
+                }
+
+                // Simulate processing time (remove this in real async implementation)
+                $processingTime = microtime(true) - $task['start_time'];
+                if ($processingTime > 0.1) { // 100ms simulation
+                    try {
+                        $task['result'] = $executeBackgroundTaskCallback($task);
+                        $task['status'] = 'completed';
+                        $task['end_time'] = microtime(true);
+                        $runningTaskCount--;
+                    } catch (\Exception $e) {
+                        $task['status'] = 'failed';
+                        $task['error'] = $e->getMessage();
+                        $task['end_time'] = microtime(true);
+                        $runningTaskCount--;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * Start background processing tasks while waiting for user input (enhanced)
      */
     public function startBackgroundProcessing(
