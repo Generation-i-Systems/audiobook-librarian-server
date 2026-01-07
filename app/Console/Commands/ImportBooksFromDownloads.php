@@ -1676,18 +1676,14 @@ class ImportBooksFromDownloads extends Command
     protected function cleanupSourceDirectory(array $audiobook, bool $filesAlreadyExist = false): void
     {
         $isCopyOperation = (bool) $this->option('copy-files');
-        $this->getImportService()->cleanupSourceDirectory($audiobook, $filesAlreadyExist, $isCopyOperation);
-
-        if (!$isCopyOperation && File::isDirectory($audiobook['path'])) {
-            if ($filesAlreadyExist) {
-                $this->info("✅ Removed duplicate source directory (identical files already exist in library)");
-            } else {
-                $remainingFiles = File::files($audiobook['path']);
-                if (empty($remainingFiles)) {
-                    $this->info("🗑️  Removed empty source directory");
-                }
-            }
-        }
+        $this->getImportService()->cleanupSourceDirectory(
+            $audiobook,
+            $filesAlreadyExist,
+            $isCopyOperation,
+            fn ($message) => $this->info($message),
+            fn ($path) => File::isDirectory($path),
+            fn ($path) => File::files($path)
+        );
     }
 
     /**

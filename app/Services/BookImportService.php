@@ -1786,11 +1786,17 @@ class BookImportService
     /**
      * Clean up source directory after successful import
      */
-    public function cleanupSourceDirectory(array $audiobook, bool $filesAlreadyExist = false, bool $isCopyOperation = false): void
-    {
+    public function cleanupSourceDirectory(
+        array $audiobook,
+        bool $filesAlreadyExist = false,
+        bool $isCopyOperation = false,
+        ?callable $infoCallback = null,
+        ?callable $isDirectoryCallback = null,
+        ?callable $filesCallback = null
+    ): void {
         $sourcePath = $audiobook['path'];
 
-        if (!File::isDirectory($sourcePath)) {
+        if (!($isDirectoryCallback ? $isDirectoryCallback($sourcePath) : File::isDirectory($sourcePath))) {
             return;
         }
 
@@ -1803,11 +1809,30 @@ class BookImportService
             if ($this->isDirectoryEmpty($sourcePath)) {
                 File::deleteDirectory($sourcePath);
                 Log::info("Cleaned up empty source directory: {$sourcePath}");
+                if ($infoCallback) {
+                    $infoCallback("🗑️  Removed empty source directory");
+                }
             }
         } catch (\Exception $e) {
             Log::warning("Failed to cleanup source directory: " . $e->getMessage(), [
                 'path' => $sourcePath,
             ]);
+        }
+
+        // Additional cleanup messages for move operations
+        if (!$isCopyOperation && ($isDirectoryCallback ? $isDirectoryCallback($sourcePath) : File::isDirectory($sourcePath))) {
+            if ($filesAlreadyExist) {
+                if ($infoCallback) {
+                    $infoCallback("✅ Removed duplicate source directory (identical files already exist in library)");
+                }
+            } else {
+                $remainingFiles = $filesCallback ? $filesCallback($sourcePath) : File::files($sourcePath);
+                if (empty($remainingFiles)) {
+                    if ($infoCallback) {
+                        $infoCallback("🗑️  Removed empty source directory");
+                    }
+                }
+            }
         }
     }
 
