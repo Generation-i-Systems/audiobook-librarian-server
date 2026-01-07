@@ -2195,6 +2195,35 @@ class BookImportService
     }
 
     /**
+     * Get first non-empty metadata value from array of keys
+     */
+    public function getFirstNonEmptyMetadataValue(array $metadata, array $keys): mixed
+    {
+        foreach ($keys as $key) {
+            if (!array_key_exists($key, $metadata)) {
+                continue;
+            }
+
+            $value = $metadata[$key];
+            if ($value === null) {
+                continue;
+            }
+
+            if (is_string($value) && trim($value) === '') {
+                continue;
+            }
+
+            if (is_array($value) && count($value) === 0) {
+                continue;
+            }
+
+            return $value;
+        }
+
+        return null;
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void

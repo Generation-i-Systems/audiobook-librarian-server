@@ -2652,28 +2652,7 @@ class ImportBooksFromDownloads extends Command
 
     protected function getFirstNonEmptyMetadataValue(array $metadata, array $keys): mixed
     {
-        foreach ($keys as $key) {
-            if (!array_key_exists($key, $metadata)) {
-                continue;
-            }
-
-            $value = $metadata[$key];
-            if ($value === null) {
-                continue;
-            }
-
-            if (is_string($value) && trim($value) === '') {
-                continue;
-            }
-
-            if (is_array($value) && count($value) === 0) {
-                continue;
-            }
-
-            return $value;
-        }
-
-        return null;
+        return $this->getImportService()->getFirstNonEmptyMetadataValue($metadata, $keys);
     }
 
     protected function promptForCoverUrl(string $currentCoverUrl): string
