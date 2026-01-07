@@ -1066,25 +1066,23 @@ class ImportBooksFromDownloads extends Command
             return;
         }
 
-        $tableData = $this->getImportService()->displayEnrichedMetadata($metadata);
-        $this->table(['Field', 'Value'], $tableData);
-
-        $this->getImportService()->handleCoverSelection(
+        $this->getImportService()->displayEnrichedMetadata(
             $metadata,
-            fn ($path) => $this->isTextOnWhiteCover($path),
-            fn ($metadata, $limit) => $this->searchAlternativeCovers($metadata, $limit),
-            fn ($message) => $this->warn($message),
-            fn ($message) => $this->line($message),
-            fn ($message) => $this->info($message),
-            fn ($message) => $this->comment($message),
-            fn ($coverOptions, $metadata) => $this->displayCoverOptions($coverOptions, $metadata),
-            fn ($coverOptions) => $this->promptForCoverSelection($coverOptions),
-            !$this->option('auto')
+            fn ($headers, $data) => $this->table($headers, $data),
+            fn ($metadata) => $this->getImportService()->handleCoverSelection(
+                $metadata,
+                fn ($path) => $this->isTextOnWhiteCover($path),
+                fn ($metadata, $limit) => $this->searchAlternativeCovers($metadata, $limit),
+                fn ($message) => $this->warn($message),
+                fn ($message) => $this->line($message),
+                fn ($message) => $this->info($message),
+                fn ($message) => $this->comment($message),
+                fn ($coverOptions, $metadata) => $this->displayCoverOptions($coverOptions, $metadata),
+                fn ($coverOptions) => $this->promptForCoverSelection($coverOptions),
+                !$this->option('auto')
+            ),
+            fn ($coverUrl) => $this->displayCoverImage($coverUrl)
         );
-
-        if (!empty($metadata['cover_url'])) {
-            $this->displayCoverImage($metadata['cover_url']);
-        }
     }
 
     /**

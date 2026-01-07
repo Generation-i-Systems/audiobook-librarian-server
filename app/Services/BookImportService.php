@@ -2299,8 +2299,13 @@ class BookImportService
     /**
      * Display enriched metadata (AI + external data) for review
      */
-    public function displayEnrichedMetadata(array $metadata): array
-    {
+    public function displayEnrichedMetadata(
+        array $metadata,
+        ?callable $tableCallback = null,
+        ?callable $handleCoverSelectionCallback = null,
+        ?callable $displayCoverImageCallback = null,
+        ?callable $isInteractiveCallback = null
+    ): array {
         $arrayToString = function ($value) {
             if (is_array($value)) {
                 $filtered = array_filter($value, function ($v) {
@@ -2364,6 +2369,21 @@ class BookImportService
                 $source = 'Google Books';
             }
             $tableData[] = ['Cover Source', $source];
+        }
+
+        // Display table if callback provided
+        if ($tableCallback) {
+            $tableCallback(['Field', 'Value'], $tableData);
+        }
+
+        // Handle cover selection if callback provided
+        if ($handleCoverSelectionCallback) {
+            $handleCoverSelectionCallback($metadata);
+        }
+
+        // Display cover image if callback provided
+        if ($displayCoverImageCallback && !empty($metadata['cover_url'])) {
+            $displayCoverImageCallback($metadata['cover_url']);
         }
 
         return $tableData;
