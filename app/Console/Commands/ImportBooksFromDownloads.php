@@ -3716,8 +3716,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function getDataSource(): string
     {
-        $model = $this->option('model');
-        return $this->getImportService()->getDataSource($model);
+        return $this->getImportService()->getDataSource($this->option('model') ?? 'gpt-4');
     }
 
     protected function calculateAudioInfo(array $audioFiles): array
