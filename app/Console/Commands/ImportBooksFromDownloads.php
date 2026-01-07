@@ -975,14 +975,6 @@ class ImportBooksFromDownloads extends Command
     }
 
     /**
-     * Find existing book in database (returns Book model instead of boolean)
-     */
-    protected function findExistingBook(string $path, array $metadata = []): ?Book
-    {
-        return $this->getImportService()->findExistingBook($path, $metadata);
-    }
-
-    /**
      * Process a single audiobook with AI and external enrichment
      */
     protected function processAudiobook(array $audiobook): void
