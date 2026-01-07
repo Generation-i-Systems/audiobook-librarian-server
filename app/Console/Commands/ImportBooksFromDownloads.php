@@ -1341,12 +1341,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function analyzeFileTypes(array $files): array
     {
-        $types = [];
-        foreach ($files as $file) {
-            $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-            $types[$ext] = ($types[$ext] ?? 0) + 1;
-        }
-        return $types;
+        return $this->getImportService()->analyzeFileTypes($files);
     }
 
     protected function analyzeDirectoryName(string $directoryName): array

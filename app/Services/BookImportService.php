@@ -2529,6 +2529,19 @@ class BookImportService
     }
 
     /**
+     * Analyze file types
+     */
+    public function analyzeFileTypes(array $files): array
+    {
+        $types = [];
+        foreach ($files as $file) {
+            $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+            $types[$ext] = ($types[$ext] ?? 0) + 1;
+        }
+        return $types;
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void
