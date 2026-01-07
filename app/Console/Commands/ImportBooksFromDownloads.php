@@ -879,26 +879,6 @@ class ImportBooksFromDownloads extends Command
         return $this->getImportService()->hasCdDirectories($path);
     }
 
-    protected function getDirectorySize(string $path): int
-    {
-        return $this->getImportService()->getDirectorySize($path);
-    }
-
-    protected function findPotentialDuplicates(string $path): array
-    {
-        return $this->getImportService()->findPotentialDuplicates($path);
-    }
-
-    protected function findSimilarBooks(array $audiobook): array
-    {
-        return $this->getImportService()->findSimilarBooks($audiobook);
-    }
-
-    protected function findDuplicatePaths(string $path): array
-    {
-        return $this->getImportService()->findDuplicatePaths($path);
-    }
-
     /**
      * Group CD directories under their parent directory to treat multi-disc books as single audiobooks
      */
