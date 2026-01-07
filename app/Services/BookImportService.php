@@ -2542,6 +2542,18 @@ class BookImportService
     }
 
     /**
+     * Format file types for display
+     */
+    public function formatFileTypes(array $fileTypes): string
+    {
+        $formatted = [];
+        foreach ($fileTypes as $ext => $count) {
+            $formatted[] = "{$ext}({$count})";
+        }
+        return implode(', ', $formatted);
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void
@@ -3451,23 +3463,6 @@ class BookImportService
         }
 
         return null;
-    }
-
-    /**
-     * Format file types for display
-     */
-    public function formatFileTypes(array $fileTypes): string
-    {
-        if (empty($fileTypes)) {
-            return 'None';
-        }
-
-        $formatted = [];
-        foreach ($fileTypes as $type => $count) {
-            $formatted[] = "{$count} {$type}";
-        }
-
-        return implode(', ', $formatted);
     }
 
     /**
