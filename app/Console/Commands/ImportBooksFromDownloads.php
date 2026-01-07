@@ -121,29 +121,11 @@ class ImportBooksFromDownloads extends Command
     protected function handleLowConfidenceMetadata(array $audiobook, ?array &$aiMetadata): bool
     {
         $minConfidence = (int) $this->option('min-confidence');
-        $hasCriticalTagMetadata = $this->hasCriticalTagMetadata($this->extractTagMetadataFromAudiobook($audiobook));
+        $hasCriticalTagMetadata = $this->getImportService()->hasCriticalTagMetadata(
+            $this->getImportService()->extractTagMetadataFromAudiobook($audiobook, $this->aiProcessor)
+        );
 
         return $this->getImportService()->handleLowConfidenceMetadata($audiobook, $aiMetadata, $minConfidence, $hasCriticalTagMetadata);
-    }
-
-    protected function extractTagMetadataFromAudiobook(array $audiobook): array
-    {
-        return $this->getImportService()->extractTagMetadataFromAudiobook($audiobook, $this->aiProcessor);
-    }
-
-    protected function hasCriticalTagMetadata(array $tagMetadata): bool
-    {
-        return $this->getImportService()->hasCriticalTagMetadata($tagMetadata);
-    }
-
-    protected function hasCover(array $metadata): bool
-    {
-        return $this->getImportService()->hasCover($metadata);
-    }
-
-    protected function hasCriticalMetadata(array $metadata): bool
-    {
-        return $this->getImportService()->hasCriticalMetadata($metadata);
     }
 
 
