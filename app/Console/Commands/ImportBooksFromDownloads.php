@@ -556,65 +556,10 @@ class ImportBooksFromDownloads extends Command
      */
     protected function scanForAudiobooks(array $directories): array
     {
-        $audiobooks = [];
-        $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
+        $audiobooks = $this->getImportService()->scanForAudiobooks($directories, fn ($path) => $this->isAlreadyImported($path));
 
         foreach ($directories as $directory) {
             $this->info("🔍 Scanning: {$directory}");
-
-            // Get all subdirectories and files
-            $iterator = new \RecursiveIteratorIterator(
-                new \RecursiveDirectoryIterator($directory, \RecursiveDirectoryIterator::SKIP_DOTS),
-                \RecursiveIteratorIterator::SELF_FIRST
-            );
-
-            $potentialBooks = [];
-
-            foreach ($iterator as $file) {
-                if ($file->isFile()) {
-                    $extension = strtolower($file->getExtension());
-                    if (in_array($extension, $audioExtensions)) {
-                        $bookDir = $file->getPath();
-                        if (!isset($potentialBooks[$bookDir])) {
-                            $potentialBooks[$bookDir] = [
-                                'path' => $bookDir,
-                                'name' => basename($bookDir),
-                                'files' => [],
-                                'total_size' => 0,
-                            ];
-                        }
-                        $potentialBooks[$bookDir]['files'][] = $file->getPathname();
-                        $potentialBooks[$bookDir]['total_size'] += $file->getSize();
-                    }
-                }
-            }
-
-            // Group CD directories under their parent before filtering
-            $potentialBooks = $this->groupCdDirectories($potentialBooks);
-
-            // Filter out directories with too few files or too small size
-            foreach ($potentialBooks as $bookData) {
-                if (count($bookData['files']) >= 1 && $bookData['total_size'] > 10 * 1024 * 1024) { // At least 10MB
-                    // Skip if this is one of the parent scan directories
-                    if (in_array($bookData['path'], $directories)) {
-                        $this->skippedBooks[] = [
-                            'path' => $bookData['path'],
-                            'reason' => 'Parent scan directory - contains subdirectories',
-                        ];
-                        continue;
-                    }
-
-                    // Check if already imported
-                    if (!$this->isAlreadyImported($bookData['path'])) {
-                        $audiobooks[] = $bookData;
-                    } else {
-                        $this->skippedBooks[] = [
-                            'path' => $bookData['path'],
-                            'reason' => 'Already imported',
-                        ];
-                    }
-                }
-            }
         }
 
         return $audiobooks;

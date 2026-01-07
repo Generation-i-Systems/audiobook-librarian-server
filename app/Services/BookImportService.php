@@ -2965,6 +2965,59 @@ class BookImportService
     }
 
     /**
+     * Scan directories for audiobook folders/files
+     */
+    public function scanForAudiobooks(array $directories, callable $isAlreadyImportedCallback = null): array
+    {
+        $audiobooks = [];
+        $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
+
+        foreach ($directories as $directory) {
+            $iterator = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($directory, \RecursiveDirectoryIterator::SKIP_DOTS),
+                \RecursiveIteratorIterator::SELF_FIRST
+            );
+
+            $potentialBooks = [];
+
+            foreach ($iterator as $file) {
+                if ($file->isFile()) {
+                    $extension = strtolower($file->getExtension());
+                    if (in_array($extension, $audioExtensions)) {
+                        $bookDir = $file->getPath();
+                        if (!isset($potentialBooks[$bookDir])) {
+                            $potentialBooks[$bookDir] = [
+                                'path' => $bookDir,
+                                'name' => basename($bookDir),
+                                'files' => [],
+                                'total_size' => 0,
+                            ];
+                        }
+                        $potentialBooks[$bookDir]['files'][] = $file->getPathname();
+                        $potentialBooks[$bookDir]['total_size'] += $file->getSize();
+                    }
+                }
+            }
+
+            $potentialBooks = $this->groupCdDirectories($potentialBooks);
+
+            foreach ($potentialBooks as $bookData) {
+                if (count($bookData['files']) >= 1 && $bookData['total_size'] > 10 * 1024 * 1024) {
+                    if (in_array($bookData['path'], $directories)) {
+                        continue;
+                    }
+
+                    if (!$isAlreadyImportedCallback || !$isAlreadyImportedCallback($bookData['path'])) {
+                        $audiobooks[] = $bookData;
+                    }
+                }
+            }
+        }
+
+        return $audiobooks;
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void
