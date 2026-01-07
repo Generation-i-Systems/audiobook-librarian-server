@@ -555,10 +555,12 @@ class ImportBooksFromDownloads extends Command
      */
     protected function startQueuedTasks(): void
     {
-        while ($this->runningTaskCount < $this->maxConcurrentTasks && !empty($this->taskQueue)) {
-            $nextTask = array_shift($this->taskQueue);
-            $this->startBackgroundTask($nextTask);
-        }
+        $this->getImportService()->startQueuedTasks(
+            $this->taskQueue,
+            $this->runningTaskCount,
+            $this->maxConcurrentTasks,
+            fn ($task) => $this->startBackgroundTask($task)
+        );
     }
 
     /**

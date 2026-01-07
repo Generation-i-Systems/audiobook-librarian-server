@@ -5144,6 +5144,22 @@ class BookImportService
     }
 
     /**
+     * Start queued tasks if we have capacity
+     */
+    public function startQueuedTasks(
+        array $taskQueue,
+        int $runningTaskCount,
+        int $maxConcurrentTasks,
+        callable $startBackgroundTaskCallback
+    ): void {
+        while ($runningTaskCount < $maxConcurrentTasks && !empty($taskQueue)) {
+            $nextTask = array_shift($taskQueue);
+            $startBackgroundTaskCallback($nextTask);
+            $runningTaskCount++;
+        }
+    }
+
+    /**
      * Queue a background task with priority
      */
     public function queueBackgroundTask(string $type, array $data, array &$taskQueue, string $priority = 'normal'): void
