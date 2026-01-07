@@ -1999,11 +1999,10 @@ class ImportBooksFromDownloads extends Command
      */
     protected function extractNfoData(string $directoryPath): ?array
     {
-        $nfoData = $this->getImportService()->extractNfoData($directoryPath);
-        if (!empty($nfoData)) {
-            $this->info("📄 Found .nfo file with metadata");
-        }
-        return $nfoData;
+        return $this->getImportService()->extractNfoData(
+            $directoryPath,
+            fn ($message) => $this->info($message)
+        );
     }
 
     protected function parseXmlNfo(string $content): array

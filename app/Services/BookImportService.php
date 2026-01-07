@@ -2010,7 +2010,7 @@ class BookImportService
     /**
      * Extract metadata from .nfo files if present
      */
-    public function extractNfoData(string $directoryPath): ?array
+    public function extractNfoData(string $directoryPath, ?callable $infoCallback = null): ?array
     {
         $nfoFiles = glob($directoryPath . '/*.nfo');
         if (empty($nfoFiles)) {
@@ -2030,6 +2030,10 @@ class BookImportService
             $nfoData = $this->parseXmlNfo($nfoContent);
         } else {
             $nfoData = $this->parsePlainTextNfo($nfoContent);
+        }
+
+        if (!empty($nfoData) && $infoCallback) {
+            $infoCallback("📄 Found .nfo file with metadata");
         }
 
         return $nfoData ?: null;
