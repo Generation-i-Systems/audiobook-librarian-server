@@ -4562,9 +4562,28 @@ class BookImportService
     /**
      * Display processing summary
      */
-    public function displaySummary(int $totalFound, array $processedBooks, array $failedBooks, array $skippedBooks, callable $infoCallback, callable $warnCallback, callable $lineCallback, callable $getTotalCostCallback): void
-    {
-        $infoCallback('📊 Import Summary:');
+    public function displaySummary(
+        int $totalFound,
+        array $processedBooks,
+        array $failedBooks,
+        array $skippedBooks,
+        callable $infoCallback,
+        callable $warnCallback,
+        callable $lineCallback,
+        callable $getTotalCostCallback,
+        ?callable $tableCallback = null
+    ): void {
+        if ($tableCallback) {
+            $tableCallback(
+                ['Metric', 'Count'],
+                [
+                    ['Total Found', $totalFound],
+                    ['Successfully Imported', count($processedBooks)],
+                    ['Failed', count($failedBooks)],
+                    ['Skipped', count($skippedBooks)],
+                ]
+            );
+        }
 
         if (!empty($processedBooks)) {
             $infoCallback('✅ Successfully Imported:');

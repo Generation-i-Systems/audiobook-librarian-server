@@ -1982,17 +1982,6 @@ class ImportBooksFromDownloads extends Command
      */
     protected function displaySummary(): void
     {
-        $this->info('📊 Import Summary:');
-        $this->table(
-            ['Metric', 'Count'],
-            [
-                ['Total Found', $this->totalFound],
-                ['Successfully Imported', count($this->processedBooks)],
-                ['Failed', count($this->failedBooks)],
-                ['Skipped', count($this->skippedBooks)],
-            ]
-        );
-
         $this->getImportService()->displaySummary(
             $this->totalFound,
             $this->processedBooks,
@@ -2001,7 +1990,8 @@ class ImportBooksFromDownloads extends Command
             fn ($message) => $this->info($message),
             fn ($message) => $this->warn($message),
             fn ($message) => $this->line($message),
-            fn () => $this->aiProcessor->getTotalCost()
+            fn () => $this->aiProcessor->getTotalCost(),
+            fn ($headers, $rows) => $this->table($headers, $rows)
         );
     }
 
