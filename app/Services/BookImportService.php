@@ -766,10 +766,34 @@ class BookImportService
     }
 
     /**
-     * Move files to library
+     * Move files to library after successful import
      */
-    public function moveFilesToLibrary(array $audiobook, Book $book, array $options = [], ?callable $warnCallback = null): bool
-    {
+    public function moveFilesToLibrary(
+        array $audiobook,
+        Book $book,
+        callable $warnCallback,
+        ?callable $getBookStoragePathCallback = null,
+        ?callable $getCopyFilesOptionCallback = null
+    ): bool {
+        $bookStoragePath = $getBookStoragePathCallback ? $getBookStoragePathCallback() : config('app.book_root', '/media/lyra_data1/audiobooks/books');
+        $copyFiles = $getCopyFilesOptionCallback ? $getCopyFilesOptionCallback() : false;
+        $options = [
+            'storage_path' => $bookStoragePath,
+            'operation' => $copyFiles ? 'copy' : 'move',
+        ];
+
+        return $this->moveFilesToLibraryInternal($audiobook, $book, $options, $warnCallback);
+    }
+
+    /**
+     * Internal method to move files to library
+     */
+    protected function moveFilesToLibraryInternal(
+        array $audiobook,
+        Book $book,
+        array $options,
+        callable $warnCallback
+    ): bool {
         try {
             $bookStoragePath = $options['storage_path'] ?? rtrim(
                 config('app.book_root', '/media/lyra_data1/audiobooks/books'),
