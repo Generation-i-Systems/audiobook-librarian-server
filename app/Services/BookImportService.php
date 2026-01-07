@@ -4463,6 +4463,54 @@ class BookImportService
     }
 
     /**
+     * Display image using Kitty graphics protocol or kitten icat
+     */
+    public function displayKittyImage(string $imageData, callable $lineCallback, callable $systemCallback): void
+    {
+        $tempFile = tempnam(sys_get_temp_dir(), 'cover_') . '.png';
+
+        try {
+            $tempOriginal = tempnam(sys_get_temp_dir(), 'orig_') . '.jpg';
+            file_put_contents($tempOriginal, $imageData);
+
+            $imageInfo = getimagesize($tempOriginal);
+            if (!$imageInfo) {
+                $lineCallback("  (Could not read image dimensions)");
+                return;
+            }
+            $width = $imageInfo[0];
+            $height = $imageInfo[1];
+
+            $maxWidth = 200;
+            $scale = min($maxWidth / $width, $maxWidth / $height);
+            $thumbWidth = (int) ($width * $scale);
+            $thumbHeight = (int) ($height * $scale);
+
+            $thumb = $this->createThumbnail($tempOriginal, $thumbWidth, $thumbHeight);
+            if ($thumb) {
+                imagepng($thumb, $tempFile);
+                imagedestroy($thumb);
+
+                if (file_exists('/usr/bin/kitten') && is_executable('/usr/bin/kitten')) {
+                    $systemCallback("kitten icat --align=left '$tempFile' 2>/dev/null");
+                } else {
+                    $base64Image = base64_encode(file_get_contents($tempFile));
+                    fwrite(STDOUT, "\033_Ga=T,f=100;{$base64Image}\033\\");
+                    echo "\n";
+                }
+            } else {
+                $lineCallback("  (Could not create thumbnail)");
+            }
+
+            @unlink($tempOriginal);
+        } catch (\Exception $e) {
+            $lineCallback("  (Image display error: " . $e->getMessage() . ")");
+        } finally {
+            @unlink($tempFile);
+        }
+    }
+
+    /**
      * Display available cover options
      */
     public function displayCoverOptions(array $coverOptions, callable $displayCoverImageCallback): void

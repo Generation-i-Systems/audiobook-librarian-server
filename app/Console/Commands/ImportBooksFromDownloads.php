@@ -1880,54 +1880,11 @@ class ImportBooksFromDownloads extends Command
      */
     protected function displayKittyImage(string $imageData): void
     {
-        // Create temporary file for thumbnail
-        $tempFile = tempnam(sys_get_temp_dir(), 'cover_') . '.png';
-
-        try {
-            // Get image info from original data
-            $tempOriginal = tempnam(sys_get_temp_dir(), 'orig_') . '.jpg';
-            file_put_contents($tempOriginal, $imageData);
-
-            $imageInfo = getimagesize($tempOriginal);
-            if (!$imageInfo) {
-                $this->line("  (Could not read image dimensions)");
-                return;
-            }
-            $width = $imageInfo[0];
-            $height = $imageInfo[1];
-
-            // Calculate thumbnail size (max 200px wide, maintain aspect ratio)
-            $maxWidth = 200;
-            $scale = min($maxWidth / $width, $maxWidth / $height);
-            $thumbWidth = (int) ($width * $scale);
-            $thumbHeight = (int) ($height * $scale);
-
-            // Create thumbnail
-            $thumb = $this->createThumbnail($tempOriginal, $thumbWidth, $thumbHeight);
-            if ($thumb) {
-                // Save thumbnail as PNG
-                imagepng($thumb, $tempFile);
-                imagedestroy($thumb);
-
-                // Use kitten icat directly since it works
-                if (file_exists('/usr/bin/kitten') && is_executable('/usr/bin/kitten')) {
-                    system("kitten icat --align=left '$tempFile' 2>/dev/null");
-                } else {
-                    // Fallback to protocol if kitten not available
-                    $base64Image = base64_encode(file_get_contents($tempFile));
-                    fwrite(STDOUT, "\033_Ga=T,f=100;{$base64Image}\033\\");
-                    echo "\n";
-                }
-            } else {
-                $this->line("  (Could not create thumbnail)");
-            }
-
-            @unlink($tempOriginal);
-        } catch (\Exception $e) {
-            $this->line("  (Image display error: " . $e->getMessage() . ")");
-        } finally {
-            @unlink($tempFile);
-        }
+        $this->getImportService()->displayKittyImage(
+            $imageData,
+            fn ($message) => $this->line($message),
+            fn ($command) => system($command)
+        );
     }
 
     /**
