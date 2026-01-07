@@ -2163,26 +2163,13 @@ class ImportBooksFromDownloads extends Command
      */
     protected function displayDirectoryComparison(array $comparison): void
     {
-        $this->line("🔍 Debug: displayDirectoryComparison called");
-        $this->line("🔍 Debug: Comparison keys: " . implode(', ', array_keys($comparison)));
-
-        $this->line("");
-        $this->line("📁 Directory Comparison:");
-        $this->line("   Source:  " . ($comparison['source_path'] ?? 'N/A'));
-        $this->line("   Target:  " . ($comparison['target_path'] ?? 'N/A'));
-        $this->line("");
-
-        $tableData = $this->getImportService()->displayDirectoryComparison(
+        $this->getImportService()->displayDirectoryComparison(
             $comparison,
             fn ($bytes) => $this->formatBytes($bytes),
-            fn ($fileTypes) => $this->formatFileTypes($fileTypes)
+            fn ($fileTypes) => $this->formatFileTypes($fileTypes),
+            fn ($message) => $this->line($message),
+            fn ($headers, $rows) => $this->table($headers, $rows)
         );
-
-        if ($tableData) {
-            $this->table($tableData[0], array_slice($tableData, 1));
-        } else {
-            $this->line("❌ Missing source or target data in comparison");
-        }
     }
 
     /**

@@ -3204,10 +3204,25 @@ class BookImportService
     /**
      * Display directory comparison information
      */
-    public function displayDirectoryComparison(array $comparison, callable $formatBytesCallback, callable $formatFileTypesCallback): ?array
-    {
+    public function displayDirectoryComparison(
+        array $comparison,
+        callable $formatBytesCallback,
+        callable $formatFileTypesCallback,
+        ?callable $lineCallback = null,
+        ?callable $tableCallback = null
+    ): ?array {
+        if ($lineCallback) {
+            $lineCallback("🔍 Debug: displayDirectoryComparison called");
+            $lineCallback("🔍 Debug: Comparison keys: " . implode(', ', array_keys($comparison)));
+            $lineCallback("");
+            $lineCallback("📁 Directory Comparison:");
+            $lineCallback("   Source:  " . ($comparison['source_path'] ?? 'N/A'));
+            $lineCallback("   Target:  " . ($comparison['target_path'] ?? 'N/A'));
+            $lineCallback("");
+        }
+
         if (isset($comparison['source']) && isset($comparison['target'])) {
-            return [
+            $tableData = [
                 [
                     'Location',
                     'Files',
@@ -3227,6 +3242,16 @@ class BookImportService
                     $formatFileTypesCallback($comparison['target']['file_types'] ?? []),
                 ],
             ];
+
+            if ($tableCallback) {
+                $tableCallback($tableData[0], array_slice($tableData, 1));
+            }
+
+            return $tableData;
+        }
+
+        if ($lineCallback) {
+            $lineCallback("❌ Missing source or target data in comparison");
         }
 
         return null;
