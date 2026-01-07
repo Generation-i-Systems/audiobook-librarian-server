@@ -3257,6 +3257,32 @@ class BookImportService
     }
 
     /**
+     * Process a single book (used for both regular books and split multi-books)
+     */
+    public function processSingleBook(array $audiobook, array $metadata, callable $enrichWithExternalDataCallback, callable $isValidEnrichmentCallback, callable $generateDirectoryPathCallback, callable $createBookFromMetadataCallback, callable $moveFilesToLibraryCallback, callable $getFileOperationCallback): ?Book
+    {
+        $enrichedData = $enrichWithExternalDataCallback($metadata);
+        if ($enrichedData) {
+            if ($isValidEnrichmentCallback($metadata, $enrichedData)) {
+                $metadata = array_merge($metadata, $enrichedData);
+            }
+        }
+
+        $metadata['source_path'] = $audiobook['path'];
+        $expectedPath = $generateDirectoryPathCallback($metadata);
+
+        $book = $createBookFromMetadataCallback($metadata, $audiobook);
+
+        if ($book) {
+            $moveFilesToLibraryCallback($audiobook, $book, [
+                'operation' => $getFileOperationCallback(),
+            ]);
+        }
+
+        return $book;
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void

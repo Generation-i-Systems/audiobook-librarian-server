@@ -2303,28 +2303,16 @@ class ImportBooksFromDownloads extends Command
      */
     protected function processSingleBook(array $audiobook, array $metadata): void
     {
-        // Continue with enrichment and import process
         if (!$this->option('skip-enrichment')) {
             $this->info("🔍 Enriching with external data...");
-            $enrichedData = $this->enrichWithExternalData($metadata);
-            if ($enrichedData) {
-                if ($this->getEnrichmentService()->isValidEnrichment($metadata, $enrichedData)) {
-                    $metadata = array_merge($metadata, $enrichedData);
-                    $this->info("✅ External data enrichment completed");
-                } else {
-                    $this->warn("⚠️  Invalid enrichment data - skipping merge.");
-                }
-            }
         }
 
-        // Show expected directory path
-        $metadata['source_path'] = $audiobook['path']; // Add source path for GraphicAudio detection
+        $metadata['source_path'] = $audiobook['path'];
         $expectedPath = $this->getImportService()->generateDirectoryPath($metadata);
         $this->info("📁 Expected directory path: {$expectedPath}");
 
         $this->displayEnrichedMetadata($metadata);
 
-        // Manual review (unless in auto mode)
         if (!$this->option('auto') && !$this->option('dry-run')) {
             if (!$this->reviewAndApprove($metadata)) {
                 $this->warn("❌ Import rejected by user");
@@ -2335,7 +2323,6 @@ class ImportBooksFromDownloads extends Command
                 return;
             }
         } elseif ($this->option('auto') && !$this->hasEnrichmentData($metadata)) {
-            // In auto mode, skip books with no enrichment data
             $this->warn("⚠️  No enrichment data found in auto mode - skipping (detected fields might be incorrect)");
             $this->skippedBooks[] = [
                 'path' => $audiobook['path'],
@@ -2344,21 +2331,24 @@ class ImportBooksFromDownloads extends Command
             return;
         }
 
-        // Import to database
         if (!$this->option('dry-run')) {
             if ($this->uiService) {
                 $this->uiService->logMessage('💾 Creating database record...');
             }
 
-            $book = $this->getImportService()->createBookFromMetadata($metadata, $audiobook);
+            $book = $this->getImportService()->processSingleBook(
+                $audiobook,
+                $metadata,
+                fn ($metadata) => $this->enrichWithExternalData($metadata),
+                fn ($metadata, $enrichedData) => $this->getEnrichmentService()->isValidEnrichment($metadata, $enrichedData),
+                fn ($metadata) => $this->getImportService()->generateDirectoryPath($metadata),
+                fn ($metadata, $audiobook) => $this->getImportService()->createBookFromMetadata($metadata, $audiobook),
+                fn ($audiobook, $book, $options) => $this->getImportService()->moveFilesToLibrary($audiobook, $book, $options),
+                fn () => $this->getFileOperation()
+            );
 
             if ($book) {
                 $this->info("✅ Book imported successfully: {$book->title} (ID: {$book->id})");
-
-                // Move/copy files
-                $this->getImportService()->moveFilesToLibrary($audiobook, $book, [
-                    'operation' => $this->getFileOperation(),
-                ]);
 
                 $this->processedBooks[] = [
                     'path' => $audiobook['path'],
