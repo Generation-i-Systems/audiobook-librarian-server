@@ -2490,6 +2490,55 @@ class BookImportService
     }
 
     /**
+     * Display cache statistics
+     */
+    public function displayCacheStatistics(
+        array $backgroundCache,
+        array $backgroundTasks,
+        callable $infoCallback,
+        callable $lineCallback,
+        callable $formatBytesCallback
+    ): void {
+        $totalEntries = count($backgroundCache);
+
+        if ($totalEntries === 0) {
+            $infoCallback("💾 Cache: empty");
+            return;
+        }
+
+        $taskTypes = [];
+        $totalSize = 0;
+        $cacheHits = 0;
+
+        foreach ($backgroundCache as $entry) {
+            $taskType = $entry['task_type'] ?? 'unknown';
+            $taskTypes[$taskType] = ($taskTypes[$taskType] ?? 0) + 1;
+            $totalSize += strlen(json_encode($entry));
+        }
+
+        // Count cache hits from this session
+        foreach ($backgroundTasks as $task) {
+            if (isset($task['result']['from_cache']) && $task['result']['from_cache']) {
+                $cacheHits++;
+            }
+        }
+
+        $infoCallback("💾 Cache: {$totalEntries} entries, " . $formatBytesCallback($totalSize) . " size");
+
+        if ($cacheHits > 0) {
+            $infoCallback("🎯 Cache hits this session: {$cacheHits}");
+        }
+
+        if (!empty($taskTypes)) {
+            $typesList = [];
+            foreach ($taskTypes as $type => $count) {
+                $typesList[] = "{$type}({$count})";
+            }
+            $lineCallback("   Types: " . implode(', ', $typesList));
+        }
+    }
+
+    /**
      * Format bytes to human-readable format
      */
     public function formatBytes(int $bytes, int $precision = 2): string

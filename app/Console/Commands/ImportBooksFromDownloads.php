@@ -1141,43 +1141,13 @@ class ImportBooksFromDownloads extends Command
      */
     protected function displayCacheStatistics(): void
     {
-        $totalEntries = count($this->backgroundCache);
-
-        if ($totalEntries === 0) {
-            $this->info("💾 Cache: empty");
-            return;
-        }
-
-        $taskTypes = [];
-        $totalSize = 0;
-        $cacheHits = 0;
-
-        foreach ($this->backgroundCache as $entry) {
-            $taskType = $entry['task_type'] ?? 'unknown';
-            $taskTypes[$taskType] = ($taskTypes[$taskType] ?? 0) + 1;
-            $totalSize += strlen(json_encode($entry));
-        }
-
-        // Count cache hits from this session
-        foreach ($this->backgroundTasks as $task) {
-            if (isset($task['result']['from_cache']) && $task['result']['from_cache']) {
-                $cacheHits++;
-            }
-        }
-
-        $this->info("💾 Cache: {$totalEntries} entries, " . $this->formatBytes($totalSize) . " size");
-
-        if ($cacheHits > 0) {
-            $this->info("🎯 Cache hits this session: {$cacheHits}");
-        }
-
-        if (!empty($taskTypes)) {
-            $typesList = [];
-            foreach ($taskTypes as $type => $count) {
-                $typesList[] = "{$type}({$count})";
-            }
-            $this->line("   Types: " . implode(', ', $typesList));
-        }
+        $this->getImportService()->displayCacheStatistics(
+            $this->backgroundCache,
+            $this->backgroundTasks,
+            fn ($message) => $this->info($message),
+            fn ($message) => $this->line($message),
+            fn ($bytes) => $this->formatBytes($bytes)
+        );
     }
 
     /**
