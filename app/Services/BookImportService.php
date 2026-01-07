@@ -2929,6 +2929,42 @@ class BookImportService
     }
 
     /**
+     * Process a single directory as an audiobook
+     */
+    public function processAudiobookDirectory(string $directory): ?array
+    {
+        $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
+        $files = [];
+        $totalSize = 0;
+
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($directory, \RecursiveDirectoryIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::LEAVES_ONLY
+        );
+
+        foreach ($iterator as $file) {
+            if ($file->isFile()) {
+                $extension = strtolower($file->getExtension());
+                if (in_array($extension, $audioExtensions)) {
+                    $files[] = $file->getPathname();
+                    $totalSize += $file->getSize();
+                }
+            }
+        }
+
+        if (count($files) >= 1 && $totalSize > 10 * 1024 * 1024) {
+            return [
+                'path' => $directory,
+                'name' => basename($directory),
+                'files' => $files,
+                'total_size' => $totalSize,
+            ];
+        }
+
+        return null;
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void
