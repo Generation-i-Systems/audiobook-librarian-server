@@ -4256,60 +4256,8 @@ class ImportBooksFromDownloads extends Command
      */
     protected function moveFilesToNarratorDirectory(array $audiobook, string $targetDir, Book $book): void
     {
-        // Create the target directory
-        File::makeDirectory($targetDir, 0755, true);
-
-        // Flatten CD subdirectories before moving files
-        $this->flattenCdDirectories($audiobook['path']);
-
-        // Move files similar to the main moveFilesToLibrary method
         $copyFiles = $this->option('copy-files');
-        $allFiles = File::allFiles($audiobook['path']);
-        $filesToMove = array_map(function ($file) {
-            return $file->getPathname();
-        }, $allFiles);
-
-        foreach ($filesToMove as $sourceFilePath) {
-            $filename = basename($sourceFilePath);
-
-            // Skip torrent/piracy tracking files
-            if ($this->isTorrentTrackingFile($filename)) {
-                File::delete($sourceFilePath);
-                continue;
-            }
-
-            $relativePath = str_replace($audiobook['path'] . '/', '', $sourceFilePath);
-            $targetFile = $targetDir . '/' . $relativePath;
-
-            // Create subdirectories if needed
-            $targetFileDir = dirname($targetFile);
-            if (!File::isDirectory($targetFileDir)) {
-                File::makeDirectory($targetFileDir, 0755, true);
-            }
-
-            // Move or copy the file with error handling
-            try {
-                if ($copyFiles) {
-                    if (!File::copy($sourceFilePath, $targetFile)) {
-                        $this->warn("❌ Failed to copy: {$filename}");
-                        continue;
-                    }
-                } else {
-                    if (!File::move($sourceFilePath, $targetFile)) {
-                        $this->warn("❌ Failed to move: {$filename}");
-                        continue;
-                    }
-                }
-            } catch (\Exception $e) {
-                $this->warn("❌ Error processing {$filename}: " . $e->getMessage());
-                continue;
-            }
-        }
-
-        // Clean up source directory if not copying
-        if (!$copyFiles) {
-            $this->cleanupSourceDirectory($audiobook, false);
-        }
+        $this->getImportService()->moveFilesToNarratorDirectory($audiobook, $targetDir, $copyFiles);
     }
 
     /**

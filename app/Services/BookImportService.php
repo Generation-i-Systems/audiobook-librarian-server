@@ -1900,6 +1900,52 @@ class BookImportService
     }
 
     /**
+     * Move files to narrator-named directory
+     */
+    public function moveFilesToNarratorDirectory(array $audiobook, string $targetDir, bool $copyFiles = false): void
+    {
+        File::makeDirectory($targetDir, 0755, true);
+
+        $this->flattenCdDirectories($audiobook['path']);
+
+        $allFiles = File::allFiles($audiobook['path']);
+        $filesToMove = array_map(function ($file) {
+            return $file->getPathname();
+        }, $allFiles);
+
+        foreach ($filesToMove as $sourceFilePath) {
+            $filename = basename($sourceFilePath);
+
+            if ($this->isTorrentTrackingFile($filename)) {
+                File::delete($sourceFilePath);
+                continue;
+            }
+
+            $relativePath = str_replace($audiobook['path'] . '/', '', $sourceFilePath);
+            $targetFile = $targetDir . '/' . $relativePath;
+
+            $targetFileDir = dirname($targetFile);
+            if (!File::isDirectory($targetFileDir)) {
+                File::makeDirectory($targetFileDir, 0755, true);
+            }
+
+            try {
+                if ($copyFiles) {
+                    File::copy($sourceFilePath, $targetFile);
+                } else {
+                    File::move($sourceFilePath, $targetFile);
+                }
+            } catch (\Exception $e) {
+                Log::warning("Error processing {$filename}: " . $e->getMessage());
+            }
+        }
+
+        if (!$copyFiles) {
+            $this->cleanupSourceDirectory($audiobook, false);
+        }
+    }
+
+    /**
      * Get duration of audio file in seconds
      */
     public function getAudioFileDuration(string $filePath): int
