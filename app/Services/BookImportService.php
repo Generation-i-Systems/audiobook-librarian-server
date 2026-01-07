@@ -3044,6 +3044,37 @@ class BookImportService
     }
 
     /**
+     * Get directories to scan for audiobooks
+     */
+    public function getDirectoriesToScan(array $customDirs = [], ?callable $warnCallback = null): array
+    {
+        $directories = [];
+
+        // Check for custom directories
+        if (!empty($customDirs)) {
+            foreach ($customDirs as $dir) {
+                if (is_dir($dir) && is_readable($dir)) {
+                    $directories[] = $dir;
+                } else {
+                    if ($warnCallback) {
+                        $warnCallback("⚠️  Directory not accessible: {$dir}");
+                    }
+                }
+            }
+        } else {
+            // Use default directories
+            $defaultDirs = ['/media/download', '/media/download/audiobooks'];
+            foreach ($defaultDirs as $dir) {
+                if (is_dir($dir) && is_readable($dir)) {
+                    $directories[] = $dir;
+                }
+            }
+        }
+
+        return $directories;
+    }
+
+    /**
      * Scan directories for audiobook folders/files
      */
     public function scanForAudiobooks(array $directories, callable $isAlreadyImportedCallback = null, ?callable $infoCallback = null): array

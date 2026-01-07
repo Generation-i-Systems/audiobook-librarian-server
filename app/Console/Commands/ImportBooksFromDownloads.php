@@ -411,29 +411,11 @@ class ImportBooksFromDownloads extends Command
      */
     protected function getDirectoriesToScan(): array
     {
-        $directories = [];
-
-        // Check for custom directories
         $customDirs = $this->option('directory');
-        if (!empty($customDirs)) {
-            foreach ($customDirs as $dir) {
-                if (is_dir($dir) && is_readable($dir)) {
-                    $directories[] = $dir;
-                } else {
-                    $this->warn("⚠️  Directory not accessible: {$dir}");
-                }
-            }
-        } else {
-            // Use default directories
-            $defaultDirs = ['/media/download', '/media/download/audiobooks'];
-            foreach ($defaultDirs as $dir) {
-                if (is_dir($dir) && is_readable($dir)) {
-                    $directories[] = $dir;
-                }
-            }
-        }
-
-        return $directories;
+        return $this->getImportService()->getDirectoriesToScan(
+            $customDirs,
+            fn ($message) => $this->warn($message)
+        );
     }
 
     /**
