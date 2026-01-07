@@ -575,22 +575,24 @@ class LibraryRepairService
             $candidateRelative = trim(Str::after($candidate, $root), '/');
 
             if ($attemptFixes && !$this->directoryInUseByOtherBook($candidateRelative, $book->id)) {
-                $originalPath = $book->directory_path;
-                $book->directory_path = $candidateRelative;
-                $book->directory_exists = true;
-                $book->directory_last_checked = now();
-                $book->save();
+                // FIX: Move files from nested directory to parent directory instead of accepting nested directory
+                $this->moveFilesFromNestedToParent($candidate, $fullPath);
+
+                // Delete the empty nested directory
+                if (count(File::allFiles($candidate)) === 0) {
+                    File::deleteDirectory($candidate);
+                }
 
                 $issue = $this->createOrUpdateIssue(
                     $book,
                     LibraryRepairIssueType::NESTED_AUDIO,
-                    $candidateRelative,
+                    $relativePath,
                     [
-                        'original_path' => $originalPath,
-                        'updated_path' => $candidateRelative,
+                        'nested_path' => $candidateRelative,
+                        'action' => 'moved_files_to_parent',
                     ],
                     autoResolve: true,
-                    resolutionNotes: 'Updated directory_path to nested audio directory.'
+                    resolutionNotes: 'Moved files from nested directory to parent directory.'
                 );
 
                 if ($issue->auto_resolved) {
@@ -1007,6 +1009,41 @@ class LibraryRepairService
         }
 
         return $normalized;
+    }
+
+    private function moveFilesFromNestedToParent(string $nestedDir, string $parentDir): void
+    {
+        if (!File::isDirectory($nestedDir) || !File::isDirectory($parentDir)) {
+            return;
+        }
+
+        $files = File::allFiles($nestedDir);
+
+        foreach ($files as $file) {
+            $filename = $file->getFilename();
+            $targetPath = $parentDir . '/' . $filename;
+
+            // Handle file name conflicts
+            if (File::exists($targetPath)) {
+                $pathInfo = pathinfo($targetPath);
+                $counter = 1;
+                while (true) {
+                    $suffix = '_' . str_pad((string) $counter, 2, '0', STR_PAD_LEFT);
+                    $candidate = ($pathInfo['dirname'] ?? '') . '/' . ($pathInfo['filename'] ?? 'file') . $suffix;
+                    if (!empty($pathInfo['extension'])) {
+                        $candidate .= '.' . $pathInfo['extension'];
+                    }
+                    if (!File::exists($candidate)) {
+                        $targetPath = $candidate;
+                        break;
+                    }
+                    $counter++;
+                }
+            }
+
+            File::move($file->getPathname(), $targetPath);
+            chmod($targetPath, 0664);
+        }
     }
 
     /**
