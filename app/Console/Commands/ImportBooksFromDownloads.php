@@ -790,24 +790,15 @@ class ImportBooksFromDownloads extends Command
      */
     protected function askWithBackground(string $question, string $default = null, array $backgroundData = []): string
     {
-        // Start background processing if data provided
-        if (!empty($backgroundData)) {
-            foreach ($backgroundData as $task) {
-                $this->queueBackgroundTask($task['type'], $task['data'], 'high');
-            }
-        }
-
-        // Continuously process background tasks while waiting for user input
-        $this->startContinuousBackgroundProcessing();
-
-        $response = $this->askWithImmediateInterrupt($question, $default);
-
-        // Handle quit request or interruption
-        if (strtolower(trim($response)) === 'q' || $this->inputInterrupted) {
-            $this->handleUserQuit();
-        }
-
-        return $response;
+        return $this->getImportService()->askWithBackground(
+            $question,
+            $default,
+            $backgroundData,
+            fn ($type, $data, $priority) => $this->queueBackgroundTask($type, $data, $priority),
+            fn () => $this->startContinuousBackgroundProcessing(),
+            fn ($question, $default) => $this->askWithImmediateInterrupt($question, $default),
+            fn () => $this->handleUserQuit()
+        );
     }
 
     /**
@@ -815,16 +806,9 @@ class ImportBooksFromDownloads extends Command
      */
     protected function startContinuousBackgroundProcessing(): void
     {
-        // Process background tasks multiple times to ensure continuous operation
-        for ($i = 0; $i < 5; $i++) {
-            $this->processBackgroundTasks();
-
-            // Small delay to simulate processing time
-            usleep(50000); // 50ms
-        }
-
-        // Show final status
-        $this->showEnhancedBackgroundStatus();
+        $this->getImportService()->startContinuousBackgroundProcessing(
+            fn () => $this->processBackgroundTasks()
+        );
     }
 
     /**

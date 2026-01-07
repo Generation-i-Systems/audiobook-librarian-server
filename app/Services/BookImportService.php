@@ -4955,6 +4955,53 @@ class BookImportService
     }
 
     /**
+     * Start continuous background processing to maintain at least 3 running tasks
+     */
+    public function startContinuousBackgroundProcessing(
+        callable $processBackgroundTasksCallback
+    ): void {
+        // Process background tasks multiple times to ensure continuous operation
+        for ($i = 0; $i < 5; $i++) {
+            $processBackgroundTasksCallback();
+
+            // Small delay to simulate processing time
+            usleep(50000); // 50ms
+        }
+    }
+
+    /**
+     * Enhanced ask method with background processing and quit handling
+     */
+    public function askWithBackground(
+        string $question,
+        ?string $default,
+        array $backgroundData,
+        callable $queueBackgroundTaskCallback,
+        callable $startContinuousBackgroundProcessingCallback,
+        callable $askWithImmediateInterruptCallback,
+        callable $handleUserQuitCallback
+    ): string {
+        // Start background processing if data provided
+        if (!empty($backgroundData)) {
+            foreach ($backgroundData as $task) {
+                $queueBackgroundTaskCallback($task['type'], $task['data'], 'high');
+            }
+        }
+
+        // Continuously process background tasks while waiting for user input
+        $startContinuousBackgroundProcessingCallback();
+
+        $response = $askWithImmediateInterruptCallback($question, $default);
+
+        // Handle quit request or interruption
+        if (strtolower(trim($response)) === 'q') {
+            $handleUserQuitCallback();
+        }
+
+        return $response;
+    }
+
+    /**
      * Process pending background tasks (enhanced with concurrent task management)
      */
     public function processBackgroundTasks(
