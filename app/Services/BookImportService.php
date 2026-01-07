@@ -5144,6 +5144,17 @@ class BookImportService
     }
 
     /**
+     * Get result from background task if available
+     */
+    public function getBackgroundResult(array $backgroundTasks, string $taskId): ?array
+    {
+        if (isset($backgroundTasks[$taskId]) && $backgroundTasks[$taskId]['status'] === 'completed') {
+            return $backgroundTasks[$taskId]['result'];
+        }
+        return null;
+    }
+
+    /**
      * Start queued tasks if we have capacity
      */
     public function startQueuedTasks(

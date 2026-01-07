@@ -576,11 +576,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function getBackgroundResult(string $taskId): ?array
     {
-        if (isset($this->backgroundTasks[$taskId]) && $this->backgroundTasks[$taskId]['status'] === 'completed') {
-            return $this->backgroundTasks[$taskId]['result'];
-        }
-
-        return null;
+        return $this->getImportService()->getBackgroundResult($this->backgroundTasks, $taskId);
     }
 
     /**
