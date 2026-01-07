@@ -1034,36 +1034,6 @@ class ImportBooksFromDownloads extends Command
     }
 
     /**
-     * Process audiobook with AI
-     */
-    protected function processWithAI(array $audiobook): ?array
-    {
-        return $this->getImportService()->processWithAI($audiobook, $this->aiProcessor);
-    }
-
-    /**
-     * Process audiobook using audio analysis fallback when metadata extraction fails
-     */
-    protected function processWithAudioAnalysis(array $audiobook): ?array
-    {
-        return $this->getImportService()->processWithAudioAnalysis($audiobook, $this->aiProcessor);
-    }
-
-    protected function mergeMetadataFillMissing(array $base, array $fill): array
-    {
-        return $this->getImportService()->mergeMetadataFillMissing($base, $fill);
-    }
-
-
-    /**
-     * Post-process AI result to fix common issues with numbered series books
-     */
-    protected function postProcessAIResult(array $aiResult, array $audiobook): array
-    {
-        return $this->getImportService()->postProcessAIResult($aiResult, $audiobook);
-    }
-
-    /**
      * Display enriched metadata (AI + external data) for review
      */
     protected function displayEnrichedMetadata(array $metadata): void
