@@ -4712,26 +4712,9 @@ class ImportBooksFromDownloads extends Command
         ];
     }
 
-    /**
-     * Parse duration string (e.g., "1:23:45") to seconds
-     */
     protected function parseDurationString(string $duration): int
     {
-        $parts = explode(':', $duration);
-        $seconds = 0;
-
-        if (count($parts) === 3) {
-            // H:M:S format
-            $seconds = ($parts[0] * 3600) + ($parts[1] * 60) + $parts[2];
-        } elseif (count($parts) === 2) {
-            // M:S format
-            $seconds = ($parts[0] * 60) + $parts[1];
-        } else {
-            // Just seconds
-            $seconds = (int) $duration;
-        }
-
-        return (int) $seconds;
+        return $this->getImportService()->parseDurationString($duration);
     }
 
     /**
