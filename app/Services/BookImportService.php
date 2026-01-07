@@ -4511,6 +4511,46 @@ class BookImportService
     }
 
     /**
+     * Display cover image if terminal supports it
+     */
+    public function displayCoverImage(string $imageUrl, callable $lineCallback, callable $displayKittyImageCallback): void
+    {
+        $term = getenv('TERM_PROGRAM') ?: getenv('TERM');
+        $termEnv = getenv('TERM') ?? '';
+        $termProgram = getenv('TERM_PROGRAM') ?? '';
+
+        $kittySupport = $termEnv === 'xterm-kitty' ||
+            $termEnv === 'xterm-ghostty' ||
+            strpos($termEnv, 'kitty') !== false ||
+            $termProgram === 'ghostty';
+
+        if ($kittySupport || in_array($term, ['Ghostty', 'iTerm.app', 'WezTerm'])) {
+            try {
+                $imageData = @file_get_contents($imageUrl);
+
+                if ($imageData) {
+                    $lineCallback("\n📸 Cover Preview: {$imageUrl}");
+
+                    if ($kittySupport) {
+                        $displayKittyImageCallback($imageData);
+                    } elseif ($term === 'iTerm.app') {
+                        $base64Image = base64_encode($imageData);
+                        $lineCallback("\033]1337;File=inline=1;width=200px;height=150px:{$base64Image}\007");
+                    }
+
+                    $lineCallback("");
+                } else {
+                    $lineCallback("📸 Cover available: {$imageUrl}");
+                }
+            } catch (\Exception $e) {
+                $lineCallback("📸 Cover available: {$imageUrl} (display error: {$e->getMessage()})");
+            }
+        } else {
+            $lineCallback("📸 Cover available: {$imageUrl}");
+        }
+    }
+
+    /**
      * Display available cover options
      */
     public function displayCoverOptions(array $coverOptions, callable $displayCoverImageCallback): void

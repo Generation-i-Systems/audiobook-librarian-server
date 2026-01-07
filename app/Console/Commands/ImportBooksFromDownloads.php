@@ -1836,43 +1836,11 @@ class ImportBooksFromDownloads extends Command
             return;
         }
 
-        // Check if we're in a terminal that supports image display
-        $term = getenv('TERM_PROGRAM') ?: getenv('TERM');
-        $termEnv = getenv('TERM') ?? '';
-        $termProgram = getenv('TERM_PROGRAM') ?? '';
-
-        $kittySupport = $termEnv === 'xterm-kitty' ||
-            $termEnv === 'xterm-ghostty' ||
-            strpos($termEnv, 'kitty') !== false ||
-            $termProgram === 'ghostty';
-
-        if ($kittySupport || in_array($term, ['Ghostty', 'iTerm.app', 'WezTerm'])) {
-            try {
-                // Download and process image
-                $imageData = @file_get_contents($imageUrl);
-
-                if ($imageData) {
-                    $this->line("\n📸 Cover Preview: {$imageUrl}");
-
-                    if ($kittySupport) {
-                        // Use Kitty graphics protocol (supported by Ghostty)
-                        $this->displayKittyImage($imageData);
-                    } elseif ($term === 'iTerm.app') {
-                        // iTerm2 inline image protocol
-                        $base64Image = base64_encode($imageData);
-                        $this->line("\033]1337;File=inline=1;width=200px;height=150px:{$base64Image}\007");
-                    }
-
-                    $this->line(""); // Add spacing after image
-                } else {
-                    $this->line("📸 Cover available: {$imageUrl}");
-                }
-            } catch (\Exception $e) {
-                $this->line("📸 Cover available: {$imageUrl} (display error: {$e->getMessage()})");
-            }
-        } else {
-            $this->line("📸 Cover available: {$imageUrl}");
-        }
+        $this->getImportService()->displayCoverImage(
+            $imageUrl,
+            fn ($message) => $this->line($message),
+            fn ($imageData) => $this->displayKittyImage($imageData)
+        );
     }
 
     /**
