@@ -932,10 +932,10 @@ class ImportBooksFromDownloads extends Command
      */
     protected function showBackgroundProcessingStatus(): void
     {
-        $status = $this->getImportService()->showBackgroundProcessingStatus($this->backgroundTasks);
-        if ($status) {
-            $this->line($status);
-        }
+        $this->getImportService()->showBackgroundProcessingStatus(
+            $this->backgroundTasks,
+            fn ($message) => $this->line($message)
+        );
     }
 
     /**
@@ -943,10 +943,11 @@ class ImportBooksFromDownloads extends Command
      */
     protected function showEnhancedBackgroundStatus(): void
     {
-        $status = $this->getImportService()->showEnhancedBackgroundStatus($this->backgroundTasks, count($this->taskQueue));
-        if ($status) {
-            $this->line($status);
-        }
+        $this->getImportService()->showEnhancedBackgroundStatus(
+            $this->backgroundTasks,
+            count($this->taskQueue),
+            fn ($message) => $this->line($message)
+        );
     }
 
     /**

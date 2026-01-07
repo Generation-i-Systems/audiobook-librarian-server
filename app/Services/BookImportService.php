@@ -4453,7 +4453,7 @@ class BookImportService
     /**
      * Show background processing status
      */
-    public function showBackgroundProcessingStatus(array $backgroundTasks): string
+    public function showBackgroundProcessingStatus(array $backgroundTasks, ?callable $lineCallback = null): string
     {
         $completed = 0;
         $failed = 0;
@@ -4481,6 +4481,9 @@ class BookImportService
             if ($pending > 0) {
                 $status .= ", {$pending} pending";
             }
+            if ($lineCallback) {
+                $lineCallback($status);
+            }
             return $status;
         }
 
@@ -4490,7 +4493,7 @@ class BookImportService
     /**
      * Show enhanced background processing status
      */
-    public function showEnhancedBackgroundStatus(array $backgroundTasks, int $taskQueueCount): string
+    public function showEnhancedBackgroundStatus(array $backgroundTasks, int $taskQueueCount, ?callable $lineCallback = null): string
     {
         $completed = 0;
         $failed = 0;
@@ -4533,7 +4536,11 @@ class BookImportService
                 $parts[] = "{$failed} failed";
             }
 
-            return "🔄 Background: " . implode(', ', $parts);
+            $status = "🔄 Background: " . implode(', ', $parts);
+            if ($lineCallback) {
+                $lineCallback($status);
+            }
+            return $status;
         }
 
         return '';
