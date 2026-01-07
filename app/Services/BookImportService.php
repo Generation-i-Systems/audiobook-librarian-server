@@ -2497,6 +2497,21 @@ class BookImportService
     }
 
     /**
+     * Get directory size
+     */
+    public function getDirectorySize(string $path): int
+    {
+        $size = 0;
+        $files = File::allFiles($path);
+
+        foreach ($files as $file) {
+            $size += $file->getSize();
+        }
+
+        return $size;
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void

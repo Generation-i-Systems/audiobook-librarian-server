@@ -1852,14 +1852,7 @@ class ImportBooksFromDownloads extends Command
 
     protected function getDirectorySize(string $path): int
     {
-        $size = 0;
-        $files = File::allFiles($path);
-
-        foreach ($files as $file) {
-            $size += $file->getSize();
-        }
-
-        return $size;
+        return $this->getImportService()->getDirectorySize($path);
     }
 
     protected function findPotentialDuplicates(string $path): array
