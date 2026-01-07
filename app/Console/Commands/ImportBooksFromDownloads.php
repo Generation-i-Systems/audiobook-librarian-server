@@ -1738,62 +1738,25 @@ class ImportBooksFromDownloads extends Command
      */
     protected function processSingleBook(array $audiobook, array $metadata): void
     {
-        if (!$this->option('skip-enrichment')) {
-            $this->info("🔍 Enriching with external data...");
-        }
-
-        $metadata['source_path'] = $audiobook['path'];
-        $expectedPath = $this->getImportService()->generateDirectoryPath($metadata);
-        $this->info("📁 Expected directory path: {$expectedPath}");
-
-        $this->displayEnrichedMetadata($metadata);
-
-        if (!$this->option('auto') && !$this->option('dry-run')) {
-            if (!$this->reviewAndApprove($metadata)) {
-                $this->warn("❌ Import rejected by user");
-                $this->skippedBooks[] = [
-                    'path' => $audiobook['path'],
-                    'reason' => 'Rejected by user',
-                ];
-                return;
-            }
-        } elseif ($this->option('auto') && !$this->hasEnrichmentData($metadata)) {
-            $this->warn("⚠️  No enrichment data found in auto mode - skipping (detected fields might be incorrect)");
-            $this->skippedBooks[] = [
-                'path' => $audiobook['path'],
-                'reason' => 'No enrichment data in auto mode',
-            ];
-            return;
-        }
-
-        if (!$this->option('dry-run')) {
-            if ($this->uiService) {
-                $this->uiService->logMessage('💾 Creating database record...');
-            }
-
-            $book = $this->getImportService()->processSingleBook(
-                $audiobook,
-                $metadata,
-                fn ($metadata) => $this->enrichWithExternalData($metadata),
-                fn ($metadata, $enrichedData) => $this->getEnrichmentService()->isValidEnrichment($metadata, $enrichedData),
-                fn ($metadata) => $this->getImportService()->generateDirectoryPath($metadata),
-                fn ($metadata, $audiobook) => $this->getImportService()->createBookFromMetadata($metadata, $audiobook),
-                fn ($audiobook, $book, $options) => $this->getImportService()->moveFilesToLibrary($audiobook, $book, $options),
-                fn () => $this->getFileOperation()
-            );
-
-            if ($book) {
-                $this->info("✅ Book imported successfully: {$book->title} (ID: {$book->id})");
-
-                $this->processedBooks[] = [
-                    'path' => $audiobook['path'],
-                    'book_id' => $book->id,
-                    'title' => $book->title,
-                ];
-            }
-        } else {
-            $this->info("🔍 [DRY RUN] Would import: {$metadata['title']}");
-        }
+        $this->getImportService()->processSingleBook(
+            $audiobook,
+            $metadata,
+            fn ($metadata) => $this->enrichWithExternalData($metadata),
+            fn ($metadata, $enrichedData) => $this->getEnrichmentService()->isValidEnrichment($metadata, $enrichedData),
+            fn ($metadata) => $this->getImportService()->generateDirectoryPath($metadata),
+            fn ($metadata, $audiobook) => $this->getImportService()->createBookFromMetadata($metadata, $audiobook),
+            fn ($audiobook, $book, $options) => $this->getImportService()->moveFilesToLibrary($audiobook, $book, $options),
+            fn () => $this->getFileOperation(),
+            fn ($message) => $this->info($message),
+            fn ($metadata) => $this->displayEnrichedMetadata($metadata),
+            fn ($metadata) => $this->reviewAndApprove($metadata),
+            fn ($metadata) => $this->hasEnrichmentData($metadata),
+            (bool) $this->option('skip-enrichment'),
+            (bool) $this->option('auto'),
+            (bool) $this->option('dry-run'),
+            $this->skippedBooks,
+            $this->processedBooks
+        );
     }
 
     /**

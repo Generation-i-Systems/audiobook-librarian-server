@@ -3259,27 +3259,92 @@ class BookImportService
     /**
      * Process a single book (used for both regular books and split multi-books)
      */
-    public function processSingleBook(array $audiobook, array $metadata, callable $enrichWithExternalDataCallback, callable $isValidEnrichmentCallback, callable $generateDirectoryPathCallback, callable $createBookFromMetadataCallback, callable $moveFilesToLibraryCallback, callable $getFileOperationCallback): ?Book
-    {
-        $enrichedData = $enrichWithExternalDataCallback($metadata);
-        if ($enrichedData) {
-            if ($isValidEnrichmentCallback($metadata, $enrichedData)) {
-                $metadata = array_merge($metadata, $enrichedData);
-            }
+    public function processSingleBook(
+        array $audiobook,
+        array $metadata,
+        callable $enrichWithExternalDataCallback,
+        callable $isValidEnrichmentCallback,
+        callable $generateDirectoryPathCallback,
+        callable $createBookFromMetadataCallback,
+        callable $moveFilesToLibraryCallback,
+        callable $getFileOperationCallback,
+        ?callable $infoCallback = null,
+        ?callable $displayEnrichedMetadataCallback = null,
+        ?callable $reviewAndApproveCallback = null,
+        ?callable $hasEnrichmentDataCallback = null,
+        bool $skipEnrichment = false,
+        bool $isAutoMode = false,
+        bool $isDryRun = false,
+        array &$skippedBooks = null,
+        array &$processedBooks = null
+    ): ?Book {
+        if ($infoCallback && !$skipEnrichment) {
+            $infoCallback("🔍 Enriching with external data...");
         }
 
         $metadata['source_path'] = $audiobook['path'];
         $expectedPath = $generateDirectoryPathCallback($metadata);
-
-        $book = $createBookFromMetadataCallback($metadata, $audiobook);
-
-        if ($book) {
-            $moveFilesToLibraryCallback($audiobook, $book, [
-                'operation' => $getFileOperationCallback(),
-            ]);
+        if ($infoCallback) {
+            $infoCallback("📁 Expected directory path: {$expectedPath}");
         }
 
-        return $book;
+        if ($displayEnrichedMetadataCallback) {
+            $displayEnrichedMetadataCallback($metadata);
+        }
+
+        if (!$isAutoMode && !$isDryRun && $reviewAndApproveCallback) {
+            if (!$reviewAndApproveCallback($metadata)) {
+                if ($infoCallback) {
+                    $infoCallback("❌ Import rejected by user");
+                }
+                if ($skippedBooks !== null) {
+                    $skippedBooks[] = [
+                        'path' => $audiobook['path'],
+                        'reason' => 'Rejected by user',
+                    ];
+                }
+                return null;
+            }
+        } elseif ($isAutoMode && $hasEnrichmentDataCallback && !$hasEnrichmentDataCallback($metadata)) {
+            if ($infoCallback) {
+                $infoCallback("⚠️  No enrichment data found in auto mode - skipping (detected fields might be incorrect)");
+            }
+            if ($skippedBooks !== null) {
+                $skippedBooks[] = [
+                    'path' => $audiobook['path'],
+                    'reason' => 'No enrichment data in auto mode',
+                ];
+            }
+            return null;
+        }
+
+        if (!$isDryRun) {
+            $book = $createBookFromMetadataCallback($metadata, $audiobook);
+
+            if ($book) {
+                $moveFilesToLibraryCallback($audiobook, $book, [
+                    'operation' => $getFileOperationCallback(),
+                ]);
+
+                if ($infoCallback) {
+                    $infoCallback("✅ Book imported successfully: {$book->title} (ID: {$book->id})");
+                }
+
+                if ($processedBooks !== null) {
+                    $processedBooks[] = [
+                        'path' => $audiobook['path'],
+                        'book_id' => $book->id,
+                        'title' => $book->title,
+                    ];
+                }
+            }
+        } else {
+            if ($infoCallback) {
+                $infoCallback("🔍 [DRY RUN] Would import: {$metadata['title']}");
+            }
+        }
+
+        return $book ?? null;
     }
 
     /**
