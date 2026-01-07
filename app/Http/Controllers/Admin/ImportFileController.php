@@ -1550,13 +1550,13 @@ class ImportFileController extends Controller
                 return false;
             }
 
-            // Determine target name
-            $sourceName = basename($sourcePath);
-            $targetPath = $fullDestinationPath . '/' . $sourceName;
+            // The fullDestinationPath is already the complete destination path where files should go
+            // Do NOT append basename($sourcePath) as that would create a nested directory
+            $targetPath = $fullDestinationPath;
 
             Log::debug('[ImportFile] Determining target path', [
                 'sourcePath' => $sourcePath,
-                'sourceName' => $sourceName,
+                'sourceName' => basename($sourcePath),
                 'destinationPath' => $destinationPath,
                 'fullDestinationPath' => $fullDestinationPath,
                 'targetPath' => $targetPath,
