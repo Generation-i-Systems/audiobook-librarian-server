@@ -927,37 +927,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function extractNfoDataInBackground(string $nfoPath): array
     {
-        $data = [];
-
-        if (file_exists($nfoPath)) {
-            $content = file_get_contents($nfoPath);
-
-            // Try to parse as XML first
-            if (strpos($content, '<?xml') !== false) {
-                try {
-                    $xml = simplexml_load_string($content);
-                    if ($xml) {
-                        $data['title'] = (string) $xml->title ?? null;
-                        $data['plot'] = (string) $xml->plot ?? null;
-                        $data['year'] = (string) $xml->year ?? null;
-                        $data['genre'] = (string) $xml->genre ?? null;
-                    }
-                } catch (\Exception $e) {
-                    // XML parsing failed, treat as plain text
-                }
-            }
-
-            // Extract key-value pairs from plain text
-            $lines = explode("\n", $content);
-            foreach ($lines as $line) {
-                if (strpos($line, ':') !== false) {
-                    [$key, $value] = explode(':', $line, 2);
-                    $data[strtolower(trim($key))] = trim($value);
-                }
-            }
-        }
-
-        return $data;
+        return $this->getImportService()->extractNfoDataInBackground($nfoPath);
     }
 
     /**

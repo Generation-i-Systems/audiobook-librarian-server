@@ -4281,6 +4281,41 @@ class BookImportService
     }
 
     /**
+     * Extract NFO data in background
+     */
+    public function extractNfoDataInBackground(string $nfoPath): array
+    {
+        $data = [];
+
+        if (file_exists($nfoPath)) {
+            $content = file_get_contents($nfoPath);
+
+            if (strpos($content, '<?xml') !== false) {
+                try {
+                    $xml = simplexml_load_string($content);
+                    if ($xml) {
+                        $data['title'] = (string) $xml->title ?? null;
+                        $data['plot'] = (string) $xml->plot ?? null;
+                        $data['year'] = (string) $xml->year ?? null;
+                        $data['genre'] = (string) $xml->genre ?? null;
+                    }
+                } catch (\Exception $e) {
+                }
+            }
+
+            $lines = explode("\n", $content);
+            foreach ($lines as $line) {
+                if (strpos($line, ':') !== false) {
+                    [$key, $value] = explode(':', $line, 2);
+                    $data[strtolower(trim($key))] = trim($value);
+                }
+            }
+        }
+
+        return $data;
+    }
+
+    /**
      * Display available cover options
      */
     public function displayCoverOptions(array $coverOptions, callable $displayCoverImageCallback): void
