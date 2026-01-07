@@ -1601,24 +1601,6 @@ class ImportBooksFromDownloads extends Command
     }
 
     /**
-     * Get data source based on AI model used
-     */
-    protected function getDataSource(): string
-    {
-        return $this->getImportService()->getDataSource($this->option('model') ?? 'gpt-4');
-    }
-
-    protected function calculateAudioInfo(array $audioFiles): array
-    {
-        return $this->getImportService()->calculateAudioInfo($audioFiles);
-    }
-
-    protected function parseDurationString(string $duration): int
-    {
-        return $this->getImportService()->parseDurationString($duration);
-    }
-
-    /**
      * Get audio file duration directly from file metadata
      */
     protected function getAudioFileDuration(string $filePath): int
