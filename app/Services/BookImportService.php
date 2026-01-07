@@ -647,7 +647,13 @@ class BookImportService
     protected function buildGenreAuthorSeriesPath(string $genre, string $authorDir, array $metadata): string
     {
         if (!empty($metadata['series'])) {
+            $originalSeries = $metadata['series'];
             $series = $this->addGraphicAudioMarker($metadata['series'], $metadata);
+            Log::debug('BookImportService::buildGenreAuthorSeriesPath', [
+                'original_series' => $originalSeries,
+                'modified_series' => $series,
+                'metadata_series' => $metadata['series'],
+            ]);
             return "{$genre}/{$authorDir}/{$series}";
         }
         return "{$genre}/{$authorDir}";
@@ -922,6 +928,14 @@ class BookImportService
         $seriesNumber = $primarySeries?->pivot->series_number ?? null;
         $seriesName = $primarySeries?->name;
 
+        Log::debug('BookImportService::generateTargetDirectory - Series info', [
+            'book_id' => $book->id,
+            'book_title' => $book->title,
+            'primarySeries_id' => $primarySeries?->id,
+            'primarySeries_name' => $seriesName,
+            'seriesNumber' => $seriesNumber,
+        ]);
+
         if ($relativePath === null) {
             $authorDir = $this->formatAuthorsForDirectory($authors);
 
@@ -932,6 +946,11 @@ class BookImportService
                 'series_number' => $seriesNumber,
                 'title' => $book->title,
             ];
+
+            Log::debug('BookImportService::generateTargetDirectory - Metadata for generateDirectoryPath', [
+                'book_id' => $book->id,
+                'metadata' => $metadata,
+            ]);
 
             $relativePath = $this->generateDirectoryPath($metadata, $options);
         }
