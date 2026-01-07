@@ -2015,6 +2015,46 @@ class BookImportService
     }
 
     /**
+     * Parse plain text NFO files
+     */
+    public function parsePlainTextNfo(string $content): array
+    {
+        $data = [];
+        $lines = explode("\n", $content);
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (empty($line)) {
+                continue;
+            }
+
+            if (preg_match('/^title\s*[:\-=]\s*(.+)$/i', $line, $matches)) {
+                $data['title'] = trim($matches[1]);
+            } elseif (preg_match('/^author\s*[:\-=]\s*(.+)$/i', $line, $matches)) {
+                $data['author'] = trim($matches[1]);
+            } elseif (preg_match('/^(?:narrator|read\s+by)\s*[:\-=]\s*(.+)$/i', $line, $matches)) {
+                $data['narrator'] = trim($matches[1]);
+            } elseif (preg_match('/^series\s*[:\-=]\s*(.+)$/i', $line, $matches)) {
+                $data['series'] = trim($matches[1]);
+            } elseif (preg_match('/^(?:series.?number|book.?number)\s*[:\-=]\s*(.+)$/i', $line, $matches)) {
+                $data['series_number'] = trim($matches[1]);
+            } elseif (preg_match('/^genre\s*[:\-=]\s*(.+)$/i', $line, $matches)) {
+                $data['genre'] = trim($matches[1]);
+            } elseif (preg_match('/^(?:year|original\s+publication)\s*[:\-=]\s*(.+)$/i', $line, $matches)) {
+                $data['year'] = trim($matches[1]);
+            } elseif (preg_match('/^publisher\s*[:\-=]\s*(.+)$/i', $line, $matches)) {
+                $data['publisher'] = trim($matches[1]);
+            } elseif (preg_match('/^isbn\s*[:\-=]\s*(.+)$/i', $line, $matches)) {
+                $data['isbn'] = trim($matches[1]);
+            } elseif (preg_match('/^(?:description|plot|summary)\s*[:\-=]\s*(.+)$/i', $line, $matches)) {
+                $data['description'] = trim($matches[1]);
+            }
+        }
+
+        return $data;
+    }
+
+    /**
      * Get duration of audio file in seconds
      */
     public function getAudioFileDuration(string $filePath): int
