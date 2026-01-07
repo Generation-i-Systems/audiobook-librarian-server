@@ -231,37 +231,17 @@ class ImportBooksFromDownloads extends Command
 
     protected function hasCriticalTagMetadata(array $tagMetadata): bool
     {
-        if (empty($tagMetadata)) {
-            return false;
-        }
-
-        $title = $tagMetadata['title'] ?? '';
-        $author = $tagMetadata['author'] ?? [];
-
-        $hasTitle = is_string($title) && trim($title) !== '';
-        $hasAuthor = is_array($author) && count($author) > 0;
-
-        return $hasTitle && $hasAuthor;
+        return $this->getImportService()->hasCriticalTagMetadata($tagMetadata);
     }
 
     protected function hasCover(array $metadata): bool
     {
-        return !empty($metadata['cover_data'])
-            || !empty($metadata['cover_image'])
-            || !empty($metadata['cover_path'])
-            || !empty($metadata['cover_url']);
+        return $this->getImportService()->hasCover($metadata);
     }
 
     protected function hasCriticalMetadata(array $metadata): bool
     {
-        $hasTitle = isset($metadata['title']) && is_string($metadata['title']) && trim($metadata['title']) !== '';
-        $authors = $metadata['author'] ?? [];
-        $hasAuthor = (is_array($authors) && count($authors) > 0)
-            || (is_string($authors) && trim($authors) !== '');
-        $hasDescription = isset($metadata['description']) && is_string($metadata['description'])
-            && trim($metadata['description']) !== '';
-
-        return $hasTitle && $hasAuthor && $hasDescription && $this->hasCover($metadata);
+        return $this->getImportService()->hasCriticalMetadata($metadata);
     }
 
 
@@ -2555,25 +2535,7 @@ class ImportBooksFromDownloads extends Command
 
     protected function mergeMetadataFillMissing(array $base, array $fill): array
     {
-        $merged = $base;
-
-        foreach ($fill as $key => $value) {
-            $current = $merged[$key] ?? null;
-
-            $isEmpty = $current === null
-                || $current === ''
-                || (is_array($current) && count($current) === 0);
-
-            $hasValue = $value !== null
-                && $value !== ''
-                && (!is_array($value) || count($value) > 0);
-
-            if ($isEmpty && $hasValue) {
-                $merged[$key] = $value;
-            }
-        }
-
-        return $merged;
+        return $this->getImportService()->mergeMetadataFillMissing($base, $fill);
     }
 
 
@@ -4242,53 +4204,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function isTorrentTrackingFile(string $filename): bool
     {
-        $filename = strtolower($filename);
-
-        // Common torrent/piracy tracking file patterns
-        $patterns = [
-            '/torrent.*download.*from/i',           // "Torrent_downloaded_from_..."
-            '/downloaded.*from.*\.txt$/i',          // "Downloaded from site.txt"
-            '/\.torrent$/i',                        // .torrent files
-            '/read.*me.*first.*\.txt$/i',          // "Read me first.txt"
-            '/please.*seed.*\.txt$/i',             // "Please seed.txt"
-            '/visit.*for.*more.*\.txt$/i',         // "Visit site for more.txt"
-            '/source.*\.txt$/i',                   // "Source.txt"
-            '/magnet.*link.*\.txt$/i',             // "Magnet link.txt"
-        ];
-
-        foreach ($patterns as $pattern) {
-            if (preg_match($pattern, $filename)) {
-                return true;
-            }
-        }
-
-        // Check for specific known tracking file names
-        $knownTrackingFiles = [
-            'demonoid.me.txt',
-            'piratebay.txt',
-            'kickass.txt',
-            'extratorrent.txt',
-            'thepiratebay.org.txt',
-            'rarbg.txt',
-            'torrentday.txt',
-            'iptorrents.txt',
-            'what.cd.txt',
-            'passthepopcorn.txt',
-            'redacted.ch.txt',
-            'orpheus.network.txt',
-            'source.txt',
-            'readme.txt',
-            'read me.txt',
-            'info.txt',
-        ];
-
-        foreach ($knownTrackingFiles as $trackingFile) {
-            if (str_contains($filename, $trackingFile)) {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->getImportService()->isTorrentTrackingFile($filename);
     }
 
     /**
@@ -5163,28 +5079,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function getAudioFileDuration(string $filePath): int
     {
-        if (!class_exists('getID3')) {
-            return 0;
-        }
-
-        try {
-            $fileInfo = $this->withHandlerIsolation(fn () => (new \getID3())->analyze($filePath));
-
-            // Get duration from playtime_seconds if available
-            if (isset($fileInfo['playtime_seconds'])) {
-                return (int) round($fileInfo['playtime_seconds']);
-            }
-
-            // Alternative: calculate from bitrate and filesize
-            if (isset($fileInfo['filesize']) && isset($fileInfo['bitrate']) && $fileInfo['bitrate'] > 0) {
-                $durationSeconds = ($fileInfo['filesize'] * 8) / $fileInfo['bitrate'];
-                return (int) round($durationSeconds);
-            }
-        } catch (\Exception $e) {
-            Log::warning("Failed to get audio file duration from {$filePath}: " . $e->getMessage());
-        }
-
-        return 0;
+        return $this->getImportService()->getAudioFileDuration($filePath);
     }
 
     /**
