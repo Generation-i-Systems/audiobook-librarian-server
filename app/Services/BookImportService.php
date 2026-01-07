@@ -939,9 +939,36 @@ class BookImportService
         $path = rtrim($basePath, '/') . '/' . ltrim($relativePath, '/');
 
         // Always include title in path unless explicitly disabled
+        // However, if the book already has a directory_path that includes the title, don't append it again
         if (!isset($options['include_title_in_path']) || $options['include_title_in_path'] !== false) {
-            $title = $book->title;
+            // If the book already has a directory_path, check if it already includes the title
+            // If it does, return the path as-is to avoid creating nested directories
+            if ($relativePath !== null) {
+                $relativeSegments = explode('/', trim($relativePath, '/'));
+                $relativeLastSegment = end($relativeSegments) ?: '';
 
+                $title = $book->title;
+                $plainTitle = $book->title;
+
+                // If we have a series number, prefix it to the title
+                if (!empty($seriesNumber)) {
+                    $formattedNumber = str_pad($seriesNumber, 2, '0', STR_PAD_LEFT);
+                    $title = $formattedNumber . ' ' . $title;
+                }
+
+                // Remove common suffixes like (GraphicAudio) for comparison
+                $cleanRelativeLast = preg_replace('/\s*\(Graphic\s*Audio\)\s*$/i', '', $relativeLastSegment);
+                $cleanTitle = preg_replace('/\s*\(Graphic\s*Audio\)\s*$/i', '', $title);
+
+                // Check if the last segment of the relative path matches the title
+                if (strcasecmp($cleanRelativeLast, $cleanTitle) === 0 ||
+                    $this->lastPathSegmentMatchesTitle($cleanRelativeLast, $plainTitle)) {
+                    return $path;
+                }
+            }
+
+            // If we get here, we need to append the title
+            $title = $book->title;
             $plainTitle = $book->title;
 
             // If we have a series number, prefix it to the title
@@ -970,22 +997,6 @@ class BookImportService
                 $segments[] = $title;
 
                 return '/' . implode('/', $segments);
-            }
-
-            // Check if the relative path already contains the title (accounting for suffixes like GraphicAudio)
-            // This prevents creating nested directories when directory_path already includes the title
-            if ($relativePath !== null) {
-                $relativeSegments = explode('/', trim($relativePath, '/'));
-                $relativeLastSegment = end($relativeSegments) ?: '';
-
-                // Remove common suffixes like (GraphicAudio) for comparison
-                $cleanRelativeLast = preg_replace('/\s*\(Graphic\s*Audio\)\s*$/i', '', $relativeLastSegment);
-                $cleanTitle = preg_replace('/\s*\(Graphic\s*Audio\)\s*$/i', '', $title);
-
-                if (strcasecmp($cleanRelativeLast, $cleanTitle) === 0 ||
-                    $this->lastPathSegmentMatchesTitle($cleanRelativeLast, $plainTitle)) {
-                    return $path;
-                }
             }
 
             // Only append title if it's not already in the path
