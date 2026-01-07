@@ -3212,43 +3212,12 @@ class ImportBooksFromDownloads extends Command
     ): void {
         $this->info("🔄 Processing {$multiBookInfo['series_name']} as split books...");
 
-        foreach ($splitGroups as $bookNumber => $fileInfos) {
-            $this->info("📖 Processing Book {$bookNumber} with " . count($fileInfos) . " files");
+        $books = $this->getImportService()->processMultiBookSplit($audiobook, $multiBookInfo, $splitGroups, $aiMetadata);
 
-            // Extract files and get the title from the first file info
-            if (empty($fileInfos)) {
-                $this->warn("⚠️  No file info found for book {$bookNumber}, skipping");
-                continue;
-            }
-
-            $files = array_map(function ($fileInfo) {
-                return $fileInfo['file'];
-            }, $fileInfos);
-            $bookTitle = $fileInfos[0]['title']; // Use title from first file
-
-            $this->info("📚 Book title: {$bookTitle}");
-
-            // Create metadata for this individual book
-            $bookMetadata = $aiMetadata;
-            $bookMetadata['title'] = $bookTitle; // Use extracted individual book title
-            $bookMetadata['series'] = $multiBookInfo['series_name']; // This is already cleaned
-            $bookMetadata['series_number'] = $bookNumber;
-
-            // Ensure any original uncleaned series name is overwritten
-            unset($bookMetadata['series_original']);
-
-            // Create a virtual audiobook entry for this book
-            $virtualAudiobook = [
-                'path' => $audiobook['path'], // Keep original path
-                'name' => $bookTitle,
-                'files' => $files,
-                'total_size' => array_sum(array_map('filesize', $files)),
-                'is_multi_book_part' => true, // Flag to indicate this is part of a multi-book
-                'multi_book_files_only' => $files // Specific files for this book
-            ];
-
-            // Process this book individually
-            $this->processSingleBook($virtualAudiobook, $bookMetadata);
+        foreach ($books as $bookData) {
+            $this->info("📖 Processing Book {$bookData['metadata']['series_number']} with " . count($bookData['audiobook']['files']) . " files");
+            $this->info("📚 Book title: {$bookData['metadata']['title']}");
+            $this->processSingleBook($bookData['audiobook'], $bookData['metadata']);
         }
     }
 

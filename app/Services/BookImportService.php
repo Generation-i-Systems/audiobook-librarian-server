@@ -2231,6 +2231,51 @@ class BookImportService
     }
 
     /**
+     * Process multi-book directory by splitting into individual books
+     */
+    public function processMultiBookSplit(
+        array $audiobook,
+        array $multiBookInfo,
+        array $splitGroups,
+        array $aiMetadata
+    ): array {
+        $books = [];
+
+        foreach ($splitGroups as $bookNumber => $fileInfos) {
+            if (empty($fileInfos)) {
+                continue;
+            }
+
+            $files = array_map(function ($fileInfo) {
+                return $fileInfo['file'];
+            }, $fileInfos);
+            $bookTitle = $fileInfos[0]['title'];
+
+            $bookMetadata = $aiMetadata;
+            $bookMetadata['title'] = $bookTitle;
+            $bookMetadata['series'] = $multiBookInfo['series_name'];
+            $bookMetadata['series_number'] = $bookNumber;
+            unset($bookMetadata['series_original']);
+
+            $virtualAudiobook = [
+                'path' => $audiobook['path'],
+                'name' => $bookTitle,
+                'files' => $files,
+                'total_size' => array_sum(array_map('filesize', $files)),
+                'is_multi_book_part' => true,
+                'multi_book_files_only' => $files,
+            ];
+
+            $books[] = [
+                'audiobook' => $virtualAudiobook,
+                'metadata' => $bookMetadata,
+            ];
+        }
+
+        return $books;
+    }
+
+    /**
      * Get duration of audio file in seconds
      */
     public function getAudioFileDuration(string $filePath): int
