@@ -681,12 +681,60 @@
                                              }
                                          }
                                      }
-                                                                                 @endphp
-                                                                                 <!-- Original coverImageSource field -->
-                                                                                 <input type="hidden" name="coverImageSource" id="coverImageSource"
-                                                                                     value="{{ $initialCoverSource }}">
- 
-                                                                                 <!-- Add a script to ensure coverImageSource is set correctly on form submission -->
+                                     @endphp
+                                     @if(empty($coverOptions))
+                                         <div class="alert alert-info">
+                                             <i class="fas fa-info-circle me-2"></i>
+                                             No cover images found.
+                                             <button type="button" class="btn btn-sm btn-outline-primary ms-2" onclick="autoExtractEmbeddedCover()">
+                                                 <i class="fas fa-music me-1"></i>Extract from Audio Files
+                                             </button>
+                                         </div>
+                                     @endif
+                                     <!-- Original coverImageSource field -->
+                                     <input type="hidden" name="coverImageSource" id="coverImageSource"
+                                         value="{{ $initialCoverSource }}">
+
+                                     <!-- Add a script to ensure coverImageSource is set correctly on form submission -->
+                                     <script>
+                                                 document.addEventListener('DOMContentLoaded', function() {
+                                                     const bookForm = document.getElementById('book-form');
+                                                     if (bookForm) {
+                                                         bookForm.addEventListener('submit', function() {
+                                                             const selectedRadio = document.querySelector('input[name="coverImageCandidate"]:checked');
+                                                             if (selectedRadio) {
+                                                                 const sourceField = document.getElementById('coverImageSource');
+                                                                 if (sourceField) {
+                                                                     sourceField.value = selectedRadio.dataset.source || '';
+                                                                     console.log('Form submit: Setting coverImageSource to ' + sourceField.value);
+                                                                 }
+                                                             }
+                                                         });
+                                                     }
+                                                 });
+                                             </script>
+                                             <!-- Debug info -->
+                                             <div class="d-none">Initial cover source: {{ $initialCoverSource }}</div>
+                                             <div class="d-flex flex-wrap gap-3" id="cover-candidates-list">
+                                                 @if(!empty($coverOptions))
+                                                     @foreach($coverOptions as $option)
+                                                         <div class="text-center">
+                                                             <label class="d-flex flex-column align-items-center">
+                                                                 <input type="radio" name="coverImageCandidate" value="{{ $option['value'] }}"
+                                                                     data-source="{{ $option['type'] }}"
+                                                                     @if((isset($biggestCover) && $biggestCover === $option['value']) || (empty($biggestCover) && $option['type'] === 'current')) checked @endif class="mb-2">
+                                                                 <img src="{{ $option['src'] }}" alt="{{ $option['label'] }}"
+                                                                     style="max-width:100px;max-height:140px;border:1px solid #ccc;">
+                                                             </label>
+                                                             <div class="mt-1" style="font-size:12px;word-break:break-all;">
+                                                                 {{ $option['label'] }}<br>
+                                                                 <small class="text-muted">{{ $option['display_name'] ?? $option['value'] }}</small>
+                                                             </div>
+                                                         </div>
+                                                     @endforeach
+                                                 @endif
+                                             </div>
+                                             </div>
                                                                                  <script>
                                                                      document.addEventListener('DOMContentLoaded', function() {
                                                                          const bookForm = document.getElementById('book-form');
@@ -726,7 +774,7 @@
                                                                      @endif
                                                                  </div>
                                                                  </div>
- 
+
                                                                  <div id="google-books-matches-table-wrapper" style="display:none;" class="mt-3">
                                                                      <label class="form-label">Google Books: Select a Match</label>
                                                                      <table class="table table-bordered table-sm" id="google-books-matches-table">
@@ -742,22 +790,32 @@
                                                                          <tbody></tbody>
                                                                      </table>
                                                                  </div>
- 
+
                                                                  <div class="mt-3">
                                                                      <label for="coverImageUrlText" class="form-label">Cover Image URL<span class="text-muted">(Optional)</span></label>
                                                                      <input type="text" class="form-control" id="coverImageUrlText"
                                                                          value="{{ old('audibleCoverImageUrl', old('coverImageUrl', '')) }}"
                                                                          placeholder="https://...">
                                                                  </div>
- 
+
                                                                  <div class="mt-3">
-                                                                     <label for="coverImage" class="form-label">Upload Cover Image <span class="text-muted">(Optional)</span></label>
-                                                                     <input type="file" class="form-control @error('coverImage') is-invalid @enderror" id="coverImage"
-                                                                         name="coverImage">
-                                                                     @error('coverImage')
-                                                                         <span class="invalid-feedback d-block">{{ $message }}</span>
-                                                                     @enderror
-                                                                 </div>
+                                                                    <label for="coverImage" class="form-label">Upload Cover Image <span class="text-muted">(Optional)</span></label>
+                                                                    <input type="file" class="form-control @error('coverImage') is-invalid @enderror" id="coverImage"
+                                                                        name="coverImage">
+                                                                    @error('coverImage')
+                                                                        <span class="invalid-feedback d-block">{{ $message }}</span>
+                                                                    @enderror
+                                                                </div>
+
+                                                                <div class="mt-3" id="extract-embedded-cover-section">
+                                                                    <button type="button" class="btn btn-outline-primary" id="extract-embedded-cover-btn">
+                                                                        <i class="fas fa-music me-2"></i>Extract Cover from Audio Files
+                                                                    </button>
+                                                                    <div id="embedded-cover-status" class="mt-2"></div>
+                                                                    <div id="embedded-cover-options" class="mt-3" style="display: none;">
+                                                                        <!-- Extracted covers will be shown here -->
+                                                                    </div>
+                                                                </div>
                              </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -860,6 +918,193 @@
                             }
                         });
                     });
+                });
+                </script>
+                <script>
+                // Embedded cover extraction functionality
+                document.addEventListener('DOMContentLoaded', function() {
+                    const extractBtn = document.getElementById('extract-embedded-cover-btn');
+                    const statusDiv = document.getElementById('embedded-cover-status');
+                    const optionsDiv = document.getElementById('embedded-cover-options');
+
+                    if (extractBtn) {
+                        extractBtn.addEventListener('click', function() {
+                            const directoryPath = document.getElementById('directoryPath')?.value;
+
+                            if (!directoryPath) {
+                                statusDiv.innerHTML = '<div class="alert alert-warning">Please select a directory path first</div>';
+                                return;
+                            }
+
+                            // Show loading state
+                            extractBtn.disabled = true;
+                            extractBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Extracting...';
+                            statusDiv.innerHTML = '<div class="alert alert-info">Scanning audio files for embedded covers...</div>';
+                            optionsDiv.style.display = 'none';
+
+                            // Make AJAX request to extract covers
+                            fetch('{{ route("admin.books.extract-embedded-cover") }}', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+                                },
+                                body: JSON.stringify({
+                                    directory_path: directoryPath
+                                })
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    statusDiv.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+                                    displayExtractedCovers(data.covers);
+                                } else {
+                                    statusDiv.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+                                    optionsDiv.style.display = 'none';
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error extracting covers:', error);
+                                statusDiv.innerHTML = '<div class="alert alert-danger">Failed to extract covers. Please try again.</div>';
+                                optionsDiv.style.display = 'none';
+                            })
+                            .finally(() => {
+                                // Reset button
+                                extractBtn.disabled = false;
+                                extractBtn.innerHTML = '<i class="fas fa-music me-2"></i>Extract Cover from Audio Files';
+                            });
+                        });
+                    }
+
+                    function autoExtractEmbeddedCover() {
+                        const directoryPath = document.getElementById('directoryPath')?.value;
+
+                        if (!directoryPath) {
+                            alert('Please select a directory path first');
+                            return;
+                        }
+
+                        // Trigger the extract button click
+                        const extractBtn = document.getElementById('extract-embedded-cover-btn');
+                        if (extractBtn) {
+                            extractBtn.click();
+                        }
+                    }
+
+                    function displayExtractedCovers(covers) {
+                        optionsDiv.innerHTML = '';
+                        optionsDiv.style.display = 'block';
+
+                        const title = document.createElement('h6');
+                        title.className = 'mb-3';
+                        title.textContent = 'Select an extracted cover:';
+                        optionsDiv.appendChild(title);
+
+                        const row = document.createElement('div');
+                        row.className = 'row g-3';
+
+                        covers.forEach((cover, index) => {
+                            const col = document.createElement('div');
+                            col.className = 'col-md-4';
+
+                            const card = document.createElement('div');
+                            card.className = 'card h-100';
+
+                            const img = document.createElement('img');
+                            img.src = cover.url;
+                            img.className = 'card-img-top';
+                            img.style.maxHeight = '200px';
+                            img.style.objectFit = 'cover';
+                            img.alt = `Cover from ${cover.file}`;
+
+                            const cardBody = document.createElement('div');
+                            cardBody.className = 'card-body p-2';
+
+                            const title = document.createElement('small');
+                            title.className = 'd-block text-muted mb-2';
+                            title.textContent = `From: ${cover.file}`;
+
+                            const selectBtn = document.createElement('button');
+                            selectBtn.type = 'button';
+                            selectBtn.className = 'btn btn-primary btn-sm w-100';
+                            selectBtn.textContent = 'Select This Cover';
+                            selectBtn.onclick = function() {
+                                selectExtractedCover(cover);
+                            };
+
+                            cardBody.appendChild(title);
+                            cardBody.appendChild(selectBtn);
+
+                            card.appendChild(img);
+                            card.appendChild(cardBody);
+                            col.appendChild(card);
+                            row.appendChild(col);
+                        });
+
+                        optionsDiv.appendChild(row);
+                    }
+
+                    function selectExtractedCover(cover) {
+                        // Create a temporary file input to hold the cover data
+                        const dataInput = document.createElement('input');
+                        dataInput.type = 'hidden';
+                        dataInput.name = 'embedded_cover_temp_path';
+                        dataInput.value = cover.temp_path;
+                        dataInput.id = 'embedded-cover-temp-path';
+
+                        // Remove any existing embedded cover input
+                        const existingInput = document.getElementById('embedded-cover-temp-path');
+                        if (existingInput) {
+                            existingInput.remove();
+                        }
+
+                        // Add the new input to the form
+                        document.getElementById('book-form').appendChild(dataInput);
+
+                        // Update the cover preview
+                        const coverPreview = document.getElementById('current-cover-image');
+                        if (coverPreview) {
+                            coverPreview.src = cover.url;
+                        }
+
+                        // Update the cover candidates list
+                        const candidatesList = document.getElementById('cover-candidates-list');
+                        if (candidatesList) {
+                            // Remove existing embedded option if present
+                            const existingEmbedded = candidatesList.querySelector('[data-source="embedded"]');
+                            if (existingEmbedded) {
+                                existingEmbedded.closest('.text-center').remove();
+                            }
+
+                            // Add new embedded option
+                            const optionDiv = document.createElement('div');
+                            optionDiv.className = 'text-center';
+                            optionDiv.innerHTML = `
+                                <label class="d-flex flex-column align-items-center">
+                                    <input type="radio" name="coverImageCandidate" value="embedded_extracted"
+                                        data-source="embedded" checked class="mb-2">
+                                    <img src="${cover.url}" alt="Extracted Cover"
+                                        style="max-width:100px;max-height:140px;border:1px solid #ccc;">
+                                </label>
+                                <div class="mt-1" style="font-size:12px;word-break:break-all;">
+                                    Extracted Cover<br>
+                                    <small class="text-muted">From ${cover.file}</small>
+                                </div>
+                            `;
+                            candidatesList.appendChild(optionDiv);
+                        }
+
+                        // Show success message
+                        statusDiv.innerHTML = '<div class="alert alert-success">Cover selected! It will be saved to the book directory when you save the book.</div>';
+
+                        // Close the modal after a short delay
+                        setTimeout(() => {
+                            const modal = bootstrap.Modal.getInstance(document.getElementById('coverImageModal'));
+                            if (modal) {
+                                modal.hide();
+                            }
+                        }, 1500);
+                    }
                 });
                 </script>
                 <script>

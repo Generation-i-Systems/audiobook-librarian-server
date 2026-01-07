@@ -1586,6 +1586,73 @@ class BookController extends Controller
                         ->withErrors(['audibleCoverImageUrl' => 'Error downloading cover image: ' . $e->getMessage()]);
                 }
             }
+        } elseif ($request->filled('embedded_cover_temp_path')) {
+            // Handle embedded cover extracted from audio files
+            $tempPath = $request->input('embedded_cover_temp_path');
+            $directoryPath = $targetDirectoryPath;
+
+            if ($tempPath && $directoryPath && file_exists($tempPath)) {
+                try {
+                    // Get the book root path
+                    $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+                    $fullDirectoryPath = $bookRoot . '/' . ltrim($directoryPath, '/');
+
+                    // Ensure directory exists
+                    if (!is_dir($fullDirectoryPath)) {
+                        mkdir($fullDirectoryPath, 0775, true);
+                        // Set directory ownership
+                        if (function_exists('chown')) {
+                            @chown($fullDirectoryPath, 'eric');
+                            @chgrp($fullDirectoryPath, 'audio');
+                        }
+                    }
+
+                    // Generate unique filename for the cover
+                    $extension = pathinfo($tempPath, PATHINFO_EXTENSION) ?: 'jpg';
+                    $coverName = 'cover_embedded_' . uniqid() . '.' . $extension;
+                    $targetPath = $fullDirectoryPath . '/' . $coverName;
+
+                    // Copy the temporary file to the book directory
+                    if (copy($tempPath, $targetPath)) {
+                        // Set proper permissions
+                        chmod($targetPath, 0664);
+
+                        // Clean up temp file
+                        unlink($tempPath);
+
+                        $validated['coverImage'] = $coverName;
+                        $coverProcessed = true;
+
+                        Log::info('Embedded cover saved successfully', [
+                            'temp_path' => $tempPath,
+                            'target_path' => $targetPath,
+                            'cover_name' => $coverName
+                        ]);
+                    } else {
+                        Log::error('Failed to copy embedded cover from temp file', [
+                            'temp_path' => $tempPath,
+                            'target_path' => $targetPath
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    Log::error('Exception while processing embedded cover', [
+                        'temp_path' => $tempPath,
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                    ]);
+
+                    // Clean up temp file on error
+                    if (file_exists($tempPath)) {
+                        unlink($tempPath);
+                    }
+                }
+            } else {
+                Log::warning('Embedded cover temp file not found or missing directory path', [
+                    'temp_path' => $tempPath,
+                    'directory_path' => $directoryPath,
+                    'temp_exists' => $tempPath ? file_exists($tempPath) : null
+                ]);
+            }
         }
 
         // Resolve and attach IDs for authors, narrators, and genres for update
@@ -2401,5 +2468,142 @@ class BookController extends Controller
         }
         $documentStore->updateBook($id, $data);
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * Extract embedded cover from audio files in the book directory
+     */
+    public function extractEmbeddedCover(Request $request)
+    {
+        $directoryPath = $request->input('directory_path');
+
+        if (!$directoryPath) {
+            return response()->json(['error' => 'Directory path is required'], 400);
+        }
+
+        // Get the full path to the book directory
+        $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        $fullDirectoryPath = $bookRoot . '/' . ltrim($directoryPath, '/');
+
+        if (!is_dir($fullDirectoryPath)) {
+            return response()->json(['error' => 'Directory not found: ' . $directoryPath], 404);
+        }
+
+        // Initialize getID3
+        if (!class_exists('\getID3')) {
+            return response()->json(['error' => 'getID3 library not available'], 500);
+        }
+
+        $getID3 = new \getID3();
+        $getID3->option_tag_id3v1 = false;
+        $getID3->option_tag_id3v2 = false;
+        $getID3->option_tag_lyrics3 = false;
+        $getID3->option_tags_process = false;
+
+        // Find audio files in the directory
+        $audioFiles = glob($fullDirectoryPath . '/*.{mp3,m4a,m4b,m4p,mp4,aac,ogg,oga,wav,flac,wma}', GLOB_BRACE);
+
+        if (empty($audioFiles)) {
+            return response()->json(['error' => 'No audio files found in directory'], 404);
+        }
+
+        $extractedCovers = [];
+
+        foreach ($audioFiles as $audioFile) {
+            try {
+                $info = $getID3->analyze($audioFile);
+
+                // Check for embedded cover in various formats
+                $coverData = null;
+                $mimeType = 'image/jpeg';
+
+                // Check QuickTime/M4B tags
+                if (!empty($info['comments']['picture'][0])) {
+                    $coverData = $info['comments']['picture'][0]['data'];
+                    if (!empty($info['comments']['picture'][0]['image_mime'])) {
+                        $mimeType = $info['comments']['picture'][0]['image_mime'];
+                    }
+                }
+
+                // Check ID3v2 tags (MP3)
+                if (!$coverData && !empty($info['id3v2']['APIC'])) {
+                    foreach ($info['id3v2']['APIC'] as $pic) {
+                        if ($pic['picturetypeid'] === 3 || $pic['picturetypeid'] === 0) { // Cover(3) or Other(0)
+                            $coverData = $pic['data'];
+                            if (!empty($pic['mime'])) {
+                                $mimeType = $pic['mime'];
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                // Check ASF/WMV tags
+                if (!$coverData && !empty($info['asf']['comments']['picture'])) {
+                    foreach ($info['asf']['comments']['picture'] as $pic) {
+                        if (!empty($pic['data'])) {
+                            $coverData = $pic['data'];
+                            if (!empty($pic['image_mime'])) {
+                                $mimeType = $pic['image_mime'];
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                // Check OGG Vorbis tags
+                if (!$coverData && !empty($info['ogg']['comments']['coverart'][0])) {
+                    $coverData = base64_decode($info['ogg']['comments']['coverart'][0]);
+                    // OGG doesn't always store mime type, default to jpeg
+                }
+
+                if ($coverData) {
+                    // Create temporary file for the cover
+                    $extension = $this->getExtensionFromMimeType($mimeType);
+                    $tempFile = tempnam(sys_get_temp_dir(), 'embedded_cover_') . '.' . $extension;
+
+                    if (file_put_contents($tempFile, $coverData)) {
+                        $extractedCovers[] = [
+                            'file' => basename($audioFile),
+                            'temp_path' => $tempFile,
+                            'mime_type' => $mimeType,
+                            'size' => strlen($coverData),
+                            'url' => 'data:' . $mimeType . ';base64,' . base64_encode($coverData)
+                        ];
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::warning('Failed to extract cover from audio file', [
+                    'file' => basename($audioFile),
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+
+        if (empty($extractedCovers)) {
+            return response()->json(['error' => 'No embedded covers found in audio files'], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'covers' => $extractedCovers,
+            'message' => 'Found ' . count($extractedCovers) . ' embedded cover(s)'
+        ]);
+    }
+
+    /**
+     * Get file extension from MIME type
+     */
+    private function getExtensionFromMimeType(string $mimeType): string
+    {
+        $extensions = [
+            'image/jpeg' => 'jpg',
+            'image/jpg' => 'jpg',
+            'image/png' => 'png',
+            'image/gif' => 'gif',
+            'image/webp' => 'webp',
+        ];
+
+        return $extensions[$mimeType] ?? 'jpg';
     }
 }
