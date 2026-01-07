@@ -1916,7 +1916,11 @@ class ImportBooksFromDownloads extends Command
     {
         $newCoverUrl = $this->askInline('Cover URL', $currentCoverUrl);
 
-        return trim($newCoverUrl) !== '' ? $newCoverUrl : $currentCoverUrl;
+        if ($this->inputInterrupted) {
+            return $currentCoverUrl;
+        }
+
+        return $newCoverUrl ?: $currentCoverUrl;
     }
 
     /**
