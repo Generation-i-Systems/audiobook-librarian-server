@@ -1178,16 +1178,6 @@ class ImportBooksFromDownloads extends Command
         return $this->getImportService()->analyzeMultiBookFiles($audiobook, $multiBookInfo);
     }
 
-    protected function extractBookTitleFromFilename(string $filename, string $seriesName, int $bookNumber): string
-    {
-        return $this->getImportService()->extractBookTitleFromFilename($filename, $seriesName, $bookNumber);
-    }
-
-    protected function extractBookNumberFromFilename(string $filename): ?int
-    {
-        return $this->getImportService()->extractBookNumberFromFilename($filename);
-    }
-
     protected function formatFileTypes(array $fileTypes): string
     {
         return $this->getImportService()->formatFileTypes($fileTypes);
