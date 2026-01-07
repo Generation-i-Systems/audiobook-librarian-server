@@ -1952,7 +1952,7 @@ class ImportBooksFromDownloads extends Command
                 }
 
                 if ($choice === '7') {
-                    $metadata = $this->manualEnrichmentWithComparison($metadata, $audiobook);
+                    $metadata = $this->getImportService()->manualEnrichmentWithComparison($metadata, $audiobook, $this->getEnrichmentService());
                     $currentCoverUrl = (string) ($metadata['cover_url'] ?? '');
                     $currentGenre = $metadata['genre'] ?? 'Other';
                     if (is_array($currentGenre)) {
@@ -2041,7 +2041,7 @@ class ImportBooksFromDownloads extends Command
             }
 
             if ($choice === '7') {
-                $metadata = $this->manualEnrichmentWithComparison($metadata, $audiobook);
+                $metadata = $this->getImportService()->manualEnrichmentWithComparison($metadata, $audiobook, $this->getEnrichmentService());
                 $currentCoverUrl = (string) ($metadata['cover_url'] ?? '');
                 $currentGenre = $metadata['genre'] ?? 'Other';
                 if (is_array($currentGenre)) {
