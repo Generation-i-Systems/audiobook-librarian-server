@@ -632,14 +632,6 @@ class ImportBooksFromDownloads extends Command
     }
 
     /**
-     * Extract NFO data in background
-     */
-    protected function extractNfoDataInBackground(string $nfoPath): array
-    {
-        return $this->getImportService()->extractNfoDataInBackground($nfoPath);
-    }
-
-    /**
      * Show background processing status
      */
     protected function showBackgroundProcessingStatus(): void
