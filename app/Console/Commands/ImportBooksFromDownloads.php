@@ -4429,16 +4429,7 @@ class ImportBooksFromDownloads extends Command
     protected function getDataSource(): string
     {
         $model = $this->option('model');
-
-        if (str_contains($model, 'gemini')) {
-            return 'gemini';
-        } elseif (str_contains($model, 'gpt') || str_contains($model, 'openai')) {
-            return 'chatgpt';
-        } elseif (str_contains($model, 'claude')) {
-            return 'claude';
-        }
-
-        return 'ai'; // Generic fallback
+        return $this->getImportService()->getDataSource($model);
     }
 
     protected function calculateAudioInfo(array $audioFiles): array

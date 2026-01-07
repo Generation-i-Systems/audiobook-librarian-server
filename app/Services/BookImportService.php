@@ -1884,6 +1884,22 @@ class BookImportService
     }
 
     /**
+     * Get data source based on AI model used
+     */
+    public function getDataSource(string $model): string
+    {
+        if (str_contains($model, 'gemini')) {
+            return 'gemini';
+        } elseif (str_contains($model, 'gpt') || str_contains($model, 'openai')) {
+            return 'chatgpt';
+        } elseif (str_contains($model, 'claude')) {
+            return 'claude';
+        }
+
+        return 'ai';
+    }
+
+    /**
      * Get duration of audio file in seconds
      */
     public function getAudioFileDuration(string $filePath): int
