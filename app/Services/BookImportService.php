@@ -1762,11 +1762,16 @@ class BookImportService
     /**
      * Clean up source directory after successful import
      */
-    public function cleanupSourceDirectory(array $audiobook, bool $filesAlreadyExist = false): void
+    public function cleanupSourceDirectory(array $audiobook, bool $filesAlreadyExist = false, bool $isCopyOperation = false): void
     {
         $sourcePath = $audiobook['path'];
 
         if (!File::isDirectory($sourcePath)) {
+            return;
+        }
+
+        // Don't delete source if it's a copy operation
+        if ($isCopyOperation) {
             return;
         }
 
