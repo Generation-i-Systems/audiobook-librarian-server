@@ -4551,6 +4551,98 @@ class BookImportService
     }
 
     /**
+     * Handle cover selection - analyze current cover and offer alternatives if needed
+     */
+    public function handleCoverSelection(array &$metadata, callable $isTextOnWhiteCoverCallback, callable $searchAlternativeCoversCallback, callable $warnCallback, callable $lineCallback, callable $infoCallback, callable $commentCallback, callable $displayCoverOptionsCallback, callable $promptForCoverSelectionCallback, bool $isInteractive): void
+    {
+        if (!empty($metadata['cover_data'])) {
+            return;
+        }
+
+        $currentCoverUrl = $metadata['cover_url'] ?? '';
+        $coverOptions = [];
+
+        $hasValidCover = false;
+        if (!empty($currentCoverUrl)) {
+            $tempCoverPath = null;
+            try {
+                $tempCoverPath = tempnam(sys_get_temp_dir(), 'cover_') . '.jpg';
+                $imageData = @file_get_contents($currentCoverUrl);
+                if ($imageData) {
+                    file_put_contents($tempCoverPath, $imageData);
+
+                    $isTextOnWhite = $isTextOnWhiteCoverCallback($tempCoverPath);
+                    if ($isTextOnWhite) {
+                        $warnCallback('⚠️  Current cover appears to be text-only on white background (low quality)');
+                        $coverOptions[] = [
+                            'url' => $currentCoverUrl,
+                            'label' => 'Current cover (text-only - low quality)',
+                            'isCurrentLowQuality' => true,
+                        ];
+                    } else {
+                        $hasValidCover = true;
+                        $coverOptions[] = [
+                            'url' => $currentCoverUrl,
+                            'label' => 'Current cover',
+                            'isCurrent' => true,
+                        ];
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::warning('Error analyzing current cover', ['error' => $e->getMessage()]);
+            } finally {
+                if ($tempCoverPath && file_exists($tempCoverPath)) {
+                    @unlink($tempCoverPath);
+                }
+            }
+        }
+
+        if (!$hasValidCover) {
+            $lineCallback('🔍 Searching for alternative book covers...');
+            $searchResults = $searchAlternativeCoversCallback($metadata, 3);
+
+            if ($searchResults['success'] && !empty($searchResults['images'])) {
+                $infoCallback('Found ' . count($searchResults['images']) . ' alternative cover(s)');
+                foreach ($searchResults['images'] as $index => $image) {
+                    $coverOptions[] = [
+                        'url' => $image['url'],
+                        'label' => 'Google Image ' . ($index + 1),
+                        'isGoogle' => true,
+                    ];
+                }
+            } else {
+                if (isset($searchResults['error'])) {
+                    $commentCallback('Could not search for alternative covers: ' . $searchResults['error']);
+                }
+            }
+        }
+
+        if (count($coverOptions) === 0) {
+            if (empty($currentCoverUrl)) {
+                $commentCallback('No cover image found');
+            }
+            return;
+        }
+
+        if ($isInteractive && count($coverOptions) > 1) {
+            $displayCoverOptionsCallback($coverOptions, $metadata);
+            $selectedUrl = $promptForCoverSelectionCallback($coverOptions);
+            if ($selectedUrl) {
+                $metadata['cover_url'] = $selectedUrl;
+            }
+        } elseif (!$isInteractive && !$hasValidCover) {
+            $googleOption = collect($coverOptions)->first(function ($opt) {
+                return $opt['isGoogle'] ?? false;
+            });
+
+            if ($googleOption) {
+                $infoCallback('🤖 Auto-selecting first Google Image cover');
+                $metadata['cover_url'] = $googleOption['url'];
+            }
+        }
+    }
+
+    /**
      * Display available cover options
      */
     public function displayCoverOptions(array $coverOptions, callable $displayCoverImageCallback): void

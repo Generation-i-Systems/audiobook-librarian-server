@@ -2242,101 +2242,20 @@ class ImportBooksFromDownloads extends Command
      */
     protected function handleCoverSelection(array &$metadata): void
     {
-        if (!empty($metadata['cover_data'])) {
-            // Embedded cover present; keep it and skip external searches
-            return;
-        }
-
-        $currentCoverUrl = $metadata['cover_url'] ?? '';
         $isInteractive = !$this->option('auto');
-        $coverOptions = [];
 
-        // Check if current cover exists and analyze it
-        $hasValidCover = false;
-        if (!empty($currentCoverUrl)) {
-            // Try to download and analyze the current cover
-            $tempCoverPath = null;
-            try {
-                $tempCoverPath = tempnam(sys_get_temp_dir(), 'cover_') . '.jpg';
-                $imageData = @file_get_contents($currentCoverUrl);
-                if ($imageData) {
-                    file_put_contents($tempCoverPath, $imageData);
-
-                    $isTextOnWhite = $this->isTextOnWhiteCover($tempCoverPath);
-                    if ($isTextOnWhite) {
-                        $this->warn('⚠️  Current cover appears to be text-only on white background (low quality)');
-                        // Add it as an option but mark it as low quality
-                        $coverOptions[] = [
-                            'url' => $currentCoverUrl,
-                            'label' => 'Current cover (text-only - low quality)',
-                            'isCurrentLowQuality' => true,
-                        ];
-                    } else {
-                        $hasValidCover = true;
-                        $coverOptions[] = [
-                            'url' => $currentCoverUrl,
-                            'label' => 'Current cover',
-                            'isCurrent' => true,
-                        ];
-                    }
-                }
-            } catch (\Exception $e) {
-                Log::warning('Error analyzing current cover', ['error' => $e->getMessage()]);
-            } finally {
-                if ($tempCoverPath && file_exists($tempCoverPath)) {
-                    @unlink($tempCoverPath);
-                }
-            }
-        }
-
-        // If no valid cover, search for alternatives
-        if (!$hasValidCover) {
-            $this->line('🔍 Searching for alternative book covers...');
-            $searchResults = $this->searchAlternativeCovers($metadata, 3);
-
-            if ($searchResults['success'] && !empty($searchResults['images'])) {
-                $this->info('Found ' . count($searchResults['images']) . ' alternative cover(s)');
-                foreach ($searchResults['images'] as $index => $image) {
-                    $coverOptions[] = [
-                        'url' => $image['url'],
-                        'label' => 'Google Image ' . ($index + 1),
-                        'isGoogle' => true,
-                    ];
-                }
-            } else {
-                if (isset($searchResults['error'])) {
-                    $this->comment('Could not search for alternative covers: ' . $searchResults['error']);
-                }
-            }
-        }
-
-        // Handle cover selection based on mode
-        if (count($coverOptions) === 0) {
-            // No covers available at all
-            if (empty($currentCoverUrl)) {
-                $this->comment('No cover image found');
-            }
-            return;
-        }
-
-        if ($isInteractive && count($coverOptions) > 1) {
-            // Interactive mode with multiple options - let user choose
-            $this->displayCoverOptions($coverOptions, $metadata);
-            $selectedUrl = $this->promptForCoverSelection($coverOptions);
-            if ($selectedUrl) {
-                $metadata['cover_url'] = $selectedUrl;
-            }
-        } elseif (!$isInteractive && !$hasValidCover) {
-            // Non-interactive mode - use first Google image if current cover is invalid
-            $googleOption = collect($coverOptions)->first(function ($opt) {
-                return $opt['isGoogle'] ?? false;
-            });
-
-            if ($googleOption) {
-                $this->info('🤖 Auto-selecting first Google Image cover');
-                $metadata['cover_url'] = $googleOption['url'];
-            }
-        }
+        $this->getImportService()->handleCoverSelection(
+            $metadata,
+            fn ($path) => $this->isTextOnWhiteCover($path),
+            fn ($metadata, $limit) => $this->searchAlternativeCovers($metadata, $limit),
+            fn ($message) => $this->warn($message),
+            fn ($message) => $this->line($message),
+            fn ($message) => $this->info($message),
+            fn ($message) => $this->comment($message),
+            fn ($coverOptions, $metadata) => $this->displayCoverOptions($coverOptions, $metadata),
+            fn ($coverOptions) => $this->promptForCoverSelection($coverOptions),
+            $isInteractive
+        );
     }
 
     /**
