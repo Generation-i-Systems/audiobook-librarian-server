@@ -1479,18 +1479,10 @@ class ImportBooksFromDownloads extends Command
             return $this->embeddedCoverTempFile;
         }
 
-        $binary = base64_decode($coverData, true);
-        if (!is_string($binary)) {
-            $binary = $coverData;
+        $tempFile = $this->getImportService()->getEmbeddedCoverTempPath($coverData);
+        if ($tempFile) {
+            $this->embeddedCoverTempFile = $tempFile;
         }
-
-        $tempFile = tempnam(sys_get_temp_dir(), 'embedded_cover_');
-        if ($tempFile === false) {
-            return null;
-        }
-
-        file_put_contents($tempFile, $binary);
-        $this->embeddedCoverTempFile = $tempFile;
 
         return $tempFile;
     }

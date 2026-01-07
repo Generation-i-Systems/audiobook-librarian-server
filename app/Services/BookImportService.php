@@ -3083,6 +3083,26 @@ class BookImportService
     }
 
     /**
+     * Get embedded cover temp path
+     */
+    public function getEmbeddedCoverTempPath(string $coverData): ?string
+    {
+        $binary = base64_decode($coverData, true);
+        if (!is_string($binary)) {
+            $binary = $coverData;
+        }
+
+        $tempFile = tempnam(sys_get_temp_dir(), 'embedded_cover_');
+        if ($tempFile === false) {
+            return null;
+        }
+
+        file_put_contents($tempFile, $binary);
+
+        return $tempFile;
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void
