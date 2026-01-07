@@ -2685,6 +2685,21 @@ class BookImportService
     }
 
     /**
+     * Extract basic metadata from audiobook
+     */
+    public function extractBasicMetadata(array $audiobook): array
+    {
+        $metadata = [
+            'title' => $audiobook['name'] ?? basename($audiobook['path'] ?? ''),
+            'path' => $audiobook['path'] ?? '',
+            'file_count' => count($audiobook['files'] ?? []),
+            'total_size' => $audiobook['total_size'] ?? 0,
+        ];
+
+        return $metadata;
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void

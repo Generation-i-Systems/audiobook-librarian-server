@@ -988,7 +988,7 @@ class ImportBooksFromDownloads extends Command
     protected function preprocessMetadataInBackground(array $audiobook): array
     {
         // Start comprehensive metadata extraction
-        $metadata = $this->extractBasicMetadata($audiobook);
+        $metadata = $this->getImportService()->extractBasicMetadata($audiobook);
 
         // Pre-analyze directory structure
         $directoryAnalysis = [
