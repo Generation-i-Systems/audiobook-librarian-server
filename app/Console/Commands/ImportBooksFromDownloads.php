@@ -1844,13 +1844,11 @@ class ImportBooksFromDownloads extends Command
      */
     protected function displayCoverOptions(array $coverOptions, array $metadata): void
     {
-        $this->newLine();
-        $this->line('📚 Available Cover Options:');
-        $this->newLine();
-
         $this->getImportService()->displayCoverOptions(
             $coverOptions,
-            fn ($url) => $this->displayCoverImage($url)
+            fn ($url) => $this->displayCoverImage($url),
+            fn () => $this->newLine(),
+            fn ($message) => $this->line($message)
         );
     }
 

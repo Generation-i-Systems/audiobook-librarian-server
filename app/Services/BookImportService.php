@@ -4795,8 +4795,18 @@ class BookImportService
     /**
      * Display available cover options
      */
-    public function displayCoverOptions(array $coverOptions, callable $displayCoverImageCallback): void
+    public function displayCoverOptions(array $coverOptions, callable $displayCoverImageCallback, ?callable $newLineCallback = null, ?callable $lineCallback = null): void
     {
+        if ($newLineCallback) {
+            $newLineCallback();
+        }
+        if ($lineCallback) {
+            $lineCallback('📚 Available Cover Options:');
+        }
+        if ($newLineCallback) {
+            $newLineCallback();
+        }
+
         foreach ($coverOptions as $index => $option) {
             $label = ($index + 1) . '. ' . $option['label'];
             $displayCoverImageCallback($option['url']);
