@@ -482,16 +482,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function scheduleBackgroundTask(string $type, array $data): void
     {
-        $taskId = md5(serialize($data));
-
-        if (!isset($this->backgroundTasks[$taskId])) {
-            $this->backgroundTasks[$taskId] = [
-                'type' => $type,
-                'data' => $data,
-                'status' => 'pending',
-                'result' => null,
-            ];
-        }
+        $this->getImportService()->scheduleBackgroundTask($type, $data, $this->backgroundTasks);
     }
 
     /**

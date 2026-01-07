@@ -4955,6 +4955,23 @@ class BookImportService
     }
 
     /**
+     * Schedule a background task
+     */
+    public function scheduleBackgroundTask(string $type, array $data, array &$backgroundTasks): void
+    {
+        $taskId = md5(serialize($data));
+
+        if (!isset($backgroundTasks[$taskId])) {
+            $backgroundTasks[$taskId] = [
+                'type' => $type,
+                'data' => $data,
+                'status' => 'pending',
+                'result' => null,
+            ];
+        }
+    }
+
+    /**
      * Start continuous background processing to maintain at least 3 running tasks
      */
     public function startContinuousBackgroundProcessing(
