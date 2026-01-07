@@ -953,6 +953,7 @@ class BookImportService
             $segments = explode('/', trim($path, '/'));
             $lastSegment = end($segments) ?: '';
 
+            // Check if title is already in the path to avoid nested directories
             if (strcasecmp($lastSegment, $title) === 0) {
                 return $path;
             }
@@ -968,6 +969,8 @@ class BookImportService
                 return $path;
             }
 
+            // Only append title if it's not already in the path
+            // This prevents creating nested directories like "Title/Title"
             $path .= "/{$title}";
         }
 
@@ -1031,13 +1034,21 @@ class BookImportService
         $files = File::allFiles($source);
 
         foreach ($files as $file) {
-            $relativePath = $file->getRelativePathname();
-            $targetFile = "{$target}/{$relativePath}";
+            // Always use just the basename to avoid creating nested directories
+            $filename = $file->getFilename();
+            $targetFile = "{$target}/{$filename}";
 
-            $targetSubDir = dirname($targetFile);
-            if (!File::isDirectory($targetSubDir)) {
-                File::makeDirectory($targetSubDir, 0775, true);
-                $this->setDirectoryOwnership($targetSubDir);
+            Log::debug('BookImportService: copyDirectoryContents - Processing file', [
+                'source' => $file->getPathname(),
+                'relativePath' => $file->getRelativePathname(),
+                'filename' => $filename,
+                'target' => $target,
+                'targetFile' => $targetFile,
+            ]);
+
+            if (!File::isDirectory($target)) {
+                File::makeDirectory($target, 0775, true);
+                $this->setDirectoryOwnership($target);
             }
 
             File::copy($file->getPathname(), $targetFile);
@@ -1088,12 +1099,20 @@ class BookImportService
         $files = File::allFiles($source);
 
         foreach ($files as $file) {
-            $relativePath = $file->getRelativePathname();
-            $targetFile = "{$target}/{$relativePath}";
+            // Always use just the basename to avoid creating nested directories
+            $filename = $file->getFilename();
+            $targetFile = "{$target}/{$filename}";
 
-            $targetSubDir = dirname($targetFile);
-            if (!File::isDirectory($targetSubDir)) {
-                File::makeDirectory($targetSubDir, 0775, true);
+            Log::debug('BookImportService: moveDirectoryContents - Processing file', [
+                'source' => $file->getPathname(),
+                'relativePath' => $file->getRelativePathname(),
+                'filename' => $filename,
+                'target' => $target,
+                'targetFile' => $targetFile,
+            ]);
+
+            if (!File::isDirectory($target)) {
+                File::makeDirectory($target, 0775, true);
             }
 
             if ($sameFileSystem) {
@@ -1512,13 +1531,36 @@ class BookImportService
     }
 
     /**
+     * Metadata filenames that can be safely overwritten
+     */
+    private const METADATA_FILES = ['librarian.json', 'cover.jpg', 'cover.jpeg', 'cover.png', 'cover.webp'];
+
+    /**
      * Handle directory conflict resolution
      */
     public function handleDirectoryConflict(array $audiobook, string $targetDir): string
     {
         $originalTargetDir = $targetDir;
-        $counter = 1;
 
+        // Check if target directory exists
+        if (!File::isDirectory($targetDir)) {
+            return $targetDir;
+        }
+
+        // Get all files in the directory
+        $files = File::allFiles($targetDir);
+        if (empty($files)) {
+            return $targetDir;
+        }
+
+        // Check if directory only contains metadata files
+        if ($this->containsOnlyMetadata($targetDir, $files)) {
+            // Safe to use this directory - metadata files will be overwritten
+            return $targetDir;
+        }
+
+        // Directory has actual content, find a non-conflicting path
+        $counter = 1;
         while (File::isDirectory($targetDir)) {
             $targetDir = "{$originalTargetDir}_" . str_pad($counter, 2, '0', STR_PAD_LEFT);
             $counter++;
@@ -1529,6 +1571,29 @@ class BookImportService
         }
 
         return $targetDir;
+    }
+
+    /**
+     * Check if directory contains only metadata files (librarian.json, covers, etc.)
+     */
+    private function containsOnlyMetadata(string $directoryPath, array $files): bool
+    {
+        foreach ($files as $file) {
+            $filename = $file->getFilename();
+            $extension = strtolower($file->getExtension());
+
+            // If it's an audio file, this is not just metadata
+            if (in_array($extension, self::AUDIO_EXTENSIONS)) {
+                return false;
+            }
+
+            // If it's not a recognized metadata file, consider it content
+            if (!in_array($filename, self::METADATA_FILES)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -1779,6 +1844,7 @@ class BookImportService
         $sourcePath = $metadata['source_path'] ?? '';
         $narrator = $metadata['narrator'] ?? '';
         $publisher = $metadata['publisher'] ?? '';
+        $series = $metadata['series'] ?? '';
 
         $isGraphicAudio = false;
 
@@ -1813,6 +1879,11 @@ class BookImportService
             if (stripos($publisher, 'graphic') !== false && stripos($publisher, 'audio') !== false) {
                 $isGraphicAudio = true;
             }
+        }
+
+        // Check if series already has GraphicAudio marker - if so, don't add to title
+        if (!empty($series) && preg_match('/\(Graphic\s*Audio\)/i', $series)) {
+            return $title;
         }
 
         if ($isGraphicAudio && !preg_match('/\(GraphicAudio\)/i', $title)) {
