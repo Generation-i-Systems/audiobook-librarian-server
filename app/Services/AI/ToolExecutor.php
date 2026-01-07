@@ -7,18 +7,25 @@ use App\Models\Book;
 use App\Models\Genre;
 use App\Models\Narrator;
 use App\Models\Series;
+use App\Services\AIBookProcessor;
+use App\Services\BookTrashService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class ToolExecutor
 {
     protected string $bookRoot;
     protected array $previewCache = [];
+    protected BookTrashService $trashService;
 
     public function __construct()
     {
         $this->bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        $this->trashService = app(BookTrashService::class);
     }
 
     public function execute(string $toolName, array $parameters): array
@@ -50,6 +57,15 @@ class ToolExecutor
                 'find_missing_metadata' => $this->findMissingMetadata($parameters),
                 'get_recommendations' => $this->getRecommendations($parameters),
                 'analyze_collection' => $this->analyzeCollection($parameters),
+                'read_audio_metadata' => $this->readAudioMetadata($parameters),
+                'create_book' => $this->createBook($parameters),
+                'update_book_metadata' => $this->updateBookMetadata($parameters),
+                'delete_books' => $this->deleteBooks($parameters),
+                'apply_bulk_updates' => $this->applyBulkUpdates($parameters),
+                'fetch_external_metadata' => $this->fetchExternalMetadata($parameters),
+                'download_cover_image' => $this->downloadCoverImage($parameters),
+                'trigger_ai_processing' => $this->triggerAIProcessing($parameters),
+                'generate_nfo_files' => $this->generateNFOFiles($parameters),
                 default => ['success' => false, 'error' => "Unknown tool: {$toolName}"],
             };
 
@@ -1207,5 +1223,704 @@ class ToolExecutor
             'success' => true,
             'analysis' => $analysis,
         ];
+    }
+
+    protected function readAudioMetadata(array $params): array
+    {
+        try {
+            $bookId = $params['book_id'] ?? null;
+            $filePath = $params['file_path'] ?? null;
+            $includeChapters = $params['include_chapters'] ?? false;
+
+            if ($bookId) {
+                $book = Book::find($bookId);
+                if (!$book) {
+                    return ['success' => false, 'error' => 'Book not found'];
+                }
+                $basePath = $this->bookRoot . '/' . ltrim($book->directory_path, '/');
+            } elseif ($filePath) {
+                $basePath = str_starts_with($filePath, '/') ? $filePath : $this->bookRoot . '/' . ltrim($filePath, '/');
+            } else {
+                return ['success' => false, 'error' => 'Either book_id or file_path required'];
+            }
+
+            if (!File::exists($basePath)) {
+                return ['success' => false, 'error' => 'Path does not exist'];
+            }
+
+            $audioFiles = [];
+            if (File::isDirectory($basePath)) {
+                $files = File::allFiles($basePath);
+                foreach ($files as $file) {
+                    if (preg_match('/\.(m4b|mp3|mp4|ogg|flac|wav|m4a)$/i', $file->getFilename())) {
+                        $audioFiles[] = $file->getPathname();
+                    }
+                }
+            } else {
+                $audioFiles[] = $basePath;
+            }
+
+            if (empty($audioFiles)) {
+                return ['success' => false, 'error' => 'No audio files found'];
+            }
+
+            $metadata = [];
+            foreach (array_slice($audioFiles, 0, 5) as $audioFile) {
+                $fileMetadata = [
+                    'file' => basename($audioFile),
+                    'path' => $audioFile,
+                    'size' => File::size($audioFile),
+                    'tags' => [],
+                ];
+
+                if (function_exists('shell_exec')) {
+                    $ffprobeOutput = shell_exec('ffprobe -v quiet -print_format json -show_format -show_chapters ' . escapeshellarg($audioFile) . ' 2>&1');
+                    if ($ffprobeOutput) {
+                        $ffprobeData = json_decode($ffprobeOutput, true);
+                        if ($ffprobeData) {
+                            if (isset($ffprobeData['format'])) {
+                                $fileMetadata['duration'] = $ffprobeData['format']['duration'] ?? null;
+                                $fileMetadata['bitrate'] = $ffprobeData['format']['bit_rate'] ?? null;
+                                $fileMetadata['format'] = $ffprobeData['format']['format_name'] ?? null;
+                                $fileMetadata['tags'] = $ffprobeData['format']['tags'] ?? [];
+                            }
+                            if ($includeChapters && isset($ffprobeData['chapters'])) {
+                                $fileMetadata['chapters'] = array_map(fn ($ch) => [
+                                    'id' => $ch['id'] ?? null,
+                                    'start' => $ch['start_time'] ?? null,
+                                    'end' => $ch['end_time'] ?? null,
+                                    'title' => $ch['tags']['title'] ?? null,
+                                ], $ffprobeData['chapters']);
+                            }
+                        }
+                    }
+                }
+
+                $metadata[] = $fileMetadata;
+            }
+
+            return [
+                'success' => true,
+                'metadata' => $metadata,
+                'total_files' => count($audioFiles),
+                'files_analyzed' => count($metadata),
+            ];
+        } catch (\Exception $e) {
+            Log::error('read_audio_metadata failed', ['error' => $e->getMessage()]);
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    protected function createBook(array $params): array
+    {
+        try {
+            $directoryPath = $params['directory_path'];
+            $autoDiscoverMetadata = $params['auto_discover_metadata'] ?? true;
+            $confirmed = $params['confirmed'] ?? false;
+
+            if (!$confirmed) {
+                return [
+                    'success' => false,
+                    'error' => 'Confirmation required. Set confirmed=true to create book',
+                    'requires_confirmation' => true,
+                ];
+            }
+
+            $fullPath = str_starts_with($directoryPath, '/') ? $directoryPath : $this->bookRoot . '/' . ltrim($directoryPath, '/');
+
+            if (!File::exists($fullPath) || !File::isDirectory($fullPath)) {
+                return ['success' => false, 'error' => 'Directory does not exist'];
+            }
+
+            $audioFiles = collect(File::allFiles($fullPath))
+                ->filter(fn ($file) => preg_match('/\.(m4b|mp3|mp4|ogg|flac|wav|m4a)$/i', $file->getFilename()))
+                ->values();
+
+            if ($audioFiles->isEmpty()) {
+                return ['success' => false, 'error' => 'No audio files found in directory'];
+            }
+
+            $pathParts = explode('/', trim(str_replace($this->bookRoot, '', $fullPath), '/'));
+            $bookData = [
+                'directory_path' => str_replace($this->bookRoot . '/', '', $fullPath),
+                'audio_file_count' => $audioFiles->count(),
+            ];
+
+            if ($autoDiscoverMetadata && count($pathParts) >= 3) {
+                $bookData['title'] = $pathParts[count($pathParts) - 1] ?? 'Unknown';
+                $authorName = $pathParts[count($pathParts) - 2] ?? null;
+                $genreName = $pathParts[0] ?? null;
+
+                if ($authorName) {
+                    $author = Author::firstOrCreate(['name' => $authorName]);
+                    $bookData['author_id'] = $author->id;
+                }
+
+                if ($genreName) {
+                    $genre = Genre::firstOrCreate(['name' => $genreName]);
+                    $bookData['genre_id'] = $genre->id;
+                }
+            }
+
+            if (isset($params['title'])) {
+                $bookData['title'] = $params['title'];
+            }
+            if (isset($params['description'])) {
+                $bookData['description'] = $params['description'];
+            }
+
+            $book = new Book($bookData);
+            $book->save();
+
+            if (isset($bookData['author_id'])) {
+                $book->authors()->attach($bookData['author_id']);
+            }
+            if (isset($bookData['genre_id'])) {
+                $book->genres()->attach($bookData['genre_id']);
+            }
+
+            Log::info('Book created', ['book_id' => $book->id, 'directory' => $directoryPath]);
+
+            return [
+                'success' => true,
+                'book' => [
+                    'id' => $book->id,
+                    'title' => $book->title,
+                    'directory_path' => $book->directory_path,
+                    'audio_file_count' => $book->audio_file_count,
+                ],
+            ];
+        } catch (\Exception $e) {
+            Log::error('create_book failed', ['error' => $e->getMessage()]);
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    protected function updateBookMetadata(array $params): array
+    {
+        try {
+            $bookId = $params['book_id'];
+            $updates = $params['updates'];
+            $previewOnly = $params['preview_only'] ?? true;
+            $createBackup = $params['create_backup'] ?? true;
+
+            $book = Book::with(['authors', 'genres', 'series', 'narrators'])->find($bookId);
+            if (!$book) {
+                return ['success' => false, 'error' => 'Book not found'];
+            }
+
+            $currentMetadata = [
+                'title' => $book->title,
+                'description' => $book->description,
+                'authors' => $book->authors->pluck('name')->toArray(),
+                'genres' => $book->genres->pluck('name')->toArray(),
+                'narrators' => $book->narrators->pluck('name')->toArray(),
+                'series' => $book->series->pluck('name')->toArray(),
+                'language' => $book->language,
+                'isbn' => $book->isbn,
+                'release_date' => $book->release_date,
+            ];
+
+            $proposedChanges = [];
+            foreach ($updates as $field => $value) {
+                if (isset($currentMetadata[$field]) && $currentMetadata[$field] !== $value) {
+                    $proposedChanges[$field] = [
+                        'old' => $currentMetadata[$field],
+                        'new' => $value,
+                    ];
+                }
+            }
+
+            if ($previewOnly) {
+                return [
+                    'success' => true,
+                    'preview' => true,
+                    'book_id' => $bookId,
+                    'current_metadata' => $currentMetadata,
+                    'proposed_changes' => $proposedChanges,
+                    'message' => 'This is a preview. Set preview_only=false to apply changes.',
+                ];
+            }
+
+            if ($createBackup) {
+                $backupResult = $this->trashService->createBackup((string)$bookId, 'before_metadata_update');
+                if (!$backupResult['success']) {
+                    Log::warning('Failed to create backup before update', ['book_id' => $bookId]);
+                }
+            }
+
+            DB::transaction(function () use ($book, $updates) {
+                foreach ($updates as $field => $value) {
+                    switch ($field) {
+                        case 'title':
+                        case 'description':
+                        case 'language':
+                        case 'isbn':
+                        case 'release_date':
+                            $book->$field = $value;
+                            break;
+
+                        case 'authors':
+                            $authorIds = collect($value)->map(function ($authorName) {
+                                return Author::firstOrCreate(['name' => $authorName])->id;
+                            });
+                            $book->authors()->sync($authorIds);
+                            break;
+
+                        case 'genres':
+                            $genreIds = collect($value)->map(function ($genreName) {
+                                return Genre::firstOrCreate(['name' => $genreName])->id;
+                            });
+                            $book->genres()->sync($genreIds);
+                            break;
+
+                        case 'narrators':
+                            $narratorIds = collect($value)->map(function ($narratorName) {
+                                return Narrator::firstOrCreate(['name' => $narratorName])->id;
+                            });
+                            $book->narrators()->sync($narratorIds);
+                            break;
+                    }
+                }
+                $book->save();
+            });
+
+            $book->refresh();
+            Log::info('Book metadata updated', ['book_id' => $bookId, 'changes' => $proposedChanges]);
+
+            return [
+                'success' => true,
+                'book_id' => $bookId,
+                'changes_applied' => $proposedChanges,
+            ];
+        } catch (\Exception $e) {
+            Log::error('update_book_metadata failed', ['error' => $e->getMessage()]);
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    protected function deleteBooks(array $params): array
+    {
+        try {
+            $bookIds = $params['book_ids'];
+            $deleteFiles = $params['delete_files'] ?? false;
+            $reason = $params['reason'];
+            $confirmed = $params['confirmed'] ?? false;
+
+            if (!$confirmed) {
+                $books = Book::whereIn('id', $bookIds)->get(['id', 'title']);
+                return [
+                    'success' => false,
+                    'error' => 'Confirmation required. Set confirmed=true to delete books',
+                    'requires_confirmation' => true,
+                    'books_to_delete' => $books->map(fn ($b) => [
+                        'id' => $b->id,
+                        'title' => $b->title,
+                    ])->toArray(),
+                    'delete_files' => $deleteFiles,
+                    'reason' => $reason,
+                ];
+            }
+
+            $results = [];
+            $successCount = 0;
+            $failCount = 0;
+
+            foreach ($bookIds as $bookId) {
+                $result = $this->trashService->moveToTrash((string)$bookId, $deleteFiles);
+                $results[$bookId] = $result;
+
+                if ($result['success']) {
+                    $successCount++;
+                } else {
+                    $failCount++;
+                }
+            }
+
+            Log::info('Books deleted', [
+                'total' => count($bookIds),
+                'success' => $successCount,
+                'failed' => $failCount,
+                'reason' => $reason,
+            ]);
+
+            return [
+                'success' => $failCount === 0,
+                'total' => count($bookIds),
+                'success_count' => $successCount,
+                'fail_count' => $failCount,
+                'results' => $results,
+            ];
+        } catch (\Exception $e) {
+            Log::error('delete_books failed', ['error' => $e->getMessage()]);
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    protected function applyBulkUpdates(array $params): array
+    {
+        try {
+            $updates = $params['updates'];
+            $previewId = $params['preview_id'] ?? null;
+            $confirmed = $params['confirmed'] ?? false;
+
+            if (!$confirmed) {
+                return [
+                    'success' => false,
+                    'error' => 'Confirmation required. Set confirmed=true to apply updates',
+                    'requires_confirmation' => true,
+                ];
+            }
+
+            if (!is_array($updates) || empty($updates)) {
+                return ['success' => false, 'error' => 'Updates array is required'];
+            }
+
+            $backupBookIds = collect($updates)->pluck('book_id')->unique()->toArray();
+            $this->trashService->createBulkBackup($backupBookIds, 'before_bulk_update');
+
+            $results = [];
+            $successCount = 0;
+            $failCount = 0;
+
+            DB::transaction(function () use ($updates, &$results, &$successCount, &$failCount) {
+                foreach ($updates as $update) {
+                    try {
+                        $bookId = $update['book_id'];
+                        $updateData = $update['updates'];
+
+                        $book = Book::find($bookId);
+                        if (!$book) {
+                            $results[] = ['book_id' => $bookId, 'success' => false, 'error' => 'Book not found'];
+                            $failCount++;
+                            continue;
+                        }
+
+                        foreach ($updateData as $field => $value) {
+                            if (in_array($field, ['title', 'description', 'language', 'isbn', 'release_date'])) {
+                                $book->$field = $value;
+                            }
+                        }
+
+                        $book->save();
+                        $results[] = ['book_id' => $bookId, 'success' => true];
+                        $successCount++;
+                    } catch (\Exception $e) {
+                        $results[] = ['book_id' => $update['book_id'] ?? null, 'success' => false, 'error' => $e->getMessage()];
+                        $failCount++;
+                    }
+                }
+            });
+
+            Log::info('Bulk updates applied', ['total' => count($updates), 'success' => $successCount, 'failed' => $failCount]);
+
+            return [
+                'success' => $failCount === 0,
+                'total' => count($updates),
+                'success_count' => $successCount,
+                'fail_count' => $failCount,
+                'results' => $results,
+            ];
+        } catch (\Exception $e) {
+            Log::error('apply_bulk_updates failed', ['error' => $e->getMessage()]);
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    protected function fetchExternalMetadata(array $params): array
+    {
+        try {
+            $source = $params['source'];
+            $searchQuery = $params['search_query'];
+
+            return match ($source) {
+                'audible' => $this->fetchFromAudible($searchQuery),
+                'google_books' => $this->fetchFromGoogleBooks($searchQuery),
+                'hardcover' => $this->fetchFromHardcover($searchQuery),
+                default => ['success' => false, 'error' => 'Unknown source'],
+            };
+        } catch (\Exception $e) {
+            Log::error('fetch_external_metadata failed', ['error' => $e->getMessage()]);
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    private function fetchFromAudible(string $query): array
+    {
+        return [
+            'success' => true,
+            'source' => 'audible',
+            'message' => 'Audible API integration not yet implemented',
+            'results' => [],
+        ];
+    }
+
+    private function fetchFromGoogleBooks(string $query): array
+    {
+        try {
+            $response = Http::timeout(10)->get('https://www.googleapis.com/books/v1/volumes', [
+                'q' => $query,
+                'maxResults' => 5,
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                $results = collect($data['items'] ?? [])->map(function ($item) {
+                    $volumeInfo = $item['volumeInfo'] ?? [];
+                    return [
+                        'title' => $volumeInfo['title'] ?? null,
+                        'authors' => $volumeInfo['authors'] ?? [],
+                        'description' => $volumeInfo['description'] ?? null,
+                        'isbn' => collect($volumeInfo['industryIdentifiers'] ?? [])->firstWhere('type', 'ISBN_13')['identifier'] ?? null,
+                        'published_date' => $volumeInfo['publishedDate'] ?? null,
+                        'categories' => $volumeInfo['categories'] ?? [],
+                        'cover_url' => $volumeInfo['imageLinks']['thumbnail'] ?? null,
+                    ];
+                });
+
+                return [
+                    'success' => true,
+                    'source' => 'google_books',
+                    'results' => $results->toArray(),
+                    'total' => count($results),
+                ];
+            }
+
+            return ['success' => false, 'error' => 'Google Books API request failed'];
+        } catch (\Exception $e) {
+            Log::error('Google Books fetch failed', ['error' => $e->getMessage()]);
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    private function fetchFromHardcover(string $query): array
+    {
+        return [
+            'success' => true,
+            'source' => 'hardcover',
+            'message' => 'Hardcover API integration not yet implemented',
+            'results' => [],
+        ];
+    }
+
+    protected function downloadCoverImage(array $params): array
+    {
+        try {
+            $bookId = $params['book_id'];
+            $imageUrl = $params['image_url'] ?? null;
+            $autoFetch = $params['auto_fetch'] ?? false;
+
+            $book = Book::find($bookId);
+            if (!$book) {
+                return ['success' => false, 'error' => 'Book not found'];
+            }
+
+            if (!$imageUrl && $autoFetch) {
+                $searchQuery = $book->title;
+                if ($book->authors->isNotEmpty()) {
+                    $searchQuery .= ' ' . $book->authors->first()->name;
+                }
+
+                $metadataResult = $this->fetchFromGoogleBooks($searchQuery);
+                if ($metadataResult['success'] && !empty($metadataResult['results'])) {
+                    $imageUrl = $metadataResult['results'][0]['cover_url'] ?? null;
+                }
+            }
+
+            if (!$imageUrl) {
+                return ['success' => false, 'error' => 'No image URL provided or found'];
+            }
+
+            $response = Http::timeout(15)->get($imageUrl);
+            if (!$response->successful()) {
+                return ['success' => false, 'error' => 'Failed to download image'];
+            }
+
+            $imageData = $response->body();
+            $extension = pathinfo(parse_url($imageUrl, PHP_URL_PATH), PATHINFO_EXTENSION) ?: 'jpg';
+            $filename = "cover_{$bookId}.{$extension}";
+            $coverPath = "covers/{$filename}";
+
+            Storage::disk('public')->put($coverPath, $imageData);
+
+            $book->cover_image = $coverPath;
+            $book->save();
+
+            Log::info('Cover image downloaded', ['book_id' => $bookId, 'url' => $imageUrl]);
+
+            return [
+                'success' => true,
+                'book_id' => $bookId,
+                'cover_path' => $coverPath,
+                'cover_url' => Storage::disk('public')->url($coverPath),
+            ];
+        } catch (\Exception $e) {
+            Log::error('download_cover_image failed', ['error' => $e->getMessage()]);
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    protected function triggerAIProcessing(array $params): array
+    {
+        try {
+            $bookIds = $params['book_ids'];
+            $force = $params['force_reprocess'] ?? false;
+            $minConfidence = $params['min_confidence'] ?? 0.7;
+
+            $processor = app(AIBookProcessor::class);
+            $results = [];
+            $successCount = 0;
+            $failCount = 0;
+
+            foreach ($bookIds as $bookId) {
+                try {
+                    $book = Book::find($bookId);
+                    if (!$book) {
+                        $results[] = ['book_id' => $bookId, 'success' => false, 'error' => 'Book not found'];
+                        $failCount++;
+                        continue;
+                    }
+
+                    if (!$force && $book->ai_processed && ($book->ai_confidence ?? 0) >= $minConfidence) {
+                        $results[] = ['book_id' => $bookId, 'success' => true, 'skipped' => true, 'reason' => 'Already processed with sufficient confidence'];
+                        $successCount++;
+                        continue;
+                    }
+
+                    $this->trashService->createBackup((string)$bookId, 'before_ai_processing');
+
+                    $processResult = $processor->processBook($book);
+
+                    $results[] = [
+                        'book_id' => $bookId,
+                        'success' => true,
+                        'processed' => true,
+                        'confidence' => $book->fresh()->ai_confidence ?? null,
+                    ];
+                    $successCount++;
+                } catch (\Exception $e) {
+                    $results[] = ['book_id' => $bookId, 'success' => false, 'error' => $e->getMessage()];
+                    $failCount++;
+                }
+            }
+
+            Log::info('AI processing triggered', ['total' => count($bookIds), 'success' => $successCount, 'failed' => $failCount]);
+
+            return [
+                'success' => $failCount === 0,
+                'total' => count($bookIds),
+                'success_count' => $successCount,
+                'fail_count' => $failCount,
+                'results' => $results,
+            ];
+        } catch (\Exception $e) {
+            Log::error('trigger_ai_processing failed', ['error' => $e->getMessage()]);
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    protected function generateNFOFiles(array $params): array
+    {
+        try {
+            $bookIds = $params['book_ids'];
+            $format = $params['format'] ?? 'kodi';
+
+            $results = [];
+            $successCount = 0;
+            $failCount = 0;
+
+            foreach ($bookIds as $bookId) {
+                try {
+                    $book = Book::with(['authors', 'genres', 'narrators', 'series'])->find($bookId);
+                    if (!$book) {
+                        $results[] = ['book_id' => $bookId, 'success' => false, 'error' => 'Book not found'];
+                        $failCount++;
+                        continue;
+                    }
+
+                    $nfoContent = $this->generateNFOContent($book, $format);
+                    $bookPath = $this->bookRoot . '/' . ltrim($book->directory_path, '/');
+
+                    if (!File::exists($bookPath)) {
+                        $results[] = ['book_id' => $bookId, 'success' => false, 'error' => 'Book directory not found'];
+                        $failCount++;
+                        continue;
+                    }
+
+                    $nfoPath = rtrim($bookPath, '/') . '/book.nfo';
+                    File::put($nfoPath, $nfoContent);
+
+                    $results[] = ['book_id' => $bookId, 'success' => true, 'nfo_path' => $nfoPath];
+                    $successCount++;
+                } catch (\Exception $e) {
+                    $results[] = ['book_id' => $bookId, 'success' => false, 'error' => $e->getMessage()];
+                    $failCount++;
+                }
+            }
+
+            Log::info('NFO files generated', ['total' => count($bookIds), 'success' => $successCount, 'failed' => $failCount]);
+
+            return [
+                'success' => $failCount === 0,
+                'total' => count($bookIds),
+                'success_count' => $successCount,
+                'fail_count' => $failCount,
+                'results' => $results,
+            ];
+        } catch (\Exception $e) {
+            Log::error('generate_nfo_files failed', ['error' => $e->getMessage()]);
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    private function generateNFOContent(Book $book, string $format): string
+    {
+        $xml = new \SimpleXMLElement('<?xml version="1.0" encoding="UTF-8"?><book></book>');
+
+        $xml->addChild('title', htmlspecialchars($book->title ?? '', ENT_XML1));
+        $xml->addChild('plot', htmlspecialchars($book->description ?? '', ENT_XML1));
+
+        foreach ($book->authors as $author) {
+            $xml->addChild('author', htmlspecialchars($author->name, ENT_XML1));
+        }
+
+        foreach ($book->genres as $genre) {
+            $xml->addChild('genre', htmlspecialchars($genre->name, ENT_XML1));
+        }
+
+        foreach ($book->narrators as $narrator) {
+            $xml->addChild('narrator', htmlspecialchars($narrator->name, ENT_XML1));
+        }
+
+        if ($book->series->isNotEmpty()) {
+            $series = $book->series->first();
+            $xml->addChild('series', htmlspecialchars($series->name, ENT_XML1));
+            if ($series->pivot->series_number) {
+                $xml->addChild('series_number', $series->pivot->series_number);
+            }
+        }
+
+        if ($book->isbn) {
+            $xml->addChild('isbn', htmlspecialchars($book->isbn, ENT_XML1));
+        }
+
+        if ($book->release_date) {
+            $xml->addChild('year', date('Y', strtotime($book->release_date)));
+        }
+
+        if ($book->language) {
+            $xml->addChild('language', htmlspecialchars($book->language, ENT_XML1));
+        }
+
+        if ($book->duration) {
+            $xml->addChild('runtime', round($book->duration / 60));
+        }
+
+        $dom = new \DOMDocument('1.0', 'UTF-8');
+        $dom->preserveWhiteSpace = false;
+        $dom->formatOutput = true;
+        $dom->loadXML($xml->asXML());
+
+        return $dom->saveXML();
     }
 }

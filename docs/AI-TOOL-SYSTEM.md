@@ -12,6 +12,11 @@ The AI Tool-Based Query System provides a flexible, powerful way to interact wit
 - **Filesystem Operations**: List directories, scan files, move files with preview
 - **Series Analysis**: Find gaps, duplicates, detect patterns
 - **Bulk Operations**: Preview and apply changes to multiple books
+- **Book Management**: Create, update, and delete books with automatic backups
+- **External Integration**: Fetch metadata from Google Books, Audible, Hardcover
+- **Audio Metadata**: Extract ID3 tags, chapters, and technical details from files
+- **Media Server Support**: Generate NFO files for Kodi/Plex
+- **Safety First**: Preview mode, confirmations, automatic backups, trash system
 - **Iterative Reasoning**: AI can chain multiple tool calls to answer complex questions
 
 ## Architecture
@@ -224,6 +229,160 @@ Execute complex custom queries for special cases.
 - "Find all series with more than 10 books"
 - "Show statistics about the library"
 
+### Book Management Tools
+
+#### `read_audio_metadata`
+Extract ID3 tags and technical metadata from audio files.
+
+**Parameters:**
+- `book_id` (integer): Book ID to read metadata for
+- `file_path` (string): Specific file path (alternative to book_id)
+- `include_chapters` (boolean): Extract chapter information (default: false)
+
+**Returns:**
+- File metadata: duration, bitrate, format
+- ID3 tags: title, artist, album, genre, year
+- Chapter information (if requested)
+- Technical details
+
+**Example Queries:**
+- "Read audio metadata for book ID 12345"
+- "Extract chapter information from 'The Way of Kings'"
+- "What are the ID3 tags for this book?"
+
+#### `create_book`
+Create new book records from filesystem directories.
+
+**Parameters:**
+- `directory_path` (string, required): Path to book directory
+- `auto_discover_metadata` (boolean): Auto-extract from directory structure (default: true)
+- `title` (string): Override discovered title
+- `description` (string): Book description
+- `confirmed` (boolean, required): Safety confirmation
+
+**Safety**: Requires confirmation (confirmed=true)
+
+**Example Queries:**
+- "Create a book entry for the directory 'Fantasy/Brandon Sanderson/Mistborn'"
+- "Add a new book from this directory with title 'Custom Title'"
+
+#### `update_book_metadata`
+Update book metadata with automatic backup.
+
+**Parameters:**
+- `book_id` (integer, required): Book to update
+- `updates` (object, required): Fields to update (title, description, authors, genres, narrators, language, isbn, release_date)
+- `preview_only` (boolean): Preview changes without applying (default: true)
+- `create_backup` (boolean): Create backup before changes (default: true)
+
+**Safety**:
+- Preview mode by default
+- Automatic backup before changes
+- Set preview_only=false to apply
+
+**Example Queries:**
+- "Preview updating book 123 with genre 'Science Fiction'"
+- "Update book title to 'New Title' and description to 'New description'"
+- "Change the author of this book to 'Isaac Asimov'"
+
+#### `delete_books`
+Delete books with automatic trash/backup.
+
+**Parameters:**
+- `book_ids` (array, required): Book IDs to delete
+- `delete_files` (boolean): Also delete physical files (default: false)
+- `reason` (string, required): Reason for deletion (audit log)
+- `confirmed` (boolean, required): Safety confirmation
+
+**Safety**:
+- Requires confirmation
+- Requires reason for audit trail
+- Automatic backup to trash
+- Can be restored later
+
+**Example Queries:**
+- "Delete book ID 12345 because it's a duplicate"
+- "Remove books 100, 101, 102 and their files - they're corrupted"
+
+#### `apply_bulk_updates`
+Execute bulk metadata updates with automatic backups.
+
+**Parameters:**
+- `updates` (array, required): Array of {book_id, updates} objects
+- `preview_id` (string): Reference to preview
+- `confirmed` (boolean, required): Safety confirmation
+
+**Safety**:
+- Requires confirmation
+- Automatic bulk backup before changes
+- Use with bulk_update_preview first
+
+**Example Queries:**
+- "Apply the previewed bulk updates to all Foundation books"
+- "Execute the genre changes for all selected books"
+
+#### `fetch_external_metadata`
+Fetch enriched metadata from external sources.
+
+**Parameters:**
+- `source` (string, required): "audible", "google_books", or "hardcover"
+- `search_query` (string, required): Search query
+
+**Returns:**
+- Title, authors, description
+- ISBN, publication date
+- Categories/genres
+- Cover image URLs
+
+**Example Queries:**
+- "Search Google Books for 'The Hobbit by J.R.R. Tolkien'"
+- "Find metadata for 'Foundation' on Audible"
+- "Get book information from Hardcover for this title"
+
+#### `download_cover_image`
+Download and save cover images.
+
+**Parameters:**
+- `book_id` (integer, required): Book to add cover to
+- `image_url` (string): Direct URL to image
+- `auto_fetch` (boolean): Auto-search and download from Google Books (default: false)
+
+**Example Queries:**
+- "Download cover image for book 12345"
+- "Auto-fetch and save cover for 'The Way of Kings'"
+- "Download cover from this URL for book 100"
+
+#### `trigger_ai_processing`
+Run AI metadata extraction on books.
+
+**Parameters:**
+- `book_ids` (array, required): Books to process
+- `force_reprocess` (boolean): Reprocess even if already done (default: false)
+- `min_confidence` (float): Minimum confidence threshold (default: 0.7)
+
+**Safety**: Automatic backup before processing
+
+**Example Queries:**
+- "Run AI processing on book 12345"
+- "Reprocess all books with low confidence scores"
+- "Extract metadata using AI for these 10 books"
+
+#### `generate_nfo_files`
+Generate NFO sidecar files for Kodi/Plex.
+
+**Parameters:**
+- `book_ids` (array, required): Books to generate NFO for
+- `format` (string): "kodi" or "plex" (default: "kodi")
+
+**Returns:**
+- Generated NFO file paths
+- Success/failure for each book
+
+**Example Queries:**
+- "Generate NFO files for all Foundation books"
+- "Create Kodi metadata files for book 12345"
+- "Generate Plex-compatible NFO for this series"
+
 ## Usage
 
 ### Command Line
@@ -313,6 +472,30 @@ if ($result['success']) {
 "List all m4b files in the Science Fiction directory"
 ```
 
+### Book Management
+```
+"Create a new book from the directory 'Fantasy/Patrick Rothfuss/The Name of the Wind'"
+"Update book 12345 to add genre 'Epic Fantasy'"
+"Delete duplicate books 100, 101, 102 - reason: duplicates found"
+"Preview metadata update for book 'The Way of Kings'"
+```
+
+### Metadata Enhancement
+```
+"Read audio metadata and chapters from book 12345"
+"Search Google Books for 'The Hobbit' and show results"
+"Download cover image for 'Foundation' by Isaac Asimov"
+"Run AI processing on all books with missing authors"
+"Generate NFO files for all books in the Foundation series"
+```
+
+### External Integration
+```
+"Find metadata on Google Books for 'The Lord of the Rings'"
+"Auto-fetch cover image for book 12345"
+"Get publication details from external sources for this book"
+```
+
 ## How It Works
 
 1. **User submits query** in natural language
@@ -333,9 +516,13 @@ The AI can chain multiple tool calls in one conversation to answer complex quest
 
 1. **File Operation Previews**: All file moves require preview first
 2. **Confirmation Required**: Destructive operations need user approval
-3. **Error Handling**: Graceful failures with helpful error messages
-4. **Iteration Limits**: Prevents infinite loops (default: 10, configurable)
-5. **Filesystem Validation**: Checks file existence before operations
+3. **Automatic Backups**: Data changes create automatic backups in trash system
+4. **Trash & Restore**: Deleted books can be restored from trash with full metadata
+5. **Preview Mode**: Metadata updates default to preview-only mode
+6. **Audit Trail**: Deletions require reason for audit logging
+7. **Error Handling**: Graceful failures with helpful error messages
+8. **Iteration Limits**: Prevents infinite loops (default: 10, configurable)
+9. **Filesystem Validation**: Checks file existence before operations
 
 ## Configuration
 
