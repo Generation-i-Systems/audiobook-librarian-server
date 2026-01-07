@@ -75,19 +75,19 @@ class AIToolService
                     if (isset($part['functionCall'])) {
                         $hasFunctionCall = true;
                         $functionName = $part['functionCall']['name'];
-                        $functionArgs = $part['functionCall']['args'] ?? [];
+                        $functionArgs = $part['functionCall']['args'] ?? (object)[];
 
                         Log::info("AI requested tool execution", [
                             'tool' => $functionName,
                             'args' => $functionArgs,
                         ]);
 
-                        $result = $this->toolExecutor->execute($functionName, $functionArgs);
+                        $result = $this->toolExecutor->execute($functionName, (array)$functionArgs);
 
                         $functionResults[] = [
                             'functionResponse' => [
                                 'name' => $functionName,
-                                'response' => $result,
+                                'response' => (object)$result,
                             ],
                         ];
                     }

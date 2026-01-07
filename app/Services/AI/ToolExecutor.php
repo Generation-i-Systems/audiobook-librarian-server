@@ -45,6 +45,11 @@ class ToolExecutor
                 'pattern_rename_preview' => $this->patternRenamePreview($parameters),
                 'bulk_update_preview' => $this->bulkUpdatePreview($parameters),
                 'execute_advanced_query' => $this->executeAdvancedQuery($parameters),
+                'analyze_data_quality' => $this->analyzeDataQuality($parameters),
+                'find_duplicate_books' => $this->findDuplicateBooks($parameters),
+                'find_missing_metadata' => $this->findMissingMetadata($parameters),
+                'get_recommendations' => $this->getRecommendations($parameters),
+                'analyze_collection' => $this->analyzeCollection($parameters),
                 default => ['success' => false, 'error' => "Unknown tool: {$toolName}"],
             };
 
@@ -897,6 +902,310 @@ class ToolExecutor
         return [
             'success' => true,
             'statistics' => $stats,
+        ];
+    }
+
+    protected function analyzeDataQuality(array $params): array
+    {
+        $checkTypes = $params['check_types'] ?? ['all'];
+        $limit = $params['limit'] ?? 50;
+        $issues = [];
+
+        if (in_array('all', $checkTypes) || in_array('missing_metadata', $checkTypes)) {
+            $issues['missing_metadata'] = [
+                'no_author' => Book::doesntHave('authors')->limit($limit)->get(['id', 'title'])->toArray(),
+                'no_genre' => Book::doesntHave('genres')->limit($limit)->get(['id', 'title'])->toArray(),
+                'no_description' => Book::whereNull('description')->orWhere('description', '')->limit($limit)->get(['id', 'title'])->toArray(),
+            ];
+        }
+
+        if (in_array('all', $checkTypes) || in_array('orphaned_records', $checkTypes)) {
+            $issues['orphaned_records'] = [
+                'authors_without_books' => Author::doesntHave('books')->limit($limit)->get(['id', 'name'])->toArray(),
+                'genres_without_books' => Genre::doesntHave('books')->limit($limit)->get(['id', 'name'])->toArray(),
+                'series_without_books' => Series::doesntHave('books')->limit($limit)->get(['id', 'name'])->toArray(),
+            ];
+        }
+
+        if (in_array('all', $checkTypes) || in_array('filesystem_mismatches', $checkTypes)) {
+            $books = Book::limit($limit)->get();
+            $mismatches = [];
+            foreach ($books as $book) {
+                $path = $this->bookRoot . '/' . ltrim($book->directory_path, '/');
+                if (!File::exists($path)) {
+                    $mismatches[] = [
+                        'id' => $book->id,
+                        'title' => $book->title,
+                        'path' => $book->directory_path,
+                        'issue' => 'path_not_found',
+                    ];
+                }
+            }
+            $issues['filesystem_mismatches'] = $mismatches;
+        }
+
+        return [
+            'success' => true,
+            'issues' => $issues,
+            'summary' => [
+                'total_issues' => array_sum(array_map(fn ($cat) => is_array($cat) ? count($cat) : 0, $issues)),
+            ],
+        ];
+    }
+
+    protected function findDuplicateBooks(array $params): array
+    {
+        $method = $params['method'] ?? 'all';
+        $threshold = $params['threshold'] ?? 0.85;
+        $includeSeriesBooks = $params['include_series_books'] ?? false;
+        $duplicates = [];
+
+        if ($method === 'exact_title' || $method === 'all') {
+            $titleGroups = Book::select('title', DB::raw('GROUP_CONCAT(id) as book_ids'), DB::raw('COUNT(*) as count'))
+                ->groupBy('title')
+                ->having('count', '>', 1)
+                ->get();
+
+            foreach ($titleGroups as $group) {
+                $bookIds = explode(',', $group->book_ids);
+                $books = Book::whereIn('id', $bookIds)->with(['authors', 'series'])->get();
+
+                $duplicates[] = [
+                    'method' => 'exact_title',
+                    'title' => $group->title,
+                    'count' => $group->count,
+                    'books' => $books->map(fn ($b) => [
+                        'id' => $b->id,
+                        'title' => $b->title,
+                        'authors' => $b->authors->pluck('name')->toArray(),
+                        'series' => $b->series->pluck('name')->toArray(),
+                    ])->toArray(),
+                ];
+            }
+        }
+
+        if ($method === 'isbn' || $method === 'all') {
+            $isbnGroups = Book::select('isbn', DB::raw('GROUP_CONCAT(id) as book_ids'), DB::raw('COUNT(*) as count'))
+                ->whereNotNull('isbn')
+                ->where('isbn', '!=', '')
+                ->groupBy('isbn')
+                ->having('count', '>', 1)
+                ->get();
+
+            foreach ($isbnGroups as $group) {
+                $bookIds = explode(',', $group->book_ids);
+                $books = Book::whereIn('id', $bookIds)->with(['authors'])->get();
+
+                $duplicates[] = [
+                    'method' => 'isbn',
+                    'isbn' => $group->isbn,
+                    'count' => $group->count,
+                    'books' => $books->map(fn ($b) => [
+                        'id' => $b->id,
+                        'title' => $b->title,
+                        'authors' => $b->authors->pluck('name')->toArray(),
+                    ])->toArray(),
+                ];
+            }
+        }
+
+        return [
+            'success' => true,
+            'duplicates' => $duplicates,
+            'total_duplicate_groups' => count($duplicates),
+        ];
+    }
+
+    protected function findMissingMetadata(array $params): array
+    {
+        $metadataTypes = $params['metadata_types'] ?? ['all'];
+        $limit = $params['limit'] ?? 50;
+        $missing = [];
+
+        if (in_array('all', $metadataTypes) || in_array('author', $metadataTypes)) {
+            $missing['no_author'] = Book::doesntHave('authors')->limit($limit)->get(['id', 'title', 'directory_path'])->toArray();
+        }
+
+        if (in_array('all', $metadataTypes) || in_array('genre', $metadataTypes)) {
+            $missing['no_genre'] = Book::doesntHave('genres')->limit($limit)->get(['id', 'title', 'directory_path'])->toArray();
+        }
+
+        if (in_array('all', $metadataTypes) || in_array('series', $metadataTypes)) {
+            $missing['no_series'] = Book::doesntHave('series')->limit($limit)->get(['id', 'title', 'directory_path'])->toArray();
+        }
+
+        if (in_array('all', $metadataTypes) || in_array('narrator', $metadataTypes)) {
+            $missing['no_narrator'] = Book::doesntHave('narrators')->limit($limit)->get(['id', 'title', 'directory_path'])->toArray();
+        }
+
+        if (in_array('all', $metadataTypes) || in_array('cover', $metadataTypes)) {
+            $missing['no_cover'] = Book::whereNull('cover_image')->orWhere('cover_image', '')->limit($limit)->get(['id', 'title', 'directory_path'])->toArray();
+        }
+
+        if (in_array('all', $metadataTypes) || in_array('description', $metadataTypes)) {
+            $missing['no_description'] = Book::whereNull('description')->orWhere('description', '')->limit($limit)->get(['id', 'title', 'directory_path'])->toArray();
+        }
+
+        if (in_array('all', $metadataTypes) || in_array('isbn', $metadataTypes)) {
+            $missing['no_isbn'] = Book::whereNull('isbn')->orWhere('isbn', '')->limit($limit)->get(['id', 'title', 'directory_path'])->toArray();
+        }
+
+        return [
+            'success' => true,
+            'missing' => $missing,
+            'summary' => array_map('count', $missing),
+        ];
+    }
+
+    protected function getRecommendations(array $params): array
+    {
+        $basedOn = $params['based_on'];
+        $limit = $params['limit'] ?? 10;
+        $recommendations = [];
+
+        switch ($basedOn) {
+            case 'book':
+                $bookId = $params['book_id'];
+                $book = Book::with(['authors', 'genres', 'series'])->find($bookId);
+                if (!$book) {
+                    return ['success' => false, 'error' => 'Book not found'];
+                }
+
+                $recommendations = Book::where('id', '!=', $bookId)
+                    ->where(function ($q) use ($book) {
+                        $q->whereHas('authors', fn ($q) => $q->whereIn('id', $book->authors->pluck('id')))
+                            ->orWhereHas('genres', fn ($q) => $q->whereIn('id', $book->genres->pluck('id')))
+                            ->orWhereHas('series', fn ($q) => $q->whereIn('id', $book->series->pluck('id')));
+                    })
+                    ->with(['authors', 'genres'])
+                    ->limit($limit)
+                    ->get();
+                break;
+
+            case 'author':
+                $authorName = $params['author_name'];
+                $author = Author::where('name', 'like', "%{$authorName}%")->first();
+                if (!$author) {
+                    return ['success' => false, 'error' => 'Author not found'];
+                }
+
+                $recommendations = $author->books()->with(['authors', 'genres'])->limit($limit)->get();
+                break;
+
+            case 'genre':
+                $genreName = $params['genre_name'];
+                $genre = Genre::where('name', 'like', "%{$genreName}%")->first();
+                if (!$genre) {
+                    return ['success' => false, 'error' => 'Genre not found'];
+                }
+
+                $recommendations = $genre->books()->with(['authors', 'genres'])->limit($limit)->get();
+                break;
+
+            case 'series':
+                $seriesName = $params['series_name'];
+                $series = Series::where('name', 'like', "%{$seriesName}%")->first();
+                if (!$series) {
+                    return ['success' => false, 'error' => 'Series not found'];
+                }
+
+                $recommendations = $series->books()->with(['authors', 'genres'])->limit($limit)->get();
+                break;
+        }
+
+        return [
+            'success' => true,
+            'based_on' => $basedOn,
+            'recommendations' => $recommendations->map(fn ($b) => [
+                'id' => $b->id,
+                'title' => $b->title,
+                'authors' => $b->authors->pluck('name')->toArray(),
+                'genres' => $b->genres->pluck('name')->toArray(),
+            ])->toArray(),
+        ];
+    }
+
+    protected function analyzeCollection(array $params): array
+    {
+        $analysisTypes = $params['analysis_types'] ?? ['overview'];
+        $includeChartsData = $params['include_charts_data'] ?? false;
+        $analysis = [];
+
+        if (in_array('all', $analysisTypes) || in_array('overview', $analysisTypes)) {
+            $analysis['overview'] = [
+                'total_books' => Book::count(),
+                'total_authors' => Author::count(),
+                'total_genres' => Genre::count(),
+                'total_series' => Series::count(),
+                'total_narrators' => Narrator::count(),
+                'total_duration_hours' => round(Book::sum('duration') / 3600, 2),
+                'books_with_series' => Book::has('series')->count(),
+                'books_without_series' => Book::doesntHave('series')->count(),
+                'ai_processed_books' => Book::where('ai_processed', true)->count(),
+            ];
+        }
+
+        if (in_array('all', $analysisTypes) || in_array('genres', $analysisTypes)) {
+            $genreStats = Genre::withCount('books')
+                ->orderBy('books_count', 'desc')
+                ->get()
+                ->map(fn ($g) => [
+                    'name' => $g->name,
+                    'count' => $g->books_count,
+                ]);
+
+            $analysis['genres'] = [
+                'distribution' => $genreStats->toArray(),
+                'top_genre' => $genreStats->first(),
+            ];
+        }
+
+        if (in_array('all', $analysisTypes) || in_array('authors', $analysisTypes)) {
+            $authorStats = Author::withCount('books')
+                ->orderBy('books_count', 'desc')
+                ->limit(20)
+                ->get()
+                ->map(fn ($a) => [
+                    'name' => $a->name,
+                    'count' => $a->books_count,
+                ]);
+
+            $analysis['authors'] = [
+                'top_authors' => $authorStats->toArray(),
+                'total_authors' => Author::count(),
+            ];
+        }
+
+        if (in_array('all', $analysisTypes) || in_array('series', $analysisTypes)) {
+            $seriesStats = Series::withCount('books')
+                ->orderBy('books_count', 'desc')
+                ->limit(20)
+                ->get()
+                ->map(fn ($s) => [
+                    'name' => $s->name,
+                    'count' => $s->books_count,
+                ]);
+
+            $analysis['series'] = [
+                'top_series' => $seriesStats->toArray(),
+                'total_series' => Series::count(),
+                'series_with_10plus_books' => Series::withCount('books')->having('books_count', '>=', 10)->count(),
+            ];
+        }
+
+        if (in_array('all', $analysisTypes) || in_array('quality', $analysisTypes)) {
+            $analysis['quality'] = [
+                'books_missing_author' => Book::doesntHave('authors')->count(),
+                'books_missing_genre' => Book::doesntHave('genres')->count(),
+                'books_missing_description' => Book::whereNull('description')->orWhere('description', '')->count(),
+                'books_needing_review' => Book::where('needs_review', true)->count(),
+                'ai_unprocessed' => Book::where('ai_processed', false)->count(),
+            ];
+        }
+
+        return [
+            'success' => true,
+            'analysis' => $analysis,
         ];
     }
 }

@@ -22,6 +22,11 @@ class ToolDefinitions
             self::patternRenamePreview(),
             self::bulkUpdatePreview(),
             self::executeAdvancedQuery(),
+            self::analyzeDataQuality(),
+            self::findDuplicateBooks(),
+            self::findMissingMetadata(),
+            self::getRecommendations(),
+            self::analyzeCollection(),
         ];
     }
 
@@ -428,6 +433,146 @@ class ToolDefinitions
                     ],
                 ],
                 'required' => ['description', 'query_type'],
+            ],
+        ];
+    }
+
+    protected static function analyzeDataQuality(): array
+    {
+        return [
+            'name' => 'analyze_data_quality',
+            'description' => 'Analyze library data quality, finding books with missing or incomplete metadata, orphaned records, filesystem mismatches, and other data integrity issues.',
+            'parameters' => [
+                'type' => 'object',
+                'properties' => [
+                    'check_types' => [
+                        'type' => 'array',
+                        'items' => [
+                            'type' => 'string',
+                            'enum' => ['missing_metadata', 'orphaned_records', 'filesystem_mismatches', 'invalid_data', 'all'],
+                        ],
+                        'description' => 'Types of quality checks to perform (default: all)',
+                    ],
+                    'limit' => [
+                        'type' => 'integer',
+                        'description' => 'Maximum number of issues to return per check type',
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    protected static function findDuplicateBooks(): array
+    {
+        return [
+            'name' => 'find_duplicate_books',
+            'description' => 'Find potential duplicate books across the entire library based on title similarity, author matching, ISBN, or ASIN. Useful for library cleanup.',
+            'parameters' => [
+                'type' => 'object',
+                'properties' => [
+                    'method' => [
+                        'type' => 'string',
+                        'enum' => ['exact_title', 'similar_title', 'isbn', 'asin', 'all'],
+                        'description' => 'Method to use for duplicate detection (default: all)',
+                    ],
+                    'threshold' => [
+                        'type' => 'number',
+                        'description' => 'Similarity threshold for fuzzy matching (0-1, default: 0.85)',
+                    ],
+                    'include_series_books' => [
+                        'type' => 'boolean',
+                        'description' => 'Include books in same series (may have similar titles) (default: false)',
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    protected static function findMissingMetadata(): array
+    {
+        return [
+            'name' => 'find_missing_metadata',
+            'description' => 'Find books with missing or incomplete metadata such as no author, no genre, no cover, no description, etc.',
+            'parameters' => [
+                'type' => 'object',
+                'properties' => [
+                    'metadata_types' => [
+                        'type' => 'array',
+                        'items' => [
+                            'type' => 'string',
+                            'enum' => ['author', 'genre', 'series', 'narrator', 'cover', 'description', 'publisher', 'isbn', 'all'],
+                        ],
+                        'description' => 'Types of missing metadata to find (default: all)',
+                    ],
+                    'limit' => [
+                        'type' => 'integer',
+                        'description' => 'Maximum results per metadata type (default: 50)',
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    protected static function getRecommendations(): array
+    {
+        return [
+            'name' => 'get_recommendations',
+            'description' => 'Get book recommendations based on a given book, author, genre, or series. Uses collaborative filtering based on shared characteristics.',
+            'parameters' => [
+                'type' => 'object',
+                'properties' => [
+                    'based_on' => [
+                        'type' => 'string',
+                        'enum' => ['book', 'author', 'genre', 'series'],
+                        'description' => 'What to base recommendations on',
+                    ],
+                    'book_id' => [
+                        'type' => 'integer',
+                        'description' => 'Book ID (if based_on is "book")',
+                    ],
+                    'author_name' => [
+                        'type' => 'string',
+                        'description' => 'Author name (if based_on is "author")',
+                    ],
+                    'genre_name' => [
+                        'type' => 'string',
+                        'description' => 'Genre name (if based_on is "genre")',
+                    ],
+                    'series_name' => [
+                        'type' => 'string',
+                        'description' => 'Series name (if based_on is "series")',
+                    ],
+                    'limit' => [
+                        'type' => 'integer',
+                        'description' => 'Number of recommendations (default: 10)',
+                    ],
+                ],
+                'required' => ['based_on'],
+            ],
+        ];
+    }
+
+    protected static function analyzeCollection(): array
+    {
+        return [
+            'name' => 'analyze_collection',
+            'description' => 'Analyze the entire library collection with comprehensive statistics including genre distribution, author counts, series completion rates, reading time estimates, and more.',
+            'parameters' => [
+                'type' => 'object',
+                'properties' => [
+                    'analysis_types' => [
+                        'type' => 'array',
+                        'items' => [
+                            'type' => 'string',
+                            'enum' => ['overview', 'genres', 'authors', 'series', 'narrators', 'publishers', 'quality', 'growth', 'all'],
+                        ],
+                        'description' => 'Types of analysis to perform (default: overview)',
+                    ],
+                    'include_charts_data' => [
+                        'type' => 'boolean',
+                        'description' => 'Include data formatted for charting (default: false)',
+                    ],
+                ],
             ],
         ];
     }

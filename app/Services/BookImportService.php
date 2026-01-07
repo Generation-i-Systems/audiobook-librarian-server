@@ -5864,41 +5864,6 @@ class BookImportService
         }
     }
 
-    /**
-     * Prompt user to select a cover from available options
-     */
-    public function promptForCoverSelection(array $coverOptions, callable $choiceCallback, callable $askCallback): ?string
-    {
-        if (empty($coverOptions)) {
-            return null;
-        }
-
-        $choices = [];
-        foreach ($coverOptions as $index => $option) {
-            $choices[(string) ($index + 1)] = $option['label'];
-        }
-        $choices['0'] = 'None - skip cover';
-        $choices['u'] = 'Enter custom URL';
-
-        $selection = $choiceCallback('Select a cover image', $choices, '1');
-
-        if ($selection === '0' || $selection === 'None - skip cover') {
-            return '';
-        }
-
-        if ($selection === 'u' || $selection === 'Enter custom URL') {
-            $customUrl = $askCallback('Enter cover URL');
-            return $customUrl ? trim($customUrl) : null;
-        }
-
-        foreach ($coverOptions as $index => $option) {
-            if ($option['label'] === $selection || (string) ($index + 1) === $selection) {
-                return $option['url'];
-            }
-        }
-
-        return null;
-    }
 
     /**
      * Process a single audiobook with AI and external enrichment
@@ -6259,7 +6224,12 @@ class BookImportService
                 }
 
                 if ($choice === '4') {
-                    $metadata['cover_url'] = $this->promptForCoverUrl($currentCoverUrl, $askInlineCallback, $inputInterrupted);
+                    $newCoverUrl = $askInlineCallback('Cover URL', $currentCoverUrl);
+                    if ($inputInterrupted) {
+                        $metadata['cover_url'] = $currentCoverUrl;
+                    } else {
+                        $metadata['cover_url'] = $newCoverUrl ?: $currentCoverUrl;
+                    }
                     $currentCoverUrl = (string) ($metadata['cover_url'] ?? '');
                     $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
                     continue;
@@ -6342,7 +6312,12 @@ class BookImportService
             }
 
             if ($choice === '4') {
-                $metadata['cover_url'] = $this->promptForCoverUrl($currentCoverUrl, $askInlineCallback, $inputInterrupted);
+                $newCoverUrl = $askInlineCallback('Cover URL', $currentCoverUrl);
+                if ($inputInterrupted) {
+                    $metadata['cover_url'] = $currentCoverUrl;
+                } else {
+                    $metadata['cover_url'] = $newCoverUrl ?: $currentCoverUrl;
+                }
                 $currentCoverUrl = (string) ($metadata['cover_url'] ?? '');
                 $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
                 continue;
@@ -6391,19 +6366,5 @@ class BookImportService
                 continue;
             }
         }
-    }
-
-    /**
-     * Prompt for cover URL
-     */
-    protected function promptForCoverUrl(string $currentCoverUrl, callable $askInlineCallback, bool &$inputInterrupted): string
-    {
-        $newCoverUrl = $askInlineCallback('Cover URL', $currentCoverUrl);
-
-        if ($inputInterrupted) {
-            return $currentCoverUrl;
-        }
-
-        return $newCoverUrl ?: $currentCoverUrl;
     }
 }

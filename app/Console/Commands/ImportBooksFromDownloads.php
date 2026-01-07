@@ -1014,6 +1014,10 @@ class ImportBooksFromDownloads extends Command
         return $this->getImportService()->getFirstNonEmptyMetadataValue($metadata, $keys);
     }
 
+    /**
+     * Prompt for cover URL
+     * CLI-specific implementation
+     */
     protected function promptForCoverUrl(string $currentCoverUrl): string
     {
         $newCoverUrl = $this->askInline('Cover URL', $currentCoverUrl);
@@ -1242,14 +1246,39 @@ class ImportBooksFromDownloads extends Command
 
     /**
      * Prompt user to select a cover from available options
+     * CLI-specific implementation
      */
     protected function promptForCoverSelection(array $coverOptions): ?string
     {
-        return $this->getImportService()->promptForCoverSelection(
-            $coverOptions,
-            fn ($question, $choices, $default) => $this->choice($question, $choices, $default),
-            fn ($question) => $this->ask($question)
-        );
+        if (empty($coverOptions)) {
+            return null;
+        }
+
+        $choices = [];
+        foreach ($coverOptions as $index => $option) {
+            $choices[(string) ($index + 1)] = $option['label'];
+        }
+        $choices['0'] = 'None - skip cover';
+        $choices['u'] = 'Enter custom URL';
+
+        $selection = $this->choice('Select a cover image', $choices, '1');
+
+        if ($selection === '0' || $selection === 'None - skip cover') {
+            return '';
+        }
+
+        if ($selection === 'u' || $selection === 'Enter custom URL') {
+            $customUrl = $this->ask('Enter cover URL');
+            return $customUrl ? trim($customUrl) : null;
+        }
+
+        foreach ($coverOptions as $index => $option) {
+            if ($option['label'] === $selection || (string) ($index + 1) === $selection) {
+                return $option['url'];
+            }
+        }
+
+        return null;
     }
 
     /**
