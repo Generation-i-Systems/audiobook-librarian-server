@@ -2024,51 +2024,15 @@ class ImportBooksFromDownloads extends Command
      */
     protected function handleDirectoryConflict(array $audiobook, string $targetDir): string
     {
-        $this->uiService->logMessage("⚠️  Target directory already exists: " . basename($targetDir));
-
-        // Compare directories
-        $comparison = $this->compareDirectories($audiobook['path'], $targetDir);
-
-        // Display comparison
-        $this->displayDirectoryComparison($comparison);
-
-        // If directories are identical, automatically clean up source
-        if ($comparison['identical']) {
-            $this->uiService->logMessage("🔍 Directories are identical - source will be automatically deleted");
-            return 'skip';
-        }
-
-        // If in auto mode, default to replace
-        if ($this->option('auto')) {
-            $this->uiService->logMessage("🤖 Auto mode: Replacing existing directory");
-            return 'replace';
-        }
-
-        // Prompt user for action
-        $options = [
-            '1' => 'Replace existing directory with new files',
-            '2' => 'Rename existing directory (backup)',
-            '3' => 'Rename new import',
-            '4' => 'Rename both directories by narrator',
-            '5' => 'Cancel import',
-        ];
-
-        $choice = $this->uiService->select("Target directory conflict - choose action", $options, '1');
-
-        switch ($choice) {
-            case '1':
-                return 'replace';
-            case '2':
-                return 'rename_existing';
-            case '3':
-                return 'rename_new';
-            case '4':
-                return 'rename_both_narrator';
-            case '5':
-                return 'cancel';
-            default:
-                return 'replace';
-        }
+        return $this->getImportService()->handleDirectoryConflict(
+            $audiobook,
+            $targetDir,
+            fn ($sourcePath, $targetPath) => $this->compareDirectories($sourcePath, $targetPath),
+            fn ($comparison) => $this->displayDirectoryComparison($comparison),
+            fn ($message) => $this->uiService->logMessage($message),
+            fn ($question, $options, $default) => $this->uiService->select($question, $options, $default),
+            fn ($option) => $this->option($option)
+        );
     }
 
     /**

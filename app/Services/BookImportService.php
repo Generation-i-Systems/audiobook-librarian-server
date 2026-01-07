@@ -837,7 +837,7 @@ class BookImportService
                 && $options['target_directory'] !== '';
 
             if (!$hasExplicitTargetDirectory && File::isDirectory($targetDir)) {
-                $targetDir = $this->handleDirectoryConflict($audiobook, $targetDir);
+                $targetDir = $this->resolveDirectoryConflictPath($targetDir);
 
                 // If directory was changed due to conflict, update book's directory_path
                 if ($targetDir !== $originalTargetDir) {
@@ -1555,9 +1555,9 @@ class BookImportService
     private const METADATA_FILES = ['librarian.json', 'cover.jpg', 'cover.jpeg', 'cover.png', 'cover.webp'];
 
     /**
-     * Handle directory conflict resolution
+     * Resolve directory conflict by finding a non-conflicting path (automated)
      */
-    public function handleDirectoryConflict(array $audiobook, string $targetDir): string
+    public function resolveDirectoryConflictPath(string $targetDir): string
     {
         $originalTargetDir = $targetDir;
 
@@ -1590,6 +1590,65 @@ class BookImportService
         }
 
         return $targetDir;
+    }
+
+    /**
+     * Handle directory conflict resolution with UI interaction
+     */
+    public function handleDirectoryConflict(
+        array $audiobook,
+        string $targetDir,
+        callable $compareDirectoriesCallback,
+        callable $displayDirectoryComparisonCallback,
+        callable $logMessageCallback,
+        ?callable $selectCallback = null,
+        ?callable $optionCallback = null
+    ): string {
+        $logMessageCallback("⚠️  Target directory already exists: " . basename($targetDir));
+
+        // Compare directories
+        $comparison = $compareDirectoriesCallback($audiobook['path'], $targetDir);
+
+        // Display comparison
+        $displayDirectoryComparisonCallback($comparison);
+
+        // If directories are identical, automatically clean up source
+        if ($comparison['identical']) {
+            $logMessageCallback("🔍 Directories are identical - source will be automatically deleted");
+            return 'skip';
+        }
+
+        // If in auto mode, default to replace
+        if ($optionCallback && $optionCallback('auto')) {
+            $logMessageCallback("🤖 Auto mode: Replacing existing directory");
+            return 'replace';
+        }
+
+        // Prompt user for action
+        $options = [
+            '1' => 'Replace existing directory with new files',
+            '2' => 'Rename existing directory (backup)',
+            '3' => 'Rename new import',
+            '4' => 'Rename both directories by narrator',
+            '5' => 'Cancel import',
+        ];
+
+        $choice = $selectCallback("Target directory conflict - choose action", $options, '1');
+
+        switch ($choice) {
+            case '1':
+                return 'replace';
+            case '2':
+                return 'rename_existing';
+            case '3':
+                return 'rename_new';
+            case '4':
+                return 'rename_both_narrator';
+            case '5':
+                return 'cancel';
+            default:
+                return 'replace';
+        }
     }
 
     /**
