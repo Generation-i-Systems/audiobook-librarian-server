@@ -5163,6 +5163,34 @@ class BookImportService
     }
 
     /**
+     * Store result in cache
+     */
+    public function setCachedResult(
+        array $backgroundCache,
+        array $audiobook,
+        string $taskType,
+        array $result,
+        bool $cacheEnabled,
+        callable $getCacheKeyCallback,
+        callable $getDirectoryModificationTimeCallback
+    ): void {
+        if (!$cacheEnabled) {
+            return;
+        }
+
+        $cacheKey = $getCacheKeyCallback($audiobook);
+        $fullKey = $cacheKey . '_' . $taskType;
+
+        $backgroundCache[$fullKey] = [
+            'path' => $audiobook['path'],
+            'task_type' => $taskType,
+            'result' => $result,
+            'timestamp' => time(),
+            'directory_mtime' => $getDirectoryModificationTimeCallback($audiobook['path']),
+        ];
+    }
+
+    /**
      * Get cached result for a background task
      */
     public function getCachedResult(array $backgroundCache, array $audiobook, string $taskType, bool $cacheEnabled): ?array

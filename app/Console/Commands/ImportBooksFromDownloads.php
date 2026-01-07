@@ -720,20 +720,15 @@ class ImportBooksFromDownloads extends Command
      */
     protected function setCachedResult(array $audiobook, string $taskType, array $result): void
     {
-        if (!$this->cacheEnabled) {
-            return;
-        }
-
-        $cacheKey = $this->getCacheKey($audiobook);
-        $fullKey = $cacheKey . '_' . $taskType;
-
-        $this->backgroundCache[$fullKey] = [
-            'path' => $audiobook['path'],
-            'task_type' => $taskType,
-            'result' => $result,
-            'timestamp' => time(),
-            'directory_mtime' => $this->getDirectoryModificationTime($audiobook['path']),
-        ];
+        $this->getImportService()->setCachedResult(
+            $this->backgroundCache,
+            $audiobook,
+            $taskType,
+            $result,
+            $this->cacheEnabled,
+            fn ($data) => $this->getCacheKey($data),
+            fn ($path) => $this->getDirectoryModificationTime($path)
+        );
     }
 
     /**
