@@ -411,6 +411,11 @@ trait BookImportTrait
                 // Only set series if the folder is not numeric
                 if (!is_numeric($seriesCandidate)) {
                     $series = $seriesCandidate;
+                    Log::debug('BookImportTrait::processDirPath - Series extracted from path', [
+                        'directoryPath' => $directoryPath,
+                        'series' => $series,
+                        'seriesCandidate' => $seriesCandidate,
+                    ]);
                 } else {
                     // If the folder is numeric, treat it as part of the title (prepend to title)
                     $title = $seriesCandidate . ' ' . $title;
