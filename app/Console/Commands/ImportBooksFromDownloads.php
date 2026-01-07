@@ -1488,269 +1488,43 @@ class ImportBooksFromDownloads extends Command
      */
     protected function processAudiobook(array $audiobook): void
     {
-        if ($this->uiService) {
-            $this->uiService->setCurrentBook($this->buildUiMetadata([
-                'title' => $audiobook['name'] ?? '',
-                'source_path' => $audiobook['path'] ?? '',
-                'author' => [],
-                'genre' => [],
-                'confidence' => 0,
-            ]));
-        }
+        $skippedBooks = &$this->skippedBooks;
+        $processedBooks = &$this->processedBooks;
 
-        $missingFiles = 0;
-        $sampleSize = min(3, count($audiobook['files'])); // Check up to 3 files
-        for ($i = 0; $i < $sampleSize; $i++) {
-            if (!file_exists($audiobook['files'][$i])) {
-                $missingFiles++;
-            }
-        }
-
-        if ($missingFiles > 0) {
-            $this->warn("⚠️  Skipping {$audiobook['name']} - {$missingFiles} of {$sampleSize} sample files missing");
-            $this->skippedBooks[] = [
-                'path' => $audiobook['path'],
-                'reason' => 'Some audio files no longer exist',
-            ];
-            return;
-        }
-
-        // Skip directories with no audio files
-        if (empty($audiobook['files']) || count($audiobook['files']) === 0) {
-            $this->warn("⚠️  Skipping {$audiobook['name']} - no audio files found");
-            $this->skippedBooks[] = [
-                'path' => $audiobook['path'],
-                'reason' => 'No audio files found',
-            ];
-            return;
-        }
-
-        if ($this->uiService) {
-            $this->uiService->logMessage('📖 Processing: ' . $audiobook['name']);
-            $this->uiService->logMessage('📁 Path: ' . $audiobook['path']);
-            $this->uiService->logMessage(
-                '📄 Files: ' . count($audiobook['files']) . ' (' . $this->formatBytes($audiobook['total_size']) . ')'
-            );
-            $this->uiService->logMessage('🤖 Analyzing metadata with AI...');
-        } else {
-            $this->newLine();
-            $this->info("📖 Processing: " . $audiobook['name']);
-            $this->line("📁 Path: " . $audiobook['path']);
-            $this->line(
-                "📄 Files: " . count($audiobook['files']) . " (" . $this->formatBytes($audiobook['total_size']) . ")"
-            );
-        }
-
-        $aiMetadata = $this->processWithAI($audiobook);
-
-        if ($this->handleLowConfidenceMetadata($audiobook, $aiMetadata)) {
-            return;
-        }
-
-        $successMessage = "✅ AI processing successful (confidence: {$aiMetadata['confidence']}%)";
-        if ($this->uiService) {
-            $this->uiService->logMessage($successMessage);
-        } else {
-            $this->info($successMessage);
-        }
-
-        // Check for multi-book directory pattern first
-        $multiBookInfo = $this->detectMultiBookPattern($audiobook['name']);
-        if ($multiBookInfo) {
-            // Clean series name by removing author names
-            $authors = is_array($aiMetadata['author']) ? $aiMetadata['author'] : [$aiMetadata['author']];
-            $cleanedSeriesName = $this->getImportService()->cleanSeriesName($multiBookInfo['series_name'], $authors);
-            $multiBookInfo['series_name'] = $cleanedSeriesName;
-
-            $this->info(
-                "📚 Detected multi-book directory: {$cleanedSeriesName} " .
-                "[{$multiBookInfo['start_number']}-{$multiBookInfo['end_number']}]"
-            );
-
-            // Analyze files to see if they can be split
-            $splitGroups = $this->analyzeMultiBookFiles($audiobook, $multiBookInfo);
-
-            if (count($splitGroups) >= 2) {
-                $this->info("🔍 Found individual book files - will split during import");
-                $this->processMultiBookSplit($audiobook, $multiBookInfo, $splitGroups, $aiMetadata);
-                return;
-            } else {
-                $this->info(
-                    '📖 No individual book files found - will create combined entry with multiple series numbers'
-                );
-                // Update metadata to reflect multi-book nature
-                $aiMetadata['series'] = $cleanedSeriesName;
-                $aiMetadata['multi_book_numbers'] = $multiBookInfo['numbers'];
-                $aiMetadata['title'] = $cleanedSeriesName; // Clean title
-            }
-        } else {
-            // Extract series number from title if present (single book)
-            $this->extractSeriesNumberFromTitle($aiMetadata);
-        }
-
-        // Check for duplicates with AI-extracted metadata (more accurate than path-based check)
-
-        $existingBook = $this->findExistingBook($audiobook['path'], $aiMetadata);
-        if ($existingBook) {
-            $this->warn("⚠️  Book already exists (detected after AI processing)");
-            $this->line("  Found existing book: '{$existingBook->title}' (ID: {$existingBook->id})");
-
-            // Get the existing book's directory path in the library
-            $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
-            if ($bookStoragePath && $existingBook->directory_path) {
-                $existingDir = $bookStoragePath . '/' . $existingBook->directory_path;
-
-                // Compare directories to see if they're identical
-                if (File::isDirectory($existingDir)) {
-                    $comparison = $this->compareDirectories($audiobook['path'], $existingDir);
-
-                    if ($comparison['identical']) {
-                        $this->info("🔍 Source and existing directories are identical - cleaning up source");
-                        $this->cleanupSourceDirectory($audiobook, true);
-                        $this->skippedBooks[] = [
-                            'path' => $audiobook['path'],
-                            'reason' => 'Duplicate - source cleaned up (identical to existing)',
-                        ];
-                        return;
-                    } else {
-                        $this->warn("📁 Directories differ - manual decision needed");
-                        $comparisonExists = is_array($comparison) ? 'YES' : 'NO';
-                        $this->line('🔍 Debug: Comparison data structure exists: ' . $comparisonExists);
-                        if (is_array($comparison)) {
-                            $this->line("🔍 Debug: Keys present: " . implode(', ', array_keys($comparison)));
-                        }
-                        $this->displayDirectoryComparison($comparison);
-
-                        $options = [
-                            '1' => 'Skip import completely',
-                            '2' => 'Replace existing with source',
-                            '3' => 'Delete source (keep existing)',
-                            '4' => 'Import anyway with new name',
-                        ];
-
-                        $choice = $this->uiService->select("Directories differ - choose action", $options, '1');
-
-                        switch ($choice) {
-                            case '2':
-                                // Replace existing - remove existing and continue with import
-                                $this->info("🗑️ Removing existing directory to replace with source");
-                                File::deleteDirectory($existingDir);
-                                break;
-
-                            case '3':
-                                // Delete source, keep existing
-                                $this->info("🗑️ Removing source directory, keeping existing");
-                                $this->cleanupSourceDirectory($audiobook, true);
-                                $this->skippedBooks[] = [
-                                    'path' => $audiobook['path'],
-                                    'reason' => 'User chose to keep existing over source',
-                                ];
-                                return;
-
-                            case '4':
-                                // Import with renamed directory - store preference for later
-                                $this->info("📁 Will import with renamed directory to avoid conflict");
-                                $aiMetadata['_force_rename_directory'] = true;
-                                break;
-
-                            case '1':
-                            default:
-                                // Skip import completely
-                                $this->info("📁 Skipping import, leaving both directories unchanged");
-                                $this->skippedBooks[] = [
-                                    'path' => $audiobook['path'],
-                                    'reason' => 'User chose to skip import (directory conflict)',
-                                ];
-                                return;
-                        }
-                    }
-                } else {
-                    $this->warn("📁 Cannot compare directories (existing directory not found)");
-                    $this->line("  Existing path: {$existingDir}");
-                    $shouldContinue = $this->promptForDuplicateAction($audiobook, $existingBook);
-                    if (!$shouldContinue) {
-                        return;
-                    }
-                }
-            } else {
-                $this->warn("📁 Cannot compare directories (storage path or directory path missing)");
-                $shouldContinue = $this->promptForDuplicateAction($audiobook, $existingBook);
-                if (!$shouldContinue) {
-                    return;
-                }
-            }
-        }
-
-        // Step 2: External data enrichment (before manual review)
-        if (!$this->option('skip-enrichment')) {
-            $this->info("🔍 Attempting to enrich with external data...");
-            $enrichedData = $this->enrichWithExternalData($aiMetadata);
-            if ($enrichedData) {
-                if ($this->getEnrichmentService()->isValidEnrichment($aiMetadata, $enrichedData)) {
-                    $aiMetadata = array_merge($aiMetadata, $enrichedData);
-                    $this->info("✅ Found enrichment data!");
-                } else {
-                    $this->warn("⚠️  Invalid enrichment data - skipping merge.");
-                }
-            } else {
-                $this->warn("⚠️  No enrichment data found");
-            }
-        }
-
-        $this->newLine();
-        $this->displayEnrichedMetadata($aiMetadata);
-        $this->newLine();
-
-        // Show expected directory path
-        $aiMetadata['source_path'] = $audiobook['path']; // Add source path for GraphicAudio detection
-        $expectedPath = $this->getImportService()->generateDirectoryPath($aiMetadata);
-        $this->info("📁 Expected directory path: {$expectedPath}");
-
-        // Step 3: Manual review (unless in auto mode)
-        if (!$this->option('auto') && !$this->option('dry-run')) {
-            if (!$this->reviewAndApprove($aiMetadata, $audiobook)) {
-                $this->warn("❌ Import rejected by user");
-                $this->skippedBooks[] = [
-                    'path' => $audiobook['path'],
-                    'reason' => 'Rejected by user',
-                ];
-                return;
-            }
-        } elseif ($this->option('auto') && !$this->hasEnrichmentData($aiMetadata)) {
-            // In auto mode, skip books with no enrichment data as the detected fields might be wrong
-            $this->warn("⚠️  No enrichment data found in auto mode - skipping (detected fields might be incorrect)");
-            $this->skippedBooks[] = [
-                'path' => $audiobook['path'],
-                'reason' => 'No enrichment data in auto mode',
-            ];
-            return;
-        }
-
-        // Step 4: Import to database
-        if (!$this->option('dry-run')) {
-            if ($this->uiService) {
-                $this->uiService->logMessage('💾 Creating database record...');
-            }
-
-            $book = $this->getImportService()->createBookFromMetadata($aiMetadata, $audiobook);
-
-            if ($book) {
-                $this->info("✅ Book imported successfully: {$book->title} (ID: {$book->id})");
-
-                // Step 5: Move/copy files
-                $this->getImportService()->moveFilesToLibrary($audiobook, $book, [
-                    'operation' => $this->getFileOperation(),
-                ]);
-
-                $this->processedBooks[] = [
-                    'path' => $audiobook['path'],
-                    'book_id' => $book->id,
-                    'title' => $book->title,
-                ];
-            }
-        } else {
-            $this->info("🔍 [DRY RUN] Would import: {$aiMetadata['title']}");
-        }
+        $this->getImportService()->processAudiobook(
+            $audiobook,
+            $this->aiProcessor,
+            fn ($metadata) => $this->buildUiMetadata($metadata),
+            fn ($message) => $this->uiService->logMessage($message),
+            fn ($message) => $this->info($message),
+            fn ($message) => $this->line($message),
+            fn () => $this->newLine(),
+            fn ($message) => $this->warn($message),
+            fn ($metadata) => $this->displayEnrichedMetadata($metadata),
+            fn (&$metadata, $audiobook) => $this->reviewAndApprove($metadata, $audiobook),
+            fn ($metadata) => $this->hasEnrichmentData($metadata),
+            fn () => $this->getFileOperation(),
+            fn ($metadata) => $this->enrichWithExternalData($metadata),
+            fn () => $this->getEnrichmentService(),
+            fn ($path, $metadata) => $this->findExistingBook($path, $metadata),
+            fn ($dir1, $dir2) => $this->compareDirectories($dir1, $dir2),
+            fn ($comparison) => $this->displayDirectoryComparison($comparison),
+            fn ($audiobook, $existingBook) => $this->promptForDuplicateAction($audiobook, $existingBook),
+            fn ($audiobook, $force) => $this->cleanupSourceDirectory($audiobook, $force),
+            fn ($bytes) => $this->formatBytes($bytes),
+            fn (&$metadata) => $this->extractSeriesNumberFromTitle($metadata),
+            fn ($title) => $this->detectMultiBookPattern($title),
+            fn ($audiobook, $multiBookInfo) => $this->analyzeMultiBookFiles($audiobook, $multiBookInfo),
+            fn ($audiobook, $multiBookInfo, $splitGroups, $aiMetadata) => $this->processMultiBookSplit($audiobook, $multiBookInfo, $splitGroups, $aiMetadata),
+            fn ($audiobook, $aiMetadata) => $this->handleLowConfidenceMetadata($audiobook, $aiMetadata),
+            fn ($audiobook) => $this->processWithAI($audiobook),
+            $skippedBooks,
+            $processedBooks,
+            (bool) $this->option('auto'),
+            (bool) $this->option('dry-run'),
+            (bool) $this->option('skip-enrichment'),
+            $this->uiService ?? null
+        );
     }
 
     /**

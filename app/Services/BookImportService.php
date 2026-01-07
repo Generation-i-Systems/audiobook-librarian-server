@@ -4693,4 +4693,293 @@ class BookImportService
 
         return null;
     }
+
+    /**
+     * Process a single audiobook with AI and external enrichment
+     */
+    public function processAudiobook(
+        array $audiobook,
+        ?AIBookProcessor $aiProcessor,
+        callable $buildUiMetadataCallback,
+        callable $uiServiceLogCallback,
+        callable $infoCallback,
+        callable $lineCallback,
+        callable $newLineCallback,
+        callable $warnCallback,
+        callable $displayEnrichedMetadataCallback,
+        callable $reviewAndApproveCallback,
+        callable $hasEnrichmentDataCallback,
+        callable $getFileOperationCallback,
+        callable $enrichWithExternalDataCallback,
+        callable $getEnrichmentServiceCallback,
+        callable $findExistingBookCallback,
+        callable $compareDirectoriesCallback,
+        callable $displayDirectoryComparisonCallback,
+        callable $promptForDuplicateActionCallback,
+        callable $cleanupSourceDirectoryCallback,
+        callable $formatBytesCallback,
+        callable $extractSeriesNumberFromTitleCallback,
+        callable $detectMultiBookPatternCallback,
+        callable $analyzeMultiBookFilesCallback,
+        callable $processMultiBookSplitCallback,
+        callable $handleLowConfidenceMetadataCallback,
+        callable $processWithAICallback,
+        array &$skippedBooks,
+        array &$processedBooks,
+        bool $isAutoMode,
+        bool $isDryRun,
+        bool $skipEnrichment,
+        ?object $uiService = null
+    ): void {
+        if ($uiService) {
+            $uiService->setCurrentBook($buildUiMetadataCallback([
+                'title' => $audiobook['name'] ?? '',
+                'source_path' => $audiobook['path'] ?? '',
+                'author' => [],
+                'genre' => [],
+                'confidence' => 0,
+            ]));
+        }
+
+        $missingFiles = 0;
+        $sampleSize = min(3, count($audiobook['files']));
+        for ($i = 0; $i < $sampleSize; $i++) {
+            if (!file_exists($audiobook['files'][$i])) {
+                $missingFiles++;
+            }
+        }
+
+        if ($missingFiles > 0) {
+            $warnCallback("⚠️  Skipping {$audiobook['name']} - {$missingFiles} of {$sampleSize} sample files missing");
+            $skippedBooks[] = [
+                'path' => $audiobook['path'],
+                'reason' => 'Some audio files no longer exist',
+            ];
+            return;
+        }
+
+        if (empty($audiobook['files']) || count($audiobook['files']) === 0) {
+            $warnCallback("⚠️  Skipping {$audiobook['name']} - no audio files found");
+            $skippedBooks[] = [
+                'path' => $audiobook['path'],
+                'reason' => 'No audio files found',
+            ];
+            return;
+        }
+
+        if ($uiService) {
+            $uiServiceLogCallback('📖 Processing: ' . $audiobook['name']);
+            $uiServiceLogCallback('📁 Path: ' . $audiobook['path']);
+            $uiServiceLogCallback(
+                '📄 Files: ' . count($audiobook['files']) . ' (' . $formatBytesCallback($audiobook['total_size']) . ')'
+            );
+            $uiServiceLogCallback('🤖 Analyzing metadata with AI...');
+        } else {
+            $newLineCallback();
+            $infoCallback("📖 Processing: " . $audiobook['name']);
+            $lineCallback("📁 Path: " . $audiobook['path']);
+            $lineCallback(
+                "📄 Files: " . count($audiobook['files']) . " (" . $formatBytesCallback($audiobook['total_size']) . ")"
+            );
+        }
+
+        $aiMetadata = $processWithAICallback($audiobook);
+
+        $hasCriticalTagMetadata = false;
+        $tagMetadata = $this->extractTagMetadataFromAudiobook($audiobook, $aiProcessor);
+        if ($this->hasCriticalTagMetadata($tagMetadata)) {
+            $hasCriticalTagMetadata = true;
+        }
+
+        if ($handleLowConfidenceMetadataCallback($audiobook, $aiMetadata)) {
+            return;
+        }
+
+        $successMessage = "✅ AI processing successful (confidence: {$aiMetadata['confidence']}%)";
+        if ($uiService) {
+            $uiServiceLogCallback($successMessage);
+        } else {
+            $infoCallback($successMessage);
+        }
+
+        $multiBookInfo = $detectMultiBookPatternCallback($audiobook['name']);
+        if ($multiBookInfo) {
+            $authors = is_array($aiMetadata['author']) ? $aiMetadata['author'] : [$aiMetadata['author']];
+            $cleanedSeriesName = $this->cleanSeriesName($multiBookInfo['series_name'], $authors);
+            $multiBookInfo['series_name'] = $cleanedSeriesName;
+
+            $infoCallback(
+                "📚 Detected multi-book directory: {$cleanedSeriesName} " .
+                "[{$multiBookInfo['start_number']}-{$multiBookInfo['end_number']}]"
+            );
+
+            $splitGroups = $analyzeMultiBookFilesCallback($audiobook, $multiBookInfo);
+
+            if (count($splitGroups) >= 2) {
+                $infoCallback("🔍 Found individual book files - will split during import");
+                $processMultiBookSplitCallback($audiobook, $multiBookInfo, $splitGroups, $aiMetadata);
+                return;
+            } else {
+                $infoCallback(
+                    '📖 No individual book files found - will create combined entry with multiple series numbers'
+                );
+                $aiMetadata['series'] = $cleanedSeriesName;
+                $aiMetadata['multi_book_numbers'] = $multiBookInfo['numbers'];
+                $aiMetadata['title'] = $cleanedSeriesName;
+            }
+        } else {
+            $extractSeriesNumberFromTitleCallback($aiMetadata);
+        }
+
+        $existingBook = $findExistingBookCallback($audiobook['path'], $aiMetadata);
+        if ($existingBook) {
+            $warnCallback("⚠️  Book already exists (detected after AI processing)");
+            $lineCallback("  Found existing book: '{$existingBook->title}' (ID: {$existingBook->id})");
+
+            $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
+            if ($bookStoragePath && $existingBook->directory_path) {
+                $existingDir = $bookStoragePath . '/' . $existingBook->directory_path;
+
+                if (\Illuminate\Support\Facades\File::isDirectory($existingDir)) {
+                    $comparison = $compareDirectoriesCallback($audiobook['path'], $existingDir);
+
+                    if ($comparison['identical']) {
+                        $infoCallback("🔍 Source and existing directories are identical - cleaning up source");
+                        $cleanupSourceDirectoryCallback($audiobook, true);
+                        $skippedBooks[] = [
+                            'path' => $audiobook['path'],
+                            'reason' => 'Duplicate - source cleaned up (identical to existing)',
+                        ];
+                        return;
+                    } else {
+                        $warnCallback("📁 Directories differ - manual decision needed");
+                        $comparisonExists = is_array($comparison) ? 'YES' : 'NO';
+                        $lineCallback('🔍 Debug: Comparison data structure exists: ' . $comparisonExists);
+                        if (is_array($comparison)) {
+                            $lineCallback("🔍 Debug: Keys present: " . implode(', ', array_keys($comparison)));
+                        }
+                        $displayDirectoryComparisonCallback($comparison);
+
+                        $options = [
+                            '1' => 'Skip import completely',
+                            '2' => 'Replace existing with source',
+                            '3' => 'Delete source (keep existing)',
+                            '4' => 'Import anyway with new name',
+                        ];
+
+                        $choice = $uiService->select("Directories differ - choose action", $options, '1');
+
+                        switch ($choice) {
+                            case '2':
+                                $infoCallback("🗑️ Removing existing directory to replace with source");
+                                \Illuminate\Support\Facades\File::deleteDirectory($existingDir);
+                                break;
+
+                            case '3':
+                                $infoCallback("🗑️ Removing source directory, keeping existing");
+                                $cleanupSourceDirectoryCallback($audiobook, true);
+                                $skippedBooks[] = [
+                                    'path' => $audiobook['path'],
+                                    'reason' => 'User chose to keep existing over source',
+                                ];
+                                return;
+
+                            case '4':
+                                $infoCallback("📁 Will import with renamed directory to avoid conflict");
+                                $aiMetadata['_force_rename_directory'] = true;
+                                break;
+
+                            case '1':
+                            default:
+                                $infoCallback("📁 Skipping import, leaving both directories unchanged");
+                                $skippedBooks[] = [
+                                    'path' => $audiobook['path'],
+                                    'reason' => 'User chose to skip import (directory conflict)',
+                                ];
+                                return;
+                        }
+                    }
+                } else {
+                    $warnCallback("📁 Cannot compare directories (existing directory not found)");
+                    $lineCallback("  Existing path: {$existingDir}");
+                    $shouldContinue = $promptForDuplicateActionCallback($audiobook, $existingBook);
+                    if (!$shouldContinue) {
+                        return;
+                    }
+                }
+            } else {
+                $warnCallback("📁 Cannot compare directories (storage path or directory path missing)");
+                $shouldContinue = $promptForDuplicateActionCallback($audiobook, $existingBook);
+                if (!$shouldContinue) {
+                    return;
+                }
+            }
+        }
+
+        if (!$skipEnrichment) {
+            $infoCallback("🔍 Attempting to enrich with external data...");
+            $enrichedData = $enrichWithExternalDataCallback($aiMetadata);
+            if ($enrichedData) {
+                $enrichmentService = $getEnrichmentServiceCallback();
+                if ($enrichmentService->isValidEnrichment($aiMetadata, $enrichedData)) {
+                    $aiMetadata = array_merge($aiMetadata, $enrichedData);
+                    $infoCallback("✅ Found enrichment data!");
+                } else {
+                    $warnCallback("⚠️  Invalid enrichment data - skipping merge.");
+                }
+            } else {
+                $warnCallback("⚠️  No enrichment data found");
+            }
+        }
+
+        $newLineCallback();
+        $displayEnrichedMetadataCallback($aiMetadata);
+        $newLineCallback();
+
+        $aiMetadata['source_path'] = $audiobook['path'];
+        $expectedPath = $this->generateDirectoryPath($aiMetadata);
+        $infoCallback("📁 Expected directory path: {$expectedPath}");
+
+        if (!$isAutoMode && !$isDryRun) {
+            if (!$reviewAndApproveCallback($aiMetadata, $audiobook)) {
+                $warnCallback("❌ Import rejected by user");
+                $skippedBooks[] = [
+                    'path' => $audiobook['path'],
+                    'reason' => 'Rejected by user',
+                ];
+                return;
+            }
+        } elseif ($isAutoMode && !$hasEnrichmentDataCallback($aiMetadata)) {
+            $warnCallback("⚠️  No enrichment data found in auto mode - skipping (detected fields might be incorrect)");
+            $skippedBooks[] = [
+                'path' => $audiobook['path'],
+                'reason' => 'No enrichment data in auto mode',
+            ];
+            return;
+        }
+
+        if (!$isDryRun) {
+            if ($uiService) {
+                $uiServiceLogCallback('💾 Creating database record...');
+            }
+
+            $book = $this->createBookFromMetadata($aiMetadata, $audiobook);
+
+            if ($book) {
+                $infoCallback("✅ Book imported successfully: {$book->title} (ID: {$book->id})");
+
+                $this->moveFilesToLibrary($audiobook, $book, [
+                    'operation' => $getFileOperationCallback(),
+                ]);
+
+                $processedBooks[] = [
+                    'path' => $audiobook['path'],
+                    'book_id' => $book->id,
+                    'title' => $book->title,
+                ];
+            }
+        } else {
+            $infoCallback("🔍 [DRY RUN] Would import: {$aiMetadata['title']}");
+        }
+    }
 }
