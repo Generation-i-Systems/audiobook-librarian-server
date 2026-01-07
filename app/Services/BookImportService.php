@@ -4316,6 +4316,95 @@ class BookImportService
     }
 
     /**
+     * Show background processing status
+     */
+    public function showBackgroundProcessingStatus(array $backgroundTasks): string
+    {
+        $completed = 0;
+        $failed = 0;
+        $pending = 0;
+
+        foreach ($backgroundTasks as $task) {
+            switch ($task['status']) {
+                case 'completed':
+                    $completed++;
+                    break;
+                case 'failed':
+                    $failed++;
+                    break;
+                case 'pending':
+                    $pending++;
+                    break;
+            }
+        }
+
+        if ($completed > 0 || $failed > 0) {
+            $status = "🔄 Background: {$completed} completed";
+            if ($failed > 0) {
+                $status .= ", {$failed} failed";
+            }
+            if ($pending > 0) {
+                $status .= ", {$pending} pending";
+            }
+            return $status;
+        }
+
+        return '';
+    }
+
+    /**
+     * Show enhanced background processing status
+     */
+    public function showEnhancedBackgroundStatus(array $backgroundTasks, int $taskQueueCount): string
+    {
+        $completed = 0;
+        $failed = 0;
+        $processing = 0;
+        $cached = 0;
+
+        foreach ($backgroundTasks as $task) {
+            switch ($task['status']) {
+                case 'completed':
+                    $completed++;
+                    if (isset($task['result']['from_cache']) && $task['result']['from_cache']) {
+                        $cached++;
+                    }
+                    break;
+                case 'failed':
+                    $failed++;
+                    break;
+                case 'processing':
+                    $processing++;
+                    break;
+            }
+        }
+
+        if ($processing > 0 || $completed > 0 || $taskQueueCount > 0) {
+            $parts = [];
+
+            if ($processing > 0) {
+                $parts[] = "{$processing} running";
+            }
+            if ($taskQueueCount > 0) {
+                $parts[] = "{$taskQueueCount} queued";
+            }
+            if ($completed > 0) {
+                $parts[] = "{$completed} done";
+                if ($cached > 0) {
+                    $parts[] = "{$cached} cached";
+                }
+            }
+            if ($failed > 0) {
+                $parts[] = "{$failed} failed";
+            }
+
+            return "🔄 Background: " . implode(', ', $parts);
+        }
+
+        return '';
+    }
+
+    /**
      * Display available cover options
      */
     public function displayCoverOptions(array $coverOptions, callable $displayCoverImageCallback): void

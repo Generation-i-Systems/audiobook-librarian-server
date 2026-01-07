@@ -935,32 +935,8 @@ class ImportBooksFromDownloads extends Command
      */
     protected function showBackgroundProcessingStatus(): void
     {
-        $completed = 0;
-        $failed = 0;
-        $pending = 0;
-
-        foreach ($this->backgroundTasks as $task) {
-            switch ($task['status']) {
-                case 'completed':
-                    $completed++;
-                    break;
-                case 'failed':
-                    $failed++;
-                    break;
-                case 'pending':
-                    $pending++;
-                    break;
-            }
-        }
-
-        if ($completed > 0 || $failed > 0) {
-            $status = "🔄 Background: {$completed} completed";
-            if ($failed > 0) {
-                $status .= ", {$failed} failed";
-            }
-            if ($pending > 0) {
-                $status .= ", {$pending} pending";
-            }
+        $status = $this->getImportService()->showBackgroundProcessingStatus($this->backgroundTasks);
+        if ($status) {
             $this->line($status);
         }
     }
@@ -970,50 +946,8 @@ class ImportBooksFromDownloads extends Command
      */
     protected function showEnhancedBackgroundStatus(): void
     {
-        $completed = 0;
-        $failed = 0;
-        $processing = 0;
-        $cached = 0;
-        $queued = count($this->taskQueue);
-
-        foreach ($this->backgroundTasks as $task) {
-            switch ($task['status']) {
-                case 'completed':
-                    $completed++;
-                    // Check if result came from cache
-                    if (isset($task['result']['from_cache']) && $task['result']['from_cache']) {
-                        $cached++;
-                    }
-                    break;
-                case 'failed':
-                    $failed++;
-                    break;
-                case 'processing':
-                    $processing++;
-                    break;
-            }
-        }
-
-        if ($processing > 0 || $completed > 0 || $queued > 0) {
-            $parts = [];
-
-            if ($processing > 0) {
-                $parts[] = "{$processing} running";
-            }
-            if ($queued > 0) {
-                $parts[] = "{$queued} queued";
-            }
-            if ($completed > 0) {
-                $parts[] = "{$completed} done";
-                if ($cached > 0) {
-                    $parts[] = "{$cached} cached";
-                }
-            }
-            if ($failed > 0) {
-                $parts[] = "{$failed} failed";
-            }
-
-            $status = "🔄 Background: " . implode(', ', $parts);
+        $status = $this->getImportService()->showEnhancedBackgroundStatus($this->backgroundTasks, count($this->taskQueue));
+        if ($status) {
             $this->line($status);
         }
     }
