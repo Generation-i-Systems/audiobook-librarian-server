@@ -599,7 +599,19 @@ class UnifiedBookImporter
         // Series
         if (!empty($bookData['series_name']) || !empty($bookData['series'])) {
             $seriesName = $bookData['series_name'] ?? $bookData['series'];
+            Log::debug('UnifiedBookImporter::createRelationships - Series assignment', [
+                'book_id' => $book->id,
+                'book_title' => $book->title,
+                'seriesName' => $seriesName,
+                'bookData_series_name' => $bookData['series_name'] ?? null,
+                'bookData_series' => $bookData['series'] ?? null,
+            ]);
             $series = Series::firstOrCreate(['name' => $seriesName]);
+            Log::debug('UnifiedBookImporter::createRelationships - Series found/created', [
+                'book_id' => $book->id,
+                'series_id' => $series->id,
+                'series_name' => $series->name,
+            ]);
             $seriesNumber = $bookData['series_sequence'] ?? $bookData['series_number'] ?? null;
 
             $book->series()->sync([
