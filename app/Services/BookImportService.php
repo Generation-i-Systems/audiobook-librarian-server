@@ -2791,6 +2791,23 @@ class BookImportService
     }
 
     /**
+     * Manual enrichment with comparison
+     */
+    public function manualEnrichmentWithComparison(array $metadata, array $audiobook, ?BookEnrichmentService $enrichmentService): array
+    {
+        if (!$enrichmentService) {
+            return $metadata;
+        }
+
+        $enrichedData = $enrichmentService->enrichWithExternalData($metadata, ['force_refresh' => true]);
+        if ($enrichedData && $enrichmentService->isValidEnrichment($metadata, $enrichedData)) {
+            return array_merge($metadata, $enrichedData);
+        }
+
+        return $metadata;
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void
