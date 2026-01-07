@@ -4979,7 +4979,220 @@ class BookImportService
                 ];
             }
         } else {
-            $infoCallback("🔍 [DRY RUN] Would import: {$aiMetadata['title']}");
+            $this->info("🔍 [DRY RUN] Would import: {$aiMetadata['title']}");
         }
+    }
+
+    /**
+     * Manual review and approval
+     */
+    public function reviewAndApprove(
+        array &$metadata,
+        array $audiobook,
+        callable $buildUiMetadataCallback,
+        callable $uiServiceLogCallback,
+        callable $selectWithImmediateInterruptCallback,
+        callable $askInlineCallback,
+        callable $buildReviewOptionsCallback,
+        callable $editMetadataFieldsCallback,
+        callable $manualEnrichmentWithComparisonCallback,
+        callable $getEnrichmentServiceCallback,
+        callable $getValidGenresCallback,
+        callable $hasEnrichmentDataCallback,
+        callable $generateDirectoryPathCallback,
+        bool &$inputInterrupted
+    ): bool {
+        $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
+
+        $currentDirectoryPath = (string) ($metadata['custom_directory_path'] ?? '');
+        if ($currentDirectoryPath === '') {
+            $currentDirectoryPath = $generateDirectoryPathCallback($metadata, [
+                'include_title' => true,
+            ]);
+        }
+
+        $currentGenre = $metadata['genre'] ?? 'Other';
+        if (is_array($currentGenre)) {
+            $currentGenre = $currentGenre[0] ?? 'Other';
+        }
+
+        $currentCoverUrl = (string) ($metadata['cover_url'] ?? '');
+
+        $validGenres = $getValidGenresCallback();
+        $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
+        $isGenreValid = in_array($normalizedGenre, $validGenres, true);
+
+        if (!$hasEnrichmentDataCallback($metadata)) {
+            $uiServiceLogCallback("⚠️  No external enrichment data found - detected fields may be incorrect");
+        } else {
+            $confidence = $metadata['confidence'] ?? 0;
+            $defaultChoice = $confidence > 80 ? '1' : '2';
+            if (!$isGenreValid) {
+                $defaultChoice = '2';
+            }
+
+            while (true) {
+                $options = $buildReviewOptionsCallback($currentCoverUrl, $currentGenre, $currentDirectoryPath, false);
+                $choice = $selectWithImmediateInterruptCallback('Choose an option', $options, $defaultChoice);
+
+                $choice = strtolower(trim($choice));
+                if (in_array($choice, ['1', 'a', 'accept'], true)) {
+                    if (!$isGenreValid) {
+                        $uiServiceLogCallback('⚠️  Cannot accept: genre is invalid - please update genre first');
+                        continue;
+                    }
+                    return true;
+                }
+                if (in_array($choice, ['3', 's', 'skip'], true)) {
+                    return false;
+                }
+
+                if ($choice === '4') {
+                    $metadata['cover_url'] = $this->promptForCoverUrl($currentCoverUrl, $askInlineCallback, $inputInterrupted);
+                    $currentCoverUrl = (string) ($metadata['cover_url'] ?? '');
+                    $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
+                    continue;
+                }
+
+                if ($choice === '5') {
+                    $validGenres = $getValidGenresCallback();
+                    $genreOptions = [];
+                    foreach ($validGenres as $idx => $g) {
+                        $genreOptions[(string) ($idx + 1)] = $g;
+                    }
+
+                    $currentGenreIdx = array_search($currentGenre, $validGenres, true);
+                    if ($currentGenreIdx !== false) {
+                        $defaultGenreIdx = (string) ($currentGenreIdx + 1);
+                    } else {
+                        $defaultGenreIdx = (string) count($validGenres);
+                    }
+
+                    $selectedGenreIdx = $selectWithImmediateInterruptCallback('Genre', $genreOptions, $defaultGenreIdx);
+                    $metadata['genre'] = $genreOptions[$selectedGenreIdx] ?? $currentGenre;
+                    $currentGenre = $metadata['genre'] ?? $currentGenre;
+                    $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
+                    continue;
+                }
+
+                if ($choice === '6') {
+                    $metadata['custom_directory_path'] = $askInlineCallback('Directory', $currentDirectoryPath);
+                    $currentDirectoryPath = (string) ($metadata['custom_directory_path'] ?? $currentDirectoryPath);
+                    $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
+                    continue;
+                }
+
+                if ($choice === '7') {
+                    $metadata = $manualEnrichmentWithComparisonCallback($metadata, $audiobook, $getEnrichmentServiceCallback());
+                    $currentCoverUrl = (string) ($metadata['cover_url'] ?? '');
+                    $currentGenre = $metadata['genre'] ?? 'Other';
+                    if (is_array($currentGenre)) {
+                        $currentGenre = $currentGenre[0] ?? 'Other';
+                    }
+                    $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
+                    $isGenreValid = in_array($normalizedGenre, $validGenres, true);
+                    $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
+                    continue;
+                }
+
+                break;
+            }
+        }
+
+        $uiServiceLogCallback("📝 Editing individual fields...");
+        $metadata = $editMetadataFieldsCallback($metadata, $audiobook);
+        if ($inputInterrupted) {
+            return false;
+        }
+
+        $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
+
+        while (true) {
+            $options = $buildReviewOptionsCallback($currentCoverUrl, $currentGenre, $currentDirectoryPath, true);
+
+            $finalDefaultChoice = $isGenreValid ? '1' : '2';
+            $choice = $selectWithImmediateInterruptCallback("Final confirmation", $options, $finalDefaultChoice);
+
+            $choice = strtolower(trim($choice));
+            if ($choice === '1' || $choice === 'a' || $choice === 'accept') {
+                if (!$isGenreValid) {
+                    $uiServiceLogCallback('⚠️  Cannot accept: genre is invalid - please update genre first');
+                    continue;
+                }
+                return true;
+            }
+            if ($choice === '2' || $choice === 'e' || $choice === 'edit') {
+                $metadata = $editMetadataFieldsCallback($metadata, $audiobook);
+                $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
+                continue;
+            }
+            if ($choice === '3' || $choice === 's' || $choice === 'skip') {
+                return false;
+            }
+
+            if ($choice === '4') {
+                $metadata['cover_url'] = $this->promptForCoverUrl($currentCoverUrl, $askInlineCallback, $inputInterrupted);
+                $currentCoverUrl = (string) ($metadata['cover_url'] ?? '');
+                $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
+                continue;
+            }
+
+            if ($choice === '5') {
+                $validGenres = $getValidGenresCallback();
+                $genreOptions = [];
+                foreach ($validGenres as $idx => $g) {
+                    $genreOptions[(string) ($idx + 1)] = $g;
+                }
+
+                $currentGenreIdx = array_search($currentGenre, $validGenres, true);
+                if ($currentGenreIdx !== false) {
+                    $defaultGenreIdx = (string) ($currentGenreIdx + 1);
+                } else {
+                    $defaultGenreIdx = (string) count($validGenres);
+                }
+
+                $selectedGenreIdx = $selectWithImmediateInterruptCallback('Genre', $genreOptions, $defaultGenreIdx);
+                $metadata['genre'] = $genreOptions[$selectedGenreIdx] ?? $currentGenre;
+                $currentGenre = $metadata['genre'] ?? $currentGenre;
+                $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
+                $isGenreValid = in_array($normalizedGenre, $validGenres, true);
+                $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
+                continue;
+            }
+
+            if ($choice === '6') {
+                $metadata['custom_directory_path'] = $askInlineCallback('Directory', $currentDirectoryPath);
+                $currentDirectoryPath = (string) ($metadata['custom_directory_path'] ?? $currentDirectoryPath);
+                $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
+                continue;
+            }
+
+            if ($choice === '7') {
+                $metadata = $manualEnrichmentWithComparisonCallback($metadata, $audiobook, $getEnrichmentServiceCallback());
+                $currentCoverUrl = (string) ($metadata['cover_url'] ?? '');
+                $currentGenre = $metadata['genre'] ?? 'Other';
+                if (is_array($currentGenre)) {
+                    $currentGenre = $currentGenre[0] ?? 'Other';
+                }
+                $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
+                $isGenreValid = in_array($normalizedGenre, $validGenres, true);
+                $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
+                continue;
+            }
+        }
+    }
+
+    /**
+     * Prompt for cover URL
+     */
+    protected function promptForCoverUrl(string $currentCoverUrl, callable $askInlineCallback, bool &$inputInterrupted): string
+    {
+        $newCoverUrl = $askInlineCallback('Cover URL', $currentCoverUrl);
+
+        if ($inputInterrupted) {
+            return $currentCoverUrl;
+        }
+
+        return $newCoverUrl ?: $currentCoverUrl;
     }
 }

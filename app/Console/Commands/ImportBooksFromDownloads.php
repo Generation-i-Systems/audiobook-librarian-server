@@ -1642,191 +1642,22 @@ class ImportBooksFromDownloads extends Command
      */
     protected function reviewAndApprove(array &$metadata, array $audiobook = []): bool
     {
-        $this->uiService->setCurrentBook($this->buildUiMetadata($metadata));
-
-        $currentDirectoryPath = (string) ($metadata['custom_directory_path'] ?? '');
-        if ($currentDirectoryPath === '') {
-            $currentDirectoryPath = $this->getImportService()->generateDirectoryPath($metadata, [
-                'include_title' => true,
-            ]);
-        }
-
-        $currentGenre = $metadata['genre'] ?? 'Other';
-        if (is_array($currentGenre)) {
-            $currentGenre = $currentGenre[0] ?? 'Other';
-        }
-
-        $currentCoverUrl = (string) ($metadata['cover_url'] ?? '');
-
-        $validGenres = $this->getValidGenres();
-        $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
-        $isGenreValid = in_array($normalizedGenre, $validGenres, true);
-
-        // If no enrichment data found, assume detected fields are wrong and skip auto-approval
-        if (!$this->hasEnrichmentData($metadata)) {
-            $this->uiService->logMessage("⚠️  No external enrichment data found - detected fields may be incorrect");
-        } else {
-            // Ask if user wants to accept all fields as shown
-            $confidence = $metadata['confidence'] ?? 0;
-            $defaultChoice = $confidence > 80 ? '1' : '2';
-            if (!$isGenreValid) {
-                $defaultChoice = '2';
-            }
-
-            while (true) {
-                $options = $this->buildReviewOptions($currentCoverUrl, $currentGenre, $currentDirectoryPath, false);
-                $choice = $this->selectWithImmediateInterrupt('Choose an option', $options, $defaultChoice);
-
-                // Normalize choice to handle letters
-                $choice = strtolower(trim($choice));
-                if (in_array($choice, ['1', 'a', 'accept'], true)) {
-                    if (!$isGenreValid) {
-                        $this->uiService->logMessage('⚠️  Cannot accept: genre is invalid - please update genre first');
-                        continue;
-                    }
-                    return true;
-                }
-                if (in_array($choice, ['3', 's', 'skip'], true)) {
-                    return false;
-                }
-
-                if ($choice === '4') {
-                    $metadata['cover_url'] = $this->promptForCoverUrl($currentCoverUrl);
-                    $currentCoverUrl = (string) ($metadata['cover_url'] ?? '');
-                    $this->uiService->setCurrentBook($this->buildUiMetadata($metadata));
-                    continue;
-                }
-
-                if ($choice === '5') {
-                    $validGenres = $this->getValidGenres();
-                    $genreOptions = [];
-                    foreach ($validGenres as $idx => $g) {
-                        $genreOptions[(string) ($idx + 1)] = $g;
-                    }
-
-                    $currentGenreIdx = array_search($currentGenre, $validGenres, true);
-                    if ($currentGenreIdx !== false) {
-                        $defaultGenreIdx = (string) ($currentGenreIdx + 1);
-                    } else {
-                        $defaultGenreIdx = (string) count($validGenres);
-                    }
-
-                    $selectedGenreIdx = $this->selectWithImmediateInterrupt('Genre', $genreOptions, $defaultGenreIdx);
-                    $metadata['genre'] = $genreOptions[$selectedGenreIdx] ?? $currentGenre;
-                    $currentGenre = $metadata['genre'] ?? $currentGenre;
-                    $this->uiService->setCurrentBook($this->buildUiMetadata($metadata));
-                    continue;
-                }
-
-                if ($choice === '6') {
-                    $metadata['custom_directory_path'] = $this->askInline('Directory', $currentDirectoryPath);
-                    $currentDirectoryPath = (string) ($metadata['custom_directory_path'] ?? $currentDirectoryPath);
-                    $this->uiService->setCurrentBook($this->buildUiMetadata($metadata));
-                    continue;
-                }
-
-                if ($choice === '7') {
-                    $metadata = $this->getImportService()->manualEnrichmentWithComparison($metadata, $audiobook, $this->getEnrichmentService());
-                    $currentCoverUrl = (string) ($metadata['cover_url'] ?? '');
-                    $currentGenre = $metadata['genre'] ?? 'Other';
-                    if (is_array($currentGenre)) {
-                        $currentGenre = $currentGenre[0] ?? 'Other';
-                    }
-                    $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
-                    $isGenreValid = in_array($normalizedGenre, $validGenres, true);
-                    $this->uiService->setCurrentBook($this->buildUiMetadata($metadata));
-                    continue;
-                }
-
-                // Case '2' (Edit) continues below
-                break;
-            }
-        }
-
-        // Offer individual field editing
-        $this->uiService->logMessage("📝 Editing individual fields...");
-        $metadata = $this->editMetadataFields($metadata, $audiobook);
-        if ($this->inputInterrupted) {
-            return false;
-        }
-
-        // Show updated metadata
-        $this->uiService->setCurrentBook($this->buildUiMetadata($metadata));
-
-        // Final confirmation loop
-        while (true) {
-            $options = $this->buildReviewOptions($currentCoverUrl, $currentGenre, $currentDirectoryPath, true);
-
-            $finalDefaultChoice = $isGenreValid ? '1' : '2';
-            $choice = $this->selectWithImmediateInterrupt("Final confirmation", $options, $finalDefaultChoice);
-
-            $choice = strtolower(trim($choice));
-            if ($choice === '1' || $choice === 'a' || $choice === 'accept') {
-                if (!$isGenreValid) {
-                    $this->uiService->logMessage('⚠️  Cannot accept: genre is invalid - please update genre first');
-                    continue;
-                }
-                return true;
-            }
-            if ($choice === '2' || $choice === 'e' || $choice === 'edit') {
-                $metadata = $this->editMetadataFields($metadata, $audiobook);
-                $this->uiService->setCurrentBook($this->buildUiMetadata($metadata));
-                continue;
-            }
-            if ($choice === '3' || $choice === 's' || $choice === 'skip') {
-                return false;
-            }
-
-            if ($choice === '4') {
-                $metadata['cover_url'] = $this->promptForCoverUrl($currentCoverUrl);
-                $currentCoverUrl = (string) ($metadata['cover_url'] ?? '');
-                $this->uiService->setCurrentBook($this->buildUiMetadata($metadata));
-                continue;
-            }
-
-            if ($choice === '5') {
-                $validGenres = $this->getValidGenres();
-                $genreOptions = [];
-                foreach ($validGenres as $idx => $g) {
-                    $genreOptions[(string) ($idx + 1)] = $g;
-                }
-
-                $currentGenreIdx = array_search($currentGenre, $validGenres, true);
-                if ($currentGenreIdx !== false) {
-                    $defaultGenreIdx = (string) ($currentGenreIdx + 1);
-                } else {
-                    $defaultGenreIdx = (string) count($validGenres);
-                }
-
-                $selectedGenreIdx = $this->selectWithImmediateInterrupt('Genre', $genreOptions, $defaultGenreIdx);
-                $metadata['genre'] = $genreOptions[$selectedGenreIdx] ?? $currentGenre;
-                $currentGenre = $metadata['genre'] ?? $currentGenre;
-                $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
-                $isGenreValid = in_array($normalizedGenre, $validGenres, true);
-                $this->uiService->setCurrentBook($this->buildUiMetadata($metadata));
-                continue;
-            }
-
-            if ($choice === '6') {
-                $metadata['custom_directory_path'] = $this->askInline('Directory', $currentDirectoryPath);
-                $currentDirectoryPath = (string) ($metadata['custom_directory_path'] ?? $currentDirectoryPath);
-                $this->uiService->setCurrentBook($this->buildUiMetadata($metadata));
-                continue;
-            }
-
-            if ($choice === '7') {
-                $metadata = $this->getImportService()->manualEnrichmentWithComparison($metadata, $audiobook, $this->getEnrichmentService());
-                $currentCoverUrl = (string) ($metadata['cover_url'] ?? '');
-                $currentGenre = $metadata['genre'] ?? 'Other';
-                if (is_array($currentGenre)) {
-                    $currentGenre = $currentGenre[0] ?? 'Other';
-                }
-                $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
-                $isGenreValid = in_array($normalizedGenre, $validGenres, true);
-                $this->uiService->setCurrentBook($this->buildUiMetadata($metadata));
-                continue;
-            }
-        }
+        return $this->getImportService()->reviewAndApprove(
+            $metadata,
+            $audiobook,
+            fn ($metadata) => $this->buildUiMetadata($metadata),
+            fn ($action, $data) => $this->uiService->logMessage($data),
+            fn ($question, $options, $default) => $this->selectWithImmediateInterrupt($question, $options, $default),
+            fn ($question, $default) => $this->askInline($question, $default),
+            fn ($currentCoverUrl, $currentGenre, $currentDirectoryPath, $isFinalConfirmation) => $this->buildReviewOptions($currentCoverUrl, $currentGenre, $currentDirectoryPath, $isFinalConfirmation),
+            fn ($metadata, $audiobook) => $this->editMetadataFields($metadata, $audiobook),
+            fn ($metadata, $audiobook) => $this->getImportService()->manualEnrichmentWithComparison($metadata, $audiobook, $this->getEnrichmentService()),
+            fn () => $this->getEnrichmentService(),
+            fn () => $this->getValidGenres(),
+            fn ($metadata) => $this->hasEnrichmentData($metadata),
+            fn ($metadata, $options) => $this->getImportService()->generateDirectoryPath($metadata, $options),
+            $this->inputInterrupted
+        );
     }
 
     protected function buildReviewOptions(
