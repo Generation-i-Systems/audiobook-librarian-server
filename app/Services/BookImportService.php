@@ -4955,6 +4955,44 @@ class BookImportService
     }
 
     /**
+     * Start background processing tasks while waiting for user input (enhanced)
+     */
+    public function startBackgroundProcessing(
+        array $audiobooks,
+        int $currentIndex,
+        callable $queueBackgroundTaskCallback,
+        callable $processBackgroundTasksCallback,
+        callable $showEnhancedBackgroundStatusCallback
+    ): void {
+        // Process more books ahead (increased to 7 for deeper queue)
+        $lookaheadCount = min(7, count($audiobooks) - $currentIndex - 1);
+
+        for ($i = $currentIndex + 1; $i <= $currentIndex + $lookaheadCount; $i++) {
+            if (isset($audiobooks[$i])) {
+                $audiobook = $audiobooks[$i];
+                $distance = $i - $currentIndex;
+
+                // Prioritize tasks for closer books
+                $priority = $distance <= 2 ? 'high' : 'normal';
+
+                // Queue multiple task types for each upcoming book
+                $queueBackgroundTaskCallback('preprocess_metadata', $audiobook, $priority);
+                $queueBackgroundTaskCallback('scan_directory', $audiobook, $priority);
+                $queueBackgroundTaskCallback('duplicate_check', $audiobook, $priority);
+                $queueBackgroundTaskCallback('extract_metadata', $audiobook, $priority);
+                $queueBackgroundTaskCallback('analyze_audio_files', $audiobook, $priority);
+                $queueBackgroundTaskCallback('prepare_cover_image', $audiobook, $priority);
+            }
+        }
+
+        // Continuously process background tasks to maintain 3+ concurrent operations
+        $processBackgroundTasksCallback();
+
+        // Show enhanced background processing status
+        $showEnhancedBackgroundStatusCallback();
+    }
+
+    /**
      * Maintain at least 3 concurrent background tasks
      */
     public function maintainConcurrentTasks(

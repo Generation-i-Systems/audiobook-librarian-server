@@ -467,32 +467,13 @@ class ImportBooksFromDownloads extends Command
             return;
         }
 
-        // Process more books ahead (increased to 7 for deeper queue)
-        $lookaheadCount = min(7, count($audiobooks) - $currentIndex - 1);
-
-        for ($i = $currentIndex + 1; $i <= $currentIndex + $lookaheadCount; $i++) {
-            if (isset($audiobooks[$i])) {
-                $audiobook = $audiobooks[$i];
-                $distance = $i - $currentIndex;
-
-                // Prioritize tasks for closer books
-                $priority = $distance <= 2 ? 'high' : 'normal';
-
-                // Queue multiple task types for each upcoming book
-                $this->queueBackgroundTask('preprocess_metadata', $audiobook, $priority);
-                $this->queueBackgroundTask('scan_directory', $audiobook, $priority);
-                $this->queueBackgroundTask('duplicate_check', $audiobook, $priority);
-                $this->queueBackgroundTask('extract_metadata', $audiobook, $priority);
-                $this->queueBackgroundTask('analyze_audio_files', $audiobook, $priority);
-                $this->queueBackgroundTask('prepare_cover_image', $audiobook, $priority);
-            }
-        }
-
-        // Continuously process background tasks to maintain 3+ concurrent operations
-        $this->processBackgroundTasks();
-
-        // Show enhanced background processing status
-        $this->showEnhancedBackgroundStatus();
+        $this->getImportService()->startBackgroundProcessing(
+            $audiobooks,
+            $currentIndex,
+            fn ($type, $data, $priority) => $this->queueBackgroundTask($type, $data, $priority),
+            fn () => $this->processBackgroundTasks(),
+            fn () => $this->showEnhancedBackgroundStatus()
+        );
     }
 
     /**
