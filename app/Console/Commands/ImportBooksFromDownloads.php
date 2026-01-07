@@ -3933,174 +3933,19 @@ class ImportBooksFromDownloads extends Command
      */
     protected function moveFilesToLibrary(array $audiobook, Book $book): bool
     {
-        try {
-            $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
-            if (!$bookStoragePath) {
-                $this->warn("⚠️  Book storage path not configured - files not moved");
-                return false;
-            }
-
-            $targetDir = $bookStoragePath . '/' . $book->directory_path;
-
-            // Handle target directory existence and conflicts
-            $needToCreateDirectory = true;
-
-            if (File::isDirectory($targetDir)) {
-                // Check if the existing directory has any relevant files (same logic as comparison)
-                $targetInfo = $this->getDirectoryInfo($targetDir);
-
-                if ($targetInfo['count'] === 0) {
-                    // Directory exists but has no audio files - no conflict, just proceed
-                    $this->info("📁 Target directory exists but has no audio files - proceeding with import");
-                    $needToCreateDirectory = false; // Directory already exists
-                } else {
-                    // Directory has audio files - handle the conflict
-                    $conflictAction = $this->handleDirectoryConflict($audiobook, $targetDir);
-
-                    switch ($conflictAction) {
-                        case 'skip':
-                            $this->info("🗑️  Cleaning up duplicate source directory");
-                            $this->cleanupSourceDirectory($audiobook, true); // Clean up since files already exist
-                            return true;
-
-                        case 'replace':
-                            $this->info("🗑️  Removing existing directory to replace with new files");
-                            File::deleteDirectory($targetDir);
-                            // Directory will be recreated below
-                            break;
-
-                        case 'rename_existing':
-                            $newExistingPath = $targetDir . '_backup_' . date('Y-m-d_H-i-s');
-                            File::move($targetDir, $newExistingPath);
-                            $this->info("📁 Renamed existing directory to: " . basename($newExistingPath));
-                            // Directory will be recreated below
-                            break;
-
-                        case 'rename_new':
-                            $targetDir = $targetDir . '_imported_' . date('Y-m-d_H-i-s');
-                            $this->info("📁 Importing to renamed directory: " . basename($targetDir));
-                            // New directory name will be created below
-                            break;
-
-                        case 'rename_both_narrator':
-                            // Rename both directories with narrator format
-                            $this->renameBothDirectoriesByNarrator($audiobook, $targetDir, $book);
-                            return true;
-
-                        case 'cancel':
-                            $this->warn("❌ Import cancelled by user");
-                            return false;
-                    }
-                }
-            }
-
-            // Create target directory only if needed
-            if ($needToCreateDirectory) {
-                File::makeDirectory($targetDir, 0755, true);
-            }
-
-            // Flatten CD subdirectories before moving files
-            $this->flattenCdDirectories($audiobook['path']);
-
-            // Move or copy all files in the directory (not just audio files)
-            $copyFiles = $this->option('copy-files');
-            $filesMoved = 0;
-            $filesCopied = 0;
-
-            // Get files to move - either all files in directory or specific files for multi-book
-            if (isset($audiobook['is_multi_book_part']) && $audiobook['is_multi_book_part']) {
-                // For multi-book parts, only move the specific files for this book
-                $filesToMove = $audiobook['multi_book_files_only'];
-            } elseif (is_file($audiobook['path'])) {
-                // For individual files, just move the single file
-                $filesToMove = [$audiobook['path']];
-            } else {
-                // For regular books, move all files in the directory
-                $allFiles = File::allFiles($audiobook['path']);
-                $filesToMove = array_map(function ($file) {
-                    return $file->getPathname();
-                }, $allFiles);
-            }
-
-            // Start spinner for file operations
-            $operationType = $copyFiles ? 'Copying' : 'Moving';
-            $fileCount = count($filesToMove);
-            if ($this->uiService) {
-                $this->uiService->logMessage("📁 {$operationType} {$fileCount} files to library...");
-            }
-
-            foreach ($filesToMove as $sourceFilePath) {
-                $filename = basename($sourceFilePath);
-
-                // Skip torrent/piracy tracking files
-                if ($this->isTorrentTrackingFile($filename)) {
-                    File::delete($sourceFilePath);
-                    continue;
-                }
-
-                // Calculate relative path differently for files vs directories
-                if (is_file($audiobook['path'])) {
-                    // For individual files, just use the filename
-                    $relativePath = basename($sourceFilePath);
-                } else {
-                    // For directories, calculate relative path from directory root
-                    $relativePath = str_replace($audiobook['path'] . '/', '', $sourceFilePath);
-                }
-                $targetFile = $targetDir . '/' . $relativePath;
-
-                // Create subdirectories if needed
-                $targetSubDir = dirname($targetFile);
-                if (!File::isDirectory($targetSubDir)) {
-                    File::makeDirectory($targetSubDir, 0755, true);
-                }
-
-                if ($copyFiles) {
-                    File::copy($sourceFilePath, $targetFile);
-                    $filesCopied++;
-                } else {
-                    // Try to move first, fallback to copy if move fails
-                    try {
-                        File::move($sourceFilePath, $targetFile);
-                        $filesMoved++;
-                    } catch (\Exception $e) {
-                        // Check if source file still exists before trying to copy
-                        if (File::exists($sourceFilePath)) {
-                            $this->warn("⚠️  Failed to move {$relativePath}, copying instead: " . $e->getMessage());
-                            try {
-                                File::copy($sourceFilePath, $targetFile);
-                                $filesCopied++;
-                            } catch (\Exception $copyException) {
-                                $this->error("❌ Failed to copy {$relativePath}: " . $copyException->getMessage());
-                                throw $copyException;
-                            }
-                        } else {
-                            // File was moved successfully despite the exception (common with inter-device moves)
-                            $this->info("📁 File {$relativePath} moved successfully");
-                            $filesMoved++;
-                        }
-                    }
-                }
-            }
-
-            // Log the actual operation performed
-            if ($filesMoved > 0 && $filesCopied > 0) {
-                $this->info("✅ {$filesMoved} files moved, {$filesCopied} files copied to library");
-            } elseif ($filesMoved > 0) {
-                $this->info("✅ {$filesMoved} files moved to library");
-            } elseif ($filesCopied > 0) {
-                $this->info("✅ {$filesCopied} files copied to library");
-            }
-
-            // Clean up source directory if files were moved successfully
-            if ($filesMoved > 0 && $filesCopied == 0) {
-                $this->cleanupSourceDirectory($audiobook);
-            }
-
-            return true;
-        } catch (\Exception $e) {
-            $this->error("❌ Failed to move files: " . $e->getMessage());
+        $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
+        if (!$bookStoragePath) {
+            $this->warn("⚠️  Book storage path not configured - files not moved");
             return false;
         }
+
+        $copyFiles = $this->option('copy-files');
+        $options = [
+            'storage_path' => $bookStoragePath,
+            'operation' => $copyFiles ? 'copy' : 'move',
+        ];
+
+        return $this->getImportService()->moveFilesToLibrary($audiobook, $book, $options);
     }
 
     /**
