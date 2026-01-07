@@ -958,15 +958,34 @@ class BookImportService
                 return $path;
             }
 
-            if (!empty($seriesNumber) && $this->lastPathSegmentMatchesTitle($lastSegment, $plainTitle)) {
+            // Check if last segment matches the plain title (without series number prefix)
+            if ($this->lastPathSegmentMatchesTitle($lastSegment, $plainTitle)) {
+                return $path;
+            }
+
+            // Check if last segment matches the formatted title (with series number prefix)
+            if (!empty($seriesNumber) && $this->lastPathSegmentMatchesTitle($lastSegment, $title)) {
+                // Replace the last segment with the properly formatted title
                 array_pop($segments);
                 $segments[] = $title;
 
                 return '/' . implode('/', $segments);
             }
 
-            if ($this->lastPathSegmentMatchesTitle($lastSegment, $plainTitle)) {
-                return $path;
+            // Check if the relative path already contains the title (accounting for suffixes like GraphicAudio)
+            // This prevents creating nested directories when directory_path already includes the title
+            if ($relativePath !== null) {
+                $relativeSegments = explode('/', trim($relativePath, '/'));
+                $relativeLastSegment = end($relativeSegments) ?: '';
+
+                // Remove common suffixes like (GraphicAudio) for comparison
+                $cleanRelativeLast = preg_replace('/\s*\(Graphic\s*Audio\)\s*$/i', '', $relativeLastSegment);
+                $cleanTitle = preg_replace('/\s*\(Graphic\s*Audio\)\s*$/i', '', $title);
+
+                if (strcasecmp($cleanRelativeLast, $cleanTitle) === 0 ||
+                    $this->lastPathSegmentMatchesTitle($cleanRelativeLast, $plainTitle)) {
+                    return $path;
+                }
             }
 
             // Only append title if it's not already in the path
