@@ -4750,12 +4750,166 @@ class BookImportService
     }
 
     /**
+     * Preprocess metadata in background (enhanced)
+     */
+    public function preprocessMetadataInBackground(
+        array $audiobook,
+        callable $extractBasicMetadataCallback,
+        callable $hasCdDirectoriesCallback,
+        callable $analyzeFileTypesCallback,
+        callable $analyzeDirectoryNameCallback,
+        callable $isMultiBookDirectoryCallback,
+        callable $findCoverImageCallback
+    ): array {
+        // Start comprehensive metadata extraction
+        $metadata = $extractBasicMetadataCallback($audiobook);
+
+        // Pre-analyze directory structure
+        $directoryAnalysis = [
+            'has_subdirectories' => !empty(File::directories($audiobook['path'])),
+            'cd_directories' => $hasCdDirectoriesCallback($audiobook['path']),
+            'file_types' => $analyzeFileTypesCallback($audiobook['files']),
+            'total_size' => array_sum(array_map('filesize', $audiobook['files'])),
+            'directory_depth' => substr_count($audiobook['path'], '/'),
+        ];
+
+        // Pre-extract basic info from directory name
+        $directoryInfo = $analyzeDirectoryNameCallback(basename($audiobook['path']));
+
+        // Check for special markers
+        $specialMarkers = [
+            'multi_book' => $isMultiBookDirectoryCallback($audiobook['path']),
+            'graphic_audio' => str_contains(strtolower($audiobook['path']), 'graphic'),
+            'series_book' => preg_match('/\d+/', basename($audiobook['path'])),
+        ];
+
+        return [
+            'basic_metadata' => $metadata,
+            'directory_analysis' => $directoryAnalysis,
+            'directory_info' => $directoryInfo,
+            'special_markers' => $specialMarkers,
+            'audio_files_counted' => count($audiobook['files']),
+            'cover_image_found' => $findCoverImageCallback($audiobook['path']) !== null,
+            'ready_for_processing' => true,
+            'timestamp' => time(),
+        ];
+    }
+
+    /**
+     * Scan directory structure in background
+     */
+    public function scanDirectoryInBackground(array $data): array
+    {
+        $path = $data['path'];
+
+        return [
+            'directory_structure' => [
+                'subdirectories' => File::directories($path),
+                'file_count' => count(File::allFiles($path)),
+                'total_size' => $this->getDirectorySize($path),
+            ],
+            'timestamp' => time(),
+        ];
+    }
+
+    /**
+     * Check for duplicates in background
+     */
+    public function checkDuplicatesInBackground(array $audiobook, callable $findSimilarBooksCallback): array
+    {
+        return [
+            'existing_books' => $findSimilarBooksCallback($audiobook),
+            'timestamp' => time(),
+        ];
+    }
+
+    /**
+     * Extract detailed metadata in background
+     */
+    public function extractMetadataInBackground(
+        array $audiobook,
+        callable $extractTagMetadataCallback,
+        callable $extractNfoDataCallback
+    ): array {
+        $metadata = [];
+
+        // Extract file tags
+        $metadata['file_tags'] = $extractTagMetadataCallback($audiobook);
+
+        // Extract NFO data if available
+        $nfoData = $extractNfoDataCallback($audiobook['path']);
+        if ($nfoData) {
+            $metadata['nfo_data'] = $nfoData;
+        }
+
+        return [
+            'metadata' => $metadata,
+            'timestamp' => time(),
+        ];
+    }
+
+    /**
+     * Analyze audio files in background
+     */
+    public function analyzeAudioFilesInBackground(array $audiobook): array
+    {
+        $analysis = [
+            'total_files' => 0,
+            'total_duration' => 0,
+            'file_types' => [],
+            'bitrates' => [],
+            'sample_rates' => [],
+        ];
+
+        foreach ($audiobook['files'] as $file) {
+            $analysis['total_files']++;
+            $analysis['file_types'][] = pathinfo($file, PATHINFO_EXTENSION);
+        }
+
+        return [
+            'analysis' => $analysis,
+            'timestamp' => time(),
+        ];
+    }
+
+    /**
+     * Prepare cover image in background
+     */
+    public function prepareCoverImageInBackground(array $audiobook, callable $findCoverImageCallback): array
+    {
+        $result = [
+            'has_cover' => false,
+            'cover_path' => null,
+            'cover_type' => null,
+        ];
+
+        $coverPath = $findCoverImageCallback($audiobook['path']);
+        if ($coverPath) {
+            $result['has_cover'] = true;
+            $result['cover_path'] = $coverPath;
+            $result['cover_type'] = pathinfo($coverPath, PATHINFO_EXTENSION);
+        }
+
+        return [
+            'result' => $result,
+            'timestamp' => time(),
+        ];
+    }
+
+    /**
      * Get cached result for a background task
      */
-    public function getCachedResult(array $backgroundCache, string $cacheKey): ?array
+    public function getCachedResult(array $backgroundCache, array $audiobook, string $taskType, bool $cacheEnabled): ?array
     {
-        if (isset($backgroundCache[$cacheKey])) {
-            return $backgroundCache[$cacheKey];
+        if (!$cacheEnabled) {
+            return null;
+        }
+
+        $cacheKey = $this->getCacheKey($audiobook);
+        $fullKey = $cacheKey . '_' . $taskType;
+
+        if (isset($backgroundCache[$fullKey])) {
+            return $backgroundCache[$fullKey];
         }
 
         return null;

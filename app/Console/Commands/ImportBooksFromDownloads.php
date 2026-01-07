@@ -684,38 +684,15 @@ class ImportBooksFromDownloads extends Command
      */
     protected function preprocessMetadataInBackground(array $audiobook): array
     {
-        // Start comprehensive metadata extraction
-        $metadata = $this->getImportService()->extractBasicMetadata($audiobook);
-
-        // Pre-analyze directory structure
-        $directoryAnalysis = [
-            'has_subdirectories' => !empty(File::directories($audiobook['path'])),
-            'cd_directories' => $this->hasCdDirectories($audiobook['path']),
-            'file_types' => $this->analyzeFileTypes($audiobook['files']),
-            'total_size' => array_sum(array_map('filesize', $audiobook['files'])),
-            'directory_depth' => substr_count($audiobook['path'], '/'),
-        ];
-
-        // Pre-extract basic info from directory name
-        $directoryInfo = $this->analyzeDirectoryName(basename($audiobook['path']));
-
-        // Check for special markers
-        $specialMarkers = [
-            'multi_book' => $this->isMultiBookDirectory($audiobook['path']),
-            'graphic_audio' => str_contains(strtolower($audiobook['path']), 'graphic'),
-            'series_book' => preg_match('/\d+/', basename($audiobook['path'])),
-        ];
-
-        return [
-            'basic_metadata' => $metadata,
-            'directory_analysis' => $directoryAnalysis,
-            'directory_info' => $directoryInfo,
-            'special_markers' => $specialMarkers,
-            'audio_files_counted' => count($audiobook['files']),
-            'cover_image_found' => $this->findCoverImage($audiobook['path']) !== null,
-            'ready_for_processing' => true,
-            'timestamp' => time(),
-        ];
+        return $this->getImportService()->preprocessMetadataInBackground(
+            $audiobook,
+            fn ($data) => $this->getImportService()->extractBasicMetadata($data),
+            fn ($path) => $this->hasCdDirectories($path),
+            fn ($files) => $this->analyzeFileTypes($files),
+            fn ($name) => $this->analyzeDirectoryName($name),
+            fn ($path) => $this->isMultiBookDirectory($path),
+            fn ($path) => $this->findCoverImage($path)
+        );
     }
 
     /**
@@ -723,14 +700,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function scanDirectoryInBackground(array $data): array
     {
-        $path = $data['path'];
-
-        return [
-            'file_count' => count(File::allFiles($path)),
-            'has_cd_directories' => $this->hasCdDirectories($path),
-            'directory_size' => $this->getDirectorySize($path),
-            'potential_duplicates' => $this->findPotentialDuplicates($path),
-        ];
+        return $this->getImportService()->scanDirectoryInBackground($data);
     }
 
     /**
@@ -738,10 +708,10 @@ class ImportBooksFromDownloads extends Command
      */
     protected function checkDuplicatesInBackground(array $audiobook): array
     {
-        return [
-            'existing_books' => $this->findSimilarBooks($audiobook),
-            'duplicate_paths' => $this->findDuplicatePaths($audiobook['path']),
-        ];
+        return $this->getImportService()->checkDuplicatesInBackground(
+            $audiobook,
+            fn ($data) => $this->findSimilarBooks($data)
+        );
     }
 
     /**
@@ -749,48 +719,11 @@ class ImportBooksFromDownloads extends Command
      */
     protected function extractMetadataInBackground(array $audiobook): array
     {
-        $metadata = [];
-
-        // Get first audio file for metadata extraction
-        $audioFiles = array_filter($audiobook['files'], function ($file) {
-            $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-            return in_array($ext, ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac']);
-        });
-
-        if (!empty($audioFiles)) {
-            $audioFileValues = array_values($audioFiles);
-            $firstAudioFile = $audioFileValues[0];
-
-            // Extract basic file metadata
-            if (function_exists('getid3_analyze')) {
-                try {
-                    $fileInfo = $this->withHandlerIsolation(fn () => (new \getID3())->analyze($firstAudioFile));
-
-                    $metadata = [
-                        'title' => $fileInfo['tags']['id3v2']['title'][0] ?? basename($audiobook['path']),
-                        'artist' => $fileInfo['tags']['id3v2']['artist'][0] ?? null,
-                        'album' => $fileInfo['tags']['id3v2']['album'][0] ?? null,
-                        'year' => $fileInfo['tags']['id3v2']['year'][0] ?? null,
-                        'genre' => $fileInfo['tags']['id3v2']['genre'][0] ?? null,
-                        'duration' => $fileInfo['playtime_seconds'] ?? 0,
-                        'bitrate' => $fileInfo['audio']['bitrate'] ?? 0,
-                        'sample_rate' => $fileInfo['audio']['sample_rate'] ?? 0
-                    ];
-                } catch (\Exception $e) {
-                    // Fallback to basic extraction
-                    $metadata['title'] = basename($audiobook['path']);
-                }
-            }
-        }
-
-        // Extract NFO data if available
-        $nfoFiles = glob($audiobook['path'] . '/*.nfo');
-        if (!empty($nfoFiles)) {
-            $metadata['has_nfo'] = true;
-            $metadata['nfo_data'] = $this->extractNfoDataInBackground($nfoFiles[0]);
-        }
-
-        return $metadata;
+        return $this->getImportService()->extractMetadataInBackground(
+            $audiobook,
+            fn ($data) => $this->extractTagMetadataFromAudiobook($data),
+            fn ($path) => $this->extractNfoData($path)
+        );
     }
 
     /**
@@ -798,59 +731,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function analyzeAudioFilesInBackground(array $audiobook): array
     {
-        $analysis = [
-            'total_files' => 0,
-            'audio_files' => 0,
-            'total_duration' => 0,
-            'average_bitrate' => 0,
-            'file_formats' => [],
-            'largest_file' => null,
-            'smallest_file' => null,
-        ];
-
-        $durations = [];
-        $bitrates = [];
-        $fileSizes = [];
-
-        foreach ($audiobook['files'] as $file) {
-            $analysis['total_files']++;
-            $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-
-            if (in_array($ext, ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'])) {
-                $analysis['audio_files']++;
-                $analysis['file_formats'][$ext] = ($analysis['file_formats'][$ext] ?? 0) + 1;
-
-                $fileSize = filesize($file);
-                $fileSizes[] = $fileSize;
-
-                // Track largest and smallest files
-                if (is_null($analysis['largest_file'])) {
-                    $analysis['largest_file'] = ['path' => $file, 'size' => $fileSize];
-                } else {
-                    $largestSize = (int) ($analysis['largest_file']['size'] ?? 0);
-                    if ($fileSize > $largestSize) {
-                        $analysis['largest_file'] = ['path' => $file, 'size' => $fileSize];
-                    }
-                }
-
-                if (is_null($analysis['smallest_file'])) {
-                    $analysis['smallest_file'] = ['path' => $file, 'size' => $fileSize];
-                } else {
-                    $smallestSize = (int) ($analysis['smallest_file']['size'] ?? PHP_INT_MAX);
-                    if ($fileSize < $smallestSize) {
-                        $analysis['smallest_file'] = ['path' => $file, 'size' => $fileSize];
-                    }
-                }
-            }
-        }
-
-        $analysis['total_size'] = array_sum($fileSizes);
-        $analysis['average_file_size'] = 0;
-        if ($analysis['audio_files'] > 0) {
-            $analysis['average_file_size'] = $analysis['total_size'] / $analysis['audio_files'];
-        }
-
-        return $analysis;
+        return $this->getImportService()->analyzeAudioFilesInBackground($audiobook);
     }
 
     /**
@@ -858,35 +739,15 @@ class ImportBooksFromDownloads extends Command
      */
     protected function prepareCoverImageInBackground(array $audiobook): array
     {
-        $result = [
-            'has_cover' => false,
-            'cover_path' => null,
-            'cover_size' => null,
-            'thumbnail_ready' => false,
-        ];
+        return $this->getImportService()->prepareCoverImageInBackground(
+            $audiobook,
+            fn ($path) => $this->findCoverImage($path)
+        );
+    }
 
-        $coverPath = $this->findCoverImage($audiobook['path']);
-
-        if ($coverPath && file_exists($coverPath)) {
-            $result['has_cover'] = true;
-            $result['cover_path'] = $coverPath;
-            $result['cover_size'] = filesize($coverPath);
-
-            // Pre-create thumbnail if using Kitty protocol
-            if ($this->isGhosttyTerminal()) {
-                try {
-                    $thumbnailPath = $this->createThumbnail($coverPath, 200, 200);
-                    if ($thumbnailPath) {
-                        $result['thumbnail_ready'] = true;
-                        $result['thumbnail_path'] = $thumbnailPath;
-                    }
-                } catch (\Exception $e) {
-                    // Thumbnail creation failed, but we still have the original cover
-                }
-            }
-        }
-
-        return $result;
+    protected function getCachedResult(array $audiobook, string $taskType): ?array
+    {
+        return $this->getImportService()->getCachedResult($this->backgroundCache, $audiobook, $taskType, $this->cacheEnabled);
     }
 
     /**
@@ -950,27 +811,6 @@ class ImportBooksFromDownloads extends Command
             fn () => $this->loadCache(),
             fn (&$cache) => $this->cleanupCache()
         );
-    }
-
-    protected function getCachedResult(array $audiobook, string $taskType): ?array
-    {
-        if (!$this->cacheEnabled) {
-            return null;
-        }
-
-        $cacheKey = $this->getCacheKey($audiobook);
-        $fullKey = $cacheKey . '_' . $taskType;
-
-        if (isset($this->backgroundCache[$fullKey])) {
-            $cached = $this->backgroundCache[$fullKey];
-
-            // Check if cache is still valid
-            if (isset($cached['timestamp']) && (time() - $cached['timestamp']) < 86400) {
-                return $cached['result'];
-            }
-        }
-
-        return null;
     }
 
     /**
