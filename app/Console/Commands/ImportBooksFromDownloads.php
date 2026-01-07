@@ -2228,31 +2228,13 @@ class ImportBooksFromDownloads extends Command
         string $currentDirectoryPath,
         bool $isFinalConfirmation
     ): array {
-        $validGenres = $this->getValidGenres();
-        $normalizedGenre = trim($currentGenre);
-        $isGenreValid = in_array($normalizedGenre, $validGenres, true);
-
-        $displayGenre = $normalizedGenre;
-        if (strlen($displayGenre) > 16) {
-            $displayGenre = substr($displayGenre, 0, 15) . '…';
-        }
-
-        $acceptLabel = $isFinalConfirmation ? 'Accept all' : 'Accept all metadata';
-        if (!$isGenreValid) {
-            $acceptLabel = "\e[9m{$acceptLabel}\e[0m";
-        }
-
-        $options = [
-            '1' => $acceptLabel,
-            '2' => $isFinalConfirmation ? 'Edit again' : 'Edit individual fields',
-            '3' => $isFinalConfirmation ? 'Skip' : 'Skip this book',
-            '4' => 'Update cover' . ($currentCoverUrl !== '' ? ' (has URL)' : ''),
-            '5' => 'Update genre (' . $displayGenre . ')',
-            '6' => 'Update directory',
-            '7' => 'Request enrichment (Audible/Google Books)',
-        ];
-
-        return $options;
+        return $this->getImportService()->buildReviewOptions(
+            $currentCoverUrl,
+            $currentGenre,
+            $currentDirectoryPath,
+            $isFinalConfirmation,
+            fn () => $this->getValidGenres()
+        );
     }
 
     /**
