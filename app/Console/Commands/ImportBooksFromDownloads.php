@@ -30,7 +30,6 @@ class ImportBooksFromDownloads extends Command
     use IsolatesErrorHandlers;
     use GenreMapping;
     use BookImportTrait;
-    use ManualEnrichmentTrait;
 
     /**
      * The name and signature of the console command.
@@ -569,10 +568,10 @@ class ImportBooksFromDownloads extends Command
         return $this->getImportService()->preprocessMetadataInBackground(
             $audiobook,
             fn ($data) => $this->getImportService()->extractBasicMetadata($data),
-            fn ($path) => $this->hasCdDirectories($path),
-            fn ($files) => $this->analyzeFileTypes($files),
-            fn ($name) => $this->analyzeDirectoryName($name),
-            fn ($path) => $this->isMultiBookDirectory($path),
+            fn ($path) => $this->getImportService()->hasCdDirectories($path),
+            fn ($files) => $this->getImportService()->analyzeFileTypes($files),
+            fn ($name) => $this->getImportService()->analyzeDirectoryName($name),
+            fn ($path) => $this->getImportService()->isMultiBookDirectory($path),
             fn ($path) => $this->findCoverImage($path)
         );
     }
@@ -603,7 +602,7 @@ class ImportBooksFromDownloads extends Command
     {
         return $this->getImportService()->extractMetadataInBackground(
             $audiobook,
-            fn ($data) => $this->extractTagMetadataFromAudiobook($data),
+            fn ($data) => $this->getImportService()->extractTagMetadataFromAudiobook($data, $this->aiProcessor),
             fn ($path) => $this->extractNfoData($path)
         );
     }
