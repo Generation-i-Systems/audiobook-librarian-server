@@ -1770,7 +1770,7 @@ class BookImportService
     /**
      * Calculate audio information from files with advanced tag extraction
      */
-    protected function calculateAudioInfo(array $audioFiles): array
+    public function calculateAudioInfo(array $audioFiles): array
     {
         $totalDuration = 0;
         $allTags = [];

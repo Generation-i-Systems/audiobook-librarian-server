@@ -4652,64 +4652,9 @@ class ImportBooksFromDownloads extends Command
         return 'ai'; // Generic fallback
     }
 
-    /**
-     * Calculate audio file information including duration and tags
-     */
     protected function calculateAudioInfo(array $audioFiles): array
     {
-        $totalDuration = 0;
-        $allTags = [];
-        $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
-        $audioFileCount = 0;
-
-        foreach ($audioFiles as $filePath) {
-            $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
-
-            if (in_array($extension, $audioExtensions)) {
-                $audioFileCount++;
-
-                try {
-                    // Extract file tags
-                    $tags = $this->aiProcessor->extractFileTags($filePath);
-                    if (!empty($tags)) {
-                        $fileName = basename($filePath);
-                        $allTags[$fileName] = $tags;
-
-                        // Add to total duration if available
-                        if (isset($tags['duration_seconds'])) {
-                            $totalDuration += (int) $tags['duration_seconds'];
-                        } elseif (isset($tags['duration'])) {
-                            // Parse duration from string format (e.g., "1:23:45")
-                            $totalDuration += $this->parseDurationString($tags['duration']);
-                        } elseif (isset($tags['DURATION'])) {
-                            // Some formats use uppercase
-                            $totalDuration += $this->parseDurationString($tags['DURATION']);
-                        } elseif (isset($tags['LENGTH'])) {
-                            // Alternative field name
-                            $totalDuration += $this->parseDurationString($tags['LENGTH']);
-                        }
-
-                        // Try to get duration from file directly if not in tags
-                        if ($totalDuration == 0) {
-                            $fileDuration = $this->getAudioFileDuration($filePath);
-                            if ($fileDuration > 0) {
-                                $totalDuration += $fileDuration;
-                                // Store calculated duration in tags for reference
-                                $allTags[$fileName]['calculated_duration'] = $fileDuration;
-                            }
-                        }
-                    }
-                } catch (\Exception $e) {
-                    Log::warning("Failed to extract tags from {$filePath}: " . $e->getMessage());
-                }
-            }
-        }
-
-        return [
-            'count' => $audioFileCount,
-            'duration' => $totalDuration, // in seconds
-            'tags' => $allTags,
-        ];
+        return $this->getImportService()->calculateAudioInfo($audioFiles);
     }
 
     protected function parseDurationString(string $duration): int
