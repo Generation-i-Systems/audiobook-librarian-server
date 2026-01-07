@@ -20,7 +20,6 @@ use App\Services\ImportUIService;
 use App\Traits\GenreMapping;
 use App\Traits\BookImportTrait;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Storage;
 use App\Traits\IsolatesErrorHandlers;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\File;
@@ -1118,20 +1117,6 @@ class ImportBooksFromDownloads extends Command
         );
     }
 
-    protected function detectMultiBookPattern(string $title): ?array
-    {
-        return $this->getImportService()->detectMultiBookPattern($title);
-    }
-
-    protected function analyzeMultiBookFiles(array $audiobook, array $multiBookInfo): array
-    {
-        return $this->getImportService()->analyzeMultiBookFiles($audiobook, $multiBookInfo);
-    }
-
-    protected function formatFileTypes(array $fileTypes): string
-    {
-        return $this->getImportService()->formatFileTypes($fileTypes);
-    }
 
     /**
      * Process multi-book directory by splitting into individual books
@@ -1282,85 +1267,11 @@ class ImportBooksFromDownloads extends Command
     }
 
     /**
-     * Create book record in database
+     * Format file types for display
      */
-    protected function createBookFromMetadata(array $metadata, array $audiobook): ?Book
+    protected function formatFileTypes(array $fileTypes): string
     {
-        return $this->getImportService()->createBookFromMetadata(
-            $metadata,
-            $audiobook,
-            [
-                'download_cover' => true,
-                'cover_source' => isset($metadata['audible_raw']) ? 'audible' : 'googlebooks',
-            ]
-        );
-    }
-
-    /**
-     * Generate directory path for book storage
-     */
-    protected function generateDirectoryPath(array $metadata): string
-    {
-        return $this->getImportService()->generateDirectoryPath($metadata);
-    }
-
-    /**
-     * Flatten CD subdirectories by moving all files to the main directory
-     */
-    protected function flattenCdDirectories(string $sourcePath): void
-    {
-        $this->getImportService()->flattenCdDirectories($sourcePath);
-    }
-
-    /**
-     * Get all files from a directory recursively
-     */
-    protected function getAllFilesFromDirectory(string $path): array
-    {
-        return $this->getImportService()->getAllFilesFromDirectory($path);
-    }
-
-    /**
-     * Check if two files are identical by comparing size and hash
-     */
-    protected function areFilesIdentical(string $file1, string $file2): bool
-    {
-        return $this->getImportService()->areFilesIdentical($file1, $file2);
-    }
-
-    /**
-     * Check if a filename indicates a torrent/piracy tracking file
-     */
-    protected function isTorrentTrackingFile(string $filename): bool
-    {
-        return $this->getImportService()->isTorrentTrackingFile($filename);
-    }
-
-    /**
-     * Extract track number from filename
-     */
-    protected function extractTrackNumber(string $filename): ?int
-    {
-        return $this->getImportService()->extractTrackNumber($filename);
-    }
-
-    protected function isDirectoryEmpty(string $path): bool
-    {
-        return $this->getImportService()->isDirectoryEmpty($path);
-    }
-
-    /**
-     * Move files to library after successful import
-     */
-    protected function moveFilesToLibrary(array $audiobook, Book $book): bool
-    {
-        return $this->getImportService()->moveFilesToLibrary(
-            $audiobook,
-            $book,
-            fn ($message) => $this->warn($message),
-            fn () => config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH'),
-            fn () => $this->option('copy-files')
-        );
+        return $this->getImportService()->formatFileTypes($fileTypes);
     }
 
     /**
