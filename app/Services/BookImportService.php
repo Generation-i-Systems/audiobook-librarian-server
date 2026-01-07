@@ -4247,9 +4247,9 @@ class BookImportService
      * Validate and map genre to valid primary genre
      * Prevents creation of invalid genre directories
      */
-    protected function validateAndMapGenre(string $genreName): string
+    public function getValidGenres(): array
     {
-        $validGenres = [
+        return [
             'Science Fiction',
             'Fantasy',
             'LitRPG',
@@ -4270,6 +4270,11 @@ class BookImportService
             'Other',
             'Science',
         ];
+    }
+
+    protected function validateAndMapGenre(string $genreName): string
+    {
+        $validGenres = $this->getValidGenres();
 
         // If already a valid genre, return as-is
         if (in_array($genreName, $validGenres)) {

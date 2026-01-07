@@ -2201,8 +2201,13 @@ class ImportBooksFromDownloads extends Command
     {
         $this->getImportService()->extractSeriesNumberFromTitle($metadata);
         if (isset($metadata['series_number'])) {
-            $this->info("📚 Extracted series number {$metadata['series_number']} from title");
+            return;
         }
+    }
+
+    protected function getValidGenres(): array
+    {
+        return $this->getImportService()->getValidGenres();
     }
 
     /**
