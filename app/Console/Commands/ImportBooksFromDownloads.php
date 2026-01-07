@@ -632,17 +632,6 @@ class ImportBooksFromDownloads extends Command
     }
 
     /**
-     * Show background processing status
-     */
-    protected function showBackgroundProcessingStatus(): void
-    {
-        $this->getImportService()->showBackgroundProcessingStatus(
-            $this->backgroundTasks,
-            fn ($message) => $this->line($message)
-        );
-    }
-
-    /**
      * Show enhanced background processing status
      */
     protected function showEnhancedBackgroundStatus(): void
