@@ -3436,25 +3436,16 @@ class ImportBooksFromDownloads extends Command
      */
     protected function cleanupSourceDirectory(array $audiobook, bool $filesAlreadyExist = false): void
     {
-        if (!$this->option('copy-files') && File::isDirectory($audiobook['path'])) {
+        $isCopyOperation = (bool) $this->option('copy-files');
+        $this->getImportService()->cleanupSourceDirectory($audiobook, $filesAlreadyExist, $isCopyOperation);
+
+        if (!$isCopyOperation && File::isDirectory($audiobook['path'])) {
             if ($filesAlreadyExist) {
-                // Files already exist in target, safe to remove source
-                try {
-                    File::deleteDirectory($audiobook['path']);
-                    $this->info("✅ Removed duplicate source directory (identical files already exist in library)");
-                } catch (\Exception $e) {
-                    $this->warn("⚠️  Could not remove source directory: " . $e->getMessage());
-                }
+                $this->info("✅ Removed duplicate source directory (identical files already exist in library)");
             } else {
-                // Check if directory is empty after move
                 $remainingFiles = File::files($audiobook['path']);
                 if (empty($remainingFiles)) {
-                    try {
-                        File::deleteDirectory($audiobook['path']);
-                        $this->info("🗑️  Removed empty source directory");
-                    } catch (\Exception $e) {
-                        $this->warn("⚠️  Could not remove source directory: " . $e->getMessage());
-                    }
+                    $this->info("🗑️  Removed empty source directory");
                 }
             }
         }
