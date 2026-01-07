@@ -540,30 +540,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function processSingleAudioFile(string $filePath): ?array
     {
-        if (!file_exists($filePath) || !is_file($filePath)) {
-            return null;
-        }
-
-        $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
-        $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
-
-        if (!in_array($extension, $audioExtensions)) {
-            return null;
-        }
-
-        $fileSize = filesize($filePath);
-
-        // Require at least 10MB for audiobook files
-        if ($fileSize < 10 * 1024 * 1024) {
-            return null;
-        }
-
-        return [
-            'path' => $filePath,
-            'name' => pathinfo($filePath, PATHINFO_FILENAME),
-            'files' => [$filePath],
-            'total_size' => $fileSize,
-        ];
+        return $this->getImportService()->processSingleAudioFile($filePath);
     }
 
     /**

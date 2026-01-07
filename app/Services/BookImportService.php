@@ -2899,6 +2899,36 @@ class BookImportService
     }
 
     /**
+     * Process a single audio file as an individual audiobook
+     */
+    public function processSingleAudioFile(string $filePath): ?array
+    {
+        if (!file_exists($filePath) || !is_file($filePath)) {
+            return null;
+        }
+
+        $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
+        $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+
+        if (!in_array($extension, $audioExtensions)) {
+            return null;
+        }
+
+        $fileSize = filesize($filePath);
+
+        if ($fileSize < 10 * 1024 * 1024) {
+            return null;
+        }
+
+        return [
+            'path' => $filePath,
+            'name' => pathinfo($filePath, PATHINFO_FILENAME),
+            'files' => [$filePath],
+            'total_size' => $fileSize,
+        ];
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void
