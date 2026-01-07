@@ -3233,6 +3233,30 @@ class BookImportService
     }
 
     /**
+     * Prompt user for action when duplicate is detected but can't be compared
+     * Returns action result: 'skip', 'delete', 'continue', or 'skip'
+     */
+    public function promptForDuplicateAction(array $options, callable $selectCallback): string
+    {
+        $choice = $selectCallback("Duplicate detected - choose action", $options, '1');
+
+        $choice = strtolower(trim($choice));
+        if (in_array($choice, ['1', 's', 'skip'])) {
+            return 'skip';
+        }
+
+        if (in_array($choice, ['2', 'd', 'delete'])) {
+            return 'delete';
+        }
+
+        if (in_array($choice, ['3', 'c', 'continue'])) {
+            return 'continue';
+        }
+
+        return 'skip';
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void

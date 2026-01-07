@@ -3069,11 +3069,12 @@ class ImportBooksFromDownloads extends Command
             '3' => 'Continue with import anyway',
         ];
 
-        $choice = $this->uiService->select("Duplicate detected - choose action", $options, '1');
+        $action = $this->getImportService()->promptForDuplicateAction(
+            $options,
+            fn ($question, $options, $default) => $this->uiService->select($question, $options, $default)
+        );
 
-        // Normalize choice to handle letters
-        $choice = strtolower(trim($choice));
-        if (in_array($choice, ['1', 's', 'skip'])) {
+        if ($action === 'skip') {
             $this->uiService->logMessage("📁 Skipping import, keeping both");
             $this->skippedBooks[] = [
                 'path' => $audiobook['path'],
@@ -3082,7 +3083,7 @@ class ImportBooksFromDownloads extends Command
             return false;
         }
 
-        if (in_array($choice, ['2', 'd', 'delete'])) {
+        if ($action === 'delete') {
             $this->uiService->logMessage("🗑️ Removing source directory");
             $this->cleanupSourceDirectory($audiobook, true);
             $this->skippedBooks[] = [
@@ -3092,7 +3093,7 @@ class ImportBooksFromDownloads extends Command
             return false;
         }
 
-        if (in_array($choice, ['3', 'c', 'continue'])) {
+        if ($action === 'continue') {
             $this->uiService->logMessage("⚠️ Continuing with import despite duplicate detection");
             return true;
         }
