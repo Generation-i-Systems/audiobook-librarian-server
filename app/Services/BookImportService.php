@@ -771,16 +771,32 @@ class BookImportService
     public function moveFilesToLibrary(
         array $audiobook,
         Book $book,
-        callable $warnCallback,
+        callable|array $warnCallback,
         ?callable $getBookStoragePathCallback = null,
         ?callable $getCopyFilesOptionCallback = null
     ): bool {
-        $bookStoragePath = $getBookStoragePathCallback ? $getBookStoragePathCallback() : config('app.book_root', '/media/lyra_data1/audiobooks/books');
-        $copyFiles = $getCopyFilesOptionCallback ? $getCopyFilesOptionCallback() : false;
+        $legacyOptions = null;
+        if (is_array($warnCallback)) {
+            $legacyOptions = $warnCallback;
+            $warnCallback = fn ($message) => Log::warning($message);
+        }
+
+        $bookStoragePath = $getBookStoragePathCallback
+            ? $getBookStoragePathCallback()
+            : ($legacyOptions['storage_path'] ?? (config('filesystems.disks.books.root') ?? config('app.book_root', '/media/lyra_data1/audiobooks/books')));
+
+        $copyFiles = $getCopyFilesOptionCallback
+            ? (bool) $getCopyFilesOptionCallback()
+            : (($legacyOptions['operation'] ?? 'move') === 'copy');
+
         $options = [
             'storage_path' => $bookStoragePath,
             'operation' => $copyFiles ? 'copy' : 'move',
         ];
+
+        if (isset($legacyOptions['target_directory'])) {
+            $options['target_directory'] = $legacyOptions['target_directory'];
+        }
 
         return $this->moveFilesToLibraryInternal($audiobook, $book, $options, $warnCallback);
     }
@@ -1479,17 +1495,52 @@ class BookImportService
      */
     public function downloadCoverImage(string $imageUrl, string $directoryPath, string $source = 'unknown', ?ExternalCoverService $coverService = null): ?string
     {
-        if (!$coverService) {
+        if ($coverService) {
+            $result = $coverService->downloadCoverImage($imageUrl, $directoryPath, $source);
+
+            return $result['success'] ? $result['path'] : null;
+        }
+
+        if ($imageUrl === '') {
             return null;
         }
 
-        $result = $coverService->downloadCoverImage($imageUrl, $directoryPath, $source);
+        $baseStoragePath = rtrim(storage_path('app'), '/');
+        $targetDirectory = $baseStoragePath . '/' . ltrim($directoryPath, '/');
 
-        if ($result['success']) {
-            return $result['path'];
+        if (!File::exists($targetDirectory)) {
+            File::makeDirectory($targetDirectory, 0755, true);
         }
 
-        return null;
+        $extension = $this->getImageExtensionFromUrl($imageUrl);
+        $filename = sprintf('cover_%s.%s', strtolower($source ?: 'unknown'), $extension);
+        $targetPath = $targetDirectory . '/' . $filename;
+
+        try {
+            $context = stream_context_create([
+                'http' => ['timeout' => 15],
+                'https' => ['timeout' => 15],
+            ]);
+            $imageData = @file_get_contents($imageUrl, false, $context);
+            if ($imageData === false || $imageData === null) {
+                return null;
+            }
+
+            if (@file_put_contents($targetPath, $imageData) === false) {
+                return null;
+            }
+
+            @chmod($targetPath, 0664);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to download cover image', [
+                'error' => $e->getMessage(),
+                'url' => $imageUrl,
+                'directory' => $targetDirectory,
+            ]);
+            return null;
+        }
+
+        return $filename;
     }
 
     /**
@@ -1625,30 +1676,61 @@ class BookImportService
     public function handleDirectoryConflict(
         array $audiobook,
         string $targetDir,
-        callable $compareDirectoriesCallback,
-        callable $displayDirectoryComparisonCallback,
-        callable $logMessageCallback,
+        ?callable $compareDirectoriesCallback = null,
+        ?callable $displayDirectoryComparisonCallback = null,
+        ?callable $logMessageCallback = null,
         ?callable $selectCallback = null,
         ?callable $optionCallback = null
     ): string {
-        $logMessageCallback("⚠️  Target directory already exists: " . basename($targetDir));
+        $targetDir = rtrim($targetDir, '/');
+        if ($targetDir === '') {
+            return $targetDir;
+        }
+
+        if (!File::isDirectory($targetDir)) {
+            return $targetDir;
+        }
+
+        $hasInteractiveCallbacks = $compareDirectoriesCallback
+            || $displayDirectoryComparisonCallback
+            || $logMessageCallback
+            || $selectCallback
+            || $optionCallback;
+
+        if (!$hasInteractiveCallbacks) {
+            return $this->resolveDirectoryConflictPath($targetDir);
+        }
+
+        $log = $logMessageCallback ?? fn (...$args) => null;
+
+        $log("⚠️  Target directory already exists: " . basename($targetDir));
 
         // Compare directories
-        $comparison = $compareDirectoriesCallback($audiobook['path'], $targetDir);
+        $comparison = $compareDirectoriesCallback
+            ? $compareDirectoriesCallback($audiobook['path'], $targetDir)
+            : $this->compareDirectories($audiobook['path'], $targetDir);
 
         // Display comparison
-        $displayDirectoryComparisonCallback($comparison);
+        if ($displayDirectoryComparisonCallback) {
+            $displayDirectoryComparisonCallback($comparison);
+        }
 
         // If directories are identical, automatically clean up source
         if ($comparison['identical']) {
-            $logMessageCallback("🔍 Directories are identical - source will be automatically deleted");
+            $log("🔍 Directories are identical - source will be automatically deleted");
             return 'skip';
         }
 
         // If in auto mode, default to replace
-        if ($optionCallback && $optionCallback('auto')) {
-            $logMessageCallback("🤖 Auto mode: Replacing existing directory");
-            return 'replace';
+        if ($optionCallback) {
+            try {
+                if ($optionCallback('auto')) {
+                    $log("🤖 Auto mode: Replacing existing directory");
+                    return 'replace';
+                }
+            } catch (\Throwable $e) {
+                $log("⚠️  Auto option callback failed: " . $e->getMessage());
+            }
         }
 
         // Prompt user for action
@@ -6092,9 +6174,14 @@ class BookImportService
             if ($book) {
                 $infoCallback("✅ Book imported successfully: {$book->title} (ID: {$book->id})");
 
-                $this->moveFilesToLibrary($audiobook, $book, [
-                    'operation' => $getFileOperationCallback(),
-                ]);
+                $operation = $getFileOperationCallback();
+                $this->moveFilesToLibrary(
+                    $audiobook,
+                    $book,
+                    $warnCallback,
+                    fn () => config('filesystems.disks.books.root') ?? config('app.book_root', '/media/lyra_data1/audiobooks/books'),
+                    fn () => $operation === 'copy'
+                );
 
                 $processedBooks[] = [
                     'path' => $audiobook['path'],
@@ -6103,7 +6190,7 @@ class BookImportService
                 ];
             }
         } else {
-            $this->info("🔍 [DRY RUN] Would import: {$aiMetadata['title']}");
+            $infoCallback("🔍 [DRY RUN] Would import: {$aiMetadata['title']}");
         }
     }
 

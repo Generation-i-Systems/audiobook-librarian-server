@@ -50,8 +50,21 @@ class BookDirectoryMoveService
             ];
         }
 
+        $inPlaceMove = $oldDirectoryPath === $newDirectoryPath;
+
+        if ($inPlaceMove) {
+            return [
+                'moved' => true,
+                'coverImage' => $coverImageBasename,
+                'directoryPath' => $newDirectoryPath,
+            ];
+        }
+
         $newDirectoryPath = $this->resolveNonConflictingDirectoryPath($disk, $newDirectoryPath);
-        $disk->makeDirectory($newDirectoryPath);
+
+        if (!$this->directoryExistsOnDisk($disk, $newDirectoryPath)) {
+            $disk->makeDirectory($newDirectoryPath);
+        }
 
         // Set directory ownership
         $newAbsPath = $disk->path($newDirectoryPath);
@@ -144,6 +157,15 @@ class BookDirectoryMoveService
             'coverImage' => $newCoverImageBasename,
             'directoryPath' => $newDirectoryPath,
         ];
+    }
+
+    private function directoryExistsOnDisk($disk, string $path): bool
+    {
+        if (method_exists($disk, 'directoryExists')) {
+            return $disk->{'directoryExists'}($path);
+        }
+
+        return count($disk->allFiles($path)) > 0;
     }
 
     private function resolveNonConflictingDirectoryPath($disk, string $directoryPath): string

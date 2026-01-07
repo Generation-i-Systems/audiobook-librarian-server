@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use App\Traits\IsolatesErrorHandlers;
+use Illuminate\Support\Str;
 
 class ImportFileController extends Controller
 {
@@ -1745,16 +1746,29 @@ class ImportFileController extends Controller
             'files' => array_map(fn ($f) => $f->getPathname(), $files),
         ]);
 
+        $normalizedSourceDir = rtrim($sourceDir, '/');
         foreach ($files as $file) {
             $sourceFilePath = $file->getPathname();
-            // Always use just the filename to avoid creating nested directories
-            $filename = $file->getFilename();
-            $targetFile = rtrim($destDir, '/') . '/' . $filename;
+            $relativePath = Str::after($sourceFilePath, $normalizedSourceDir . '/');
+            if ($relativePath === $sourceFilePath) {
+                $relativePath = basename($sourceFilePath);
+            }
+            $relativePath = ltrim($relativePath, '/');
+            if ($relativePath === '') {
+                $relativePath = method_exists($file, 'getFilename')
+                    ? $file->getFilename()
+                    : basename($sourceFilePath);
+            }
+            $targetFile = rtrim($destDir, '/') . '/' . $relativePath;
+            $targetDirPath = dirname($targetFile);
+            if (!File::isDirectory($targetDirPath)) {
+                File::makeDirectory($targetDirPath, 0775, true);
+            }
 
             Log::debug('[ImportFile] Moving file', [
                 'from' => $sourceFilePath,
                 'to' => $targetFile,
-                'filename' => $filename,
+                'filename' => $relativePath,
             ]);
 
             if (File::exists($targetFile)) {

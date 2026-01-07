@@ -137,10 +137,40 @@ class ImportBooksFromDownloads extends Command
         );
     }
 
+    protected function logUiMessage(mixed $message, mixed $data = null): void
+    {
+        if (!$this->uiService) {
+            $text = is_string($message)
+                ? $message
+                : (is_array($message) ? json_encode($message, JSON_UNESCAPED_UNICODE) : (string) $message);
+
+            if ($data !== null) {
+                $suffix = is_string($data)
+                    ? $data
+                    : (is_array($data) ? json_encode($data, JSON_UNESCAPED_UNICODE) : (string) $data);
+                $text .= ' ' . $suffix;
+            }
+
+            parent::line($text ?? '');
+            return;
+        }
+
+        if ($message === 'setCurrentBook' && is_array($data)) {
+            $this->uiService->setCurrentBook($data);
+            return;
+        }
+
+        $text = is_string($message)
+            ? $message
+            : (is_array($message) ? json_encode($message, JSON_UNESCAPED_UNICODE) : (string) $message);
+
+        $this->uiService->logMessage($text ?? '');
+    }
+
     public function line($string, $style = null, $verbosity = null)
     {
         if ($this->uiService) {
-            $this->uiService->logMessage((string) $string);
+            $this->logUiMessage((string) $string);
             return;
         }
 
@@ -150,7 +180,7 @@ class ImportBooksFromDownloads extends Command
     public function info($string, $verbosity = null)
     {
         if ($this->uiService) {
-            $this->uiService->logMessage((string) $string);
+            $this->logUiMessage((string) $string);
             return;
         }
 
@@ -160,7 +190,7 @@ class ImportBooksFromDownloads extends Command
     public function warn($string, $verbosity = null)
     {
         if ($this->uiService) {
-            $this->uiService->logMessage((string) $string);
+            $this->logUiMessage((string) $string);
             return;
         }
 
@@ -170,7 +200,7 @@ class ImportBooksFromDownloads extends Command
     public function error($string, $verbosity = null)
     {
         if ($this->uiService) {
-            $this->uiService->logMessage((string) $string);
+            $this->logUiMessage((string) $string);
             return;
         }
 
@@ -193,9 +223,9 @@ class ImportBooksFromDownloads extends Command
         if ($this->uiService) {
             foreach ($rows as $row) {
                 if (is_array($row)) {
-                    $this->uiService->logMessage(implode(' | ', array_map('strval', $row)));
+                    $this->logUiMessage(implode(' | ', array_map('strval', $row)));
                 } else {
-                    $this->uiService->logMessage((string) $row);
+                    $this->logUiMessage((string) $row);
                 }
             }
             return;
@@ -362,7 +392,7 @@ class ImportBooksFromDownloads extends Command
 
         // Save cache before exit and show cache statistics
         if ($this->cacheEnabled) {
-            $this->saveCache();
+            $this->saveCacheBeforeExit();
             $this->displayCacheStatistics();
         }
     }
@@ -459,14 +489,6 @@ class ImportBooksFromDownloads extends Command
     }
 
     /**
-     * Schedule a background task
-     */
-    protected function scheduleBackgroundTask(string $type, array $data): void
-    {
-        $this->getImportService()->scheduleBackgroundTask($type, $data, $this->backgroundTasks);
-    }
-
-    /**
      * Execute a specific background task (with caching)
      */
     protected function executeBackgroundTask(array $task): array
@@ -512,7 +534,7 @@ class ImportBooksFromDownloads extends Command
     /**
      * Maintain at least 3 concurrent background tasks
      */
-    protected function maintainConcurrentTasks(): void
+    protected function maintainConcurrentTasks(): int
     {
         $this->runningTaskCount = $this->getImportService()->maintainConcurrentTasks(
             $this->backgroundTasks,
@@ -520,6 +542,8 @@ class ImportBooksFromDownloads extends Command
             $this->maxConcurrentTasks,
             fn ($task) => $this->startBackgroundTask($task)
         );
+
+        return $this->runningTaskCount;
     }
 
     /**
@@ -529,19 +553,6 @@ class ImportBooksFromDownloads extends Command
     {
         $this->getImportService()->startBackgroundTask($taskInfo, $this->backgroundTasks);
         $this->runningTaskCount++;
-    }
-
-    /**
-     * Start queued tasks if we have capacity
-     */
-    protected function startQueuedTasks(): void
-    {
-        $this->getImportService()->startQueuedTasks(
-            $this->taskQueue,
-            $this->runningTaskCount,
-            $this->maxConcurrentTasks,
-            fn ($task) => $this->startBackgroundTask($task)
-        );
     }
 
     /**
@@ -648,12 +659,23 @@ class ImportBooksFromDownloads extends Command
      */
     protected function initializeCache(): void
     {
+        $cacheFilePath = storage_path('app/audiobook-cache/background-processing-cache.json');
         $this->backgroundCache = $this->getImportService()->initializeCache(
             $this->option('no-cache'),
             $this->option('clear-cache'),
             fn ($message) => $this->info($message),
-            fn () => $this->loadCache(),
-            fn (&$cache) => $this->cleanupCache()
+            fn () => $this->getImportService()->loadCache(
+                $this->cacheEnabled,
+                $cacheFilePath,
+                $this->cacheVersion,
+                fn ($message) => $this->info($message),
+                fn ($message) => $this->warn($message)
+            ),
+            fn (&$cache) => $this->getImportService()->cleanupCache(
+                $cache,
+                fn ($path) => $this->getDirectoryModificationTime($path),
+                fn ($message) => $this->info($message)
+            )
         );
     }
 
@@ -709,7 +731,8 @@ class ImportBooksFromDownloads extends Command
     protected function saveCacheBeforeExit(): void
     {
         if ($this->cacheEnabled && $this->cacheService) {
-            $this->cacheService->save();
+            $cacheFilePath = storage_path('app/audiobook-cache/background-processing-cache.json');
+            $this->getImportService()->saveCache($this->backgroundCache, true, $cacheFilePath, $this->cacheVersion);
         }
     }
 
@@ -910,7 +933,7 @@ class ImportBooksFromDownloads extends Command
             $audiobook,
             $this->aiProcessor,
             fn ($metadata) => $this->getImportService()->buildUiMetadata($metadata),
-            fn ($message) => $this->uiService->logMessage($message),
+            fn ($message, $data = null) => $this->logUiMessage($message, $data),
             fn ($message) => $this->info($message),
             fn ($message) => $this->line($message),
             fn () => $this->newLine(),
@@ -1047,7 +1070,7 @@ class ImportBooksFromDownloads extends Command
             $metadata,
             $audiobook,
             fn ($metadata) => $this->buildUiMetadata($metadata),
-            fn ($action, $data) => $this->uiService->logMessage($data),
+            fn ($message, $data = null) => $this->logUiMessage($message, $data),
             fn ($question, $options, $default) => $this->selectWithImmediateInterrupt($question, $options, $default),
             fn ($question, $default) => $this->askInline($question, $default),
             fn ($currentCoverUrl, $currentGenre, $currentDirectoryPath, $isFinalConfirmation) => $this->buildReviewOptions($currentCoverUrl, $currentGenre, $currentDirectoryPath, $isFinalConfirmation),
@@ -1060,7 +1083,6 @@ class ImportBooksFromDownloads extends Command
             $this->inputInterrupted
         );
     }
-
     protected function buildReviewOptions(
         string $currentCoverUrl,
         string $currentGenre,
@@ -1340,7 +1362,7 @@ class ImportBooksFromDownloads extends Command
             fn ($message) => $this->info($message),
             fn ($message) => $this->warn($message),
             fn ($message) => $this->line($message),
-            fn () => $this->aiProcessor->getTotalCost(),
+            fn () => $this->aiProcessor ? $this->aiProcessor->getTotalCost() : 0.0,
             fn ($headers, $rows) => $this->table($headers, $rows)
         );
     }

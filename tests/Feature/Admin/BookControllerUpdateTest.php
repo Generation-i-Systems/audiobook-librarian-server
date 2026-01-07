@@ -381,7 +381,7 @@ class BookControllerUpdateTest extends TestCase
 
         $this->assertTrue(Storage::disk('books')->exists('new/path_01/track1.mp3'));
         $this->assertTrue(Storage::disk('books')->exists('new/path_01/cover.jpg'));
-        $this->assertTrue(Storage::disk('books')->exists('new/path_01/sub/track2.mp3'));
+        $this->assertTrue(Storage::disk('books')->exists('new/path_01/track2.mp3'));
 
         $this->assertTrue(Storage::disk('books')->exists('new/path/cover.jpg'));
         $this->assertTrue(Storage::disk('books')->exists('new/path/sub/track2.mp3'));

@@ -5,8 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 
-return new class extends Migration
-{
+return new class () extends Migration {
     /**
      * Run the migrations.
      */
@@ -24,7 +23,7 @@ return new class extends Migration
             });
         }
 
-        // Series table indexes  
+        // Series table indexes
         if (Schema::hasTable('series')) {
             Schema::table('series', function (Blueprint $table) {
                 if (!$this->indexExists('series', 'idx_series_name')) {
@@ -145,28 +144,42 @@ return new class extends Migration
     {
         if (Schema::hasTable('authors')) {
             Schema::table('authors', function (Blueprint $table) {
-                if ($this->indexExists('authors', 'idx_authors_name')) $table->dropIndex('idx_authors_name');
-                if ($this->indexExists('authors', 'idx_authors_created')) $table->dropIndex('idx_authors_created');
+                if ($this->indexExists('authors', 'idx_authors_name')) {
+                    $table->dropIndex('idx_authors_name');
+                }
+                if ($this->indexExists('authors', 'idx_authors_created')) {
+                    $table->dropIndex('idx_authors_created');
+                }
             });
         }
 
         if (Schema::hasTable('series')) {
             Schema::table('series', function (Blueprint $table) {
-                if ($this->indexExists('series', 'idx_series_name')) $table->dropIndex('idx_series_name');
-                if ($this->indexExists('series', 'idx_series_created')) $table->dropIndex('idx_series_created');
+                if ($this->indexExists('series', 'idx_series_name')) {
+                    $table->dropIndex('idx_series_name');
+                }
+                if ($this->indexExists('series', 'idx_series_created')) {
+                    $table->dropIndex('idx_series_created');
+                }
             });
         }
 
         if (Schema::hasTable('genres')) {
             Schema::table('genres', function (Blueprint $table) {
-                if ($this->indexExists('genres', 'idx_genres_name')) $table->dropIndex('idx_genres_name');
-                if ($this->indexExists('genres', 'idx_genres_created')) $table->dropIndex('idx_genres_created');
+                if ($this->indexExists('genres', 'idx_genres_name')) {
+                    $table->dropIndex('idx_genres_name');
+                }
+                if ($this->indexExists('genres', 'idx_genres_created')) {
+                    $table->dropIndex('idx_genres_created');
+                }
             });
         }
 
         if (Schema::hasTable('users')) {
             Schema::table('users', function (Blueprint $table) {
-                if ($this->indexExists('users', 'idx_users_email')) $table->dropIndex('idx_users_email');
+                if ($this->indexExists('users', 'idx_users_email')) {
+                    $table->dropIndex('idx_users_email');
+                }
                 if (Schema::hasColumn('users', 'role') && $this->indexExists('users', 'idx_users_role_created')) {
                     $table->dropIndex('idx_users_role_created');
                 }
@@ -178,15 +191,23 @@ return new class extends Migration
 
         if (Schema::hasTable('author_book')) {
             Schema::table('author_book', function (Blueprint $table) {
-                if ($this->indexExists('author_book', 'idx_author_book_composite')) $table->dropIndex('idx_author_book_composite');
-                if ($this->indexExists('author_book', 'idx_author_book_book_id')) $table->dropIndex('idx_author_book_book_id');
+                if ($this->indexExists('author_book', 'idx_author_book_composite')) {
+                    $table->dropIndex('idx_author_book_composite');
+                }
+                if ($this->indexExists('author_book', 'idx_author_book_book_id')) {
+                    $table->dropIndex('idx_author_book_book_id');
+                }
             });
         }
 
         if (Schema::hasTable('book_series')) {
             Schema::table('book_series', function (Blueprint $table) {
-                if ($this->indexExists('book_series', 'idx_book_series_composite')) $table->dropIndex('idx_book_series_composite');
-                if ($this->indexExists('book_series', 'idx_book_series_series_id')) $table->dropIndex('idx_book_series_series_id');
+                if ($this->indexExists('book_series', 'idx_book_series_composite')) {
+                    $table->dropIndex('idx_book_series_composite');
+                }
+                if ($this->indexExists('book_series', 'idx_book_series_series_id')) {
+                    $table->dropIndex('idx_book_series_series_id');
+                }
                 if (Schema::hasColumn('book_series', 'series_number') && $this->indexExists('book_series', 'idx_book_series_number')) {
                     $table->dropIndex('idx_book_series_number');
                 }
@@ -195,22 +216,34 @@ return new class extends Migration
 
         if (Schema::hasTable('book_genre')) {
             Schema::table('book_genre', function (Blueprint $table) {
-                if ($this->indexExists('book_genre', 'idx_book_genre_composite')) $table->dropIndex('idx_book_genre_composite');
-                if ($this->indexExists('book_genre', 'idx_book_genre_genre_id')) $table->dropIndex('idx_book_genre_genre_id');
+                if ($this->indexExists('book_genre', 'idx_book_genre_composite')) {
+                    $table->dropIndex('idx_book_genre_composite');
+                }
+                if ($this->indexExists('book_genre', 'idx_book_genre_genre_id')) {
+                    $table->dropIndex('idx_book_genre_genre_id');
+                }
             });
         }
 
         if (Schema::hasTable('book_narrator')) {
             Schema::table('book_narrator', function (Blueprint $table) {
-                if ($this->indexExists('book_narrator', 'idx_book_narrator_composite')) $table->dropIndex('idx_book_narrator_composite');
-                if ($this->indexExists('book_narrator', 'idx_book_narrator_narrator_id')) $table->dropIndex('idx_book_narrator_narrator_id');
+                if ($this->indexExists('book_narrator', 'idx_book_narrator_composite')) {
+                    $table->dropIndex('idx_book_narrator_composite');
+                }
+                if ($this->indexExists('book_narrator', 'idx_book_narrator_narrator_id')) {
+                    $table->dropIndex('idx_book_narrator_narrator_id');
+                }
             });
         }
 
         if (Schema::hasTable('book_progress')) {
             Schema::table('book_progress', function (Blueprint $table) {
-                if ($this->indexExists('book_progress', 'idx_book_progress_user_book')) $table->dropIndex('idx_book_progress_user_book');
-                if ($this->indexExists('book_progress', 'idx_book_progress_updated')) $table->dropIndex('idx_book_progress_updated');
+                if ($this->indexExists('book_progress', 'idx_book_progress_user_book')) {
+                    $table->dropIndex('idx_book_progress_user_book');
+                }
+                if ($this->indexExists('book_progress', 'idx_book_progress_updated')) {
+                    $table->dropIndex('idx_book_progress_updated');
+                }
             });
         }
     }

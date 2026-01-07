@@ -319,7 +319,9 @@ class AudiobookReplacer
             'operation' => 'mp3_to_m4a_replacement',
             'book_number' => $bookNum,
             'directory' => $targetDir,
-            'mp3_files' => array_map(function($f) { return $f['basename']; }, $movedMp3Files),
+            'mp3_files' => array_map(function ($f) {
+                return $f['basename'];
+            }, $movedMp3Files),
             'mp3_file_count' => count($mp3Files),
             'm4a_file' => basename($m4aFile),
             'total_mp3_size' => $totalMp3Size,

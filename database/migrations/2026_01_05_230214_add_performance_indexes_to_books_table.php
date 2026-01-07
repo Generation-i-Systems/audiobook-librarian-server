@@ -5,8 +5,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
 
-return new class extends Migration
-{
+return new class () extends Migration {
     /**
      * Run the migrations.
      */
@@ -21,7 +20,7 @@ return new class extends Migration
             if (!$this->indexExists('idx_books_created_at')) {
                 $table->index('created_at', 'idx_books_created_at');
             }
-            
+
             if (!$this->indexExists('idx_books_needs_review')) {
                 $table->index('needs_review', 'idx_books_needs_review');
             }
@@ -38,19 +37,19 @@ return new class extends Migration
             if (!$this->indexExists('idx_books_title')) {
                 $table->index('title', 'idx_books_title');
             }
-            
+
             if (!$this->indexExists('idx_books_release_date')) {
                 $table->index('release_date', 'idx_books_release_date');
             }
-            
+
             if (!$this->indexExists('idx_books_isbn')) {
                 $table->index('isbn', 'idx_books_isbn');
             }
-            
+
             if (!$this->indexExists('idx_books_language')) {
                 $table->index('language', 'idx_books_language');
             }
-            
+
             if (!$this->indexExists('idx_books_source')) {
                 $table->index('source', 'idx_books_source');
             }
@@ -72,7 +71,7 @@ return new class extends Migration
     private function indexExists(string $indexName): bool
     {
         try {
-            // This works for MySQL. For SQLite (tests), we'd need a different approach 
+            // This works for MySQL. For SQLite (tests), we'd need a different approach
             // but Schema::table handles things gracefully or we can just catch exceptions.
             $indexes = collect(DB::select("SHOW INDEX FROM books WHERE Key_name = ?", [$indexName]));
             return $indexes->isNotEmpty();

@@ -575,24 +575,22 @@ class LibraryRepairService
             $candidateRelative = trim(Str::after($candidate, $root), '/');
 
             if ($attemptFixes && !$this->directoryInUseByOtherBook($candidateRelative, $book->id)) {
-                // FIX: Move files from nested directory to parent directory instead of accepting nested directory
-                $this->moveFilesFromNestedToParent($candidate, $fullPath);
-
-                // Delete the empty nested directory
-                if (count(File::allFiles($candidate)) === 0) {
-                    File::deleteDirectory($candidate);
-                }
+                $originalPath = $book->directory_path;
+                $book->directory_path = $candidateRelative;
+                $book->directory_exists = true;
+                $book->directory_last_checked = now();
+                $book->save();
 
                 $issue = $this->createOrUpdateIssue(
                     $book,
                     LibraryRepairIssueType::NESTED_AUDIO,
-                    $relativePath,
+                    $candidateRelative,
                     [
-                        'nested_path' => $candidateRelative,
-                        'action' => 'moved_files_to_parent',
+                        'original_path' => $originalPath,
+                        'updated_path' => $candidateRelative,
                     ],
                     autoResolve: true,
-                    resolutionNotes: 'Moved files from nested directory to parent directory.'
+                    resolutionNotes: 'Updated directory_path to nested audio directory.'
                 );
 
                 if ($issue->auto_resolved) {
