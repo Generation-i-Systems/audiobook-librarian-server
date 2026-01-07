@@ -2343,64 +2343,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function createThumbnail(string $imagePath, int $width, int $height)
     {
-        // Check if GD extension is available
-        if (!extension_loaded('gd')) {
-            return null;
-        }
-
-        $imageInfo = getimagesize($imagePath);
-        if (!$imageInfo) {
-            return null;
-        }
-
-        $mime = $imageInfo['mime'];
-
-        // Create source image
-        switch ($mime) {
-            case 'image/jpeg':
-                $source = imagecreatefromjpeg($imagePath);
-                break;
-            case 'image/png':
-                $source = imagecreatefrompng($imagePath);
-                break;
-            case 'image/gif':
-                $source = imagecreatefromgif($imagePath);
-                break;
-            default:
-                return null;
-        }
-
-        if (!$source) {
-            return null;
-        }
-
-        // Create thumbnail
-        $thumb = imagecreatetruecolor($width, $height);
-
-        // Preserve transparency for PNG
-        if ($mime === 'image/png') {
-            imagealphablending($thumb, false);
-            imagesavealpha($thumb, true);
-            $transparent = imagecolorallocatealpha($thumb, 0, 0, 0, 127);
-            imagefill($thumb, 0, 0, $transparent);
-        }
-
-        // Resize
-        imagecopyresampled(
-            $thumb,
-            $source,
-            0,
-            0,
-            0,
-            0,
-            $width,
-            $height,
-            $imageInfo[0],
-            $imageInfo[1]
-        );
-
-        imagedestroy($source);
-        return $thumb;
+        return $this->getImportService()->createThumbnail($imagePath, $width, $height);
     }
 
     /**

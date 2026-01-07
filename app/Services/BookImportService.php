@@ -1450,63 +1450,16 @@ class BookImportService
     /**
      * Download cover image
      */
-    public function downloadCoverImage(string $imageUrl, string $directoryPath, string $source = 'unknown'): ?string
+    public function downloadCoverImage(string $imageUrl, string $directoryPath, string $source = 'unknown', ?ExternalCoverService $coverService = null): ?string
     {
-        try {
-            // CRITICAL: directoryPath is RELATIVE - convert to absolute
-            $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
-            $absoluteDir = $bookRoot . '/' . ltrim($directoryPath, '/');
+        if (!$coverService) {
+            return null;
+        }
 
-            // Create directory if it doesn't exist
-            if (!is_dir($absoluteDir)) {
-                mkdir($absoluteDir, 0775, true);
-            }
+        $result = $coverService->downloadCoverImage($imageUrl, $directoryPath, $source);
 
-            // Check if this is a local file path instead of a URL
-            $localImagePath = $imageUrl;
-            if (str_starts_with($imageUrl, 'file://')) {
-                $parsedPath = parse_url($imageUrl, PHP_URL_PATH);
-                if (is_string($parsedPath) && $parsedPath !== '') {
-                    $localImagePath = $parsedPath;
-                }
-            }
-
-            if (file_exists($localImagePath) && is_file($localImagePath)) {
-                // It's a local file - copy it instead of downloading
-                $extension = strtolower(pathinfo($localImagePath, PATHINFO_EXTENSION));
-                if (!in_array($extension, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
-                    $extension = 'jpg';
-                }
-                $filename = "cover_{$source}.{$extension}";
-                $destPath = "{$absoluteDir}/{$filename}";
-
-                if (File::copy($localImagePath, $destPath)) {
-                    chmod($destPath, 0664);
-                    return $filename;
-                }
-                return null;
-            }
-
-            // It's a URL - download it
-            $imageData = file_get_contents($imageUrl);
-            if (!$imageData) {
-                return null;
-            }
-
-            $extension = $this->getImageExtensionFromUrl($imageUrl);
-            $filename = "cover_{$source}.{$extension}";
-            $filePath = "{$absoluteDir}/{$filename}";
-
-            if (file_put_contents($filePath, $imageData)) {
-                // Set file permissions for cover image
-                chmod($filePath, 0664);
-                return $filename;
-            }
-        } catch (\Exception $e) {
-            Log::warning("Failed to download cover image: " . $e->getMessage(), [
-                'url' => $imageUrl,
-                'directory' => $directoryPath,
-            ]);
+        if ($result['success']) {
+            return $result['path'];
         }
 
         return null;
@@ -2749,6 +2702,66 @@ class BookImportService
         }
 
         return $googleImageService->searchBookCovers($author, $title, $limit);
+    }
+
+    /**
+     * Create thumbnail image
+     */
+    public function createThumbnail(string $imagePath, int $width, int $height)
+    {
+        if (!extension_loaded('gd')) {
+            return null;
+        }
+
+        $imageInfo = getimagesize($imagePath);
+        if (!$imageInfo) {
+            return null;
+        }
+
+        $mime = $imageInfo['mime'];
+
+        switch ($mime) {
+            case 'image/jpeg':
+                $source = imagecreatefromjpeg($imagePath);
+                break;
+            case 'image/png':
+                $source = imagecreatefrompng($imagePath);
+                break;
+            case 'image/gif':
+                $source = imagecreatefromgif($imagePath);
+                break;
+            default:
+                return null;
+        }
+
+        if (!$source) {
+            return null;
+        }
+
+        $thumb = imagecreatetruecolor($width, $height);
+
+        if ($mime === 'image/png') {
+            imagealphablending($thumb, false);
+            imagesavealpha($thumb, true);
+            $transparent = imagecolorallocatealpha($thumb, 0, 0, 0, 127);
+            imagefill($thumb, 0, 0, $transparent);
+        }
+
+        imagecopyresampled(
+            $thumb,
+            $source,
+            0,
+            0,
+            0,
+            0,
+            $width,
+            $height,
+            $imageInfo[0],
+            $imageInfo[1]
+        );
+
+        imagedestroy($source);
+        return $thumb;
     }
 
     /**
