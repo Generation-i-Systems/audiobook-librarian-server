@@ -1505,11 +1505,15 @@ class BookImportService
             return null;
         }
 
-        $baseStoragePath = rtrim(storage_path('app'), '/');
-        $targetDirectory = $baseStoragePath . '/' . ltrim($directoryPath, '/');
+        // CRITICAL: Use the correct book storage path, not storage_path('app')
+        $bookStoragePath = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        $targetDirectory = $bookStoragePath . '/' . ltrim($directoryPath, '/');
 
         if (!File::exists($targetDirectory)) {
-            File::makeDirectory($targetDirectory, 0755, true);
+            File::makeDirectory($targetDirectory, 0775, true);
+
+            // Set directory ownership to eric:audio
+            $this->setDirectoryOwnership($targetDirectory);
         }
 
         $extension = $this->getImageExtensionFromUrl($imageUrl);
@@ -1536,6 +1540,7 @@ class BookImportService
                 'error' => $e->getMessage(),
                 'url' => $imageUrl,
                 'directory' => $targetDirectory,
+                'target_path' => $targetPath,
             ]);
             return null;
         }
