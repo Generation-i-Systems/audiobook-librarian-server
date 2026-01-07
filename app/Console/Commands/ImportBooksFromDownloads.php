@@ -1564,14 +1564,6 @@ class ImportBooksFromDownloads extends Command
     }
 
     /**
-     * Get audio file duration directly from file metadata
-     */
-    protected function getAudioFileDuration(string $filePath): int
-    {
-        return $this->getImportService()->getAudioFileDuration($filePath);
-    }
-
-    /**
      * Clean up source directory after successful operations
      */
     protected function cleanupSourceDirectory(array $audiobook, bool $filesAlreadyExist = false): void
