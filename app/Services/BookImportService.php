@@ -3103,6 +3103,73 @@ class BookImportService
     }
 
     /**
+     * Edit metadata fields interactively
+     */
+    public function editMetadataFields(array $metadata, array $audiobook, callable $askInlineCallback, callable $selectWithImmediateInterruptCallback, callable $getFirstNonEmptyMetadataValueCallback, callable $extractSeriesNumberFromTitleCallback, callable $getValidGenresCallback): array
+    {
+        $currentTitle = $getFirstNonEmptyMetadataValueCallback($metadata, ['title', 'book_title', 'name']);
+        $metadata['title'] = $askInlineCallback('Title', is_string($currentTitle) ? $currentTitle : (string) ($metadata['title'] ?? ''));
+
+        $currentAuthor = $getFirstNonEmptyMetadataValueCallback($metadata, ['author', 'authors', 'authorName', 'author_name']);
+        if (is_array($currentAuthor)) {
+            $currentAuthor = implode(', ', $currentAuthor);
+        }
+        $newAuthor = $askInlineCallback("Author(s) (comma-separated)", $currentAuthor);
+        $metadata['author'] = array_map('trim', explode(',', $newAuthor));
+
+        $currentNarrator = $getFirstNonEmptyMetadataValueCallback($metadata, ['narrator', 'narrators', 'narratorName', 'narrator_name']);
+        if (is_array($currentNarrator)) {
+            $currentNarrator = implode(', ', $currentNarrator);
+        }
+        $newNarrator = $askInlineCallback('Narrator(s) (comma-separated)', is_string($currentNarrator) ? $currentNarrator : '');
+        $metadata['narrator'] = array_map('trim', explode(',', $newNarrator));
+
+        $validGenres = $getValidGenresCallback();
+        $genreOptions = [];
+        foreach ($validGenres as $idx => $g) {
+            $genreOptions[$idx + 1] = $g;
+        }
+
+        $currentGenre = $getFirstNonEmptyMetadataValueCallback($metadata, ['genre', 'genres', 'genreName', 'genre_name']) ?? 'Other';
+        if (is_array($currentGenre)) {
+            $currentGenre = $currentGenre[0] ?? 'Other';
+        }
+        $currentGenreIdx = array_search($currentGenre, $validGenres);
+        $defaultGenreIdx = ($currentGenreIdx !== false) ? $currentGenreIdx + 1 : count($validGenres);
+
+        $selectedGenreIdx = $selectWithImmediateInterruptCallback("Genre", $genreOptions, (string) $defaultGenreIdx);
+        $metadata['genre'] = $genreOptions[$selectedGenreIdx] ?? $currentGenre;
+
+        $currentSeries = $getFirstNonEmptyMetadataValueCallback($metadata, ['series', 'seriesName', 'series_name']);
+        $metadata['series'] = $askInlineCallback('Series', is_string($currentSeries) ? $currentSeries : (string) ($metadata['series'] ?? ''));
+
+        $currentSeriesNumber = $getFirstNonEmptyMetadataValueCallback($metadata, ['series_number', 'seriesNumber', 'series_num', 'seriesNum']);
+        $metadata['series_number'] = $askInlineCallback(
+            'Series Number',
+            is_scalar($currentSeriesNumber) ? (string) $currentSeriesNumber : (string) ($metadata['series_number'] ?? '')
+        );
+
+        $currentYear = $getFirstNonEmptyMetadataValueCallback($metadata, ['year', 'publishedYear', 'published_year', 'published_date']);
+        if (is_string($currentYear) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $currentYear)) {
+            $currentYear = substr($currentYear, 0, 4);
+        }
+        $metadata['year'] = $askInlineCallback('Year', is_scalar($currentYear) ? (string) $currentYear : (string) ($metadata['year'] ?? ''));
+
+        $currentDirectory = (string) ($metadata['custom_directory_path'] ?? '');
+        if ($currentDirectory === '') {
+            $currentDirectory = $this->generateDirectoryPath($metadata, [
+                'include_title' => true,
+            ]);
+        }
+
+        $metadata['custom_directory_path'] = $askInlineCallback('Directory', $currentDirectory);
+
+        $extractSeriesNumberFromTitleCallback($metadata);
+
+        return $metadata;
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void

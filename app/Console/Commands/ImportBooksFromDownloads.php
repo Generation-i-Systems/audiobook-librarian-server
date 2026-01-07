@@ -2260,99 +2260,15 @@ class ImportBooksFromDownloads extends Command
      */
     protected function editMetadataFields(array $metadata, array $audiobook): array
     {
-        // Edit title
-        $currentTitle = $this->getFirstNonEmptyMetadataValue($metadata, ['title', 'book_title', 'name']);
-        $metadata['title'] = $this->askInline('Title', is_string($currentTitle) ? $currentTitle : (string) ($metadata['title'] ?? ''));
-        if ($this->inputInterrupted) {
-            return $metadata;
-        }
-
-        // Edit author
-        $currentAuthor = $this->getFirstNonEmptyMetadataValue($metadata, ['author', 'authors', 'authorName', 'author_name']);
-        if (is_array($currentAuthor)) {
-            $currentAuthor = implode(', ', $currentAuthor);
-        }
-        $newAuthor = $this->askInline("Author(s) (comma-separated)", $currentAuthor);
-        if ($this->inputInterrupted) {
-            return $metadata;
-        }
-        $metadata['author'] = array_map('trim', explode(',', $newAuthor));
-
-        // Edit narrator
-        $currentNarrator = $this->getFirstNonEmptyMetadataValue($metadata, ['narrator', 'narrators', 'narratorName', 'narrator_name']);
-        if (is_array($currentNarrator)) {
-            $currentNarrator = implode(', ', $currentNarrator);
-        }
-        $newNarrator = $this->askInline('Narrator(s) (comma-separated)', is_string($currentNarrator) ? $currentNarrator : '');
-        if ($this->inputInterrupted) {
-            return $metadata;
-        }
-        $metadata['narrator'] = array_map('trim', explode(',', $newNarrator));
-
-        // Edit genre with dropdown
-        $validGenres = $this->getValidGenres();
-        $genreOptions = [];
-        foreach ($validGenres as $idx => $g) {
-            $genreOptions[$idx + 1] = $g;
-        }
-
-        $currentGenre = $this->getFirstNonEmptyMetadataValue($metadata, ['genre', 'genres', 'genreName', 'genre_name']) ?? 'Other';
-        if (is_array($currentGenre)) {
-            $currentGenre = $currentGenre[0] ?? 'Other';
-        }
-        $currentGenreIdx = array_search($currentGenre, $validGenres);
-        // Default to last (Other) if not found
-        $defaultGenreIdx = ($currentGenreIdx !== false) ? $currentGenreIdx + 1 : count($validGenres);
-
-        $selectedGenreIdx = $this->selectWithImmediateInterrupt("Genre", $genreOptions, (string) $defaultGenreIdx);
-        if ($this->inputInterrupted) {
-            return $metadata;
-        }
-        $metadata['genre'] = $genreOptions[$selectedGenreIdx] ?? $currentGenre;
-
-        // Edit series
-        $currentSeries = $this->getFirstNonEmptyMetadataValue($metadata, ['series', 'seriesName', 'series_name']);
-        $metadata['series'] = $this->askInline('Series', is_string($currentSeries) ? $currentSeries : (string) ($metadata['series'] ?? ''));
-        if ($this->inputInterrupted) {
-            return $metadata;
-        }
-
-        // Edit series number
-        $currentSeriesNumber = $this->getFirstNonEmptyMetadataValue($metadata, ['series_number', 'seriesNumber', 'series_num', 'seriesNum']);
-        $metadata['series_number'] = $this->askInline(
-            'Series Number',
-            is_scalar($currentSeriesNumber) ? (string) $currentSeriesNumber : (string) ($metadata['series_number'] ?? '')
+        return $this->getImportService()->editMetadataFields(
+            $metadata,
+            $audiobook,
+            fn ($question, $default) => $this->askInline($question, $default),
+            fn ($question, $options, $default) => $this->selectWithImmediateInterrupt($question, $options, $default),
+            fn ($metadata, $keys) => $this->getFirstNonEmptyMetadataValue($metadata, $keys),
+            fn (&$metadata) => $this->extractSeriesNumberFromTitle($metadata),
+            fn () => $this->getValidGenres()
         );
-        if ($this->inputInterrupted) {
-            return $metadata;
-        }
-
-        // Edit year
-        $currentYear = $this->getFirstNonEmptyMetadataValue($metadata, ['year', 'publishedYear', 'published_year', 'published_date']);
-        if (is_string($currentYear) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $currentYear)) {
-            $currentYear = substr($currentYear, 0, 4);
-        }
-        $metadata['year'] = $this->askInline('Year', is_scalar($currentYear) ? (string) $currentYear : (string) ($metadata['year'] ?? ''));
-        if ($this->inputInterrupted) {
-            return $metadata;
-        }
-
-        $currentDirectory = (string) ($metadata['custom_directory_path'] ?? '');
-        if ($currentDirectory === '') {
-            $currentDirectory = $this->getImportService()->generateDirectoryPath($metadata, [
-                'include_title' => true,
-            ]);
-        }
-
-        $metadata['custom_directory_path'] = $this->askInline('Directory', $currentDirectory);
-        if ($this->inputInterrupted) {
-            return $metadata;
-        }
-
-        // Extract series number from edited title if present
-        $this->extractSeriesNumberFromTitle($metadata);
-
-        return $metadata;
     }
 
     protected function detectMultiBookPattern(string $title): ?array
