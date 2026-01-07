@@ -148,7 +148,7 @@ class BookImportServiceTest extends TestCase
 
         $book = Book::create([
             'title' => 'Willful Child',
-            'directory_path' => 'Science Fiction/Steven Erikson/Willful Child',
+            'directory_path' => null, // No existing path, so it will be generated with series number
             'language' => 'en',
         ]);
 
@@ -156,13 +156,16 @@ class BookImportServiceTest extends TestCase
         $book->genres()->attach($genre);
         $book->series()->attach($series, ['series_number' => 1]);
 
+        // Load relationships to ensure they're available
+        $book->load(['authors', 'genres', 'series']);
+
         // Use reflection to access protected method
         $reflection = new \ReflectionClass($this->service);
         $method = $reflection->getMethod('generateTargetDirectory');
         $method->setAccessible(true);
 
         $basePath = '/test/path';
-        $targetPath = $method->invoke($this->service, $book, $basePath);
+        $targetPath = $method->invoke($this->service, $book, $basePath, ['include_title' => true]);
 
         $this->assertStringContainsString('01 Willful Child', $targetPath);
     }

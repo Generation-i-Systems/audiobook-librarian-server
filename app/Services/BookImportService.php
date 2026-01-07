@@ -1349,21 +1349,18 @@ class BookImportService
     /**
      * Format authors for directory paths
      */
-    protected function formatAuthorsForDirectory(array $authors): string
+    public function formatAuthorsForDirectory(array $authors): string
     {
         $normalizedAuthors = array_map([$this, 'normalizeAuthorName'], $authors);
         return implode(' & ', $normalizedAuthors);
     }
 
     /**
-     * Normalize author names - extract actual author from patterns
-     * Examples:
-     *   "Graphic Audio [Alex Archer]" -> "Alex Archer"
-     *   "GraphicAudio [John Smith]" -> "John Smith"
+     * Normalize author names for directory use
      *
      * CRITICAL: Author will NEVER contain "Graphic" AND "Audio" - this is always invalid
      */
-    protected function normalizeAuthorName(string $authorName): string
+    public function normalizeAuthorName(string $authorName): string
     {
         $name = trim($authorName);
 
@@ -1878,25 +1875,149 @@ class BookImportService
     /**
      * Clean series name by removing author names
      */
-    protected function cleanSeriesName(string $seriesName, array $authors): string
+    public function cleanSeriesName(string $seriesName, array $authors): string
     {
+        $originalSeries = $seriesName;
         $cleanedSeries = $seriesName;
 
-        foreach ($authors as $author) {
-            $authorWords = explode(' ', trim($author));
-            foreach ($authorWords as $word) {
-                if (strlen($word) > 2) { // Only remove meaningful words, not initials
-                    $cleanedSeries = preg_replace('/\b' . preg_quote($word, '/') . '\b/i', '', $cleanedSeries);
+        // Preserve GraphicAudio markers - extract and reapply later
+        $graphicAudioMarker = '';
+        if (preg_match('/\(Graphic\s*Audio\)/i', $cleanedSeries, $matches)) {
+            $graphicAudioMarker = ' (GraphicAudio)';
+            $cleanedSeries = preg_replace('/\(Graphic\s*Audio\)/i', '', $cleanedSeries);
+        }
+
+        // First try to remove the complete author list as a combined string
+        // Try both comma and & separators since both are common
+        $combinedAuthorsComma = implode(', ', $authors);
+        $combinedAuthorsAmpersand = implode(' & ', $authors);
+
+        $combinedPatterns = [
+            // Patterns with comma separator
+            '/^' . preg_quote($combinedAuthorsComma, '/') . '\s*-\s*/i',
+            '/^' . preg_quote($combinedAuthorsComma, '/') . '\s+/i',
+            '/\s*-\s*' . preg_quote($combinedAuthorsComma, '/') . '$/i',
+            // Patterns with & separator
+            '/^' . preg_quote($combinedAuthorsAmpersand, '/') . '\s*-\s*/i',
+            '/^' . preg_quote($combinedAuthorsAmpersand, '/') . '\s+/i',
+            '/\s*-\s*' . preg_quote($combinedAuthorsAmpersand, '/') . '$/i',
+        ];
+
+        foreach ($combinedPatterns as $pattern) {
+            $before = $cleanedSeries;
+            $cleanedSeries = preg_replace($pattern, '', $cleanedSeries);
+            if ($before !== $cleanedSeries) {
+                $cleanedSeries = preg_replace('/^[\s\-_]+|[\s\-_]+$/', '', $cleanedSeries);
+                $cleanedSeries = trim($cleanedSeries);
+                if (!empty($cleanedSeries) && strlen($cleanedSeries) >= 2) {
+                    return $cleanedSeries . $graphicAudioMarker;
                 }
             }
         }
+
+        // If combined pattern didn't work, try individual authors
+        foreach ($authors as $author) {
+            $authorName = trim($author);
+
+            // Try different patterns to remove author names from series
+            $patterns = [
+                '/^' . preg_quote($authorName, '/') . '\s*-\s*/i',
+                '/^' . preg_quote($authorName, '/') . '\s+/i',
+                '/\s*-\s*' . preg_quote($authorName, '/') . '$/i',
+                '/\s+' . preg_quote($authorName, '/') . '$/i',
+            ];
+
+            foreach ($patterns as $pattern) {
+                $cleanedSeries = preg_replace($pattern, '', $cleanedSeries);
+            }
+
+            // Also try with normalized author name (with periods)
+            $normalizedAuthor = $this->normalizeAuthorName($authorName);
+            if ($normalizedAuthor !== $authorName) {
+                $patterns = [
+                    '/^' . preg_quote($normalizedAuthor, '/') . '\s*-\s*/i',
+                    '/^' . preg_quote($normalizedAuthor, '/') . '\s+/i',
+                    '/\s*-\s*' . preg_quote($normalizedAuthor, '/') . '$/i',
+                    '/\s+' . preg_quote($normalizedAuthor, '/') . '$/i',
+                ];
+
+                foreach ($patterns as $pattern) {
+                    $cleanedSeries = preg_replace($pattern, '', $cleanedSeries);
+                }
+            }
+        }
+
+        // Clean up any remaining separators and whitespace
+        $cleanedSeries = preg_replace('/^[\s\-_]+|[\s\-_]+$/', '', $cleanedSeries);
+        $cleanedSeries = trim($cleanedSeries);
 
         // Clean up extra spaces and common series words
         $cleanedSeries = preg_replace('/\b(series|saga|chronicles|collection)\b/i', '', $cleanedSeries);
         $cleanedSeries = preg_replace('/\s+/', ' ', $cleanedSeries);
         $cleanedSeries = trim($cleanedSeries, ' -,');
 
-        return $cleanedSeries ?: $seriesName; // Return original if cleaning resulted in empty string
+        // If we cleaned too much and ended up with nothing, return original
+        if (empty($cleanedSeries) || strlen($cleanedSeries) < 2) {
+            return $originalSeries;
+        }
+
+        return $cleanedSeries . $graphicAudioMarker;
+    }
+
+    /**
+     * Extract metadata from audio file tags
+     */
+    public function extractMetadataFromFileTags(array $fileTags): array
+    {
+        if (empty($fileTags)) {
+            return [];
+        }
+
+        $firstTags = reset($fileTags);
+        if (!is_array($firstTags) || empty($firstTags)) {
+            return [];
+        }
+
+        $metadata = [];
+
+        if (!empty($firstTags['album']) && is_string($firstTags['album'])) {
+            $metadata['title'] = $firstTags['album'];
+        }
+
+        if (!empty($firstTags['artist'])) {
+            if (is_array($firstTags['artist'])) {
+                $metadata['author'] = $firstTags['artist'];
+            } else {
+                $metadata['author'] = [(string) $firstTags['artist']];
+            }
+        }
+
+        if (!empty($firstTags['genre']) && is_string($firstTags['genre'])) {
+            $metadata['genre'] = [$firstTags['genre']];
+        }
+
+        if (!empty($firstTags['year']) && is_numeric($firstTags['year'])) {
+            $metadata['year'] = (int) $firstTags['year'];
+        }
+
+        if (!empty($firstTags['narrator'])) {
+            if (is_array($firstTags['narrator'])) {
+                $metadata['narrator'] = array_map('strval', $firstTags['narrator']);
+            } else {
+                $metadata['narrator'] = [(string) $firstTags['narrator']];
+            }
+        } elseif (!empty($firstTags['writer']) && is_string($firstTags['writer'])) {
+            $writerParts = array_map('trim', explode(',', $firstTags['writer']));
+            $writerParts = array_values(array_filter(
+                $writerParts,
+                static fn ($value) => $value !== '' && strtolower($value) !== 'full cast'
+            ));
+            if (!empty($writerParts)) {
+                $metadata['narrator'] = $writerParts;
+            }
+        }
+
+        return $metadata;
     }
 
     /**
@@ -1909,37 +2030,35 @@ class BookImportService
             return preg_replace('/\(Graphic\s*Audio\)/i', '(GraphicAudio)', $title);
         }
 
+        // Check if series already has GraphicAudio marker - if so, don't add to title
+        $series = $metadata['series'] ?? '';
+        if (!empty($series) && preg_match('/\(Graphic\s*Audio\)/i', $series)) {
+            return $title;
+        }
+
         // Check various fields for GraphicAudio indicators
         $sourcePath = $metadata['source_path'] ?? '';
         $narrator = $metadata['narrator'] ?? '';
         $publisher = $metadata['publisher'] ?? '';
-        $series = $metadata['series'] ?? '';
+        $originalTitle = $metadata['original_title'] ?? $title;
 
         $isGraphicAudio = false;
 
-        // Check source path
-        if (stripos($sourcePath, 'graphic') !== false && stripos($sourcePath, 'audio') !== false) {
+        // Check source directory path
+        if (preg_match('/\(Graphic\s*Audio\)/i', $sourcePath)) {
             $isGraphicAudio = true;
         }
 
-        // Check narrator field
-        if (is_array($narrator)) {
-            foreach ($narrator as $n) {
-                if (stripos($n, 'graphic') !== false && stripos($n, 'audio') !== false) {
-                    $isGraphicAudio = true;
-                    break;
-                }
-            }
-        } elseif (is_string($narrator)) {
-            if (stripos($narrator, 'graphic') !== false && stripos($narrator, 'audio') !== false) {
-                $isGraphicAudio = true;
-            }
+        // Check narrator field (handle arrays)
+        $narratorString = is_array($narrator) ? implode(' ', $narrator) : (string) $narrator;
+        if (preg_match('/Graphic\s*Audio/i', $narratorString)) {
+            $isGraphicAudio = true;
         }
 
         // Check publisher field
         if (is_array($publisher)) {
             foreach ($publisher as $p) {
-                if (stripos($p, 'graphic') !== false && stripos($p, 'audio') !== false) {
+                if (is_string($p) && stripos($p, 'graphic') !== false && stripos($p, 'audio') !== false) {
                     $isGraphicAudio = true;
                     break;
                 }
@@ -1950,16 +2069,278 @@ class BookImportService
             }
         }
 
-        // Check if series already has GraphicAudio marker - if so, don't add to title
-        if (!empty($series) && preg_match('/\(Graphic\s*Audio\)/i', $series)) {
-            return $title;
+        // Check original title
+        if (is_string($originalTitle) && preg_match('/\(Graphic\s*Audio\)/i', $originalTitle)) {
+            $isGraphicAudio = true;
         }
 
+        // Check if narrator contains typical GraphicAudio cast indicators
+        $graphicAudioNarratorPatterns = [
+            '/full\s*cast/i',
+            '/ensemble\s*cast/i',
+            '/multi\s*cast/i',
+            '/cast\s*of\s*voices/i',
+        ];
+
+        foreach ($graphicAudioNarratorPatterns as $pattern) {
+            if (preg_match($pattern, $narratorString)) {
+                $isGraphicAudio = true;
+                break;
+            }
+        }
+
+        // Add GraphicAudio marker if detected
         if ($isGraphicAudio && !preg_match('/\(GraphicAudio\)/i', $title)) {
             return $title . ' (GraphicAudio)';
         }
 
         return $title;
+    }
+
+    /**
+     * Remove series names from title when they contain colons
+     */
+    public function removeSeriesFromTitle(string $title): string
+    {
+        // Handle pattern "Series: Title" - remove series before colon
+        if (preg_match('/^([^:]+):\s*(.+)$/', $title, $matches)) {
+            $beforeColon = trim($matches[1]);
+            $afterColon = trim($matches[2]);
+
+            // Always prioritize the part after the colon as the title
+            // Exception: if the part after colon is clearly metadata (Book, Vol, etc.)
+            if (preg_match('/^\b(book|vol|volume|part|chapter)\s*\d+/i', $afterColon)) {
+                return $beforeColon;
+            }
+
+            return $afterColon;
+        }
+
+        // Handle pattern "Title: Series" - remove series after colon
+        if (preg_match('/^(.+?):\s*([^:]+)$/', $title, $matches)) {
+            $beforeColon = trim($matches[1]);
+            $afterColon = trim($matches[2]);
+
+            // If the part after colon looks like metadata/series info, keep the part before
+            if (
+                strlen($afterColon) < strlen($beforeColon) ||
+                preg_match('/\b(series|book|vol|volume|\d+|saga|chronicles|collection)\b/i', $afterColon)
+            ) {
+                return $beforeColon;
+            }
+        }
+
+        return $title;
+    }
+
+    /**
+     * Get narrator information from audiobook metadata
+     */
+    public function getNarratorFromMetadata(array $audiobook): string
+    {
+        if (isset($audiobook['metadata']['narrator'])) {
+            $narrator = $audiobook['metadata']['narrator'];
+            if (is_array($narrator)) {
+                return implode(', ', $narrator);
+            }
+            return $narrator;
+        }
+
+        // Try to extract narrator from directory name patterns
+        $dirName = basename($audiobook['path']);
+
+        $patterns = [
+            '/\{([^}]+)\}/',
+            '/\(([^)]+)\)$/',
+            '/\[([^\]]+)\]$/',
+            '/ - ([^-]+)$/',
+            '/ narrated by ([^,]+)/i',
+            '/ read by ([^,]+)/i',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $dirName, $matches)) {
+                $narrator = trim($matches[1]);
+                if (
+                    !preg_match('/^\d{4}$/', $narrator) &&
+                    !preg_match('/\b(book|vol|volume|series|edition|unabridged|audiobook)\b/i', $narrator)
+                ) {
+                    return $narrator;
+                }
+            }
+        }
+
+        return 'Unknown Narrator';
+    }
+
+    /**
+     * Get narrator information from existing directory/book
+     */
+    public function getNarratorFromDirectory(string $targetDir, ?Book $existingBook): string
+    {
+        if ($existingBook && !empty($existingBook->narrator)) {
+            return $existingBook->narrator;
+        }
+
+        $dirName = basename($targetDir);
+
+        $patterns = [
+            '/\{([^}]+)\}/',
+            '/\(([^)]+)\)$/',
+            '/\[([^\]]+)\]$/',
+            '/ - ([^-]+)$/',
+            '/ narrated by ([^,]+)/i',
+            '/ read by ([^,]+)/i',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $dirName, $matches)) {
+                $narrator = trim($matches[1]);
+                if (
+                    !preg_match('/^\d{4}$/', $narrator) &&
+                    !preg_match('/\b(book|vol|volume|series|edition|unabridged|audiobook)\b/i', $narrator)
+                ) {
+                    return $narrator;
+                }
+            }
+        }
+
+        return 'Unknown Narrator';
+    }
+
+    /**
+     * Get detailed information about files in a directory
+     */
+    public function getDirectoryInfo(string $path): array
+    {
+        $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
+        $files = [];
+        $totalSize = 0;
+        $fileTypes = [];
+
+        if (File::isFile($path)) {
+            $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+            if (in_array($extension, $audioExtensions)) {
+                $size = filesize($path);
+                $filename = basename($path);
+                return [
+                    'files' => [
+                        [
+                            'name' => $filename,
+                            'size' => $size,
+                            'extension' => $extension,
+                            'hash' => md5($filename . $size),
+                        ],
+                    ],
+                    'total_size' => $size,
+                    'file_types' => [$extension => 1],
+                    'count' => 1,
+                ];
+            }
+            return [
+                'files' => [],
+                'total_size' => 0,
+                'file_types' => [],
+                'count' => 0,
+            ];
+        }
+
+        if (!File::isDirectory($path)) {
+            return [
+                'files' => [],
+                'total_size' => 0,
+                'file_types' => [],
+                'count' => 0,
+            ];
+        }
+
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($path, \RecursiveDirectoryIterator::SKIP_DOTS)
+        );
+
+        foreach ($iterator as $file) {
+            if ($file->isFile()) {
+                $extension = strtolower($file->getExtension());
+                if (in_array($extension, $audioExtensions)) {
+                    $size = $file->getSize();
+                    $files[] = [
+                        'name' => $file->getFilename(),
+                        'size' => $size,
+                        'extension' => $extension,
+                        'hash' => md5($file->getFilename() . $size),
+                    ];
+                    $totalSize += $size;
+                    $fileTypes[$extension] = ($fileTypes[$extension] ?? 0) + 1;
+                }
+            }
+        }
+
+        return [
+            'files' => $files,
+            'total_size' => $totalSize,
+            'file_types' => $fileTypes,
+            'count' => count($files),
+        ];
+    }
+
+    /**
+     * Check if two directories have identical content
+     */
+    public function areDirectoriesIdentical(array $sourceFiles, array $targetFiles): bool
+    {
+        if ($sourceFiles['count'] !== $targetFiles['count']) {
+            return false;
+        }
+
+        if ($sourceFiles['total_size'] !== $targetFiles['total_size']) {
+            return false;
+        }
+
+        $sourceHashes = array_column($sourceFiles['files'], 'hash');
+        $targetHashes = array_column($targetFiles['files'], 'hash');
+
+        sort($sourceHashes);
+        sort($targetHashes);
+
+        return $sourceHashes === $targetHashes;
+    }
+
+    /**
+     * Compare two directories for content differences
+     */
+    public function compareDirectories(string $sourcePath, string $targetPath): array
+    {
+        $sourceFiles = $this->getDirectoryInfo($sourcePath);
+        $targetFiles = $this->getDirectoryInfo($targetPath);
+
+        $identical = $this->areDirectoriesIdentical($sourceFiles, $targetFiles);
+
+        return [
+            'identical' => $identical,
+            'source' => $sourceFiles,
+            'target' => $targetFiles,
+            'source_path' => $sourcePath,
+            'target_path' => $targetPath,
+        ];
+    }
+
+    /**
+     * Parse duration string (e.g., "1:23:45") to seconds
+     */
+    public function parseDurationString(string $duration): int
+    {
+        $parts = explode(':', $duration);
+        $seconds = 0;
+
+        if (count($parts) === 3) {
+            $seconds = ($parts[0] * 3600) + ($parts[1] * 60) + $parts[2];
+        } elseif (count($parts) === 2) {
+            $seconds = ($parts[0] * 60) + $parts[1];
+        } else {
+            $seconds = (int) $duration;
+        }
+
+        return (int) $seconds;
     }
 
     /**

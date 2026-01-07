@@ -10,6 +10,15 @@ use Illuminate\Support\Str;
 
 class BookDirectoryMoveService
 {
+    /**
+     * Audio file extensions that constitute actual book content
+     */
+    private const AUDIO_EXTENSIONS = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'opus', 'aac', 'wav', 'wma'];
+
+    /**
+     * Metadata filenames that can be safely overwritten
+     */
+    private const METADATA_FILES = ['librarian.json', 'cover.jpg', 'cover.jpeg', 'cover.png', 'cover.webp'];
     public function moveBookDirectoryContents(
         string $oldDirectoryPath,
         string $newDirectoryPath,
@@ -55,24 +64,38 @@ class BookDirectoryMoveService
         $files = $disk->allFiles($oldDirectoryPath);
         $newCoverImageBasename = $coverImageBasename;
 
+        Log::debug('BookDirectoryMoveService: Moving files', [
+            'oldDirectoryPath' => $oldDirectoryPath,
+            'newDirectoryPath' => $newDirectoryPath,
+            'fileCount' => count($files),
+            'files' => $files,
+            'diskRoot' => $disk->path(''),
+        ]);
+
         foreach ($files as $file) {
-            if (Str::startsWith($file, $oldDirectoryPath . '/')) {
+            $startsWithCheck = Str::startsWith($file, $oldDirectoryPath . '/');
+            Log::debug('BookDirectoryMoveService: File path check', [
+                'file' => $file,
+                'startsWith' => $startsWithCheck,
+                'oldDirectoryPathWithSlash' => $oldDirectoryPath . '/',
+            ]);
+
+            if ($startsWithCheck) {
                 $relative = Str::after($file, $oldDirectoryPath . '/');
             } else {
                 $relative = basename($file);
             }
 
-            $target = rtrim($newDirectoryPath, '/') . '/' . ltrim($relative, '/');
-            $targetDir = trim((string) dirname($target), '/');
-            if ($targetDir !== '') {
-                $disk->makeDirectory($targetDir);
-                $targetAbsDir = $disk->path($targetDir);
-                if (is_dir($targetAbsDir)) {
-                    @chown($targetAbsDir, 'eric');
-                    @chgrp($targetAbsDir, 'audio');
-                    @chmod($targetAbsDir, 0775);
-                }
-            }
+            // Always use just the basename to avoid creating nested directories
+            $filename = basename($relative);
+            $target = rtrim($newDirectoryPath, '/') . '/' . $filename;
+
+            Log::debug('BookDirectoryMoveService: Processing file', [
+                'file' => $file,
+                'relative' => $relative,
+                'filename' => $filename,
+                'target' => $target,
+            ]);
 
             $finalTarget = $target;
             if ($disk->exists($finalTarget)) {
@@ -130,6 +153,7 @@ class BookDirectoryMoveService
             return $directoryPath;
         }
 
+        // Check if directory exists
         if (method_exists($disk, 'directoryExists')) {
             $exists = $disk->{'directoryExists'}($directoryPath);
         } else {
@@ -140,10 +164,19 @@ class BookDirectoryMoveService
             return $directoryPath;
         }
 
-        if (count($disk->allFiles($directoryPath)) === 0) {
+        // Get all files in the directory
+        $files = $disk->allFiles($directoryPath);
+        if (empty($files)) {
             return $directoryPath;
         }
 
+        // Check if directory only contains metadata files
+        if ($this->containsOnlyMetadata($disk, $directoryPath, $files)) {
+            // Safe to use this directory - metadata files will be overwritten
+            return $directoryPath;
+        }
+
+        // Directory has actual content, find a non-conflicting path
         $counter = 1;
         while (true) {
             $suffix = '_' . str_pad((string) $counter, 2, '0', STR_PAD_LEFT);
@@ -159,6 +192,29 @@ class BookDirectoryMoveService
             }
             $counter++;
         }
+    }
+
+    /**
+     * Check if directory contains only metadata files (librarian.json, covers, etc.)
+     */
+    private function containsOnlyMetadata($disk, string $directoryPath, array $files): bool
+    {
+        foreach ($files as $file) {
+            $filename = basename($file);
+            $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+
+            // If it's an audio file, this is not just metadata
+            if (in_array($extension, self::AUDIO_EXTENSIONS)) {
+                return false;
+            }
+
+            // If it's not a recognized metadata file, consider it content
+            if (!in_array($filename, self::METADATA_FILES)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function generateNonConflictingPath($disk, string $targetPath): string

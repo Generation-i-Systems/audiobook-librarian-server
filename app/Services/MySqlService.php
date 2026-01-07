@@ -20,7 +20,6 @@ use App\Models\Series;
 use App\Models\User;
 use App\Traits\HandlesLibraryJson;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
@@ -67,57 +66,56 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
     public function getBook(string $id): ?array
     {
-        return Cache::tags(['books'])->remember("book:{$id}", 3600, function () use ($id) {
-            $book = Book::with(['authors', 'narrators', 'genres', 'series', 'chapters'])->find($id);
+        $book = Book::with(['authors', 'narrators', 'genres', 'series', 'chapters'])->find($id);
 
-            if (!$book) {
-                return null;
+        if (!$book) {
+            return null;
+        }
+
+        $bookArray = $book->toArray();
+        $camelCasedBook = [];
+
+        // First, copy all non-relational properties, converting keys to camelCase
+        foreach ($bookArray as $key => $value) {
+            if (!is_array($value)) {
+                $camelCasedBook[Str::camel($key)] = $value;
             }
+        }
 
-            $bookArray = $book->toArray();
-            $camelCasedBook = [];
+        // Handle array-type fields that are not relationships
+        // (Book model's toArray already converts to camelCase via CamelCaseAttributeAccess trait)
+        if (isset($bookArray['needsReviewReasons'])) {
+            $camelCasedBook['needsReviewReasons'] = $bookArray['needsReviewReasons'];
+        }
 
-            // First, copy all non-relational properties, converting keys to camelCase
-            foreach ($bookArray as $key => $value) {
-                if (!is_array($value)) {
-                    $camelCasedBook[Str::camel($key)] = $value;
-                }
-            }
+        // Then, specifically handle the relationships with the correct keys and structures
+        if (!empty($bookArray['authors'])) {
+            $camelCasedBook['author'] = collect($bookArray['authors'])->pluck('name')->all();
+        }
 
-            // Handle array-type fields that are not relationships
-            // (Book model's toArray already converts to camelCase via CamelCaseAttributeAccess trait)
-            if (isset($bookArray['needsReviewReasons'])) {
-                $camelCasedBook['needsReviewReasons'] = $bookArray['needsReviewReasons'];
-            }
+        if (!empty($bookArray['genres'])) {
+            $camelCasedBook['genre'] = collect($bookArray['genres'])->pluck('name')->all();
+        }
 
-            // Then, specifically handle the relationships with the correct keys and structures
-            if (!empty($bookArray['authors'])) {
-                $camelCasedBook['author'] = collect($bookArray['authors'])->pluck('name')->all();
-            }
+        if (!empty($bookArray['narrators'])) {
+            $camelCasedBook['narrator'] = collect($bookArray['narrators'])->pluck('name')->all();
+        }
 
-            if (!empty($bookArray['genres'])) {
-                $camelCasedBook['genre'] = collect($bookArray['genres'])->pluck('name')->all();
-            }
+        if (!empty($bookArray['series'])) {
+            $camelCasedBook['series'] = collect($bookArray['series'])->map(function ($s) {
+                return [
+                    'seriesName' => $s['name'],
+                    'number' => $s['pivot']['series_number'] ?? null,
+                    'isCollection' => $s['is_collection'] ?? false,
+                ];
+            })->all();
+        }
 
-            if (!empty($bookArray['narrators'])) {
-                $camelCasedBook['narrator'] = collect($bookArray['narrators'])->pluck('name')->all();
-            }
+        if (!empty($bookArray['chapters'])) {
+            $camelCasedBook['chapters'] = $bookArray['chapters'];
+        }
 
-            if (!empty($bookArray['series'])) {
-                $camelCasedBook['series'] = collect($bookArray['series'])->map(function ($s) {
-                    return [
-                        'name' => $s['name'],
-                        'number' => $s['pivot']['series_number'] ?? null,
-                    ];
-                })->all();
-            }
-
-            if (!empty($bookArray['chapters'])) {
-                $camelCasedBook['chapters'] = $bookArray['chapters'];
-            }
-
-            return $camelCasedBook;
-        });
+        return $camelCasedBook;
     }
 
     public function findBookByDirectoryPath(string $directoryPath): ?array
@@ -3187,8 +3185,6 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 'device' => $data['device'] ?? null,
             ]);
 
-            $this->clearReadingStatsCache($userId, $bookId);
-
             return $session->toArray();
         } catch (\Exception $e) {
             Log::error('MySqlService recordReadingSession failed: ' . $e->getMessage(), [
@@ -3205,50 +3201,46 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      */
     public function getDailyStats(string $userId, ?string $from = null, ?string $to = null): array
     {
-        $cacheKey = "user:{$userId}:daily_stats:" . md5(serialize([$from, $to]));
+        try {
+            $query = ReadingSession::where('user_id', $userId);
 
-        return Cache::tags(['reading_stats', "user:{$userId}"])->remember($cacheKey, 3600, function () use ($userId, $from, $to) {
-            try {
-                $query = ReadingSession::where('user_id', $userId);
-
-                if ($from) {
-                    $query->whereDate('started_at', '>=', $from);
-                }
-
-                if ($to) {
-                    $query->whereDate('started_at', '<=', $to);
-                }
-
-                return $query->selectRaw('
-                        DATE(started_at) as date,
-                        SUM(duration_seconds) as duration_seconds,
-                        COUNT(*) as sessions,
-                        COUNT(DISTINCT book_id) as books
-                    ')
-                    ->whereNotNull('started_at')
-                    ->groupBy('date')
-                    ->orderBy('date')
-                    ->get()
-                    ->map(function ($row) {
-                        return [
-                            'date' => $row->date,
-                            'duration_seconds' => (int) $row->duration_seconds,
-                            'sessions' => (int) $row->sessions,
-                            'books' => (int) $row->books,
-                        ];
-                    })
-                    ->toArray()
-                ;
-            } catch (\Exception $e) {
-                Log::error('MySqlService getDailyStats failed: ' . $e->getMessage(), [
-                    'userId' => $userId,
-                    'from' => $from,
-                    'to' => $to,
-                ]);
-
-                return [];
+            if ($from) {
+                $query->whereDate('started_at', '>=', $from);
             }
-        });
+
+            if ($to) {
+                $query->whereDate('started_at', '<=', $to);
+            }
+
+            return $query->selectRaw('
+                    DATE(started_at) as date,
+                    SUM(duration_seconds) as duration_seconds,
+                    COUNT(*) as sessions,
+                    COUNT(DISTINCT book_id) as books
+                ')
+                ->whereNotNull('started_at')
+                ->groupBy('date')
+                ->orderBy('date')
+                ->get()
+                ->map(function ($row) {
+                    return [
+                        'date' => $row->date,
+                        'duration_seconds' => (int) $row->duration_seconds,
+                        'sessions' => (int) $row->sessions,
+                        'books' => (int) $row->books,
+                    ];
+                })
+                ->toArray()
+            ;
+        } catch (\Exception $e) {
+            Log::error('MySqlService getDailyStats failed: ' . $e->getMessage(), [
+                'userId' => $userId,
+                'from' => $from,
+                'to' => $to,
+            ]);
+
+            return [];
+        }
     }
 
     /**
@@ -3256,42 +3248,19 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      */
     public function getBookStats(string $userId, string $bookId): array
     {
-        $cacheKey = "user:{$userId}:book:{$bookId}:stats";
+        try {
+            $stats = ReadingSession::where('user_id', $userId)
+                ->where('book_id', $bookId)
+                ->selectRaw('
+                    SUM(duration_seconds) as total_duration_seconds,
+                    COUNT(*) as sessions,
+                    MIN(started_at) as first_started_at,
+                    MAX(ended_at) as last_ended_at
+                ')
+                ->first()
+            ;
 
-        return Cache::tags(['reading_stats', "user:{$userId}", "book:{$bookId}"])->remember($cacheKey, 3600, function () use ($userId, $bookId) {
-            try {
-                $stats = ReadingSession::where('user_id', $userId)
-                    ->where('book_id', $bookId)
-                    ->selectRaw('
-                        SUM(duration_seconds) as total_duration_seconds,
-                        COUNT(*) as sessions,
-                        MIN(started_at) as first_started_at,
-                        MAX(ended_at) as last_ended_at
-                    ')
-                    ->first()
-                ;
-
-                if (!$stats) {
-                    return [
-                        'total_duration_seconds' => 0,
-                        'sessions' => 0,
-                        'first_started_at' => null,
-                        'last_ended_at' => null,
-                    ];
-                }
-
-                return [
-                    'total_duration_seconds' => (int) $stats->total_duration_seconds ?? 0,
-                    'sessions' => (int) $stats->sessions ?? 0,
-                    'first_started_at' => $stats->first_started_at ? $stats->first_started_at->toIso8601String() : null,
-                    'last_ended_at' => $stats->last_ended_at ? $stats->last_ended_at->toIso8601String() : null,
-                ];
-            } catch (\Exception $e) {
-                Log::error('MySqlService getBookStats failed: ' . $e->getMessage(), [
-                    'userId' => $userId,
-                    'bookId' => $bookId,
-                ]);
-
+            if (!$stats) {
                 return [
                     'total_duration_seconds' => 0,
                     'sessions' => 0,
@@ -3299,7 +3268,26 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                     'last_ended_at' => null,
                 ];
             }
-        });
+
+            return [
+                'total_duration_seconds' => (int) $stats->total_duration_seconds ?? 0,
+                'sessions' => (int) $stats->sessions ?? 0,
+                'first_started_at' => $stats->first_started_at ? $stats->first_started_at->toIso8601String() : null,
+                'last_ended_at' => $stats->last_ended_at ? $stats->last_ended_at->toIso8601String() : null,
+            ];
+        } catch (\Exception $e) {
+            Log::error('MySqlService getBookStats failed: ' . $e->getMessage(), [
+                'userId' => $userId,
+                'bookId' => $bookId,
+            ]);
+
+            return [
+                'total_duration_seconds' => 0,
+                'sessions' => 0,
+                'first_started_at' => null,
+                'last_ended_at' => null,
+            ];
+        }
     }
 
     /**
@@ -3307,43 +3295,39 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      */
     public function getUserStats(string $userId): array
     {
-        $cacheKey = "user:{$userId}:stats";
+        try {
+            $stats = ReadingSession::where('user_id', $userId)
+                ->selectRaw('
+                    SUM(duration_seconds) as total_duration_seconds,
+                    COUNT(*) as sessions,
+                    COUNT(DISTINCT DATE(started_at)) as active_days
+                ')
+                ->whereNotNull('started_at')
+                ->first()
+            ;
 
-        return Cache::tags(['reading_stats', "user:{$userId}"])->remember($cacheKey, 3600, function () use ($userId) {
-            try {
-                $stats = ReadingSession::where('user_id', $userId)
-                    ->selectRaw('
-                        SUM(duration_seconds) as total_duration_seconds,
-                        COUNT(*) as sessions,
-                        COUNT(DISTINCT DATE(started_at)) as active_days
-                    ')
-                    ->whereNotNull('started_at')
-                    ->first()
-                ;
+            $streaks = $this->getStreaks($userId);
 
-                $streaks = $this->getStreaks($userId);
+            return [
+                'total_duration_seconds' => (int) $stats->total_duration_seconds ?? 0,
+                'sessions' => (int) $stats->sessions ?? 0,
+                'active_days' => (int) $stats->active_days ?? 0,
+                'streak_current' => $streaks['current'] ?? 0,
+                'streak_longest' => $streaks['longest'] ?? 0,
+            ];
+        } catch (\Exception $e) {
+            Log::error('MySqlService getUserStats failed: ' . $e->getMessage(), [
+                'userId' => $userId,
+            ]);
 
-                return [
-                    'total_duration_seconds' => (int) $stats->total_duration_seconds ?? 0,
-                    'sessions' => (int) $stats->sessions ?? 0,
-                    'active_days' => (int) $stats->active_days ?? 0,
-                    'streak_current' => $streaks['current'] ?? 0,
-                    'streak_longest' => $streaks['longest'] ?? 0,
-                ];
-            } catch (\Exception $e) {
-                Log::error('MySqlService getUserStats failed: ' . $e->getMessage(), [
-                    'userId' => $userId,
-                ]);
-
-                return [
-                    'total_duration_seconds' => 0,
-                    'sessions' => 0,
-                    'active_days' => 0,
-                    'streak_current' => 0,
-                    'streak_longest' => 0,
-                ];
-            }
-        });
+            return [
+                'total_duration_seconds' => 0,
+                'sessions' => 0,
+                'active_days' => 0,
+                'streak_current' => 0,
+                'streak_longest' => 0,
+            ];
+        }
     }
 
     /**
@@ -3351,92 +3335,72 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
      */
     public function getStreaks(string $userId): array
     {
-        $cacheKey = "user:{$userId}:streaks";
+        try {
+            $dates = ReadingSession::where('user_id', $userId)
+                ->selectRaw('DISTINCT DATE(started_at) as reading_date')
+                ->whereNotNull('started_at')
+                ->orderBy('reading_date', 'desc')
+                ->pluck('reading_date')
+                ->map(function ($date) {
+                    return $date->format('Y-m-d');
+                })
+                ->values()
+                ->toArray()
+            ;
 
-        return Cache::tags(['reading_stats', "user:{$userId}"])->remember($cacheKey, 3600, function () use ($userId) {
-            try {
-                $dates = ReadingSession::where('user_id', $userId)
-                    ->selectRaw('DISTINCT DATE(started_at) as reading_date')
-                    ->whereNotNull('started_at')
-                    ->orderBy('reading_date', 'desc')
-                    ->pluck('reading_date')
-                    ->map(function ($date) {
-                        return $date->format('Y-m-d');
-                    })
-                    ->values()
-                    ->toArray()
-                ;
-
-                if (empty($dates)) {
-                    return [
-                        'current' => 0,
-                        'longest' => 0,
-                        'last_active_date' => null,
-                    ];
-                }
-
-                $lastActiveDate = $dates[0];
-                $today = now()->format('Y-m-d');
-                $yesterday = now()->subDay()->format('Y-m-d');
-
-                $currentStreak = 0;
-                $longestStreak = 0;
-                $tempStreak = 0;
-
-                foreach ($dates as $i => $date) {
-                    if ($i === 0) {
-                        $tempStreak = 1;
-                    } else {
-                        $prevDate = $dates[$i - 1];
-                        $currentDate = strtotime($date);
-                        $prevDateTime = strtotime($prevDate);
-
-                        if ($currentDate === $prevDateTime - 86400) {
-                            $tempStreak++;
-                        } else {
-                            $tempStreak = 1;
-                        }
-                    }
-
-                    $longestStreak = max($longestStreak, $tempStreak);
-                }
-
-                if ($lastActiveDate === $today || $lastActiveDate === $yesterday) {
-                    $currentStreak = $tempStreak;
-                }
-
-                return [
-                    'current' => $currentStreak,
-                    'longest' => $longestStreak,
-                    'last_active_date' => $lastActiveDate,
-                ];
-            } catch (\Exception $e) {
-                Log::error('MySqlService getStreaks failed: ' . $e->getMessage(), [
-                    'userId' => $userId,
-                ]);
-
+            if (empty($dates)) {
                 return [
                     'current' => 0,
                     'longest' => 0,
                     'last_active_date' => null,
                 ];
             }
-        });
-    }
 
-    private function clearReadingStatsCache(string $userId, ?string $bookId = null): void
-    {
-        try {
-            Cache::tags(['reading_stats', "user:{$userId}"])->flush();
+            $lastActiveDate = $dates[0];
+            $today = now()->format('Y-m-d');
+            $yesterday = now()->subDay()->format('Y-m-d');
 
-            if ($bookId) {
-                Cache::tags(["book:{$bookId}"])->flush();
+            $currentStreak = 0;
+            $longestStreak = 0;
+            $tempStreak = 0;
+
+            foreach ($dates as $i => $date) {
+                if ($i === 0) {
+                    $tempStreak = 1;
+                } else {
+                    $prevDate = $dates[$i - 1];
+                    $currentDate = strtotime($date);
+                    $prevDateTime = strtotime($prevDate);
+
+                    if ($currentDate === $prevDateTime - 86400) {
+                        $tempStreak++;
+                    } else {
+                        $tempStreak = 1;
+                    }
+                }
+
+                $longestStreak = max($longestStreak, $tempStreak);
             }
+
+            if ($lastActiveDate === $today || $lastActiveDate === $yesterday) {
+                $currentStreak = $tempStreak;
+            }
+
+            return [
+                'current' => $currentStreak,
+                'longest' => $longestStreak,
+                'last_active_date' => $lastActiveDate,
+            ];
         } catch (\Exception $e) {
-            Log::error('MySqlService clearReadingStatsCache failed: ' . $e->getMessage(), [
+            Log::error('MySqlService getStreaks failed: ' . $e->getMessage(), [
                 'userId' => $userId,
-                'bookId' => $bookId,
             ]);
+
+            return [
+                'current' => 0,
+                'longest' => 0,
+                'last_active_date' => null,
+            ];
         }
     }
 }

@@ -1376,10 +1376,19 @@ class BookController extends Controller
         ]);
         if ($oldDirectoryPath && $newDirectoryPath && $oldDirectoryPath !== $newDirectoryPath) {
             Log::info('Moving files from old directory to new directory: ' . $oldDirectoryPath . ' -> ' . $newDirectoryPath);
+            Log::debug('BookController@update: Directory move details', [
+                'oldDirectoryPath' => $oldDirectoryPath,
+                'newDirectoryPath' => $newDirectoryPath,
+                'book' => $book,
+            ]);
 
             $oldCoverBasename = !empty($book['coverImage']) ? basename((string) $book['coverImage']) : null;
             $moveService = app(BookDirectoryMoveService::class);
             $moveResult = $moveService->moveBookDirectoryContents($oldDirectoryPath, $newDirectoryPath, $oldCoverBasename);
+
+            Log::debug('BookController@update: Move result', [
+                'moveResult' => $moveResult,
+            ]);
 
             if (!empty($moveResult['directoryPath']) && is_string($moveResult['directoryPath'])) {
                 $validated['directoryPath'] = $moveResult['directoryPath'];
