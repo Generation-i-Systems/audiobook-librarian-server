@@ -2680,23 +2680,14 @@ class ImportBooksFromDownloads extends Command
      */
     protected function showCostEstimate(int $bookCount): void
     {
-        $costEstimate = $this->aiProcessor->estimateBatchCost($bookCount);
-
-        if ($costEstimate['total_cost'] > 0) {
-            $this->warn(
-                "💰 Estimated AI processing cost: \${$costEstimate['total_cost']} " .
-                "(\${$costEstimate['cost_per_book']} per book)"
-            );
-
-            if ($costEstimate['total_cost'] > 1.0) {
-                $this->error("⚠️  High cost operation (>\$1.00) - use --force to proceed");
-                if (!$this->option('force')) {
-                    exit(1);
-                }
-            }
-        } else {
-            $this->info("💰 Using free tier AI model - no cost");
-        }
+        $this->getImportService()->showCostEstimate(
+            $bookCount,
+            fn ($count) => $this->aiProcessor->estimateBatchCost($count),
+            fn ($message) => $this->warn($message),
+            fn ($message) => $this->error($message),
+            fn ($message) => $this->info($message),
+            fn ($option) => $this->option($option)
+        );
     }
 
     /**
@@ -2715,32 +2706,16 @@ class ImportBooksFromDownloads extends Command
             ]
         );
 
-        if (!empty($this->processedBooks)) {
-            $this->info('✅ Successfully Imported:');
-            foreach ($this->processedBooks as $book) {
-                $this->line("  📚 {$book['title']} (ID: {$book['book_id']})");
-            }
-        }
-
-        if (!empty($this->failedBooks)) {
-            $this->warn('❌ Failed Imports:');
-            foreach ($this->failedBooks as $failed) {
-                $this->line("  🚫 {$failed['path']}: {$failed['error']}");
-            }
-        }
-
-        if (!empty($this->skippedBooks)) {
-            $this->info('⏭️  Skipped:');
-            foreach ($this->skippedBooks as $skipped) {
-                $this->line("  ⚠️  {$skipped['path']}: {$skipped['reason']}");
-            }
-        }
-
-        // Show actual AI costs
-        $totalCost = $this->aiProcessor->getTotalCost();
-        if ($totalCost > 0) {
-            $this->info("💰 Total AI cost: \${$totalCost}");
-        }
+        $this->getImportService()->displaySummary(
+            $this->totalFound,
+            $this->processedBooks,
+            $this->failedBooks,
+            $this->skippedBooks,
+            fn ($message) => $this->info($message),
+            fn ($message) => $this->warn($message),
+            fn ($message) => $this->line($message),
+            fn () => $this->aiProcessor->getTotalCost()
+        );
     }
 
 

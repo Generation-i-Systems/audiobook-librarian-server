@@ -4405,6 +4405,64 @@ class BookImportService
     }
 
     /**
+     * Show cost estimate for AI processing
+     */
+    public function showCostEstimate(int $bookCount, callable $estimateBatchCostCallback, callable $warnCallback, callable $errorCallback, callable $infoCallback, callable $optionCallback): void
+    {
+        $costEstimate = $estimateBatchCostCallback($bookCount);
+
+        if ($costEstimate['total_cost'] > 0) {
+            $warnCallback(
+                "💰 Estimated AI processing cost: \${$costEstimate['total_cost']} " .
+                "(\${$costEstimate['cost_per_book']} per book)"
+            );
+
+            if ($costEstimate['total_cost'] > 1.0) {
+                $errorCallback("⚠️  High cost operation (>\$1.00) - use --force to proceed");
+                if (!$optionCallback('force')) {
+                    exit(1);
+                }
+            }
+        } else {
+            $infoCallback("💰 Using free tier AI model - no cost");
+        }
+    }
+
+    /**
+     * Display processing summary
+     */
+    public function displaySummary(int $totalFound, array $processedBooks, array $failedBooks, array $skippedBooks, callable $infoCallback, callable $warnCallback, callable $lineCallback, callable $getTotalCostCallback): void
+    {
+        $infoCallback('📊 Import Summary:');
+
+        if (!empty($processedBooks)) {
+            $infoCallback('✅ Successfully Imported:');
+            foreach ($processedBooks as $book) {
+                $lineCallback("  📚 {$book['title']} (ID: {$book['book_id']})");
+            }
+        }
+
+        if (!empty($failedBooks)) {
+            $warnCallback('❌ Failed Imports:');
+            foreach ($failedBooks as $failed) {
+                $lineCallback("  🚫 {$failed['path']}: {$failed['error']}");
+            }
+        }
+
+        if (!empty($skippedBooks)) {
+            $infoCallback('⏭️  Skipped:');
+            foreach ($skippedBooks as $skipped) {
+                $lineCallback("  ⚠️  {$skipped['path']}: {$skipped['reason']}");
+            }
+        }
+
+        $totalCost = $getTotalCostCallback();
+        if ($totalCost > 0) {
+            $infoCallback("💰 Total AI cost: \${$totalCost}");
+        }
+    }
+
+    /**
      * Display available cover options
      */
     public function displayCoverOptions(array $coverOptions, callable $displayCoverImageCallback): void
