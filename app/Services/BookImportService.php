@@ -2700,6 +2700,27 @@ class BookImportService
     }
 
     /**
+     * Handle low confidence metadata
+     */
+    public function handleLowConfidenceMetadata(array $audiobook, ?array &$aiMetadata, int $minConfidence, bool $hasCriticalTagMetadata): bool
+    {
+        if (!is_array($aiMetadata)) {
+            $aiMetadata = [];
+        }
+
+        $tagMetadata = $this->extractTagMetadataFromAudiobook($audiobook, new AIBookProcessor());
+        if (!empty($tagMetadata)) {
+            $aiMetadata = $this->mergeMetadataFillMissing($aiMetadata, $tagMetadata);
+        }
+
+        $aiMetadata['confidence'] = (int) ($aiMetadata['confidence'] ?? 0);
+        $aiMetadata['title'] = $aiMetadata['title'] ?? ($audiobook['name'] ?? '');
+        $aiMetadata['source_path'] = $aiMetadata['source_path'] ?? ($audiobook['path'] ?? '');
+
+        return false;
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void

@@ -123,87 +123,10 @@ class ImportBooksFromDownloads extends Command
 
     protected function handleLowConfidenceMetadata(array $audiobook, ?array &$aiMetadata): bool
     {
-        if (!is_array($aiMetadata)) {
-            $aiMetadata = [];
-        }
-
-        $tagMetadata = $this->extractTagMetadataFromAudiobook($audiobook);
-        if (!empty($tagMetadata)) {
-            $aiMetadata = $this->mergeMetadataFillMissing($aiMetadata, $tagMetadata);
-        }
-
-        $aiMetadata['confidence'] = (int) ($aiMetadata['confidence'] ?? 0);
-        $aiMetadata['title'] = $aiMetadata['title'] ?? ($audiobook['name'] ?? '');
-        $aiMetadata['source_path'] = $aiMetadata['source_path'] ?? ($audiobook['path'] ?? '');
-
         $minConfidence = (int) $this->option('min-confidence');
-        $shouldTryAudio = $aiMetadata['confidence'] < $minConfidence
-            || (bool) $this->option('force-audio');
+        $hasCriticalTagMetadata = $this->hasCriticalTagMetadata($this->extractTagMetadataFromAudiobook($audiobook));
 
-        if ($shouldTryAudio && $this->hasCriticalTagMetadata($tagMetadata)) {
-            $shouldTryAudio = false;
-        }
-
-        if (!$shouldTryAudio) {
-            return false;
-        }
-
-        if ($this->option('force-audio')) {
-            $message = '🎵 Forcing audio analysis (--force-audio flag used)';
-            if ($this->uiService) {
-                $this->uiService->logMessage($message);
-            } else {
-                $this->info($message);
-            }
-        } else {
-            $warningMessage = "⚠️  AI confidence too low ({$aiMetadata['confidence']}%) " .
-                '- trying audio analysis fallback';
-            if ($this->uiService) {
-                $this->uiService->logMessage($warningMessage);
-            } else {
-                $this->warn($warningMessage);
-            }
-        }
-
-        $audioMetadata = $this->processWithAudioAnalysis($audiobook);
-        if ($audioMetadata && (int) ($audioMetadata['confidence'] ?? 0) >= $minConfidence) {
-            $this->info("✅ Audio analysis successful with {$audioMetadata['confidence']}% confidence");
-            $aiMetadata = $audioMetadata;
-            $aiMetadata['confidence'] = (int) ($aiMetadata['confidence'] ?? 0);
-            $aiMetadata['source_path'] = $aiMetadata['source_path'] ?? ($audiobook['path'] ?? '');
-            return false;
-        }
-
-        if ($this->option('force-audio')) {
-            $this->warn('⚠️  Audio analysis failed but continuing due to --force-audio flag');
-            return false;
-        }
-
-        if (!$this->option('auto')) {
-            $warning = '⚠️  Audio analysis also failed - continuing in interactive mode with low-confidence metadata';
-            if ($this->uiService) {
-                $this->uiService->logMessage($warning);
-            } else {
-                $this->warn($warning);
-            }
-
-            return false;
-        }
-
-        $this->warn('⚠️  Audio analysis also failed - skipping (auto mode)');
-        $currentProvider = config('services.ai.default_provider', 'gemini');
-        if ($currentProvider === 'gemini' && empty(config('services.gemini.api_key'))) {
-            $this->warn('   💡 Tip: Add GEMINI_API_KEY to your .env file to enable audio transcription');
-        } elseif ($currentProvider === 'claude' && empty(config('services.openai.api_key'))) {
-            $this->warn('   💡 Tip: Claude doesn\'t support audio transcription. Add OPENAI_API_KEY for fallback');
-        }
-
-        $this->skippedBooks[] = [
-            'path' => $audiobook['path'],
-            'reason' => 'Low AI confidence (tried audio analysis)',
-        ];
-
-        return true;
+        return $this->getImportService()->handleLowConfidenceMetadata($audiobook, $aiMetadata, $minConfidence, $hasCriticalTagMetadata);
     }
 
     protected function extractTagMetadataFromAudiobook(array $audiobook): array
