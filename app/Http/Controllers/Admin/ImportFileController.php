@@ -1554,6 +1554,15 @@ class ImportFileController extends Controller
             $sourceName = basename($sourcePath);
             $targetPath = $fullDestinationPath . '/' . $sourceName;
 
+            Log::debug('[ImportFile] Determining target path', [
+                'sourcePath' => $sourcePath,
+                'sourceName' => $sourceName,
+                'destinationPath' => $destinationPath,
+                'fullDestinationPath' => $fullDestinationPath,
+                'targetPath' => $targetPath,
+                'sourceType' => $sourceType,
+            ]);
+
             // Check if target already exists
             if (file_exists($targetPath)) {
                 Log::warning('[ImportFile] Target already exists, skipping move', [
@@ -1565,9 +1574,15 @@ class ImportFileController extends Controller
 
             // Move the files
             if ($sourceType === 'file') {
+                // When importing a file, move it directly to the destination directory
+                // without preserving the source directory structure
+                $filename = basename($sourcePath);
+                $targetPath = $fullDestinationPath . '/' . $filename;
                 $success = File::move($sourcePath, $targetPath);
             } else {
-                $success = File::moveDirectory($sourcePath, $targetPath);
+                // Use moveDirectoryContentsToTarget instead of moveDirectory to avoid nested directories
+                $this->moveDirectoryContentsToTarget($sourcePath, $fullDestinationPath);
+                $success = true;
             }
 
             if ($success) {
@@ -1714,20 +1729,33 @@ class ImportFileController extends Controller
 
     protected function moveDirectoryContentsToTarget(string $sourceDir, string $destDir): void
     {
+        Log::debug('[ImportFile] moveDirectoryContentsToTarget called', [
+            'sourceDir' => $sourceDir,
+            'destDir' => $destDir,
+        ]);
+
         if (!File::isDirectory($destDir)) {
             File::makeDirectory($destDir, 0775, true);
+            Log::debug('[ImportFile] Created destination directory', ['destDir' => $destDir]);
         }
 
         $files = File::allFiles($sourceDir);
+        Log::debug('[ImportFile] Found files to move', [
+            'fileCount' => count($files),
+            'files' => array_map(fn ($f) => $f->getPathname(), $files),
+        ]);
+
         foreach ($files as $file) {
             $sourceFilePath = $file->getPathname();
-            $relativePath = str_replace(rtrim($sourceDir, '/') . '/', '', $sourceFilePath);
-            $targetFile = rtrim($destDir, '/') . '/' . ltrim($relativePath, '/');
+            // Always use just the filename to avoid creating nested directories
+            $filename = $file->getFilename();
+            $targetFile = rtrim($destDir, '/') . '/' . $filename;
 
-            $targetSubDir = dirname($targetFile);
-            if (!File::isDirectory($targetSubDir)) {
-                File::makeDirectory($targetSubDir, 0775, true);
-            }
+            Log::debug('[ImportFile] Moving file', [
+                'from' => $sourceFilePath,
+                'to' => $targetFile,
+                'filename' => $filename,
+            ]);
 
             if (File::exists($targetFile)) {
                 $pathInfo = pathinfo($targetFile);
@@ -1744,6 +1772,7 @@ class ImportFileController extends Controller
                     }
                     $counter++;
                 }
+                Log::debug('[ImportFile] File exists, using alternate name', ['targetFile' => $targetFile]);
             }
 
             File::move($sourceFilePath, $targetFile);
@@ -1751,6 +1780,7 @@ class ImportFileController extends Controller
 
         if (count(File::allFiles($sourceDir)) === 0) {
             File::deleteDirectory($sourceDir);
+            Log::debug('[ImportFile] Deleted empty source directory', ['sourceDir' => $sourceDir]);
         }
     }
 
