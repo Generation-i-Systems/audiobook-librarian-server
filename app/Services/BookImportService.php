@@ -1816,6 +1816,50 @@ class BookImportService
     }
 
     /**
+     * Check if two files are identical by comparing size and hash
+     */
+    public function areFilesIdentical(string $file1, string $file2): bool
+    {
+        if (!File::exists($file1) || !File::exists($file2)) {
+            return false;
+        }
+
+        if (File::size($file1) !== File::size($file2)) {
+            return false;
+        }
+
+        $maxHashSize = 1024 * 1024;
+
+        $size1 = File::size($file1);
+        $size2 = File::size($file2);
+
+        if ($size1 <= $maxHashSize && $size2 <= $maxHashSize) {
+            return hash_file('md5', $file1) === hash_file('md5', $file2);
+        } else {
+            $handle1 = fopen($file1, 'rb');
+            $handle2 = fopen($file2, 'rb');
+
+            if (!$handle1 || !$handle2) {
+                if ($handle1) {
+                    fclose($handle1);
+                }
+                if ($handle2) {
+                    fclose($handle2);
+                }
+                return false;
+            }
+
+            $chunk1 = fread($handle1, $maxHashSize);
+            $chunk2 = fread($handle2, $maxHashSize);
+
+            fclose($handle1);
+            fclose($handle2);
+
+            return hash('md5', $chunk1) === hash('md5', $chunk2);
+        }
+    }
+
+    /**
      * Get duration of audio file in seconds
      */
     public function getAudioFileDuration(string $filePath): int

@@ -3864,47 +3864,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function areFilesIdentical(string $file1, string $file2): bool
     {
-        if (!File::exists($file1) || !File::exists($file2)) {
-            return false;
-        }
-
-        // Quick size check first
-        if (File::size($file1) !== File::size($file2)) {
-            return false;
-        }
-
-        // Compare file contents hash for small files or first 1MB for large files
-        $maxHashSize = 1024 * 1024; // 1MB
-
-        $size1 = File::size($file1);
-        $size2 = File::size($file2);
-
-        if ($size1 <= $maxHashSize && $size2 <= $maxHashSize) {
-            // Hash entire file for small files
-            return hash_file('md5', $file1) === hash_file('md5', $file2);
-        } else {
-            // Hash first 1MB for large files
-            $handle1 = fopen($file1, 'rb');
-            $handle2 = fopen($file2, 'rb');
-
-            if (!$handle1 || !$handle2) {
-                if ($handle1) {
-                    fclose($handle1);
-                }
-                if ($handle2) {
-                    fclose($handle2);
-                }
-                return false;
-            }
-
-            $chunk1 = fread($handle1, $maxHashSize);
-            $chunk2 = fread($handle2, $maxHashSize);
-
-            fclose($handle1);
-            fclose($handle2);
-
-            return hash('md5', $chunk1) === hash('md5', $chunk2);
-        }
+        return $this->getImportService()->areFilesIdentical($file1, $file2);
     }
 
     /**
