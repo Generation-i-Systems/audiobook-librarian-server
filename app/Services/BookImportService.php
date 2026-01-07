@@ -3673,8 +3673,14 @@ class BookImportService
         array $audiobook,
         array $multiBookInfo,
         array $splitGroups,
-        array $aiMetadata
+        array $aiMetadata,
+        ?callable $infoCallback = null,
+        ?callable $processSingleBookCallback = null
     ): array {
+        if ($infoCallback) {
+            $infoCallback("🔄 Processing {$multiBookInfo['series_name']} as split books...");
+        }
+
         $books = [];
 
         foreach ($splitGroups as $bookNumber => $fileInfos) {
@@ -3702,10 +3708,21 @@ class BookImportService
                 'multi_book_files_only' => $files,
             ];
 
-            $books[] = [
+            $bookData = [
                 'audiobook' => $virtualAudiobook,
                 'metadata' => $bookMetadata,
             ];
+
+            $books[] = $bookData;
+
+            // Process each book if callback provided
+            if ($processSingleBookCallback) {
+                if ($infoCallback) {
+                    $infoCallback("📖 Processing Book {$bookMetadata['series_number']} with " . count($virtualAudiobook['files']) . " files");
+                    $infoCallback("📚 Book title: {$bookMetadata['title']}");
+                }
+                $processSingleBookCallback($virtualAudiobook, $bookMetadata);
+            }
         }
 
         return $books;

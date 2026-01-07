@@ -1235,15 +1235,14 @@ class ImportBooksFromDownloads extends Command
         array $splitGroups,
         array $aiMetadata
     ): void {
-        $this->info("🔄 Processing {$multiBookInfo['series_name']} as split books...");
-
-        $books = $this->getImportService()->processMultiBookSplit($audiobook, $multiBookInfo, $splitGroups, $aiMetadata);
-
-        foreach ($books as $bookData) {
-            $this->info("📖 Processing Book {$bookData['metadata']['series_number']} with " . count($bookData['audiobook']['files']) . " files");
-            $this->info("📚 Book title: {$bookData['metadata']['title']}");
-            $this->processSingleBook($bookData['audiobook'], $bookData['metadata']);
-        }
+        $this->getImportService()->processMultiBookSplit(
+            $audiobook,
+            $multiBookInfo,
+            $splitGroups,
+            $aiMetadata,
+            fn ($message) => $this->info($message),
+            fn ($virtualAudiobook, $bookMetadata) => $this->processSingleBook($virtualAudiobook, $bookMetadata)
+        );
     }
 
     /**
