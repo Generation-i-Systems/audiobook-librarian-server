@@ -3,8 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Models\Book;
-use App\Models\Author;
-use App\Models\Genre;
 use App\Models\Narrator;
 use App\Models\Series;
 use App\Services\AIBookProcessor;
@@ -22,7 +20,6 @@ use App\Services\ImportUIService;
 use App\Traits\GenreMapping;
 use App\Traits\BookImportTrait;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use App\Traits\IsolatesErrorHandlers;
 use Illuminate\Support\Facades\Log;
@@ -1908,152 +1905,14 @@ class ImportBooksFromDownloads extends Command
      */
     protected function createBookFromMetadata(array $metadata, array $audiobook): ?Book
     {
-        try {
-            return DB::transaction(function () use ($metadata, $audiobook) {
-                // Create book
-                $book = new Book();
-                $book->title = $metadata['title'] ?? basename($audiobook['path']);
-                $book->description = $metadata['description'] ?? null;
-                $metadata['source_path'] = $audiobook['path']; // Add source path for GraphicAudio detection
-                $book->directory_path = $this->getImportService()->generateDirectoryPath($metadata);
-                $book->language = $metadata['language'] ?? 'en';
-                $book->isbn = $metadata['isbn'] ?? null;
-
-                // Handle publisher (may be array from external services)
-                if (!empty($metadata['publisher'])) {
-                    $publisherName = $metadata['publisher'];
-                    if (is_array($publisherName)) {
-                        $publisherName = implode(', ', array_filter($publisherName));
-                    }
-
-                    $publisher = \App\Models\Publisher::firstOrCreate(['name' => trim($publisherName)]);
-                    $book->publisher_id = $publisher->id;
-                } else {
-                    $book->publisher_id = null;
-                }
-
-                // Set data source based on AI model used
-                $book->source = $this->getDataSource();
-
-                // Calculate and store audio file information
-                $audioInfo = $this->calculateAudioInfo($audiobook['files']);
-                $book->audio_file_count = $audioInfo['count'];
-                $book->duration = $audioInfo['duration'];
-                $book->file_tags = json_encode($audioInfo['tags']);
-
-                // Store enrichment data if available
-                if (isset($metadata['google_books_raw'])) {
-                    $book->google_books_info = json_encode($metadata['google_books_raw']);
-                }
-                if (isset($metadata['audible_raw'])) {
-                    $book->audible_info = json_encode($metadata['audible_raw']);
-                }
-                if (isset($metadata['audiobook_bay_raw'])) {
-                    $book->audiobook_bay_info = json_encode($metadata['audiobook_bay_raw']);
-                }
-
-                // Download and set cover image if found during enrichment
-                if (isset($metadata['cover_url'])) {
-                    $source = isset($metadata['audible_raw']) ? 'audible' : 'googlebooks';
-                    $coverPath = $this->downloadCoverImage($metadata['cover_url'], $book->directory_path, $source);
-                    if ($coverPath) {
-                        $book->cover_image = $coverPath;
-                    }
-                }
-
-                if (!empty($metadata['year'])) {
-                    $book->release_date = \Illuminate\Support\Carbon::createFromFormat(
-                        'Y-m-d',
-                        $metadata['year'] . '-01-01'
-                    );
-                }
-
-                $book->save();
-
-                // Handle authors
-                if (!empty($metadata['author'])) {
-                    $authors = is_array($metadata['author']) ? $metadata['author'] : [$metadata['author']];
-                    $authorIds = [];
-                    foreach ($authors as $authorName) {
-                        $author = Author::firstOrCreate(['name' => trim($authorName)]);
-                        $authorIds[] = $author->id;
-                    }
-                    $book->authors()->sync($authorIds);
-                }
-
-                // Handle narrators
-                if (!empty($metadata['narrator'])) {
-                    $narrators = is_array($metadata['narrator']) ? $metadata['narrator'] : [$metadata['narrator']];
-                    $narratorIds = [];
-                    foreach ($narrators as $narratorName) {
-                        $narrator = Narrator::firstOrCreate(['name' => trim($narratorName)]);
-                        $narratorIds[] = $narrator->id;
-                    }
-                    $book->narrators()->sync($narratorIds);
-                }
-
-                // Handle genres with author consistency check
-                if (!empty($metadata['genre'])) {
-                    $genres = is_array($metadata['genre']) ? $metadata['genre'] : [$metadata['genre']];
-
-                    // Check if author has existing books and prefer their established genre
-                    $authorGenre = $this->getImportService()->getAuthorPreferredGenre($metadata['author']);
-                    if ($authorGenre) {
-                        $this->info("📚 Author genre preference found: Using '{$authorGenre}' based on existing books");
-                        $genres = [$authorGenre]; // Override AI genre with author's established genre
-                    }
-
-                    $genreIds = [];
-                    foreach ($genres as $genreName) {
-                        $mappedGenre = $this->mapToValidGenre(trim($genreName));
-                        $genre = Genre::firstOrCreate(['name' => $mappedGenre]);
-                        $genreIds[] = $genre->id;
-                    }
-                    $book->genres()->sync($genreIds);
-                }
-
-                // Handle series
-                if (!empty($metadata['series'])) {
-                    // Clean series name by removing author names
-                    $authors = is_array($metadata['author']) ? $metadata['author'] : [$metadata['author']];
-                    $cleanedSeriesName = $this->getImportService()->cleanSeriesName($metadata['series'], $authors);
-
-                    $series = Series::firstOrCreate(['name' => trim($cleanedSeriesName)]);
-
-                    // Handle multi-book entries (e.g., books 2-3 combined)
-                    if (!empty($metadata['multi_book_numbers'])) {
-                        $seriesData = [];
-                        foreach ($metadata['multi_book_numbers'] as $number) {
-                            $seriesData[$series->id] = ['series_number' => $number];
-                        }
-
-                        // Note: This might require updating the pivot table to allow multiple entries
-                        // For now, we'll use the first number and log the multi-book nature
-                        $firstNumber = $metadata['multi_book_numbers'][0];
-                        $lastNumber = end($metadata['multi_book_numbers']);
-
-                        $book->series()->sync([
-                            $series->id => [
-                                'series_number' => $firstNumber,
-                                'series_end_number' => $lastNumber // This field may need to be added to the pivot table
-                            ],
-                        ]);
-
-                        $this->info("📚 Multi-book entry: Books {$firstNumber}-{$lastNumber} combined");
-                    } else {
-                        $seriesNumber = $metadata['series_number'] ?? 1;
-                        $book->series()->sync([
-                            $series->id => ['series_number' => $seriesNumber],
-                        ]);
-                    }
-                }
-
-                return $book;
-            });
-        } catch (\Exception $e) {
-            $this->error("❌ Failed to create book: " . $e->getMessage());
-            return null;
-        }
+        return $this->getImportService()->createBookFromMetadata(
+            $metadata,
+            $audiobook,
+            [
+                'download_cover' => true,
+                'cover_source' => isset($metadata['audible_raw']) ? 'audible' : 'googlebooks',
+            ]
+        );
     }
 
     /**
