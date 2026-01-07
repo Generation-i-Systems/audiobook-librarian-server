@@ -2051,62 +2051,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function processWithAudioAnalysis(array $audiobook): ?array
     {
-        try {
-            $this->line("🎵 Attempting audio analysis of first 30 seconds...");
-
-            // Get the first audio file (alphanumerically sorted)
-            if (empty($audiobook['files'])) {
-                return null;
-            }
-
-            // Sort files alphanumerically to ensure we get the intro file first
-            $sortedFiles = $audiobook['files'];
-            sort($sortedFiles, SORT_STRING);
-
-            $firstAudioFile = $sortedFiles[0];
-
-            $this->line("📁 Using first audio file: " . basename($firstAudioFile));
-            if (!file_exists($firstAudioFile)) {
-                return null;
-            }
-
-            // Extract first 30 seconds using ffmpeg
-            $tempAudioFile = tempnam(sys_get_temp_dir(), 'audio_sample_') . '.mp3';
-            $ffmpegCommand = sprintf(
-                'ffmpeg -i %s -t 30 -acodec libmp3lame -ab 64k %s -y 2>/dev/null',
-                escapeshellarg($firstAudioFile),
-                escapeshellarg($tempAudioFile)
-            );
-
-            exec($ffmpegCommand, $output, $returnCode);
-
-            if ($returnCode !== 0 || !file_exists($tempAudioFile)) {
-                $this->warn("⚠️  Failed to extract audio sample");
-                return null;
-            }
-
-            $this->line("🎵 Audio sample extracted, sending to AI for transcription...");
-
-            // Send audio to AI for transcription and analysis
-            $audioAnalysis = $this->aiProcessor->processAudioSample(
-                $tempAudioFile,
-                basename($audiobook['path'])
-            );
-
-            // Clean up temp file
-            @unlink($tempAudioFile);
-
-            if ($audioAnalysis) {
-                $this->line("🎵 Audio transcription successful");
-                $this->line("  Transcribed: " . substr($audioAnalysis['transcription'] ?? '', 0, 100) . "...");
-                return $audioAnalysis;
-            }
-
-            return null;
-        } catch (\Exception $e) {
-            $this->error("❌ Audio analysis failed: " . $e->getMessage());
-            return null;
-        }
+        return $this->getImportService()->processWithAudioAnalysis($audiobook, $this->aiProcessor);
     }
 
     protected function mergeMetadataFillMissing(array $base, array $fill): array

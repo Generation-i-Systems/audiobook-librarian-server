@@ -2849,6 +2849,56 @@ class BookImportService
     }
 
     /**
+     * Process audiobook using audio analysis fallback
+     */
+    public function processWithAudioAnalysis(array $audiobook, AIBookProcessor $aiProcessor): ?array
+    {
+        try {
+            if (empty($audiobook['files'])) {
+                return null;
+            }
+
+            $sortedFiles = $audiobook['files'];
+            sort($sortedFiles, SORT_STRING);
+
+            $firstAudioFile = $sortedFiles[0];
+
+            if (!file_exists($firstAudioFile)) {
+                return null;
+            }
+
+            $tempAudioFile = tempnam(sys_get_temp_dir(), 'audio_sample_') . '.mp3';
+            $ffmpegCommand = sprintf(
+                'ffmpeg -i %s -t 30 -acodec libmp3lame -ab 64k %s -y 2>/dev/null',
+                escapeshellarg($firstAudioFile),
+                escapeshellarg($tempAudioFile)
+            );
+
+            exec($ffmpegCommand, $output, $returnCode);
+
+            if ($returnCode !== 0 || !file_exists($tempAudioFile)) {
+                @unlink($tempAudioFile);
+                return null;
+            }
+
+            $audioAnalysis = $aiProcessor->processAudioSample(
+                $tempAudioFile,
+                basename($audiobook['path'])
+            );
+
+            @unlink($tempAudioFile);
+
+            if ($audioAnalysis) {
+                return $audioAnalysis;
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void
