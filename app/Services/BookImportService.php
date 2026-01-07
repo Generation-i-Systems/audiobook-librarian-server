@@ -2403,6 +2403,64 @@ class BookImportService
     }
 
     /**
+     * Group CD directories under their parent directory to treat multi-disc books as single audiobooks
+     */
+    public function groupCdDirectories(array $potentialBooks): array
+    {
+        $grouped = [];
+        $cdPattern = '/^(cd|disc|disk)[\s_-]*(\d+)$/i';
+
+        $cdDirectories = [];
+        $parentDirectories = [];
+
+        foreach ($potentialBooks as $path => $bookData) {
+            $dirName = basename($path);
+            if (preg_match($cdPattern, $dirName, $matches)) {
+                $parentPath = dirname($path);
+                $cdDirectories[$path] = [
+                    'parent' => $parentPath,
+                    'cd_number' => (int) $matches[2],
+                    'data' => $bookData,
+                ];
+
+                if (!isset($parentDirectories[$parentPath])) {
+                    $parentDirectories[$parentPath] = [
+                        'path' => $parentPath,
+                        'name' => basename($parentPath),
+                        'files' => [],
+                        'total_size' => 0,
+                        'cd_count' => 0,
+                    ];
+                }
+
+                $parentDirectories[$parentPath]['files'] = array_merge(
+                    $parentDirectories[$parentPath]['files'],
+                    $bookData['files']
+                );
+                $parentDirectories[$parentPath]['total_size'] += $bookData['total_size'];
+                $parentDirectories[$parentPath]['cd_count']++;
+            } else {
+                $grouped[$path] = $bookData;
+            }
+        }
+
+        foreach ($parentDirectories as $parentPath => $parentData) {
+            if ($parentData['cd_count'] > 1) {
+                $grouped[$parentPath] = $parentData;
+            } else {
+                foreach ($cdDirectories as $cdPath => $cdInfo) {
+                    if ($cdInfo['parent'] === $parentPath) {
+                        $grouped[$cdPath] = $cdInfo['data'];
+                        break;
+                    }
+                }
+            }
+        }
+
+        return $grouped;
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void
