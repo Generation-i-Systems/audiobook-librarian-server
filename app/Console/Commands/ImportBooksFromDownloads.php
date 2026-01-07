@@ -454,85 +454,11 @@ class ImportBooksFromDownloads extends Command
      */
     protected function processSpecificPaths(array $paths): array
     {
-        $audiobooks = [];
-        $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
-        $processedDirectories = []; // Track directories we've already processed
-
-        foreach ($paths as $path) {
-            // Handle escaped spaces and normalize path
-            $normalizedPath = str_replace('\ ', ' ', $path);
-
-            // Try multiple path variations
-            $pathsToTry = [
-                $path,
-                $normalizedPath,
-            ];
-
-            // If not absolute path, try current directory first, then common audiobook directories
-            if (!str_starts_with($path, '/')) {
-                // Try current working directory first
-                $currentDir = getcwd();
-                $pathsToTry[] = $currentDir . '/' . $path;
-                $pathsToTry[] = $currentDir . '/' . $normalizedPath;
-
-                // Then try common audiobook directories
-                $commonDirs = ['/media/download/audiobooks', '/media/download'];
-                foreach ($commonDirs as $baseDir) {
-                    $pathsToTry[] = $baseDir . '/' . $path;
-                    $pathsToTry[] = $baseDir . '/' . $normalizedPath;
-                }
-            }
-
-            $actualPath = null;
-            foreach ($pathsToTry as $tryPath) {
-                if (file_exists($tryPath)) {
-                    $actualPath = $tryPath;
-                    break;
-                }
-            }
-
-            if (!$actualPath) {
-                $this->warn("⚠️  Path does not exist: {$path}");
-                $this->warn("⚠️  Tried paths:");
-                foreach (array_unique($pathsToTry) as $tryPath) {
-                    $exists = file_exists($tryPath) ? '✅' : '❌';
-                    $this->warn("    {$exists} {$tryPath}");
-                }
-                continue;
-            }
-
-            $path = $actualPath;
-
-            if (is_file($path)) {
-                // Single file - treat as individual audiobook
-                $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-                if (in_array($extension, $audioExtensions)) {
-                    $this->info("🔍 Processing individual audio file: {$path}");
-                    $audiobook = $this->processSingleAudioFile($path);
-                    if ($audiobook) {
-                        $audiobooks[] = $audiobook;
-                    }
-                } else {
-                    $this->warn("⚠️  Not an audio file: {$path}");
-                }
-            } elseif (is_dir($path)) {
-                // Skip if we've already processed this directory
-                if (in_array($path, $processedDirectories)) {
-                    $this->info("🔍 Directory already processed: {$path}");
-                    continue;
-                }
-
-                // Directory - scan it for audiobooks
-                $this->info("🔍 Processing directory: {$path}");
-                $audiobook = $this->processAudiobookDirectory($path);
-                if ($audiobook) {
-                    $audiobooks[] = $audiobook;
-                    $processedDirectories[] = $path;
-                }
-            }
-        }
-
-        return $audiobooks;
+        return $this->getImportService()->processSpecificPaths(
+            $paths,
+            fn ($path) => $this->processSingleAudioFile($path),
+            fn ($path) => $this->processAudiobookDirectory($path)
+        );
     }
 
     /**

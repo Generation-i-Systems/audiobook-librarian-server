@@ -3018,6 +3018,71 @@ class BookImportService
     }
 
     /**
+     * Process specific files or folders provided as arguments
+     */
+    public function processSpecificPaths(array $paths, callable $processSingleAudioFileCallback, callable $processAudiobookDirectoryCallback): array
+    {
+        $audiobooks = [];
+        $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
+        $processedDirectories = [];
+
+        foreach ($paths as $path) {
+            $normalizedPath = str_replace('\ ', ' ', $path);
+
+            $pathsToTry = [
+                $path,
+                $normalizedPath,
+            ];
+
+            if (!str_starts_with($path, '/')) {
+                $currentDir = getcwd();
+                $pathsToTry[] = $currentDir . '/' . $path;
+                $pathsToTry[] = $currentDir . '/' . $normalizedPath;
+
+                $commonDirs = ['/media/download/audiobooks', '/media/download'];
+                foreach ($commonDirs as $baseDir) {
+                    $pathsToTry[] = $baseDir . '/' . $path;
+                    $pathsToTry[] = $baseDir . '/' . $normalizedPath;
+                }
+            }
+
+            $actualPath = null;
+            foreach ($pathsToTry as $tryPath) {
+                if (file_exists($tryPath)) {
+                    $actualPath = $tryPath;
+                    break;
+                }
+            }
+
+            if (!$actualPath) {
+                continue;
+            }
+
+            $path = $actualPath;
+
+            if (is_file($path)) {
+                $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+                if (in_array($extension, $audioExtensions)) {
+                    $audiobook = $processSingleAudioFileCallback($path);
+                    if ($audiobook) {
+                        $audiobooks[] = $audiobook;
+                    }
+                }
+            } elseif (is_dir($path)) {
+                if (!in_array($path, $processedDirectories)) {
+                    $audiobook = $processAudiobookDirectoryCallback($path);
+                    if ($audiobook) {
+                        $audiobooks[] = $audiobook;
+                        $processedDirectories[] = $path;
+                    }
+                }
+            }
+        }
+
+        return $audiobooks;
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void
