@@ -3330,37 +3330,9 @@ class ImportBooksFromDownloads extends Command
      */
     protected function extractSeriesNumberFromTitle(array &$metadata): void
     {
-        if (empty($metadata['title'])) {
-            return;
-        }
-
-        $title = trim($metadata['title']);
-
-        // Common patterns for book numbers in titles
-        $patterns = [
-            '/^(.+?),\s*Book\s+(\d+)$/i',            // "Title, Book 1"
-            '/^(.+?)\s+Book\s+(\d+)$/i',             // "Title Book 1"
-            '/^(.+?),\s*Volume\s+(\d+)$/i',          // "Title, Volume 1"
-            '/^(.+?)\s+Volume\s+(\d+)$/i',           // "Title Volume 1"
-            '/^(.+?),\s*#(\d+)$/i',                  // "Title, #1"
-            '/^(.+?)\s+#(\d+)$/i',                   // "Title #1"
-            '/^(.+?),\s*Part\s+(\d+)$/i',            // "Title, Part 1"
-            '/^(.+?)\s+Part\s+(\d+)$/i',             // "Title Part 1"
-            '/^(.+?)\s+(\d+)$/',                     // "Title 1" (last resort)
-        ];
-
-        foreach ($patterns as $pattern) {
-            if (preg_match($pattern, $title, $matches)) {
-                $cleanTitle = trim($matches[1]);
-                $bookNumber = (int) $matches[2];
-
-                // Apply the extraction
-                $metadata['title'] = $cleanTitle;
-                $metadata['series_number'] = $bookNumber;
-
-                $this->info("📚 Extracted series number {$bookNumber} from title: '{$title}' → '{$cleanTitle}'");
-                return; // Exit after first match
-            }
+        $this->getImportService()->extractSeriesNumberFromTitle($metadata);
+        if (isset($metadata['series_number'])) {
+            $this->info("📚 Extracted series number {$metadata['series_number']} from title");
         }
     }
 

@@ -2195,6 +2195,42 @@ class BookImportService
     }
 
     /**
+     * Extract series number from title and clean the title
+     */
+    public function extractSeriesNumberFromTitle(array &$metadata): void
+    {
+        if (empty($metadata['title'])) {
+            return;
+        }
+
+        $title = trim($metadata['title']);
+
+        $patterns = [
+            '/^(.+?),\s*Book\s+(\d+)$/i',
+            '/^(.+?)\s+Book\s+(\d+)$/i',
+            '/^(.+?),\s*Volume\s+(\d+)$/i',
+            '/^(.+?)\s+Volume\s+(\d+)$/i',
+            '/^(.+?),\s*#(\d+)$/i',
+            '/^(.+?)\s+#(\d+)$/i',
+            '/^(.+?),\s*Part\s+(\d+)$/i',
+            '/^(.+?)\s+Part\s+(\d+)$/i',
+            '/^(.+?)\s+(\d+)$/',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $title, $matches)) {
+                $cleanTitle = trim($matches[1]);
+                $bookNumber = (int) $matches[2];
+
+                $metadata['title'] = $cleanTitle;
+                $metadata['series_number'] = $bookNumber;
+
+                return;
+            }
+        }
+    }
+
+    /**
      * Get duration of audio file in seconds
      */
     public function getAudioFileDuration(string $filePath): int
