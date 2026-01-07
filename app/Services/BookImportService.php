@@ -1709,6 +1709,27 @@ class BookImportService
     }
 
     /**
+     * Extract track number from filename
+     */
+    public function extractTrackNumber(string $filename): ?int
+    {
+        $patterns = [
+            '/^(\d{1,3})[\s\-_\.]+/',
+            '/^Track[\s_]*(\d{1,3})/i',
+            '/^(\d{1,3})\./',
+            '/[\s\-_](\d{1,3})[\s\-_\.]+/',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $filename, $matches)) {
+                return (int) $matches[1];
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Check if directory is empty
      */
     public function isDirectoryEmpty(string $path): bool

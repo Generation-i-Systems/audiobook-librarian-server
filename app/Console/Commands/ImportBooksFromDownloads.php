@@ -3832,139 +3832,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function flattenCdDirectories(string $sourcePath): void
     {
-        $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
-        $cdPattern = '/^(cd|disc|disk)[\s_-]*(\d+)$/i';
-
-        // Find CD subdirectories
-        $cdDirs = [];
-        if (File::isDirectory($sourcePath)) {
-            $directories = glob($sourcePath . '/*', GLOB_ONLYDIR);
-
-            foreach ($directories as $dir) {
-                $dirName = basename($dir);
-                if (preg_match($cdPattern, $dirName, $matches)) {
-                    $cdNumber = (int) $matches[2];
-                    $cdDirs[$cdNumber] = $dir;
-                }
-            }
-        }
-
-        if (empty($cdDirs)) {
-            return; // No CD directories found
-        }
-
-        $this->info("📀 Found " . count($cdDirs) . " CD directories - flattening structure");
-
-        // Get all files (not just audio) from all CD directories
-        $allFiles = [];
-        $audioConflicts = [];
-        $duplicatesDeleted = 0;
-
-        foreach ($cdDirs as $cdNumber => $cdDir) {
-            $files = $this->getAllFilesFromDirectory($cdDir);
-
-            foreach ($files as $file) {
-                $filename = basename($file);
-                $isAudioFile = in_array(strtolower(pathinfo($filename, PATHINFO_EXTENSION)), $audioExtensions);
-
-                // Delete torrent/piracy tracking files
-                if ($this->isTorrentTrackingFile($filename)) {
-                    File::delete($file);
-                    $duplicatesDeleted++;
-                    $this->line("  🗑️ Deleted tracking file: {$filename}");
-                    continue;
-                }
-
-                $targetPath = $sourcePath . '/' . $filename;
-
-                // Handle existing files in main directory
-                if (File::exists($targetPath)) {
-                    if ($isAudioFile) {
-                        // Audio files get renamed with CD/track prefix
-                        $trackNumber = $this->extractTrackNumber($filename);
-                        $newFilename = sprintf(
-                            '%02d-%02d %s',
-                            $cdNumber,
-                            $trackNumber ?: 1,
-                            $filename
-                        );
-                        $audioConflicts[] = $filename;
-                        $allFiles[] = [
-                            'source_path' => $file,
-                            'new_name' => $newFilename,
-                            'original_name' => $filename,
-                            'type' => 'audio_conflict',
-                        ];
-                    } else {
-                        // Non-audio files: check if identical, delete duplicate if so
-                        if ($this->areFilesIdentical($file, $targetPath)) {
-                            File::delete($file);
-                            $duplicatesDeleted++;
-                            $this->line("  🗑️ Deleted duplicate: {$filename}");
-                            continue;
-                        } else {
-                            // Different files with same name - rename with CD prefix
-                            $pathInfo = pathinfo($filename);
-                            $newFilename = sprintf(
-                                'CD%02d_%s.%s',
-                                $cdNumber,
-                                $pathInfo['filename'],
-                                $pathInfo['extension'] ?? ''
-                            );
-                            $allFiles[] = [
-                                'source_path' => $file,
-                                'new_name' => $newFilename,
-                                'original_name' => $filename,
-                                'type' => 'other_conflict',
-                            ];
-                        }
-                    }
-                } else {
-                    // No conflict - move as-is
-                    $allFiles[] = [
-                        'source_path' => $file,
-                        'new_name' => $filename,
-                        'original_name' => $filename,
-                        'type' => 'no_conflict',
-                    ];
-                }
-            }
-        }
-
-        if (!empty($audioConflicts)) {
-            $this->line("  🔄 Renaming " . count($audioConflicts) . " conflicting audio files with CD-track prefix");
-        }
-
-        if ($duplicatesDeleted > 0) {
-            $this->line("  🗑️ Deleted {$duplicatesDeleted} duplicate files");
-        }
-
-        // Move all files to main directory
-        foreach ($allFiles as $fileInfo) {
-            $sourceFilePath = $fileInfo['source_path'];
-            $targetPath = $sourcePath . '/' . $fileInfo['new_name'];
-
-            if (File::move($sourceFilePath, $targetPath)) {
-                if ($fileInfo['type'] !== 'no_conflict') {
-                    $this->line("  ✓ {$fileInfo['original_name']} → {$fileInfo['new_name']}");
-                }
-            } else {
-                $this->warn("  ✗ Failed to move: {$fileInfo['original_name']}");
-            }
-        }
-
-        // Remove now-empty CD directories
-        foreach ($cdDirs as $cdDir) {
-            if ($this->isDirectoryEmpty($cdDir)) {
-                File::deleteDirectory($cdDir);
-                $this->line("  🗑️ Removed empty directory: " . basename($cdDir));
-            } else {
-                $this->warn("  ⚠️  Directory not empty, keeping: " . basename($cdDir));
-            }
-        }
-
-        $totalFiles = count($allFiles) + $duplicatesDeleted;
-        $this->info("📀 CD flattening complete: {$totalFiles} files processed");
+        $this->getImportService()->flattenCdDirectories($sourcePath);
     }
 
     /**
@@ -4052,43 +3920,12 @@ class ImportBooksFromDownloads extends Command
      */
     protected function extractTrackNumber(string $filename): ?int
     {
-        // Common track number patterns
-        $patterns = [
-            '/^(\d{1,3})[\s\-_\.]+/',           // "01 - Title.mp3"
-            '/^Track[\s_]*(\d{1,3})/i',        // "Track 01.mp3"
-            '/^(\d{1,3})\./',                  // "01.Title.mp3"
-            '/[\s\-_](\d{1,3})[\s\-_\.]+/',    // "Chapter 01 - Title.mp3"
-        ];
-
-        foreach ($patterns as $pattern) {
-            if (preg_match($pattern, $filename, $matches)) {
-                return (int) $matches[1];
-            }
-        }
-
-        return null;
+        return $this->getImportService()->extractTrackNumber($filename);
     }
 
-    /**
-     * Check if directory is empty (no files, only empty subdirectories allowed)
-     */
     protected function isDirectoryEmpty(string $path): bool
     {
-        if (!File::isDirectory($path)) {
-            return true;
-        }
-
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($path, \RecursiveDirectoryIterator::SKIP_DOTS)
-        );
-
-        foreach ($iterator as $file) {
-            if ($file->isFile()) {
-                return false;
-            }
-        }
-
-        return true;
+        return $this->getImportService()->isDirectoryEmpty($path);
     }
 
     /**
