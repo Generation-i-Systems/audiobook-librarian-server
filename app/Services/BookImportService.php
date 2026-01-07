@@ -2765,6 +2765,32 @@ class BookImportService
     }
 
     /**
+     * Build UI metadata for display
+     */
+    public function buildUiMetadata(array $metadata): array
+    {
+        $uiMetadata = $metadata;
+
+        $coverSource = '';
+
+        if (!empty($uiMetadata['cover_data'])) {
+            $coverSource = 'Embedded';
+        } elseif (!empty($uiMetadata['cover_url'])) {
+            if (isset($uiMetadata['audible_raw'])) {
+                $coverSource = 'Audible';
+            } elseif (isset($uiMetadata['google_books_raw'])) {
+                $coverSource = 'Google Books';
+            } else {
+                $coverSource = 'Unknown';
+            }
+        }
+
+        $uiMetadata['cover_source'] = $coverSource;
+
+        return $uiMetadata;
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void

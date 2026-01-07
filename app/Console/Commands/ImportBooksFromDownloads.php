@@ -152,31 +152,19 @@ class ImportBooksFromDownloads extends Command
 
     protected function buildUiMetadata(array $metadata): array
     {
-        $uiMetadata = $metadata;
-
-        $coverSource = '';
+        $uiMetadata = $this->getImportService()->buildUiMetadata($metadata);
 
         if (!empty($uiMetadata['cover_data'])) {
             $tempPath = $this->getEmbeddedCoverTempPath($uiMetadata['cover_data']);
             if ($tempPath) {
                 $uiMetadata['cover_url'] = $tempPath;
                 $uiMetadata['cover_is_local_file'] = true;
-                $coverSource = 'Embedded';
-            }
-        } elseif (!empty($uiMetadata['cover_url'])) {
-            if (isset($uiMetadata['audible_raw'])) {
-                $coverSource = 'Audible';
-            } elseif (isset($uiMetadata['google_books_raw'])) {
-                $coverSource = 'Google Books';
-            } else {
-                $coverSource = 'Unknown';
             }
         }
 
         $uiMetadata['directory_path'] = $this->getImportService()->generateDirectoryPath($uiMetadata, [
             'include_title' => true,
         ]);
-        $uiMetadata['cover_source'] = $coverSource;
 
         return $uiMetadata;
     }
