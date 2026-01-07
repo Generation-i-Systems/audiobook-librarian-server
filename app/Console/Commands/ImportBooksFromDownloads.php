@@ -208,25 +208,7 @@ class ImportBooksFromDownloads extends Command
 
     protected function extractTagMetadataFromAudiobook(array $audiobook): array
     {
-        if (empty($audiobook['files']) || !$this->aiProcessor) {
-            return [];
-        }
-
-        $fileTags = [];
-        foreach (array_slice($audiobook['files'], 0, 3) as $filePath) {
-            $ext = strtolower((string) pathinfo($filePath, PATHINFO_EXTENSION));
-            if ($ext !== 'm4b' && $ext !== 'mp3') {
-                continue;
-            }
-
-            $tags = $this->aiProcessor->extractFileTags($filePath);
-            if (!empty($tags)) {
-                $fileTags[basename((string) $filePath)] = $tags;
-                // do not break; we want embedded covers even if first file lacks it
-            }
-        }
-
-        return $this->getImportService()->extractMetadataFromFileTags($fileTags);
+        return $this->getImportService()->extractTagMetadataFromAudiobook($audiobook, $this->aiProcessor);
     }
 
     protected function hasCriticalTagMetadata(array $tagMetadata): bool

@@ -2660,6 +2660,31 @@ class BookImportService
     }
 
     /**
+     * Extract tag metadata from audiobook
+     */
+    public function extractTagMetadataFromAudiobook(array $audiobook, AIBookProcessor $aiProcessor): array
+    {
+        if (empty($audiobook['files']) || !$aiProcessor) {
+            return [];
+        }
+
+        $fileTags = [];
+        foreach (array_slice($audiobook['files'], 0, 3) as $filePath) {
+            $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+            if ($ext !== 'm4b' && $ext !== 'mp3') {
+                continue;
+            }
+
+            $tags = $aiProcessor->extractFileTags($filePath);
+            if (!empty($tags)) {
+                $fileTags[basename($filePath)] = $tags;
+            }
+        }
+
+        return $this->extractMetadataFromFileTags($fileTags);
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void
