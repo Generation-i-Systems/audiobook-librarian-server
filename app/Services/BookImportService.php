@@ -2224,6 +2224,79 @@ class BookImportService
     }
 
     /**
+     * Display enriched metadata (AI + external data) for review
+     */
+    public function displayEnrichedMetadata(array $metadata): array
+    {
+        $arrayToString = function ($value) {
+            if (is_array($value)) {
+                $filtered = array_filter($value, function ($v) {
+                    return !is_array($v) && !is_object($v) && $v !== null && $v !== '';
+                });
+                return implode(', ', $filtered);
+            }
+            return $value ?? 'N/A';
+        };
+
+        $formatAuthors = function ($authors) {
+            if (is_array($authors)) {
+                $filtered = array_filter($authors, function ($v) {
+                    return !is_array($v) && !is_object($v) && $v !== null && $v !== '';
+                });
+                return implode(' & ', $filtered);
+            }
+            return $authors ?? 'N/A';
+        };
+
+        $displaySeries = '';
+        if (!empty($metadata['series'])) {
+            $authors = is_array($metadata['author']) ? $metadata['author'] : [$metadata['author']];
+            $cleanedSeriesName = $this->cleanSeriesName($metadata['series'], $authors);
+            $displaySeries = $cleanedSeriesName . ($metadata['series_number'] ? " #{$metadata['series_number']}" : '');
+        }
+
+        $tableData = [
+            ['Title', $arrayToString($metadata['title'])],
+            ['Author', $formatAuthors($metadata['author'])],
+            ['Narrator', $arrayToString($metadata['narrator'])],
+            ['Series', $displaySeries],
+            ['Genre', $arrayToString($metadata['genre'])],
+            ['Year', $metadata['year'] ?? 'N/A'],
+            ['Publisher', $arrayToString($metadata['publisher'])],
+            ['Language', $metadata['language'] ?? 'N/A'],
+            ['ISBN', $metadata['isbn'] ?? 'N/A'],
+            ['Confidence', $metadata['confidence'] . '%'],
+        ];
+
+        if (!empty($metadata['source_path'])) {
+            $tableData[] = ['Source Path', $metadata['source_path']];
+        }
+
+        $expectedPath = $this->generateDirectoryPath($metadata);
+        $tableData[] = ['Directory Path', $expectedPath];
+
+        if (!empty($metadata['description'])) {
+            $description = $metadata['description'];
+            if (strlen($description) > 80) {
+                $description = substr($description, 0, 80) . '...';
+            }
+            $tableData[] = ['Description', $description];
+        }
+
+        if (!empty($metadata['cover_url'])) {
+            $source = 'Unknown';
+            if (isset($metadata['audible_raw'])) {
+                $source = 'Audible';
+            } elseif (isset($metadata['google_books_raw'])) {
+                $source = 'Google Books';
+            }
+            $tableData[] = ['Cover Source', $source];
+        }
+
+        return $tableData;
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void
