@@ -2808,6 +2808,47 @@ class BookImportService
     }
 
     /**
+     * Process audiobook with AI
+     */
+    public function processWithAI(array $audiobook, AIBookProcessor $aiProcessor): ?array
+    {
+        try {
+            $nfoData = $this->extractNfoData($audiobook['path']);
+
+            $fileTags = [];
+            $fileNames = [];
+
+            foreach (array_slice($audiobook['files'], 0, 3) as $filePath) {
+                $fileName = basename($filePath);
+                $fileNames[] = $fileName;
+
+                $tags = $aiProcessor->extractFileTags($filePath);
+                if (!empty($tags)) {
+                    $fileTags[$fileName] = $tags;
+                }
+            }
+
+            $aiResult = $aiProcessor->processBookDirectory(
+                $audiobook['path'],
+                $fileNames,
+                $fileTags,
+                $nfoData
+            );
+
+            if ($aiResult) {
+                $tagMetadata = $this->extractMetadataFromFileTags($fileTags);
+                $aiResult = $this->mergeMetadataFillMissing($aiResult, $tagMetadata);
+
+                $aiResult = $this->postProcessAIResult($aiResult, $audiobook);
+            }
+
+            return $aiResult;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void

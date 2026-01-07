@@ -2043,67 +2043,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function processWithAI(array $audiobook): ?array
     {
-        try {
-            // Check for .nfo file first (priority over audio file tags)
-            $nfoData = $this->extractNfoData($audiobook['path']);
-
-            // Extract file tags from first few files
-            $fileTags = [];
-            $fileNames = [];
-
-            foreach (array_slice($audiobook['files'], 0, 3) as $filePath) {
-                $fileName = basename($filePath);
-                $fileNames[] = $fileName;
-
-                $tags = $this->aiProcessor->extractFileTags($filePath);
-                if (!empty($tags)) {
-                    $fileTags[$fileName] = $tags;
-                }
-            }
-
-            // Debug: Show what we're passing to the AI
-            $this->line("🔍 AI Input Debug:");
-            $this->line("  Directory: " . $audiobook['path']);
-            $filesPreview = implode(', ', array_slice($fileNames, 0, 5));
-            if (count($fileNames) > 5) {
-                $filesPreview .= '...';
-            }
-            $this->line("  Files (" . count($fileNames) . "): " . $filesPreview);
-            $this->line("  Has NFO: " . (empty($nfoData) ? 'No' : 'Yes'));
-            $this->line("  Has Tags: " . (empty($fileTags) ? 'No' : count($fileTags) . ' files'));
-
-            // Process with AI, passing NFO data as priority information
-            $aiResult = $this->aiProcessor->processBookDirectory(
-                $audiobook['path'],
-                $fileNames,
-                $fileTags,
-                $nfoData
-            );
-
-            // Debug: Show raw AI output before post-processing
-            if ($aiResult) {
-                $this->line("🤖 Raw AI Output:");
-                $this->line("  Title: " . ($aiResult['title'] ?? 'N/A'));
-                $this->line("  Series: " . ($aiResult['series'] ?? 'N/A'));
-                $this->line("  Series Number: " . ($aiResult['series_number'] ?? 'N/A'));
-                $authorValue = $aiResult['author'] ?? 'N/A';
-                if (is_array($authorValue)) {
-                    $authorValue = implode(', ', $authorValue);
-                }
-                $this->line('  Author: ' . $authorValue);
-
-                // Post-process AI result to fix common issues with numbered series books
-                $aiResult = $this->postProcessAIResult($aiResult, $audiobook);
-
-                $tagMetadata = $this->getImportService()->extractMetadataFromFileTags($fileTags);
-                $aiResult = $this->mergeMetadataFillMissing($aiResult, $tagMetadata);
-            }
-
-            return $aiResult;
-        } catch (\Exception $e) {
-            $this->error("❌ AI processing failed: " . $e->getMessage());
-            return null;
-        }
+        return $this->getImportService()->processWithAI($audiobook, $this->aiProcessor);
     }
 
     /**
