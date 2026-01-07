@@ -1828,45 +1828,17 @@ class ImportBooksFromDownloads extends Command
 
     protected function findPotentialDuplicates(string $path): array
     {
-        $baseName = basename($path);
-
-        // Look for similar directory names in the library
-        return Book::where('directory_path', 'LIKE', "%{$baseName}%")
-            ->orWhere('title', 'LIKE', "%{$baseName}%")
-            ->limit(5)
-            ->get()
-            ->toArray();
+        return $this->getImportService()->findPotentialDuplicates($path);
     }
 
     protected function findSimilarBooks(array $audiobook): array
     {
-        $baseName = basename($audiobook['path']);
-
-        return Book::where('title', 'LIKE', "%{$baseName}%")
-            ->orWhere('directory_path', 'LIKE', "%{$baseName}%")
-            ->limit(10)
-            ->get()
-            ->toArray();
+        return $this->getImportService()->findSimilarBooks($audiobook);
     }
 
     protected function findDuplicatePaths(string $path): array
     {
-        $results = [];
-        $baseName = basename($path);
-
-        // Check for existing books with similar paths
-        $existingBooks = Book::where('directory_path', 'LIKE', "%{$baseName}%")->get();
-
-        foreach ($existingBooks as $book) {
-            $results[] = [
-                'id' => $book->id,
-                'title' => $book->title,
-                'path' => $book->directory_path,
-                'similarity' => similar_text($baseName, basename($book->directory_path)),
-            ];
-        }
-
-        return $results;
+        return $this->getImportService()->findDuplicatePaths($path);
     }
 
     /**

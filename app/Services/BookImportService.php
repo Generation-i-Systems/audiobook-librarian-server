@@ -2585,6 +2585,56 @@ class BookImportService
     }
 
     /**
+     * Find potential duplicates
+     */
+    public function findPotentialDuplicates(string $path): array
+    {
+        $baseName = basename($path);
+
+        return Book::where('directory_path', 'LIKE', "%{$baseName}%")
+            ->orWhere('title', 'LIKE', "%{$baseName}%")
+            ->limit(5)
+            ->get()
+            ->toArray();
+    }
+
+    /**
+     * Find similar books
+     */
+    public function findSimilarBooks(array $audiobook): array
+    {
+        $baseName = basename($audiobook['path']);
+
+        return Book::where('title', 'LIKE', "%{$baseName}%")
+            ->orWhere('directory_path', 'LIKE', "%{$baseName}%")
+            ->limit(10)
+            ->get()
+            ->toArray();
+    }
+
+    /**
+     * Find duplicate paths
+     */
+    public function findDuplicatePaths(string $path): array
+    {
+        $results = [];
+        $baseName = basename($path);
+
+        $existingBooks = Book::where('directory_path', 'LIKE', "%{$baseName}%")->get();
+
+        foreach ($existingBooks as $book) {
+            $results[] = [
+                'id' => $book->id,
+                'title' => $book->title,
+                'path' => $book->directory_path,
+                'similarity' => similar_text($baseName, basename($book->directory_path)),
+            ];
+        }
+
+        return $results;
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void
