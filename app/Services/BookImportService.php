@@ -2554,6 +2554,37 @@ class BookImportService
     }
 
     /**
+     * Analyze directory name
+     */
+    public function analyzeDirectoryName(string $directoryName): array
+    {
+        return [
+            'contains_numbers' => preg_match('/\d+/', $directoryName),
+            'contains_series_markers' => preg_match('/\b(book|vol|volume|part|chapter)\b/i', $directoryName),
+            'has_separators' => preg_match('/[-:_]/', $directoryName),
+            'word_count' => str_word_count($directoryName),
+            'length' => strlen($directoryName),
+        ];
+    }
+
+    /**
+     * Check if directory is multi-book directory
+     */
+    public function isMultiBookDirectory(string $path): bool
+    {
+        $files = File::files($path);
+        $multiBookPattern = '/\[(\d{2,3})\]/';
+
+        foreach ($files as $file) {
+            if (preg_match($multiBookPattern, $file->getFilename())) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void
