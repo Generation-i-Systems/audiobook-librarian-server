@@ -1569,22 +1569,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function getDirectoryModificationTime(string $path): int
     {
-        if (!is_dir($path)) {
-            return 0;
-        }
-
-        $latestMtime = filemtime($path);
-
-        // Check files in directory for latest modification
-        $files = File::allFiles($path);
-        foreach ($files as $file) {
-            $mtime = $file->getMTime();
-            if ($mtime > $latestMtime) {
-                $latestMtime = $mtime;
-            }
-        }
-
-        return $latestMtime;
+        return $this->getImportService()->getDirectoryModificationTime($path);
     }
 
     /**

@@ -2475,6 +2475,28 @@ class BookImportService
     }
 
     /**
+     * Get directory modification time
+     */
+    public function getDirectoryModificationTime(string $path): int
+    {
+        if (!is_dir($path)) {
+            return 0;
+        }
+
+        $latestMtime = filemtime($path);
+
+        $files = File::allFiles($path);
+        foreach ($files as $file) {
+            $mtime = $file->getMTime();
+            if ($mtime > $latestMtime) {
+                $latestMtime = $mtime;
+            }
+        }
+
+        return $latestMtime;
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void
