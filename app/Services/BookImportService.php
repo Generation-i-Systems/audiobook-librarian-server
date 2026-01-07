@@ -2135,6 +2135,22 @@ class BookImportService
     }
 
     /**
+     * Clean description text (remove HTML, limit length, etc.)
+     */
+    public function cleanDescription(string $description): string
+    {
+        $cleaned = strip_tags($description);
+        $cleaned = html_entity_decode($cleaned, ENT_QUOTES, 'UTF-8');
+        $cleaned = trim($cleaned);
+
+        if (strlen($cleaned) > 2000) {
+            $cleaned = substr($cleaned, 0, 1997) . '...';
+        }
+
+        return $cleaned;
+    }
+
+    /**
      * Get duration of audio file in seconds
      */
     public function getAudioFileDuration(string $filePath): int

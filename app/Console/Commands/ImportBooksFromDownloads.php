@@ -3586,21 +3586,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function cleanDescription(string $description): string
     {
-        // Remove HTML tags
-        $cleaned = strip_tags($description);
-
-        // Decode HTML entities
-        $cleaned = html_entity_decode($cleaned, ENT_QUOTES, 'UTF-8');
-
-        // Trim whitespace
-        $cleaned = trim($cleaned);
-
-        // Limit length if extremely long
-        if (strlen($cleaned) > 2000) {
-            $cleaned = substr($cleaned, 0, 1997) . '...';
-        }
-
-        return $cleaned;
+        return $this->getImportService()->cleanDescription($description);
     }
 
     /**
