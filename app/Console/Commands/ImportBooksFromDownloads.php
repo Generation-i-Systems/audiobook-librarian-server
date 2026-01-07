@@ -2544,69 +2544,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function postProcessAIResult(array $aiResult, array $audiobook): array
     {
-        $directoryName = basename($audiobook['path']);
-        $parentDirectory = basename(dirname($audiobook['path']));
-
-        // Pattern 1: "05 - Convergence"
-        if (preg_match('/^(\d{1,2})\s*-\s*(.+)$/', $directoryName, $matches)) {
-            $bookNumber = (int) $matches[1];
-            $bookTitle = trim($matches[2]);
-
-            $this->line("🔧 Post-processing: Detected numbered book '{$bookTitle}' (#{$bookNumber})");
-
-            // Check if AI put the series name in the title field incorrectly
-            $aiTitle = $aiResult['title'] ?? '';
-            $aiSeries = $aiResult['series'] ?? '';
-
-            // If the AI title doesn't match the directory title, it might have extracted series as title
-            if (strcasecmp($aiTitle, $bookTitle) !== 0) {
-                $this->line("  AI title '{$aiTitle}' doesn't match directory title '{$bookTitle}'");
-
-                // If AI title looks like a series name and series field is empty/different
-                if (empty($aiSeries) || strcasecmp($aiTitle, $aiSeries) !== 0) {
-                    $this->line("  Moving AI title to series field and using directory title");
-                    $aiResult['series'] = $aiTitle;  // AI title becomes series
-                    $aiResult['title'] = $bookTitle;  // Directory title becomes book title
-                } else {
-                    $this->line("  Using directory title, keeping AI series");
-                    $aiResult['title'] = $bookTitle;
-                }
-            }
-
-            // Set the series number from directory
-            $aiResult['series_number'] = $bookNumber;
-
-            $this->line("  Final: Title='{$aiResult['title']}', Series='{$aiResult['series']}' #{$bookNumber}");
-        } elseif (preg_match('/^(.+),\s*Book\s*(\d{1,2})\s*-\s*(.+)$/', $directoryName, $matches)) {
-            // Pattern 2: "Series Name, Book 02 - Actual Title"
-            $seriesName = trim($matches[1]);
-            $bookNumber = (int) $matches[2];
-            $bookTitle = trim($matches[3]);
-
-            $this->line(
-                "🔧 Post-processing: Detected series book '{$bookTitle}' from '{$seriesName}' series (#{$bookNumber})"
-            );
-
-            // Override AI result with directory-based extraction
-            $aiResult['series'] = $seriesName;
-            $aiResult['title'] = $bookTitle;
-            $aiResult['series_number'] = $bookNumber;
-
-            $this->line("  Final: Title='{$bookTitle}', Series='{$seriesName}' #{$bookNumber}");
-        }
-
-        // Apply series name removal from title if it contains colons
-        if (!empty($aiResult['title'])) {
-            $originalTitle = $aiResult['title'];
-            $cleanedTitle = $this->removeSeriesFromTitle($originalTitle);
-
-            if ($cleanedTitle !== $originalTitle) {
-                $this->line("🧹 Cleaned series from title: '{$originalTitle}' → '{$cleanedTitle}'");
-                $aiResult['title'] = $cleanedTitle;
-            }
-        }
-
-        return $aiResult;
+        return $this->getImportService()->postProcessAIResult($aiResult, $audiobook);
     }
 
     /**
@@ -3238,127 +3176,29 @@ class ImportBooksFromDownloads extends Command
         return $metadata;
     }
 
-    /**
-     * Detect multi-book directory patterns like "Series [2-3]" or "Series [1-4]"
-     */
     protected function detectMultiBookPattern(string $title): ?array
     {
-        // Patterns for multi-book directories
-        $patterns = [
-            '/^(.+?)\s*\[(\d+)-(\d+)\]$/i',          // "Series [2-3]"
-            '/^(.+?)\s*\[(\d+)–(\d+)\]$/i',          // "Series [2–3]" (em dash)
-            '/^(.+?)\s*\[(\d+)—(\d+)\]$/i',          // "Series [2—3]" (em dash variant)
-            '/^(.+?)\s*\((\d+)-(\d+)\)$/i',          // "Series (2-3)"
-        ];
-
-        foreach ($patterns as $pattern) {
-            if (preg_match($pattern, $title, $matches)) {
-                $seriesName = trim($matches[1]);
-                $startNum = (int) $matches[2];
-                $endNum = (int) $matches[3];
-
-                if ($startNum < $endNum && $endNum - $startNum <= 10) { // Reasonable range limit
-                    return [
-                        'series_name' => $seriesName,
-                        'start_number' => $startNum,
-                        'end_number' => $endNum,
-                        'numbers' => range($startNum, $endNum),
-                    ];
-                }
-            }
-        }
-
-        return null;
+        return $this->getImportService()->detectMultiBookPattern($title);
     }
 
-    /**
-     * Analyze files in multi-book directory to determine if they can be split
-     */
     protected function analyzeMultiBookFiles(array $audiobook, array $multiBookInfo): array
     {
-        $files = $audiobook['files'];
-        $numbers = $multiBookInfo['numbers'];
-        $splitGroups = [];
-
-        // Look for files that clearly indicate individual books
-        foreach ($files as $file) {
-            $filename = basename($file);
-
-            // Check if filename contains any of the expected book numbers
-            foreach ($numbers as $bookNum) {
-                $patterns = [
-                    "/\[0?{$bookNum}\]/i",                   // "[02]", "[2]" - bracket notation
-                    "/book\s*0?{$bookNum}[^\d]/i",           // "Book 2", "Book 02"
-                    "/part\s*0?{$bookNum}[^\d]/i",           // "Part 2", "Part 02"
-                    "/vol\s*0?{$bookNum}[^\d]/i",            // "Vol 2", "Vol 02"
-                    "/volume\s*0?{$bookNum}[^\d]/i",         // "Volume 2"
-                    "/^0?{$bookNum}[\s\-_]/i",               // "2 - Title", "02_Title"
-                    "/[\s\-_]0?{$bookNum}[\s\-_]/i",         // "Title_2_Chapter", "Title-02-"
-                ];
-
-                foreach ($patterns as $pattern) {
-                    if (preg_match($pattern, $filename)) {
-                        if (!isset($splitGroups[$bookNum])) {
-                            $splitGroups[$bookNum] = [];
-                        }
-
-                        // Extract individual book title from filename
-                        $bookTitle = $this->extractBookTitleFromFilename(
-                            $filename,
-                            $multiBookInfo['series_name'],
-                            $bookNum
-                        );
-
-                        $splitGroups[$bookNum][] = [
-                            'file' => $file,
-                            'title' => $bookTitle,
-                        ];
-                        break 2; // Break both loops
-                    }
-                }
-            }
-        }
-
-        return $splitGroups;
+        return $this->getImportService()->analyzeMultiBookFiles($audiobook, $multiBookInfo);
     }
 
-    /**
-     * Extract individual book title from filename
-     */
     protected function extractBookTitleFromFilename(string $filename, string $seriesName, int $bookNumber): string
     {
-        // Remove file extension
-        $name = preg_replace('/\.[^.]+$/', '', $filename);
+        return $this->getImportService()->extractBookTitleFromFilename($filename, $seriesName, $bookNumber);
+    }
 
-        // Remove author names if present at the beginning
-        $name = preg_replace('/^[^-]+-\s*/', '', $name);
+    protected function extractBookNumberFromFilename(string $filename): ?int
+    {
+        return $this->getImportService()->extractBookNumberFromFilename($filename);
+    }
 
-        // Remove series name if present
-        $name = preg_replace('/' . preg_quote($seriesName, '/') . '\s*/i', '', $name);
-
-        // Remove book number patterns
-        $patterns = [
-            "/\[0?{$bookNumber}\]\s*-?\s*/i",        // "[02] - " or "[2] - "
-            "/book\s*0?{$bookNumber}\s*-?\s*/i",     // "Book 02 - " or "Book 2 - "
-            "/part\s*0?{$bookNumber}\s*-?\s*/i",     // "Part 02 - "
-            "/vol\s*0?{$bookNumber}\s*-?\s*/i",      // "Vol 02 - "
-            "/volume\s*0?{$bookNumber}\s*-?\s*/i",   // "Volume 02 - "
-        ];
-
-        foreach ($patterns as $pattern) {
-            $name = preg_replace($pattern, '', $name);
-        }
-
-        // Clean up remaining separators and whitespace
-        $name = preg_replace('/^[\s\-_]+|[\s\-_]+$/', '', $name);
-        $name = trim($name);
-
-        // If we couldn't extract a meaningful title, use series name + book number
-        if (empty($name) || strlen($name) < 2) {
-            $name = $seriesName . " Book " . $bookNumber;
-        }
-
-        return $name;
+    protected function formatFileTypes(array $fileTypes): string
+    {
+        return $this->getImportService()->formatFileTypes($fileTypes);
     }
 
     /**
@@ -4955,23 +4795,6 @@ class ImportBooksFromDownloads extends Command
         }
 
         return false;
-    }
-
-    /**
-     * Format file types for display
-     */
-    protected function formatFileTypes(array $fileTypes): string
-    {
-        if (empty($fileTypes)) {
-            return 'None';
-        }
-
-        $formatted = [];
-        foreach ($fileTypes as $type => $count) {
-            $formatted[] = "{$count} {$type}";
-        }
-
-        return implode(', ', $formatted);
     }
 
     /**

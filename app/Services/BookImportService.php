@@ -2463,6 +2463,186 @@ class BookImportService
     }
 
     /**
+     * Post-process AI result to fix common issues with numbered series books
+     */
+    public function postProcessAIResult(array $aiResult, array $audiobook): array
+    {
+        $directoryName = basename($audiobook['path']);
+
+        if (preg_match('/^(\d{1,2})\s*-\s*(.+)$/', $directoryName, $matches)) {
+            $bookNumber = (int) $matches[1];
+            $bookTitle = trim($matches[2]);
+
+            $aiTitle = $aiResult['title'] ?? '';
+            $aiSeries = $aiResult['series'] ?? '';
+
+            if (strcasecmp($aiTitle, $bookTitle) !== 0) {
+                if (empty($aiSeries) || strcasecmp($aiTitle, $aiSeries) !== 0) {
+                    $aiResult['series'] = $aiTitle;
+                    $aiResult['title'] = $bookTitle;
+                } else {
+                    $aiResult['title'] = $bookTitle;
+                }
+            }
+
+            $aiResult['series_number'] = $bookNumber;
+        } elseif (preg_match('/^(.+),\s*Book\s*(\d{1,2})\s*-\s*(.+)$/', $directoryName, $matches)) {
+            $seriesName = trim($matches[1]);
+            $bookNumber = (int) $matches[2];
+            $bookTitle = trim($matches[3]);
+
+            $aiResult['series'] = $seriesName;
+            $aiResult['title'] = $bookTitle;
+            $aiResult['series_number'] = $bookNumber;
+        }
+
+        if (!empty($aiResult['title'])) {
+            $originalTitle = $aiResult['title'];
+            $cleanedTitle = $this->removeSeriesFromTitle($originalTitle);
+
+            if ($cleanedTitle !== $originalTitle) {
+                $aiResult['title'] = $cleanedTitle;
+            }
+        }
+
+        return $aiResult;
+    }
+
+    /**
+     * Detect multi-book directory patterns like "Series [2-3]" or "Series [1-4]"
+     */
+    public function detectMultiBookPattern(string $title): ?array
+    {
+        $patterns = [
+            '/^(.+?)\s*\[(\d+)\s*-\s*(\d+)\]$/i',           // "Series [2-3]" or "Series [2-10]"
+            '/^(.+?)\s*-\s*\[(\d+)\s*-\s*(\d+)\]$/i',        // "Series - [2-3]"
+            '/^(.+?)\s*\((\d+)\s*-\s*(\d+)\)$/i',           // "Series (2-3)"
+            '/^(.+?)\s*-\s*\((\d+)\s*-\s*(\d+)\)$/i',        // "Series - (2-3)"
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $title, $matches)) {
+                $seriesName = trim($matches[1]);
+                $startNumber = (int) $matches[2];
+                $endNumber = (int) $matches[3];
+
+                if ($endNumber > $startNumber && ($endNumber - $startNumber) <= 20) {
+                    return [
+                        'series_name' => $seriesName,
+                        'start_number' => $startNumber,
+                        'end_number' => $endNumber,
+                        'numbers' => range($startNumber, $endNumber),
+                    ];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Analyze files in multi-book directory to determine if they can be split
+     */
+    public function analyzeMultiBookFiles(array $audiobook, array $multiBookInfo): array
+    {
+        $files = $audiobook['files'];
+        $numbers = $multiBookInfo['numbers'];
+        $splitGroups = [];
+
+        foreach ($files as $filePath) {
+            $filename = basename($filePath);
+            $title = $this->extractBookTitleFromFilename($filename, $multiBookInfo['series_name'], 0);
+
+            foreach ($numbers as $number) {
+                if (stripos($title, (string) $number) !== false || stripos($filename, (string) $number) !== false) {
+                    if (!isset($splitGroups[$number])) {
+                        $splitGroups[$number] = [];
+                    }
+                    $splitGroups[$number][] = [
+                        'file' => $filePath,
+                        'title' => $title,
+                    ];
+                    break;
+                }
+            }
+
+            if (!isset($splitGroups[$number])) {
+                if (!isset($splitGroups['unmatched'])) {
+                    $splitGroups['unmatched'] = [];
+                }
+                $splitGroups['unmatched'][] = [
+                    'file' => $filePath,
+                    'title' => $title,
+                ];
+            }
+        }
+
+        return $splitGroups;
+    }
+
+    /**
+     * Extract individual book title from filename
+     */
+    public function extractBookTitleFromFilename(string $filename, string $seriesName, int $bookNumber): string
+    {
+        $name = preg_replace('/\.[^.]+$/', '', $filename);
+
+        $name = preg_replace('/^(\d+)[\s\-_\.]+/', '', $name);
+        $name = preg_replace('/^Track[\s_]*(\d+)[\s\-_\.]+/i', '', $name);
+        $name = preg_replace('/^CD[\s_]*(\d+)[\s\-_\.]+/i', '', $name);
+        $name = preg_replace('/^Disc[\s_]*(\d+)[\s\-_\.]+/i', '', $name);
+
+        $name = str_ireplace($seriesName, '', $name);
+        $name = str_ireplace((string) $bookNumber, '', $name);
+        $name = preg_replace('/\s+/', ' ', $name);
+        $name = trim($name, ' -_');
+
+        if (empty($name) || strlen($name) < 2) {
+            $name = $seriesName . " Book " . $bookNumber;
+        }
+
+        return $name;
+    }
+
+    /**
+     * Extract book number from filename
+     */
+    public function extractBookNumberFromFilename(string $filename): ?int
+    {
+        $patterns = [
+            '/^(\d{1,2})[\s\-_\.]+/',
+            '/^Book[\s_]*(\d{1,2})/i',
+            '/^Part[\s_]*(\d{1,2})/i',
+            '/[\s\-_](\d{1,2})[\s\-_\.]+/',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $filename, $matches)) {
+                return (int) $matches[1];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Format file types for display
+     */
+    public function formatFileTypes(array $fileTypes): string
+    {
+        if (empty($fileTypes)) {
+            return 'None';
+        }
+
+        $formatted = [];
+        foreach ($fileTypes as $type => $count) {
+            $formatted[] = "{$count} {$type}";
+        }
+
+        return implode(', ', $formatted);
+    }
+
+    /**
      * Convert absolute path to relative path by removing book root
      */
     protected function makePathRelative(string $absolutePath, string $bookRoot): string
