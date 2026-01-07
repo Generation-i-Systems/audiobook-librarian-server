@@ -88,6 +88,12 @@ class UnifiedBookImporter
         $sourcePath = $options['source_path'] ?? null;
         $duplicateAction = $options['duplicate_action'] ?? null;
 
+        Log::debug('UnifiedBookImporter: importBook called', [
+            'bookData' => $bookData,
+            'options' => $options,
+            'bookRoot' => $this->bookRoot,
+        ]);
+
         try {
             // Check for existing book
             $existingBook = $this->findExistingBook($bookData);
@@ -219,19 +225,40 @@ class UnifiedBookImporter
      */
     private function prepareDestinationPath(array $bookData, array $options): string
     {
+        Log::debug('UnifiedBookImporter: prepareDestinationPath called', [
+            'bookData' => $bookData,
+            'options' => $options,
+        ]);
+
         // If already in library, use existing path
         if (!empty($options['source_path'])) {
             $sourcePath = realpath($options['source_path']);
             $bookRootPath = realpath($this->bookRoot);
 
+            Log::debug('UnifiedBookImporter: Checking if source is in library', [
+                'sourcePath' => $options['source_path'],
+                'realpath_source' => $sourcePath,
+                'bookRoot' => $this->bookRoot,
+                'realpath_bookRoot' => $bookRootPath,
+                'starts_with' => $sourcePath && $bookRootPath && str_starts_with($sourcePath, $bookRootPath),
+            ]);
+
             if ($sourcePath && $bookRootPath && str_starts_with($sourcePath, $bookRootPath)) {
                 // Already in library
-                return str_replace($bookRootPath . '/', '', $sourcePath);
+                $relativePath = str_replace($bookRootPath . '/', '', $sourcePath);
+                Log::debug('UnifiedBookImporter: Source is already in library', [
+                    'relativePath' => $relativePath,
+                ]);
+                return $relativePath;
             }
         }
 
         // Generate new path
-        return $this->generateDirectoryPath($bookData);
+        $generatedPath = $this->generateDirectoryPath($bookData);
+        Log::debug('UnifiedBookImporter: Generated new path', [
+            'generatedPath' => $generatedPath,
+        ]);
+        return $generatedPath;
     }
 
     /**
@@ -239,6 +266,10 @@ class UnifiedBookImporter
      */
     private function generateDirectoryPath(array $bookData): string
     {
+        Log::debug('UnifiedBookImporter: generateDirectoryPath called', [
+            'bookData' => $bookData,
+        ]);
+
         if ($this->genreMapper === null) {
             try {
                 $this->genreMapper = app(GenreMappingService::class);
@@ -288,10 +319,30 @@ class UnifiedBookImporter
                 $title = str_pad($sequence, 2, '0', STR_PAD_LEFT) . ' ' . $title;
             }
 
-            return "{$genre}/{$author}/{$series}/{$title}";
+            $path = "{$genre}/{$author}/{$series}/{$title}";
+
+            Log::debug('UnifiedBookImporter: Generated series path', [
+                'genre' => $genre,
+                'author' => $author,
+                'series' => $series,
+                'title' => $title,
+                'sequence' => $sequence,
+                'path' => $path,
+            ]);
+
+            return $path;
         }
 
-        return "{$genre}/{$author}/{$title}";
+        $path = "{$genre}/{$author}/{$title}";
+
+        Log::debug('UnifiedBookImporter: Generated non-series path', [
+            'genre' => $genre,
+            'author' => $author,
+            'title' => $title,
+            'path' => $path,
+        ]);
+
+        return $path;
     }
 
     /**
@@ -322,9 +373,25 @@ class UnifiedBookImporter
     ): array {
         $fullDestPath = $this->bookRoot . '/' . $destPath;
 
+        Log::debug('UnifiedBookImporter: handleFileOperations START', [
+            'sourcePath' => $sourcePath,
+            'destPath' => $destPath,
+            'fullDestPath' => $fullDestPath,
+            'bookRoot' => $this->bookRoot,
+            'is_dir' => is_dir($sourcePath),
+            'is_file' => is_file($sourcePath),
+        ]);
+
         // Create destination directory
         if (!File::exists($fullDestPath)) {
+            Log::debug('UnifiedBookImporter: Creating destination directory', [
+                'path' => $fullDestPath,
+            ]);
             File::makeDirectory($fullDestPath, 0755, true);
+        } else {
+            Log::debug('UnifiedBookImporter: Destination directory already exists', [
+                'path' => $fullDestPath,
+            ]);
         }
 
         $copiedFiles = [];
@@ -345,10 +412,21 @@ class UnifiedBookImporter
             $files = [new \SplFileInfo($sourcePath)];
         }
 
+        Log::debug('UnifiedBookImporter: Found files to copy', [
+            'fileCount' => count($files),
+            'files' => array_map(fn ($f) => $f->getPathname(), $files),
+        ]);
+
         foreach ($files as $file) {
             $filename = $file->getFilename();
             $destFile = $fullDestPath . '/' . $filename;
             $ext = strtolower($file->getExtension());
+
+            Log::debug('UnifiedBookImporter: Processing file', [
+                'file' => $file->getPathname(),
+                'filename' => $filename,
+                'destFile' => $destFile,
+            ]);
 
             // Skip audio files if merge mode and file exists
             if (
@@ -363,8 +441,21 @@ class UnifiedBookImporter
             if (File::copy($file->getPathname(), $destFile)) {
                 $copiedFiles[] = $filename;
                 chmod($destFile, 0664);
+                Log::debug('UnifiedBookImporter: File copied successfully', [
+                    'from' => $file->getPathname(),
+                    'to' => $destFile,
+                ]);
+            } else {
+                Log::error('UnifiedBookImporter: Failed to copy file', [
+                    'from' => $file->getPathname(),
+                    'to' => $destFile,
+                ]);
             }
         }
+
+        Log::debug('UnifiedBookImporter: File operations complete', [
+            'copiedFiles' => $copiedFiles,
+        ]);
 
         return $copiedFiles;
     }
