@@ -4897,6 +4897,64 @@ class BookImportService
     }
 
     /**
+     * Execute a specific background task (with caching)
+     */
+    public function executeBackgroundTask(
+        array $task,
+        callable $getCachedResultCallback,
+        callable $executeBackgroundTaskInternalCallback,
+        callable $setCachedResultCallback
+    ): array {
+        $audiobook = $task['data'];
+        $taskType = $task['type'];
+
+        // Check cache first
+        $cachedResult = $getCachedResultCallback($audiobook, $taskType);
+        if ($cachedResult !== null) {
+            return array_merge($cachedResult, ['from_cache' => true]);
+        }
+
+        // Execute task if not cached
+        $result = $executeBackgroundTaskInternalCallback($taskType, $audiobook);
+
+        // Store result in cache
+        $setCachedResultCallback($audiobook, $taskType, $result);
+
+        return array_merge($result, ['from_cache' => false]);
+    }
+
+    /**
+     * Internal task execution without caching
+     */
+    public function executeBackgroundTaskInternal(
+        string $taskType,
+        array $audiobook,
+        callable $preprocessMetadataCallback,
+        callable $scanDirectoryCallback,
+        callable $checkDuplicatesCallback,
+        callable $extractMetadataCallback,
+        callable $analyzeAudioFilesCallback,
+        callable $prepareCoverImageCallback
+    ): array {
+        switch ($taskType) {
+            case 'preprocess_metadata':
+                return $preprocessMetadataCallback($audiobook);
+            case 'scan_directory':
+                return $scanDirectoryCallback($audiobook);
+            case 'duplicate_check':
+                return $checkDuplicatesCallback($audiobook);
+            case 'extract_metadata':
+                return $extractMetadataCallback($audiobook);
+            case 'analyze_audio_files':
+                return $analyzeAudioFilesCallback($audiobook);
+            case 'prepare_cover_image':
+                return $prepareCoverImageCallback($audiobook);
+            default:
+                throw new \Exception("Unknown task type: {$taskType}");
+        }
+    }
+
+    /**
      * Get cached result for a background task
      */
     public function getCachedResult(array $backgroundCache, array $audiobook, string $taskType, bool $cacheEnabled): ?array

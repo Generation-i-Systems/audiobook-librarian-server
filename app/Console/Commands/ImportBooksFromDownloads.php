@@ -555,22 +555,12 @@ class ImportBooksFromDownloads extends Command
      */
     protected function executeBackgroundTask(array $task): array
     {
-        $audiobook = $task['data'];
-        $taskType = $task['type'];
-
-        // Check cache first
-        $cachedResult = $this->getCachedResult($audiobook, $taskType);
-        if ($cachedResult !== null) {
-            return array_merge($cachedResult, ['from_cache' => true]);
-        }
-
-        // Execute task if not cached
-        $result = $this->executeBackgroundTaskInternal($taskType, $audiobook);
-
-        // Store result in cache
-        $this->setCachedResult($audiobook, $taskType, $result);
-
-        return array_merge($result, ['from_cache' => false]);
+        return $this->getImportService()->executeBackgroundTask(
+            $task,
+            fn ($audiobook, $taskType) => $this->getCachedResult($audiobook, $taskType),
+            fn ($taskType, $audiobook) => $this->executeBackgroundTaskInternal($taskType, $audiobook),
+            fn ($audiobook, $taskType, $result) => $this->setCachedResult($audiobook, $taskType, $result)
+        );
     }
 
     /**
@@ -578,22 +568,16 @@ class ImportBooksFromDownloads extends Command
      */
     protected function executeBackgroundTaskInternal(string $taskType, array $audiobook): array
     {
-        switch ($taskType) {
-            case 'preprocess_metadata':
-                return $this->preprocessMetadataInBackground($audiobook);
-            case 'scan_directory':
-                return $this->scanDirectoryInBackground($audiobook);
-            case 'duplicate_check':
-                return $this->checkDuplicatesInBackground($audiobook);
-            case 'extract_metadata':
-                return $this->extractMetadataInBackground($audiobook);
-            case 'analyze_audio_files':
-                return $this->analyzeAudioFilesInBackground($audiobook);
-            case 'prepare_cover_image':
-                return $this->prepareCoverImageInBackground($audiobook);
-            default:
-                throw new \Exception("Unknown task type: {$taskType}");
-        }
+        return $this->getImportService()->executeBackgroundTaskInternal(
+            $taskType,
+            $audiobook,
+            fn ($data) => $this->preprocessMetadataInBackground($data),
+            fn ($data) => $this->scanDirectoryInBackground($data),
+            fn ($data) => $this->checkDuplicatesInBackground($data),
+            fn ($data) => $this->extractMetadataInBackground($data),
+            fn ($data) => $this->analyzeAudioFilesInBackground($data),
+            fn ($data) => $this->prepareCoverImageInBackground($data)
+        );
     }
 
     /**
