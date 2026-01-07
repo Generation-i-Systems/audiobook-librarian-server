@@ -520,8 +520,9 @@ class UnifiedBookImporter
         $duration = $this->parseDuration($bookData);
         $totalSize = $this->calculateTotalSize($destPath, $copiedFiles);
 
-        $book->update([
-            'directory_path' => $destPath,
+        // Only update directory_path if it's different from the current one
+        // This prevents creating nested directories during reimports
+        $updateData = [
             'description' => strip_tags($bookData['description'] ?? $bookData['summary'] ?? $book->description),
             'duration' => $duration ?: $book->duration,
             'audio_file_count' => count(array_filter($copiedFiles, fn ($f) => preg_match('/\.(m4b|m4a|mp3)$/i', $f))) ?: $book->audio_file_count,
@@ -532,7 +533,14 @@ class UnifiedBookImporter
             'publisher' => $bookData['publisher'] ?? $book->publisher,
             'language' => $bookData['language'] ?? $book->language,
             'abridged' => isset($bookData['abridged']) ? ($bookData['abridged'] === 'true') : $book->abridged,
-        ]);
+        ];
+
+        // Only update directory_path if it's different from the current one
+        if ($book->directory_path !== $destPath) {
+            $updateData['directory_path'] = $destPath;
+        }
+
+        $book->update($updateData);
 
         return $book;
     }
