@@ -943,42 +943,13 @@ class ImportBooksFromDownloads extends Command
      */
     protected function initializeCache(): void
     {
-        // Check if caching is disabled
-        if ($this->option('no-cache')) {
-            $this->cacheEnabled = false;
-            $this->info("📦 Background processing cache disabled");
-            return;
-        }
-
-        // Set up cache directory
-        $this->cacheDirectory = storage_path('app/audiobook-cache');
-        $this->cacheFilePath = $this->cacheDirectory . '/background-processing-cache.json';
-
-        // Create cache directory if it doesn't exist
-        if (!File::isDirectory($this->cacheDirectory)) {
-            File::makeDirectory($this->cacheDirectory, 0755, true);
-        }
-
-        // Clear cache if requested
-        if ($this->option('clear-cache')) {
-            if (file_exists($this->cacheFilePath)) {
-                unlink($this->cacheFilePath);
-                $this->info("🗑️  Background processing cache cleared");
-            }
-            $this->backgroundCache = [];
-            return;
-        }
-
-        // Load existing cache
-        $this->loadCache();
-
-        // Clean up old/invalid cache entries
-        $this->cleanupCache();
-
-        $cacheSize = count($this->backgroundCache);
-        if ($cacheSize > 0) {
-            $this->info("📦 Loaded {$cacheSize} cached background processing results");
-        }
+        $this->backgroundCache = $this->getImportService()->initializeCache(
+            $this->option('no-cache'),
+            $this->option('clear-cache'),
+            fn ($message) => $this->info($message),
+            fn () => $this->loadCache(),
+            fn (&$cache) => $this->cleanupCache()
+        );
     }
 
     protected function getCachedResult(array $audiobook, string $taskType): ?array

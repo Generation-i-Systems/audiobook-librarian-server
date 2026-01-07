@@ -4585,6 +4585,54 @@ class BookImportService
     }
 
     /**
+     * Initialize persistent cache system
+     */
+    public function initializeCache(
+        bool $noCacheOption,
+        bool $clearCacheOption,
+        callable $infoCallback,
+        callable $loadCacheCallback,
+        callable $cleanupCacheCallback
+    ): array {
+        // Check if caching is disabled
+        if ($noCacheOption) {
+            $infoCallback("📦 Background processing cache disabled");
+            return [];
+        }
+
+        // Set up cache directory
+        $cacheDirectory = storage_path('app/audiobook-cache');
+        $cacheFilePath = $cacheDirectory . '/background-processing-cache.json';
+
+        // Create cache directory if it doesn't exist
+        if (!File::isDirectory($cacheDirectory)) {
+            File::makeDirectory($cacheDirectory, 0755, true);
+        }
+
+        // Clear cache if requested
+        if ($clearCacheOption) {
+            if (file_exists($cacheFilePath)) {
+                unlink($cacheFilePath);
+                $infoCallback("🗑️  Background processing cache cleared");
+            }
+            return [];
+        }
+
+        // Load existing cache
+        $backgroundCache = $loadCacheCallback();
+
+        // Clean up old/invalid cache entries
+        $cleanupCacheCallback($backgroundCache);
+
+        $cacheSize = count($backgroundCache);
+        if ($cacheSize > 0) {
+            $infoCallback("📦 Loaded {$cacheSize} cached background processing results");
+        }
+
+        return $backgroundCache;
+    }
+
+    /**
      * Get cache key for an audiobook
      */
     public function getCacheKey(array $audiobook): string
