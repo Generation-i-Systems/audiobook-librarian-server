@@ -2721,6 +2721,37 @@ class BookImportService
     }
 
     /**
+     * Analyze if a cover image is a low-quality text-on-white cover
+     */
+    public function isTextOnWhiteCover(string $imagePath, ?CoverImageAnalysisService $coverAnalysisService): bool
+    {
+        if (!$coverAnalysisService) {
+            return false;
+        }
+
+        return $coverAnalysisService->isTextOnWhiteCover($imagePath);
+    }
+
+    /**
+     * Search for alternative book covers using Google Image Search
+     */
+    public function searchAlternativeCovers(array $metadata, int $limit = 3, ?GoogleImageSearchService $googleImageService): array
+    {
+        if (!$googleImageService) {
+            return ['success' => false, 'images' => [], 'error' => 'Google Image Service not available'];
+        }
+
+        $author = is_array($metadata['author']) ? implode(' ', $metadata['author']) : ($metadata['author'] ?? '');
+        $title = $metadata['title'] ?? '';
+
+        if (empty($author) || empty($title)) {
+            return ['success' => false, 'images' => [], 'error' => 'Missing author or title'];
+        }
+
+        return $googleImageService->searchBookCovers($author, $title, $limit);
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void

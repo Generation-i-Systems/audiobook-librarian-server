@@ -2870,19 +2870,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function downloadCoverImage(string $imageUrl, string $directoryPath, string $source = 'unknown'): ?string
     {
-        if (!$this->coverService) {
-            $this->coverService = app(ExternalCoverService::class);
-        }
-
-        $result = $this->coverService->downloadCoverImage($imageUrl, $directoryPath, $source);
-
-        if ($result['success']) {
-            $this->info("📸 Downloaded cover image: {$result['path']}");
-            return $result['path'];
-        } else {
-            $this->warn("⚠️  Error downloading cover image: " . $result['error']);
-            return null;
-        }
+        return $this->getImportService()->downloadCoverImage($imageUrl, $directoryPath, $source, $this->coverService);
     }
 
     /**
@@ -2890,11 +2878,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function isTextOnWhiteCover(string $imagePath): bool
     {
-        if (!$this->coverAnalysisService) {
-            $this->coverAnalysisService = app(CoverImageAnalysisService::class);
-        }
-
-        return $this->coverAnalysisService->isTextOnWhiteCover($imagePath);
+        return $this->getImportService()->isTextOnWhiteCover($imagePath, $this->coverAnalysisService);
     }
 
     /**
@@ -2902,18 +2886,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function searchAlternativeCovers(array $metadata, int $limit = 3): array
     {
-        if (!$this->googleImageService) {
-            $this->googleImageService = app(GoogleImageSearchService::class);
-        }
-
-        $author = is_array($metadata['author']) ? implode(' ', $metadata['author']) : ($metadata['author'] ?? '');
-        $title = $metadata['title'] ?? '';
-
-        if (empty($author) || empty($title)) {
-            return ['success' => false, 'images' => [], 'error' => 'Missing author or title'];
-        }
-
-        return $this->googleImageService->searchBookCovers($author, $title, $limit);
+        return $this->getImportService()->searchAlternativeCovers($metadata, $limit, $this->googleImageService);
     }
 
     /**
