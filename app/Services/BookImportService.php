@@ -3046,12 +3046,16 @@ class BookImportService
     /**
      * Scan directories for audiobook folders/files
      */
-    public function scanForAudiobooks(array $directories, callable $isAlreadyImportedCallback = null): array
+    public function scanForAudiobooks(array $directories, callable $isAlreadyImportedCallback = null, ?callable $infoCallback = null): array
     {
         $audiobooks = [];
         $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
 
         foreach ($directories as $directory) {
+            if ($infoCallback) {
+                $infoCallback("🔍 Scanning: {$directory}");
+            }
+
             $iterator = new \RecursiveIteratorIterator(
                 new \RecursiveDirectoryIterator($directory, \RecursiveDirectoryIterator::SKIP_DOTS),
                 \RecursiveIteratorIterator::SELF_FIRST

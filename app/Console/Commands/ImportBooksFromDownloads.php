@@ -469,13 +469,11 @@ class ImportBooksFromDownloads extends Command
      */
     protected function scanForAudiobooks(array $directories): array
     {
-        $audiobooks = $this->getImportService()->scanForAudiobooks($directories, fn ($path) => $this->isAlreadyImported($path));
-
-        foreach ($directories as $directory) {
-            $this->info("🔍 Scanning: {$directory}");
-        }
-
-        return $audiobooks;
+        return $this->getImportService()->scanForAudiobooks(
+            $directories,
+            fn ($path) => $this->isAlreadyImported($path),
+            fn ($message) => $this->info($message)
+        );
     }
 
     /**
