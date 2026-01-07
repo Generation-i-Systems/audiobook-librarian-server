@@ -2512,6 +2512,23 @@ class BookImportService
     }
 
     /**
+     * Check if directory has CD subdirectories
+     */
+    public function hasCdDirectories(string $path): bool
+    {
+        $cdPattern = '/^(cd|disc|disk)[\s_-]*(\d+)$/i';
+        $directories = File::directories($path);
+
+        foreach ($directories as $dir) {
+            if (preg_match($cdPattern, basename($dir))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void

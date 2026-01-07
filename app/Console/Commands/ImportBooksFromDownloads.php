@@ -1838,16 +1838,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function hasCdDirectories(string $path): bool
     {
-        $cdPattern = '/^(cd|disc|disk)[\s_-]*(\d+)$/i';
-        $directories = File::directories($path);
-
-        foreach ($directories as $dir) {
-            if (preg_match($cdPattern, basename($dir))) {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->getImportService()->hasCdDirectories($path);
     }
 
     protected function getDirectorySize(string $path): int
