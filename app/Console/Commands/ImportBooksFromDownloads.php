@@ -1306,33 +1306,16 @@ class ImportBooksFromDownloads extends Command
      */
     protected function displayPartialSummary(): void
     {
-        $this->newLine();
-        $this->info("📊 Partial Import Summary (before quit):");
-
-        $processed = count($this->processedBooks);
-        $failed = count($this->failedBooks);
-        $skipped = count($this->skippedBooks);
-
-        if ($processed > 0) {
-            $this->info("✅ Successfully processed: {$processed} books");
-        }
-
-        if ($failed > 0) {
-            $this->warn("❌ Failed: {$failed} books");
-            foreach ($this->failedBooks as $book) {
-                $this->line("  • " . basename($book['path']) . " - " . $book['error']);
-            }
-        }
-
-        if ($skipped > 0) {
-            $this->info("⏭️  Skipped: {$skipped} books");
-        }
-
-        $total = $processed + $failed + $skipped;
-        if ($this->totalFound > $total) {
-            $remaining = $this->totalFound - $total;
-            $this->line("⏸️  Not processed: {$remaining} books");
-        }
+        $this->getImportService()->displayPartialSummary(
+            $this->totalFound,
+            $this->processedBooks,
+            $this->failedBooks,
+            $this->skippedBooks,
+            fn () => $this->newLine(),
+            fn ($message) => $this->info($message),
+            fn ($message) => $this->warn($message),
+            fn ($message) => $this->line($message)
+        );
     }
 
     /**

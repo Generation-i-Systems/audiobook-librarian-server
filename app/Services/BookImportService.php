@@ -4683,6 +4683,48 @@ class BookImportService
     }
 
     /**
+     * Display partial summary when quitting mid-process
+     */
+    public function displayPartialSummary(
+        int $totalFound,
+        array $processedBooks,
+        array $failedBooks,
+        array $skippedBooks,
+        callable $newLineCallback,
+        callable $infoCallback,
+        callable $warnCallback,
+        callable $lineCallback
+    ): void {
+        $newLineCallback();
+        $infoCallback("📊 Partial Import Summary (before quit):");
+
+        $processed = count($processedBooks);
+        $failed = count($failedBooks);
+        $skipped = count($skippedBooks);
+
+        if ($processed > 0) {
+            $infoCallback("✅ Successfully processed: {$processed} books");
+        }
+
+        if ($failed > 0) {
+            $warnCallback("❌ Failed: {$failed} books");
+            foreach ($failedBooks as $book) {
+                $lineCallback("  • " . basename($book['path']) . " - " . $book['error']);
+            }
+        }
+
+        if ($skipped > 0) {
+            $infoCallback("⏭️  Skipped: {$skipped} books");
+        }
+
+        $total = $processed + $failed + $skipped;
+        if ($totalFound > $total) {
+            $remaining = $totalFound - $total;
+            $lineCallback("⏸️  Not processed: {$remaining} books");
+        }
+    }
+
+    /**
      * Display image using Kitty graphics protocol or kitten icat
      */
     public function displayKittyImage(string $imageData, callable $lineCallback, callable $systemCallback): void
