@@ -1634,20 +1634,20 @@ class ImportBooksFromDownloads extends Command
     /**
      * Format bytes to human readable format
      */
-    protected function formatBytes(int $bytes): string
+    protected function formatBytes(int $bytes, int $precision = 2): string
     {
-        if ($bytes >= 1024 * 1024) {
-            return round($bytes / (1024 * 1024), 1) . 'MB';
-        } elseif ($bytes >= 1024) {
-            return round($bytes / 1024, 1) . 'KB';
-        } else {
-            return $bytes . 'B';
-        }
+        return $this->getImportService()->formatBytes($bytes, $precision);
     }
 
     /**
      * Save cache before application exit
      */
+    protected function saveCacheBeforeExit(): void
+    {
+        if ($this->cacheEnabled && $this->cacheService) {
+            $this->cacheService->save();
+        }
+    }
 
     /**
      * Enhanced ask method with background processing and quit handling
