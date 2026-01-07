@@ -2635,6 +2635,31 @@ class BookImportService
     }
 
     /**
+     * Check if metadata contains enrichment data from external sources
+     */
+    public function hasEnrichmentData(array $metadata): bool
+    {
+        $enrichmentFields = [
+            'audible_raw',
+            'google_books_raw',
+            'audiobook_bay_raw',
+            'cover_url',
+        ];
+
+        foreach ($enrichmentFields as $field) {
+            if (!empty($metadata[$field])) {
+                return true;
+            }
+        }
+
+        if (!empty($metadata['description']) && strlen($metadata['description']) > 100) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * Extract series number from title and clean the title
      */
     public function extractSeriesNumberFromTitle(array &$metadata): void

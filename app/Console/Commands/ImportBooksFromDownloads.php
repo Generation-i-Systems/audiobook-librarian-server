@@ -3772,24 +3772,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function hasEnrichmentData(array $metadata): bool
     {
-        $enrichmentFields = [
-            'audible_raw',
-            'google_books_raw',
-            'audiobook_bay_raw',
-            'cover_url',
-        ];
-
-        foreach ($enrichmentFields as $field) {
-            if (!empty($metadata[$field])) {
-                return true;
-            }
-        }
-
-        if (!empty($metadata['description']) && strlen($metadata['description']) > 100) {
-            return true;
-        }
-
-        return false;
+        return $this->getImportService()->hasEnrichmentData($metadata);
     }
 
     protected function mapToValidGenre(string $genre): string
