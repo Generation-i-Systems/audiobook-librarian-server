@@ -20,11 +20,13 @@ class ShowBookInfo extends Command
     use BookImportTrait;
 
     private array $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'opus', 'aac', 'wav', 'wma'];
+    private array $seriesCollection = [];
+    private ?string $resolvedBookRoot = null;
 
     protected $signature = 'books:info {directories?*}
                             {--compact : Use compact view instead of table}
                             {--show-paths : Show full paths being checked}
-                            {--delete= : Delete book by ID (with confirmation)}
+                            {--delete= : Delete book(s) by ID(s) or directory}
                             {--c|cover= : Update cover image (filename or path)}
                             {--t|title= : Update book title}
                             {--a|author=* : Update authors (+add, -remove, or replace all)}
@@ -36,7 +38,8 @@ class ShowBookInfo extends Command
                             {--d|description= : Update book description}
                             {--S|source= : Update source of the book data}
                             {--e|edit : Open book edit page in browser}
-                            {--merge-directories : Merge multiple directories (or subdirectories) into one before displaying details}';
+                            {--merge-directories : Merge multiple directories (or subdirectories) into one before displaying details}
+                            {--force : Skip confirmation prompts}';
 
     protected $description = 'Display and optionally update book information from database';
 

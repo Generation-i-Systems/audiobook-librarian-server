@@ -943,7 +943,7 @@
                             optionsDiv.style.display = 'none';
 
                             // Make AJAX request to extract covers
-                            fetch('{{ route("admin.books.extract-embedded-cover") }}', {
+                            fetch('{{ route("admin.admin.books.extract-embedded-cover") }}', {
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',
