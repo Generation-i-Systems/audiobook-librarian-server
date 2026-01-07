@@ -4585,6 +4585,135 @@ class BookImportService
     }
 
     /**
+     * Get cache key for an audiobook
+     */
+    public function getCacheKey(array $audiobook): string
+    {
+        return md5($audiobook['path'] . '|' . ($audiobook['total_size'] ?? 0));
+    }
+
+    /**
+     * Load cache from disk
+     */
+    public function loadCache(
+        bool $cacheEnabled,
+        ?string $cacheFilePath,
+        int $cacheVersion,
+        ?callable $infoCallback = null,
+        ?callable $warnCallback = null
+    ): array {
+        if (!$cacheEnabled || !$cacheFilePath || !file_exists($cacheFilePath)) {
+            return [];
+        }
+
+        try {
+            $cacheData = json_decode(file_get_contents($cacheFilePath), true);
+
+            if (!$cacheData || !is_array($cacheData)) {
+                return [];
+            }
+
+            // Check cache version compatibility
+            if (($cacheData['version'] ?? 1) !== $cacheVersion) {
+                if ($infoCallback) {
+                    $infoCallback("📦 Cache version mismatch - rebuilding cache");
+                }
+                return [];
+            }
+
+            return $cacheData['data'] ?? [];
+        } catch (\Exception $e) {
+            if ($warnCallback) {
+                $warnCallback("⚠️  Failed to load cache: " . $e->getMessage());
+            }
+            return [];
+        }
+    }
+
+    /**
+     * Save cache to disk
+     */
+    public function saveCache(
+        array $backgroundCache,
+        bool $cacheEnabled,
+        ?string $cacheFilePath,
+        int $cacheVersion
+    ): void {
+        if (!$cacheEnabled || !$cacheFilePath) {
+            return;
+        }
+
+        try {
+            $cacheData = [
+                'version' => $cacheVersion,
+                'last_updated' => time(),
+                'data' => $backgroundCache,
+            ];
+
+            file_put_contents($cacheFilePath, json_encode($cacheData, JSON_PRETTY_PRINT));
+        } catch (\Exception $e) {
+            // Silently fail on save errors
+        }
+    }
+
+    /**
+     * Clean up old or invalid cache entries
+     */
+    public function cleanupCache(
+        array &$backgroundCache,
+        callable $getDirectoryModificationTimeCallback,
+        ?callable $infoCallback = null
+    ): int {
+        $cleaned = 0;
+        $maxAge = 86400 * 7; // 7 days
+        $currentTime = time();
+
+        foreach ($backgroundCache as $cacheKey => $cacheEntry) {
+            // Remove entries older than max age
+            if (isset($cacheEntry['timestamp']) && ($currentTime - $cacheEntry['timestamp']) > $maxAge) {
+                unset($backgroundCache[$cacheKey]);
+                $cleaned++;
+                continue;
+            }
+
+            // Remove entries for directories that no longer exist
+            if (isset($cacheEntry['path']) && !is_dir($cacheEntry['path'])) {
+                unset($backgroundCache[$cacheKey]);
+                $cleaned++;
+                continue;
+            }
+
+            // Remove entries where files have been modified
+            if (isset($cacheEntry['path']) && isset($cacheEntry['directory_mtime'])) {
+                $currentMtime = $getDirectoryModificationTimeCallback($cacheEntry['path']);
+                if ($currentMtime > $cacheEntry['directory_mtime']) {
+                    unset($backgroundCache[$cacheKey]);
+                    $cleaned++;
+                    continue;
+                }
+            }
+        }
+
+        if ($cleaned > 0 && $infoCallback) {
+            $infoCallback("🧹 Cleaned {$cleaned} stale cache entries");
+        }
+
+        return $cleaned;
+    }
+
+    /**
+     * Get cached result for a background task
+     */
+    public function getCachedResult(array $backgroundCache, string $cacheKey): ?array
+    {
+        if (isset($backgroundCache[$cacheKey])) {
+            return $backgroundCache[$cacheKey];
+        }
+
+        return null;
+    }
+
+    /**
      * Extract NFO data in background
      */
     public function extractNfoDataInBackground(string $nfoPath): array
