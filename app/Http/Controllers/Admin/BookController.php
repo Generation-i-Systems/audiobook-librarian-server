@@ -2498,7 +2498,7 @@ class BookController extends Controller
         $getID3->option_tag_id3v1 = false;
         $getID3->option_tag_id3v2 = false;
         $getID3->option_tag_lyrics3 = false;
-        $getID3->option_tags_process = false;
+        $getID3->option_tags_process = true; // Enable tag processing to get embedded covers
 
         // Find audio files in the directory
         $audioFiles = glob($fullDirectoryPath . '/*.{mp3,m4a,m4b,m4p,mp4,aac,ogg,oga,wav,flac,wma}', GLOB_BRACE);

@@ -659,164 +659,105 @@
                 {{-- Cover Image Selection Modal --}}
                 <div class="modal fade" id="coverImageModal" tabindex="-1" aria-labelledby="coverImageModalLabel"
                     aria-hidden="true">
-                    <div class="modal-dialog modal-xl">
+                    <div class="modal-dialog modal-xl modal-dialog-scrollable">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h5 class="modal-title" id="coverImageModalLabel"><i class="fas fa-images me-2"></i>Select Cover
-                                    Image</h5>
+                                <h5 class="modal-title" id="coverImageModalLabel">
+                                    <i class="fas fa-images me-2"></i>Select Cover Image
+                                </h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
-                             <div class="modal-body">
-                                                                             <div class="mb-3" id="cover-candidates-group" style="display: {{ !empty($coverOptions) ? 'block' : 'none' }}">
-                                                                                 @php
-                                     $initialCoverSource = '';
-                                     if (!empty($coverOptions)) {
-                                         foreach ($coverOptions as $option) {
-                                             if (
-                                                 (isset($biggestCover) && $biggestCover === $option['value']) ||
-                                                 (empty($biggestCover) && $option['type'] === 'current')
-                                             ) {
-                                                 $initialCoverSource = $option['type'];
-                                                 break;
-                                             }
-                                         }
-                                     }
-                                     @endphp
-                                     @if(empty($coverOptions))
-                                         <div class="alert alert-info">
-                                             <i class="fas fa-info-circle me-2"></i>
-                                             No cover images found.
-                                             <button type="button" class="btn btn-sm btn-outline-primary ms-2" onclick="autoExtractEmbeddedCover()">
-                                                 <i class="fas fa-music me-1"></i>Extract from Audio Files
-                                             </button>
-                                         </div>
-                                     @endif
-                                     <!-- Original coverImageSource field -->
-                                     <input type="hidden" name="coverImageSource" id="coverImageSource"
-                                         value="{{ $initialCoverSource }}">
+                            <div class="modal-body">
+                                @php
+                                    $initialCoverSource = '';
+                                    if (!empty($coverOptions)) {
+                                        foreach ($coverOptions as $option) {
+                                            if (
+                                                (isset($biggestCover) && $biggestCover === $option['value']) ||
+                                                (empty($biggestCover) && $option['type'] === 'current')
+                                            ) {
+                                                $initialCoverSource = $option['type'];
+                                                break;
+                                            }
+                                        }
+                                    }
+                                @endphp
 
-                                     <!-- Add a script to ensure coverImageSource is set correctly on form submission -->
-                                     <script>
-                                                 document.addEventListener('DOMContentLoaded', function() {
-                                                     const bookForm = document.getElementById('book-form');
-                                                     if (bookForm) {
-                                                         bookForm.addEventListener('submit', function() {
-                                                             const selectedRadio = document.querySelector('input[name="coverImageCandidate"]:checked');
-                                                             if (selectedRadio) {
-                                                                 const sourceField = document.getElementById('coverImageSource');
-                                                                 if (sourceField) {
-                                                                     sourceField.value = selectedRadio.dataset.source || '';
-                                                                     console.log('Form submit: Setting coverImageSource to ' + sourceField.value);
-                                                                 }
-                                                             }
-                                                         });
-                                                     }
-                                                 });
-                                             </script>
-                                             <!-- Debug info -->
-                                             <div class="d-none">Initial cover source: {{ $initialCoverSource }}</div>
-                                             <div class="d-flex flex-wrap gap-3" id="cover-candidates-list">
-                                                 @if(!empty($coverOptions))
-                                                     @foreach($coverOptions as $option)
-                                                         <div class="text-center">
-                                                             <label class="d-flex flex-column align-items-center">
-                                                                 <input type="radio" name="coverImageCandidate" value="{{ $option['value'] }}"
-                                                                     data-source="{{ $option['type'] }}"
-                                                                     @if((isset($biggestCover) && $biggestCover === $option['value']) || (empty($biggestCover) && $option['type'] === 'current')) checked @endif class="mb-2">
-                                                                 <img src="{{ $option['src'] }}" alt="{{ $option['label'] }}"
-                                                                     style="max-width:100px;max-height:140px;border:1px solid #ccc;">
-                                                             </label>
-                                                             <div class="mt-1" style="font-size:12px;word-break:break-all;">
-                                                                 {{ $option['label'] }}<br>
-                                                                 <small class="text-muted">{{ $option['display_name'] ?? $option['value'] }}</small>
-                                                             </div>
-                                                         </div>
-                                                     @endforeach
-                                                 @endif
-                                             </div>
-                                             </div>
-                                                                                 <script>
-                                                                     document.addEventListener('DOMContentLoaded', function() {
-                                                                         const bookForm = document.getElementById('book-form');
-                                                                         if (bookForm) {
-                                                                             bookForm.addEventListener('submit', function() {
-                                                                                 const selectedRadio = document.querySelector('input[name="coverImageCandidate"]:checked');
-                                                                                 if (selectedRadio) {
-                                                                                     const sourceField = document.getElementById('coverImageSource');
-                                                                                     if (sourceField) {
-                                                                                         sourceField.value = selectedRadio.dataset.source || '';
-                                                                                         console.log('Form submit: Setting coverImageSource to ' + sourceField.value);
-                                                                                     }
-                                                                                 }
-                                                                             });
-                                                                         }
-                                                                     });
-                                                                 </script>
-                                                                 <!-- Debug info -->
-                                                                 <div class="d-none">Initial cover source: {{ $initialCoverSource }}</div>
-                                                                 <div class="d-flex flex-wrap gap-3" id="cover-candidates-list">
-                                                                     @if(!empty($coverOptions))
-                                                                         @foreach($coverOptions as $option)
-                                                                             <div class="text-center">
-                                                                                 <label class="d-flex flex-column align-items-center">
-                                                                                     <input type="radio" name="coverImageCandidate" value="{{ $option['value'] }}"
-                                                                                         data-source="{{ $option['type'] }}"
-                                                                                         @if((isset($biggestCover) && $biggestCover === $option['value']) || (empty($biggestCover) && $option['type'] === 'current')) checked @endif class="mb-2">
-                                                                                     <img src="{{ $option['src'] }}" alt="{{ $option['label'] }}"
-                                                                                         style="max-width:100px;max-height:140px;border:1px solid #ccc;">
-                                                                                 </label>
-                                                                                 <div class="mt-1" style="font-size:12px;word-break:break-all;">
-                                                                                     {{ $option['label'] }}<br>
-                                                                                     <small class="text-muted">{{ $option['display_name'] ?? $option['value'] }}</small>
-                                                                                 </div>
-                                                                             </div>
-                                                                         @endforeach
-                                                                     @endif
-                                                                 </div>
-                                                                 </div>
+                                <input type="hidden" name="coverImageSource" id="coverImageSource" value="{{ $initialCoverSource }}">
 
-                                                                 <div id="google-books-matches-table-wrapper" style="display:none;" class="mt-3">
-                                                                     <label class="form-label">Google Books: Select a Match</label>
-                                                                     <table class="table table-bordered table-sm" id="google-books-matches-table">
-                                                                         <thead>
-                                                                             <tr>
-                                                                                 <th></th>
-                                                                                 <th>Title</th>
-                                                                                 <th>Authors</th>
-                                                                                 <th>Year</th>
-                                                                                 <th>Cover</th>
-                                                                             </tr>
-                                                                         </thead>
-                                                                         <tbody></tbody>
-                                                                     </table>
-                                                                 </div>
+                                <div class="mb-3" id="cover-candidates-group" style="display: {{ !empty($coverOptions) ? 'block' : 'none' }}">
+                                    <div class="d-flex flex-wrap gap-3" id="cover-candidates-list">
+                                        @forelse($coverOptions as $option)
+                                            <div class="text-center">
+                                                <label class="d-flex flex-column align-items-center">
+                                                    <input type="radio" name="coverImageCandidate" value="{{ $option['value'] }}"
+                                                        data-source="{{ $option['type'] }}"
+                                                        @if((isset($biggestCover) && $biggestCover === $option['value']) || (empty($biggestCover) && $option['type'] === 'current')) checked @endif
+                                                        class="mb-2">
+                                                    <img src="{{ $option['src'] }}" alt="{{ $option['label'] }}"
+                                                        style="max-width:100px;max-height:140px;border:1px solid #ccc;border-radius:4px;">
+                                                </label>
+                                                <div class="mt-1" style="font-size:12px;word-break:break-all;">
+                                                    {{ $option['label'] }}<br>
+                                                    <small class="text-muted">{{ $option['display_name'] ?? $option['value'] }}</small>
+                                                </div>
+                                            </div>
+                                        @empty
+                                            <div class="alert alert-info w-100 mb-0">
+                                                <i class="fas fa-info-circle me-2"></i>No cover images found.
+                                                <button type="button" class="btn btn-sm btn-outline-primary ms-2" onclick="autoExtractEmbeddedCover()">
+                                                    <i class="fas fa-music me-1"></i>Extract from Audio Files
+                                                </button>
+                                            </div>
+                                        @endforelse
+                                    </div>
+                                </div>
 
-                                                                 <div class="mt-3">
-                                                                     <label for="coverImageUrlText" class="form-label">Cover Image URL<span class="text-muted">(Optional)</span></label>
-                                                                     <input type="text" class="form-control" id="coverImageUrlText"
-                                                                         value="{{ old('audibleCoverImageUrl', old('coverImageUrl', '')) }}"
-                                                                         placeholder="https://...">
-                                                                 </div>
+                                <div id="embedded-cover-status" class="mt-3"></div>
+                                <div id="embedded-cover-options" class="mt-3" style="display:none;"></div>
 
-                                                                 <div class="mt-3">
-                                                                    <label for="coverImage" class="form-label">Upload Cover Image <span class="text-muted">(Optional)</span></label>
-                                                                    <input type="file" class="form-control @error('coverImage') is-invalid @enderror" id="coverImage"
-                                                                        name="coverImage">
-                                                                    @error('coverImage')
-                                                                        <span class="invalid-feedback d-block">{{ $message }}</span>
-                                                                    @enderror
-                                                                </div>
+                                <div id="google-books-matches-table-wrapper" style="display:none;" class="mt-4">
+                                    <label class="form-label">Google Books: Select a Match</label>
+                                    <table class="table table-bordered table-sm mb-0" id="google-books-matches-table">
+                                        <thead>
+                                            <tr>
+                                                <th></th>
+                                                <th>Title</th>
+                                                <th>Authors</th>
+                                                <th>Year</th>
+                                                <th>Cover</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
 
-                                                                <div class="mt-3" id="extract-embedded-cover-section">
-                                                                    <button type="button" class="btn btn-outline-primary" id="extract-embedded-cover-btn">
-                                                                        <i class="fas fa-music me-2"></i>Extract Cover from Audio Files
-                                                                    </button>
-                                                                    <div id="embedded-cover-status" class="mt-2"></div>
-                                                                    <div id="embedded-cover-options" class="mt-3" style="display: none;">
-                                                                        <!-- Extracted covers will be shown here -->
-                                                                    </div>
-                                                                </div>
-                             </div>
+                                <div class="mt-3">
+                                    <label for="coverImageUrlText" class="form-label">
+                                        Cover Image URL <span class="text-muted">(Optional)</span>
+                                    </label>
+                                    <input type="text" class="form-control" id="coverImageUrlText"
+                                        value="{{ old('audibleCoverImageUrl', old('coverImageUrl', '')) }}"
+                                        placeholder="https://...">
+                                </div>
+
+                                <div class="mt-3">
+                                    <label for="coverImage" class="form-label">
+                                        Upload Cover Image <span class="text-muted">(Optional)</span>
+                                    </label>
+                                    <input type="file" class="form-control @error('coverImage') is-invalid @enderror" id="coverImage"
+                                        name="coverImage">
+                                    @error('coverImage')
+                                        <span class="invalid-feedback d-block">{{ $message }}</span>
+                                    @enderror
+                                </div>
+
+                                <div class="mt-4" id="extract-embedded-cover-section">
+                                    <button type="button" class="btn btn-outline-primary" id="extract-embedded-cover-btn">
+                                        <i class="fas fa-music me-2"></i>Extract Cover from Audio Files
+                                    </button>
+                                </div>
+                            </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                             </div>
