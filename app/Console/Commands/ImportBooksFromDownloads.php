@@ -1405,17 +1405,10 @@ class ImportBooksFromDownloads extends Command
      */
     protected function groupCdDirectories(array $potentialBooks): array
     {
-        $grouped = $this->getImportService()->groupCdDirectories($potentialBooks);
-
-        foreach ($grouped as $path => $data) {
-            if (isset($data['cd_count']) && $data['cd_count'] > 1) {
-                $this->line(
-                    "📀 Detected multi-disc audiobook: " . basename($path) . " ({$data['cd_count']} discs)"
-                );
-            }
-        }
-
-        return $grouped;
+        return $this->getImportService()->groupCdDirectories(
+            $potentialBooks,
+            fn ($message) => $this->line($message)
+        );
     }
 
     /**

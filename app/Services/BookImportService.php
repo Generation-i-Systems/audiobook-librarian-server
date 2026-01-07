@@ -2424,7 +2424,7 @@ class BookImportService
     /**
      * Group CD directories under their parent directory to treat multi-disc books as single audiobooks
      */
-    public function groupCdDirectories(array $potentialBooks): array
+    public function groupCdDirectories(array $potentialBooks, ?callable $lineCallback = null): array
     {
         $grouped = [];
         $cdPattern = '/^(cd|disc|disk)[\s_-]*(\d+)$/i';
@@ -2466,6 +2466,11 @@ class BookImportService
         foreach ($parentDirectories as $parentPath => $parentData) {
             if ($parentData['cd_count'] > 1) {
                 $grouped[$parentPath] = $parentData;
+                if ($lineCallback) {
+                    $lineCallback(
+                        "📀 Detected multi-disc audiobook: " . basename($parentPath) . " ({$parentData['cd_count']} discs)"
+                    );
+                }
             } else {
                 foreach ($cdDirectories as $cdPath => $cdInfo) {
                     if ($cdInfo['parent'] === $parentPath) {
