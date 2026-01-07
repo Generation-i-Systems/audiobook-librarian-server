@@ -663,24 +663,6 @@ class ImportBooksFromDownloads extends Command
     }
 
     /**
-     * Add helper methods for enhanced background processing
-     */
-    protected function analyzeFileTypes(array $files): array
-    {
-        return $this->getImportService()->analyzeFileTypes($files);
-    }
-
-    protected function analyzeDirectoryName(string $directoryName): array
-    {
-        return $this->getImportService()->analyzeDirectoryName($directoryName);
-    }
-
-    protected function isMultiBookDirectory(string $path): bool
-    {
-        return $this->getImportService()->isMultiBookDirectory($path);
-    }
-
-    /**
      * Initialize persistent cache system
      */
     protected function initializeCache(): void
