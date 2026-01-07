@@ -4146,42 +4146,8 @@ class ImportBooksFromDownloads extends Command
     protected function renameBothDirectoriesByNarrator(array $audiobook, string $targetDir, Book $book): void
     {
         $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
-
-        // Get book title from the existing book in database
-        $existingBook = Book::where('directory_path', str_replace($bookStoragePath . '/', '', $targetDir))->first();
-
-        // Get narrator information for both books
-        $existingNarrator = $this->getNarratorFromDirectory($targetDir, $existingBook);
-        $newNarrator = $this->getNarratorFromMetadata($audiobook);
-
-        // Generate new directory names with narrator format
-        $existingTitle = $existingBook ? $existingBook->title : basename($targetDir);
-        $newTitle = $book->title;
-
-        $baseDir = dirname($targetDir);
-        $existingNewPath = $baseDir . '/' . $this->createNarratorDirectoryName($existingTitle, $existingNarrator);
-        $newImportPath = $baseDir . '/' . $this->createNarratorDirectoryName($newTitle, $newNarrator);
-
-        // Rename existing directory
-        if (File::exists($targetDir)) {
-            File::move($targetDir, $existingNewPath);
-            $this->info("📁 Renamed existing directory to: " . basename($existingNewPath));
-
-            // Update database record for existing book
-            if ($existingBook) {
-                $existingBook->directory_path = str_replace($bookStoragePath . '/', '', $existingNewPath);
-                $existingBook->save();
-            }
-        }
-
-        // Move new files to narrator-named directory
-        $this->moveFilesToNarratorDirectory($audiobook, $newImportPath, $book);
-
-        // Update database record for new book
-        $book->directory_path = str_replace($bookStoragePath . '/', '', $newImportPath);
-        $book->save();
-
-        $this->info("📁 Imported new files to: " . basename($newImportPath));
+        $this->getImportService()->renameBothDirectoriesByNarrator($audiobook, $targetDir, $book, $bookStoragePath);
+        $this->info("📁 Imported new files to: " . basename($targetDir));
     }
 
     /**

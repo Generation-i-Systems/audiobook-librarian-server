@@ -1983,6 +1983,38 @@ class BookImportService
     }
 
     /**
+     * Handle directory conflict by comparing and prompting for action
+     */
+    public function renameBothDirectoriesByNarrator(array $audiobook, string $targetDir, Book $book, string $bookStoragePath): void
+    {
+        $existingBook = Book::where('directory_path', str_replace($bookStoragePath . '/', '', $targetDir))->first();
+
+        $existingNarrator = $this->getNarratorFromDirectory($targetDir, $existingBook);
+        $newNarrator = $this->getNarratorFromMetadata($audiobook);
+
+        $existingTitle = $existingBook ? $existingBook->title : basename($targetDir);
+        $newTitle = $book->title;
+
+        $baseDir = dirname($targetDir);
+        $existingNewPath = $baseDir . '/' . $this->createNarratorDirectoryName($existingTitle, $existingNarrator);
+        $newImportPath = $baseDir . '/' . $this->createNarratorDirectoryName($newTitle, $newNarrator);
+
+        if (File::exists($targetDir)) {
+            File::move($targetDir, $existingNewPath);
+
+            if ($existingBook) {
+                $existingBook->directory_path = str_replace($bookStoragePath . '/', '', $existingNewPath);
+                $existingBook->save();
+            }
+        }
+
+        $this->moveFilesToNarratorDirectory($audiobook, $newImportPath, false);
+
+        $book->directory_path = str_replace($bookStoragePath . '/', '', $newImportPath);
+        $book->save();
+    }
+
+    /**
      * Get duration of audio file in seconds
      */
     public function getAudioFileDuration(string $filePath): int
