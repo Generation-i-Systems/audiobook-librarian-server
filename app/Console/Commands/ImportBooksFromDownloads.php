@@ -149,21 +149,11 @@ class ImportBooksFromDownloads extends Command
 
     protected function buildUiMetadata(array $metadata): array
     {
-        $uiMetadata = $this->getImportService()->buildUiMetadata($metadata);
-
-        if (!empty($uiMetadata['cover_data'])) {
-            $tempPath = $this->getEmbeddedCoverTempPath($uiMetadata['cover_data']);
-            if ($tempPath) {
-                $uiMetadata['cover_url'] = $tempPath;
-                $uiMetadata['cover_is_local_file'] = true;
-            }
-        }
-
-        $uiMetadata['directory_path'] = $this->getImportService()->generateDirectoryPath($uiMetadata, [
-            'include_title' => true,
-        ]);
-
-        return $uiMetadata;
+        return $this->getImportService()->buildUiMetadata(
+            $metadata,
+            fn ($coverData) => $this->getEmbeddedCoverTempPath($coverData),
+            fn ($metadata, $options) => $this->getImportService()->generateDirectoryPath($metadata, $options)
+        );
     }
 
     public function line($string, $style = null, $verbosity = null)

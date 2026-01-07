@@ -2830,7 +2830,7 @@ class BookImportService
     /**
      * Build UI metadata for display
      */
-    public function buildUiMetadata(array $metadata): array
+    public function buildUiMetadata(array $metadata, ?callable $getEmbeddedCoverTempPathCallback = null, ?callable $generateDirectoryPathCallback = null): array
     {
         $uiMetadata = $metadata;
 
@@ -2838,6 +2838,13 @@ class BookImportService
 
         if (!empty($uiMetadata['cover_data'])) {
             $coverSource = 'Embedded';
+            if ($getEmbeddedCoverTempPathCallback) {
+                $tempPath = $getEmbeddedCoverTempPathCallback($uiMetadata['cover_data']);
+                if ($tempPath) {
+                    $uiMetadata['cover_url'] = $tempPath;
+                    $uiMetadata['cover_is_local_file'] = true;
+                }
+            }
         } elseif (!empty($uiMetadata['cover_url'])) {
             if (isset($uiMetadata['audible_raw'])) {
                 $coverSource = 'Audible';
@@ -2849,6 +2856,12 @@ class BookImportService
         }
 
         $uiMetadata['cover_source'] = $coverSource;
+
+        if ($generateDirectoryPathCallback) {
+            $uiMetadata['directory_path'] = $generateDirectoryPathCallback($uiMetadata, [
+                'include_title' => true,
+            ]);
+        }
 
         return $uiMetadata;
     }
