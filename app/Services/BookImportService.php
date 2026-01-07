@@ -768,7 +768,7 @@ class BookImportService
     /**
      * Move files to library
      */
-    public function moveFilesToLibrary(array $audiobook, Book $book, array $options = []): bool
+    public function moveFilesToLibrary(array $audiobook, Book $book, array $options = [], ?callable $warnCallback = null): bool
     {
         try {
             $bookStoragePath = $options['storage_path'] ?? rtrim(
@@ -776,7 +776,10 @@ class BookImportService
                 '/'
             );
             if (!$bookStoragePath) {
-                throw new \Exception('Book storage path not configured');
+                if ($warnCallback) {
+                    $warnCallback("⚠️  Book storage path not configured - files not moved");
+                }
+                return false;
             }
 
             $originalSourcePath = $audiobook['path'];

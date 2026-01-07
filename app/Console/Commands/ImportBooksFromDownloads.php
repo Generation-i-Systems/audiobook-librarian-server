@@ -1920,18 +1920,18 @@ class ImportBooksFromDownloads extends Command
     protected function moveFilesToLibrary(array $audiobook, Book $book): bool
     {
         $bookStoragePath = config('filesystems.disks.books.root') ?? env('BOOK_STORAGE_PATH');
-        if (!$bookStoragePath) {
-            $this->warn("⚠️  Book storage path not configured - files not moved");
-            return false;
-        }
-
         $copyFiles = $this->option('copy-files');
         $options = [
             'storage_path' => $bookStoragePath,
             'operation' => $copyFiles ? 'copy' : 'move',
         ];
 
-        return $this->getImportService()->moveFilesToLibrary($audiobook, $book, $options);
+        return $this->getImportService()->moveFilesToLibrary(
+            $audiobook,
+            $book,
+            $options,
+            fn ($message) => $this->warn($message)
+        );
     }
 
     /**
