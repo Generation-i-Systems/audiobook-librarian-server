@@ -3102,7 +3102,13 @@ class BookImportService
 
             if ($getEmbeddedCoverTempPathCallback) {
                 file_put_contents('/tmp/cover_debug.log', "DEBUG: buildUiMetadata - About to call getEmbeddedCoverTempPathCallback\n", FILE_APPEND | LOCK_EX);
+                file_put_contents('/tmp/cover_debug.log', "DEBUG: buildUiMetadata - Callback type: " . gettype($getEmbeddedCoverTempPathCallback) . "\n", FILE_APPEND | LOCK_EX);
+                file_put_contents('/tmp/cover_debug.log', "DEBUG: buildUiMetadata - Callback is: " . spl_object_hash($getEmbeddedCoverTempPathCallback) . "\n", FILE_APPEND | LOCK_EX);
+
                 $tempPath = $getEmbeddedCoverTempPathCallback($uiMetadata['cover_data']);
+
+                file_put_contents('/tmp/cover_debug.log', "DEBUG: buildUiMetadata - Callback returned: " . ($tempPath ?? 'null') . "\n", FILE_APPEND | LOCK_EX);
+
                 if ($tempPath) {
                     $uiMetadata['cover_url'] = $tempPath;
                     $uiMetadata['cover_is_local_file'] = true;
