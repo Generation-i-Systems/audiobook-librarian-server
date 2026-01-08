@@ -1494,7 +1494,12 @@ class ImportUIService
         $output = $this->screen->output();
         echo rtrim($output, "\n");
 
-        $this->renderCoverInline();
+        // Always force re-render for embedded covers to ensure they update properly
+        $coverUrl = $this->stringifyForDisplay($this->currentBook['cover_url'] ?? null);
+        $isTempFile = $coverUrl && strpos($coverUrl, sys_get_temp_dir()) === 0;
+        $forceRender = $isTempFile;
+
+        $this->renderCoverInline($forceRender);
 
         if (function_exists('ob_flush')) {
             @ob_flush();
@@ -1564,6 +1569,19 @@ class ImportUIService
             return;
         }
 
+        // Try to clear the specific area where the cover was rendered
+        $x = max(4, $this->width - ($this->inlineCoverCols + $this->inlineCoverPadding + 2));
+        $y = 9;
+        $cols = $this->inlineCoverCols;
+        $rows = $this->inlineCoverRows;
+
+        // Clear the specific area first
+        for ($row = $y; $row < $y + $rows; $row++) {
+            echo "\e[{$row};{$x}H";
+            echo str_repeat(' ', $cols);
+        }
+
+        // Then try the icat clear command
         @system($kittenPath . ' icat --clear 2>/dev/null');
     }
 }
