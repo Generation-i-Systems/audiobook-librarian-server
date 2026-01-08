@@ -1918,43 +1918,80 @@ class BookImportService
     ): void {
         $sourcePath = $audiobook['path'];
 
-        if (!($isDirectoryCallback ? $isDirectoryCallback($sourcePath) : File::isDirectory($sourcePath))) {
-            return;
-        }
-
-        // Don't delete source if it's a copy operation
         if ($isCopyOperation) {
             return;
         }
 
+        $isDirectory = $isDirectoryCallback ? $isDirectoryCallback($sourcePath) : File::isDirectory($sourcePath);
+
+        if (!$isDirectory) {
+            $this->deleteSourceFile($sourcePath, $infoCallback, $filesAlreadyExist);
+            return;
+        }
+
         try {
-            if ($this->isDirectoryEmpty($sourcePath)) {
-                File::deleteDirectory($sourcePath);
-                Log::info("Cleaned up empty source directory: {$sourcePath}");
-                if ($infoCallback) {
-                    $infoCallback("🗑️  Removed empty source directory");
+            $files = $filesCallback ? $filesCallback($sourcePath) : File::allFiles($sourcePath);
+            foreach ($files as $file) {
+                $filePath = is_string($file) ? $file : $file->getPathname();
+                if (File::exists($filePath)) {
+                    File::delete($filePath);
                 }
+            }
+
+            File::deleteDirectory($sourcePath);
+
+            if ($infoCallback) {
+                $infoCallback(
+                    $filesAlreadyExist
+                        ? "✅ Removed duplicate source directory (identical files already exist in library)"
+                        : "🗑️  Removed source directory"
+                );
             }
         } catch (\Exception $e) {
             Log::warning("Failed to cleanup source directory: " . $e->getMessage(), [
                 'path' => $sourcePath,
             ]);
         }
+    }
 
-        // Additional cleanup messages for move operations
-        if (!$isCopyOperation && ($isDirectoryCallback ? $isDirectoryCallback($sourcePath) : File::isDirectory($sourcePath))) {
-            if ($filesAlreadyExist) {
-                if ($infoCallback) {
-                    $infoCallback("✅ Removed duplicate source directory (identical files already exist in library)");
-                }
-            } else {
-                $remainingFiles = $filesCallback ? $filesCallback($sourcePath) : File::files($sourcePath);
-                if (empty($remainingFiles)) {
-                    if ($infoCallback) {
-                        $infoCallback("🗑️  Removed empty source directory");
-                    }
-                }
+    protected function deleteSourceFile(string $path, ?callable $infoCallback = null, bool $filesAlreadyExist = false): void
+    {
+        if (!File::exists($path)) {
+            return;
+        }
+
+        try {
+            File::delete($path);
+            $parentDirectory = dirname($path);
+            if ($parentDirectory && $parentDirectory !== '.') {
+                $this->deleteDirectoryIfEmpty($parentDirectory);
             }
+
+            if ($infoCallback) {
+                $infoCallback(
+                    $filesAlreadyExist
+                        ? "✅ Removed duplicate source file (identical file already exists in library)"
+                        : "🗑️  Removed source file"
+                );
+            }
+        } catch (\Exception $e) {
+            Log::warning("Failed to delete source file: " . $e->getMessage(), [
+                'path' => $path,
+            ]);
+        }
+    }
+
+    protected function deleteDirectoryIfEmpty(string $directory): void
+    {
+        if (!$directory || !File::isDirectory($directory)) {
+            return;
+        }
+
+        $files = File::files($directory);
+        $subdirectories = File::directories($directory);
+
+        if (empty($files) && empty($subdirectories)) {
+            File::deleteDirectory($directory);
         }
     }
 
@@ -3274,10 +3311,15 @@ class BookImportService
         $files = [];
         $totalSize = 0;
 
-        $iterator = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($directory, \RecursiveDirectoryIterator::SKIP_DOTS),
+        $iterator = $this->createRecursiveIterator(
+            $directory,
+            \RecursiveDirectoryIterator::SKIP_DOTS,
             \RecursiveIteratorIterator::LEAVES_ONLY
         );
+
+        if (!$iterator) {
+            return null;
+        }
 
         foreach ($iterator as $file) {
             if ($file->isFile()) {
@@ -3296,6 +3338,35 @@ class BookImportService
                 'files' => $files,
                 'total_size' => $totalSize,
             ];
+        }
+
+        return null;
+    }
+
+    protected function createRecursiveIterator(
+        string $path,
+        int $directoryFlags,
+        int $iteratorMode
+    ): ?\RecursiveIteratorIterator {
+        if (!is_dir($path) || !is_readable($path)) {
+            Log::warning('Directory not accessible for iteration', ['path' => $path]);
+            return null;
+        }
+
+        try {
+            $directoryIterator = new \RecursiveDirectoryIterator($path, $directoryFlags);
+
+            return new \RecursiveIteratorIterator($directoryIterator, $iteratorMode);
+        } catch (\UnexpectedValueException $e) {
+            Log::warning('Failed to iterate directory', [
+                'path' => $path,
+                'error' => $e->getMessage(),
+            ]);
+        } catch (\Exception $e) {
+            Log::warning('Unexpected error iterating directory', [
+                'path' => $path,
+                'error' => $e->getMessage(),
+            ]);
         }
 
         return null;
@@ -3345,10 +3416,18 @@ class BookImportService
                 $infoCallback("🔍 Scanning: {$directory}");
             }
 
-            $iterator = new \RecursiveIteratorIterator(
-                new \RecursiveDirectoryIterator($directory, \RecursiveDirectoryIterator::SKIP_DOTS),
+            $iterator = $this->createRecursiveIterator(
+                $directory,
+                \RecursiveDirectoryIterator::SKIP_DOTS,
                 \RecursiveIteratorIterator::SELF_FIRST
             );
+
+            if (!$iterator) {
+                if ($infoCallback) {
+                    $infoCallback("⚠️  Skipping inaccessible directory: {$directory}");
+                }
+                continue;
+            }
 
             $potentialBooks = [];
 

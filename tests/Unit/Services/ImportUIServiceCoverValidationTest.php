@@ -73,4 +73,46 @@ class ImportUIServiceCoverValidationTest extends TestCase
         $this->assertNull($getProperty('renderedCoverUrl'));
         $this->assertNull($getProperty('renderedCoverSignature'));
     }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function cacheCoverForCurrentBookClearingInvokesInlineRendererReset(): void
+    {
+        $ui = new ImportUIServiceClearInlineStub();
+
+        $reflection = new \ReflectionClass($ui);
+        $setProperty = static function (string $name, $value) use ($reflection, $ui): void {
+            $property = $reflection->getProperty($name);
+            $property->setAccessible(true);
+            $property->setValue($ui, $value);
+        };
+
+        $tempFile = tempnam(sys_get_temp_dir(), 'cover_cache_test_');
+        $this->assertIsString($tempFile);
+        file_put_contents($tempFile, 'dummy');
+
+        $setProperty('cachedCoverTempFile', $tempFile);
+        $setProperty('cachedCoverUrl', 'https://example.com/cover.jpg');
+        $setProperty('currentBook', ['title' => 'Test Book', 'cover_url' => null]);
+
+        $method = $reflection->getMethod('cacheCoverForCurrentBook');
+        $method->setAccessible(true);
+        $method->invoke($ui);
+
+        $this->assertTrue($ui->wasInlineCoverCleared());
+    }
+}
+
+class ImportUIServiceClearInlineStub extends ImportUIService
+{
+    private bool $inlineCleared = false;
+
+    protected function clearInlineCoverRendering(): void
+    {
+        $this->inlineCleared = true;
+    }
+
+    public function wasInlineCoverCleared(): bool
+    {
+        return $this->inlineCleared;
+    }
 }

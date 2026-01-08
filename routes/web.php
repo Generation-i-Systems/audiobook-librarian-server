@@ -413,7 +413,7 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
 
     // AJAX: Extract embedded cover from audio files
     Route::post('books/extract-embedded-cover', [Admin\BookController::class, 'extractEmbeddedCover'])
-        ->name('admin.books.extract-embedded-cover');
+        ->name('books.extract-embedded-cover');
 
     // AJAX: Get audio file metadata
     Route::get('books/audio-metadata', [Admin\AudioMetadataController::class, 'getMetadata'])

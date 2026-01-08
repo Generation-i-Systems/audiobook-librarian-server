@@ -197,6 +197,8 @@ class ImportUIService
         $this->cachedCoverUrl = null;
         $this->renderedCoverUrl = null;
         $this->renderedCoverSignature = null;
+
+        $this->clearInlineCoverRendering();
     }
 
     public function drawInitialLayout(): void
@@ -251,12 +253,20 @@ class ImportUIService
         $c = $colors[$color] ?? $colors['white'];
         $reset = $colors['reset'];
 
-        // Draw corners and lines
-        $this->screen->write("\e[{$y};{$x}H{$c}┌" . str_repeat("─", $w - 2) . "┐{$reset}");
+        $block = '▒';
+
+        // Draw top border
+        $this->screen->write("\e[{$y};{$x}H{$c}" . str_repeat($block, $w) . "{$reset}");
+
+        // Draw sides
         for ($i = 1; $i < $h - 1; $i++) {
-            $this->screen->write("\e[" . ($y + $i) . ";{$x}H{$c}│\e[" . ($y + $i) . ";" . ($x + $w - 1) . "H│{$reset}");
+            $currentY = $y + $i;
+            $this->screen->write("\e[{$currentY};{$x}H{$c}{$block}{$reset}");
+            $this->screen->write("\e[{$currentY};" . ($x + $w - 1) . "H{$c}{$block}{$reset}");
         }
-        $this->screen->write("\e[" . ($y + $h - 1) . ";{$x}H{$c}└" . str_repeat("─", $w - 2) . "┘{$reset}");
+
+        // Draw bottom border
+        $this->screen->write("\e[" . ($y + $h - 1) . ";{$x}H{$c}" . str_repeat($block, $w) . "{$reset}");
 
         if ($title) {
             $titleLen = strlen($title);
@@ -1515,5 +1525,19 @@ class ImportUIService
 
         // Keep the cursor in a safe position after kitten renders
         echo "\e[1;1H";
+    }
+
+    protected function clearInlineCoverRendering(): void
+    {
+        if (!$this->terminalSupportsKitty()) {
+            return;
+        }
+
+        $kittenPath = '/usr/bin/kitten';
+        if (!file_exists($kittenPath) || !is_executable($kittenPath)) {
+            return;
+        }
+
+        @system($kittenPath . ' icat --clear 2>/dev/null');
     }
 }

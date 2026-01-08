@@ -19,15 +19,6 @@
                 box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
             }
 
-            .book-form-card.collapsed {
-                padding-bottom: 0.5rem;
-            }
-
-            .book-form-card .form-label {
-                font-weight: 600;
-                color: #495057;
-                margin-bottom: 0.5rem;
-            }
 
             .book-form-section-title {
                 font-size: 1.1rem;
@@ -403,29 +394,13 @@
                                                     title="Rename this series" aria-label="Rename series">
                                                     <i class="fas fa-edit"></i>
                                                 </button>
-                                            @else
-                                                <div style="width:32px; height:32px; margin-left:0.5rem; flex-shrink:0;"></div>
+                                             @else
+                                                <div style="width:32px; height:32px; margin-left:0.5rem; flex-shrink:0;" role="presentation" aria-hidden="true"></div>
                                             @endif
-                            <div class="d-flex flex-column ms-2" style="gap:2px;">
-                                @if(!empty($series['seriesName']))
-                                    <button type="button" class="btn btn-outline-primary btn-sm rename-series-btn"
-                                        data-series-name="{{ $series['seriesName'] }}"
-                                        style="height:32px; width:32px; padding:0; display:flex; align-items:center; justify-content:center; flex-shrink:0;"
-                                        title="Rename this series" aria-label="Rename series">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                @else
-                                    <div style="width:32px; height:32px; margin-left:0.5rem; flex-shrink:0;" role="presentation" aria-hidden="true"></div>
-                                @endif
-                                <div class="d-flex flex-column ms-2" style="gap:2px;">
-                                    <button type="button" class="btn btn-outline-danger btn-sm remove-series"
-                                        style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Remove series">&times;</button>
-                                    @if($idx === count($seriesList) - 1)
-                                        <button type="button" class="btn btn-primary btn-sm add-series-row"
-                                            style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Add series">+</button>
-                                    @endif
-                                </div>
-                            </div>
+                                        </div>
+                                    </div>
+                                        @endforeach
+                                    </div>
                                         </div>
                                     @endforeach
                                 </div>
