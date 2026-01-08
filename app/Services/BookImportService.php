@@ -4557,9 +4557,65 @@ class BookImportService
             if ($cleanedTitle !== $originalTitle) {
                 $aiResult['title'] = $cleanedTitle;
             }
+
+            $aiResult['title'] = $this->removeExtensionFromTitle($aiResult['title']);
+        }
+
+        if (!empty($aiResult['series'])) {
+            $aiResult['series'] = $this->removeAuthorFromSeries($aiResult['series'], $aiResult['author'] ?? []);
         }
 
         return $aiResult;
+    }
+
+    /**
+     * Remove file extensions from title
+     */
+    protected function removeExtensionFromTitle(string $title): string
+    {
+        $audioExtensions = ['m4b', 'mp3', 'm4a', 'flac', 'ogg', 'oga', 'wav', 'wma', 'aac', 'opus'];
+
+        foreach ($audioExtensions as $ext) {
+            if (preg_match('/^(.+)\.' . preg_quote($ext, '/') . '$/i', $title, $matches)) {
+                return trim($matches[1]);
+            }
+        }
+
+        return $title;
+    }
+
+    /**
+     * Remove author name from series name
+     */
+    protected function removeAuthorFromSeries(string $series, array|string $authors): string
+    {
+        if (is_string($authors)) {
+            $authors = [$authors];
+        }
+
+        if (empty($authors)) {
+            return $series;
+        }
+
+        foreach ($authors as $author) {
+            if (empty($author)) {
+                continue;
+            }
+
+            $patterns = [
+                '/^' . preg_quote($author, '/') . '\s*-\s*(.+)$/i',
+                '/^(.+)\s*-\s*' . preg_quote($author, '/') . '$/i',
+                '/^' . preg_quote($author, '/') . '\s*:\s*(.+)$/i',
+            ];
+
+            foreach ($patterns as $pattern) {
+                if (preg_match($pattern, $series, $matches)) {
+                    return trim($matches[1]);
+                }
+            }
+        }
+
+        return $series;
     }
 
     /**
