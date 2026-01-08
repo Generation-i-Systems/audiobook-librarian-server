@@ -19,6 +19,7 @@ class BookImportService
     use HandlesLibraryJson;
 
     protected GenreMappingService $genreMappingService;
+    protected SourceTrashService $sourceTrashService;
 
     private const AUDIO_EXTENSIONS = [
         'mp3',
@@ -34,9 +35,12 @@ class BookImportService
         'wma',
     ];
 
-    public function __construct(GenreMappingService $genreMappingService)
-    {
+    public function __construct(
+        GenreMappingService $genreMappingService,
+        SourceTrashService $sourceTrashService
+    ) {
         $this->genreMappingService = $genreMappingService;
+        $this->sourceTrashService = $sourceTrashService;
     }
 
     protected function areOnSameFileSystem(string $sourcePath, string $targetPath): bool
@@ -1237,6 +1241,11 @@ class BookImportService
                 }
             } else {
                 // Use copy+delete instead of move to avoid cross-filesystem issues
+                // NOTE: Source is deleted after successful copy. This is safe because:
+                // 1. Copy is verified successful before delete
+                // 2. Target (library) is the permanent location - source is staging
+                // 3. Entire source directory is moved to trash after import completes
+                // 4. If import fails mid-process, remaining source files can still be recovered
                 if (!File::copy($file->getPathname(), $targetFile)) {
                     throw new \Exception("Failed to copy file: {$file->getPathname()} to {$targetFile}");
                 }
@@ -1753,8 +1762,15 @@ class BookImportService
 
         switch ($choice) {
             case '1':
-                // Replace: delete existing directory
-                File::deleteDirectory($targetDir);
+                // Replace: move existing directory to trash
+                $trashResult = $this->sourceTrashService->movePathToTrash(
+                    $targetDir,
+                    'directory_conflict_replace',
+                    ['conflict_reason' => 'user chose replace during import']
+                );
+                if ($trashResult) {
+                    $log("🗑️ Moved existing directory to trash ({$trashResult['id']})");
+                }
                 return $targetDir;
 
             case '2':
@@ -1916,82 +1932,31 @@ class BookImportService
         ?callable $isDirectoryCallback = null,
         ?callable $filesCallback = null
     ): void {
-        $sourcePath = $audiobook['path'];
+        $sourcePath = $audiobook['path'] ?? null;
+
+        if ($sourcePath === null || $sourcePath === '') {
+            return;
+        }
 
         if ($isCopyOperation) {
             return;
         }
 
-        $isDirectory = $isDirectoryCallback ? $isDirectoryCallback($sourcePath) : File::isDirectory($sourcePath);
+        $trashMetadata = [
+            'files_already_in_library' => $filesAlreadyExist,
+            'source_audiobook' => $audiobook,
+        ];
 
-        if (!$isDirectory) {
-            $this->deleteSourceFile($sourcePath, $infoCallback, $filesAlreadyExist);
-            return;
-        }
+        $trashResult = $this->sourceTrashService->movePathToTrash(
+            $sourcePath,
+            $filesAlreadyExist ? 'duplicate_source_after_import' : 'source_cleanup_after_import',
+            $trashMetadata
+        );
 
-        try {
-            $files = $filesCallback ? $filesCallback($sourcePath) : File::allFiles($sourcePath);
-            foreach ($files as $file) {
-                $filePath = is_string($file) ? $file : $file->getPathname();
-                if (File::exists($filePath)) {
-                    File::delete($filePath);
-                }
-            }
-
-            File::deleteDirectory($sourcePath);
-
-            if ($infoCallback) {
-                $infoCallback(
-                    $filesAlreadyExist
-                        ? "✅ Removed duplicate source directory (identical files already exist in library)"
-                        : "🗑️  Removed source directory"
-                );
-            }
-        } catch (\Exception $e) {
-            Log::warning("Failed to cleanup source directory: " . $e->getMessage(), [
-                'path' => $sourcePath,
-            ]);
-        }
-    }
-
-    protected function deleteSourceFile(string $path, ?callable $infoCallback = null, bool $filesAlreadyExist = false): void
-    {
-        if (!File::exists($path)) {
-            return;
-        }
-
-        try {
-            File::delete($path);
-            $parentDirectory = dirname($path);
-            if ($parentDirectory && $parentDirectory !== '.') {
-                $this->deleteDirectoryIfEmpty($parentDirectory);
-            }
-
-            if ($infoCallback) {
-                $infoCallback(
-                    $filesAlreadyExist
-                        ? "✅ Removed duplicate source file (identical file already exists in library)"
-                        : "🗑️  Removed source file"
-                );
-            }
-        } catch (\Exception $e) {
-            Log::warning("Failed to delete source file: " . $e->getMessage(), [
-                'path' => $path,
-            ]);
-        }
-    }
-
-    protected function deleteDirectoryIfEmpty(string $directory): void
-    {
-        if (!$directory || !File::isDirectory($directory)) {
-            return;
-        }
-
-        $files = File::files($directory);
-        $subdirectories = File::directories($directory);
-
-        if (empty($files) && empty($subdirectories)) {
-            File::deleteDirectory($directory);
+        if ($trashResult !== null && $infoCallback) {
+            $infoCallback(
+                $filesAlreadyExist ? "✅ Moved duplicate source to trash ({$trashResult['id']})" : "🗑️  Moved source to trash ({$trashResult['id']})"
+            );
         }
     }
 
@@ -6217,13 +6182,41 @@ class BookImportService
                     $comparison = $compareDirectoriesCallback($audiobook['path'], $existingDir);
 
                     if ($comparison['identical']) {
-                        $infoCallback("🔍 Source and existing directories are identical - cleaning up source");
-                        $cleanupSourceDirectoryCallback($audiobook, true);
-                        $skippedBooks[] = [
-                            'path' => $audiobook['path'],
-                            'reason' => 'Duplicate - source cleaned up (identical to existing)',
+                        $infoCallback("🔍 Source and existing directories are identical");
+
+                        // Always ask for confirmation before deleting
+                        $options = [
+                            '1' => 'Skip import completely (keep both directories)',
+                            '2' => 'Delete source directory (keep existing)',
+                            '3' => 'Import anyway with new name',
                         ];
-                        return;
+
+                        $choice = $uiService->select("Identical directories detected - choose action", $options, '1');
+
+                        switch ($choice) {
+                            case '2':
+                                $infoCallback("🗑️ Removing source directory, keeping existing");
+                                $cleanupSourceDirectoryCallback($audiobook, true);
+                                $skippedBooks[] = [
+                                    'path' => $audiobook['path'],
+                                    'reason' => 'User chose to keep existing over source (identical directories)',
+                                ];
+                                return;
+
+                            case '3':
+                                $infoCallback("📁 Will import with renamed directory to avoid conflict");
+                                $aiMetadata['_force_rename_directory'] = true;
+                                break;
+
+                            case '1':
+                            default:
+                                $infoCallback("📁 Skipping import, leaving both directories unchanged");
+                                $skippedBooks[] = [
+                                    'path' => $audiobook['path'],
+                                    'reason' => 'User chose to skip import (identical directories)',
+                                ];
+                                return;
+                        }
                     } else {
                         $warnCallback("📁 Directories differ - manual decision needed");
                         $comparisonExists = is_array($comparison) ? 'YES' : 'NO';
@@ -6245,7 +6238,14 @@ class BookImportService
                         switch ($choice) {
                             case '2':
                                 $infoCallback("🗑️ Removing existing directory to replace with source");
-                                \Illuminate\Support\Facades\File::deleteDirectory($existingDir);
+                                $trashResult = $this->sourceTrashService->movePathToTrash(
+                                    $existingDir,
+                                    'directory_diff_replace',
+                                    ['conflict_reason' => 'directories differ - user chose replace']
+                                );
+                                if ($trashResult) {
+                                    $infoCallback("✅ Moved existing directory to trash ({$trashResult['id']})");
+                                }
                                 break;
 
                             case '3':
