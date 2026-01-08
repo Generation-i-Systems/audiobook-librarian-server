@@ -4636,7 +4636,7 @@ class BookImportService
                 $startNumber = (int) $matches[2];
                 $endNumber = (int) $matches[3];
 
-                if ($endNumber > $startNumber && ($endNumber - $startNumber) <= 20) {
+                if ($endNumber > $startNumber && ($endNumber - $startNumber) <= 200) {
                     return [
                         'series_name' => $seriesName,
                         'start_number' => $startNumber,
