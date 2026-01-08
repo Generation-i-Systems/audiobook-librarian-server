@@ -8,19 +8,23 @@
 
     const bookForm = (window.BookForm = window.BookForm || {});
 
-    function formatFileSize(bytes)
-    {
+    function formatFileSize(bytes) {
         if (!bytes) {
             return "0 B";
         }
         const k = 1024;
         const sizes = ["B", "KB", "MB", "GB"];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
+        if (i >= sizes.length) {
+            return (
+                parseFloat((bytes / Math.pow(k, sizes.length - 1)).toFixed(2)) +
+                " " +
+                sizes[sizes.length - 1]
+            );
+        }
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
     }
-
-    function showToast(message, type)
-    {
+    function showToast(message, type) {
         const toast = $("<div>")
             .addClass("alert alert-" + (type || "success"))
             .css({
@@ -34,7 +38,8 @@
             })
             .text(message);
 
-        $("body").append(toast);
+        const $body = $("body");
+        $body.append(toast);
         setTimeout(function () {
             toast.fadeOut(300, function () {
                 $(this).remove();
@@ -42,8 +47,7 @@
         }, 2000);
     }
 
-    function resyncFromDirectoryPath()
-    {
+    function resyncFromDirectoryPath() {
         const directoryPath = $("#directoryPath").val();
         if (!directoryPath) {
             showToast("Please enter a directory path first", "warning");
@@ -97,15 +101,15 @@
                 showToast("Fields updated from path!", "success");
             },
             error(xhr) {
-                const msg = (xhr.responseJSON && xhr.responseJSON.error) ||
+                const msg =
+                    (xhr.responseJSON && xhr.responseJSON.error) ||
                     "Unknown error";
                 showToast("Error parsing path: " + msg, "danger");
             },
         });
     }
 
-    function loadDirectoryFiles($container)
-    {
+    function loadDirectoryFiles($container) {
         const filesList = $container.find("#directory-files-list-content");
         if (!filesList.length) {
             return;
@@ -151,7 +155,8 @@
             )
             .show();
 
-        const filesAjaxUrl = window.BOOK_FORM_ROUTES.filesAjax || "/admin/books/files-ajax";
+        const filesAjaxUrl =
+            window.BOOK_FORM_ROUTES.filesAjax || "/admin/books/files-ajax";
 
         $.ajax({
             url: filesAjaxUrl,
@@ -177,7 +182,8 @@
 
                 const listItems = files
                     .map(function (file) {
-                        const filename = file.name || file.filename || "Unknown";
+                        const filename =
+                            file.name || file.filename || "Unknown";
                         const size = file.size ? formatFileSize(file.size) : "";
                         const ext = (file.extension || "").toLowerCase();
 
@@ -207,26 +213,55 @@
                             icon = "fa-file-code text-warning";
                         }
 
-                        const dataAttrs = type ? ' data-type="' + type + '"'
+                        const dataAttrs = type
+                            ? ' data-type="' + type + '"'
                             : "";
-                        const coverAttr = type === "image" ? ' data-cover-file="' + filename + '"'
+                        const coverAttr =
+                            type === "image"
+                                ? ' data-cover-file="' + filename + '"'
                                 : "";
-                        const badge = size ? '<span class="text-muted">' + size + "</span>"
+                        const badge = size
+                            ? '<span class="text-muted">' + size + "</span>"
                             : "";
-                        const metadataBtn = type === "audio" ? '<a href="#" class="btn btn-sm btn-outline-primary view-metadata" data-file="' + dirPath + "/" + filename + '" title="View Metadata"><i class="fas fa-info-circle"></i></a>'
+                        const metadataBtn =
+                            type === "audio"
+                                ? '<a href="#" class="btn btn-sm btn-outline-primary view-metadata" data-file="' +
+                                  dirPath +
+                                  "/" +
+                                  filename +
+                                  '" title="View Metadata"><i class="fas fa-info-circle"></i></a>'
                                 : "";
 
                         return (
-                            '<div class="list-group-item py-1 px-2 small d-flex justify-content-between align-items-center' + (type === "image" ? " list-group-item-action cursor-pointer"
-                                : "") + '"' + dataAttrs + coverAttr + ">" + '<span><i class="fas ' + icon + ' me-2"></i>' + filename + (type === "image" ? ' <small class="text-muted">(click to set as cover)</small>'
-                                : "") + "</span>" + '<span class="d-flex align-items-center gap-2">' + badge + metadataBtn + "</span></div>"
+                            '<div class="list-group-item py-1 px-2 small d-flex justify-content-between align-items-center' +
+                            (type === "image"
+                                ? " list-group-item-action cursor-pointer"
+                                : "") +
+                            '"' +
+                            dataAttrs +
+                            coverAttr +
+                            ">" +
+                            '<span><i class="fas ' +
+                            icon +
+                            ' me-2"></i>' +
+                            filename +
+                            (type === "image"
+                                ? ' <small class="text-muted">(click to set as cover)</small>'
+                                : "") +
+                            "</span>" +
+                            '<span class="d-flex align-items-center gap-2">' +
+                            badge +
+                            metadataBtn +
+                            "</span></div>"
                         );
                     })
                     .join("");
 
                 filesList
                     .html(
-                        '<div class="list-group list-group-flush">' + listItems + "</div>",
+                        '<div class="list-group list-group-flush">' +
+                            listItems +
+                            "</div>",
                     )
                     .show();
             },
@@ -241,8 +276,7 @@
         });
     }
 
-    function registerDirectoryHandlers($container)
-    {
+    function registerDirectoryHandlers($container) {
         $container
             .off("click.directory", "#show-files-link, #showFilesLink")
             .on(
@@ -318,8 +352,7 @@
             });
     }
 
-    function registerResyncHandler()
-    {
+    function registerResyncHandler() {
         $(document)
             .off("click.resyncPath", "#resync-path-btn")
             .on("click.resyncPath", "#resync-path-btn", function (e) {
@@ -328,8 +361,7 @@
             });
     }
 
-    function registerMetadataHandler()
-    {
+    function registerMetadataHandler() {
         $(document)
             .off("click.metadata", ".view-metadata")
             .on("click.metadata", ".view-metadata", function (e) {
@@ -341,7 +373,12 @@
                 const metadataContent = $("#metadata-content");
 
                 metadataContent.html(
-                    '<div class="text-center p-4">' + '<div class="spinner-border" role="status">' + '<span class="visually-hidden">Loading...</span>' + "</div>" + '<p class="mt-2 text-muted">Loading metadata...</p>' + "</div>",
+                    '<div class="text-center p-4">' +
+                        '<div class="spinner-border" role="status">' +
+                        '<span class="visually-hidden">Loading...</span>' +
+                        "</div>" +
+                        '<p class="mt-2 text-muted">Loading metadata...</p>' +
+                        "</div>",
                 );
 
                 modal.show();
@@ -357,79 +394,128 @@
                             displayMetadata(response.metadata, response.file);
                         } else {
                             metadataContent.html(
-                                '<div class="alert alert-danger">' + '<i class="fas fa-exclamation-triangle me-2"></i>' + "Failed to load metadata" + "</div>",
+                                '<div class="alert alert-danger">' +
+                                    '<i class="fas fa-exclamation-triangle me-2"></i>' +
+                                    "Failed to load metadata" +
+                                    "</div>",
                             );
                         }
                     },
                     error(xhr) {
-                        const error = (xhr.responseJSON && xhr.responseJSON.error) ||
+                        const error =
+                            (xhr.responseJSON && xhr.responseJSON.error) ||
                             "Unknown error";
                         metadataContent.html(
-                            '<div class="alert alert-danger">' + '<i class="fas fa-exclamation-triangle me-2"></i>' + "Error: " + error + "</div>",
+                            '<div class="alert alert-danger">' +
+                                '<i class="fas fa-exclamation-triangle me-2"></i>' +
+                                "Error: " +
+                                error +
+                                "</div>",
                         );
                     },
                 });
             });
     }
 
-    function displayMetadata(metadata, filename)
-    {
+    function displayMetadata(metadata, filename) {
         let html = '<div class="metadata-display">';
         if (metadata.file) {
-            html += '<h6 class="border-bottom pb-2 mb-3"><i class="fas fa-file me-2"></i>File Information</h6>';
+            html +=
+                '<h6 class="border-bottom pb-2 mb-3"><i class="fas fa-file me-2"></i>File Information</h6>';
             html += '<table class="table table-sm table-bordered mb-4">';
-            html += '<tr><th style="width: 30%">Filename</th><td>' + filename + "</td></tr>";
+            html +=
+                '<tr><th style="width: 30%">Filename</th><td>' +
+                filename +
+                "</td></tr>";
             if (metadata.file.size_formatted) {
-                html += "<tr><th>Size</th><td>" + metadata.file.size_formatted + "</td></tr>";
+                html +=
+                    "<tr><th>Size</th><td>" +
+                    metadata.file.size_formatted +
+                    "</td></tr>";
             }
             if (metadata.file.modified) {
-                html += "<tr><th>Modified</th><td>" + metadata.file.modified + "</td></tr>";
+                html +=
+                    "<tr><th>Modified</th><td>" +
+                    metadata.file.modified +
+                    "</td></tr>";
             }
             if (metadata.file.extension) {
-                html += "<tr><th>Extension</th><td>" + metadata.file.extension.toUpperCase() + "</td></tr>";
+                html +=
+                    "<tr><th>Extension</th><td>" +
+                    metadata.file.extension.toUpperCase() +
+                    "</td></tr>";
             }
             html += "</table>";
         }
 
         if (metadata.format) {
-            html += '<h6 class="border-bottom pb-2 mb-3"><i class="fas fa-info-circle me-2"></i>Format Information</h6>';
+            html +=
+                '<h6 class="border-bottom pb-2 mb-3"><i class="fas fa-info-circle me-2"></i>Format Information</h6>';
             html += '<table class="table table-sm table-bordered mb-4">';
             if (metadata.format.format_long_name) {
-                html += '<tr><th style="width: 30%">Format</th><td>' + metadata.format.format_long_name + "</td></tr>";
+                html +=
+                    '<tr><th style="width: 30%">Format</th><td>' +
+                    metadata.format.format_long_name +
+                    "</td></tr>";
             }
             if (metadata.format.duration_formatted) {
-                html += "<tr><th>Duration</th><td>" + metadata.format.duration_formatted + "</td></tr>";
+                html +=
+                    "<tr><th>Duration</th><td>" +
+                    metadata.format.duration_formatted +
+                    "</td></tr>";
             }
             if (metadata.format.bit_rate_formatted) {
-                html += "<tr><th>Bit Rate</th><td>" + metadata.format.bit_rate_formatted + "</td></tr>";
+                html +=
+                    "<tr><th>Bit Rate</th><td>" +
+                    metadata.format.bit_rate_formatted +
+                    "</td></tr>";
             }
             html += "</table>";
         }
 
         if (metadata.streams && metadata.streams.length) {
-            html += '<h6 class="border-bottom pb-2 mb-3"><i class="fas fa-stream me-2"></i>Audio Streams</h6>';
+            html +=
+                '<h6 class="border-bottom pb-2 mb-3"><i class="fas fa-stream me-2"></i>Audio Streams</h6>';
             metadata.streams.forEach(function (stream, index) {
                 html += '<table class="table table-sm table-bordered mb-3">';
-                html += '<tr><th colspan="2" class="bg-light">Stream ' + (index + 1) + "</th></tr>";
+                html +=
+                    '<tr><th colspan="2" class="bg-light">Stream ' +
+                    (index + 1) +
+                    "</th></tr>";
                 if (stream.codec_long_name) {
-                    html += '<tr><th style="width: 30%">Codec</th><td>' + stream.codec_long_name + "</td></tr>";
+                    html +=
+                        '<tr><th style="width: 30%">Codec</th><td>' +
+                        stream.codec_long_name +
+                        "</td></tr>";
                 }
                 if (stream.sample_rate_formatted) {
-                    html += "<tr><th>Sample Rate</th><td>" + stream.sample_rate_formatted + "</td></tr>";
+                    html +=
+                        "<tr><th>Sample Rate</th><td>" +
+                        stream.sample_rate_formatted +
+                        "</td></tr>";
                 }
                 if (stream.channels) {
-                    html += "<tr><th>Channels</th><td>" + stream.channels + (stream.channel_layout ? " (" + stream.channel_layout + ")"
-                            : "") + "</td></tr>";
+                    html +=
+                        "<tr><th>Channels</th><td>" +
+                        stream.channels +
+                        (stream.channel_layout
+                            ? " (" + stream.channel_layout + ")"
+                            : "") +
+                        "</td></tr>";
                 }
                 if (stream.bit_rate_formatted) {
-                    html += "<tr><th>Bit Rate</th><td>" + stream.bit_rate_formatted + "</td></tr>";
+                    html +=
+                        "<tr><th>Bit Rate</th><td>" +
+                        stream.bit_rate_formatted +
+                        "</td></tr>";
                 }
                 html += "</table>";
             });
         }
 
         if (metadata.tags && Object.keys(metadata.tags).length) {
-            html += '<h6 class="border-bottom pb-2 mb-3"><i class="fas fa-tags me-2"></i>Metadata Tags</h6>';
+            html +=
+                '<h6 class="border-bottom pb-2 mb-3"><i class="fas fa-tags me-2"></i>Metadata Tags</h6>';
             html += '<table class="table table-sm table-bordered mb-3">';
             Object.keys(metadata.tags).forEach(function (key) {
                 const displayKey = key
@@ -437,7 +523,12 @@
                     .replace(/\b\w/g, function (l) {
                         return l.toUpperCase();
                     });
-                html += '<tr><th style="width: 30%">' + displayKey + "</th><td>" + metadata.tags[key] + "</td></tr>";
+                html +=
+                    '<tr><th style="width: 30%">' +
+                    displayKey +
+                    "</th><td>" +
+                    metadata.tags[key] +
+                    "</td></tr>";
             });
             html += "</table>";
         }
@@ -446,8 +537,7 @@
         $("#metadata-content").html(html);
     }
 
-    function initialize($container)
-    {
+    function initialize($container) {
         registerDirectoryHandlers($container);
         registerResyncHandler();
         registerMetadataHandler();

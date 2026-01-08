@@ -266,9 +266,15 @@
                         authors.forEach((author) => addAuthor($form, author));
                     } else {
                         authors.forEach((author) => {
+                            const escapedAuthor =
+                                typeof author === "string"
+                                    ? author
+                                          .replace(/"/g, "&quot;")
+                                          .replace(/'/g, "&#039;")
+                                    : "";
                             authorsGroup.append(
                                 '<div class="author-row mb-2"><input type="text" name="author[]" class="form-control" value="' +
-                                    (author || "") +
+                                    escapedAuthor +
                                     '"></div>',
                             );
                         });
