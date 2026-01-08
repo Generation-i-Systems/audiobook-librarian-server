@@ -982,6 +982,10 @@ class ImportBooksFromDownloads extends Command
             if (method_exists($this->uiService, 'requestInterrupt')) {
                 $this->uiService->requestInterrupt();
             }
+            // Render before exit like 'q' option does
+            if (method_exists($this->uiService, 'render')) {
+                $this->uiService->render();
+            }
         }
 
         $this->inputInterrupted = true;
@@ -989,7 +993,7 @@ class ImportBooksFromDownloads extends Command
         $this->warn("⚠️  [Request interrupted by user] - Ctrl+C detected");
         $this->info('🛑 Quitting import process gracefully...');
 
-        // Exit immediately without any cleanup to avoid screen clearing
+        // Exit after rendering to match 'q' option behavior
         exit(130);
     }
 
