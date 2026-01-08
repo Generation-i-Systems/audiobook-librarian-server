@@ -99,6 +99,70 @@ class ImportBooksFromDownloadsEditMetadataPrefillTestDouble extends ImportBooksF
         return $default !== '' ? $default : (string) array_key_first($options);
     }
 
+    protected function getFirstNonEmptyMetadataValue(array $metadata, array $keys): mixed
+    {
+        foreach ($keys as $key) {
+            if (isset($metadata[$key]) && !empty($metadata[$key])) {
+                return $metadata[$key];
+            }
+        }
+        return null;
+    }
+
+    protected function extractSeriesNumberFromTitle(array &$metadata): void
+    {
+        if (!isset($metadata['title']) || !is_string($metadata['title'])) {
+            return;
+        }
+
+        $title = $metadata['title'];
+        if (preg_match('/\b(\d+(?:\.\d+)?)\b/', $title, $matches) && isset($matches[1])) {
+            $metadata['series_number'] = $matches[1];
+        }
+    }
+
+    protected function editMetadataFields(array $metadata, array $audiobook): array
+    {
+        $currentTitle = $this->getFirstNonEmptyMetadataValue($metadata, ['title', 'book_title', 'name']);
+        $metadata['title'] = $this->askInline('Title', is_string($currentTitle) ? $currentTitle : (string) ($metadata['title'] ?? ''));
+
+        $currentAuthor = $this->getFirstNonEmptyMetadataValue($metadata, ['author', 'authors', 'authorName', 'author_name']);
+        if (is_array($currentAuthor)) {
+            $currentAuthor = implode(', ', $currentAuthor);
+        }
+        $newAuthor = $this->askInline("Author(s) (comma-separated)", $currentAuthor);
+        $metadata['author'] = array_map('trim', explode(',', $newAuthor));
+
+        $currentNarrator = $this->getFirstNonEmptyMetadataValue($metadata, ['narrator', 'narrators', 'narratorName', 'narrator_name']);
+        if (is_array($currentNarrator)) {
+            $currentNarrator = implode(', ', $currentNarrator);
+        }
+        $newNarrator = $this->askInline('Narrator(s) (comma-separated)', is_string($currentNarrator) ? $currentNarrator : '');
+        $metadata['narrator'] = array_map('trim', explode(',', $newNarrator));
+
+        $currentSeries = $this->getFirstNonEmptyMetadataValue($metadata, ['series', 'seriesName', 'series_name']);
+        $metadata['series'] = $this->askInline('Series', is_string($currentSeries) ? $currentSeries : (string) ($metadata['series'] ?? ''));
+
+        $currentSeriesNumber = $this->getFirstNonEmptyMetadataValue($metadata, ['series_number', 'seriesNumber', 'series_num', 'seriesNum']);
+        $metadata['series_number'] = $this->askInline(
+            'Series Number',
+            is_scalar($currentSeriesNumber) ? (string) $currentSeriesNumber : (string) ($metadata['series_number'] ?? '')
+        );
+
+        $currentYear = $this->getFirstNonEmptyMetadataValue($metadata, ['year', 'publishedYear', 'published_year', 'published_date']);
+        if (is_string($currentYear) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $currentYear)) {
+            $currentYear = substr($currentYear, 0, 4);
+        }
+        $metadata['year'] = $this->askInline('Year', is_scalar($currentYear) ? (string) $currentYear : (string) ($metadata['year'] ?? ''));
+
+        $currentDirectory = (string) ($metadata['custom_directory_path'] ?? '');
+        $metadata['custom_directory_path'] = $this->askInline('Directory', $currentDirectory);
+
+        $this->extractSeriesNumberFromTitle($metadata);
+
+        return $metadata;
+    }
+
     protected function getImportService(): BookImportService
     {
         /** @var MockInterface $mock */

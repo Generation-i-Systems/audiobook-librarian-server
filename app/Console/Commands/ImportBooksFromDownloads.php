@@ -8,7 +8,6 @@ use App\Models\Series;
 use App\Services\AIBookProcessor;
 use App\Services\AudioFileAnalyzer;
 use App\Services\AudibleService;
-use App\Services\BackgroundProcessingService;
 use App\Services\BookEnrichmentService;
 use App\Services\BookImportService;
 use App\Services\CoverImageAnalysisService;
@@ -68,7 +67,6 @@ class ImportBooksFromDownloads extends Command
     // New services
     protected ?BookEnrichmentService $enrichmentService = null;
     protected ?BookImportService $importService = null;
-    protected ?BackgroundProcessingService $backgroundService = null;
     protected ?ImportCacheService $cacheService = null;
 
     // Background processing
@@ -103,6 +101,148 @@ class ImportBooksFromDownloads extends Command
         return $this->getImportService()->getFileOperation(fn () => $this->option('copy-files'));
     }
 
+    protected function extractMetadataFromFileTags(array $fileTags): array
+    {
+        return $this->getImportService()->extractMetadataFromFileTags($fileTags);
+    }
+
+    protected function mergeMetadataFillMissing(array $base, array $fill): array
+    {
+        return $this->getImportService()->mergeMetadataFillMissing($base, $fill);
+    }
+
+    protected function detectMultiBookPattern(string $title): ?array
+    {
+        $patterns = [
+            '/^(.+?)\s*\[(\d+)\s*-\s*(\d+)\]$/i',
+            '/^(.+?)\s*-\s*\[(\d+)\s*-\s*(\d+)\]$/i',
+            '/^(.+?)\s*\((\d+)\s*-\s*(\d+)\)$/i',
+            '/^(.+?)\s*-\s*\((\d+)\s*-\s*(\d+)\)$/i',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (!preg_match($pattern, $title, $matches)) {
+                continue;
+            }
+
+            $seriesName = trim($matches[1]);
+            $start = (int) $matches[2];
+            $end = (int) $matches[3];
+
+            if ($end <= $start || ($end - $start) > 200) {
+                continue;
+            }
+
+            return [
+                'series_name' => $seriesName,
+                'start_number' => $start,
+                'end_number' => $end,
+                'numbers' => range($start, $end),
+            ];
+        }
+
+        return null;
+    }
+
+    protected function analyzeMultiBookFiles(array $audiobook, array $multiBookInfo): array
+    {
+        $files = $audiobook['files'] ?? [];
+        $numbers = $multiBookInfo['numbers'] ?? [];
+        $seriesName = $multiBookInfo['series_name'] ?? '';
+        $splitGroups = [];
+
+        foreach ($files as $filePath) {
+            $filename = basename($filePath);
+            $assigned = false;
+
+            foreach ($numbers as $number) {
+                $numberPattern = sprintf('/\b0*%d\b/', $number);
+
+                if (preg_match($numberPattern, $filename)) {
+                    $title = $this->extractBookTitleFromFilename($filename, $seriesName, $number);
+                    $splitGroups[$number][] = [
+                        'file' => $filePath,
+                        'title' => $title,
+                    ];
+                    $assigned = true;
+                    break;
+                }
+            }
+
+            if (!$assigned) {
+                $splitGroups['unmatched'][] = [
+                    'file' => $filePath,
+                    'title' => $this->extractBookTitleFromFilename($filename, $seriesName, 0),
+                ];
+            }
+        }
+
+        return $splitGroups;
+    }
+
+    protected function cleanSeriesName(string $seriesName, array $authors): string
+    {
+        $cleaned = trim($seriesName);
+
+        foreach ($authors as $author) {
+            $author = trim((string) $author);
+            if ($author === '') {
+                continue;
+            }
+
+            $patterns = [
+                '/^' . preg_quote($author, '/') . '\s*[-:]\s*/i',
+                '/\s*[-:]\s*' . preg_quote($author, '/') . '$/i',
+                '/^' . preg_quote($author, '/') . '\s+/i',
+                '/\s+' . preg_quote($author, '/') . '$/i',
+            ];
+
+            foreach ($patterns as $pattern) {
+                $cleaned = preg_replace($pattern, '', $cleaned);
+            }
+        }
+
+        $cleaned = preg_replace('/\s+/', ' ', $cleaned);
+        $cleaned = trim($cleaned, ' -_');
+
+        return $cleaned !== '' ? $cleaned : $seriesName;
+    }
+
+    protected function extractBookTitleFromFilename(string $filename, string $seriesName, int $bookNumber): string
+    {
+        $name = preg_replace('/\.[^.]+$/', '', $filename);
+        $patterns = [
+            '/^Book\s*\d+\s*[-_:]\s*/i',
+            '/^Part\s*\d+\s*[-_:]\s*/i',
+            '/^Track\s*\d+\s*[-_:]\s*/i',
+            '/^Disc\s*\d+\s*[-_:]\s*/i',
+            '/^\d+\s*[-_:]\s*/',
+        ];
+
+        foreach ($patterns as $pattern) {
+            $name = preg_replace($pattern, '', $name);
+        }
+
+        if ($seriesName !== '') {
+            $name = preg_replace('/^' . preg_quote($seriesName, '/') . '\s*[-_:]\s*/i', '', $name);
+        }
+
+        if ($bookNumber > 0) {
+            $numberPattern = sprintf('/\b0*%d\b/', $bookNumber);
+            $name = preg_replace($numberPattern, '', $name);
+        }
+
+        $name = preg_replace('/\s+/', ' ', $name);
+        $name = trim($name, ' -_');
+
+        if ($name === '') {
+            $suffix = $bookNumber > 0 ? " Book {$bookNumber}" : '';
+            return trim($seriesName . $suffix);
+        }
+
+        return $name;
+    }
+
     public function __construct(?ImportUIService $uiService = null)
     {
         parent::__construct();
@@ -119,9 +259,13 @@ class ImportBooksFromDownloads extends Command
     protected function handleLowConfidenceMetadata(array $audiobook, ?array &$aiMetadata): bool
     {
         $minConfidence = (int) $this->option('min-confidence');
-        $hasCriticalTagMetadata = $this->getImportService()->hasCriticalTagMetadata(
-            $this->getImportService()->extractTagMetadataFromAudiobook($audiobook, $this->aiProcessor)
-        );
+        $tagMetadata = $this->getImportService()->extractTagMetadataFromAudiobook($audiobook, $this->aiProcessor);
+
+        if (!empty($tagMetadata)) {
+            $aiMetadata = $this->getImportService()->mergeMetadataFillMissing($aiMetadata ?? [], $tagMetadata);
+        }
+
+        $hasCriticalTagMetadata = $this->getImportService()->hasCriticalTagMetadata($tagMetadata);
 
         return $this->getImportService()->handleLowConfidenceMetadata($audiobook, $aiMetadata, $minConfidence, $hasCriticalTagMetadata);
     }
@@ -139,14 +283,10 @@ class ImportBooksFromDownloads extends Command
     protected function logUiMessage(mixed $message, mixed $data = null): void
     {
         if (!$this->uiService) {
-            $text = is_string($message)
-                ? $message
-                : (is_array($message) ? json_encode($message, JSON_UNESCAPED_UNICODE) : (string) $message);
+            $text = is_string($message) ? $message : (is_array($message) ? json_encode($message, JSON_UNESCAPED_UNICODE) : (string) $message);
 
             if ($data !== null) {
-                $suffix = is_string($data)
-                    ? $data
-                    : (is_array($data) ? json_encode($data, JSON_UNESCAPED_UNICODE) : (string) $data);
+                $suffix = is_string($data) ? $data : (is_array($data) ? json_encode($data, JSON_UNESCAPED_UNICODE) : (string) $data);
                 $text .= ' ' . $suffix;
             }
 
@@ -159,9 +299,7 @@ class ImportBooksFromDownloads extends Command
             return;
         }
 
-        $text = is_string($message)
-            ? $message
-            : (is_array($message) ? json_encode($message, JSON_UNESCAPED_UNICODE) : (string) $message);
+        $text = is_string($message) ? $message : (is_array($message) ? json_encode($message, JSON_UNESCAPED_UNICODE) : (string) $message);
 
         $this->uiService->logMessage($text ?? '');
     }
@@ -1518,17 +1656,6 @@ class ImportBooksFromDownloads extends Command
             $this->importService = app(BookImportService::class);
         }
         return $this->importService;
-    }
-
-    /**
-     * Get background processing service instance
-     */
-    protected function getBackgroundService(): BackgroundProcessingService
-    {
-        if (!$this->backgroundService) {
-            $this->backgroundService = new BackgroundProcessingService();
-        }
-        return $this->backgroundService;
     }
 
     /**

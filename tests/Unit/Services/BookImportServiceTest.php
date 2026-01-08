@@ -60,6 +60,53 @@ class BookImportServiceTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
+    public function reviewAndApproveAllowsAcceptAfterGenreFix(): void
+    {
+        $metadata = [
+            'title' => 'Test Book',
+            'author' => ['Author'],
+            'genre' => 'Invalid Genre',
+            'confidence' => 90,
+        ];
+
+        $audiobook = [
+            'path' => '/tmp/book',
+            'files' => ['/tmp/book/file.m4b'],
+        ];
+
+        $logs = [];
+        $selectResponses = ['5', '1', '1'];
+        $inputInterrupted = false;
+
+        $result = $this->service->reviewAndApprove(
+            $metadata,
+            $audiobook,
+            fn ($data) => $data,
+            function ($message, $data = null) use (&$logs) {
+                $logs[] = $message;
+            },
+            function ($question, $options, $default) use (&$selectResponses) {
+                return array_shift($selectResponses) ?? $default;
+            },
+            fn ($question, $default = '') => $default,
+            fn ($cover, $genre, $directory, $isFinal) => [],
+            fn ($data, $book) => $data,
+            fn ($data, $book, $service) => $data,
+            fn () => null,
+            fn () => $this->service->getValidGenres(),
+            fn ($data) => true,
+            fn ($data, $options) => 'dir/path',
+            $inputInterrupted
+        );
+
+        $this->assertTrue($result);
+        $this->assertEquals('Science Fiction', $metadata['genre']);
+        $this->assertTrue(
+            collect($logs)->contains(fn ($message) => str_contains($message, 'Genre updated to a valid value'))
+        );
+    }
+
+    #[\PHPUnit\Framework\Attributes\Test]
     public function generateDirectoryPathWithoutSeriesNumber(): void
     {
         $metadata = [

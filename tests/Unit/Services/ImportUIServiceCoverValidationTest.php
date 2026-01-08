@@ -34,4 +34,43 @@ class ImportUIServiceCoverValidationTest extends TestCase
         $this->assertFalse($method->invoke($ui, ''));
         $this->assertFalse($method->invoke($ui, '<html>not an image</html>'));
     }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function cacheCoverForCurrentBookClearsCacheWhenCoverMissing(): void
+    {
+        $ui = new ImportUIService();
+        $reflection = new \ReflectionClass($ui);
+
+        $tempFile = tempnam(sys_get_temp_dir(), 'cover_cache_test_');
+        $this->assertIsString($tempFile);
+        file_put_contents($tempFile, 'dummy');
+
+        $setProperty = static function (string $name, $value) use ($reflection, $ui): void {
+            $property = $reflection->getProperty($name);
+            $property->setAccessible(true);
+            $property->setValue($ui, $value);
+        };
+
+        $getProperty = static function (string $name) use ($reflection, $ui) {
+            $property = $reflection->getProperty($name);
+            $property->setAccessible(true);
+            return $property->getValue($ui);
+        };
+
+        $setProperty('cachedCoverTempFile', $tempFile);
+        $setProperty('cachedCoverUrl', 'https://example.com/cover.jpg');
+        $setProperty('renderedCoverUrl', 'https://example.com/cover.jpg');
+        $setProperty('renderedCoverSignature', 'signature');
+        $setProperty('currentBook', ['title' => 'Test Book', 'cover_url' => null]);
+
+        $method = $reflection->getMethod('cacheCoverForCurrentBook');
+        $method->setAccessible(true);
+        $method->invoke($ui);
+
+        $this->assertFileDoesNotExist($tempFile);
+        $this->assertNull($getProperty('cachedCoverTempFile'));
+        $this->assertNull($getProperty('cachedCoverUrl'));
+        $this->assertNull($getProperty('renderedCoverUrl'));
+        $this->assertNull($getProperty('renderedCoverSignature'));
+    }
 }

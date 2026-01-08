@@ -540,6 +540,21 @@ class ImportUIService
         return $selectedIndex;
     }
 
+    protected static function resolveDefaultSelectionIndex(array $keys, string $default): int
+    {
+        if ($default === '') {
+            return 0;
+        }
+
+        foreach ($keys as $index => $key) {
+            if ((string) $key === (string) $default) {
+                return $index;
+            }
+        }
+
+        return 0;
+    }
+
     protected static function shouldAutoCommitChoice(string $buffer, array $options): bool
     {
         $buffer = strtolower(trim($buffer));
@@ -627,10 +642,7 @@ class ImportUIService
             return '';
         }
 
-        $selectedIndex = 0;
-        if ($default !== '' && in_array($default, $keys, true)) {
-            $selectedIndex = (int) array_search($default, $keys, true);
-        }
+        $selectedIndex = self::resolveDefaultSelectionIndex($keys, $default);
 
         $numericBuffer = '';
         $rawState = $this->enableRawInput();
@@ -1169,7 +1181,12 @@ class ImportUIService
     protected function cacheCoverForCurrentBook(): void
     {
         $coverUrl = $this->stringifyForDisplay($this->currentBook['cover_url'] ?? null);
-        if ($coverUrl === '' || $coverUrl === $this->cachedCoverUrl) {
+        if ($coverUrl === '') {
+            $this->cleanupCoverTempFile();
+            return;
+        }
+
+        if ($coverUrl === $this->cachedCoverUrl) {
             return;
         }
 

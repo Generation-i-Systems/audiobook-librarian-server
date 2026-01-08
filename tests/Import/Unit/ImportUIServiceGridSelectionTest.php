@@ -31,4 +31,18 @@ class ImportUIServiceGridSelectionTest extends TestCase
         $this->assertSame(1, $method->invoke(null, 2, 'up', 3, 3, 8));
         $this->assertSame(2, $method->invoke(null, 1, 'down', 3, 3, 8));
     }
+
+    #[\PHPUnit\Framework\Attributes\Test]
+    public function resolveDefaultSelectionIndexHonorsProvidedDefault(): void
+    {
+        $reflection = new \ReflectionClass(ImportUIService::class);
+        $method = $reflection->getMethod('resolveDefaultSelectionIndex');
+        $method->setAccessible(true);
+
+        $keys = ['1', '2', '3'];
+
+        $this->assertSame(1, $method->invoke(null, $keys, '2'));
+        $this->assertSame(0, $method->invoke(null, $keys, ''));
+        $this->assertSame(0, $method->invoke(null, $keys, '999'));
+    }
 }

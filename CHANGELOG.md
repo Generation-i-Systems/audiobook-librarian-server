@@ -55,6 +55,7 @@
 - Both web-based directory edits and command-line imports now reuse existing directories when they only contain metadata
 - Added metadata detection to distinguish between actual content conflicts and overwritable metadata files
 - BookDirectoryMoveService and BookImportService now consistently handle directory conflicts with the same logic
+- CLI import UI now clears cached cover art between books so stale images are never shown when the next book lacks a cover
 - Updated API authentication documentation to match the current bearer token implementation (email or username login; opaque token; logout revokes token)
 - Fixed `ShowBookInfo` command opening browser during test runs
   - Added environment detection to skip browser launch when APP_ENV=testing

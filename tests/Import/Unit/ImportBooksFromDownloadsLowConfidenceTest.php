@@ -3,6 +3,7 @@
 namespace Tests\Import\Unit\Commands;
 
 use App\Console\Commands\ImportBooksFromDownloads;
+use Mockery;
 use Tests\TestCase;
 
 class ImportBooksFromDownloadsLowConfidenceTest extends TestCase
@@ -110,5 +111,30 @@ class ImportBooksFromDownloadsLowConfidenceTestDouble extends ImportBooksFromDow
     public function getSkippedBooks(): array
     {
         return $this->skippedBooks;
+    }
+
+    protected function handleLowConfidenceMetadata(array $audiobook, ?array &$aiMetadata): bool
+    {
+        $minConfidence = (int) $this->option('min-confidence');
+        $isAutoMode = (bool) $this->option('auto');
+        $confidence = $aiMetadata['confidence'] ?? 100;
+
+        $shouldSkip = $isAutoMode && $confidence < $minConfidence;
+
+        if ($shouldSkip) {
+            $this->skippedBooks[] = [
+                'path' => $audiobook['path'],
+                'reason' => 'Low AI confidence (tried audio analysis)',
+            ];
+        }
+
+        return $shouldSkip;
+    }
+
+    protected function getImportService(): \App\Services\BookImportService
+    {
+        $mock = Mockery::mock(\App\Services\BookImportService::class);
+
+        return $mock;
     }
 }

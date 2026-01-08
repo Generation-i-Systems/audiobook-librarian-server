@@ -1013,84 +1013,76 @@ class BookImportService
         // Always include title in path unless explicitly disabled
         // However, if the book already has a directory_path that includes the title, don't append it again
         if (!isset($options['include_title_in_path']) || $options['include_title_in_path'] !== false) {
-            // If the book already has a directory_path, check if it already includes the title
-            // If it does, return the path as-is to avoid creating nested directories
+            $plainTitle = $book->title;
+            $title = $plainTitle;
+
+            if (!empty($seriesNumber)) {
+                $formattedNumber = str_pad((string) $seriesNumber, 2, '0', STR_PAD_LEFT);
+                $title = $formattedNumber . ' ' . $title;
+            }
+
             if ($relativePath !== null) {
                 $relativeSegments = explode('/', trim($relativePath, '/'));
                 $relativeLastSegment = end($relativeSegments) ?: '';
-
-                $title = $book->title;
-                $plainTitle = $book->title;
-
-                // If we have a series number, prefix it to the title
-                if (!empty($seriesNumber)) {
-                    $formattedNumber = str_pad($seriesNumber, 2, '0', STR_PAD_LEFT);
-                    $title = $formattedNumber . ' ' . $title;
-                }
-
-                // Remove common suffixes like (GraphicAudio) for comparison
-                $cleanRelativeLast = preg_replace('/\s*\(Graphic\s*Audio\)\s*$/i', '', $relativeLastSegment);
-                $cleanTitle = preg_replace('/\s*\(Graphic\s*Audio\)\s*$/i', '', $title);
 
                 Log::debug('BookImportService::generateTargetDirectory - Checking relative path', [
                     'book_id' => $book->id,
                     'relativePath' => $relativePath,
                     'relativeLastSegment' => $relativeLastSegment,
-                    'cleanRelativeLast' => $cleanRelativeLast,
                     'title' => $title,
-                    'cleanTitle' => $cleanTitle,
                     'plainTitle' => $plainTitle,
                     'seriesNumber' => $seriesNumber,
                     'path' => $path,
                 ]);
 
-                // Check if the last segment of the relative path matches the title
-                if (
-                    strcasecmp($cleanRelativeLast, $cleanTitle) === 0 ||
-                    $this->lastPathSegmentMatchesTitle($cleanRelativeLast, $plainTitle)
-                ) {
-                    Log::debug('BookImportService::generateTargetDirectory - Title already in path, returning as-is', [
-                        'book_id' => $book->id,
-                        'path' => $path,
-                    ]);
+                if (strcasecmp($relativeLastSegment, $title) === 0) {
                     return $path;
                 }
-            }
 
-            // If we get here, we need to append the title
-            $title = $book->title;
-            $plainTitle = $book->title;
+                if (
+                    !empty($seriesNumber)
+                    && $this->lastPathSegmentMatchesTitle($relativeLastSegment, $plainTitle)
+                ) {
+                    array_pop($relativeSegments);
+                    $relativeSegments[] = $title;
 
-            // If we have a series number, prefix it to the title
-            if (!empty($seriesNumber)) {
-                $formattedNumber = str_pad($seriesNumber, 2, '0', STR_PAD_LEFT);
-                $title = $formattedNumber . ' ' . $title;
+                    $relativePath = implode('/', $relativeSegments);
+                    $updatedPath = rtrim($basePath, '/') . '/' . ltrim($relativePath, '/');
+
+                    Log::debug('BookImportService::generateTargetDirectory - Updated relative path with series number', [
+                        'book_id' => $book->id,
+                        'updatedPath' => $updatedPath,
+                    ]);
+
+                    return $updatedPath;
+                }
             }
 
             $segments = explode('/', trim($path, '/'));
             $lastSegment = end($segments) ?: '';
 
-            // Check if title is already in the path to avoid nested directories
             if (strcasecmp($lastSegment, $title) === 0) {
                 return $path;
             }
 
-            // Check if last segment matches the plain title (without series number prefix)
             if ($this->lastPathSegmentMatchesTitle($lastSegment, $plainTitle)) {
+                if (!empty($seriesNumber)) {
+                    array_pop($segments);
+                    $segments[] = $title;
+
+                    return '/' . implode('/', $segments);
+                }
+
                 return $path;
             }
 
-            // Check if last segment matches the formatted title (with series number prefix)
             if (!empty($seriesNumber) && $this->lastPathSegmentMatchesTitle($lastSegment, $title)) {
-                // Replace the last segment with the properly formatted title
                 array_pop($segments);
                 $segments[] = $title;
 
                 return '/' . implode('/', $segments);
             }
 
-            // Only append title if it's not already in the path
-            // This prevents creating nested directories like "Title/Title"
             $path .= "/{$title}";
             Log::debug('BookImportService::generateTargetDirectory - Appending title to path', [
                 'book_id' => $book->id,
@@ -5142,22 +5134,41 @@ class BookImportService
      */
     public function analyzeAudioFilesInBackground(array $audiobook): array
     {
-        $analysis = [
-            'total_files' => 0,
-            'total_duration' => 0,
-            'file_types' => [],
-            'bitrates' => [],
-            'sample_rates' => [],
-        ];
+        $audioFiles = [];
+        $totalSize = 0;
 
         foreach ($audiobook['files'] as $file) {
-            $analysis['total_files']++;
-            $analysis['file_types'][] = pathinfo($file, PATHINFO_EXTENSION);
+            if (file_exists($file)) {
+                $size = filesize($file);
+                $audioFiles[] = [
+                    'path' => $file,
+                    'size' => $size,
+                ];
+                $totalSize += $size;
+            }
         }
 
+        $largestFile = null;
+        $smallestFile = null;
+
+        foreach ($audioFiles as $file) {
+            if ($largestFile === null || $file['size'] > $largestFile['size']) {
+                $largestFile = $file;
+            }
+            if ($smallestFile === null || $file['size'] < $smallestFile['size']) {
+                $smallestFile = $file;
+            }
+        }
+
+        $averageFileSize = count($audioFiles) > 0 ? $totalSize / count($audioFiles) : 0;
+
         return [
-            'analysis' => $analysis,
-            'timestamp' => time(),
+            'total_files' => count($audioFiles),
+            'audio_files' => count($audioFiles),
+            'largest_file' => $largestFile,
+            'smallest_file' => $smallestFile,
+            'total_size' => $totalSize,
+            'average_file_size' => $averageFileSize,
         ];
     }
 
@@ -6364,6 +6375,11 @@ class BookImportService
                     $selectedGenreIdx = $selectWithImmediateInterruptCallback('Genre', $genreOptions, $defaultGenreIdx);
                     $metadata['genre'] = $genreOptions[$selectedGenreIdx] ?? $currentGenre;
                     $currentGenre = $metadata['genre'] ?? $currentGenre;
+                    $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
+                    $isGenreValid = in_array($normalizedGenre, $validGenres, true);
+                    if ($isGenreValid) {
+                        $uiServiceLogCallback('[Genre] ✅ Genre updated to a valid value: ' . $currentGenre);
+                    }
                     $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
                     continue;
                 }
@@ -6399,6 +6415,15 @@ class BookImportService
         }
 
         $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
+        $currentGenre = $metadata['genre'] ?? $currentGenre;
+        if (is_array($currentGenre)) {
+            $currentGenre = $currentGenre[0] ?? 'Other';
+        }
+        $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
+        $isGenreValid = in_array($normalizedGenre, $validGenres, true);
+        if ($isGenreValid) {
+            $uiServiceLogCallback('[Genre] ✅ Genre updated to a valid value: ' . $currentGenre);
+        }
 
         while (true) {
             $options = $buildReviewOptionsCallback($currentCoverUrl, $currentGenre, $currentDirectoryPath, true);
@@ -6417,6 +6442,15 @@ class BookImportService
             if ($choice === '2' || $choice === 'e' || $choice === 'edit') {
                 $metadata = $editMetadataFieldsCallback($metadata, $audiobook);
                 $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
+                $currentGenre = $metadata['genre'] ?? $currentGenre;
+                if (is_array($currentGenre)) {
+                    $currentGenre = $currentGenre[0] ?? 'Other';
+                }
+                $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
+                $isGenreValid = in_array($normalizedGenre, $validGenres, true);
+                if ($isGenreValid) {
+                    $uiServiceLogCallback('[Genre] ✅ Genre updated to a valid value: ' . $currentGenre);
+                }
                 continue;
             }
             if ($choice === '3' || $choice === 's' || $choice === 'skip') {
@@ -6454,6 +6488,9 @@ class BookImportService
                 $currentGenre = $metadata['genre'] ?? $currentGenre;
                 $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
                 $isGenreValid = in_array($normalizedGenre, $validGenres, true);
+                if ($isGenreValid) {
+                    $uiServiceLogCallback('[Genre] ✅ Genre updated to a valid value: ' . $currentGenre);
+                }
                 $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
                 continue;
             }
