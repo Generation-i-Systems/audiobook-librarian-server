@@ -3093,30 +3093,12 @@ class BookImportService
 
         if (!empty($uiMetadata['cover_data'])) {
             $coverSource = 'Embedded';
-
-            // DEBUG: Log cover data info to specific file
-            $debugMsg = "DEBUG: buildUiMetadata - Processing embedded cover for: " . ($uiMetadata['title'] ?? 'unknown') . "\n";
-            $debugMsg .= "DEBUG: buildUiMetadata - Cover data length: " . strlen($uiMetadata['cover_data']) . "\n";
-            $debugMsg .= "DEBUG: buildUiMetadata - Cover data hash: " . md5($uiMetadata['cover_data']) . "\n";
-            file_put_contents('/tmp/cover_debug.log', $debugMsg, FILE_APPEND | LOCK_EX);
-
             if ($getEmbeddedCoverTempPathCallback) {
-                file_put_contents('/tmp/cover_debug.log', "DEBUG: buildUiMetadata - About to call getEmbeddedCoverTempPathCallback\n", FILE_APPEND | LOCK_EX);
-                file_put_contents('/tmp/cover_debug.log', "DEBUG: buildUiMetadata - Callback type: " . gettype($getEmbeddedCoverTempPathCallback) . "\n", FILE_APPEND | LOCK_EX);
-
                 $tempPath = $getEmbeddedCoverTempPathCallback($uiMetadata['cover_data']);
-
-                file_put_contents('/tmp/cover_debug.log', "DEBUG: buildUiMetadata - Callback returned: " . ($tempPath ?? 'null') . "\n", FILE_APPEND | LOCK_EX);
-
                 if ($tempPath) {
                     $uiMetadata['cover_url'] = $tempPath;
                     $uiMetadata['cover_is_local_file'] = true;
-                    file_put_contents('/tmp/cover_debug.log', "DEBUG: buildUiMetadata - Set cover_url to: " . $tempPath . "\n", FILE_APPEND | LOCK_EX);
-                } else {
-                    file_put_contents('/tmp/cover_debug.log', "DEBUG: buildUiMetadata - getEmbeddedCoverTempPathCallback returned null\n", FILE_APPEND | LOCK_EX);
                 }
-            } else {
-                file_put_contents('/tmp/cover_debug.log', "DEBUG: buildUiMetadata - getEmbeddedCoverTempPathCallback is null\n", FILE_APPEND | LOCK_EX);
             }
         } elseif (!empty($uiMetadata['cover_url'])) {
             if (isset($uiMetadata['audible_raw'])) {
@@ -3521,14 +3503,6 @@ class BookImportService
      */
     public function getEmbeddedCoverTempPath(string $coverData): ?string
     {
-        // DEBUG: Log entry to specific file
-        file_put_contents('/tmp/cover_debug.log', "DEBUG: getEmbeddedCoverTempPath ENTRY - Cover data hash: " . md5($coverData) . "\n", FILE_APPEND | LOCK_EX);
-
-        // DEBUG: Log cover data info to specific file
-        $debugMsg = "DEBUG: getEmbeddedCoverTempPath - Cover data length: " . strlen($coverData) . "\n";
-        $debugMsg .= "DEBUG: getEmbeddedCoverTempPath - Cover data hash: " . md5($coverData) . "\n";
-        file_put_contents('/tmp/cover_debug.log', $debugMsg, FILE_APPEND | LOCK_EX);
-
         $binary = base64_decode($coverData, true);
         if (!is_string($binary)) {
             $binary = $coverData;
@@ -3538,13 +3512,10 @@ class BookImportService
         $coverHash = substr(md5($coverData), 0, 8);
         $tempFile = tempnam(sys_get_temp_dir(), 'embedded_cover_' . $coverHash . '_');
         if ($tempFile === false) {
-            file_put_contents('/tmp/cover_debug.log', "DEBUG: getEmbeddedCoverTempPath - tempnam failed\n", FILE_APPEND | LOCK_EX);
             return null;
         }
 
         file_put_contents($tempFile, $binary);
-
-        file_put_contents('/tmp/cover_debug.log', "DEBUG: getEmbeddedCoverTempPath - Created temp file: " . $tempFile . "\n", FILE_APPEND | LOCK_EX);
 
         return $tempFile;
     }

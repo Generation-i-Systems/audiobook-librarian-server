@@ -1183,18 +1183,12 @@ class ImportUIService
 
     public function setCurrentBook(array $metadata): void
     {
-        // DEBUG: Log book change
-        error_log("DEBUG: setCurrentBook - Title: " . ($metadata['title'] ?? 'unknown') .
-                 ", CoverURL: " . ($metadata['cover_url'] ?? 'null'));
-
         $this->currentBook = $metadata;
         $this->cacheCoverForCurrentBook();
 
         // Clear render state to force re-render for new book
         $this->renderedCoverUrl = null;
         $this->renderedCoverSignature = null;
-
-        error_log("DEBUG: setCurrentBook - After caching, CachedURL: " . ($this->cachedCoverUrl ?? 'null'));
 
         $this->renderFull();
     }
@@ -1532,20 +1526,12 @@ class ImportUIService
         $alreadyRendered = $this->renderedCoverUrl === $this->cachedCoverUrl
             && $this->renderedCoverSignature === $signature;
 
-        // DEBUG: Log rendering state
-        error_log("DEBUG: renderCoverInline - URL: " . ($this->cachedCoverUrl ?? 'null') .
-                 ", RenderedURL: " . ($this->renderedCoverUrl ?? 'null') .
-                 ", Force: " . ($force ? 'true' : 'false') .
-                 ", AlreadyRendered: " . ($alreadyRendered ? 'true' : 'false'));
-
         if (!$force && $alreadyRendered) {
-            error_log("DEBUG: Skipping render - already rendered");
             return;
         }
 
         // Clear previous cover before rendering new one
         if ($this->renderedCoverUrl !== null || $force) {
-            error_log("DEBUG: Clearing previous cover");
             $this->clearInlineCoverRendering();
 
             // Add small delay to ensure clearing completes
@@ -1557,7 +1543,6 @@ class ImportUIService
 
         $kittenPath = '/usr/bin/kitten';
         if (!file_exists($kittenPath) || !is_executable($kittenPath)) {
-            error_log("DEBUG: kitten not found or not executable");
             return;
         }
 
@@ -1571,9 +1556,6 @@ class ImportUIService
         $cmd = $kittenPath . ' icat --place=' . escapeshellarg($place) . ' ';
         $cmd .= escapeshellarg($this->cachedCoverTempFile);
         $cmd .= ' 2>/dev/null';
-
-        error_log("DEBUG: Executing: " . $cmd);
-        error_log("DEBUG: Temp file exists: " . (file_exists($this->cachedCoverTempFile ?? '') ? 'true' : 'false'));
 
         @system($cmd);
 
