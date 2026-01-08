@@ -517,7 +517,7 @@
         }
                                             @endphp
                                             <input type="text" name="author[]" class="form-control author-autocomplete"
-                                                style="height:32px; flex:1;" value="{{ $author }}" placeholder="Author Name"
+                                                class="form-control-height-32 form-control-flex-1" value="{{ $author }}" placeholder="Author Name"
                                                 required>
                                             <datalist id="author-list"></datalist> {{-- Populated by JavaScript via autocomplete --}}
                                             <div class="d-flex flex-column ms-2" style="gap:2px;">
@@ -561,7 +561,7 @@
         }
                                             @endphp
                                             <input type="text" name="narrator[]" class="form-control narrator-autocomplete"
-                                                style="height:32px; flex:1;" value="{{ $narrator }}" placeholder="Narrator Name">
+                                                class="form-control-height-32 form-control-flex-1" value="{{ $narrator }}" placeholder="Narrator Name">
                                             <datalist id="narrator-list"></datalist> {{-- Populated by JavaScript via autocomplete --}}
                                             <div class="d-flex flex-column ms-2" style="gap:2px;">
                                                 <button type="button" class="btn btn-outline-danger btn-sm remove-row"
@@ -599,7 +599,7 @@
                                     @endphp
                                     @foreach($genres as $idx => $genre)
                                         <div class="d-flex align-items-start mb-2 genre-row" data-original-genre="{{ $genre }}">
-                                            <select name="genre[]" class="form-select" style="height:32px; flex:1;" required>
+                                            <select name="genre[]" class="form-select" class="form-control-height-32 form-control-flex-1" required>
                                                 <option value="">Select a genre</option>
                                                 @foreach($genreList as $g)
                                                     <option value="{{ $g }}" {{ $genre === $g ? 'selected' : '' }}>{{ $g }}</option>
@@ -1285,7 +1285,7 @@
                     const row = document.createElement('div');
                     row.className = 'd-flex align-items-start mb-2 series-row';
                     row.innerHTML = `<input type="number" name="series[${idx}][number]" class="form-control" style="width:60px; height:32px; flex-shrink:0;" placeholder="#" step="any">
-                        <input type="text" name="series[${idx}][seriesName]" class="form-control series-autocomplete ms-2" style="height:32px; flex:1;" placeholder="Series Name">
+                        <input type="text" name="series[${idx}][seriesName]" class="form-control series-autocomplete ms-2" class="form-control-height-32 form-control-flex-1" placeholder="Series Name">
                         <div class="form-check ms-2 d-flex align-items-center" style="height:32px;" title="Collection (not a primary series)">
                             <input type="checkbox" name="series[${idx}][isCollection]" class="form-check-input" value="1" style="margin-top:0;">
                             <label class="form-check-label ms-1 small">Collection</label>
