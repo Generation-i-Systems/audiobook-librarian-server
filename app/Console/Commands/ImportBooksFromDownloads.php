@@ -400,8 +400,14 @@ class ImportBooksFromDownloads extends Command
             // Create a database backup unless --no-backup is specified
             if (!$this->option('no-backup')) {
                 $this->uiService->logMessage('Creating a database backup before importing books...');
-                $this->call('backup:database', ['--suffix' => 'import-books']);
-                $this->uiService->logMessage('Database backup created.');
+
+                // Capture backup command output and redirect to TUI log
+                try {
+                    $this->callSilent('backup:database', ['--suffix' => 'import-books']);
+                    $this->uiService->logMessage('✓ Database backup created successfully.');
+                } catch (\Exception $e) {
+                    $this->uiService->logMessage('⚠️  Database backup failed: ' . $e->getMessage());
+                }
             }
 
             $this->uiService->logMessage("🚀 Starting automated audiobook import from download directories...");
@@ -976,7 +982,7 @@ class ImportBooksFromDownloads extends Command
             if (method_exists($this->uiService, 'requestInterrupt')) {
                 $this->uiService->requestInterrupt();
             }
-            // Don't manually restore terminal - let natural shutdown handle it
+            $this->uiService->restoreTerminalState();
         }
 
         $this->inputInterrupted = true;
@@ -984,7 +990,6 @@ class ImportBooksFromDownloads extends Command
         $this->warn("⚠️  [Request interrupted by user] - Ctrl+C detected");
         $this->info('🛑 Quitting import process gracefully...');
 
-        // Exit and let natural shutdown process handle terminal restoration
         exit(130);
     }
 
