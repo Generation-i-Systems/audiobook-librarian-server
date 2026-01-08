@@ -1185,6 +1185,11 @@ class ImportUIService
     {
         $this->currentBook = $metadata;
         $this->cacheCoverForCurrentBook();
+
+        // Clear render state to force re-render for new book
+        $this->renderedCoverUrl = null;
+        $this->renderedCoverSignature = null;
+
         $this->renderFull();
     }
 
