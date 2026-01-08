@@ -3101,12 +3101,17 @@ class BookImportService
             file_put_contents('/tmp/cover_debug.log', $debugMsg, FILE_APPEND | LOCK_EX);
 
             if ($getEmbeddedCoverTempPathCallback) {
+                file_put_contents('/tmp/cover_debug.log', "DEBUG: buildUiMetadata - About to call getEmbeddedCoverTempPathCallback\n", FILE_APPEND | LOCK_EX);
                 $tempPath = $getEmbeddedCoverTempPathCallback($uiMetadata['cover_data']);
                 if ($tempPath) {
                     $uiMetadata['cover_url'] = $tempPath;
                     $uiMetadata['cover_is_local_file'] = true;
                     file_put_contents('/tmp/cover_debug.log', "DEBUG: buildUiMetadata - Set cover_url to: " . $tempPath . "\n", FILE_APPEND | LOCK_EX);
+                } else {
+                    file_put_contents('/tmp/cover_debug.log', "DEBUG: buildUiMetadata - getEmbeddedCoverTempPathCallback returned null\n", FILE_APPEND | LOCK_EX);
                 }
+            } else {
+                file_put_contents('/tmp/cover_debug.log', "DEBUG: buildUiMetadata - getEmbeddedCoverTempPathCallback is null\n", FILE_APPEND | LOCK_EX);
             }
         } elseif (!empty($uiMetadata['cover_url'])) {
             if (isset($uiMetadata['audible_raw'])) {
@@ -3521,7 +3526,9 @@ class BookImportService
             $binary = $coverData;
         }
 
-        $tempFile = tempnam(sys_get_temp_dir(), 'embedded_cover_');
+        // Create unique temp file name using cover data hash to avoid collisions
+        $coverHash = substr(md5($coverData), 0, 8);
+        $tempFile = tempnam(sys_get_temp_dir(), 'embedded_cover_' . $coverHash . '_');
         if ($tempFile === false) {
             return null;
         }
