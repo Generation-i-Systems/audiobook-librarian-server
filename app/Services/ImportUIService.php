@@ -220,7 +220,7 @@ class ImportUIService
         $this->screen->write("\e[H\e[J");
 
         // Draw outer border
-        $this->drawBox(1, 1, $this->width, $this->height, " Audiobook Import Librarian ", "cyan");
+        $this->drawBox(1, 1, $this->width, $this->height, " Audiobook LibrarianImport ", "cyan");
 
         // Header section (Progress)
         $this->drawProgress();
@@ -823,7 +823,7 @@ class ImportUIService
     {
         $y = 5;
         $footerTop = $this->getFooterSeparatorY();
-        $logHeight = min(8, max(6, $this->height - 30));
+        $logHeight = min(14, max(12, $this->height - 24));
         $detailsHeight = max(10, $footerTop - $y - $logHeight);
         $this->drawBox(2, $y, $this->width - 2, $detailsHeight, " Current Book Details ", "green");
 
@@ -944,7 +944,7 @@ class ImportUIService
     protected function drawLogs(): void
     {
         $footerTop = $this->getFooterSeparatorY();
-        $h = min(8, max(6, $this->height - 30));
+        $h = min(14, max(12, $this->height - 24));
         $y = $footerTop - $h;
         $this->drawBox(2, $y, $this->width - 2, $h, " Activity Log ", "yellow");
 
