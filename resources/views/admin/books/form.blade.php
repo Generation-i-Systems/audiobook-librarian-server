@@ -62,6 +62,117 @@
                 padding: 0.5rem 0;
                 margin-bottom: 0.25rem;
             }
+
+            .form-control-height-32 {
+                height: 32px;
+            }
+
+            .form-control-flex-1 {
+                flex: 1;
+            }
+
+            .btn-size-32 {
+                width: 32px;
+                height: 32px;
+                padding: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .btn-size-32-danger {
+                width: 32px;
+                height: 32px;
+                padding: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .btn-size-40 {
+                width: 40px;
+                height: 32px;
+                padding: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .btn-size-40-danger {
+                width: 40px;
+                height: 32px;
+                padding: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .btn-size-40-primary {
+                width: 40px;
+                height: 28px;
+                padding: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .gap-2px {
+                gap: 2px;
+            }
+
+            .ms-gap-2px {
+                margin-left: 0.5rem;
+            }
+
+            .width-80 {
+                width: 80px;
+            }
+
+            .flex-shrink-0 {
+                flex-shrink: 0;
+            }
+
+            .cover-preview-size {
+                height: 120px;
+                border: 2px solid #dee2e6;
+                border-radius: 4px;
+            }
+
+            .cover-preview-placeholder {
+                opacity: 0.5;
+            }
+
+            .cover-preview-badge {
+                width: 24px;
+                height: 24px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: -8px;
+            }
+
+            .series-placeholder {
+                width: 32px;
+                height: 32px;
+                margin-left: 0.5rem;
+                flex-shrink: 0;
+            }
+
+            .directory-files-list {
+                max-height: 220px;
+                overflow-y: auto;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                background: #fafbfc;
+                padding: 8px;
+            }
+
+            .cover-option-img {
+                max-width: 100px;
+                max-height: 140px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+            }
         </style>
         <div class="container-fluid" style="max-width: 1400px;">
             @php
@@ -96,10 +207,10 @@
                     <div>
                         <h1 style="margin-bottom: 30px;">{{ isset($book) ? 'Edit Book' : 'Create New Book' }}</h1>
                         <div class="mb-3">
-                            <button type="button" class="btn btn-info" id="autofill-modal-btn"><i
+                            <button type="button" class="btn btn-info" id="autofill-modal-btn" aria-label="Autofill Book Metadata"><i
                                     class="fas fa-magic me-2"></i>Autofill Book Metadata</button>
-                            <button type="button" class="btn btn-success ms-2" id="magic-autofill-btn"
-                                title="Auto-search and apply first result from Audible"><i class="fas fa-magic"></i></button>
+                             <button type="button" class="btn btn-success ms-2" id="magic-autofill-btn"
+                                  title="Auto-search and apply first result from Audible" aria-label="Magic Autofill"><i class="fas fa-magic"></i></button>
                             @if(isset($book))
                                 <button type="button" class="btn btn-secondary ms-2" id="raw-json-edit-btn"><i
                                         class="fas fa-code me-2"></i>Raw JSON Edit</button>
@@ -284,25 +395,37 @@
                                                     class="form-check-input" value="1" {{ ($series['isCollection'] ?? false) ? 'checked' : '' }} style="margin-top:0;">
                                                 <label class="form-check-label ms-1 small">Collection</label>
                                             </div>
-                                            <datalist id="series-list"></datalist>
+                                            <datalist id="series-list"></datalist> {{-- Populated by JavaScript via autocomplete --}}
                                             @if(!empty($series['seriesName']))
                                                 <button type="button" class="btn btn-sm btn-outline-primary ms-2 rename-series-btn"
                                                     data-series-name="{{ $series['seriesName'] }}"
                                                     style="height:32px; width:32px; padding:0; display:flex; align-items:center; justify-content:center; flex-shrink:0;"
-                                                    title="Rename this series">
+                                                    title="Rename this series" aria-label="Rename series">
                                                     <i class="fas fa-edit"></i>
                                                 </button>
                                             @else
                                                 <div style="width:32px; height:32px; margin-left:0.5rem; flex-shrink:0;"></div>
                                             @endif
-                                            <div class="d-flex flex-column ms-2" style="gap:2px;">
-                                                <button type="button" class="btn btn-outline-danger btn-sm remove-series"
-                                                    style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">&times;</button>
-                                                @if($idx === count($seriesList) - 1)
-                                                    <button type="button" class="btn btn-primary btn-sm add-series-row"
-                                                        style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">+</button>
-                                                @endif
-                                            </div>
+                            <div class="d-flex flex-column ms-2" style="gap:2px;">
+                                @if(!empty($series['seriesName']))
+                                    <button type="button" class="btn btn-outline-primary btn-sm rename-series-btn"
+                                        data-series-name="{{ $series['seriesName'] }}"
+                                        style="height:32px; width:32px; padding:0; display:flex; align-items:center; justify-content:center; flex-shrink:0;"
+                                        title="Rename this series" aria-label="Rename series">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                @else
+                                    <div style="width:32px; height:32px; margin-left:0.5rem; flex-shrink:0;" role="presentation" aria-hidden="true"></div>
+                                @endif
+                                <div class="d-flex flex-column ms-2" style="gap:2px;">
+                                    <button type="button" class="btn btn-outline-danger btn-sm remove-series"
+                                        style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Remove series">&times;</button>
+                                    @if($idx === count($seriesList) - 1)
+                                        <button type="button" class="btn btn-primary btn-sm add-series-row"
+                                            style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Add series">+</button>
+                                    @endif
+                                </div>
+                            </div>
                                         </div>
                                     @endforeach
                                 </div>
@@ -343,13 +466,13 @@
                                             <input type="text" name="author[]" class="form-control author-autocomplete"
                                                 style="height:32px; flex:1;" value="{{ $author }}" placeholder="Author Name"
                                                 required>
-                                            <datalist id="author-list"></datalist>
+                                            <datalist id="author-list"></datalist> {{-- Populated by JavaScript via autocomplete --}}
                                             <div class="d-flex flex-column ms-2" style="gap:2px;">
                                                 <button type="button" class="btn btn-outline-danger btn-sm remove-author"
-                                                    style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">&times;</button>
+                                                    style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Remove author">&times;</button>
                                                 @if($idx === $authorsCount - 1)
                                                     <button type="button" class="btn btn-primary btn-sm add-author-row"
-                                                        style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">+</button>
+                                                        style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Add author">+</button>
                                                 @endif
                                             </div>
                                         </div>
@@ -386,13 +509,13 @@
                                             @endphp
                                             <input type="text" name="narrator[]" class="form-control narrator-autocomplete"
                                                 style="height:32px; flex:1;" value="{{ $narrator }}" placeholder="Narrator Name">
-                                            <datalist id="narrator-list"></datalist>
+                                            <datalist id="narrator-list"></datalist> {{-- Populated by JavaScript via autocomplete --}}
                                             <div class="d-flex flex-column ms-2" style="gap:2px;">
                                                 <button type="button" class="btn btn-outline-danger btn-sm remove-row"
-                                                    style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">&times;</button>
+                                                    style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Remove narrator">&times;</button>
                                                 @if($idx === $narratorsCount - 1)
                                                     <button type="button" class="btn btn-primary btn-sm add-narrator-row"
-                                                        style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">+</button>
+                                                        style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Add narrator">+</button>
                                                 @endif
                                             </div>
                                         </div>
@@ -438,10 +561,10 @@
                                             @endif
                                             <div class="d-flex flex-column ms-2" style="gap:2px;">
                                                 <button type="button" class="btn btn-outline-danger btn-sm remove-genre"
-                                                    style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">&times;</button>
+                                                    style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Remove genre">&times;</button>
                                                 @if($idx === $genresCount - 1)
                                                     <button type="button" class="btn btn-primary btn-sm add-genre-row"
-                                                        style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">+</button>
+                                                        style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Add genre">+</button>
                                                 @endif
                                             </div>
                                         </div>
@@ -467,12 +590,23 @@
                                         id="directoryPath" name="directoryPath"
                                         value="{{ old('directoryPath', $directoryPath ?? ($initial['directoryPath'] ?? '')) }}"
                                         style="padding-right: 35px;" placeholder="Path to book directory">
-                                    <button type="button" class="btn btn-link text-danger position-absolute"
+                                <button type="button" class="btn btn-link text-danger position-absolute"
                                         id="directory-not-found-btn"
                                         style="display: none; right: 5px; top: 50%; transform: translateY(-50%); padding: 0; width: 25px; height: 25px;"
-                                        title="Directory not found - Click to browse">
+                                        title="Directory not found - Click to browse"
+                                        aria-label="Directory not found - Click to browse">
                                         <i class="fas fa-times-circle"></i>
                                     </button>
+                                <button type="button" class="btn btn-outline-secondary" id="update-path-from-fields-btn"
+                                    title="Update directory path based on current genre, author, title, and series fields"
+                                    aria-label="Update directory path based on current genre, author, title, and series fields">
+                                    <i class="fas fa-folder-plus me-1"></i>Update Path from Fields
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" id="resync-path-btn"
+                                    title="Parse directory path to populate title, author, and series fields"
+                                    aria-label="Parse directory path to populate title, author, and series fields">
+                                    <i class="fas fa-sync-alt me-1"></i>Parse Path to Fields
+                                </button>
                                 </div>
                                 <button type="button" class="btn btn-outline-secondary" id="update-path-from-fields-btn"
                                     title="Update directory path based on current genre, author, title, and series fields">
@@ -494,7 +628,7 @@
                             <a href="#" class="text-decoration-none" id="show-files-link">
                                 <i class="fas fa-folder-open me-1"></i>View Directory Files
                             </a>
-                            <div id="directory-files-list" class="w-100 mt-2"
+                            <div id="directory-files-list-content" class="w-100 mt-2"
                                 style="max-height:220px; overflow-y:auto; border:1px solid #ccc; border-radius:4px; background:#fafbfc; padding:8px; display:none; position: relative;">
                                 <span class="text-muted">No files loaded yet.</span>
                             </div>
@@ -686,7 +820,7 @@
                                 <input type="hidden" name="coverImageSource" id="coverImageSource" value="{{ $initialCoverSource }}">
 
                                 <div class="mb-3" id="cover-candidates-group" style="display: {{ !empty($coverOptions) ? 'block' : 'none' }}">
-                                    <div class="d-flex flex-wrap gap-3" id="cover-candidates-list">
+                                    <div class="d-flex flex-wrap gap-3" id="cover-candidates-list" style="max-height: 400px; overflow-y: auto; padding: 10px; background: #f8f9fa; border-radius: 4px; border: 1px solid #dee2e6;">
                                         @forelse($coverOptions as $option)
                                             <div class="text-center">
                                                 <label class="d-flex flex-column align-items-center">
@@ -705,7 +839,7 @@
                                         @empty
                                             <div class="alert alert-info w-100 mb-0">
                                                 <i class="fas fa-info-circle me-2"></i>No cover images found.
-                                                <button type="button" class="btn btn-sm btn-outline-primary ms-2" onclick="autoExtractEmbeddedCover()">
+                                                <button type="button" class="btn btn-sm btn-outline-primary ms-2" id="extract-cover-no-covers-btn" aria-label="Extract cover from audio files">
                                                     <i class="fas fa-music me-1"></i>Extract from Audio Files
                                                 </button>
                                             </div>
@@ -714,7 +848,7 @@
                                 </div>
 
                                 <div id="embedded-cover-status" class="mt-3"></div>
-                                <div id="embedded-cover-options" class="mt-3" style="display:none;"></div>
+                                <div id="embedded-cover-options" class="mt-3" style="display:none; min-height: 50px;"></div>
 
                                 <div id="google-books-matches-table-wrapper" style="display:none;" class="mt-4">
                                     <label class="form-label">Google Books: Select a Match</label>
@@ -753,13 +887,14 @@
                                 </div>
 
                                 <div class="mt-4" id="extract-embedded-cover-section">
-                                    <button type="button" class="btn btn-outline-primary" id="extract-embedded-cover-btn">
+                                    <button type="button" class="btn btn-outline-primary" id="extract-embedded-cover-btn"
+                                aria-label="Extract cover from audio files">
                                         <i class="fas fa-music me-2"></i>Extract Cover from Audio Files
                                     </button>
                                 </div>
                             </div>
                             <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" aria-label="Close modal">Close</button>
                             </div>
                         </div>
                     </div>
@@ -884,7 +1019,7 @@
                             optionsDiv.style.display = 'none';
 
                             // Make AJAX request to extract covers
-                            fetch('{{ route("admin.admin.books.extract-embedded-cover") }}', {
+                            fetch('{{ route("admin.books.extract-embedded-cover") }}', {
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',
@@ -894,13 +1029,18 @@
                                     directory_path: directoryPath
                                 })
                             })
-                            .then(response => response.json())
+                            .then(response => {
+                                if (!response.ok) {
+                                    return response.json().then(err => { throw err; });
+                                }
+                                return response.json();
+                            })
                             .then(data => {
                                 if (data.success) {
                                     statusDiv.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
                                     displayExtractedCovers(data.covers);
                                 } else {
-                                    statusDiv.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+                                    statusDiv.innerHTML = `<div class="alert alert-danger">${data.error || 'Extraction failed'}</div>`;
                                     optionsDiv.style.display = 'none';
                                 }
                             })
@@ -914,6 +1054,14 @@
                                 extractBtn.disabled = false;
                                 extractBtn.innerHTML = '<i class="fas fa-music me-2"></i>Extract Cover from Audio Files';
                             });
+                        });
+                    }
+
+                    // Add event listener for the extract button in the no covers alert
+                    const extractNoCoversBtn = document.getElementById('extract-cover-no-covers-btn');
+                    if (extractNoCoversBtn && extractBtn) {
+                        extractNoCoversBtn.addEventListener('click', function() {
+                            extractBtn.click();
                         });
                     }
 
@@ -1061,8 +1209,8 @@
                     row.className = 'input-group author-row align-items-start mb-3';
                     row.innerHTML = `<input type="text" name="author[]" class="form-control w-auto author-autocomplete" style="max-width:300px; height:32px;" required>
                         <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
-                            <button type="button" class="btn btn-outline-danger btn-sm remove-author p-0 mb-0" style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
-                            <button type="button" class="btn btn-primary btn-sm add-author-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
+                            <button type="button" class="btn btn-outline-danger btn-sm remove-author p-0 mb-0" style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;" aria-label="Remove author">&times;</button>
+                            <button type="button" class="btn btn-primary btn-sm add-author-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;" aria-label="Add author">+</button>
                         </div>`;
                     group.appendChild(row);
                     initBookFormUI();
@@ -1091,8 +1239,8 @@
                         </div>
                         <div style="width:32px; height:32px; margin-left:0.5rem; flex-shrink:0;"></div>
                         <div class="d-flex flex-column ms-2" style="gap:2px;">
-                            <button type="button" class="btn btn-outline-danger btn-sm remove-series" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">&times;</button>
-                            <button type="button" class="btn btn-primary btn-sm add-series-row" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;">+</button>
+                            <button type="button" class="btn btn-outline-danger btn-sm remove-series" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Remove series">&times;</button>
+                            <button type="button" class="btn btn-primary btn-sm add-series-row" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Add series">+</button>
                         </div>`;
                     group.appendChild(row);
                     initBookFormUI();
@@ -1114,8 +1262,8 @@
                     row.className = 'input-group genre-row align-items-start mb-3';
                     row.innerHTML = `<input type="text" name="genre[]" class="form-control w-auto genre-autocomplete" style="max-width:200px; height:32px;" required>
                         <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
-                            <button type="button" class="btn btn-outline-danger btn-sm remove-genre p-0 mb-0" style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
-                            <button type="button" class="btn btn-primary btn-sm add-genre-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
+                            <button type="button" class="btn btn-outline-danger btn-sm remove-genre p-0 mb-0" style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;" aria-label="Remove genre">&times;</button>
+                            <button type="button" class="btn btn-primary btn-sm add-genre-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;" aria-label="Add genre">+</button>
                         </div>`;
                     group.appendChild(row);
                     initBookFormUI();
@@ -1169,8 +1317,8 @@
                                         row.className = 'input-group author-row align-items-start mb-3';
                                         row.innerHTML = `<input type="text" name="author[]" class="form-control w-auto author-autocomplete" style="max-width:300px; height:32px;" value="${author}" required>
                                             <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
-                                                <button type="button" class="btn btn-outline-danger btn-sm remove-author p-0 mb-0" style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
-                                                <button type="button" class="btn btn-primary btn-sm add-author-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
+                                                <button type="button" class="btn btn-outline-danger btn-sm remove-author p-0 mb-0" style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;" aria-label="Remove author">&times;</button>
+                                                <button type="button" class="btn btn-primary btn-sm add-author-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;" aria-label="Add author">+</button>
                                             </div>`;
                                         authorsGroup.appendChild(row);
                                     });
@@ -1184,8 +1332,8 @@
                                         row.innerHTML = `<input type="text" name="series[${idx}][name]" class="form-control w-auto series-autocomplete" style="max-width:200px; height:32px;" value="${series.name}" placeholder="Series Name">
                                             <input type="text" name="series[${idx}][number]" class="form-control w-auto ms-2" style="max-width:100px; height:32px;" value="${series.number}" placeholder="Number">
                                             <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
-                                                <button type="button" class="btn btn-outline-danger btn-sm remove-series p-0 mb-0" style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;">&times;</button>
-                                                <button type="button" class="btn btn-primary btn-sm add-series-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;">+</button>
+                                                <button type="button" class="btn btn-outline-danger btn-sm remove-series p-0 mb-0" style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;" aria-label="Remove series">&times;</button>
+                                                <button type="button" class="btn btn-primary btn-sm add-series-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;" aria-label="Add series">+</button>
                                             </div>`;
                                         seriesGroup.appendChild(row);
                                     });
@@ -1203,11 +1351,8 @@
                         });
                 });
             }
-        });
-        </script>
-                <div id="directory-files-list" class="mt-2 mb-3" style="display:none; border: 1px solid #ddd; padding: 10px; border-radius: 4px;">
-                    {{-- Files will be listed here by JavaScript --}}
-                </div>
+                });
+                </script>
                 @if(isset($book))
                     <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
                         <div>
