@@ -1511,6 +1511,11 @@ class ImportUIService
             return;
         }
 
+        // Clear previous cover before rendering new one
+        if ($this->renderedCoverUrl !== null || $force) {
+            $this->clearInlineCoverRendering();
+        }
+
         $this->renderedCoverUrl = $this->cachedCoverUrl;
         $this->renderedCoverSignature = $signature;
 
