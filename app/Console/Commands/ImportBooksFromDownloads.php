@@ -976,8 +976,8 @@ class ImportBooksFromDownloads extends Command
             if (method_exists($this->uiService, 'requestInterrupt')) {
                 $this->uiService->requestInterrupt();
             }
-            // Clear the screen and restore terminal state like 'q' does
-            $this->uiService->clear();
+            // Use public method for proper terminal restoration
+            $this->uiService->restoreTerminalState();
         }
 
         $this->inputInterrupted = true;
