@@ -3093,11 +3093,18 @@ class BookImportService
 
         if (!empty($uiMetadata['cover_data'])) {
             $coverSource = 'Embedded';
+
+            // DEBUG: Log cover data info
+            error_log("DEBUG: buildUiMetadata - Processing embedded cover for: " . ($uiMetadata['title'] ?? 'unknown'));
+            error_log("DEBUG: buildUiMetadata - Cover data length: " . strlen($uiMetadata['cover_data']));
+            error_log("DEBUG: buildUiMetadata - Cover data hash: " . md5($uiMetadata['cover_data']));
+
             if ($getEmbeddedCoverTempPathCallback) {
                 $tempPath = $getEmbeddedCoverTempPathCallback($uiMetadata['cover_data']);
                 if ($tempPath) {
                     $uiMetadata['cover_url'] = $tempPath;
                     $uiMetadata['cover_is_local_file'] = true;
+                    error_log("DEBUG: buildUiMetadata - Set cover_url to: " . $tempPath);
                 }
             }
         } elseif (!empty($uiMetadata['cover_url'])) {
@@ -3503,9 +3510,16 @@ class BookImportService
      */
     public function getEmbeddedCoverTempPath(string $coverData): ?string
     {
+        // DEBUG: Log cover data info
+        error_log("DEBUG: getEmbeddedCoverTempPath - Cover data length: " . strlen($coverData));
+        error_log("DEBUG: getEmbeddedCoverTempPath - Cover data hash: " . md5($coverData));
+
         $binary = base64_decode($coverData, true);
         if (!is_string($binary)) {
+            error_log("DEBUG: getEmbeddedCoverTempPath - Using raw data (not base64)");
             $binary = $coverData;
+        } else {
+            error_log("DEBUG: getEmbeddedCoverTempPath - Decoded from base64, binary length: " . strlen($binary));
         }
 
         $tempFile = tempnam(sys_get_temp_dir(), 'embedded_cover_');
@@ -3513,7 +3527,8 @@ class BookImportService
             return null;
         }
 
-        file_put_contents($tempFile, $binary);
+        $result = file_put_contents($tempFile, $binary);
+        error_log("DEBUG: getEmbeddedCoverTempPath - Wrote " . $result . " bytes to " . $tempFile);
 
         return $tempFile;
     }

@@ -1547,6 +1547,9 @@ class ImportUIService
         if ($this->renderedCoverUrl !== null || $force) {
             error_log("DEBUG: Clearing previous cover");
             $this->clearInlineCoverRendering();
+
+            // Add small delay to ensure clearing completes
+            usleep(100000); // 0.1 second delay
         }
 
         $this->renderedCoverUrl = $this->cachedCoverUrl;
@@ -1589,7 +1592,13 @@ class ImportUIService
             return;
         }
 
-        // Try to clear the specific area where the cover was rendered
+        // Try multiple clearing approaches for kitten's internal cache
+        @system($kittenPath . ' icat --clear 2>/dev/null');
+
+        // Also try clearing with different parameters
+        @system($kittenPath . ' icat --clear --all 2>/dev/null');
+
+        // Clear the specific area where the cover was rendered
         $x = max(4, $this->width - ($this->inlineCoverCols + $this->inlineCoverPadding + 2));
         $y = 9;
         $cols = $this->inlineCoverCols;
@@ -1601,7 +1610,7 @@ class ImportUIService
             echo str_repeat(' ', $cols);
         }
 
-        // Then try the icat clear command
-        @system($kittenPath . ' icat --clear 2>/dev/null');
+        // Force screen refresh
+        echo "\e[0J";
     }
 }
