@@ -897,12 +897,16 @@ class ImportUIService
             'Publisher' => $publisher,
             'Confidence' => $confidenceLabel,
             'Cover' => $coverSourceLabel,
-            'Cover URL' => $coverUrlLabel,
             'Directory' => $directoryLabel,
             'Path' => $sourcePathLabel,
             'Desc' => $descriptionLabel,
-            'File' => $pathLabel,
         ];
+
+        // Only add Cover URL if it's not from embedded data
+        $isEmbeddedCover = strpos($coverUrl, sys_get_temp_dir()) === 0 && strpos($coverUrl, 'embedded_cover_') !== false;
+        if (!$isEmbeddedCover && $coverUrl !== '') {
+            $fields['Cover URL'] = $coverUrlLabel;
+        }
 
         $row = $y + 2;
         $maxRows = ($y + $detailsHeight) - 2;
