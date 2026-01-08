@@ -989,16 +989,9 @@ class ImportBooksFromDownloads extends Command
 
     protected function getEmbeddedCoverTempPath(string $coverData): ?string
     {
-        if ($this->embeddedCoverTempFile && file_exists($this->embeddedCoverTempFile)) {
-            return $this->embeddedCoverTempFile;
-        }
-
-        $tempFile = $this->getImportService()->getEmbeddedCoverTempPath($coverData);
-        if ($tempFile) {
-            $this->embeddedCoverTempFile = $tempFile;
-        }
-
-        return $tempFile;
+        // Always create a new temp file for each call to avoid caching issues
+        // The BookImportService already handles unique naming with content hash
+        return $this->getImportService()->getEmbeddedCoverTempPath($coverData);
     }
 
     /**
