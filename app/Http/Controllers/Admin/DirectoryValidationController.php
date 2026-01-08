@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Jobs\ValidateBookDirectoriesJob;
 use App\Models\Book;
+use App\Services\BookDeletionService;
 use App\Services\DirectoryMatchingService;
+use App\Services\SourceTrashService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
@@ -13,10 +15,17 @@ use Illuminate\Support\Facades\File;
 class DirectoryValidationController extends Controller
 {
     protected DirectoryMatchingService $matchingService;
+    protected SourceTrashService $trashService;
+    protected BookDeletionService $bookDeletionService;
 
-    public function __construct(DirectoryMatchingService $matchingService)
-    {
+    public function __construct(
+        DirectoryMatchingService $matchingService,
+        SourceTrashService $trashService,
+        BookDeletionService $bookDeletionService
+    ) {
         $this->matchingService = $matchingService;
+        $this->trashService = $trashService;
+        $this->bookDeletionService = $bookDeletionService;
     }
 
     public function index(Request $request)
@@ -98,10 +107,13 @@ class DirectoryValidationController extends Controller
             'book_id' => 'required|exists:books,id',
         ]);
 
-        $book = Book::findOrFail($request->book_id);
-        $book->delete();
+        $result = $this->bookDeletionService->moveToTrash($request->book_id, true);
 
-        return back()->with('success', 'Book entry deleted');
+        if ($result['success']) {
+            return back()->with('success', 'Book moved to trash successfully');
+        }
+
+        return back()->with('error', $result['error'] ?? 'Failed to move book to trash');
     }
 
     public function importOrphanedDirectory(Request $request)
@@ -130,8 +142,14 @@ class DirectoryValidationController extends Controller
             return back()->with('error', 'Directory not found');
         }
 
-        // Delete directory and all contents
-        if (File::deleteDirectory($fullPath)) {
+        // Move directory to trash instead of deleting
+        $trashResult = $this->trashService->movePathToTrash(
+            $fullPath,
+            'orphaned_directory_cleanup',
+            ['cleanup_reason' => 'admin deleted orphaned directory via web interface']
+        );
+
+        if ($trashResult) {
             // Update cache by removing just this entry
             $orphanedDirs = Cache::get('orphaned_directories', []);
             $orphanedDirs = array_filter($orphanedDirs, function ($dir) use ($fullPath) {
@@ -146,10 +164,10 @@ class DirectoryValidationController extends Controller
                 Cache::put('book_validation_results', $validationResults, now()->addDay());
             }
 
-            return back()->with('success', 'Directory deleted successfully');
+            return back()->with('success', 'Directory moved to trash successfully');
         }
 
-        return back()->with('error', 'Failed to delete directory');
+        return back()->with('error', 'Failed to move directory to trash');
     }
 
     public function renameOrphanedDirectory(Request $request)

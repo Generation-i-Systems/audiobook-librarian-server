@@ -579,36 +579,30 @@ class VerifyBookDirectories extends Command
                 $bookTitle = $book->title; // Store title before deletion
                 $bookId = $book->id;
 
-                if ($permanent) {
-                    $book->delete();
-                    $this->info("🗑️ Successfully permanently deleted book: {$bookTitle}");
-                    SafeLoggingService::safeLog('info', "Book permanently deleted", [
+                // Always use trash system
+                $result = $this->deletionService->moveToTrash((string) $bookId, true);
+
+                if ($result['success']) {
+                    if ($permanent) {
+                        $this->info("🗑️ Successfully moved book to trash (soft-deleted): {$bookTitle}");
+                    } else {
+                        $this->info("🗑️ Successfully moved book to trash: {$bookTitle}");
+                    }
+                    $this->line("   Trash ID: {$result['trash_item_id']}");
+                    SafeLoggingService::safeLog('info', "Book moved to trash", [
                         'book_id' => $bookId,
                         'book_title' => $bookTitle,
                         'deleted_from_command' => true,
-                        'permanent' => true,
+                        'trash_item_id' => $result['trash_item_id'],
                     ]);
                 } else {
-                    $result = $this->deletionService->moveToTrash((string) $bookId, true);
-
-                    if ($result['success']) {
-                        $this->info("🗑️ Successfully moved book to trash: {$bookTitle}");
-                        $this->line("   Trash ID: {$result['trash_item_id']}");
-                        SafeLoggingService::safeLog('info', "Book moved to trash", [
-                            'book_id' => $bookId,
-                            'book_title' => $bookTitle,
-                            'deleted_from_command' => true,
-                            'trash_item_id' => $result['trash_item_id'],
-                        ]);
-                    } else {
-                        $this->error("❌ Failed to move book to trash: " . ($result['error'] ?? 'Unknown error'));
-                        SafeLoggingService::safeLog('error', "Failed to move book to trash", [
-                            'book_id' => $bookId,
-                            'book_title' => $bookTitle,
-                            'error' => $result['error'] ?? 'Unknown error',
-                        ]);
-                        return 'skipped';
-                    }
+                    $this->error("❌ Failed to move book to trash: " . ($result['error'] ?? 'Unknown error'));
+                    SafeLoggingService::safeLog('error', "Failed to move book to trash", [
+                        'book_id' => $bookId,
+                        'book_title' => $bookTitle,
+                        'error' => $result['error'] ?? 'Unknown error',
+                    ]);
+                    return 'skipped';
                 }
                 return 'deleted';
             } catch (\Exception $e) {

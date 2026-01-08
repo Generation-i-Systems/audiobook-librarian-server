@@ -99,31 +99,19 @@ class BookObserver
 
     /**
      * Handle the Book "deleted" event.
-     * Clean up librarian.json when a book is deleted.
+     * NOTE: With SoftDeletes enabled, BookDeletionService handles moving files to trash.
+     * This method no longer deletes librarian.json directly to prevent data loss.
      */
     public function deleted(Book $book): void
     {
-        if (empty($book->directory_path)) {
-            return;
-        }
+        // Do nothing - BookDeletionService handles file cleanup via trash system
+        // If a book is soft-deleted, files remain in place until permanently deleted from trash
+        // If force-deleted, BookDeletionService should have already moved files to trash
 
-        try {
-            $jsonPath = rtrim($book->directory_path, '/') . '/librarian.json';
-
-            if (file_exists($jsonPath)) {
-                unlink($jsonPath);
-                Log::debug('Deleted librarian.json for book', [
-                    'book_id' => $book->id,
-                    'title' => $book->title,
-                    'path' => $jsonPath,
-                ]);
-            }
-        } catch (\Exception $e) {
-            Log::warning('Failed to delete librarian.json', [
-                'book_id' => $book->id,
-                'title' => $book->title,
-                'error' => $e->getMessage(),
-            ]);
-        }
+        Log::debug('Book deleted event fired', [
+            'book_id' => $book->id,
+            'title' => $book->title,
+            'soft_deleted' => $book->trashed(),
+        ]);
     }
 }

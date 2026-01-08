@@ -13,10 +13,12 @@ use Illuminate\Support\Facades\Storage;
 class AIQueryService
 {
     protected AIBookProcessor $aiProcessor;
+    protected BookDeletionService $bookDeletionService;
 
     public function __construct(?string $model = null, bool $paidTier = false)
     {
         $this->aiProcessor = new AIBookProcessor($model, $paidTier);
+        $this->bookDeletionService = app(BookDeletionService::class);
     }
 
     public function processQuery(string $userPrompt, int $userId, ?int $contextQueryId = null, int $contextLimit = 50): array
@@ -1141,7 +1143,10 @@ PROMPT;
                 case 'books':
                     $book = Book::findOrFail($id);
                     $entityName = $book->title;
-                    $book->delete();
+                    $result = $this->bookDeletionService->moveToTrash($id, true);
+                    if (!$result['success']) {
+                        return $result;
+                    }
                     break;
 
                 default:

@@ -142,19 +142,15 @@ class PrepareForReprocessing extends Command
                     try {
                         if ($this->option('permanent')) {
                             // Permanently delete without trash
-                            DB::beginTransaction();
-                            // Detach relationships
-                            $book->authors()->detach();
-                            $book->narrators()->detach();
-                            $book->genres()->detach();
-                            $book->series()->detach();
+                            // Use trash system even for "permanent" delete
+                            $result = $this->deletionService->moveToTrash((string) $book->id, false);
 
-                            // Delete book
-                            $book->delete();
-
-                            DB::commit();
-                            $this->line("   ✓ Permanently deleted from database");
-                            $deletedCount++;
+                            if ($result['success']) {
+                                $this->line("   ✓ Moved to trash (database entry soft-deleted)");
+                                $deletedCount++;
+                            } else {
+                                $this->error("   ✗ Failed to move to trash: " . ($result['error'] ?? 'Unknown error'));
+                            }
                         } else {
                             // Move to trash (files are already in _NEEDS_REPROCESSING, don't move them again)
                             $result = $this->deletionService->moveToTrash((string) $book->id, false);

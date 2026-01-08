@@ -27,14 +27,17 @@ class UnifiedBookImporter
     private DocumentStoreServiceInterface $documentStore;
     private BookDirectoryParser $parser;
     private ?GenreMappingService $genreMapper = null;
+    private SourceTrashService $sourceTrashService;
 
     public function __construct(
         DocumentStoreServiceInterface $documentStore,
         BookDirectoryParser $parser,
+        SourceTrashService $sourceTrashService,
         ?GenreMappingService $genreMapper = null
     ) {
         $this->documentStore = $documentStore;
         $this->parser = $parser;
+        $this->sourceTrashService = $sourceTrashService;
         $this->genreMapper = $genreMapper;
         if ($this->genreMapper === null) {
             try {
@@ -398,10 +401,23 @@ class UnifiedBookImporter
 
         // Handle duplicate action for audio files
         if ($duplicateAction === 'replace') {
-            // Delete existing audio files
+            // Move existing audio files to trash before replacing
             $existingAudioFiles = glob($fullDestPath . '/*.{m4b,m4a,mp3}', GLOB_BRACE);
             foreach ($existingAudioFiles as $existingFile) {
-                @unlink($existingFile);
+                $trashResult = $this->sourceTrashService->movePathToTrash(
+                    $existingFile,
+                    'replaced_during_import',
+                    [
+                        'destination' => $fullDestPath,
+                        'action' => 'replace',
+                        'original_filename' => basename($existingFile),
+                    ]
+                );
+                if (!$trashResult) {
+                    Log::warning('Failed to move file to trash during replace', [
+                        'file' => $existingFile,
+                    ]);
+                }
             }
         }
 

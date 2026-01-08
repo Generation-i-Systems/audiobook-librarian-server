@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Traits\CamelCaseAttributeAccess;
 use App\Traits\Auditable;
 
@@ -12,6 +13,7 @@ class Narrator extends Model
     use HasFactory;
     use CamelCaseAttributeAccess;
     use Auditable;
+    use SoftDeletes;
 
     protected $fillable = ['name', 'normalized_name'];
 

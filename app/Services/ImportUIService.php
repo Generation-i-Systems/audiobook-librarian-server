@@ -1196,7 +1196,10 @@ class ImportUIService
             return;
         }
 
-        if ($coverUrl === $this->cachedCoverUrl) {
+        // Check if we have a valid cached cover for this URL
+        if ($coverUrl === $this->cachedCoverUrl
+            && $this->cachedCoverTempFile
+            && file_exists($this->cachedCoverTempFile)) {
             return;
         }
 

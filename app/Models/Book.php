@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Relations\TouchesParentBelongsToMany;
 use App\Traits\CamelCaseAttributeAccess;
 use App\Traits\Auditable;
@@ -43,6 +44,7 @@ class Book extends Model
     use HasFactory;
     use CamelCaseAttributeAccess;
     use Auditable;
+    use SoftDeletes;
 
     protected $observables = [
         'pivotAttached',
@@ -103,6 +105,7 @@ class Book extends Model
         'directory_last_checked' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'deleted_at' => 'datetime',
     ];
 
     /**
