@@ -979,7 +979,13 @@ class ImportBooksFromDownloads extends Command
     protected function handleUserInterruption(): void
     {
         $this->inputInterrupted = true;
-        exit(130);
+
+        // Set interrupted flag on UI service to break out of input loops
+        if ($this->uiService && method_exists($this->uiService, 'requestInterrupt')) {
+            $this->uiService->requestInterrupt();
+        }
+
+        // Don't exit immediately - let the interrupt handling break loops and exit naturally
     }
 
     protected function getEmbeddedCoverTempPath(string $coverData): ?string
