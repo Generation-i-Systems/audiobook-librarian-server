@@ -985,7 +985,8 @@ class ImportBooksFromDownloads extends Command
             $this->uiService->requestInterrupt();
         }
 
-        // Don't exit immediately - let the interrupt handling break loops and exit naturally
+        // Exit after setting flags - this should work with the interrupt checks in loops
+        exit(130);
     }
 
     protected function getEmbeddedCoverTempPath(string $coverData): ?string
