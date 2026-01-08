@@ -976,7 +976,8 @@ class ImportBooksFromDownloads extends Command
             if (method_exists($this->uiService, 'requestInterrupt')) {
                 $this->uiService->requestInterrupt();
             }
-            $this->uiService->restoreTerminalState();
+            // Clear the screen and restore terminal state like 'q' does
+            $this->uiService->clear();
         }
 
         $this->inputInterrupted = true;
@@ -984,7 +985,8 @@ class ImportBooksFromDownloads extends Command
         $this->warn("⚠️  [Request interrupted by user] - Ctrl+C detected");
         $this->info('🛑 Quitting import process gracefully...');
 
-        exit(130);
+        // Don't call exit() directly - let the normal cleanup flow handle it
+        // This allows proper terminal restoration like 'q' option
     }
 
     protected function getEmbeddedCoverTempPath(string $coverData): ?string

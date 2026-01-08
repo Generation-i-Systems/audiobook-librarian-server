@@ -1551,7 +1551,7 @@ class ImportUIService
 
         // Place the cover image inside the Book Details panel (top-right)
         $x = max(4, $this->width - ($this->inlineCoverCols + $this->inlineCoverPadding + 2));
-        $y = 9;
+        $y = 7; // Moved up 2 rows from original position 9
         $cols = $this->inlineCoverCols;
         $rows = $this->inlineCoverRows;
         $place = $cols . 'x' . $rows . '@' . $x . 'x' . $y;

@@ -3094,30 +3094,12 @@ class BookImportService
         if (!empty($uiMetadata['cover_data'])) {
             $coverSource = 'Embedded';
 
-            // DEBUG: Log cover data info to specific file
-            $debugMsg = "DEBUG: buildUiMetadata - Processing embedded cover for: " . ($uiMetadata['title'] ?? 'unknown') . "\n";
-            $debugMsg .= "DEBUG: buildUiMetadata - Cover data length: " . strlen($uiMetadata['cover_data']) . "\n";
-            $debugMsg .= "DEBUG: buildUiMetadata - Cover data hash: " . md5($uiMetadata['cover_data']) . "\n";
-            file_put_contents('/tmp/cover_debug.log', $debugMsg, FILE_APPEND | LOCK_EX);
-
             if ($getEmbeddedCoverTempPathCallback) {
-                file_put_contents('/tmp/cover_debug.log', "DEBUG: buildUiMetadata - About to call getEmbeddedCoverTempPathCallback\n", FILE_APPEND | LOCK_EX);
-                file_put_contents('/tmp/cover_debug.log', "DEBUG: buildUiMetadata - Callback type: " . gettype($getEmbeddedCoverTempPathCallback) . "\n", FILE_APPEND | LOCK_EX);
-                file_put_contents('/tmp/cover_debug.log', "DEBUG: buildUiMetadata - Callback is: " . spl_object_hash($getEmbeddedCoverTempPathCallback) . "\n", FILE_APPEND | LOCK_EX);
-
                 $tempPath = $getEmbeddedCoverTempPathCallback($uiMetadata['cover_data']);
-
-                file_put_contents('/tmp/cover_debug.log', "DEBUG: buildUiMetadata - Callback returned: " . ($tempPath ?? 'null') . "\n", FILE_APPEND | LOCK_EX);
-
                 if ($tempPath) {
                     $uiMetadata['cover_url'] = $tempPath;
                     $uiMetadata['cover_is_local_file'] = true;
-                    file_put_contents('/tmp/cover_debug.log', "DEBUG: buildUiMetadata - Set cover_url to: " . $tempPath . "\n", FILE_APPEND | LOCK_EX);
-                } else {
-                    file_put_contents('/tmp/cover_debug.log', "DEBUG: buildUiMetadata - getEmbeddedCoverTempPathCallback returned null\n", FILE_APPEND | LOCK_EX);
                 }
-            } else {
-                file_put_contents('/tmp/cover_debug.log', "DEBUG: buildUiMetadata - getEmbeddedCoverTempPathCallback is null\n", FILE_APPEND | LOCK_EX);
             }
         } elseif (!empty($uiMetadata['cover_url'])) {
             if (isset($uiMetadata['audible_raw'])) {
@@ -3130,6 +3112,19 @@ class BookImportService
         }
 
         $uiMetadata['cover_source'] = $coverSource;
+
+        // Prioritize OpenAudible XML metadata when path includes OpenAudible
+        $sourcePath = $uiMetadata['source_path'] ?? '';
+        if (is_string($sourcePath) && stripos($sourcePath, 'OpenAudible') !== false) {
+            // OpenAudible XML is the best metadata source - mark as high confidence
+            $uiMetadata['confidence'] = 95;
+            $uiMetadata['metadata_source'] = 'OpenAudible XML';
+
+            // Ensure OpenAudible metadata takes precedence
+            if (isset($uiMetadata['openaudible_raw'])) {
+                $uiMetadata['metadata_priority'] = 'openaudible';
+            }
+        }
 
         if ($generateDirectoryPathCallback) {
             $uiMetadata['directory_path'] = $generateDirectoryPathCallback($uiMetadata, [
@@ -6425,9 +6420,22 @@ class BookImportService
             $uiServiceLogCallback("⚠️  No external enrichment data found - detected fields may be incorrect");
         } else {
             $confidence = $metadata['confidence'] ?? 0;
-            $defaultChoice = $confidence > 80 ? '1' : '2';
-            if (!$isGenreValid) {
-                $defaultChoice = '2';
+
+            // Smart default logic
+            $title = $metadata['title'] ?? '';
+            $author = $metadata['author'] ?? '';
+            $isTitleGood = is_string($title) && strlen(trim($title)) > 0;
+            $isAuthorGood = is_string($author) && strlen(trim($author)) > 0;
+
+            // Default to Accept all if title, author, and genres are all good
+            if ($isTitleGood && $isAuthorGood && $isGenreValid && $confidence > 80) {
+                $defaultChoice = '1';
+            } elseif (!$isGenreValid) {
+                // Default to option 5 (Update genre) when genre is invalid
+                $defaultChoice = '5';
+            } else {
+                // Default to Edit if confidence is low or some fields are weak
+                $defaultChoice = $confidence > 80 ? '1' : '2';
             }
 
             while (true) {
