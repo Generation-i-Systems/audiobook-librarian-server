@@ -1530,8 +1530,10 @@ class ImportUIService
             return;
         }
 
-        // Clear previous cover before rendering new one
-        if ($this->renderedCoverUrl !== null || $force) {
+        // Only clear if the cover URL is actually different (not just force render)
+        $shouldClear = ($this->renderedCoverUrl !== null && $this->renderedCoverUrl !== $this->cachedCoverUrl);
+
+        if ($shouldClear) {
             $this->clearInlineCoverRendering();
         }
 
