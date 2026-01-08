@@ -985,8 +985,8 @@ class ImportBooksFromDownloads extends Command
         $this->warn("⚠️  [Request interrupted by user] - Ctrl+C detected");
         $this->info('🛑 Quitting import process gracefully...');
 
-        // Don't call exit() directly - let the normal cleanup flow handle it
-        // This allows proper terminal restoration like 'q' option
+        // Exit after proper cleanup to ensure process termination
+        exit(130);
     }
 
     protected function getEmbeddedCoverTempPath(string $coverData): ?string
