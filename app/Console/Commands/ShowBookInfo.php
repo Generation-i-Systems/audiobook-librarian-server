@@ -24,22 +24,22 @@ class ShowBookInfo extends Command
     private ?string $resolvedBookRoot = null;
 
     protected $signature = 'books:info {directories?*}
-                            {--compact : Use compact view instead of table}
-                            {--show-paths : Show full paths being checked}
-                            {--delete= : Delete book(s) by ID(s) or directory}
-                            {--c|cover= : Update cover image (filename or path)}
-                            {--t|title= : Update book title}
-                            {--a|author=* : Update authors (+add, -remove, or replace all)}
-                            {--s|series=* : Update series (+add, -remove, or replace all)}
-                            {--g|genre=* : Update genres (+add, -remove, or replace all)}
-                            {--p|publisher= : Update publisher name}
-                            {--l|language= : Update language code}
-                            {--r|release-date= : Update release date (YYYY-MM-DD)}
-                            {--d|description= : Update book description}
-                            {--S|source= : Update source of the book data}
-                            {--e|edit : Open book edit page in browser}
-                            {--merge-directories : Merge multiple directories (or subdirectories) into one before displaying details}
-                            {--force : Skip confirmation prompts}';
+                {--compact : Use compact view instead of table}
+                {--show-paths : Show full paths being checked}
+                {--delete= : Delete book(s) by ID(s) or directory}
+                {--c|cover= : Update cover image (filename or path)}
+                {--t|title= : Update book title}
+                {--a|author=* : Update authors (+add, -remove, or replace all)}
+                {--s|series=* : Update series (+add, -remove, or replace all)}
+                {--g|genre=* : Update genres (+add, -remove, or replace all)}
+                {--p|publisher= : Update publisher name}
+                {--l|language= : Update language code}
+                {--r|release-date= : Update release date (YYYY-MM-DD)}
+                {--d|description= : Update book description}
+                {--S|source= : Update source of the book data}
+                {--e|edit : Open book edit page in browser}
+                {--merge-directories : Merge multiple directories (or subdirectories) into one}
+                {--force : Skip confirmation prompts}';
 
     protected $description = 'Display and optionally update book information from database';
 
@@ -225,7 +225,7 @@ class ShowBookInfo extends Command
     private function queryBook(): Builder
     {
         return $this->bookModel->newQuery()
-            ->with(['authors', 'narrators', 'genres', 'series', 'publisher']);
+        ->with(['authors', 'narrators', 'genres', 'series', 'publisher']);
     }
 
     protected function showBookById(string $bookId): void
@@ -297,9 +297,9 @@ class ShowBookInfo extends Command
         if ($books->isEmpty()) {
             /** @var \Illuminate\Support\Collection<int, Book> $books */
             $books = $this->queryBook()
-                ->where('directory_path', 'LIKE', '%' . basename($searchPath) . '%')
-                ->where('directory_path', 'LIKE', dirname($searchPath) . '%')
-                ->get();
+            ->where('directory_path', 'LIKE', '%' . basename($searchPath) . '%')
+            ->where('directory_path', 'LIKE', dirname($searchPath) . '%')
+            ->get();
             $isFuzzyMatch = $books->isNotEmpty();
         }
 
@@ -787,8 +787,8 @@ class ShowBookInfo extends Command
         $rowIndex = count($rows) + 1;
         $preferredWidth = $hasCoverImage && $rowIndex <= $imageCoverageRows ? $shortWidth : $maxWidth;
         $rows[] = [
-            $label,
-            $wrap ? $this->wrapText($value, $preferredWidth) : $value,
+        $label,
+        $wrap ? $this->wrapText($value, $preferredWidth) : $value,
         ];
     }
 
@@ -991,7 +991,12 @@ class ShowBookInfo extends Command
 
             if (preg_match('/^\s+$/u', $token)) {
                 if (str_contains($token, "\n") || str_contains($token, "\r")) {
-                    $segments = preg_split("/(\r\n|\r|\n)/", $token, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
+                    $segments = preg_split(
+                        "/(\r\n|\r|\n)/",
+                        $token,
+                        -1,
+                        PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY
+                    );
                     foreach ($segments as $segment) {
                         if (preg_match("/\r\n|\r|\n/", $segment)) {
                             $flushLine();
@@ -1055,15 +1060,15 @@ class ShowBookInfo extends Command
     protected function hasUpdateOptions(): bool
     {
         return $this->option('cover')
-            || $this->option('title')
-            || !empty($this->option('author'))
-            || !empty($this->option('series'))
-            || !empty($this->option('genre'))
-            || $this->option('publisher')
-            || $this->option('language')
-            || $this->option('release-date')
-            || $this->option('description')
-            || $this->option('source');
+        || $this->option('title')
+        || !empty($this->option('author'))
+        || !empty($this->option('series'))
+        || !empty($this->option('genre'))
+        || $this->option('publisher')
+        || $this->option('language')
+        || $this->option('release-date')
+        || $this->option('description')
+        || $this->option('source');
     }
 
     protected function hasAudioFiles(string $directory): bool
@@ -1128,16 +1133,16 @@ class ShowBookInfo extends Command
                 try {
                     // Use stream context to follow redirects
                     $context = stream_context_create([
-                        'http' => [
-                            'follow_location' => true,
-                            'max_redirects' => 10,
-                            'timeout' => 30,
-                            'user_agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                        ],
-                        'ssl' => [
-                            'verify_peer' => false,
-                            'verify_peer_name' => false,
-                        ],
+                    'http' => [
+                    'follow_location' => true,
+                    'max_redirects' => 10,
+                    'timeout' => 30,
+                    'user_agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    ],
+                    'ssl' => [
+                    'verify_peer' => false,
+                    'verify_peer_name' => false,
+                    ],
                     ]);
 
                     $imageData = file_get_contents($coverInput, false, $context);
@@ -1468,109 +1473,202 @@ class ShowBookInfo extends Command
     /**
      * Handle book deletion
      */
-    protected function handleDelete(string $bookId): int
+    protected function handleDelete(string $deleteInput): int
     {
-        // Find the book
-        $book = $this->queryBook()->find($bookId);
+        $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
+        $bookRoot = realpath($bookRoot) ?: $bookRoot;
 
-        if (!$book) {
-            $this->error("Book not found with ID: {$bookId}");
-            return 1;
+        $items = array_map('trim', explode(',', $deleteInput));
+        $booksToDelete = collect();
+        $notFoundItems = [];
+
+        foreach ($items as $item) {
+            if (ctype_digit($item)) {
+                $book = $this->queryBook()->find($item);
+                if ($book) {
+                    $booksToDelete->push($book);
+                } else {
+                    $notFoundItems[] = "Book ID: {$item}";
+                }
+            } else {
+                $pattern = rtrim($bookRoot, '/') . '/' . ltrim($item, '/');
+                $matchedDirs = glob($pattern, GLOB_ONLYDIR);
+
+                if (empty($matchedDirs)) {
+                    $notFoundItems[] = "Pattern: {$item}";
+                    continue;
+                }
+
+                foreach ($matchedDirs as $dir) {
+                    $relativePath = ltrim(substr($dir, strlen($bookRoot)), '/');
+                    $books = $this->queryBook()->where('directory_path', $relativePath)->get();
+
+                    if ($books->isEmpty()) {
+                        $notFoundItems[] = "Directory: {$relativePath}";
+                    }
+
+                    foreach ($books as $book) {
+                        if (!$booksToDelete->contains('id', $book->id)) {
+                            $booksToDelete->push($book);
+                        }
+                    }
+                }
+            }
         }
 
-        // Display book information
-        $this->info("Book to delete:");
-        $this->line("  ID: {$book->id}");
-        $this->line("  Title: {$book->title}");
-        $this->line("  Author: " . ($book->authors()->count() > 0 ? $book->authors()->pluck('name')->join(', ') : 'N/A'));
-        $this->line("  Directory: {$book->directoryPath}");
-
-        // Check if directory exists
-        $bookRoot = config('app.book_root', '/media/lyra_data1/audiobooks/books');
-        // Resolve symlinks in book root for consistent path handling
-        $bookRoot = realpath($bookRoot) ?: $bookRoot;
-        $fullPath = $bookRoot . '/' . ltrim($book->directoryPath, '/');
-        $directoryExists = file_exists($fullPath) && is_dir($fullPath);
-
-        if ($directoryExists) {
-            $this->line("  Directory exists: <fg=green>Yes</>");
-
-            // Check if any other books use this directory
-            $otherBooks = $this->queryBook()
-                ->where('directory_path', $book->directoryPath)
-                ->where('id', '!=', $book->id)
-                ->get();
-
-            if ($otherBooks->count() > 0) {
-                $this->error("\n⚠️  WARNING: This directory is used by " . $otherBooks->count() . " other book(s):");
-                foreach ($otherBooks as $otherBook) {
-                    $this->line("  - ID {$otherBook->id}: {$otherBook->title}");
-                }
-                $this->error("\nCannot delete directory that is shared with other books!");
-                $this->line("The book record will be deleted, but the directory will be preserved.");
-
-                if (!$this->confirm("\nDelete only the book record (preserve directory)?", false)) {
-                    $this->info("Cancelled");
-                    return 0;
-                }
-
-                $deleteDirectory = false;
-            } else {
-                $this->line("  No other books use this directory");
-
-                $choice = $this->choice(
-                    "\nWhat would you like to delete?",
-                    [
-                        '1' => 'Book record only (preserve directory and files)',
-                        '2' => 'Book record AND directory (delete everything)',
-                        '3' => 'Cancel (delete nothing)',
-                    ],
-                    '1'
-                );
-
-                if ($choice === 'Cancel (delete nothing)') {
-                    $this->info("Cancelled");
-                    return 0;
-                }
-
-                $deleteDirectory = $choice === 'Book record AND directory (delete everything)';
+        if (!empty($notFoundItems)) {
+            $this->warn("The following items were not found:");
+            foreach ($notFoundItems as $item) {
+                $this->line("  - {$item}");
             }
-        } else {
-            $this->line("  Directory exists: <fg=red>No</>");
+            $this->newLine();
 
-            if (!$this->confirm("\nDelete book record?", false)) {
+            if (!$this->option('force') && !$this->confirm("Continue with remaining books?", true)) {
                 $this->info("Cancelled");
                 return 0;
             }
-
-            $deleteDirectory = false;
         }
 
-        // Delete the book using trash system
-        try {
-            $result = $this->deletionService->moveToTrash((string) $book->id, $deleteDirectory);
-
-            if ($result['success']) {
-                if ($deleteDirectory) {
-                    $this->info("✓ Book and files moved to trash");
-                    $this->line("  Trash ID: {$result['trash_item_id']}");
-                    $this->line("  Files moved: {$result['file_count']}");
-                } else {
-                    $this->info("✓ Book record moved to trash (files preserved)");
-                    $this->line("  Trash ID: {$result['trash_item_id']}");
-                }
-                $this->newLine();
-                $this->info("You can restore this book from /admin/trash");
-            } else {
-                $this->error("Failed to delete book: " . ($result['error'] ?? 'Unknown error'));
-                return 1;
-            }
-        } catch (\Exception $e) {
-            $this->error("Failed to delete book: " . $e->getMessage());
+        if ($booksToDelete->isEmpty()) {
+            $this->error("No books found to delete");
             return 1;
         }
 
-        $this->info("\n✓ Deletion completed successfully!");
-        return 0;
+        $this->info("Found {$booksToDelete->count()} book(s) to delete:");
+        $this->newLine();
+
+        foreach ($booksToDelete as $book) {
+            $this->line("  ID: {$book->id}");
+            $this->line("  Title: {$book->title}");
+            $this->line("  Author: " .
+                ($book->authors()->count() > 0 ? $book->authors()->pluck('name')->join(', ') : 'N/A'));
+            $this->line("  Directory: {$book->directoryPath}");
+            $this->newLine();
+        }
+
+        if (!$this->option('force') && !$this->confirm("Proceed with deletion?", false)) {
+            $this->info("Cancelled");
+            return 0;
+        }
+
+        $this->newLine();
+
+        $successCount = 0;
+        $failCount = 0;
+        $skippedCount = 0;
+
+        foreach ($booksToDelete as $index => $book) {
+            $this->line("<fg=cyan>Book " . ($index + 1) . " of {$booksToDelete->count()}:</>");
+            $this->line("  ID: {$book->id}");
+            $this->line("  Title: {$book->title}");
+            $this->line("  Author: " .
+                ($book->authors()->count() > 0 ? $book->authors()->pluck('name')->join(', ') : 'N/A'));
+            $this->line("  Directory: {$book->directoryPath}");
+
+            $fullPath = $bookRoot . '/' . ltrim($book->directoryPath, '/');
+            $directoryExists = file_exists($fullPath) && is_dir($fullPath);
+
+            $deleteDirectory = false;
+
+            if ($directoryExists) {
+                $this->line("  Directory exists: <fg=green>Yes</>");
+
+                $otherBooks = $this->queryBook()
+                    ->where('directory_path', $book->directoryPath)
+                    ->where('id', '!=', $book->id)
+                    ->get();
+
+                if ($otherBooks->count() > 0) {
+                    $this->error(
+                        "\n⚠️  WARNING: This directory is used by " . $otherBooks->count() . " other book(s):"
+                    );
+                    foreach ($otherBooks as $otherBook) {
+                        $this->line("  - ID {$otherBook->id}: {$otherBook->title}");
+                    }
+                    $this->error("\nCannot delete directory that is shared with other books!");
+                    $this->line("The book record will be deleted, but the directory will be preserved.");
+
+                    if (
+                        !$this->option('force') &&
+                        !$this->confirm("\nDelete only the book record (preserve directory)?", false)
+                    ) {
+                        $skippedCount++;
+                        $this->info("Skipped");
+                        $this->newLine();
+                        continue;
+                    }
+
+                    $deleteDirectory = false;
+                } else {
+                    $this->line("  No other books use this directory");
+
+                    if ($this->option('force')) {
+                        $deleteDirectory = false;
+                    } else {
+                        $choice = $this->choice(
+                            "\nWhat would you like to delete?",
+                            [
+                            '1' => 'Book record only (preserve directory and files)',
+                            '2' => 'Book record AND directory (delete everything)',
+                            '3' => 'Cancel (delete nothing)',
+                            ],
+                            '1'
+                        );
+
+                        if ($choice === 'Cancel (delete nothing)') {
+                            $skippedCount++;
+                            $this->info("Skipped");
+                            $this->newLine();
+                            continue;
+                        }
+
+                        $deleteDirectory = $choice === 'Book record AND directory (delete everything)';
+                    }
+                }
+            } else {
+                $this->line("  Directory exists: <fg=red>No</>");
+
+                if (!$this->option('force') && !$this->confirm("\nDelete book record?", false)) {
+                    $skippedCount++;
+                    $this->info("Skipped");
+                    $this->newLine();
+                    continue;
+                }
+
+                $deleteDirectory = false;
+            }
+
+            try {
+                $result = $this->deletionService->moveToTrash((string) $book->id, $deleteDirectory);
+
+                if ($result['success']) {
+                    $successCount++;
+                    if ($deleteDirectory) {
+                        $this->info("✓ Book and files moved to trash");
+                        $this->line("  Trash ID: {$result['trash_item_id']}");
+                        $this->line("  Files moved: {$result['file_count']}");
+                    } else {
+                        $this->info("✓ Book record moved to trash (files preserved)");
+                        $this->line("  Trash ID: {$result['trash_item_id']}");
+                    }
+                } else {
+                    $failCount++;
+                    $this->error("✗ Failed to delete book: " . ($result['error'] ?? 'Unknown error'));
+                }
+            } catch (\Exception $e) {
+                $failCount++;
+                $this->error("✗ Failed to delete book: " . $e->getMessage());
+            }
+
+            $this->newLine();
+        }
+
+        $this->info("Deletion completed: {$successCount} deleted, {$skippedCount} skipped, {$failCount} failed");
+
+        if ($successCount > 0) {
+            $this->info("You can restore deleted books from /admin/trash");
+        }
+
+        return $failCount > 0 ? 1 : 0;
     }
 }
