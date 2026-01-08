@@ -1201,6 +1201,15 @@ class ImportUIService
             return;
         }
 
+        // For local temp files (like embedded covers), always re-cache to ensure freshness
+        $isTempFile = strpos($coverUrl, sys_get_temp_dir()) === 0;
+        if ($isTempFile) {
+            $this->cleanupCoverTempFile();
+            $this->cachedCoverUrl = $coverUrl;
+            $this->cacheCoverFromUrl($coverUrl);
+            return;
+        }
+
         // Check if we have a valid cached cover for this URL
         if ($coverUrl === $this->cachedCoverUrl
             && $this->cachedCoverTempFile
@@ -1210,7 +1219,11 @@ class ImportUIService
 
         $this->cleanupCoverTempFile();
         $this->cachedCoverUrl = $coverUrl;
+        $this->cacheCoverFromUrl($coverUrl);
+    }
 
+    private function cacheCoverFromUrl(string $coverUrl): void
+    {
         // Download cover to a temp file for kitten/kitty rendering
         $tempFile = tempnam(sys_get_temp_dir(), 'import_cover_');
         if (!$tempFile) {

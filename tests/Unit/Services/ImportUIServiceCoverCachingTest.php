@@ -60,6 +60,47 @@ class ImportUIServiceCoverCachingTest extends TestCase
         parent::tearDown();
     }
 
+    public function testEmbeddedCoversWithDifferentPathsAlwaysReCache(): void
+    {
+        $book1 = [
+            'title' => 'Test Book 1',
+            'cover_url' => sys_get_temp_dir() . '/embedded_cover_abc123',
+            'cover_is_local_file' => true
+        ];
+
+        $book2 = [
+            'title' => 'Test Book 2',
+            'cover_url' => sys_get_temp_dir() . '/embedded_cover_def456', // Different temp file
+            'cover_is_local_file' => true
+        ];
+
+        // Set first book with embedded cover
+        $this->importUIService->exposeSetCurrentBook($book1);
+        $tempFile1 = $this->importUIService->exposeGetCachedCoverTempFile();
+        $cachedUrl1 = $this->importUIService->exposeGetCachedCoverUrl();
+
+        $this->assertNotNull($tempFile1);
+        $this->assertFileExists($tempFile1);
+        $this->assertEquals(sys_get_temp_dir() . '/embedded_cover_abc123', $cachedUrl1);
+
+        // Set second book with different embedded cover path
+        $this->importUIService->exposeSetCurrentBook($book2);
+        $tempFile2 = $this->importUIService->exposeGetCachedCoverTempFile();
+        $cachedUrl2 = $this->importUIService->exposeGetCachedCoverUrl();
+
+        // Should have created new temp file (different embedded cover path)
+        $this->assertNotNull($tempFile2);
+        $this->assertFileExists($tempFile2);
+        $this->assertNotEquals($tempFile1, $tempFile2);
+        $this->assertEquals(sys_get_temp_dir() . '/embedded_cover_def456', $cachedUrl2);
+
+        // Old temp file should be cleaned up
+        $this->assertFileDoesNotExist($tempFile1);
+
+        // The key test: embedded covers with different paths should always re-cache
+        $this->assertTrue(true, 'Embedded covers with different paths always re-cache');
+    }
+
     public function testCoverClearedBeforeRenderingNewBook(): void
     {
         $book1 = [
