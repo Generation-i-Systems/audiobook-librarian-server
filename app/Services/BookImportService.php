@@ -3102,7 +3102,12 @@ class BookImportService
 
             if ($getEmbeddedCoverTempPathCallback) {
                 file_put_contents('/tmp/cover_debug.log', "DEBUG: buildUiMetadata - About to call getEmbeddedCoverTempPathCallback\n", FILE_APPEND | LOCK_EX);
+                file_put_contents('/tmp/cover_debug.log', "DEBUG: buildUiMetadata - Callback type: " . gettype($getEmbeddedCoverTempPathCallback) . "\n", FILE_APPEND | LOCK_EX);
+
                 $tempPath = $getEmbeddedCoverTempPathCallback($uiMetadata['cover_data']);
+
+                file_put_contents('/tmp/cover_debug.log', "DEBUG: buildUiMetadata - Callback returned: " . ($tempPath ?? 'null') . "\n", FILE_APPEND | LOCK_EX);
+
                 if ($tempPath) {
                     $uiMetadata['cover_url'] = $tempPath;
                     $uiMetadata['cover_is_local_file'] = true;
@@ -3516,6 +3521,9 @@ class BookImportService
      */
     public function getEmbeddedCoverTempPath(string $coverData): ?string
     {
+        // DEBUG: Log entry to specific file
+        file_put_contents('/tmp/cover_debug.log', "DEBUG: getEmbeddedCoverTempPath ENTRY - Cover data hash: " . md5($coverData) . "\n", FILE_APPEND | LOCK_EX);
+
         // DEBUG: Log cover data info to specific file
         $debugMsg = "DEBUG: getEmbeddedCoverTempPath - Cover data length: " . strlen($coverData) . "\n";
         $debugMsg .= "DEBUG: getEmbeddedCoverTempPath - Cover data hash: " . md5($coverData) . "\n";
@@ -3530,10 +3538,13 @@ class BookImportService
         $coverHash = substr(md5($coverData), 0, 8);
         $tempFile = tempnam(sys_get_temp_dir(), 'embedded_cover_' . $coverHash . '_');
         if ($tempFile === false) {
+            file_put_contents('/tmp/cover_debug.log', "DEBUG: getEmbeddedCoverTempPath - tempnam failed\n", FILE_APPEND | LOCK_EX);
             return null;
         }
 
         file_put_contents($tempFile, $binary);
+
+        file_put_contents('/tmp/cover_debug.log', "DEBUG: getEmbeddedCoverTempPath - Created temp file: " . $tempFile . "\n", FILE_APPEND | LOCK_EX);
 
         return $tempFile;
     }
