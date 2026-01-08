@@ -1149,7 +1149,14 @@ class ImportBooksFromDownloads extends Command
             fn ($metadata, $enrichedData) => $this->getEnrichmentService()->isValidEnrichment($metadata, $enrichedData),
             fn ($metadata) => $this->getImportService()->generateDirectoryPath($metadata),
             fn ($metadata, $audiobook) => $this->getImportService()->createBookFromMetadata($metadata, $audiobook),
-            fn ($audiobook, $book, $options) => $this->getImportService()->moveFilesToLibrary($audiobook, $book, $options),
+            fn ($audiobook, $book, $options) => $this->getImportService()->moveFilesToLibrary(
+                $audiobook,
+                $book,
+                $options,
+                null,
+                null,
+                fn ($audiobook, $targetDir, $book) => $this->handleDirectoryConflict($audiobook, $targetDir)
+            ),
             fn () => $this->getFileOperation(),
             fn ($message) => $this->info($message),
             fn ($metadata) => $this->displayEnrichedMetadata($metadata),

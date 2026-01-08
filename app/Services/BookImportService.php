@@ -773,7 +773,8 @@ class BookImportService
         Book $book,
         callable|array $warnCallback,
         ?callable $getBookStoragePathCallback = null,
-        ?callable $getCopyFilesOptionCallback = null
+        ?callable $getCopyFilesOptionCallback = null,
+        ?callable $handleDirectoryConflictCallback = null
     ): bool {
         $legacyOptions = null;
         if (is_array($warnCallback)) {
@@ -794,7 +795,7 @@ class BookImportService
             $options['target_directory'] = $legacyOptions['target_directory'];
         }
 
-        return $this->moveFilesToLibraryInternal($audiobook, $book, $options, $warnCallback);
+        return $this->moveFilesToLibraryInternal($audiobook, $book, $options, $warnCallback, $handleDirectoryConflictCallback);
     }
 
     /**
@@ -804,7 +805,8 @@ class BookImportService
         array $audiobook,
         Book $book,
         array $options,
-        callable $warnCallback
+        callable $warnCallback,
+        ?callable $handleDirectoryConflictCallback = null
     ): bool {
         try {
             $bookStoragePath = $options['storage_path'] ?? rtrim(
@@ -876,7 +878,19 @@ class BookImportService
                 && $options['target_directory'] !== '';
 
             if (!$hasExplicitTargetDirectory && File::isDirectory($targetDir)) {
-                $targetDir = $this->resolveDirectoryConflictPath($targetDir);
+                if ($handleDirectoryConflictCallback) {
+                    $conflictResolution = $handleDirectoryConflictCallback($audiobook, $targetDir, $book);
+
+                    if ($conflictResolution === 'cancel') {
+                        throw new \Exception("Import cancelled by user due to directory conflict");
+                    } elseif ($conflictResolution === 'skip') {
+                        return true;
+                    } elseif (is_string($conflictResolution) && $conflictResolution !== 'replace') {
+                        $targetDir = $conflictResolution;
+                    }
+                } else {
+                    $targetDir = $this->resolveDirectoryConflictPath($targetDir);
+                }
 
                 // If directory was changed due to conflict, update book's directory_path
                 if ($targetDir !== $originalTargetDir) {
@@ -1737,9 +1751,9 @@ class BookImportService
         // Prompt user for action
         $options = [
             '1' => 'Replace existing directory with new files',
-            '2' => 'Rename existing directory (backup)',
-            '3' => 'Rename new import',
-            '4' => 'Rename both directories by narrator',
+            '2' => 'Rename existing directory (add _01 suffix)',
+            '3' => 'Rename new import (add _01 suffix)',
+            '4' => 'Merge directories',
             '5' => 'Cancel import',
         ];
 
@@ -1747,18 +1761,51 @@ class BookImportService
 
         switch ($choice) {
             case '1':
-                return 'replace';
+                // Replace: delete existing directory
+                File::deleteDirectory($targetDir);
+                return $targetDir;
+
             case '2':
-                return 'rename_existing';
+                // Rename existing: find suffix for old directory
+                $existingRenamed = $this->findAvailableDirectoryWithSuffix($targetDir);
+                File::move($targetDir, $existingRenamed);
+                $log("📁 Renamed existing directory to: " . basename($existingRenamed));
+                return $targetDir;
+
             case '3':
-                return 'rename_new';
+                // Rename new: find suffix for new import
+                $newRenamed = $this->findAvailableDirectoryWithSuffix($targetDir);
+                $log("📁 New import will use: " . basename($newRenamed));
+                return $newRenamed;
+
             case '4':
-                return 'rename_both_narrator';
+                // Merge: use existing directory
+                $log("🔀 Merging into existing directory");
+                return $targetDir;
+
             case '5':
                 return 'cancel';
+
             default:
-                return 'replace';
+                return $targetDir;
         }
+    }
+
+    /**
+     * Find an available directory path with _01, _02, etc. suffix
+     */
+    protected function findAvailableDirectoryWithSuffix(string $basePath): string
+    {
+        $counter = 1;
+        while ($counter <= 99) {
+            $newPath = $basePath . '_' . str_pad($counter, 2, '0', STR_PAD_LEFT);
+            if (!File::isDirectory($newPath)) {
+                return $newPath;
+            }
+            $counter++;
+        }
+
+        return $basePath . '_99';
     }
 
     /**
