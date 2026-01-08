@@ -976,8 +976,7 @@ class ImportBooksFromDownloads extends Command
             if (method_exists($this->uiService, 'requestInterrupt')) {
                 $this->uiService->requestInterrupt();
             }
-            // Use public method for proper terminal restoration
-            $this->uiService->restoreTerminalState();
+            // Don't manually restore terminal - let natural shutdown handle it
         }
 
         $this->inputInterrupted = true;
@@ -985,7 +984,7 @@ class ImportBooksFromDownloads extends Command
         $this->warn("⚠️  [Request interrupted by user] - Ctrl+C detected");
         $this->info('🛑 Quitting import process gracefully...');
 
-        // Exit after proper cleanup to ensure process termination
+        // Exit and let natural shutdown process handle terminal restoration
         exit(130);
     }
 
