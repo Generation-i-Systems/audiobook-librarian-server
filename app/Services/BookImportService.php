@@ -781,13 +781,9 @@ class BookImportService
             $warnCallback = fn ($message) => Log::warning($message);
         }
 
-        $bookStoragePath = $getBookStoragePathCallback
-            ? $getBookStoragePathCallback()
-            : ($legacyOptions['storage_path'] ?? (config('filesystems.disks.books.root') ?? config('app.book_root', '/media/lyra_data1/audiobooks/books')));
+        $bookStoragePath = $getBookStoragePathCallback ? $getBookStoragePathCallback() : ($legacyOptions['storage_path'] ?? (config('filesystems.disks.books.root') ?? config('app.book_root', '/media/lyra_data1/audiobooks/books')));
 
-        $copyFiles = $getCopyFilesOptionCallback
-            ? (bool) $getCopyFilesOptionCallback()
-            : (($legacyOptions['operation'] ?? 'move') === 'copy');
+        $copyFiles = $getCopyFilesOptionCallback ? (bool) $getCopyFilesOptionCallback() : (($legacyOptions['operation'] ?? 'move') === 'copy');
 
         $options = [
             'storage_path' => $bookStoragePath,
@@ -1035,8 +1031,10 @@ class BookImportService
                 ]);
 
                 // Check if the last segment of the relative path matches the title
-                if (strcasecmp($cleanRelativeLast, $cleanTitle) === 0 ||
-                    $this->lastPathSegmentMatchesTitle($cleanRelativeLast, $plainTitle)) {
+                if (
+                    strcasecmp($cleanRelativeLast, $cleanTitle) === 0 ||
+                    $this->lastPathSegmentMatchesTitle($cleanRelativeLast, $plainTitle)
+                ) {
                     Log::debug('BookImportService::generateTargetDirectory - Title already in path, returning as-is', [
                         'book_id' => $book->id,
                         'path' => $path,
@@ -1711,9 +1709,7 @@ class BookImportService
         $log("⚠️  Target directory already exists: " . basename($targetDir));
 
         // Compare directories
-        $comparison = $compareDirectoriesCallback
-            ? $compareDirectoriesCallback($audiobook['path'], $targetDir)
-            : $this->compareDirectories($audiobook['path'], $targetDir);
+        $comparison = $compareDirectoriesCallback ? $compareDirectoriesCallback($audiobook['path'], $targetDir) : $this->compareDirectories($audiobook['path'], $targetDir);
 
         // Display comparison
         if ($displayDirectoryComparisonCallback) {
@@ -3132,6 +3128,14 @@ class BookImportService
             if ($aiResult) {
                 $tagMetadata = $this->extractMetadataFromFileTags($fileTags);
                 $aiResult = $this->mergeMetadataFillMissing($aiResult, $tagMetadata);
+
+                if (!empty($fileTags) && empty($aiResult['cover_data'])) {
+                    $firstTags = reset($fileTags);
+                    if (!empty($firstTags['picture']['data'])) {
+                        $aiResult['cover_data'] = $firstTags['picture']['data'];
+                        $aiResult['cover_source'] = $firstTags['picture']['type'] ?? 'Embedded';
+                    }
+                }
 
                 $aiResult = $this->postProcessAIResult($aiResult, $audiobook);
             }
