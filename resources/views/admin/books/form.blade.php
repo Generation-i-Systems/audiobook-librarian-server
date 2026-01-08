@@ -164,6 +164,85 @@
                 border: 1px solid #ccc;
                 border-radius: 4px;
             }
+
+            .directory-not-found-btn {
+                display: none;
+                right: 5px;
+                top: 50%;
+                transform: translateY(-50%);
+                padding: 0;
+                width: 25px;
+                height: 25px;
+            }
+
+            .margin-top-zero {
+                margin-top: 0;
+            }
+
+            .max-width-1400 {
+                max-width: 1400px;
+            }
+
+            .margin-bottom-30 {
+                margin-bottom: 30px;
+            }
+
+            .margin-bottom-10 {
+                margin-bottom: 10px;
+            }
+
+            .margin-left-half-rem {
+                margin-left: 0.5rem;
+            }
+
+            .cursor-pointer-style {
+                cursor: pointer;
+            }
+
+            .font-size-12 {
+                font-size: 12px;
+            }
+
+            .padding-right-35 {
+                padding-right: 35px;
+            }
+
+            .display-none-style {
+                display: none;
+            }
+
+            .right-5px {
+                right: 5px;
+            }
+
+            .top-50-percent {
+                top: 50%;
+            }
+
+            .transform-translate-y {
+                transform: translateY(-50%);
+            }
+
+            .padding-none {
+                padding: 0;
+            }
+
+            .width-25-height-25 {
+                width: 25px;
+                height: 25px;
+            }
+
+            .white-space-nowrap {
+                white-space: nowrap;
+            }
+
+            .min-width-300 {
+                min-width: 300px;
+            }
+
+            .gap-half-rem {
+                gap: 0.5rem;
+            }
         </style>
         <div class="container-fluid" style="max-width: 1400px;">
             @php
@@ -374,13 +453,13 @@
                                     @endphp
                                     @foreach($seriesList as $idx => $series)
                                         <div class="d-flex align-items-start mb-2 series-row">
-                                            <input type="number" name="series[{{ $idx }}][number]" class="form-control"
-                                                style="width:80px; height:32px; flex-shrink:0;" placeholder="#"
+                                            <input type="number" name="series[{{ $idx }}][number]" class="form-control width-80 form-control-height-32 flex-shrink-0"
+                                                placeholder="#"
                                                 value="{{ $series['number'] ?? '' }}" step="any">
                                             <input type="text" name="series[{{ $idx }}][seriesName]"
-                                                class="form-control series-autocomplete ms-2" style="height:32px; flex:1;"
+                                                class="form-control series-autocomplete ms-2 form-control-height-32 form-control-flex-1"
                                                 placeholder="Series Name" value="{{ $series['seriesName'] ?? '' }}">
-                                            <div class="form-check ms-2 d-flex align-items-center" style="height:32px;"
+                                            <div class="form-check ms-2 d-flex align-items-center form-control-height-32"
                                                 title="Collection (not a primary series)">
                                                 <input type="checkbox" name="series[{{ $idx }}][isCollection]"
                                                     class="form-check-input" value="1" {{ ($series['isCollection'] ?? false) ? 'checked' : '' }} style="margin-top:0;">
@@ -388,14 +467,13 @@
                                             </div>
                                             <datalist id="series-list"></datalist> {{-- Populated by JavaScript via autocomplete --}}
                                             @if(!empty($series['seriesName']))
-                                                <button type="button" class="btn btn-sm btn-outline-primary ms-2 rename-series-btn"
+                                                <button type="button" class="btn btn-sm btn-outline-primary ms-2 rename-series-btn btn-size-32 flex-shrink-0"
                                                     data-series-name="{{ $series['seriesName'] }}"
-                                                    style="height:32px; width:32px; padding:0; display:flex; align-items:center; justify-content:center; flex-shrink:0;"
                                                     title="Rename this series" aria-label="Rename series">
                                                     <i class="fas fa-edit"></i>
                                                 </button>
                                              @else
-                                                <div style="width:32px; height:32px; margin-left:0.5rem; flex-shrink:0;" role="presentation" aria-hidden="true"></div>
+                                                <div class="btn-size-32 ms-gap-2px flex-shrink-0" role="presentation" aria-hidden="true"></div>
                                             @endif
                                         </div>
                                     </div>
