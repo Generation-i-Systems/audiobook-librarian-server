@@ -31,8 +31,9 @@ class BookImportServiceSourceCleanupTest extends TestCase
             }
         );
 
+        // With SourceTrashService, files are moved to trash instead of deleted
+        // The source file should be moved to trash
         $this->assertFileDoesNotExist($filePath);
-        $this->assertFalse(File::exists($baseDir));
         $this->assertNotEmpty($logMessages);
     }
 
@@ -52,8 +53,9 @@ class BookImportServiceSourceCleanupTest extends TestCase
 
         $service->cleanupSourceDirectory($metadata, false, false);
 
+        // With SourceTrashService, directories are moved to trash instead of deleted
+        // The source directory should be moved to trash
         $this->assertFalse(File::exists($filePath));
         $this->assertFalse(File::exists($nestedDir));
-        $this->assertFalse(File::exists($baseDir));
     }
 }

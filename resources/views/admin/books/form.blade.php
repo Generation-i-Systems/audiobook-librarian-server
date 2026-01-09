@@ -745,9 +745,6 @@
                                                 <div class="btn-size-32 ms-gap-2px flex-shrink-0" role="presentation" aria-hidden="true"></div>
                                             @endif
                                         </div>
-                                    </div>
-                                        @endforeach
-                                    </div>
                                     @endforeach
                                 </div>
                             </div>

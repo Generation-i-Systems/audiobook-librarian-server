@@ -5,7 +5,7 @@ namespace Tests\Unit\Services;
 use App\Services\BookImportService;
 use App\Services\GenreMappingService;
 use App\Services\SourceTrashService;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 use Mockery;
 use Illuminate\Support\Facades\File;
 

@@ -18,7 +18,8 @@ class BookImportServiceMetadataTest extends TestCase
     {
         parent::setUp();
         $genreMappingService = $this->app->make(GenreMappingService::class);
-        $this->service = new BookImportService($genreMappingService);
+        $sourceTrashService = $this->app->make(\App\Services\SourceTrashService::class);
+        $this->service = new BookImportService($genreMappingService, $sourceTrashService);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]

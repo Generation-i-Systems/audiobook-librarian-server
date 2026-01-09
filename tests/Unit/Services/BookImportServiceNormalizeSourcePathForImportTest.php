@@ -12,7 +12,10 @@ class BookImportServiceNormalizeSourcePathForImportTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function normalizeSourcePathForImportUnwrapsSingleRootDirectory(): void
     {
-        $service = new BookImportService(app(GenreMappingService::class));
+        $service = new BookImportService(
+            app(GenreMappingService::class),
+            app(\App\Services\SourceTrashService::class)
+        );
 
         $reflection = new \ReflectionClass($service);
         $method = $reflection->getMethod('normalizeSourcePathForImport');
@@ -45,7 +48,10 @@ class BookImportServiceNormalizeSourcePathForImportTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function normalizeSourcePathForImportDoesNotUnwrapWhenFilesExistAtRoot(): void
     {
-        $service = new BookImportService(app(GenreMappingService::class));
+        $service = new BookImportService(
+            app(GenreMappingService::class),
+            app(\App\Services\SourceTrashService::class)
+        );
 
         $reflection = new \ReflectionClass($service);
         $method = $reflection->getMethod('normalizeSourcePathForImport');
