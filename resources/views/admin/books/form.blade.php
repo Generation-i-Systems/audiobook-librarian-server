@@ -1960,9 +1960,15 @@
                 console.log('$.fn.autocomplete:', typeof $.fn.autocomplete, $.fn.autocomplete ? 'OK' : 'MISSING');
             </script>
 
-            {{-- Include form.js, directory-browser.js, series-rename.js, and directory-conflict.js scripts via Vite --}}
+            {{-- Include book form scripts via Vite --}}
             @vite([
                 'resources/js/admin/books/form.js',
+                'resources/js/admin/books/form-helpers.js',
+                'resources/js/admin/books/form-autocomplete.js',
+                'resources/js/admin/books/form-autofill.js',
+                'resources/js/admin/books/form-cover.js',
+                'resources/js/admin/books/form-directory.js',
+                'resources/js/admin/books/init-book-form.js',
                 'resources/js/admin/books/planned-actions.js',
                 'resources/js/admin/books/directory-browser.js',
                 'resources/js/admin/books/series-rename.js',
