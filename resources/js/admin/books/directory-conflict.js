@@ -2,7 +2,14 @@
  * Directory Conflict Detection and Resolution
  */
 
-(function () {
+(function (window, $) {
+    "use strict";
+
+    if (!$) {
+        console.error("directory-conflict.js requires jQuery");
+        return;
+    }
+
     let conflictData = null;
     let checkTimeoutId = null;
     let lastCheckedPath = null;
@@ -176,13 +183,9 @@
         };
         return String(text).replace(/[&<>"']/g, function(m) { return map[m]; });
     }
-        const div = document.createElement("div");
-        div.textContent = text;
-        return div.innerHTML;
-    }
 
     // Initialize on document ready
     $(document).ready(function () {
         initDirectoryConflictDetection();
     });
-})();
+})(window, window.jQuery);

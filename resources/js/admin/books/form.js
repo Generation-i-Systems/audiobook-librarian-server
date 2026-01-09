@@ -63,7 +63,7 @@ $(function () {
                 error: function (xhr) {
                     $("#raw-json-error")
                         .text(
-                            "Failed to save JSON: " + (xhr.responseJSON ? .error || xhr.statusText),
+                            "Failed to save JSON: " + (xhr.responseJSON?.error || xhr.statusText),
                         )
                         .show();
                 },

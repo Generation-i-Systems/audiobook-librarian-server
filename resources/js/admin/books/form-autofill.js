@@ -488,6 +488,7 @@
     bookForm.displayAutofillResults = displayAutofillResults;
     bookForm.applyAutofillResult = applyAutofillResult;
     bookForm.registerAutofillHandlers = registerAutofillHandlers;
+    bookForm.setupAutofillModal = registerAutofillHandlers;
 
     window.googleBooksProxyUrl = googleBooksProxyUrl;
     window.normalizeTitleForAutofill = normalizeTitleForAutofill;
@@ -497,4 +498,5 @@
     window.displayAutofillResults = displayAutofillResults;
     window.applyAutofillResult = applyAutofillResult;
     window.registerAutofillHandlers = registerAutofillHandlers;
+    window.setupAutofillModal = registerAutofillHandlers;
 })(window, window.jQuery);

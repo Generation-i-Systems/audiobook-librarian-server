@@ -742,8 +742,12 @@
                                                     <i class="fas fa-edit"></i>
                                                 </button>
                                              @else
-                                                <div class="btn-size-32 ms-gap-2px flex-shrink-0" role="presentation" aria-hidden="true"></div>
+                                                <div class="btn-size-32 ms-2 flex-shrink-0" role="presentation" aria-hidden="true"></div>
                                             @endif
+                                            <div class="d-flex flex-column ms-2" style="gap:2px;">
+                                                <button type="button" class="btn btn-outline-danger btn-sm remove-series" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Remove series">&times;</button>
+                                                <button type="button" class="btn btn-primary btn-sm add-series-row" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Add series">+</button>
+                                            </div>
                                         </div>
                                     @endforeach
                                 </div>
@@ -926,14 +930,6 @@
                                     <i class="fas fa-sync-alt me-1"></i>Parse Path to Fields
                                 </button>
                                 </div>
-                                <button type="button" class="btn btn-outline-secondary" id="update-path-from-fields-btn"
-                                    title="Update directory path based on current genre, author, title, and series fields">
-                                    <i class="fas fa-folder-plus me-1"></i>Update Path from Fields
-                                </button>
-                                <button type="button" class="btn btn-outline-secondary" id="resync-path-btn"
-                                    title="Parse directory path to populate title, author, and series fields">
-                                    <i class="fas fa-sync-alt me-1"></i>Parse Path to Fields
-                                </button>
                             </div>
                             @error('directoryPath')
                                 <span class="invalid-feedback d-block">{{ $message }}</span>
