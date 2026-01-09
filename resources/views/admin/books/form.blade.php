@@ -1732,7 +1732,6 @@
                             @method('DELETE')
                             <input type="hidden" name="delete_files" id="deleteFilesInput" value="true">
                             <button type="submit" class="btn btn-danger">Delete Book</button>
-                        </form>
                     </div>
                 </div>
             </div>
