@@ -2,7 +2,9 @@
     "use strict";
 
     if (!$ || !$.fn || !$.fn.autocomplete) {
-        console.warn("form-autocomplete.js: jQuery UI autocomplete not available");
+        console.warn(
+            "form-autocomplete.js: jQuery UI autocomplete not available",
+        );
     }
 
     const bookForm = (window.BookForm = window.BookForm || {});
@@ -26,7 +28,40 @@
                         dataType: "json",
                         data: { term: request.term },
                         success(data) {
-                            responseCallback(data);
+                            if (Array.isArray(data)) {
+                                const processed = data
+                                    .map(function (item) {
+                                        if (typeof item === "string") {
+                                            return { label: item, value: item };
+                                        }
+                                        if (
+                                            typeof item === "object" &&
+                                            item !== null
+                                        ) {
+                                            return {
+                                                label:
+                                                    item.label ||
+                                                    item.name ||
+                                                    item.value ||
+                                                    "",
+                                                value:
+                                                    item.value ||
+                                                    item.name ||
+                                                    item.label ||
+                                                    "",
+                                            };
+                                        }
+                                        return null;
+                                    })
+                                    .filter(function (item) {
+                                        return (
+                                            item !== null && item.label !== ""
+                                        );
+                                    });
+                                responseCallback(processed);
+                            } else {
+                                responseCallback([]);
+                            }
                         },
                         error() {
                             responseCallback([]);

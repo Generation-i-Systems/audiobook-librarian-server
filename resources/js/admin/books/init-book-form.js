@@ -12,10 +12,19 @@
     const bookForm = (window.BookForm = window.BookForm || {});
 
     function initBookForm(formContainerSelector) {
+        console.log(
+            "[init-book-form] initBookForm called with selector:",
+            formContainerSelector,
+        );
         const $container = $(formContainerSelector);
         if (!$container.length) {
+            console.log("[init-book-form] Container not found!");
             return;
         }
+        console.log(
+            "[init-book-form] Container found, BookForm object:",
+            bookForm,
+        );
 
         const {
             addAuthorRow,
@@ -29,13 +38,36 @@
         } = bookForm;
 
         if (typeof updateAddRowButtons === "function") {
-            updateAddRowButtons($container, "#authors-group", ".author-row", ".add-author-row");
-            updateAddRowButtons($container, "#series-group", ".series-row", ".add-series-row");
-            updateAddRowButtons($container, "#genres-group", ".genre-row", ".add-genre-row");
-            updateAddRowButtons($container, "#narrators-group", ".narrator-row", ".add-narrator-row");
+            updateAddRowButtons(
+                $container,
+                "#authors-group",
+                ".author-row",
+                ".add-author-row",
+            );
+            updateAddRowButtons(
+                $container,
+                "#series-group",
+                ".series-row",
+                ".add-series-row",
+            );
+            updateAddRowButtons(
+                $container,
+                "#genres-group",
+                ".genre-row",
+                ".add-genre-row",
+            );
+            updateAddRowButtons(
+                $container,
+                "#narrators-group",
+                ".narrator-row",
+                ".add-narrator-row",
+            );
         }
 
-        if (typeof initializeAutocomplete === "function" && window.BOOK_FORM_ROUTES) {
+        if (
+            typeof initializeAutocomplete === "function" &&
+            window.BOOK_FORM_ROUTES
+        ) {
             initializeAutocomplete(
                 $container,
                 ".author-autocomplete",
@@ -124,7 +156,12 @@
                     if (input) input.value = "";
                 }
                 if (typeof updateAddRowButtons === "function") {
-                    updateAddRowButtons($container, "#authors-group", ".author-row", ".add-author-row");
+                    updateAddRowButtons(
+                        $container,
+                        "#authors-group",
+                        ".author-row",
+                        ".add-author-row",
+                    );
                 }
             });
 
@@ -140,13 +177,22 @@
                 if (rows.length > 1) {
                     if (row) row.remove();
                 } else if (row) {
-                    const numberInput = row.querySelector('input[name*="[number]"]');
-                    const seriesNameInput = row.querySelector('input[name*="[seriesName]"]');
+                    const numberInput = row.querySelector(
+                        'input[name*="[number]"]',
+                    );
+                    const seriesNameInput = row.querySelector(
+                        'input[name*="[seriesName]"]',
+                    );
                     if (numberInput) numberInput.value = "";
                     if (seriesNameInput) seriesNameInput.value = "";
                 }
                 if (typeof updateAddRowButtons === "function") {
-                    updateAddRowButtons($container, "#series-group", ".series-row", ".add-series-row");
+                    updateAddRowButtons(
+                        $container,
+                        "#series-group",
+                        ".series-row",
+                        ".add-series-row",
+                    );
                 }
             });
 
@@ -166,15 +212,30 @@
                     if (select) select.value = "";
                 }
                 if (typeof updateAddRowButtons === "function") {
-                    updateAddRowButtons($container, "#genres-group", ".genre-row", ".add-genre-row");
+                    updateAddRowButtons(
+                        $container,
+                        "#genres-group",
+                        ".genre-row",
+                        ".add-genre-row",
+                    );
                 }
             });
 
         if (typeof attachCoverPreviewModal === "function") {
+            console.log("[init-book-form] Calling attachCoverPreviewModal");
             attachCoverPreviewModal($container);
+        } else {
+            console.log(
+                "[init-book-form] attachCoverPreviewModal is not a function",
+            );
         }
         if (typeof setupAutofillModal === "function") {
+            console.log("[init-book-form] Calling setupAutofillModal");
             setupAutofillModal($container);
+        } else {
+            console.log(
+                "[init-book-form] setupAutofillModal is not a function",
+            );
         }
     }
 

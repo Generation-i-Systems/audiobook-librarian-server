@@ -86,8 +86,9 @@ class BookImportServiceCoverPriorityTest extends TestCase
     protected function makeService(): BookImportServiceTestDouble
     {
         $genreMapping = app(GenreMappingService::class);
+        $sourceTrash = app(\App\Services\SourceTrashService::class);
 
-        return new BookImportServiceTestDouble($genreMapping);
+        return new BookImportServiceTestDouble($genreMapping, $sourceTrash);
     }
 }
 

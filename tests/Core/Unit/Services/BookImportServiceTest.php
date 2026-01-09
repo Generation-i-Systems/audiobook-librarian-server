@@ -23,7 +23,8 @@ class BookImportServiceTest extends TestCase
         parent::setUp();
 
         $genreMappingService = $this->app->make(GenreMappingService::class);
-        $this->service = new BookImportService($genreMappingService);
+        $sourceTrashService = $this->app->make(\App\Services\SourceTrashService::class);
+        $this->service = new BookImportService($genreMappingService, $sourceTrashService);
     }
 
     private function createTempDirectory(string $prefix): string

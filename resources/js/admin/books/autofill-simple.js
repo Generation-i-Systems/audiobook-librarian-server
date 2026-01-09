@@ -22,7 +22,7 @@
             .trim();
     }
 
-    function scoreAutofillResult(result) {
+function scoreAutofillResult(result) {
         let score = 0;
         if (!result) {
             return score;
@@ -201,9 +201,7 @@
                         const authors = Array.isArray(item.author)
                             ? item.author.join(", ")
                             : item.author || "";
-                        const narrators = Array.isArray(item.narrator)
-                            ? item.narrator.join(", ")
-                            : item.narrator || "";
+                        const narrators = getNarratorList(item);
                         const coverUrl =
                             item.coverImageUrl || item.cover_image_url || "";
                         const publishedYear =
@@ -369,9 +367,7 @@
                                 const authors = Array.isArray(item.author)
                                     ? item.author.join(", ")
                                     : item.author || "";
-                                const narrators = Array.isArray(item.narrator)
-                                    ? item.narrator.join(", ")
-                                    : item.narrator || "";
+                                const narrators = getNarratorList(item);
                                 const coverUrl =
                                     item.coverImageUrl ||
                                     item.cover_image_url ||

@@ -1893,40 +1893,6 @@
 
         @push('scripts')
             <script>
-            // Accessibility fix for autofillModal: Remove aria-hidden if set while modal is open and focused
-            (function() {
-                var autofillModal = document.getElementById('autofillModal');
-                var observer = null;
-                function removeAriaHiddenIfFocused() {
-                    if (!autofillModal) return;
-                    // Remove aria-hidden if modal or any descendant has focus
-                    var focused = autofillModal.contains(document.activeElement) || autofillModal === document.activeElement;
-                    if (focused && autofillModal.hasAttribute('aria-hidden')) {
-                        autofillModal.removeAttribute('aria-hidden');
-                    }
-                }
-                if (autofillModal) {
-                    autofillModal.addEventListener('show.bs.modal', function () {
-                        removeAriaHiddenIfFocused();
-                        // Observe attribute changes to remove aria-hidden if it's set while open
-                        if (observer) observer.disconnect();
-                        observer = new MutationObserver(function(mutations) {
-                            mutations.forEach(function(mutation) {
-                                if (mutation.attributeName === 'aria-hidden') {
-                                    removeAriaHiddenIfFocused();
-                                }
-                            });
-                        });
-                        observer.observe(autofillModal, { attributes: true });
-                    });
-                    autofillModal.addEventListener('hidden.bs.modal', function () {
-                        if (observer) observer.disconnect();
-                        observer = null;
-                    });
-                    // Also patch on focusin (e.g. if focus moves to modal)
-                    autofillModal.addEventListener('focusin', removeAriaHiddenIfFocused);
-                }
-            })();
             </script>
 
             <script type="text/javascript">
@@ -1965,7 +1931,7 @@
                 'resources/js/admin/books/form.js',
                 'resources/js/admin/books/form-helpers.js',
                 'resources/js/admin/books/form-autocomplete.js',
-                'resources/js/admin/books/form-autofill.js',
+                'resources/js/admin/books/autofill-simple.js',
                 'resources/js/admin/books/form-cover.js',
                 'resources/js/admin/books/form-directory.js',
                 'resources/js/admin/books/init-book-form.js',
