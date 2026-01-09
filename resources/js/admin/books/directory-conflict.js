@@ -184,8 +184,6 @@
         return String(text).replace(/[&<>"']/g, function(m) { return map[m]; });
     }
 
-    // Initialize on document ready
-    $(document).ready(function () {
-        initDirectoryConflictDetection();
-    });
+    // Initialize immediately since this is an IIFE
+    initDirectoryConflictDetection();
 })(window, window.jQuery);
