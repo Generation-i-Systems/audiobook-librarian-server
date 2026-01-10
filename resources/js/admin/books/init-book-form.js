@@ -27,15 +27,24 @@
         );
 
         const {
+            initializeTemplates,
             addAuthorRow,
             addNarratorRow,
             addSeriesRow,
             addGenreRow,
             updateAddRowButtons,
+            clearAuthorRow,
+            clearNarratorRow,
+            clearSeriesRow,
+            clearGenreRow,
             initializeAutocomplete,
             attachCoverPreviewModal,
             setupAutofillModal,
         } = bookForm;
+
+        if (typeof initializeTemplates === "function") {
+            initializeTemplates($container);
+        }
 
         if (typeof updateAddRowButtons === "function") {
             updateAddRowButtons(
@@ -46,42 +55,21 @@
             );
             updateAddRowButtons(
                 $container,
-                "#series-group",
-                ".series-row",
-                ".add-series-row",
-            );
-            updateAddRowButtons(
-                $container,
                 "#genres-group",
                 ".genre-row",
                 ".add-genre-row",
             );
             updateAddRowButtons(
                 $container,
+                "#series-group",
+                ".series-row",
+                ".add-series-row",
+            );
+            updateAddRowButtons(
+                $container,
                 "#narrators-group",
                 ".narrator-row",
                 ".add-narrator-row",
-            );
-        }
-
-        if (
-            typeof initializeAutocomplete === "function" &&
-            window.BOOK_FORM_ROUTES
-        ) {
-            initializeAutocomplete(
-                $container,
-                ".author-autocomplete",
-                window.BOOK_FORM_ROUTES.authorsAutocomplete,
-            );
-            initializeAutocomplete(
-                $container,
-                ".narrator-autocomplete",
-                window.BOOK_FORM_ROUTES.narratorsAutocomplete,
-            );
-            initializeAutocomplete(
-                $container,
-                ".series-autocomplete",
-                window.BOOK_FORM_ROUTES.seriesAutocomplete,
             );
         }
 
@@ -94,41 +82,18 @@
             });
 
         $container
-            .off("click", ".add-narrator-row")
-            .on("click", ".add-narrator-row", function () {
-                if (typeof addNarratorRow === "function") {
-                    addNarratorRow($container);
-                }
-            })
-            .off("click", ".remove-row")
-            .on("click", ".remove-row", function () {
-                const group = $container.find("#narrators-group")[0];
-                if (!group) {
-                    return;
-                }
-                const rows = group.querySelectorAll(".narrator-row");
-                const row = $(this).closest(".narrator-row")[0];
-                if (rows.length > 1) {
-                    if (row) row.remove();
-                } else if (row) {
-                    const input = row.querySelector('input[name="narrator[]"]');
-                    if (input) input.value = "";
-                }
-                if (typeof updateAddRowButtons === "function") {
-                    updateAddRowButtons(
-                        $container,
-                        "#narrators-group",
-                        ".narrator-row",
-                        ".add-narrator-row",
-                    );
-                }
-            });
-
-        $container
             .off("click", ".add-series-row")
             .on("click", ".add-series-row", function () {
                 if (typeof addSeriesRow === "function") {
                     addSeriesRow($container);
+                }
+            });
+
+        $container
+            .off("click", ".add-narrator-row")
+            .on("click", ".add-narrator-row", function () {
+                if (typeof addNarratorRow === "function") {
+                    addNarratorRow($container);
                 }
             });
 
@@ -151,9 +116,8 @@
                 const row = $(this).closest(".author-row")[0];
                 if (rows.length > 1) {
                     if (row) row.remove();
-                } else if (row) {
-                    const input = row.querySelector('input[name="author[]"]');
-                    if (input) input.value = "";
+                } else if (row && typeof clearAuthorRow === "function") {
+                    clearAuthorRow(row);
                 }
                 if (typeof updateAddRowButtons === "function") {
                     updateAddRowButtons(
@@ -176,15 +140,8 @@
                 const row = $(this).closest(".series-row")[0];
                 if (rows.length > 1) {
                     if (row) row.remove();
-                } else if (row) {
-                    const numberInput = row.querySelector(
-                        'input[name*="[number]"]',
-                    );
-                    const seriesNameInput = row.querySelector(
-                        'input[name*="[seriesName]"]',
-                    );
-                    if (numberInput) numberInput.value = "";
-                    if (seriesNameInput) seriesNameInput.value = "";
+                } else if (row && typeof clearSeriesRow === "function") {
+                    clearSeriesRow(row);
                 }
                 if (typeof updateAddRowButtons === "function") {
                     updateAddRowButtons(
@@ -207,9 +164,8 @@
                 const row = $(this).closest(".genre-row")[0];
                 if (rows.length > 1) {
                     if (row) row.remove();
-                } else if (row) {
-                    const select = row.querySelector('select[name="genre[]"]');
-                    if (select) select.value = "";
+                } else if (row && typeof clearGenreRow === "function") {
+                    clearGenreRow(row);
                 }
                 if (typeof updateAddRowButtons === "function") {
                     updateAddRowButtons(
@@ -217,6 +173,30 @@
                         "#genres-group",
                         ".genre-row",
                         ".add-genre-row",
+                    );
+                }
+            });
+
+        $container
+            .off("click", ".remove-narrator")
+            .on("click", ".remove-narrator", function () {
+                const group = $container.find("#narrators-group")[0];
+                if (!group) {
+                    return;
+                }
+                const rows = group.querySelectorAll(".narrator-row");
+                const row = $(this).closest(".narrator-row")[0];
+                if (rows.length > 1) {
+                    if (row) row.remove();
+                } else if (row && typeof clearNarratorRow === "function") {
+                    clearNarratorRow(row);
+                }
+                if (typeof updateAddRowButtons === "function") {
+                    updateAddRowButtons(
+                        $container,
+                        "#narrators-group",
+                        ".narrator-row",
+                        ".add-narrator-row",
                     );
                 }
             });

@@ -725,9 +725,9 @@
                                             <input type="number" name="series[{{ $idx }}][number]" class="form-control width-80 form-control-height-32 flex-shrink-0"
                                                 placeholder="#"
                                                 value="{{ $series['number'] ?? '' }}" step="any">
-                                            <input type="text" name="series[{{ $idx }}][seriesName]"
-                                                class="form-control series-autocomplete ms-2 form-control-height-32 form-control-flex-1"
-                                                placeholder="Series Name" value="{{ $series['seriesName'] ?? '' }}">
+                                            %<input type="text" name="series[{{ $idx }}][seriesName]"
+                                                class="r729 form-control series-autocomplete ms-2 form-control-height-32 form-control-flex-1"
+                                                placeholder="Series Name1" value="{{ $series['seriesName'] ?? '' }}">
                                             <div class="form-check ms-2 d-flex align-items-center form-control-height-32"
                                                 title="Collection (not a primary series)">
                                                 <input type="checkbox" name="series[{{ $idx }}][isCollection]"
@@ -829,12 +829,10 @@
             $narrator = implode(', ', $narrator);
         }
                                             @endphp
-                                            <input type="text" name="narrator[]" class="form-control narrator-autocomplete"
-                                                class="form-control-height-32 form-control-flex-1" value="{{ $narrator }}" placeholder="Narrator Name">
+                                            <input type="text" name="narrator[]" class="form-control narrator-autocomplete form-control-height-32 form-control-flex-1" value="{{ $narrator }}" placeholder="Narrator Name">
                                             <datalist id="narrator-list"></datalist> {{-- Populated by JavaScript via autocomplete --}}
                                             <div class="d-flex flex-column ms-2" style="gap:2px;">
-                                                <button type="button" class="btn btn-outline-danger btn-sm remove-row"
-                                                    style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Remove narrator">&times;</button>
+                                                <button type="button" class="btn btn-outline-danger btn-sm remove-narrator btn-size-32" aria-label="Remove narrator">&times;</button>
                                                 @if($idx === $narratorsCount - 1)
                                                     <button type="button" class="btn btn-primary btn-sm add-narrator-row"
                                                         style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Add narrator">+</button>
@@ -1511,108 +1509,6 @@
                 });
                 </script>
                 <script>
-        // Function to initialize book form UI elements
-        function initBookFormUI() {
-            // Restore add/remove buttons for authors
-            // Handle add-author-row buttons
-            document.querySelectorAll('.add-author-row').forEach(btn => {
-                btn.onclick = function() {
-                    const group = document.getElementById('authors-group');
-                    const idx = group.children.length;
-                    const row = document.createElement('div');
-                    row.className = 'input-group author-row align-items-start mb-3';
-                    row.innerHTML = `<input type="text" name="author[]" class="form-control w-auto author-autocomplete" style="max-width:300px; height:32px;" required>
-                        <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
-                            <button type="button" class="btn btn-outline-danger btn-sm remove-author p-0 mb-0" style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;" aria-label="Remove author">&times;</button>
-                            <button type="button" class="btn btn-primary btn-sm add-author-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;" aria-label="Add author">+</button>
-                        </div>`;
-                    group.appendChild(row);
-                    initBookFormUI();
-                };
-            });
-            // Handle remove-author buttons
-            document.querySelectorAll('.remove-author').forEach(btn => {
-                btn.onclick = function() {
-                    const row = btn.closest('.author-row');
-                    if (row) row.remove();
-                };
-            });
-            // Series
-            // Handle add-series-row buttons
-            document.querySelectorAll('.add-series-row').forEach(btn => {
-                btn.onclick = function() {
-                    const group = document.getElementById('series-group');
-                    const idx = group.children.length;
-                    const row = document.createElement('div');
-                    row.className = 'd-flex align-items-start mb-2 series-row';
-                    row.innerHTML = `<input type="number" name="series[${idx}][number]" class="form-control" style="width:60px; height:32px; flex-shrink:0;" placeholder="#" step="any">
-                        <input type="text" name="series[${idx}][seriesName]" class="form-control series-autocomplete ms-2" style="height:32px; flex:1;" placeholder="Series Name">
-                        <div class="form-check ms-2 d-flex align-items-center" style="height:32px;" title="Collection (not a primary series)">
-                            <input type="checkbox" name="series[${idx}][isCollection]" class="form-check-input" value="1" style="margin-top:0;">
-                            <label class="form-check-label ms-1 small">Collection</label>
-                        </div>
-                        <datalist id="series-list"></datalist> {{-- Populated by JavaScript via autocomplete --}}
-                        <div class="rename-button-container ms-2" style="width:32px; height:32px; flex-shrink:0;"></div>
-                        <div class="d-flex flex-column ms-2" style="gap:2px;">
-                            <button type="button" class="btn btn-outline-danger btn-sm remove-series" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Remove series">&times;</button>
-                            <button type="button" class="btn btn-primary btn-sm add-series-row" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Add series">+</button>
-                        </div>`;
-                    group.appendChild(row);
-
-                    // Add rename button show/hide logic
-                    const seriesNameInput = row.querySelector(`input[name="series[${idx}][seriesName]"]`);
-                    const renameContainer = row.querySelector('.rename-button-container');
-
-                    function updateRenameButton() {
-                        const seriesName = seriesNameInput.value.trim();
-                        if (seriesName) {
-                            renameContainer.innerHTML = `<button type="button" class="btn btn-sm btn-outline-primary rename-series-btn" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" data-series-name="${seriesName}" title="Rename this series" aria-label="Rename series"><i class="fas fa-edit"></i></button>`;
-                        } else {
-                            renameContainer.innerHTML = '';
-                        }
-                    }
-
-                    seriesNameInput.addEventListener('input', updateRenameButton);
-                    seriesNameInput.addEventListener('change', updateRenameButton);
-
-                    initBookFormUI();
-                };
-            });
-            // Handle remove-series buttons
-            document.querySelectorAll('.remove-series').forEach(btn => {
-                btn.onclick = function() {
-                    const row = btn.closest('.series-row');
-                    if (row) row.remove();
-                };
-            });
-            // Genres
-            // Handle add-genre-row buttons
-            document.querySelectorAll('.add-genre-row').forEach(btn => {
-                btn.onclick = function() {
-                    const group = document.getElementById('genres-group');
-                    const row = document.createElement('div');
-                    row.className = 'input-group genre-row align-items-start mb-3';
-                    row.innerHTML = `<input type="text" name="genre[]" class="form-control w-auto genre-autocomplete" style="max-width:200px; height:32px;" required>
-                        <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
-                            <button type="button" class="btn btn-outline-danger btn-sm remove-genre p-0 mb-0" style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;" aria-label="Remove genre">&times;</button>
-                            <button type="button" class="btn btn-primary btn-sm add-genre-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;" aria-label="Add genre">+</button>
-                        </div>`;
-                    group.appendChild(row);
-                    initBookFormUI();
-                };
-            });
-            // Handle remove-genre buttons
-            document.querySelectorAll('.remove-genre').forEach(btn => {
-                btn.onclick = function() {
-                    const row = btn.closest('.genre-row');
-                    if (row) row.remove();
-                };
-            });
-            // Autocomplete (if using a plugin, re-initialize here)
-            // Example: $('.author-autocomplete').autocomplete(...)
-            // You may need to re-attach your autocomplete plugin here if used
-        }
-
         // Initialize directory resync functionality
         document.addEventListener('DOMContentLoaded', function() {
             const resyncBtn = document.getElementById('resync-directory-btn');
@@ -1641,44 +1537,23 @@
                                 if (data.title) {
                                     document.getElementById('title').value = data.title;
                                 }
-                                if (data.authors) {
+                                if (data.authors && window.BookForm?.addAuthorRow) {
                                     const authorsGroup = document.getElementById('authors-group');
                                     authorsGroup.innerHTML = '';
-                                    data.authors.forEach(function(author, idx) {
-                                        const row = document.createElement('div');
-                                        row.className = 'input-group author-row align-items-start mb-3';
-                                        row.innerHTML = `<input type="text" name="author[]" class="form-control w-auto author-autocomplete" style="max-width:300px; height:32px;" value="${author}" required>
-                                            <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
-                                                <button type="button" class="btn btn-outline-danger btn-sm remove-author p-0 mb-0" style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;" aria-label="Remove author">&times;</button>
-                                                <button type="button" class="btn btn-primary btn-sm add-author-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;" aria-label="Add author">+</button>
-                                            </div>`;
-                                        authorsGroup.appendChild(row);
+                                    data.authors.forEach(function(author) {
+                                        window.BookForm.addAuthorRow($('#book-form'), author);
                                     });
                                 }
-                                if (data.series) {
+                                if (data.series && window.BookForm?.addSeriesRow) {
                                     const seriesGroup = document.getElementById('series-group');
                                     seriesGroup.innerHTML = '';
-                                    data.series.forEach(function(series, idx) {
-                                        const row = document.createElement('div');
-                                        row.className = 'd-flex align-items-start mb-2 series-row';
-                                        row.innerHTML = `<input type="number" name="series[${idx}][number]" class="form-control" style="width:60px; height:32px; flex-shrink:0;" placeholder="#" step="any" value="${series.number}">
-                                            <input type="text" name="series[${idx}][seriesName]" class="form-control series-autocomplete ms-2" style="height:32px; flex:1;" placeholder="Series Name" value="${series.name}">
-                                            <div class="form-check ms-2 d-flex align-items-center" style="height:32px;" title="Collection (not a primary series)">
-                                                <input type="checkbox" name="series[${idx}][isCollection]" class="form-check-input" value="1" style="margin-top:0;">
-                                                <label class="form-check-label ms-1 small">Collection</label>
-                                            </div>
-                                            <datalist id="series-list"></datalist> {{-- Populated by JavaScript via autocomplete --}}
-                                            <button type="button" class="btn btn-sm btn-outline-primary ms-2 rename-series-btn" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center; flex-shrink:0;" data-series-name="${series.name}" title="Rename this series" aria-label="Rename series"><i class="fas fa-edit"></i></button>
-                                            <div class="d-flex flex-column ms-2" style="gap:2px;">
-                                                <button type="button" class="btn btn-outline-danger btn-sm remove-series" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Remove series">&times;</button>
-                                                <button type="button" class="btn btn-primary btn-sm add-series-row" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Add series">+</button>
-                                            </div>`;
-                                        seriesGroup.appendChild(row);
+                                    data.series.forEach(function(series) {
+                                        window.BookForm.addSeriesRow($('#book-form'), {
+                                            number: series.number,
+                                            seriesName: series.name,
+                                            isCollection: series.isCollection || false
+                                        });
                                     });
-                                }
-                                // TODO: Handle genres if needed
-                                if (typeof window.initBookForm === 'function') {
-                                    window.initBookForm('#book-form');
                                 }
                             }
                         })
@@ -1688,7 +1563,6 @@
                             alert('Resync failed.');
                         });
                 });
-            }
                 });
                 </script>
                 @if(isset($book))
@@ -1958,7 +1832,6 @@
                 'resources/js/admin/books/autofill-simple.js',
                 'resources/js/admin/books/form-cover.js',
                 'resources/js/admin/books/form-directory.js',
-                'resources/js/admin/books/init-book-form.js',
                 'resources/js/admin/books/planned-actions.js',
                 'resources/js/admin/books/directory-browser.js',
                 'resources/js/admin/books/series-rename.js',

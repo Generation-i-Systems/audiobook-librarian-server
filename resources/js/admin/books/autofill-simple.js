@@ -561,36 +561,36 @@
                 ? item.author
                 : [item.author];
             authorsGroup.empty();
-            authors.forEach(function (author) {
-                const escapedAuthor = (author || "").replace(/"/g, "&quot;");
-                authorsGroup.append(
-                    `<div class="d-flex align-items-start mb-2 author-row">
-                        <input type="text" name="author[]" class="form-control author-autocomplete" value="${escapedAuthor}">
-                        <div class="d-flex flex-column ms-2 gap-2px">
-                            <button type="button" class="btn btn-outline-danger btn-sm remove-author btn-size-32" aria-label="Remove author">&times;</button>
-                            <button type="button" class="btn btn-primary btn-sm add-author-row btn-size-32" aria-label="Add author">+</button>
-                        </div>
-                    </div>`,
+            if (
+                typeof window.BookForm?.addAuthorRow === "function" &&
+                typeof window.BookForm?.initializeTemplates === "function"
+            ) {
+                window.BookForm.initializeTemplates($("#book-form"));
+                authors.forEach(function (author) {
+                    window.BookForm.addAuthorRow($("#book-form"), author || "");
+                });
+            } else {
+                console.error(
+                    "[autofill-simple] BookForm.addAuthorRow not available",
                 );
-            });
+            }
 
             const series = item.series || "";
             const seriesNumber = item.seriesNumber || item.series_number || "";
             if (series) {
                 const seriesGroup = $("#series-group");
                 seriesGroup.empty();
-                const escapedSeries = series.replace(/"/g, "&quot;");
-                seriesGroup.append(
-                    `<div class="d-flex align-items-start mb-2 series-row">
-                        <input type="number" name="series[0][number]" class="form-control width-80" value="${seriesNumber || ""}" placeholder="#">
-                        <input type="text" name="series[0][seriesName]" class="form-control series-autocomplete ms-2" value="${escapedSeries}" placeholder="Series Name">
-                        <div style="width:32px;height:32px;margin-left:0.5rem;flex-shrink:0;"></div>
-                        <div class="d-flex flex-column ms-2 gap-2px">
-                            <button type="button" class="btn btn-outline-danger btn-sm remove-series btn-size-32">&times;</button>
-                            <button type="button" class="btn btn-primary btn-sm add-series-row btn-size-32">+</button>
-                        </div>
-                    </div>`,
-                );
+                if (typeof window.BookForm?.addSeriesRow === "function") {
+                    window.BookForm.addSeriesRow($("#book-form"), {
+                        number: seriesNumber || "",
+                        seriesName: series,
+                        isCollection: false,
+                    });
+                } else {
+                    console.error(
+                        "[autofill-simple] BookForm.addSeriesRow not available",
+                    );
+                }
             }
 
             const publishedYear =
