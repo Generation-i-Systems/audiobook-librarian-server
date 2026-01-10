@@ -70,32 +70,39 @@ class BookImportServiceDuplicateDeletionTest extends TestCase
                 if (File::isDirectory($existingDir)) {
                     $comparison = $compareDirectoriesCallback($audiobook['path'], $existingDir);
 
+                    // Check if it's a file by looking at the path structure (has audio extension)
+                    $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
+                    $extension = strtolower(pathinfo($audiobook['path'] ?? '', PATHINFO_EXTENSION));
+                    $isFile = in_array($extension, $audioExtensions);
+                    $sourceType = $isFile ? 'file' : 'directory';
+                    $sourceTypePlural = $isFile ? 'files' : 'directories';
+
                     if ($comparison['identical']) {
-                        $infoCallback("🔍 Source and existing directories are identical");
+                        $infoCallback("🔍 Source and existing {$sourceTypePlural} are identical");
 
                         // Always ask for confirmation before deleting
                         $options = [
-                            '1' => 'Skip import completely (keep both directories)',
-                            '2' => 'Delete source directory (keep existing)',
+                            '1' => "Skip import completely (keep both {$sourceTypePlural})",
+                            '2' => "Delete source {$sourceType} (keep existing)",
                             '3' => 'Import anyway with new name',
                         ];
 
-                        $choice = $uiService->select("Identical directories detected - choose action", $options, '1');
+                        $choice = $uiService->select("Identical {$sourceTypePlural} detected - choose action", $options, '1');
 
                         switch ($choice) {
                             case '2':
-                                $infoCallback("🗑️ Removing source directory, keeping existing");
+                                $infoCallback("🗑️ Removing source {$sourceType}, keeping existing");
                                 $cleanupSourceDirectoryCallback($audiobook, true);
                                 return 'deleted';
 
                             case '3':
-                                $infoCallback("📁 Will import with renamed directory to avoid conflict");
+                                $infoCallback("📁 Will import with renamed {$sourceType} to avoid conflict");
                                 $aiMetadata['_force_rename_directory'] = true;
                                 return 'renamed';
 
                             case '1':
                             default:
-                                $infoCallback("📁 Skipping import, leaving both directories unchanged");
+                                $infoCallback("📁 Skipping import, leaving both {$sourceTypePlural} unchanged");
                                 return 'skipped';
                         }
                     }
@@ -141,9 +148,9 @@ class BookImportServiceDuplicateDeletionTest extends TestCase
         // Mock UI service to return "1" (skip)
         $this->uiService->shouldReceive('select')
             ->once()
-            ->with("Identical directories detected - choose action", [
-                '1' => 'Skip import completely (keep both directories)',
-                '2' => 'Delete source directory (keep existing)',
+            ->with("Identical files detected - choose action", [
+                '1' => 'Skip import completely (keep both files)',
+                '2' => 'Delete source file (keep existing)',
                 '3' => 'Import anyway with new name',
             ], '1')
             ->andReturn('1');
@@ -165,7 +172,7 @@ class BookImportServiceDuplicateDeletionTest extends TestCase
         // Verify that cleanup was NOT called (user chose to skip)
         $this->assertFalse($cleanupCalled, 'Cleanup should not be called when user chooses to skip');
         $this->assertEquals('skipped', $result);
-        $this->assertContains('📁 Skipping import, leaving both directories unchanged', $infoMessages);
+        $this->assertContains('📁 Skipping import, leaving both files unchanged', $infoMessages);
     }
 
     public function testIdenticalDirectoriesCanDeleteWithUserConfirmation()
@@ -197,9 +204,9 @@ class BookImportServiceDuplicateDeletionTest extends TestCase
         // Mock UI service to return "2" (delete)
         $this->uiService->shouldReceive('select')
             ->once()
-            ->with("Identical directories detected - choose action", [
-                '1' => 'Skip import completely (keep both directories)',
-                '2' => 'Delete source directory (keep existing)',
+            ->with("Identical files detected - choose action", [
+                '1' => 'Skip import completely (keep both files)',
+                '2' => 'Delete source file (keep existing)',
                 '3' => 'Import anyway with new name',
             ], '1')
             ->andReturn('2');
@@ -221,7 +228,7 @@ class BookImportServiceDuplicateDeletionTest extends TestCase
         // Verify that cleanup WAS called (user chose to delete)
         $this->assertTrue($cleanupCalled, 'Cleanup should be called when user chooses to delete');
         $this->assertEquals('deleted', $result);
-        $this->assertContains('🗑️ Removing source directory, keeping existing', $infoMessages);
+        $this->assertContains('🗑️ Removing source file, keeping existing', $infoMessages);
     }
 
     public function testIdenticalDirectoriesCanImportWithNewName()
@@ -253,9 +260,9 @@ class BookImportServiceDuplicateDeletionTest extends TestCase
         // Mock UI service to return "3" (import with new name)
         $this->uiService->shouldReceive('select')
             ->once()
-            ->with("Identical directories detected - choose action", [
-                '1' => 'Skip import completely (keep both directories)',
-                '2' => 'Delete source directory (keep existing)',
+            ->with("Identical files detected - choose action", [
+                '1' => 'Skip import completely (keep both files)',
+                '2' => 'Delete source file (keep existing)',
                 '3' => 'Import anyway with new name',
             ], '1')
             ->andReturn('3');
@@ -277,7 +284,7 @@ class BookImportServiceDuplicateDeletionTest extends TestCase
         // Verify that cleanup was NOT called (user chose to import with new name)
         $this->assertFalse($cleanupCalled, 'Cleanup should not be called when user chooses to import with new name');
         $this->assertEquals('renamed', $result);
-        $this->assertContains('📁 Will import with renamed directory to avoid conflict', $infoMessages);
+        $this->assertContains('📁 Will import with renamed file to avoid conflict', $infoMessages);
         $this->assertArrayHasKey('_force_rename_directory', $aiMetadata, 'Force rename flag should be set');
         $this->assertTrue($aiMetadata['_force_rename_directory'], 'Force rename flag should be true');
     }

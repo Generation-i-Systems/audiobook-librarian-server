@@ -6197,44 +6197,51 @@ class BookImportService
                 if (\Illuminate\Support\Facades\File::isDirectory($existingDir)) {
                     $comparison = $compareDirectoriesCallback($audiobook['path'], $existingDir);
 
+                    // Check if it's a file by looking at the path structure (has audio extension)
+                    $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
+                    $extension = strtolower(pathinfo($audiobook['path'] ?? '', PATHINFO_EXTENSION));
+                    $isFile = in_array($extension, $audioExtensions);
+                    $sourceType = $isFile ? 'file' : 'directory';
+                    $sourceTypePlural = $isFile ? 'files' : 'directories';
+
                     if ($comparison['identical']) {
-                        $infoCallback("🔍 Source and existing directories are identical");
+                        $infoCallback("🔍 Source and existing {$sourceTypePlural} are identical");
 
                         // Always ask for confirmation before deleting
                         $options = [
-                            '1' => 'Skip import completely (keep both directories)',
-                            '2' => 'Delete source directory (keep existing)',
+                            '1' => "Skip import completely (keep both {$sourceTypePlural})",
+                            '2' => "Delete source {$sourceType} (keep existing)",
                             '3' => 'Import anyway with new name',
                         ];
 
-                        $choice = $uiService->select("Identical directories detected - choose action", $options, '1');
+                        $choice = $uiService->select("Identical {$sourceTypePlural} detected - choose action", $options, '1');
 
                         switch ($choice) {
                             case '2':
-                                $infoCallback("🗑️ Removing source directory, keeping existing");
+                                $infoCallback("🗑️ Removing source {$sourceType}, keeping existing");
                                 $cleanupSourceDirectoryCallback($audiobook, true);
                                 $skippedBooks[] = [
                                     'path' => $audiobook['path'],
-                                    'reason' => 'User chose to keep existing over source (identical directories)',
+                                    'reason' => "User chose to keep existing over source (identical {$sourceTypePlural})",
                                 ];
                                 return;
 
                             case '3':
-                                $infoCallback("📁 Will import with renamed directory to avoid conflict");
+                                $infoCallback("📁 Will import with renamed {$sourceType} to avoid conflict");
                                 $aiMetadata['_force_rename_directory'] = true;
                                 break;
 
                             case '1':
                             default:
-                                $infoCallback("📁 Skipping import, leaving both directories unchanged");
+                                $infoCallback("📁 Skipping import, leaving both {$sourceTypePlural} unchanged");
                                 $skippedBooks[] = [
                                     'path' => $audiobook['path'],
-                                    'reason' => 'User chose to skip import (identical directories)',
+                                    'reason' => "User chose to skip import (identical {$sourceTypePlural})",
                                 ];
                                 return;
                         }
                     } else {
-                        $warnCallback("📁 Directories differ - manual decision needed");
+                        $warnCallback("📁 {$sourceTypePlural} differ - manual decision needed");
                         $comparisonExists = is_array($comparison) ? 'YES' : 'NO';
                         $lineCallback('🔍 Debug: Comparison data structure exists: ' . $comparisonExists);
                         if (is_array($comparison)) {
@@ -6245,27 +6252,27 @@ class BookImportService
                         $options = [
                             '1' => 'Skip import completely',
                             '2' => 'Replace existing with source',
-                            '3' => 'Delete source (keep existing)',
+                            '3' => "Delete source {$sourceType} (keep existing)",
                             '4' => 'Import anyway with new name',
                         ];
 
-                        $choice = $uiService->select("Directories differ - choose action", $options, '1');
+                        $choice = $uiService->select(ucfirst($sourceTypePlural) . " differ - choose action", $options, '1');
 
                         switch ($choice) {
                             case '2':
-                                $infoCallback("🗑️ Removing existing directory to replace with source");
+                                $infoCallback("🗑️ Removing existing {$sourceType} to replace with source");
                                 $trashResult = $this->sourceTrashService->movePathToTrash(
                                     $existingDir,
                                     'directory_diff_replace',
-                                    ['conflict_reason' => 'directories differ - user chose replace']
+                                    ['conflict_reason' => "{$sourceTypePlural} differ - user chose replace"]
                                 );
                                 if ($trashResult) {
-                                    $infoCallback("✅ Moved existing directory to trash ({$trashResult['id']})");
+                                    $infoCallback("✅ Moved existing {$sourceType} to trash ({$trashResult['id']})");
                                 }
                                 break;
 
                             case '3':
-                                $infoCallback("🗑️ Removing source directory, keeping existing");
+                                $infoCallback("🗑️ Removing source {$sourceType}, keeping existing");
                                 $cleanupSourceDirectoryCallback($audiobook, true);
                                 $skippedBooks[] = [
                                     'path' => $audiobook['path'],
@@ -6274,16 +6281,16 @@ class BookImportService
                                 return;
 
                             case '4':
-                                $infoCallback("📁 Will import with renamed directory to avoid conflict");
+                                $infoCallback("📁 Will import with renamed {$sourceType} to avoid conflict");
                                 $aiMetadata['_force_rename_directory'] = true;
                                 break;
 
                             case '1':
                             default:
-                                $infoCallback("📁 Skipping import, leaving both directories unchanged");
+                                $infoCallback("📁 Skipping import, leaving both {$sourceTypePlural} unchanged");
                                 $skippedBooks[] = [
                                     'path' => $audiobook['path'],
-                                    'reason' => 'User chose to skip import (directory conflict)',
+                                    'reason' => "User chose to skip import ({$sourceType} conflict)",
                                 ];
                                 return;
                         }

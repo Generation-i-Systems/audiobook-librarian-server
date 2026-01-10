@@ -1583,9 +1583,15 @@ class ImportBooksFromDownloads extends Command
      */
     protected function promptForDuplicateAction(array $audiobook, $existingBook): bool
     {
+        // Check if it's a file by looking at the path structure (has audio extension)
+        $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
+        $extension = strtolower(pathinfo($audiobook['path'] ?? '', PATHINFO_EXTENSION));
+        $isFile = in_array($extension, $audioExtensions);
+        $sourceType = $isFile ? 'file' : 'directory';
+
         $options = [
             '1' => 'Skip import (keep both)',
-            '2' => 'Delete source directory',
+            '2' => "Delete source {$sourceType}",
             '3' => 'Continue with import anyway',
         ];
 
