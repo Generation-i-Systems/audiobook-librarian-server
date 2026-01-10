@@ -995,7 +995,7 @@ trait BookImportTrait
 
         // Check for known variations
         if (isset($this->seriesVariations[$lowerName])) {
-            $seriesRef = $this->seriesCollection->add(['seriesName' => $this->seriesVariations[$lowerName]]);
+            $name = $this->seriesVariations[$lowerName];
         }
 
         // Remove common prefixes/suffixes

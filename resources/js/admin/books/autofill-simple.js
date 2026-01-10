@@ -22,7 +22,7 @@
             .trim();
     }
 
-function scoreAutofillResult(result) {
+    function scoreAutofillResult(result) {
         let score = 0;
         if (!result) {
             return score;
@@ -44,12 +44,15 @@ function scoreAutofillResult(result) {
             score += 35;
         }
 
-        if (
-            result.narrator &&
-            currentNarrator &&
-            result.narrator.toLowerCase() === currentNarrator.toLowerCase()
-        ) {
-            score += 5;
+        if (currentNarrator) {
+            const resultNarratorList = getNarratorList(result);
+            if (
+                resultNarratorList &&
+                resultNarratorList.toLowerCase() ===
+                    currentNarrator.toLowerCase()
+            ) {
+                score += 5;
+            }
         }
 
         if (result.description && currentDescription) {
@@ -106,20 +109,32 @@ function scoreAutofillResult(result) {
     }
 
     function getNarratorList(result) {
-        const narratorData =
-            result.narrator || result.narrators || result.narratorsList || [];
-        if (Array.isArray(narratorData)) {
-            return narratorData
+        if (Array.isArray(result.narrator)) {
+            return result.narrator
                 .map(function (n) {
-                    return n.name || String(n);
+                    const narrator = n.narrator || n;
+                    const name =
+                        typeof narrator === "object" && narrator.name
+                            ? narrator.name
+                            : String(narrator);
+                    return name;
                 })
                 .join(", ");
         }
-        if (Array.isArray(narratorData)) {
-            return narratorData.join(", ");
+        if (Array.isArray(result.narrators)) {
+            return result.narrators
+                .map(function (n) {
+                    const narrator = n.narrator || n;
+                    const name =
+                        typeof narrator === "object" && narrator.name
+                            ? narrator.name
+                            : String(narrator);
+                    return name;
+                })
+                .join(", ");
         }
-        if (typeof narratorData === "string") {
-            return narratorData;
+        if (Array.isArray(result.narratorsList)) {
+            return result.narratorsList.join(", ");
         }
         return "";
     }
@@ -173,12 +188,6 @@ function scoreAutofillResult(result) {
         })
             .done(function (response) {
                 console.log("[autofill-simple] Search results:", response);
-                if (Array.isArray(response) && response.length > 0) {
-                    console.log(
-                        "[autofill-simple] First result fields:",
-                        Object.keys(response[0]),
-                    );
-                }
                 const results = Array.isArray(response) ? response : [];
 
                 if (results.length === 0) {

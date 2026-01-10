@@ -12,7 +12,7 @@ class BookImportServiceMoveNonAudioFilesToDirectoryTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function moveNonAudioFilesToDirectoryMovesCoversAndJsonButNotAudio(): void
     {
-        $service = new BookImportServiceMoveNonAudioFilesToDirectoryTestDouble(app(GenreMappingService::class));
+        $service = new BookImportServiceMoveNonAudioFilesToDirectoryTestDouble(app(GenreMappingService::class), app(\App\Services\SourceTrashService::class));
 
         $reflection = new \ReflectionClass($service);
         $method = $reflection->getMethod('moveNonAudioFilesToDirectory');

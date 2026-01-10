@@ -17,6 +17,7 @@ class ImportUIServiceCoverCachingTest extends TestCase
 
         // Mock the Screen dependency
         $screen = Mockery::mock(Screen::class);
+        /** @phpstan-ignore-next-line */
         $this->importUIService = new class ($screen) extends ImportUIService {
             public function exposeCacheCoverForCurrentBook(): void
             {
@@ -96,9 +97,6 @@ class ImportUIServiceCoverCachingTest extends TestCase
 
         // Old temp file should be cleaned up
         $this->assertFileDoesNotExist($tempFile1);
-
-        // The key test: embedded covers with different paths should always re-cache
-        $this->assertTrue(true, 'Embedded covers with different paths always re-cache');
     }
 
     public function testCoverClearedBeforeRenderingNewBook(): void
@@ -131,9 +129,6 @@ class ImportUIServiceCoverCachingTest extends TestCase
 
         // Old temp file should be cleaned up
         $this->assertFileDoesNotExist($tempFile1);
-
-        // The key test: cover clearing should happen before rendering new cover
-        $this->assertTrue(true, 'Previous cover cleared before rendering new one');
     }
 
     public function testRenderStateClearedWhenSettingNewBook(): void
@@ -162,10 +157,6 @@ class ImportUIServiceCoverCachingTest extends TestCase
         // Should reuse the same temp file (URL is same and file exists)
         $this->assertEquals($tempFile1, $tempFile2);
         $this->assertFileExists($tempFile2);
-
-        // The key test: render state should be cleared even with same URL
-        // This forces re-rendering for the new book context
-        $this->assertTrue(true, 'Render state cleared for new book context');
     }
 
     public function testCoverCacheRecreatesWhenTempFileMissing(): void

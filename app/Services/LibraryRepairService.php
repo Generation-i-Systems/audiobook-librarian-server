@@ -1009,40 +1009,7 @@ class LibraryRepairService
         return $normalized;
     }
 
-    private function moveFilesFromNestedToParent(string $nestedDir, string $parentDir): void
-    {
-        if (!File::isDirectory($nestedDir) || !File::isDirectory($parentDir)) {
-            return;
-        }
 
-        $files = File::allFiles($nestedDir);
-
-        foreach ($files as $file) {
-            $filename = $file->getFilename();
-            $targetPath = $parentDir . '/' . $filename;
-
-            // Handle file name conflicts
-            if (File::exists($targetPath)) {
-                $pathInfo = pathinfo($targetPath);
-                $counter = 1;
-                while (true) {
-                    $suffix = '_' . str_pad((string) $counter, 2, '0', STR_PAD_LEFT);
-                    $candidate = ($pathInfo['dirname'] ?? '') . '/' . ($pathInfo['filename'] ?? 'file') . $suffix;
-                    if (!empty($pathInfo['extension'])) {
-                        $candidate .= '.' . $pathInfo['extension'];
-                    }
-                    if (!File::exists($candidate)) {
-                        $targetPath = $candidate;
-                        break;
-                    }
-                    $counter++;
-                }
-            }
-
-            File::move($file->getPathname(), $targetPath);
-            chmod($targetPath, 0664);
-        }
-    }
 
     /**
      * @param array<int,string|LibraryRepairIssueType> $issueTypes

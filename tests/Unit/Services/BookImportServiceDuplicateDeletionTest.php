@@ -26,6 +26,7 @@ class BookImportServiceDuplicateDeletionTest extends TestCase
         // Mock the File facade
         File::shouldReceive('isDirectory')->andReturn(true);
 
+        /** @phpstan-ignore-next-line */
         $this->importService = new class ($genreMappingService, $this->sourceTrashService) extends BookImportService {
             public function exposeProcessAudiobookDuplicateDetection(
                 array $audiobook,
@@ -277,6 +278,7 @@ class BookImportServiceDuplicateDeletionTest extends TestCase
         $this->assertFalse($cleanupCalled, 'Cleanup should not be called when user chooses to import with new name');
         $this->assertEquals('renamed', $result);
         $this->assertContains('📁 Will import with renamed directory to avoid conflict', $infoMessages);
-        $this->assertTrue(isset($aiMetadata['_force_rename_directory']), 'Force rename flag should be set');
+        $this->assertArrayHasKey('_force_rename_directory', $aiMetadata, 'Force rename flag should be set');
+        $this->assertTrue($aiMetadata['_force_rename_directory'], 'Force rename flag should be true');
     }
 }

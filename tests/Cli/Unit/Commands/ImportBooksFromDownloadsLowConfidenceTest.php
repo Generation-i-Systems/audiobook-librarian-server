@@ -131,6 +131,10 @@ class ImportBooksFromDownloadsLowConfidenceTestDouble extends ImportBooksFromDow
         return $shouldSkip;
     }
 
+
+    /**
+     * @return \App\Services\BookImportService
+     */
     protected function getImportService(): \App\Services\BookImportService
     {
         $mock = Mockery::mock(\App\Services\BookImportService::class);
