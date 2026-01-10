@@ -725,9 +725,9 @@
                                             <input type="number" name="series[{{ $idx }}][number]" class="form-control width-80 form-control-height-32 flex-shrink-0"
                                                 placeholder="#"
                                                 value="{{ $series['number'] ?? '' }}" step="any">
-                                            %<input type="text" name="series[{{ $idx }}][seriesName]"
+                                            <input type="text" name="series[{{ $idx }}][seriesName]"
                                                 class="r729 form-control series-autocomplete ms-2 form-control-height-32 form-control-flex-1"
-                                                placeholder="Series Name1" value="{{ $series['seriesName'] ?? '' }}">
+                                                placeholder="Series Name" value="{{ $series['seriesName'] ?? '' }}">
                                             <div class="form-check ms-2 d-flex align-items-center form-control-height-32"
                                                 title="Collection (not a primary series)">
                                                 <input type="checkbox" name="series[{{ $idx }}][isCollection]"
