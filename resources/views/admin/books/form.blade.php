@@ -726,7 +726,7 @@
                                                 placeholder="#"
                                                 value="{{ $series['number'] ?? '' }}" step="any">
                                             <input type="text" name="series[{{ $idx }}][seriesName]"
-                                                class="r729 form-control series-autocomplete ms-2 form-control-height-32 form-control-flex-1"
+                                                class="form-control series-autocomplete ms-2 form-control-height-32 form-control-flex-1"
                                                 placeholder="Series Name" value="{{ $series['seriesName'] ?? '' }}">
                                             <div class="form-check ms-2 d-flex align-items-center form-control-height-32"
                                                 title="Collection (not a primary series)">
@@ -785,9 +785,7 @@
             $author = implode(', ', $author);
         }
                                             @endphp
-                                            <input type="text" name="author[]" class="form-control author-autocomplete"
-                                                class="form-control-height-32 form-control-flex-1" value="{{ $author }}" placeholder="Author Name"
-                                                required>
+                                            <input type="text" name="author[]" class="form-control author-autocomplete form-control-height-32 form-control-flex-1" value="{{ $author }}" placeholder="Author Name" required>
                                             <datalist id="author-list"></datalist> {{-- Populated by JavaScript via autocomplete --}}
                                             <div class="d-flex flex-column ms-2" style="gap:2px;">
                                                 <button type="button" class="btn btn-outline-danger btn-sm remove-author"
@@ -866,7 +864,7 @@
                                     @endphp
                                     @foreach($genres as $idx => $genre)
                                         <div class="d-flex align-items-start mb-2 genre-row" data-original-genre="{{ $genre }}">
-                                            <select name="genre[]" class="form-select" class="form-control-height-32 form-control-flex-1" required>
+                                            <select name="genre[]" class="form-select form-control-height-32 form-control-flex-1" required>
                                                 <option value="">Select a genre</option>
                                                 @foreach($genreList as $g)
                                                     <option value="{{ $g }}" {{ $genre === $g ? 'selected' : '' }}>{{ $g }}</option>
