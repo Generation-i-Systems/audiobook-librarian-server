@@ -1546,17 +1546,35 @@
                     const row = document.createElement('div');
                     row.className = 'd-flex align-items-start mb-2 series-row';
                     row.innerHTML = `<input type="number" name="series[${idx}][number]" class="form-control" style="width:60px; height:32px; flex-shrink:0;" placeholder="#" step="any">
-                        <input type="text" name="series[${idx}][seriesName]" class="form-control series-autocomplete ms-2" class="form-control-height-32 form-control-flex-1" placeholder="Series Name">
+                        <input type="text" name="series[${idx}][seriesName]" class="form-control series-autocomplete ms-2" style="height:32px; flex:1;" placeholder="Series Name">
                         <div class="form-check ms-2 d-flex align-items-center" style="height:32px;" title="Collection (not a primary series)">
                             <input type="checkbox" name="series[${idx}][isCollection]" class="form-check-input" value="1" style="margin-top:0;">
                             <label class="form-check-label ms-1 small">Collection</label>
                         </div>
-                        <div style="width:32px; height:32px; margin-left:0.5rem; flex-shrink:0;"></div>
+                        <datalist id="series-list"></datalist> {{-- Populated by JavaScript via autocomplete --}}
+                        <div class="rename-button-container ms-2" style="width:32px; height:32px; flex-shrink:0;"></div>
                         <div class="d-flex flex-column ms-2" style="gap:2px;">
                             <button type="button" class="btn btn-outline-danger btn-sm remove-series" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Remove series">&times;</button>
                             <button type="button" class="btn btn-primary btn-sm add-series-row" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Add series">+</button>
                         </div>`;
                     group.appendChild(row);
+
+                    // Add rename button show/hide logic
+                    const seriesNameInput = row.querySelector(`input[name="series[${idx}][seriesName]"]`);
+                    const renameContainer = row.querySelector('.rename-button-container');
+
+                    function updateRenameButton() {
+                        const seriesName = seriesNameInput.value.trim();
+                        if (seriesName) {
+                            renameContainer.innerHTML = `<button type="button" class="btn btn-sm btn-outline-primary rename-series-btn" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" data-series-name="${seriesName}" title="Rename this series" aria-label="Rename series"><i class="fas fa-edit"></i></button>`;
+                        } else {
+                            renameContainer.innerHTML = '';
+                        }
+                    }
+
+                    seriesNameInput.addEventListener('input', updateRenameButton);
+                    seriesNameInput.addEventListener('change', updateRenameButton);
+
                     initBookFormUI();
                 };
             });
@@ -1642,12 +1660,18 @@
                                     seriesGroup.innerHTML = '';
                                     data.series.forEach(function(series, idx) {
                                         const row = document.createElement('div');
-                                        row.className = 'input-group series-row align-items-start mb-3';
-                                        row.innerHTML = `<input type="text" name="series[${idx}][name]" class="form-control w-auto series-autocomplete" style="max-width:200px; height:32px;" value="${series.name}" placeholder="Series Name">
-                                            <input type="text" name="series[${idx}][number]" class="form-control w-auto ms-2" style="max-width:100px; height:32px;" value="${series.number}" placeholder="Number">
-                                            <div class="d-flex flex-column flex-shrink-0 ms-2 align-items-center" style="min-width:40px;">
-                                                <button type="button" class="btn btn-outline-danger btn-sm remove-series p-0 mb-0" style="width:40px; height:32px; display:flex; align-items:center; justify-content:center;" aria-label="Remove series">&times;</button>
-                                                <button type="button" class="btn btn-primary btn-sm add-series-row p-0 mt-1" style="width:40px; height:28px; display:flex; align-items:center; justify-content:center;" aria-label="Add series">+</button>
+                                        row.className = 'd-flex align-items-start mb-2 series-row';
+                                        row.innerHTML = `<input type="number" name="series[${idx}][number]" class="form-control" style="width:60px; height:32px; flex-shrink:0;" placeholder="#" step="any" value="${series.number}">
+                                            <input type="text" name="series[${idx}][seriesName]" class="form-control series-autocomplete ms-2" style="height:32px; flex:1;" placeholder="Series Name" value="${series.name}">
+                                            <div class="form-check ms-2 d-flex align-items-center" style="height:32px;" title="Collection (not a primary series)">
+                                                <input type="checkbox" name="series[${idx}][isCollection]" class="form-check-input" value="1" style="margin-top:0;">
+                                                <label class="form-check-label ms-1 small">Collection</label>
+                                            </div>
+                                            <datalist id="series-list"></datalist> {{-- Populated by JavaScript via autocomplete --}}
+                                            <button type="button" class="btn btn-sm btn-outline-primary ms-2 rename-series-btn" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center; flex-shrink:0;" data-series-name="${series.name}" title="Rename this series" aria-label="Rename series"><i class="fas fa-edit"></i></button>
+                                            <div class="d-flex flex-column ms-2" style="gap:2px;">
+                                                <button type="button" class="btn btn-outline-danger btn-sm remove-series" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Remove series">&times;</button>
+                                                <button type="button" class="btn btn-primary btn-sm add-series-row" style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Add series">+</button>
                                             </div>`;
                                         seriesGroup.appendChild(row);
                                     });

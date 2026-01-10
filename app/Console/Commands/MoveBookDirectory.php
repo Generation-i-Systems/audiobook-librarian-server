@@ -739,6 +739,7 @@ class MoveBookDirectory extends Command
         try {
             // Use raw query for speed - find books where directoryPath starts with the source path
             $books = DB::table('books')
+                ->whereNull('deleted_at')
                 ->where(function ($query) use ($relativePath) {
                     $query->where('directory_path', $relativePath)
                         ->orWhere('directory_path', 'like', $relativePath . '/%');
