@@ -565,6 +565,14 @@
                 authors.forEach(function (author) {
                     window.BookForm.addAuthorRow($("#book-form"), author || "");
                 });
+                if (typeof window.BookForm?.updateAddRowButtons === "function") {
+                    window.BookForm.updateAddRowButtons(
+                        $("#book-form"),
+                        "#authors-group",
+                        ".author-row",
+                        ".add-author-row"
+                    );
+                }
             } else {
                 console.error(
                     "[autofill-simple] BookForm.addAuthorRow not available",
@@ -582,6 +590,14 @@
                         seriesName: series,
                         isCollection: false,
                     });
+                    if (typeof window.BookForm?.updateAddRowButtons === "function") {
+                        window.BookForm.updateAddRowButtons(
+                            $("#book-form"),
+                            "#series-group",
+                            ".series-row",
+                            ".add-series-row"
+                        );
+                    }
                 } else {
                     console.error(
                         "[autofill-simple] BookForm.addSeriesRow not available",
