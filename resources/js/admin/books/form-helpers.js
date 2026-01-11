@@ -67,14 +67,16 @@
                 );
                 return null;
             }
-            const firstRow = group.querySelector(rowSelector);
-            if (!firstRow) {
+            const rows = group.querySelectorAll(rowSelector);
+            if (rows.length === 0) {
                 console.warn(
                     `[form-helpers] Cannot find ${rowSelector} in ${groupSelector} for template creation`,
                 );
                 return null;
             }
-            const template = firstRow.cloneNode(true);
+            // Clone from the last row since it has the add button
+            const lastRow = rows[rows.length - 1];
+            const template = lastRow.cloneNode(true);
             clearFn(template);
             return template;
         };
