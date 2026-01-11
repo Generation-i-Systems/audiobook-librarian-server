@@ -561,11 +561,7 @@
                 ? item.author
                 : [item.author];
             authorsGroup.empty();
-            if (
-                typeof window.BookForm?.addAuthorRow === "function" &&
-                typeof window.BookForm?.initializeTemplates === "function"
-            ) {
-                window.BookForm.initializeTemplates($("#book-form"));
+            if (typeof window.BookForm?.addAuthorRow === "function") {
                 authors.forEach(function (author) {
                     window.BookForm.addAuthorRow($("#book-form"), author || "");
                 });
