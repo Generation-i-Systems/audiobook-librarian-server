@@ -29,16 +29,21 @@ class AIQueryController extends Controller
     public function process(Request $request)
     {
         $request->validate([
-            'prompt' => 'required|string|min:3',
+            'prompt' => 'required|string|min:3|max:5000',
             'context_query_id' => 'nullable|integer',
             'context_limit' => 'nullable|integer|min:0|max:1000',
         ]);
+
+        $prompt = $request->input('prompt');
+
+        // Basic sanitization: trim and remove excessive whitespace
+        $prompt = trim(preg_replace('/\s+/', ' ', $prompt));
 
         $contextQueryId = $request->input('context_query_id');
         $contextLimit = $request->input('context_limit', 50);
 
         $result = $this->aiQueryService->processQuery(
-            $request->input('prompt'),
+            $prompt,
             Auth::id(),
             $contextQueryId,
             $contextLimit
@@ -70,22 +75,24 @@ class AIQueryController extends Controller
         $rootQuery = DB::table('ai_queries')->where('id', $queryId)->first();
 
         if (!$rootQuery || $rootQuery->user_id != Auth::id()) {
+            Log::warning('Query not found or access denied', ['query_id' => $queryId]);
             abort(404);
         }
 
         // Load all queries in this conversation (root + all follow-ups)
-        // Only include queries explicitly linked to this conversation via parent_query_id
-        $conversationQueries = DB::table('ai_queries')
+        // Use simpler approach: get root, then get all follow-ups
+        $rootQueries = DB::table('ai_queries')
+            ->where('id', $queryId)
             ->where('user_id', Auth::id())
-            ->where(function ($query) use ($queryId) {
-                $query->where('id', $queryId)
-                    ->orWhere(function ($q) use ($queryId) {
-                        $q->whereRaw("JSON_EXTRACT(results, '$.parent_query_id') = ?", [$queryId])
-                          ->whereNotNull(DB::raw("JSON_EXTRACT(results, '$.parent_query_id')"));
-                    });
-            })
+            ->get();
+
+        $followUpQueries = DB::table('ai_queries')
+            ->where('user_id', Auth::id())
+            ->whereJsonContains('results->parent_query_id', $queryId)
             ->orderBy('id', 'asc')
             ->get();
+
+        $conversationQueries = $rootQueries->merge($followUpQueries);
 
         // Format conversation for display
         $conversation = [];
@@ -275,12 +282,14 @@ class AIQueryController extends Controller
         $request->validate([
             'query_id' => 'required|integer',
             'conversation_id' => 'required|integer',
-            'prompt' => 'required|string|min:3',
+            'prompt' => 'required|string|min:3|max:5000',
         ]);
+
+        $prompt = trim(preg_replace('/\s+/', ' ', $request->input('prompt')));
 
         $queryId = $request->input('query_id');
         $conversationId = $request->input('conversation_id');
-        $newPrompt = $request->input('prompt');
+        $newPrompt = $prompt;
 
         // Verify ownership
         $queryRecord = DB::table('ai_queries')->where('id', $queryId)->first();

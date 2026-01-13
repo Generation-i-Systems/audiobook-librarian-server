@@ -3,21 +3,21 @@ let currentOperationType = null;
 let currentQueries = [];
 let selectedBookIds = new Set();
 
-document.addEventListener('DOMContentLoaded', function() {
-    const toggleBtn = document.getElementById('toggle-ai-prompt');
-    const promptBody = document.getElementById('ai-prompt-body');
-    const submitBtn = document.getElementById('submit-ai-query');
-    const queryInput = document.getElementById('ai-query-input');
-    const viewQueriesBtn = document.getElementById('view-queries-btn');
-    const saveQueriesBtn = document.getElementById('save-queries-btn');
-    const executeBtn = document.getElementById('execute-query-btn');
-    const closeResultsBtn = document.getElementById('close-ai-results');
-    const resultsOverlay = document.getElementById('ai-results-overlay');
+document.addEventListener("DOMContentLoaded", function () {
+    const toggleBtn = document.getElementById("toggle-ai-prompt");
+    const promptBody = document.getElementById("ai-prompt-body");
+    const submitBtn = document.getElementById("submit-ai-query");
+    const queryInput = document.getElementById("ai-query-input");
+    const viewQueriesBtn = document.getElementById("view-queries-btn");
+    const saveQueriesBtn = document.getElementById("save-queries-btn");
+    const executeBtn = document.getElementById("execute-query-btn");
+    const closeResultsBtn = document.getElementById("close-ai-results");
+    const resultsOverlay = document.getElementById("ai-results-overlay");
 
     if (toggleBtn) {
-        toggleBtn.addEventListener('click', function() {
-            const isVisible = promptBody.style.display !== 'none';
-            promptBody.style.display = isVisible ? 'none' : 'block';
+        toggleBtn.addEventListener("click", function () {
+            const isVisible = promptBody.style.display !== "none";
+            promptBody.style.display = isVisible ? "none" : "block";
             toggleBtn.innerHTML = isVisible
                 ? '<i class="fas fa-chevron-down"></i>'
                 : '<i class="fas fa-chevron-up"></i>';
@@ -25,56 +25,57 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     if (closeResultsBtn) {
-        closeResultsBtn.addEventListener('click', function() {
-            resultsOverlay.style.display = 'none';
-            document.body.style.overflow = 'auto';
+        closeResultsBtn.addEventListener("click", function () {
+            resultsOverlay.style.display = "none";
+            document.body.style.overflow = "auto";
         });
     }
 
     // Close overlay when clicking outside modal
     if (resultsOverlay) {
-        resultsOverlay.addEventListener('click', function(e) {
+        resultsOverlay.addEventListener("click", function (e) {
             if (e.target === resultsOverlay) {
-                resultsOverlay.style.display = 'none';
-                document.body.style.overflow = 'auto';
+                resultsOverlay.style.display = "none";
+                document.body.style.overflow = "auto";
             }
         });
     }
 
     if (submitBtn) {
-        submitBtn.addEventListener('click', submitQuery);
+        submitBtn.addEventListener("click", submitQuery);
     }
 
     if (queryInput) {
-        queryInput.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' && e.ctrlKey) {
+        queryInput.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" && e.ctrlKey) {
                 submitQuery();
             }
         });
     }
 
     if (viewQueriesBtn) {
-        viewQueriesBtn.addEventListener('click', function() {
-            const editor = document.getElementById('query-editor');
-            editor.style.display = editor.style.display === 'none' ? 'block' : 'none';
+        viewQueriesBtn.addEventListener("click", function () {
+            const editor = document.getElementById("query-editor");
+            editor.style.display =
+                editor.style.display === "none" ? "block" : "none";
         });
     }
 
     if (saveQueriesBtn) {
-        saveQueriesBtn.addEventListener('click', saveQueryChanges);
+        saveQueriesBtn.addEventListener("click", saveQueryChanges);
     }
 
     if (executeBtn) {
-        executeBtn.addEventListener('click', executeQuery);
+        executeBtn.addEventListener("click", executeQuery);
     }
 });
 
 async function submitQuery() {
-    const queryInput = document.getElementById('ai-query-input');
+    const queryInput = document.getElementById("ai-query-input");
     const prompt = queryInput.value.trim();
 
     if (!prompt) {
-        showError('Please enter a query');
+        showError("Please enter a query");
         return;
     }
 
@@ -83,19 +84,27 @@ async function submitQuery() {
     hideResults();
 
     try {
-        const response = await fetch('/admin/ai-query/process', {
-            method: 'POST',
+        const response = await fetch("/admin/ai-query/process", {
+            method: "POST",
             headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                "Content-Type": "application/json",
+                "X-CSRF-TOKEN": document.querySelector(
+                    'meta[name="csrf-token"]',
+                ).content,
             },
             body: JSON.stringify({ prompt }),
         });
 
         const data = await response.json();
 
-        if (!response.ok || !data.success) {
-            throw new Error(data.error || 'Query processing failed');
+        if (!response.ok) {
+            throw new Error("Network error: Unable to connect to server");
+        }
+
+        if (!data.success) {
+            const errorMessage = data.error || "Unknown error occurred";
+            console.error("[AI Query] Processing failed:", errorMessage);
+            throw new Error(errorMessage);
         }
 
         currentQueryId = data.query_id;
@@ -112,7 +121,7 @@ async function submitQuery() {
 
 async function executeQuery() {
     if (!currentQueryId) {
-        showError('No query to execute');
+        showError("No query to execute");
         return;
     }
 
@@ -120,19 +129,27 @@ async function executeQuery() {
     hideError();
 
     try {
-        const response = await fetch('/admin/ai-query/execute', {
-            method: 'POST',
+        const response = await fetch("/admin/ai-query/execute", {
+            method: "POST",
             headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                "Content-Type": "application/json",
+                "X-CSRF-TOKEN": document.querySelector(
+                    'meta[name="csrf-token"]',
+                ).content,
             },
             body: JSON.stringify({ query_id: currentQueryId }),
         });
 
         const data = await response.json();
 
-        if (!response.ok || !data.success) {
-            throw new Error(data.error || 'Query execution failed');
+        if (!response.ok) {
+            throw new Error("Network error: Unable to connect to server");
+        }
+
+        if (!data.success) {
+            const errorMessage = data.error || "Unknown error occurred";
+            console.error("[AI Query] Execution failed:", errorMessage);
+            throw new Error(errorMessage);
         }
 
         displayResults(data.data);
@@ -145,7 +162,7 @@ async function executeQuery() {
 
 async function applyBulkUpdate() {
     if (!currentQueryId || selectedBookIds.size === 0) {
-        showError('No items selected');
+        showError("No items selected");
         return;
     }
 
@@ -157,11 +174,13 @@ async function applyBulkUpdate() {
     hideError();
 
     try {
-        const response = await fetch('/admin/ai-query/apply-bulk-update', {
-            method: 'POST',
+        const response = await fetch("/admin/ai-query/apply-bulk-update", {
+            method: "POST",
             headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                "Content-Type": "application/json",
+                "X-CSRF-TOKEN": document.querySelector(
+                    'meta[name="csrf-token"]',
+                ).content,
             },
             body: JSON.stringify({
                 query_id: currentQueryId,
@@ -171,11 +190,19 @@ async function applyBulkUpdate() {
 
         const data = await response.json();
 
-        if (!response.ok || !data.success) {
-            throw new Error(data.error || 'Bulk update failed');
+        if (!response.ok) {
+            throw new Error("Network error: Unable to connect to server");
         }
 
-        showSuccess(`Successfully applied changes to ${data.applied_count} item(s)`);
+        if (!data.success) {
+            const errorMessage = data.error || "Unknown error occurred";
+            console.error("[AI Query] Bulk update failed:", errorMessage);
+            throw new Error(errorMessage);
+        }
+
+        showSuccess(
+            `Successfully applied changes to ${data.applied_count} item(s)`,
+        );
         setTimeout(() => {
             window.location.reload();
         }, 2000);
@@ -188,27 +215,29 @@ async function applyBulkUpdate() {
 
 async function saveQueryChanges() {
     if (!currentQueryId) {
-        showError('No query to save');
+        showError("No query to save");
         return;
     }
 
     const updatedQueries = [];
-    const queryItems = document.querySelectorAll('.query-item');
+    const queryItems = document.querySelectorAll(".query-item");
 
     queryItems.forEach((item, index) => {
         updatedQueries.push({
             type: currentQueries[index].type,
-            query: item.querySelector('textarea').value,
-            purpose: item.querySelector('.query-purpose').textContent,
+            query: item.querySelector("textarea").value,
+            purpose: item.querySelector(".query-purpose").textContent,
         });
     });
 
     try {
-        const response = await fetch('/admin/ai-query/edit', {
-            method: 'POST',
+        const response = await fetch("/admin/ai-query/edit", {
+            method: "POST",
             headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                "Content-Type": "application/json",
+                "X-CSRF-TOKEN": document.querySelector(
+                    'meta[name="csrf-token"]',
+                ).content,
             },
             body: JSON.stringify({
                 query_id: currentQueryId,
@@ -218,27 +247,33 @@ async function saveQueryChanges() {
 
         const data = await response.json();
 
-        if (!response.ok || !data.success) {
-            throw new Error(data.error || 'Failed to save changes');
+        if (!response.ok) {
+            throw new Error("Network error: Unable to connect to server");
+        }
+
+        if (!data.success) {
+            const errorMessage = data.error || "Unknown error occurred";
+            console.error("[AI Query] Save failed:", errorMessage);
+            throw new Error(errorMessage);
         }
 
         currentQueries = updatedQueries;
-        showSuccess('Queries updated successfully');
+        showSuccess("Queries updated successfully");
     } catch (error) {
         showError(error.message);
     }
 }
 
 function displayQueryInfo(data) {
-    document.getElementById('operation-type').textContent = data.operation_type;
-    document.getElementById('explanation').textContent = data.explanation;
+    document.getElementById("operation-type").textContent = data.operation_type;
+    document.getElementById("explanation").textContent = data.explanation;
 
-    const queriesContainer = document.getElementById('queries-container');
-    queriesContainer.innerHTML = '';
+    const queriesContainer = document.getElementById("queries-container");
+    queriesContainer.innerHTML = "";
 
     data.queries.forEach((query, index) => {
-        const queryDiv = document.createElement('div');
-        queryDiv.className = 'query-item';
+        const queryDiv = document.createElement("div");
+        queryDiv.className = "query-item";
         queryDiv.innerHTML = `
             <div class="mb-2">
                 <strong>Query ${index + 1}:</strong>
@@ -250,25 +285,25 @@ function displayQueryInfo(data) {
         queriesContainer.appendChild(queryDiv);
     });
 
-    document.getElementById('ai-query-results').style.display = 'block';
+    document.getElementById("ai-query-results").style.display = "block";
 }
 
 function displayResults(data) {
-    const resultsDiv = document.getElementById('ai-results-display');
-    const overlay = document.getElementById('ai-results-overlay');
-    resultsDiv.innerHTML = '';
+    const resultsDiv = document.getElementById("ai-results-display");
+    const overlay = document.getElementById("ai-results-overlay");
+    resultsDiv.innerHTML = "";
 
-    if (currentOperationType === 'research') {
+    if (currentOperationType === "research") {
         displayResearchResults(data, resultsDiv);
-    } else if (currentOperationType === 'list') {
+    } else if (currentOperationType === "list") {
         displayListResults(data, resultsDiv);
-    } else if (currentOperationType === 'bulk_update') {
+    } else if (currentOperationType === "bulk_update") {
         displayBulkUpdateResults(data, resultsDiv);
     }
 
     // Show overlay modal
-    overlay.style.display = 'block';
-    document.body.style.overflow = 'hidden';
+    overlay.style.display = "block";
+    document.body.style.overflow = "hidden";
 }
 
 function displayResearchResults(data, container) {
@@ -278,14 +313,22 @@ function displayResearchResults(data, container) {
                 <h5 class="mb-0"><i class="fas fa-chart-bar"></i> Research Results</h5>
             </div>
             <div class="card-body">
-                ${data.stats.map(stat => `
+                ${data.stats
+                    .map(
+                        (stat) => `
                     <div class="mb-3">
                         <h6>${stat.purpose}</h6>
-                        ${stat.error ? `<div class="alert alert-danger">${stat.error}</div>` : `
+                        ${
+                            stat.error
+                                ? `<div class="alert alert-danger">${stat.error}</div>`
+                                : `
                             <pre class="bg-light p-3 rounded">${JSON.stringify(stat.result, null, 2)}</pre>
-                        `}
+                        `
+                        }
                     </div>
-                `).join('')}
+                `,
+                    )
+                    .join("")}
             </div>
         </div>
     `;
@@ -312,19 +355,23 @@ function displayListResults(data, container) {
                             </tr>
                         </thead>
                         <tbody>
-                            ${data.books.map(book => `
+                            ${data.books
+                                .map(
+                                    (book) => `
                                 <tr>
                                     <td>${book.title}</td>
-                                    <td>${Array.isArray(book.authors) ? book.authors.join(', ') : book.authors}</td>
-                                    <td>${Array.isArray(book.genres) ? book.genres.join(', ') : book.genres}</td>
-                                    <td>${book.series || '-'}</td>
+                                    <td>${Array.isArray(book.authors) ? book.authors.join(", ") : book.authors}</td>
+                                    <td>${Array.isArray(book.genres) ? book.genres.join(", ") : book.genres}</td>
+                                    <td>${book.series || "-"}</td>
                                     <td>
                                         <a href="${book.edit_url}" class="btn btn-sm btn-primary">
                                             <i class="fas fa-edit"></i> Edit
                                         </a>
                                     </td>
                                 </tr>
-                            `).join('')}
+                            `,
+                                )
+                                .join("")}
                         </tbody>
                     </table>
                 </div>
@@ -357,7 +404,9 @@ function displayBulkUpdateResults(data, container) {
                 </div>
 
                 <div class="bulk-update-preview">
-                    ${data.preview.map(item => `
+                    ${data.preview
+                        .map(
+                            (item) => `
                         <div class="book-card" data-book-id="${item.id}">
                             <div class="form-check mb-2">
                                 <input
@@ -372,24 +421,34 @@ function displayBulkUpdateResults(data, container) {
                                 </label>
                             </div>
 
-                            ${Object.keys(item.changes).length > 0 ? `
+                            ${
+                                Object.keys(item.changes).length > 0
+                                    ? `
                                 <div class="changes-list">
-                                    ${Object.entries(item.changes).map(([field, change]) => `
+                                    ${Object.entries(item.changes)
+                                        .map(
+                                            ([field, change]) => `
                                         <div class="mb-2">
                                             <strong>${field}:</strong><br>
                                             <span class="change-badge change-from">
-                                                From: ${Array.isArray(change.from) ? change.from.join(', ') : change.from}
+                                                From: ${Array.isArray(change.from) ? change.from.join(", ") : change.from}
                                             </span>
                                             <i class="fas fa-arrow-right"></i>
                                             <span class="change-badge change-to">
-                                                To: ${Array.isArray(change.to) ? change.to.join(', ') : change.to}
+                                                To: ${Array.isArray(change.to) ? change.to.join(", ") : change.to}
                                             </span>
                                         </div>
-                                    `).join('')}
+                                    `,
+                                        )
+                                        .join("")}
                                 </div>
-                            ` : '<p class="text-muted mb-0">No changes</p>'}
+                            `
+                                    : '<p class="text-muted mb-0">No changes</p>'
+                            }
                         </div>
-                    `).join('')}
+                    `,
+                        )
+                        .join("")}
                 </div>
             </div>
         </div>
@@ -400,63 +459,65 @@ function displayBulkUpdateResults(data, container) {
 
 function toggleBookSelection(bookId) {
     const checkbox = document.getElementById(`book-${bookId}`);
-    const card = checkbox.closest('.book-card');
+    const card = checkbox.closest(".book-card");
 
     if (checkbox.checked) {
         selectedBookIds.add(bookId);
-        card.classList.add('selected');
+        card.classList.add("selected");
     } else {
         selectedBookIds.delete(bookId);
-        card.classList.remove('selected');
+        card.classList.remove("selected");
     }
 }
 
 function selectAll() {
-    document.querySelectorAll('.book-checkbox').forEach(checkbox => {
+    document.querySelectorAll(".book-checkbox").forEach((checkbox) => {
         checkbox.checked = true;
         const bookId = parseInt(checkbox.dataset.bookId);
         selectedBookIds.add(bookId);
-        checkbox.closest('.book-card').classList.add('selected');
+        checkbox.closest(".book-card").classList.add("selected");
     });
 }
 
 function selectNone() {
-    document.querySelectorAll('.book-checkbox').forEach(checkbox => {
+    document.querySelectorAll(".book-checkbox").forEach((checkbox) => {
         checkbox.checked = false;
         const bookId = parseInt(checkbox.dataset.bookId);
         selectedBookIds.delete(bookId);
-        checkbox.closest('.book-card').classList.remove('selected');
+        checkbox.closest(".book-card").classList.remove("selected");
     });
 }
 
 function showLoading(show) {
-    document.getElementById('ai-query-loading').style.display = show ? 'block' : 'none';
+    document.getElementById("ai-query-loading").style.display = show
+        ? "block"
+        : "none";
 }
 
 function hideResults() {
-    document.getElementById('ai-query-results').style.display = 'none';
-    document.getElementById('ai-results-overlay').style.display = 'none';
-    document.body.style.overflow = 'auto';
+    document.getElementById("ai-query-results").style.display = "none";
+    document.getElementById("ai-results-overlay").style.display = "none";
+    document.body.style.overflow = "auto";
 }
 
 function showError(message) {
-    const errorDiv = document.getElementById('ai-query-error');
+    const errorDiv = document.getElementById("ai-query-error");
     errorDiv.textContent = message;
-    errorDiv.style.display = 'block';
+    errorDiv.style.display = "block";
 }
 
 function hideError() {
-    document.getElementById('ai-query-error').style.display = 'none';
+    document.getElementById("ai-query-error").style.display = "none";
 }
 
 function showSuccess(message) {
-    const resultsDiv = document.getElementById('ai-results-display');
-    const overlay = document.getElementById('ai-results-overlay');
-    const successDiv = document.createElement('div');
-    successDiv.className = 'alert alert-success';
+    const resultsDiv = document.getElementById("ai-results-display");
+    const overlay = document.getElementById("ai-results-overlay");
+    const successDiv = document.createElement("div");
+    successDiv.className = "alert alert-success";
     successDiv.innerHTML = `<i class="fas fa-check-circle"></i> ${message}`;
-    resultsDiv.innerHTML = '';
+    resultsDiv.innerHTML = "";
     resultsDiv.appendChild(successDiv);
-    overlay.style.display = 'block';
-    document.body.style.overflow = 'hidden';
+    overlay.style.display = "block";
+    document.body.style.overflow = "hidden";
 }
