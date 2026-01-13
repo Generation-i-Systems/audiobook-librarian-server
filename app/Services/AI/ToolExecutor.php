@@ -76,6 +76,7 @@ class ToolExecutor
                 'download_cover_image' => $this->downloadCoverImage($parameters),
                 'trigger_ai_processing' => $this->triggerAIProcessing($parameters),
                 'generate_nfo_files' => $this->generateNFOFiles($parameters),
+                'preview_and_execute_bulk_operation' => $this->previewAndExecuteBulkOperation($parameters),
                 default => ['success' => false, 'error' => "Unknown tool: {$toolName}"],
             };
 
@@ -1932,5 +1933,441 @@ class ToolExecutor
         $dom->loadXML($xml->asXML());
 
         return $dom->saveXML();
+    }
+
+    protected function previewAndExecuteBulkOperation(array $params): array
+    {
+        $action = $params['action'];
+        $operations = $params['operations'];
+        $executeMode = $params['execute_mode'] ?? 'preview';
+        $previewId = Str::uuid()->toString();
+
+        $previewResults = [];
+
+        foreach ($operations as $operation) {
+            $bookId = $operation['book_id'];
+            $dbUpdates = $operation['database_updates'] ?? [];
+            $dirOps = $operation['directory_operations'] ?? [];
+            $fileOps = $operation['file_operations'] ?? [];
+
+            $book = Book::with(['authors', 'genres', 'narrators', 'series'])->find($bookId);
+            if (!$book) {
+                $previewResults[] = [
+                    'book_id' => $bookId,
+                    'success' => false,
+                    'error' => 'Book not found',
+                ];
+                continue;
+            }
+
+            $changes = [];
+
+            if (!empty($dbUpdates)) {
+                foreach ($dbUpdates as $field => $value) {
+                    $currentValue = $this->getCurrentFieldValue($book, $field);
+
+                    $changes[] = [
+                        'type' => 'database_update',
+                        'field' => $field,
+                        'current' => $currentValue,
+                        'proposed' => $value,
+                    ];
+                }
+            }
+
+            if (!empty($dirOps)) {
+                $currentPath = $this->bookRoot . '/' . ltrim($book->directory_path, '/');
+
+                if (isset($dirOps['rename_to'])) {
+                    $newPath = dirname($currentPath) . '/' . $dirOps['rename_to'];
+
+                    $changes[] = [
+                        'type' => 'directory_rename',
+                        'field' => 'directory_name',
+                        'current' => basename($currentPath),
+                        'proposed' => $dirOps['rename_to'],
+                        'current_path' => $currentPath,
+                        'proposed_path' => $newPath,
+                    ];
+                }
+
+                if (isset($dirOps['move_to'])) {
+                    $newPath = $dirOps['move_to'];
+                    if (!str_starts_with($newPath, '/')) {
+                        $newPath = $this->bookRoot . '/' . ltrim($newPath, '/');
+                    }
+
+                    $changes[] = [
+                        'type' => 'directory_move',
+                        'field' => 'directory_path',
+                        'current' => $book->directory_path,
+                        'proposed' => ltrim(str_replace($this->bookRoot . '/', '', $newPath), '/'),
+                        'current_path' => $currentPath,
+                        'proposed_path' => $newPath,
+                    ];
+                }
+            }
+
+            if (!empty($fileOps)) {
+                $bookPath = $this->bookRoot . '/' . ltrim($book->directory_path, '/');
+                $files = File::files($bookPath);
+
+                foreach ($fileOps as $fileOp) {
+                    if (isset($fileOp['rename_to'])) {
+                        $currentFilename = $fileOp['file_name'];
+                        $newFilename = $fileOp['rename_to'];
+                        $currentFilepath = $bookPath . '/' . $currentFilename;
+                        $newFilepath = $bookPath . '/' . $newFilename;
+
+                        $changes[] = [
+                            'type' => 'file_rename',
+                            'field' => 'audio_filename',
+                            'current' => $currentFilename,
+                            'proposed' => $newFilename,
+                            'current_path' => $currentFilepath,
+                            'proposed_path' => $newFilepath,
+                        ];
+                    } elseif (isset($fileOp['pattern_replace'])) {
+                        $pattern = $fileOp['pattern_replace']['pattern'];
+                        $replacement = $fileOp['pattern_replace']['replacement'];
+                        $currentFilename = $fileOp['file_name'];
+                        $newFilename = str_replace($pattern, $replacement, $currentFilename);
+                        $currentFilepath = $bookPath . '/' . $currentFilename;
+                        $newFilepath = $bookPath . '/' . $newFilename;
+
+                        $changes[] = [
+                            'type' => 'file_pattern_replace',
+                            'field' => 'audio_filename',
+                            'current' => $currentFilename,
+                            'proposed' => $newFilename,
+                            'pattern' => $pattern,
+                            'replacement' => $replacement,
+                            'current_path' => $currentFilepath,
+                            'proposed_path' => $newFilepath,
+                        ];
+                    } elseif (isset($fileOp['delete']) && $fileOp['delete'] === true) {
+                        $filename = $fileOp['file_name'];
+                        $filepath = $bookPath . '/' . $filename;
+
+                        $changes[] = [
+                            'type' => 'file_delete',
+                            'field' => 'audio_filename',
+                            'current' => $filename,
+                            'proposed' => null,
+                            'current_path' => $filepath,
+                            'proposed_path' => null,
+                        ];
+                    }
+                }
+            }
+
+            $previewResults[] = [
+                'book_id' => $bookId,
+                'title' => $book->title,
+                'authors' => $book->authors->pluck('name')->toArray(),
+                'series' => $book->series->map(function ($s) {
+                    return [
+                        'name' => $s->name,
+                        'number' => $s->pivot->series_number,
+                    ];
+                })->toArray(),
+                'current_directory' => $book->directory_path,
+                'changes' => $changes,
+                'change_count' => count($changes),
+                'success' => true,
+            ];
+        }
+
+        $this->previewCache[$previewId] = [
+            'action' => $action,
+            'operations' => $previewResults,
+            'created_at' => now(),
+        ];
+
+        $summary = [
+            'preview_id' => $previewId,
+            'action' => $action,
+            'execute_mode' => $executeMode,
+            'total_books' => count($operations),
+            'successful' => collect($previewResults)->where('success', true)->count(),
+            'failed' => collect($previewResults)->where('success', false)->count(),
+            'total_changes' => collect($previewResults)->sum('change_count'),
+        ];
+
+        if ($executeMode === 'preview' || $executeMode === 'preview_only') {
+            return [
+                'success' => true,
+                'preview_id' => $previewId,
+                'mode' => 'preview',
+                'summary' => $summary,
+                'books' => $previewResults,
+                'message' => 'Preview generated. Use execute mode to apply changes.',
+            ];
+        }
+
+        if ($executeMode === 'execute') {
+            $executionResults = [];
+            $successCount = 0;
+            $failureCount = 0;
+
+            foreach ($previewResults as $preview) {
+                if (!$preview['success']) {
+                    $executionResults[] = $preview;
+                    $failureCount++;
+                    continue;
+                }
+
+                $bookId = $preview['book_id'];
+                $book = Book::find($bookId);
+                if (!$book) {
+                    continue;
+                }
+
+                try {
+                    $appliedChanges = [];
+
+                    foreach ($preview['changes'] as $change) {
+                        $success = false;
+
+                        if ($change['type'] === 'database_update') {
+                            $success = $this->applyDatabaseUpdate($book, $change);
+                        } elseif ($change['type'] === 'directory_rename' || $change['type'] === 'directory_move') {
+                            $success = $this->applyDirectoryOperation($change);
+                        } elseif ($change['type'] === 'file_rename') {
+                            $success = $this->applyFileRename($change);
+                        } elseif ($change['type'] === 'file_pattern_replace') {
+                            $success = $this->applyFilePatternReplace($change);
+                        } elseif ($change['type'] === 'file_delete') {
+                            $success = $this->applyFileDelete($change);
+                        }
+
+                        if ($success) {
+                            $appliedChanges[] = $change;
+                        }
+                    }
+
+                    $book->refresh();
+                    $executionResults[] = [
+                        'book_id' => $bookId,
+                        'title' => $book->title,
+                        'changes_applied' => count($appliedChanges),
+                        'changes_total' => count($preview['changes']),
+                        'success' => !empty($appliedChanges),
+                        'error' => count($appliedChanges) < count($preview['changes']) ? 'Some changes failed' : null,
+                    ];
+
+                    if (!empty($appliedChanges)) {
+                        $successCount++;
+                    } else {
+                        $failureCount++;
+                    }
+                } catch (\Exception $e) {
+                    $executionResults[] = [
+                        'book_id' => $bookId,
+                        'title' => $book->title ?? 'Unknown',
+                        'changes_applied' => 0,
+                        'changes_total' => count($preview['changes']),
+                        'success' => false,
+                        'error' => $e->getMessage(),
+                    ];
+                    $failureCount++;
+                }
+            }
+
+            return [
+                'success' => $failureCount === 0,
+                'mode' => 'execute',
+                'summary' => [
+                    'total_books' => count($operations),
+                    'successful' => $successCount,
+                    'failed' => $failureCount,
+                    'total_changes' => $summary['total_changes'],
+                    'changes_applied' => $successCount,
+                ],
+                'results' => $executionResults,
+            ];
+        }
+
+        return [
+            'success' => false,
+            'error' => 'Invalid execute_mode. Use "preview", "preview_only", or "execute"',
+        ];
+    }
+
+    protected function getCurrentFieldValue(Book $book, string $field)
+    {
+        switch ($field) {
+            case 'title':
+                return $book->title;
+            case 'description':
+                return $book->description;
+            case 'language':
+                return $book->language;
+            case 'isbn':
+                return $book->isbn;
+            case 'release_date':
+                return $book->release_date ? $book->release_date->format('Y-m-d') : null;
+            case 'series_number':
+                $series = $book->series->first();
+                return $series ? (string)$series->pivot->series_number : null;
+            default:
+                return null;
+        }
+    }
+
+    protected function applyDatabaseUpdate(Book $book, array $change): bool
+    {
+        try {
+            $field = $change['field'];
+            $value = $change['proposed'];
+
+            switch ($field) {
+                case 'title':
+                case 'description':
+                case 'language':
+                    $book->$field = $value;
+                    break;
+
+                case 'series_number':
+                    $series = $book->series->first();
+                    if ($series) {
+                        DB::table('book_series')
+                            ->where('book_id', $book->id)
+                            ->where('series_id', $series->id)
+                            ->update(['series_number' => $value]);
+                    }
+                    break;
+
+                default:
+                    return false;
+            }
+
+            $book->save();
+            return true;
+        } catch (\Exception $e) {
+            Log::error('Database update failed', [
+                'book_id' => $book->id,
+                'field' => $field,
+                'value' => $value,
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
+    protected function applyDirectoryOperation(array $change): bool
+    {
+        try {
+            $fromPath = $change['current_path'];
+            $toPath = $change['proposed_path'];
+
+            if (!File::exists($fromPath)) {
+                Log::warning('Source does not exist', ['path' => $fromPath]);
+                return false;
+            }
+
+            if (File::exists($toPath)) {
+                Log::warning('Destination already exists', ['path' => $toPath]);
+                return false;
+            }
+
+            $success = File::move($fromPath, $toPath);
+
+            if ($success) {
+                $bookId = DB::table('books')->where('directory_path', str_replace($this->bookRoot . '/', '', $fromPath))->value('id');
+                if ($bookId) {
+                    $relativePath = ltrim(str_replace($this->bookRoot, '', $toPath), '/');
+                    DB::table('books')->where('id', $bookId)->update(['directory_path' => $relativePath]);
+                }
+            }
+
+            return $success;
+        } catch (\Exception $e) {
+            Log::error('Directory operation failed', [
+                'from' => $change['current_path'],
+                'to' => $change['proposed_path'],
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
+    protected function applyFileRename(array $change): bool
+    {
+        try {
+            $currentPath = $change['current_path'];
+            $newPath = $change['proposed_path'];
+
+            if (!File::exists($currentPath)) {
+                Log::warning('Source file does not exist', ['path' => $currentPath]);
+                return false;
+            }
+
+            if (File::exists($newPath)) {
+                Log::warning('Destination file already exists', ['path' => $newPath]);
+                return false;
+            }
+
+            $success = File::move($currentPath, $newPath);
+            return $success;
+        } catch (\Exception $e) {
+            Log::error('File rename failed', [
+                'from' => $change['current_path'],
+                'to' => $change['proposed_path'],
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
+    protected function applyFilePatternReplace(array $change): bool
+    {
+        try {
+            $currentPath = $change['current_path'];
+            $newPath = $change['proposed_path'];
+
+            if (!File::exists($currentPath)) {
+                Log::warning('Source file does not exist', ['path' => $currentPath]);
+                return false;
+            }
+
+            if (File::exists($newPath)) {
+                Log::warning('Destination file already exists', ['path' => $newPath]);
+                return false;
+            }
+
+            $success = File::move($currentPath, $newPath);
+            return $success;
+        } catch (\Exception $e) {
+            Log::error('File pattern replace failed', [
+                'from' => $change['current_path'],
+                'to' => $change['proposed_path'],
+                'pattern' => $change['pattern'],
+                'replacement' => $change['replacement'],
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
+    protected function applyFileDelete(array $change): bool
+    {
+        try {
+            $filePath = $change['current_path'];
+
+            if (!File::exists($filePath)) {
+                Log::warning('File does not exist', ['path' => $filePath]);
+                return false;
+            }
+
+            $success = File::delete($filePath);
+            return $success;
+        } catch (\Exception $e) {
+            Log::error('File delete failed', [
+                'path' => $change['current_path'],
+                'error' => $e->getMessage(),
+            ]);
+            return false;
+        }
     }
 }

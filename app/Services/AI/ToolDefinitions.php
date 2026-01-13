@@ -36,6 +36,69 @@ class ToolDefinitions
             self::downloadCoverImage(),
             self::triggerAiProcessing(),
             self::generateNfoFiles(),
+            self::previewAndExecuteBulkOperation(),
+        ];
+    }
+
+    protected static function previewAndExecuteBulkOperation(): array
+    {
+        return [
+            'name' => 'preview_and_execute_bulk_operation',
+            'description' => 'Preview and execute flexible bulk operations across database, directories, and audio files. Supports pattern-based renaming, file-level operations, and database updates. Enables complex workflows like removing "r" from audio filenames, zero-padding directories while fixing DB series numbers, or batch renaming files.',
+            'parameters' => [
+                'type' => 'object',
+                'properties' => [
+                    'action' => [
+                        'type' => 'string',
+                        'description' => 'Human-readable description (e.g., "Remove letter r from all audio filenames")',
+                    ],
+                    'operations' => [
+                        'type' => 'array',
+                        'items' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'book_id' => ['type' => 'integer'],
+                                'database_updates' => [
+                                    'type' => 'object',
+                                    'description' => 'Database fields to update',
+                                ],
+                                'directory_operations' => [
+                                    'type' => 'object',
+                                    'properties' => [
+                                        'rename_to' => ['type' => 'string', 'description' => 'Rename directory to this name'],
+                                        'move_to' => ['type' => 'string', 'description' => 'Move directory to this path'],
+                                    ],
+                                ],
+                                'file_operations' => [
+                                    'type' => 'array',
+                                    'items' => [
+                                        'type' => 'object',
+                                        'properties' => [
+                                            'file_name' => ['type' => 'string', 'description' => 'Current filename to match'],
+                                            'rename_to' => ['type' => 'string', 'description' => 'New filename'],
+                                            'pattern_replace' => [
+                                                'type' => 'object',
+                                                'properties' => [
+                                                    'pattern' => ['type' => 'string'],
+                                                    'replacement' => ['type' => 'string'],
+                                                ],
+                                            ],
+                                            'delete' => ['type' => 'boolean', 'description' => 'Delete this file'],
+                                        ],
+                                    ],
+                                ],
+                            ],
+                        ],
+                        'description' => 'Array of coordinated operations per book',
+                    ],
+                    'execute_mode' => [
+                        'type' => 'string',
+                        'enum' => ['preview', 'preview_only', 'execute'],
+                        'description' => 'preview: generate detailed before/after; execute: apply confirmed changes',
+                    ],
+                ],
+                'required' => ['action', 'operations'],
+            ],
         ];
     }
 
