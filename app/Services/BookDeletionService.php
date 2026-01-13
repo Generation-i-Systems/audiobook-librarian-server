@@ -104,7 +104,7 @@ class BookDeletionService
         }
     }
 
-    private function isDirectoryShared(string $bookId, string $directoryPath): bool
+    public function isDirectoryShared(string $bookId, string $directoryPath): bool
     {
         $directoryPath = trim($directoryPath);
 

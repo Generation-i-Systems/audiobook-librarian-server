@@ -1726,8 +1726,47 @@ class BookController extends Controller
     public function destroy(Request $request, $book)
     {
         $deletionService = app(\App\Services\BookDeletionService::class);
+        $documentStore = $this->documentStoreService;
 
         $deleteFiles = $request->input('delete_files', 'true') === 'true';
+        $confirmed = $request->input('confirmed', 'false') === 'true';
+
+        // Get book details for validation
+        $bookData = $documentStore->getBook($book);
+        if (!$bookData) {
+            return redirect()->route('admin.books.index')
+                ->with('error', 'Book not found');
+        }
+
+        $directoryPath = $bookData['directoryPath'] ?? null;
+        $bookId = $book;
+
+        // Check if directory is shared and files are to be deleted
+        if ($deleteFiles && !$confirmed && !empty($directoryPath)) {
+            $isShared = $deletionService->isDirectoryShared($bookId, $directoryPath);
+
+            if ($isShared) {
+                // Directory is shared - return back with confirmation request
+                return redirect()->back()
+                    ->with('error', 'This book shares a directory with other books. You can only delete the database record.')
+                    ->with('requires_confirmation', true)
+                    ->with('book_id', $bookId)
+                    ->with('book_title', $bookData['title'] ?? 'Unknown')
+                    ->with('shared_directory', $directoryPath);
+            }
+        }
+
+        // If directory is shared and confirmed, force deleteFiles to false
+        if (!empty($directoryPath)) {
+            $isShared = $deletionService->isDirectoryShared($bookId, $directoryPath);
+            if ($isShared && $deleteFiles) {
+                Log::info('Forcing database-only deletion for shared directory', [
+                    'book_id' => $bookId,
+                    'directory_path' => $directoryPath,
+                ]);
+                $deleteFiles = false;
+            }
+        }
 
         $result = $deletionService->moveToTrash($book, $deleteFiles);
 

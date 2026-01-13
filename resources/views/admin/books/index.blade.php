@@ -318,9 +318,52 @@
         </div>
 
     </div>
+
+    {{-- Shared Directory Confirmation Modal --}}
+    @if(session('requires_confirmation') && session('book_id'))
+    <div class="modal fade" id="sharedDirectoryModal" tabindex="-1" aria-labelledby="sharedDirectoryModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title" id="sharedDirectoryModalLabel">Shared Directory Warning</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>This book shares a directory with other books!</strong>
+                    </div>
+                    <p class="mb-2"><strong>Book:</strong> {{ session('book_title') }}</p>
+                    <p class="text-muted small mb-3"><strong>Shared directory:</strong> <code>{{ session('shared_directory') }}</code></p>
+                    <p><strong>You can only delete the database record. The files will remain on disk for the other books.</strong></p>
+                    <p class="mb-0">Do you want to proceed with deleting only the database record?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <form action="{{ route('admin.books.destroy', session('book_id')) }}" method="POST" style="display:inline;">
+                        @csrf
+                        @method('DELETE')
+                        <input type="hidden" name="delete_files" value="false">
+                        <input type="hidden" name="confirmed" value="true">
+                        <button type="submit" class="btn btn-danger">Delete Database Record Only</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
     @push('scripts')
         <script>
             document.addEventListener('DOMContentLoaded', function () {
+                // Auto-show shared directory modal
+                const sharedDirModal = document.getElementById('sharedDirectoryModal');
+                if (sharedDirModal) {
+                    const modal = new bootstrap.Modal(sharedDirModal);
+                    modal.show();
+                }
+
+                // Clickable rows
                 document.querySelectorAll('.clickable-row').forEach(function (row) {
                     row.addEventListener('click', function (event) {
                         if (event.target.closest('a, button, input, select, textarea, label, form')) {
