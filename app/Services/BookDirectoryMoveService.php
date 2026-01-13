@@ -62,13 +62,20 @@ class BookDirectoryMoveService
 
         $newDirectoryPath = $this->resolveNonConflictingDirectoryPath($disk, $newDirectoryPath);
 
-        if (!$this->directoryExistsOnDisk($disk, $newDirectoryPath)) {
-            $disk->makeDirectory($newDirectoryPath, 0775, true); // Create recursively with permissions
-        }
-
-        // Set directory ownership
+        // Create directory using native PHP mkdir for better control
         $newAbsPath = $disk->path($newDirectoryPath);
-        if (is_dir($newAbsPath)) {
+        if (!is_dir($newAbsPath)) {
+            if (!@mkdir($newAbsPath, 0775, true)) {
+                Log::error('Failed to create directory', [
+                    'path' => $newAbsPath,
+                    'error' => error_get_last(),
+                ]);
+                return [
+                    'moved' => false,
+                    'coverImage' => $coverImageBasename,
+                    'error' => 'Failed to create target directory',
+                ];
+            }
             @chown($newAbsPath, 'eric');
             @chgrp($newAbsPath, 'audio');
             @chmod($newAbsPath, 0775);
@@ -76,6 +83,7 @@ class BookDirectoryMoveService
 
         $files = $disk->allFiles($oldDirectoryPath);
         $newCoverImageBasename = $coverImageBasename;
+        $failedFiles = [];
 
         Log::debug('BookDirectoryMoveService: Moving files', [
             'oldDirectoryPath' => $oldDirectoryPath,
@@ -130,6 +138,7 @@ class BookDirectoryMoveService
                     $newCoverImageBasename = basename($finalTarget);
                 }
             } catch (\Exception $e) {
+                $failedFiles[] = $file;
                 Log::error('Failed to move file during directory update', [
                     'oldPath' => $oldDirectoryPath,
                     'newPath' => $newDirectoryPath,
@@ -138,6 +147,15 @@ class BookDirectoryMoveService
                     'error' => $e->getMessage(),
                 ]);
             }
+        }
+
+        // If any files failed to move, return failure
+        if (!empty($failedFiles)) {
+            return [
+                'moved' => false,
+                'coverImage' => $coverImageBasename,
+                'error' => 'Failed to move ' . count($failedFiles) . ' file(s): ' . implode(', ', array_map('basename', $failedFiles)),
+            ];
         }
 
         $remainingFiles = $disk->allFiles($oldDirectoryPath);

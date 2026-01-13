@@ -1390,6 +1390,24 @@ class BookController extends Controller
                 'moveResult' => $moveResult,
             ]);
 
+            // Check if move failed
+            if (isset($moveResult['moved']) && $moveResult['moved'] === false) {
+                $errorMessage = $moveResult['error'] ?? 'Failed to move directory to new location';
+                Log::error('BookController@update: Directory move failed', [
+                    'oldPath' => $oldDirectoryPath,
+                    'newPath' => $newDirectoryPath,
+                    'error' => $errorMessage,
+                ]);
+
+                $data = $request->except(['_token', '_method']);
+                if ($request->has('returnUrl')) {
+                    $data['returnUrl'] = $request->input('returnUrl');
+                }
+                return redirect()->back()
+                    ->withInput($data)
+                    ->withErrors(['directoryPath' => $errorMessage]);
+            }
+
             if (!empty($moveResult['directoryPath']) && is_string($moveResult['directoryPath'])) {
                 $validated['directoryPath'] = $moveResult['directoryPath'];
                 $newDirectoryPath = $moveResult['directoryPath'];
@@ -2375,7 +2393,12 @@ class BookController extends Controller
         // Combine seriesNumber and title into final segment
         $finalSegment = [];
         if (!empty($validated['seriesNumber'])) {
-            $finalSegment[] = trim($validated['seriesNumber']);
+            // Zero-pad series number to 2 digits
+            $seriesNum = trim($validated['seriesNumber']);
+            if (is_numeric($seriesNum)) {
+                $seriesNum = str_pad($seriesNum, 2, '0', STR_PAD_LEFT);
+            }
+            $finalSegment[] = $seriesNum;
         }
         if (!empty($validated['title'])) {
             $finalSegment[] = trim($validated['title']);

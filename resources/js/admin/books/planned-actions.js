@@ -82,23 +82,22 @@
         const newPath = document.getElementById('directoryPath')?.value?.trim();
 
         if (!oldPath || !newPath) {
-            alert('Cannot execute move: missing directory paths');
+            showToast('Cannot execute move: missing directory paths', 'danger');
             return;
         }
 
         if (oldPath === newPath) {
-            alert('Old and new paths are the same');
+            showToast('Old and new paths are the same', 'warning');
             return;
         }
 
         if (!window.BOOK_FORM_ROUTES || !window.BOOK_FORM_ROUTES.executeImmediateMove) {
-            alert('Move URL not configured');
+            showToast('Move URL not configured', 'danger');
             return;
         }
 
-        if (!confirm('This will immediately move the book directory from:\n\n' + oldPath + '\n\nto:\n\n' + newPath + '\n\nContinue?')) {
-            return;
-        }
+        // Show loading message
+        showToast('Moving directory...', 'info');
 
         try {
             const response = await fetch(window.BOOK_FORM_ROUTES.executeImmediateMove, {
@@ -117,7 +116,7 @@
             const data = await response.json();
 
             if (!response.ok || !data.success) {
-                alert('Failed to move directory: ' + (data.message || 'Unknown error'));
+                showToast('Failed to move directory: ' + (data.message || 'Unknown error'), 'danger');
                 return;
             }
 
@@ -141,13 +140,36 @@
             // Note: We don't need to update coverImage input as it's a file input
             // The cover image moves with the directory and the database is already updated
 
-            alert('Directory moved successfully!');
+            showToast('Directory moved successfully!', 'success');
 
             // Refresh planned actions to show updated state
             refreshPlannedActions();
         } catch (error) {
-            alert('Error executing move: ' + error.message);
+            showToast('Error executing move: ' + error.message, 'danger');
         }
+    }
+
+    function showToast(message, type) {
+        // Use the BookForm showToast if available
+        if (window.BookForm && typeof window.BookForm.showToast === 'function') {
+            window.BookForm.showToast(message, type);
+            return;
+        }
+
+        // Fallback toast implementation
+        const toast = document.createElement('div');
+        toast.className = 'alert alert-' + (type || 'success');
+        toast.style.cssText = 'position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; min-width: 250px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);';
+        toast.textContent = message;
+
+        document.body.appendChild(toast);
+        setTimeout(function () {
+            toast.style.opacity = '0';
+            toast.style.transition = 'opacity 0.3s';
+            setTimeout(function () {
+                toast.remove();
+            }, 300);
+        }, 3000);
     }
 
     function setPreview(actions, lines) {
