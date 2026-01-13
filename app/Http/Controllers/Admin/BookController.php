@@ -1730,11 +1730,16 @@ class BookController extends Controller
 
         $deleteFiles = $request->input('delete_files', 'true') === 'true';
         $confirmed = $request->input('confirmed', 'false') === 'true';
+        $returnUrl = $request->input('return_url');
 
         // Get book details for validation
         $bookData = $documentStore->getBook($book);
         if (!$bookData) {
-            return redirect()->route('admin.books.index')
+            if ($returnUrl) {
+                return redirect($returnUrl)->with('error', 'Book not found');
+            }
+            $queryParams = $request->query();
+            return redirect()->route('admin.books.index', $queryParams ?: [])
                 ->with('error', 'Book not found');
         }
 
@@ -1752,7 +1757,8 @@ class BookController extends Controller
                     ->with('requires_confirmation', true)
                     ->with('book_id', $bookId)
                     ->with('book_title', $bookData['title'] ?? 'Unknown')
-                    ->with('shared_directory', $directoryPath);
+                    ->with('shared_directory', $directoryPath)
+                    ->with('return_url', $returnUrl);
             }
         }
 
@@ -1773,12 +1779,25 @@ class BookController extends Controller
         if ($result['success']) {
             $message = $deleteFiles ? 'Book and files moved to trash successfully.' : 'Book deleted from database (files preserved).';
 
-            return redirect()->route('admin.books.index')
+            if ($returnUrl) {
+                return redirect($returnUrl)
+                    ->with('success', $message)
+                    ->with('trash_item_id', $result['trash_item_id']);
+            }
+
+            $queryParams = $request->query();
+            return redirect()->route('admin.books.index', $queryParams ?: [])
                 ->with('success', $message)
                 ->with('trash_item_id', $result['trash_item_id']);
         }
 
-        return redirect()->route('admin.books.index')
+        if ($returnUrl) {
+            return redirect($returnUrl)
+                ->with('error', 'Failed to delete book: ' . ($result['error'] ?? 'Unknown error'));
+        }
+
+        $queryParams = $request->query();
+        return redirect()->route('admin.books.index', $queryParams ?: [])
             ->with('error', 'Failed to delete book: ' . ($result['error'] ?? 'Unknown error'));
     }
 

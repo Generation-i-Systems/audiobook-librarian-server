@@ -296,10 +296,11 @@
                             @endphp
                             <a href="{{ route('admin.books.edit', array_merge([$bookId], request()->query())) }}"
                                 class="btn btn-sm btn-outline-primary" title="Edit"><i class="fas fa-pencil-alt"></i></a>
-                            <form action="{{ route('admin.books.destroy', array_merge([$bookId], request()->query())) }}"
+                            <form action="{{ route('admin.books.destroy', $bookId) }}"
                                 method="POST" style="display: inline;">
                                 @csrf
                                 @method('DELETE')
+                                <input type="hidden" name="return_url" value="{{ url()->full() }}">
                                 @php
                                     $deleteTitle = addslashes($book['title'] ?? 'Untitled');
                                 @endphp
@@ -345,6 +346,11 @@
                         @method('DELETE')
                         <input type="hidden" name="delete_files" value="false">
                         <input type="hidden" name="confirmed" value="true">
+                        @if(session('return_url'))
+                            <input type="hidden" name="return_url" value="{{ session('return_url') }}">
+                        @else
+                            <input type="hidden" name="return_url" value="{{ url()->full() }}">
+                        @endif
                         <button type="submit" class="btn btn-danger">Delete Database Record Only</button>
                     </form>
                 </div>

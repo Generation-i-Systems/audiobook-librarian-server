@@ -202,12 +202,28 @@ class BookControllerTest extends TestCase
         $bookId = 'existing-book-id';
         $this->documentStoreServiceMock->shouldReceive('getBook')->with($bookId)->andReturn([
             'id' => $bookId,
+            'title' => 'Test Book',
             'directoryPath' => $directoryPath,
         ]);
 
+        // First attempt without confirmed flag - should redirect back with confirmation request
+        $response = $this->delete(route('admin.books.destroy', $bookId));
+        $response->assertRedirect();
+        $response->assertSessionHas('requires_confirmation', true);
+        $response->assertSessionHas('book_id', $bookId);
+
+        // Second attempt with confirmed flag - should delete with files preserved
+        $this->documentStoreServiceMock->shouldReceive('getBook')->with($bookId)->andReturn([
+            'id' => $bookId,
+            'title' => 'Test Book',
+            'directoryPath' => $directoryPath,
+        ]);
         $this->documentStoreServiceMock->shouldReceive('deleteBook')->with($bookId, false)->once()->andReturn(true);
 
-        $response = $this->delete(route('admin.books.destroy', $bookId));
+        $response = $this->delete(route('admin.books.destroy', $bookId), [
+            'confirmed' => 'true',
+            'delete_files' => 'true',
+        ]);
 
         $response->assertRedirect(route('admin.books.index'));
     }

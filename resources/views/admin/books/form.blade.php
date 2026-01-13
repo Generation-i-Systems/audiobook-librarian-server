@@ -1620,6 +1620,11 @@
                             @csrf
                             @method('DELETE')
                             <input type="hidden" name="delete_files" id="deleteFilesInput" value="true">
+                            @if($finalReturnUrl ?? null)
+                                <input type="hidden" name="return_url" value="{{ $finalReturnUrl }}">
+                            @else
+                                <input type="hidden" name="return_url" value="{{ route('admin.books.index') }}">
+                            @endif
                             <button type="submit" class="btn btn-danger">Delete Book</button>
                     </div>
                 </div>
@@ -1683,6 +1688,13 @@
                             @method('DELETE')
                             <input type="hidden" name="delete_files" value="false">
                             <input type="hidden" name="confirmed" value="true">
+                            @if(session('return_url'))
+                                <input type="hidden" name="return_url" value="{{ session('return_url') }}">
+                            @elseif($finalReturnUrl ?? null)
+                                <input type="hidden" name="return_url" value="{{ $finalReturnUrl }}">
+                            @else
+                                <input type="hidden" name="return_url" value="{{ route('admin.books.index') }}">
+                            @endif
                             <button type="submit" class="btn btn-danger">Delete Database Record Only</button>
                         </form>
                     </div>
