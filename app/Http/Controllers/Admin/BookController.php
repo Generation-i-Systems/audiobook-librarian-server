@@ -2360,12 +2360,29 @@ class BookController extends Controller
 
         $parts = [];
 
-        // Build path in order: genre/author/series/seriesNumber/title
-        foreach (['genre', 'author', 'series', 'seriesNumber', 'title'] as $key) {
-            if (!empty($validated[$key])) {
-                // Replace forward/back slashes with dashes to avoid path issues
-                $parts[] = preg_replace('/[\\/]/', '-', trim($validated[$key]));
-            }
+        // Build path in order: genre/author/series/{seriesNumber title}
+        // Note: seriesNumber and title are combined in the final segment
+        if (!empty($validated['genre'])) {
+            $parts[] = preg_replace('/[\\/]/', '-', trim($validated['genre']));
+        }
+        if (!empty($validated['author'])) {
+            $parts[] = preg_replace('/[\\/]/', '-', trim($validated['author']));
+        }
+        if (!empty($validated['series'])) {
+            $parts[] = preg_replace('/[\\/]/', '-', trim($validated['series']));
+        }
+
+        // Combine seriesNumber and title into final segment
+        $finalSegment = [];
+        if (!empty($validated['seriesNumber'])) {
+            $finalSegment[] = trim($validated['seriesNumber']);
+        }
+        if (!empty($validated['title'])) {
+            $finalSegment[] = trim($validated['title']);
+        }
+        if (!empty($finalSegment)) {
+            $combined = implode(' ', $finalSegment);
+            $parts[] = preg_replace('/[\\/]/', '-', $combined);
         }
 
         if (empty($parts)) {

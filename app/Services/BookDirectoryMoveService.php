@@ -63,7 +63,7 @@ class BookDirectoryMoveService
         $newDirectoryPath = $this->resolveNonConflictingDirectoryPath($disk, $newDirectoryPath);
 
         if (!$this->directoryExistsOnDisk($disk, $newDirectoryPath)) {
-            $disk->makeDirectory($newDirectoryPath);
+            $disk->makeDirectory($newDirectoryPath, 0775, true); // Create recursively with permissions
         }
 
         // Set directory ownership
