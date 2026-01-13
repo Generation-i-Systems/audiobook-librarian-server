@@ -13,6 +13,7 @@ class AIToolService
     protected array $conversationHistory = [];
     protected ToolExecutor $toolExecutor;
     protected int $maxIterations = 10;
+    protected int $maxExecutionTime = 300; // 5 minutes in seconds
 
     public function __construct(?string $model = null)
     {
@@ -38,8 +39,20 @@ class AIToolService
             $this->conversationHistory[] = $initialMessage;
 
             $iteration = 0;
+            $startTime = microtime(true);
             while ($iteration < $this->maxIterations) {
                 $iteration++;
+
+                if ((microtime(true) - $startTime) > $this->maxExecutionTime) {
+                    Log::warning('AI query exceeded maximum execution time', [
+                        'iterations' => $iteration,
+                        'elapsed_seconds' => round(microtime(true) - $startTime, 2),
+                    ]);
+                    return [
+                        'success' => false,
+                        'error' => 'Query exceeded maximum execution time',
+                    ];
+                }
 
                 Log::info("AI Tool Service iteration {$iteration}", [
                     'conversation_length' => count($this->conversationHistory),
@@ -136,6 +149,13 @@ class AIToolService
     protected function callGeminiWithTools(array $contents, array $tools): array
     {
         try {
+            if (empty($this->apiKey)) {
+                return [
+                    'success' => false,
+                    'error' => 'Gemini API key not configured',
+                ];
+            }
+
             $requestBody = [
                 'contents' => $contents,
                 'tools' => [
@@ -193,6 +213,7 @@ class AIToolService
         } catch (\Exception $e) {
             Log::error('Gemini API call failed', [
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return [

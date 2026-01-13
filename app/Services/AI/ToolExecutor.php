@@ -36,6 +36,16 @@ class ToolExecutor
                 'parameters' => $parameters,
             ]);
 
+            $toolName = strip_tags($toolName); // Basic sanitization
+
+            if (!in_array($toolName, array_keys(ToolDefinitions::getAllTools()), true)) {
+                Log::warning('Invalid tool requested', ['tool' => $toolName]);
+                return [
+                    'success' => false,
+                    'error' => 'Invalid tool name',
+                ];
+            }
+
             $result = match ($toolName) {
                 'search_books' => $this->searchBooks($parameters),
                 'analyze_series' => $this->analyzeSeries($parameters),

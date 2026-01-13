@@ -10,6 +10,7 @@ use App\Models\Narrator;
 use App\Models\Series;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log as Logger;
 
 class AIReviewController extends Controller
 {
@@ -153,16 +154,25 @@ class AIReviewController extends Controller
      */
     public function reject(Book $book)
     {
-        $book->update([
-            'ai_suggestions' => null,
-            'ai_processed' => true,
-            'ai_confidence' => 0,
-            'ai_processed_at' => now(),
-            'needs_review' => false,
-            'needs_review_reasons' => null,
-        ]);
+        try {
+            $book->update([
+                'ai_suggestions' => null,
+                'ai_processed' => true,
+                'ai_confidence' => 0,
+                'ai_processed_at' => now(),
+                'needs_review' => false,
+                'needs_review_reasons' => null,
+            ]);
 
-        return response()->json(['success' => true, 'message' => 'AI suggestions rejected']);
+            return response()->json(['success' => true, 'message' => 'AI suggestions rejected']);
+        } catch (\Exception $e) {
+            Logger::error('Failed to reject AI suggestions', [
+                'book_id' => $book->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json(['success' => false, 'error' => 'Failed to reject AI suggestions'], 500);
+        }
     }
 
     /**
@@ -187,8 +197,7 @@ class AIReviewController extends Controller
                 $this->applyAllSuggestions($book, $aiSuggestions);
                 $appliedCount++;
             } catch (\Exception $e) {
-                // Log error but continue with other books
-                \Log::error('Bulk AI apply failed for book ' . $book->id, ['error' => $e->getMessage()]);
+                Logger::error('Bulk AI apply failed for book ' . $book->id, ['error' => $e->getMessage()]);
             }
         }
 
