@@ -66,6 +66,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Library Repair Sync Path
+    |--------------------------------------------------------------------------
+    |
+    | This path is used by the library repair service to scan for missing
+    | books in the sync directory. It should be based on the book_root path.
+    |
+    */
+
+    'library_repair_sync_path' => env('BOOK_STORAGE_PATH', '/media/lyra_data1/audiobooks/books') . '/sync',
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |
