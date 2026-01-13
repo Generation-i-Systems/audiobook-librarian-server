@@ -138,12 +138,8 @@
                 initialState.directoryPath = data.directoryPath;
             }
 
-            if (data.coverImage) {
-                const coverImageInput = document.getElementById('coverImage');
-                if (coverImageInput) {
-                    coverImageInput.value = data.coverImage;
-                }
-            }
+            // Note: We don't need to update coverImage input as it's a file input
+            // The cover image moves with the directory and the database is already updated
 
             alert('Directory moved successfully!');
 

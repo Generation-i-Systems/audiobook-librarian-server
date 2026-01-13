@@ -217,6 +217,14 @@
                 "[init-book-form] setupAutofillModal is not a function",
             );
         }
+        if (typeof bookForm.registerDirectoryFeatures === "function") {
+            console.log("[init-book-form] Calling registerDirectoryFeatures");
+            bookForm.registerDirectoryFeatures($container);
+        } else {
+            console.log(
+                "[init-book-form] registerDirectoryFeatures is not a function",
+            );
+        }
     }
 
     window.initBookForm = initBookForm;
