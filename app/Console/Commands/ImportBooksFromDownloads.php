@@ -999,7 +999,7 @@ class ImportBooksFromDownloads extends Command
     /**
      * Ask for input with immediate interruption capability
      */
-    protected function askWithImmediateInterrupt(string $question, string $default = null): string
+    protected function askWithImmediateInterrupt(string $question, ?string $default = null): string
     {
         $response = $this->uiService->ask($question, $default ?? '');
 
@@ -1136,9 +1136,9 @@ class ImportBooksFromDownloads extends Command
     /**
      * Ask for input with prompt on the same line
      */
-    protected function askInline(string $question, string $default = ''): string
+    protected function askInline(string $question, ?string $default = ''): string
     {
-        return $this->askWithImmediateInterrupt($question, $default);
+        return $this->askWithImmediateInterrupt($question, $default ?? '');
     }
 
     protected function getFirstNonEmptyMetadataValue(array $metadata, array $keys): mixed
