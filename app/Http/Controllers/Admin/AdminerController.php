@@ -136,7 +136,12 @@ class AdminerController extends Controller
                     require_once base_path('resources/adminer/adminer-custom-class.php');
                 }
 
-                return new \Adminer\AdminerCustom();
+                require_once base_path('resources/adminer/adminer-plugins/sql-gemini.php');
+
+                return new \Adminer\Plugin(array(
+                    new \Adminer\AdminerCustom(),
+                    new \AdminerSqlGemini(),
+                ));
             }
         }
 

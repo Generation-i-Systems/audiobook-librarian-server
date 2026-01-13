@@ -61,7 +61,7 @@ class BookControllerSearchTest extends TestCase
                     'audibleId' => 'B123456789',
                     'coverImageUrl' => 'https://example.com/cover.jpg',
                     'publishedYear' => '2023',
-                    'narratorList' => ['Test Narrator'],
+                    'narrator' => ['Test Narrator'],
                     'seriesName' => 'Test Series',
                     'seriesNumber' => '1',
                     'series' => 'Test Series',

@@ -77,6 +77,7 @@ return [
         'System Volume Information',
         '\\$RECYCLE\\.BIN',
         '\\..*', // All hidden files and directories
+        '^sync$', // Sync directory (used for imports, not actual book storage)
     ],
 
     /*

@@ -415,7 +415,7 @@ class LibraryRepairService
             }
         }
 
-        // Also scan for missing books in /media/audiobooks/sync
+        // Also scan for missing books in the sync directory
         $created += $this->scanMissingDirectoriesInSync();
 
         return [

@@ -565,18 +565,31 @@
                 authors.forEach(function (author) {
                     window.BookForm.addAuthorRow($("#book-form"), author || "");
                 });
-                if (typeof window.BookForm?.updateAddRowButtons === "function") {
-                    window.BookForm.updateAddRowButtons(
-                        $("#book-form"),
-                        "#authors-group",
-                        ".author-row",
-                        ".add-author-row"
-                    );
-                }
             } else {
                 console.error(
                     "[autofill-simple] BookForm.addAuthorRow not available",
                 );
+            }
+
+            const narrators = getNarratorList(item);
+            if (narrators) {
+                const narratorsGroup = $("#narrators-group");
+                narratorsGroup.empty();
+                if (typeof window.BookForm?.addNarratorRow === "function") {
+                    const narratorArray = narrators
+                        .split(", ")
+                        .filter((n) => n.trim());
+                    narratorArray.forEach(function (narrator) {
+                        window.BookForm.addNarratorRow(
+                            $("#book-form"),
+                            narrator.trim(),
+                        );
+                    });
+                } else {
+                    console.error(
+                        "[autofill-simple] BookForm.addNarratorRow not available",
+                    );
+                }
             }
 
             const series = item.series || "";
@@ -590,14 +603,6 @@
                         seriesName: series,
                         isCollection: false,
                     });
-                    if (typeof window.BookForm?.updateAddRowButtons === "function") {
-                        window.BookForm.updateAddRowButtons(
-                            $("#book-form"),
-                            "#series-group",
-                            ".series-row",
-                            ".add-series-row"
-                        );
-                    }
                 } else {
                     console.error(
                         "[autofill-simple] BookForm.addSeriesRow not available",

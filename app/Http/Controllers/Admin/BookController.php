@@ -2241,16 +2241,16 @@ class BookController extends Controller
         // Ensure narrator is properly formatted
         if (isset($book['narrator'])) {
             if (is_array($book['narrator'])) {
-                $result['narratorList'] = $book['narrator'];
+                $result['narrator'] = $book['narrator'];
             } elseif (is_string($book['narrator'])) {
-                $result['narratorList'] = [$book['narrator']];
+                $result['narrator'] = [$book['narrator']];
             } elseif (is_string($book['narrator'])) {
-                $result['narratorList'] = [$book['narrator']];
+                $result['narrator'] = [$book['narrator']];
             } else {
-                $result['narratorList'] = [];
+                $result['narrator'] = [];
             }
         } else {
-            $result['narratorList'] = [];
+            $result['narrator'] = [];
         }
 
         // Ensure series is properly formatted
