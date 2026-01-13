@@ -78,7 +78,7 @@ class ImportBooksFromDownloadsEditMetadataPrefillTestDouble extends ImportBooksF
         return $this->editMetadataFields($metadata, []);
     }
 
-    protected function askInline(string $question, string $default = ''): string
+    protected function askInline(string $question, ?string $default = ''): string
     {
         $this->askInlineCalls[] = [$question, $default];
 

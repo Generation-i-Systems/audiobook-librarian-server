@@ -49,7 +49,7 @@ class ImportBooksFromDownloadsCoverUrlPromptTestDouble extends ImportBooksFromDo
         return $this->promptForCoverUrl($currentCoverUrl);
     }
 
-    protected function askInline(string $question, string $default = ''): string
+    protected function askInline(string $question, ?string $default = ''): string
     {
         $this->lastAskInlineArgs = [$question, $default];
 
