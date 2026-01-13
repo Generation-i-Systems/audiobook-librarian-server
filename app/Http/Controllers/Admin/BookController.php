@@ -1387,47 +1387,79 @@ class BookController extends Controller
         }
 
         if ($oldDirectoryPath && $newDirectoryPath && $oldDirectoryPath !== $newDirectoryPath && !$continueWithoutMove) {
-            Log::info('Moving files from old directory to new directory: ' . $oldDirectoryPath . ' -> ' . $newDirectoryPath);
-            Log::debug('BookController@update: Directory move details', [
-                'oldDirectoryPath' => $oldDirectoryPath,
-                'newDirectoryPath' => $newDirectoryPath,
-                'book' => $book,
-            ]);
+            // Check if old directory doesn't exist and new directory does exist - if so, skip move
+            $booksDisk = Storage::disk('books');
+            $oldExists = false;
+            $newExists = false;
 
-            $oldCoverBasename = !empty($book['coverImage']) ? basename((string) $book['coverImage']) : null;
-            $moveService = app(BookDirectoryMoveService::class);
-            $moveResult = $moveService->moveBookDirectoryContents($oldDirectoryPath, $newDirectoryPath, $oldCoverBasename);
-
-            Log::debug('BookController@update: Move result', [
-                'moveResult' => $moveResult,
-            ]);
-
-            // Check if move failed
-            if (isset($moveResult['moved']) && $moveResult['moved'] === false) {
-                $errorMessage = $moveResult['error'] ?? 'Failed to move directory to new location';
-                Log::error('BookController@update: Directory move failed', [
+            try {
+                if (method_exists($booksDisk, 'directoryExists')) {
+                    $oldExists = $booksDisk->directoryExists($oldDirectoryPath);
+                    $newExists = $booksDisk->directoryExists($newDirectoryPath);
+                } else {
+                    $oldExists = count($booksDisk->allFiles($oldDirectoryPath)) > 0;
+                    $newExists = count($booksDisk->allFiles($newDirectoryPath)) > 0;
+                }
+            } catch (\Exception $e) {
+                Log::warning('Error checking directory existence', [
                     'oldPath' => $oldDirectoryPath,
                     'newPath' => $newDirectoryPath,
-                    'error' => $errorMessage,
+                    'error' => $e->getMessage(),
                 ]);
-
-                $data = $request->except(['_token', '_method']);
-                if ($request->has('returnUrl')) {
-                    $data['returnUrl'] = $request->input('returnUrl');
-                }
-
-                // Return with modal trigger data
-                return redirect()->back()
-                    ->withInput($data)
-                    ->with('move_failed', true)
-                    ->with('move_error', $errorMessage)
-                    ->with('old_directory_path', $oldDirectoryPath)
-                    ->with('new_directory_path', $newDirectoryPath);
             }
 
-            if (!empty($moveResult['directoryPath']) && is_string($moveResult['directoryPath'])) {
-                $validated['directoryPath'] = $moveResult['directoryPath'];
-                $newDirectoryPath = $moveResult['directoryPath'];
+            if (!$oldExists && $newExists) {
+                Log::info('Old directory does not exist and new directory exists - skipping move', [
+                    'oldPath' => $oldDirectoryPath,
+                    'newPath' => $newDirectoryPath,
+                    'book_id' => $id,
+                ]);
+                // Skip the move, just proceed with database update
+            } else {
+                Log::info('Moving files from old directory to new directory: ' . $oldDirectoryPath . ' -> ' . $newDirectoryPath);
+                Log::debug('BookController@update: Directory move details', [
+                    'oldDirectoryPath' => $oldDirectoryPath,
+                    'newDirectoryPath' => $newDirectoryPath,
+                    'book' => $book,
+                    'oldExists' => $oldExists,
+                    'newExists' => $newExists,
+                ]);
+
+                $oldCoverBasename = !empty($book['coverImage']) ? basename((string) $book['coverImage']) : null;
+                $moveService = app(BookDirectoryMoveService::class);
+                $moveResult = $moveService->moveBookDirectoryContents($oldDirectoryPath, $newDirectoryPath, $oldCoverBasename);
+
+                Log::debug('BookController@update: Move result', [
+                    'moveResult' => $moveResult,
+                ]);
+
+                // Check if move failed
+                if (isset($moveResult['moved']) && $moveResult['moved'] === false) {
+                    $errorMessage = $moveResult['error'] ?? 'Failed to move directory to new location';
+                    Log::error('BookController@update: Directory move failed', [
+                        'oldPath' => $oldDirectoryPath,
+                        'newPath' => $newDirectoryPath,
+                        'error' => $errorMessage,
+                    ]);
+
+                    $data = $request->except(['_token', '_method']);
+                    if ($request->has('returnUrl')) {
+                        $data['returnUrl'] = $request->input('returnUrl');
+                    }
+
+                    // Return with modal trigger data
+                    return redirect()->back()
+                        ->withInput($data)
+                        ->with('move_failed', true)
+                        ->with('move_error', $errorMessage)
+                        ->with('old_directory_path', $oldDirectoryPath)
+                        ->with('new_directory_path', $newDirectoryPath);
+                }
+
+                if (!empty($moveResult['directoryPath']) && is_string($moveResult['directoryPath'])) {
+                    $validated['directoryPath'] = $moveResult['directoryPath'];
+                    $newDirectoryPath = $moveResult['directoryPath'];
+                }
             }
 
             $storageRoot = (string) config('app.book_root', env('BOOK_STORAGE_PATH', ''));
