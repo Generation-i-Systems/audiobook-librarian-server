@@ -1367,14 +1367,26 @@ class BookController extends Controller
         // Move files if directoryPath changed
         $oldDirectoryPath = $book['directoryPath'] ?? null;
         $newDirectoryPath = $validated['directoryPath'] ?? null;
+        $continueWithoutMove = $request->input('continue_without_move', 'false') === 'true';
+
         Log::debug('Directory path check', [
             'oldDirectoryPath' => $oldDirectoryPath,
             'newDirectoryPath' => $newDirectoryPath,
             'oldTruthy' => (bool) $oldDirectoryPath,
             'newTruthy' => (bool) $newDirectoryPath,
             'different' => $oldDirectoryPath !== $newDirectoryPath,
+            'continueWithoutMove' => $continueWithoutMove,
         ]);
-        if ($oldDirectoryPath && $newDirectoryPath && $oldDirectoryPath !== $newDirectoryPath) {
+
+        if ($continueWithoutMove && $oldDirectoryPath && $newDirectoryPath && $oldDirectoryPath !== $newDirectoryPath) {
+            Log::warning('Continuing with database-only update after move failure', [
+                'oldPath' => $oldDirectoryPath,
+                'newPath' => $newDirectoryPath,
+                'book_id' => $id,
+            ]);
+        }
+
+        if ($oldDirectoryPath && $newDirectoryPath && $oldDirectoryPath !== $newDirectoryPath && !$continueWithoutMove) {
             Log::info('Moving files from old directory to new directory: ' . $oldDirectoryPath . ' -> ' . $newDirectoryPath);
             Log::debug('BookController@update: Directory move details', [
                 'oldDirectoryPath' => $oldDirectoryPath,
@@ -1403,9 +1415,14 @@ class BookController extends Controller
                 if ($request->has('returnUrl')) {
                     $data['returnUrl'] = $request->input('returnUrl');
                 }
+
+                // Return with modal trigger data
                 return redirect()->back()
                     ->withInput($data)
-                    ->withErrors(['directoryPath' => $errorMessage]);
+                    ->with('move_failed', true)
+                    ->with('move_error', $errorMessage)
+                    ->with('old_directory_path', $oldDirectoryPath)
+                    ->with('new_directory_path', $newDirectoryPath);
             }
 
             if (!empty($moveResult['directoryPath']) && is_string($moveResult['directoryPath'])) {

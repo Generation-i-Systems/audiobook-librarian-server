@@ -1715,6 +1715,73 @@
         @endif
         @endif
 
+        {{-- Move Failure Confirmation Modal --}}
+        @if(session('move_failed'))
+        <div class="modal fade" id="moveFailureModal" tabindex="-1" aria-labelledby="moveFailureModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title" id="moveFailureModalLabel">Directory Move Failed</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>Failed to move files to new directory</strong>
+                        </div>
+                        <p class="mb-2"><strong>Error:</strong></p>
+                        <p class="text-muted small mb-3">{{ session('move_error') }}</p>
+                        <p class="mb-2"><strong>Old directory:</strong> <code>{{ session('old_directory_path') }}</code></p>
+                        <p class="mb-3"><strong>New directory:</strong> <code>{{ session('new_directory_path') }}</code></p>
+
+                        <p class="mb-2"><strong>What would you like to do?</strong></p>
+                        <ul>
+                            <li><strong>Continue Anyway:</strong> Update the database with the new directory path without moving files. Files will remain in the old location.</li>
+                            <li><strong>Revert:</strong> Cancel the update and return to editing the book.</li>
+                        </ul>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Revert</button>
+                        <form action="{{ route('admin.books.update', $book['id']) }}" method="POST" style="display:inline;">
+                            @csrf
+                            @method('PUT')
+                            <input type="hidden" name="continue_without_move" value="true">
+                            @foreach(old() as $key => $value)
+                                @if($key !== '_token' && $key !== '_method')
+                                    @if(is_array($value))
+                                        @foreach($value as $subkey => $subvalue)
+                                            @if(is_array($subvalue))
+                                                @foreach($subvalue as $subsubkey => $subsubvalue)
+                                                    <input type="hidden" name="{{ $key }}[{{ $subkey }}][{{ $subsubkey }}]" value="{{ $subsubvalue }}">
+                                                @endforeach
+                                            @else
+                                                <input type="hidden" name="{{ $key }}[{{ $subkey }}]" value="{{ $subvalue }}">
+                                            @endif
+                                        @endforeach
+                                    @else
+                                        <input type="hidden" name="{{ $key }}" value="{{ $value }}">
+                                    @endif
+                                @endif
+                            @endforeach
+                            <button type="submit" class="btn btn-warning">Continue Anyway (Database Only)</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+        // Auto-show move failure modal
+        document.addEventListener('DOMContentLoaded', function() {
+            const moveFailureModal = document.getElementById('moveFailureModal');
+            if (moveFailureModal) {
+                const modal = new bootstrap.Modal(moveFailureModal);
+                modal.show();
+            }
+        });
+        </script>
+        @endif
+
         {{-- Series Rename Modal --}}
         <div class="modal fade" id="renameSeriesModal" tabindex="-1" aria-labelledby="renameSeriesModalLabel" aria-hidden="true">
             <div class="modal-dialog">
