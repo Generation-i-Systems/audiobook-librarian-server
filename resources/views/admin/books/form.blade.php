@@ -1813,8 +1813,11 @@
                 window.BOOK_FORM_ROUTES.browseDirectories = "{{ route('admin.books.browseDirectories') }}";
                 window.BOOK_FORM_ROUTES.parsePath = "{{ route('admin.books.parsePath') }}";
                 window.BOOK_FORM_ROUTES.checkDirectoryConflict = "{{ route('admin.books.checkDirectoryConflict') }}";
+                window.BOOK_FORM_ROUTES.buildPathFromFields = "{{ route('admin.books.buildPathFromFields') }}";
                 @if(isset($book) && !empty($book['id']))
                     window.BOOK_FORM_ROUTES.plannedActions = "{{ route('admin.books.plannedActions', ['id' => $book['id']]) }}";
+                    window.BOOK_FORM_ROUTES.executeImmediateMove = "{{ route('admin.books.executeImmediateMove', ['id' => $book['id']]) }}";
+                    window.BOOK_ID = "{{ $book['id'] }}";
                 @endif
 
                 // Debug: Confirm jQuery and jQuery UI are loaded

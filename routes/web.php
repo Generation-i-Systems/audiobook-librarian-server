@@ -430,6 +430,14 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::post('books/check-directory-conflict', [Admin\BookController::class, 'checkDirectoryConflict'])
         ->name('books.checkDirectoryConflict');
 
+    // AJAX: Build directory path from form fields
+    Route::post('books/build-path-from-fields', [Admin\BookController::class, 'buildPathFromFields'])
+        ->name('books.buildPathFromFields');
+
+    // AJAX: Execute immediate directory move
+    Route::post('books/{id}/execute-immediate-move', [Admin\BookController::class, 'executeImmediateMove'])
+        ->name('books.executeImmediateMove');
+
     // AJAX: Planned actions preview for edit form
     Route::post('books/{id}/planned-actions', [Admin\BookController::class, 'plannedActions'])
         ->name('books.plannedActions');

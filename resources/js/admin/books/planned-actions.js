@@ -77,6 +77,83 @@
         refreshPlannedActions();
     }
 
+    async function executeImmediateMove() {
+        const oldPath = document.querySelector('input[name="originalDirectoryPath"]')?.value?.trim();
+        const newPath = document.getElementById('directoryPath')?.value?.trim();
+
+        if (!oldPath || !newPath) {
+            alert('Cannot execute move: missing directory paths');
+            return;
+        }
+
+        if (oldPath === newPath) {
+            alert('Old and new paths are the same');
+            return;
+        }
+
+        if (!window.BOOK_FORM_ROUTES || !window.BOOK_FORM_ROUTES.executeImmediateMove) {
+            alert('Move URL not configured');
+            return;
+        }
+
+        if (!confirm('This will immediately move the book directory from:\n\n' + oldPath + '\n\nto:\n\n' + newPath + '\n\nContinue?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(window.BOOK_FORM_ROUTES.executeImmediateMove, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': getCsrfToken(),
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({
+                    oldDirectoryPath: oldPath,
+                    newDirectoryPath: newPath,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                alert('Failed to move directory: ' + (data.message || 'Unknown error'));
+                return;
+            }
+
+            // Update the form with the actual moved path
+            if (data.directoryPath) {
+                const directoryPathInput = document.getElementById('directoryPath');
+                if (directoryPathInput) {
+                    directoryPathInput.value = data.directoryPath;
+                }
+
+                // Update the original path so we don't try to move again on submit
+                const originalPathInput = document.querySelector('input[name="originalDirectoryPath"]');
+                if (originalPathInput) {
+                    originalPathInput.value = data.directoryPath;
+                }
+
+                // Update initial state
+                initialState.directoryPath = data.directoryPath;
+            }
+
+            if (data.coverImage) {
+                const coverImageInput = document.getElementById('coverImage');
+                if (coverImageInput) {
+                    coverImageInput.value = data.coverImage;
+                }
+            }
+
+            alert('Directory moved successfully!');
+
+            // Refresh planned actions to show updated state
+            refreshPlannedActions();
+        } catch (error) {
+            alert('Error executing move: ' + error.message);
+        }
+    }
+
     function setPreview(actions, lines) {
         const preview = document.getElementById('planned-actions-preview');
         if (!preview) {
@@ -102,6 +179,25 @@
         if (hasPendingChanges(actions)) {
             const spacer = document.createTextNode(' ');
             preview.appendChild(spacer);
+
+            // Check if there's a move_files action
+            const hasMoveAction = actions.some(function(action) {
+                return action && action.type === 'move_files';
+            });
+
+            // Add "Update Now" button if there's a move action
+            if (hasMoveAction && window.BOOK_FORM_ROUTES && window.BOOK_FORM_ROUTES.executeImmediateMove) {
+                const updateNowButton = document.createElement('button');
+                updateNowButton.type = 'button';
+                updateNowButton.className = 'btn btn-sm btn-primary ms-2';
+                updateNowButton.textContent = 'Update Now';
+                updateNowButton.title = 'Execute the directory move immediately (before form submission)';
+                updateNowButton.addEventListener('click', function () {
+                    executeImmediateMove();
+                });
+
+                preview.appendChild(updateNowButton);
+            }
 
             const revertButton = document.createElement('button');
             revertButton.type = 'button';

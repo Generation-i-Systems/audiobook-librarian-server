@@ -2346,6 +2346,123 @@ class BookController extends Controller
     }
 
     /**
+     * Build directory path from form fields (genre, author, series, title)
+     */
+    public function buildPathFromFields(Request $request)
+    {
+        $validated = $request->validate([
+            'genre' => 'nullable|string',
+            'author' => 'nullable|string',
+            'series' => 'nullable|string',
+            'seriesNumber' => 'nullable|string',
+            'title' => 'nullable|string',
+        ]);
+
+        $parts = [];
+
+        // Build path in order: genre/author/series/seriesNumber/title
+        foreach (['genre', 'author', 'series', 'seriesNumber', 'title'] as $key) {
+            if (!empty($validated[$key])) {
+                // Replace forward/back slashes with dashes to avoid path issues
+                $parts[] = preg_replace('/[\\/]/', '-', trim($validated[$key]));
+            }
+        }
+
+        if (empty($parts)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'At least one field must be provided to build a path',
+            ], 400);
+        }
+
+        $directoryPath = implode(DIRECTORY_SEPARATOR, $parts);
+
+        return response()->json([
+            'success' => true,
+            'directoryPath' => $directoryPath,
+        ]);
+    }
+
+    /**
+     * Execute an immediate directory move (before form submission)
+     */
+    public function executeImmediateMove(Request $request, string $id)
+    {
+        $validated = $request->validate([
+            'oldDirectoryPath' => 'required|string',
+            'newDirectoryPath' => 'required|string',
+        ]);
+
+        $oldDirectoryPath = trim($validated['oldDirectoryPath']);
+        $newDirectoryPath = trim($validated['newDirectoryPath']);
+
+        if ($oldDirectoryPath === $newDirectoryPath) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Old and new paths are the same',
+            ], 400);
+        }
+
+        try {
+            $book = $this->documentStoreService->getBook($id);
+            if (!$book) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Book not found',
+                ], 404);
+            }
+
+            $oldCoverBasename = !empty($book['coverImage']) ? basename((string) $book['coverImage']) : null;
+            $moveService = app(BookDirectoryMoveService::class);
+            $moveResult = $moveService->moveBookDirectoryContents(
+                $oldDirectoryPath,
+                $newDirectoryPath,
+                $oldCoverBasename
+            );
+
+            if (!$moveResult['moved']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to move directory contents',
+                ], 500);
+            }
+
+            $actualNewPath = $moveResult['directoryPath'] ?? $newDirectoryPath;
+            $newCoverImage = $moveResult['coverImage'] ?? $oldCoverBasename;
+
+            // Update the book in the database
+            $book['directoryPath'] = $actualNewPath;
+            if ($newCoverImage) {
+                $book['coverImage'] = $newCoverImage;
+            }
+
+            $this->documentStoreService->updateBook($id, $book);
+
+            Log::info('Immediate directory move executed', [
+                'bookId' => $id,
+                'oldPath' => $oldDirectoryPath,
+                'newPath' => $actualNewPath,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Directory moved successfully',
+                'directoryPath' => $actualNewPath,
+                'coverImage' => $newCoverImage,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error executing immediate move: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error moving directory: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Provides autocomplete suggestions for author names.
      */
     public function autocompleteAuthors(Request $request): \Illuminate\Http\JsonResponse
