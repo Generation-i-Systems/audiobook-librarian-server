@@ -37,6 +37,7 @@ class ToolDefinitions
             self::triggerAiProcessing(),
             self::generateNfoFiles(),
             self::previewAndExecuteBulkOperation(),
+            self::extractAndApplyMetadataFromAudioFiles(),
         ];
     }
 
@@ -945,6 +946,36 @@ class ToolDefinitions
                     ],
                 ],
                 'required' => ['book_ids'],
+            ],
+        ];
+    }
+
+    protected static function extractAndApplyMetadataFromAudioFiles(): array
+    {
+        return [
+            'name' => 'extract_and_apply_metadata_from_audio_files',
+            'description' => 'Extract metadata from audio file ID3 tags using existing AudioFileAnalyzer service and optionally apply it. Can extract title, artist (author), album (series), genre, year, cover, etc. Supports batch processing of multiple books.',
+            'parameters' => [
+                'type' => 'object',
+                'properties' => [
+                    'book_ids' => [
+                        'type' => 'array',
+                        'items' => ['type' => 'integer'],
+                        'description' => 'Specific book IDs to process',
+                    ],
+                    'series_id' => [
+                        'type' => 'integer',
+                        'description' => 'Process all books in a series',
+                    ],
+                    'limit' => [
+                        'type' => 'integer',
+                        'description' => 'Maximum books to process (default: 50)',
+                    ],
+                    'auto_apply' => [
+                        'type' => 'boolean',
+                        'description' => 'Apply extracted metadata to database (default: false - preview only)',
+                    ],
+                ],
             ],
         ];
     }
