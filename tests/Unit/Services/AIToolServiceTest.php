@@ -34,15 +34,33 @@ class AIToolServiceTest extends TestCase
         $handlerStack = HandlerStack::create($mock);
         $client = new Client(['handler' => $handlerStack]);
 
-        $this->app->instance(Client::class, $client);
-
-        $aiToolService = new AIToolService('gemini-2.5-flash');
+        $aiToolService = $this->createAIToolService($client);
         $result = $aiToolService->processQuery('List all Science Fiction books by Isaac Asimov', []);
 
         $this->assertTrue($result['success']);
         $this->assertIsArray($result['conversation']);
         $this->assertNotEmpty($result['response']);
         $this->assertStringContainsString('Isaac Asimov', $result['response']);
+    }
+
+    protected function createAIToolService(Client $client): AIToolService
+    {
+        $service = new \ReflectionClass(AIToolService::class);
+        $instance = $service->newInstanceWithoutConstructor();
+        $clientProperty = $service->getProperty('client');
+        $clientProperty->setAccessible(true);
+        $clientProperty->setValue($instance, $client);
+        $modelProperty = $service->getProperty('model');
+        $modelProperty->setAccessible(true);
+        $modelProperty->setValue($instance, 'gemini-2.5-flash');
+        $toolExecutorProperty = $service->getProperty('toolExecutor');
+        $toolExecutorProperty->setAccessible(true);
+        $toolExecutorProperty->setValue($instance, new \App\Services\AI\ToolExecutor());
+        $apiKeyProperty = $service->getProperty('apiKey');
+        $apiKeyProperty->setAccessible(true);
+        $apiKeyProperty->setValue($instance, 'test-key');
+
+        return $instance;
     }
 
     public function test_get_conversation_history(): void
