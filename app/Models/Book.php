@@ -16,20 +16,29 @@ use App\Traits\Auditable;
  * @property string|null $title
  * @property string|null $description
  * @property string|null $directoryPath
+ * @property string|null $directory_path
  * @property string|null $coverImage
+ * @property string|null $cover_image
  * @property string|null $language
  * @property string|null $source
  * @property string|null $asin
+ * @property string|null $isbn
  * @property bool $needsReview
+ * @property bool $needs_review
  * @property array|null $needsReviewReasons
+ * @property array|null $needs_review_reasons
  * @property int|null $duration
  * @property int|null $audioFileCount
+ * @property int|null $audio_file_count
+ * @property bool $ai_processed
+ * @property float|null $ai_confidence
  * @property array|null $audibleInfo
  * @property array|null $googleBooksInfo
  * @property array|null $hardcoverInfo
  * @property array|null $audiobookBayInfo
  * @property \App\Models\Publisher|null $publisher
- * @property \Carbon\CarbonInterface|null $releaseDate
+ * @property \Carbon\CarbonInterface|string|null $releaseDate
+ * @property \Carbon\CarbonInterface|string|null $release_date
  * @property \Carbon\CarbonInterface|null $createdAt
  * @property \Carbon\CarbonInterface|null $updatedAt
  * @property-read \Illuminate\Support\Collection|\Illuminate\Database\Eloquent\Collection<int, \App\Models\Author> $authors

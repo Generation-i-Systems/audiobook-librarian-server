@@ -1384,10 +1384,12 @@ class BookController extends Controller
         if ($oldDirectoryPath && $newDirectoryPath && $oldDirectoryPath !== $newDirectoryPath && !$continueWithoutMove) {
             // Check if old directory doesn't exist and new directory does exist - if so, skip move
             $shouldSkipMove = false;
+            $oldExists = false;
+            $newExists = false;
+            $oldCoverBasename = null;
+
             try {
                 $booksDisk = Storage::disk('books');
-                $oldExists = false;
-                $newExists = false;
 
                 if (method_exists($booksDisk, 'directoryExists')) {
                     $oldExists = $booksDisk->directoryExists($oldDirectoryPath);

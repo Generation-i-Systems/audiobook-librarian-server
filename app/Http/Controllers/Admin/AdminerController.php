@@ -138,8 +138,11 @@ class AdminerController extends Controller
 
                 require_once base_path('resources/adminer/adminer-plugins/sql-gemini.php');
 
+                /** @phpstan-ignore-next-line */
                 return new \Adminer\Plugin(array(
+                    /** @phpstan-ignore-next-line */
                     new \Adminer\AdminerCustom(),
+                    /** @phpstan-ignore-next-line */
                     new \AdminerSqlGemini(),
                 ));
             }

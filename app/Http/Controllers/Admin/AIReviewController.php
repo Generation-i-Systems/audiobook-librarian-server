@@ -10,7 +10,7 @@ use App\Models\Narrator;
 use App\Models\Series;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log as Logger;
+use Illuminate\Support\Facades\Log;
 
 class AIReviewController extends Controller
 {
@@ -166,7 +166,7 @@ class AIReviewController extends Controller
 
             return response()->json(['success' => true, 'message' => 'AI suggestions rejected']);
         } catch (\Exception $e) {
-            Logger::error('Failed to reject AI suggestions', [
+            Log::error('Failed to reject AI suggestions', [
                 'book_id' => $book->id,
                 'error' => $e->getMessage(),
             ]);
@@ -197,7 +197,7 @@ class AIReviewController extends Controller
                 $this->applyAllSuggestions($book, $aiSuggestions);
                 $appliedCount++;
             } catch (\Exception $e) {
-                Logger::error('Bulk AI apply failed for book ' . $book->id, ['error' => $e->getMessage()]);
+                Log::error('Bulk AI apply failed for book ' . $book->id, ['error' => $e->getMessage()]);
             }
         }
 

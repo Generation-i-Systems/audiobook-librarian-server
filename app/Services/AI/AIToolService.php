@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Log;
 class AIToolService
 {
     protected Client $client;
-    protected string $apiKey;
+    protected ?string $apiKey;
     protected string $model;
     protected array $conversationHistory = [];
     protected ToolExecutor $toolExecutor;

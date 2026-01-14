@@ -182,7 +182,7 @@ class ToolExecutor
             ];
         }
 
-        $books = Book::whereHas('series', fn ($q) => $q->where('series_id', $series->id))
+        $books = Book::query()->whereHas('series', fn ($q) => $q->where('series_id', $series->id))
             ->with(['authors', 'series'])
             ->get()
             ->map(function ($book) use ($series) {
@@ -632,7 +632,7 @@ class ToolExecutor
         $results = [];
 
         if (isset($params['book_ids'])) {
-            $books = Book::whereIn('id', $params['book_ids'])->get();
+            $books = Book::query()->whereIn('id', $params['book_ids'])->get();
             foreach ($books as $book) {
                 $path = $this->bookRoot . '/' . ltrim($book->directory_path, '/');
                 $results[] = [
@@ -797,11 +797,11 @@ class ToolExecutor
         $books = collect();
 
         if (isset($params['series_id'])) {
-            $books = Book::whereHas('series', fn ($q) => $q->where('series_id', $params['series_id']))
+            $books = Book::query()->whereHas('series', fn ($q) => $q->where('series_id', $params['series_id']))
                 ->with(['authors', 'series'])
                 ->get();
         } elseif (isset($params['book_ids'])) {
-            $books = Book::whereIn('id', $params['book_ids'])->with(['authors', 'series'])->get();
+            $books = Book::query()->with(['authors', 'series'])->whereIn('id', $params['book_ids'])->get();
         }
 
         if ($books->isEmpty()) {
@@ -842,7 +842,7 @@ class ToolExecutor
         $bookIds = $params['book_ids'];
         $updates = $params['updates'];
 
-        $books = Book::whereIn('id', $bookIds)->with(['authors', 'genres', 'narrators', 'series'])->get();
+        $books = Book::query()->with(['authors', 'genres', 'narrators', 'series'])->whereIn('id', $bookIds)->get();
 
         $preview = $books->map(function ($book) use ($updates) {
             return [
@@ -929,8 +929,8 @@ class ToolExecutor
             'total_genres' => Genre::count(),
             'total_series' => Series::count(),
             'total_narrators' => Narrator::count(),
-            'books_with_ai_processing' => Book::where('ai_processed', true)->count(),
-            'books_needing_review' => Book::where('needs_review', true)->count(),
+            'books_with_ai_processing' => Book::query()->where('ai_processed', true)->count(),
+            'books_needing_review' => Book::query()->where('needs_review', true)->count(),
         ];
 
         return [
@@ -949,7 +949,7 @@ class ToolExecutor
             $issues['missing_metadata'] = [
                 'no_author' => Book::doesntHave('authors')->limit($limit)->get(['id', 'title'])->toArray(),
                 'no_genre' => Book::doesntHave('genres')->limit($limit)->get(['id', 'title'])->toArray(),
-                'no_description' => Book::whereNull('description')->orWhere('description', '')->limit($limit)->get(['id', 'title'])->toArray(),
+                'no_description' => Book::query()->whereNull('description')->orWhere('description', '')->limit($limit)->get(['id', 'title'])->toArray(),
             ];
         }
 
@@ -1002,7 +1002,7 @@ class ToolExecutor
 
             foreach ($titleGroups as $group) {
                 $bookIds = explode(',', $group->book_ids);
-                $books = Book::whereIn('id', $bookIds)->with(['authors', 'series'])->get();
+                $books = Book::query()->with(['authors', 'series'])->whereIn('id', $bookIds)->get();
 
                 $duplicates[] = [
                     'method' => 'exact_title',
@@ -1028,7 +1028,7 @@ class ToolExecutor
 
             foreach ($isbnGroups as $group) {
                 $bookIds = explode(',', $group->book_ids);
-                $books = Book::whereIn('id', $bookIds)->with(['authors'])->get();
+                $books = Book::query()->with(['authors'])->whereIn('id', $bookIds)->get();
 
                 $duplicates[] = [
                     'method' => 'isbn',
@@ -1073,15 +1073,15 @@ class ToolExecutor
         }
 
         if (in_array('all', $metadataTypes) || in_array('cover', $metadataTypes)) {
-            $missing['no_cover'] = Book::whereNull('cover_image')->orWhere('cover_image', '')->limit($limit)->get(['id', 'title', 'directory_path'])->toArray();
+            $missing['no_cover'] = Book::query()->whereNull('cover_image')->orWhere('cover_image', '')->limit($limit)->get(['id', 'title', 'directory_path'])->toArray();
         }
 
         if (in_array('all', $metadataTypes) || in_array('description', $metadataTypes)) {
-            $missing['no_description'] = Book::whereNull('description')->orWhere('description', '')->limit($limit)->get(['id', 'title', 'directory_path'])->toArray();
+            $missing['no_description'] = Book::query()->whereNull('description')->orWhere('description', '')->limit($limit)->get(['id', 'title', 'directory_path'])->toArray();
         }
 
         if (in_array('all', $metadataTypes) || in_array('isbn', $metadataTypes)) {
-            $missing['no_isbn'] = Book::whereNull('isbn')->orWhere('isbn', '')->limit($limit)->get(['id', 'title', 'directory_path'])->toArray();
+            $missing['no_isbn'] = Book::query()->whereNull('isbn')->orWhere('isbn', '')->limit($limit)->get(['id', 'title', 'directory_path'])->toArray();
         }
 
         return [
@@ -1105,7 +1105,7 @@ class ToolExecutor
                     return ['success' => false, 'error' => 'Book not found'];
                 }
 
-                $recommendations = Book::where('id', '!=', $bookId)
+                $recommendations = Book::query()->where('id', '!=', $bookId)
                     ->where(function ($q) use ($book) {
                         $q->whereHas('authors', fn ($q) => $q->whereIn('id', $book->authors->pluck('id')))
                             ->orWhereHas('genres', fn ($q) => $q->whereIn('id', $book->genres->pluck('id')))
@@ -1175,7 +1175,7 @@ class ToolExecutor
                 'total_duration_hours' => round(Book::sum('duration') / 3600, 2),
                 'books_with_series' => Book::has('series')->count(),
                 'books_without_series' => Book::doesntHave('series')->count(),
-                'ai_processed_books' => Book::where('ai_processed', true)->count(),
+                'ai_processed_books' => Book::query()->where('ai_processed', true)->count(),
             ];
         }
 
@@ -1231,9 +1231,9 @@ class ToolExecutor
             $analysis['quality'] = [
                 'books_missing_author' => Book::doesntHave('authors')->count(),
                 'books_missing_genre' => Book::doesntHave('genres')->count(),
-                'books_missing_description' => Book::whereNull('description')->orWhere('description', '')->count(),
-                'books_needing_review' => Book::where('needs_review', true)->count(),
-                'ai_unprocessed' => Book::where('ai_processed', false)->count(),
+                'books_missing_description' => Book::query()->whereNull('description')->orWhere('description', '')->count(),
+                'books_needing_review' => Book::query()->where('needs_review', true)->count(),
+                'ai_unprocessed' => Book::query()->where('ai_processed', false)->count(),
             ];
         }
 
@@ -1526,7 +1526,7 @@ class ToolExecutor
             $confirmed = $params['confirmed'] ?? false;
 
             if (!$confirmed) {
-                $books = Book::whereIn('id', $bookIds)->get(['id', 'title']);
+                $books = Book::query()->whereIn('id', $bookIds)->get(['id', 'title']);
                 return [
                     'success' => false,
                     'error' => 'Confirmation required. Set confirmed=true to delete books',
@@ -2387,9 +2387,9 @@ class ToolExecutor
             $autoApply = $params['auto_apply'] ?? false;
 
             if ($bookIds) {
-                $books = Book::whereIn('id', $bookIds)->get();
+                $books = Book::query()->whereIn('id', $bookIds)->get();
             } elseif ($seriesId) {
-                $books = Book::whereHas('series', fn ($q) => $q->where('series_id', $seriesId))
+                $books = Book::query()->whereHas('series', fn ($q) => $q->where('series_id', $seriesId))
                     ->take($limit)
                     ->get();
             } else {
@@ -2398,6 +2398,7 @@ class ToolExecutor
 
             $results = [];
 
+            /** @var \App\Models\Book $book */
             foreach ($books as $book) {
                 $bookPath = $this->bookRoot . '/' . ltrim($book->directory_path, '/');
 
