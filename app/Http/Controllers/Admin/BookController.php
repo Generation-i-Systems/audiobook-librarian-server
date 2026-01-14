@@ -1388,11 +1388,12 @@ class BookController extends Controller
 
         if ($oldDirectoryPath && $newDirectoryPath && $oldDirectoryPath !== $newDirectoryPath && !$continueWithoutMove) {
             // Check if old directory doesn't exist and new directory does exist - if so, skip move
-            $booksDisk = Storage::disk('books');
-            $oldExists = false;
-            $newExists = false;
-
+            $shouldSkipMove = false;
             try {
+                $booksDisk = Storage::disk('books');
+                $oldExists = false;
+                $newExists = false;
+
                 if (method_exists($booksDisk, 'directoryExists')) {
                     $oldExists = $booksDisk->directoryExists($oldDirectoryPath);
                     $newExists = $booksDisk->directoryExists($newDirectoryPath);
@@ -1400,15 +1401,19 @@ class BookController extends Controller
                     $oldExists = count($booksDisk->allFiles($oldDirectoryPath)) > 0;
                     $newExists = count($booksDisk->allFiles($newDirectoryPath)) > 0;
                 }
+
+                $shouldSkipMove = !$oldExists && $newExists;
             } catch (\Exception $e) {
-                Log::warning('Error checking directory existence', [
+                Log::warning('Error checking directory existence, will attempt move', [
                     'oldPath' => $oldDirectoryPath,
                     'newPath' => $newDirectoryPath,
                     'error' => $e->getMessage(),
                 ]);
+                // On error, proceed with move attempt
+                $shouldSkipMove = false;
             }
 
-            if (!$oldExists && $newExists) {
+            if ($shouldSkipMove) {
                 Log::info('Old directory does not exist and new directory exists - skipping move', [
                     'oldPath' => $oldDirectoryPath,
                     'newPath' => $newDirectoryPath,
@@ -1788,7 +1793,11 @@ class BookController extends Controller
                 return redirect($returnUrl)->with('error', 'Book not found');
             }
             $queryParams = $request->query();
-            return redirect()->route('admin.books.index', $queryParams ?: [])
+            if (empty($queryParams)) {
+                return redirect()->route('admin.books.index')
+                    ->with('error', 'Book not found');
+            }
+            return redirect()->route('admin.books.index', $queryParams)
                 ->with('error', 'Book not found');
         }
 
@@ -1835,7 +1844,12 @@ class BookController extends Controller
             }
 
             $queryParams = $request->query();
-            return redirect()->route('admin.books.index', $queryParams ?: [])
+            if (empty($queryParams)) {
+                return redirect()->route('admin.books.index')
+                    ->with('success', $message)
+                    ->with('trash_item_id', $result['trash_item_id']);
+            }
+            return redirect()->route('admin.books.index', $queryParams)
                 ->with('success', $message)
                 ->with('trash_item_id', $result['trash_item_id']);
         }
@@ -1846,7 +1860,11 @@ class BookController extends Controller
         }
 
         $queryParams = $request->query();
-        return redirect()->route('admin.books.index', $queryParams ?: [])
+        if (empty($queryParams)) {
+            return redirect()->route('admin.books.index')
+                ->with('error', 'Failed to delete book: ' . ($result['error'] ?? 'Unknown error'));
+        }
+        return redirect()->route('admin.books.index', $queryParams)
             ->with('error', 'Failed to delete book: ' . ($result['error'] ?? 'Unknown error'));
     }
 
