@@ -800,7 +800,17 @@
     if (empty($authors) || (count($authors) === 1 && ($authors[0] === null || $authors[0] === ''))) {
         $authors = [''];
     }
-                                    @php
+                                    @php $authorsCount = count($authors); @endphp
+                                    @foreach($authors as $idx => $author)
+                                        <div class="d-flex align-items-start mb-2 author-row">
+                                            @php
+        if ($author instanceof \MongoDB\Model\BSONArray) {
+            $author = (array) $author;
+        }
+        if (is_array($author)) {
+            $author = implode(', ', $author);
+        }
+                                            @php
         if ($author instanceof \MongoDB\Model\BSONArray) {
             $author = (array) $author;
         }
