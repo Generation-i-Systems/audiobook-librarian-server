@@ -91,7 +91,6 @@ npm run test:coverage
 - Prefer dependency injection over facades where possible
 - **MUST update openapi.json after any API change**
 - **MUST NOT access database from controllers** - must use DocumentStoreServiceInterface
-- **MUST return arrays from DocumentStoreServiceInterface**, not BSONArray/BSONDocument types
 - User authentication handled by DocumentstoreUser NOT models/User
 - Use Laravel Pint with config from `.pint.json` in project root if present
 
@@ -202,6 +201,13 @@ php artisan test tests/Path/To/Module/
 - **Before reverting ANY commit for ANY reason, MUST create a git tag and prompt for confirmation**
 - Always verify revert targets with `git log --oneline` before executing
 - Use descriptive tag messages: `git tag pre-revert-[YYYYMMDD]-[feature]`
+
+### Pre-commit Hooks
+
+- **Syntax Check**: All PHP (`php -l`) and JS (`node --check`) files are verified for syntax before commit.
+- **Formatting**: Laravel Pint runs on staged PHP files.
+- **Static Analysis**: PHPStan runs on the `app/` directory.
+- **Testing**: Relevant tests (Import, Web, Api, Cli) or a smoke test are executed automatically.
 
 ### Verification & Reporting
 

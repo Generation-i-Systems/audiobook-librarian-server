@@ -13,7 +13,7 @@ use Illuminate\Support\Str;
 class BookApiController extends Controller
 {
     /**
-     * Autocomplete book series names using fuzzy search (MongoDB Atlas Search).
+     * Autocomplete book series names using fuzzy search.
      *
      * @return \Illuminate\Http\JsonResponse
      */
@@ -30,7 +30,7 @@ class BookApiController extends Controller
     }
 
     /**
-     * Autocomplete author names using fuzzy search (MongoDB Atlas Search).
+     * Autocomplete author names using fuzzy search.
      *
      * @return \Illuminate\Http\JsonResponse
      */
@@ -47,7 +47,7 @@ class BookApiController extends Controller
     }
 
     /**
-     * Autocomplete narrator names using fuzzy search (MongoDB Atlas Search).
+     * Autocomplete narrator names using fuzzy search.
      *
      * @return \Illuminate\Http\JsonResponse
      */

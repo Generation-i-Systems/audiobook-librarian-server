@@ -930,11 +930,6 @@ class BookController extends Controller
                 'value' => $bookGenre,
             ]);
 
-            // Hotfix: forcibly cast BSONArray to array if still present
-            if (is_object($bookGenre) && $bookGenre instanceof \MongoDB\Model\BSONArray) {
-                $bookGenre = (array) $bookGenre;
-            }
-
             if (is_array($bookGenre)) {
                 foreach ($bookGenre as $g) {
                     $genres[] = trim((string) $g);

@@ -800,36 +800,23 @@
     if (empty($authors) || (count($authors) === 1 && ($authors[0] === null || $authors[0] === ''))) {
         $authors = [''];
     }
-                                    @php $authorsCount = count($authors); @endphp
-                                    @foreach($authors as $idx => $author)
-                                        <div class="d-flex align-items-start mb-2 author-row">
-                                            @php
-        if ($author instanceof \MongoDB\Model\BSONArray) {
-            $author = (array) $author;
-        }
-        if (is_array($author)) {
-            $author = implode(', ', $author);
-        }
-                                            @php
-        if ($author instanceof \MongoDB\Model\BSONArray) {
-            $author = (array) $author;
-        }
-        if (is_array($author)) {
-            $author = implode(', ', $author);
-        }
-                                            @endphp
-                                            <input type="text" name="author[]" class="form-control author-autocomplete form-control-height-32 form-control-flex-1" value="{{ $author }}" placeholder="Author Name" required>
-                                            <datalist id="author-list"></datalist> {{-- Populated by JavaScript via autocomplete --}}
-                                            <div class="d-flex flex-column ms-2" style="gap:2px;">
-                                                <button type="button" class="btn btn-outline-danger btn-sm remove-author"
-                                                    style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Remove author">&times;</button>
-                                                @if($idx === $authorsCount - 1)
-                                                    <button type="button" class="btn btn-primary btn-sm add-author-row"
-                                                        style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Add author">+</button>
-                                                @endif
-                                            </div>
-                                        </div>
-                                    @endforeach
+    $authorsCount = count($authors);
+@endphp
+
+@foreach($authors as $idx => $author)
+    <div class="d-flex align-items-start mb-2 author-row">
+        <input type="text" name="author[]" class="form-control author-autocomplete form-control-height-32 form-control-flex-1" value="{{ $author }}" placeholder="Author Name" required>
+        <datalist id="author-list"></datalist> {{-- Populated by JavaScript via autocomplete --}}
+        <div class="d-flex flex-column ms-2" style="gap:2px;">
+            <button type="button" class="btn btn-outline-danger btn-sm remove-author"
+                style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Remove author">&times;</button>
+            @if($idx === $authorsCount - 1)
+                <button type="button" class="btn btn-primary btn-sm add-author-row"
+                    style="width:32px; height:32px; padding:0; display:flex; align-items:center; justify-content:center;" aria-label="Add author">+</button>
+            @endif
+        </div>
+    </div>
+@endforeach
                                 </div>
                             </div>
                             <div class="col-md-6">
@@ -850,16 +837,8 @@
         $narrators = [''];
                                     @endphp
                                     @php $narratorsCount = count($narrators); @endphp
-                                    @foreach($narrators as $idx => $narrator)
+                                     @foreach($narrators as $idx => $narrator)
                                         <div class="d-flex align-items-start mb-2 narrator-row">
-                                            @php
-        if ($narrator instanceof \MongoDB\Model\BSONArray) {
-            $narrator = (array) $narrator;
-        }
-        if (is_array($narrator)) {
-            $narrator = implode(', ', $narrator);
-        }
-                                            @endphp
                                             <input type="text" name="narrator[]" class="form-control narrator-autocomplete form-control-height-32 form-control-flex-1" value="{{ $narrator }}" placeholder="Narrator Name">
                                             <datalist id="narrator-list"></datalist> {{-- Populated by JavaScript via autocomplete --}}
                                             <div class="d-flex flex-column ms-2" style="gap:2px;">
