@@ -146,7 +146,7 @@
         const row = templates.author.cloneNode(true);
         const input = row.querySelector('input[name="author[]"]');
         if (input && authorName) {
-            input.value = escapeHtml(authorName);
+            input.value = authorName;
         }
 
         group.appendChild(row);
@@ -185,7 +185,7 @@
         const row = templates.narrator.cloneNode(true);
         const input = row.querySelector('input[name="narrator[]"]');
         if (input && narratorName) {
-            input.value = escapeHtml(narratorName);
+            input.value = narratorName;
         }
 
         group.appendChild(row);
@@ -238,7 +238,7 @@
             numberInput.value = seriesData.number;
         }
         if (nameInput && seriesData.seriesName) {
-            nameInput.value = escapeHtml(seriesData.seriesName);
+            nameInput.value = seriesData.seriesName;
         }
         if (collectionInput && seriesData.isCollection) {
             collectionInput.checked = true;

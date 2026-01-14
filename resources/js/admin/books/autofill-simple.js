@@ -22,6 +22,27 @@
             .trim();
     }
 
+    function decodeHtmlEntities(text) {
+        if (!text || typeof text !== "string") {
+            return text;
+        }
+        const textarea = document.createElement("textarea");
+        textarea.innerHTML = text;
+        return textarea.value;
+    }
+
+    function getFirstAuthor(authorStr) {
+        if (!authorStr || typeof authorStr !== "string") {
+            return "";
+        }
+        const trimmed = authorStr.trim();
+        if (!trimmed) {
+            return "";
+        }
+        const parts = trimmed.split(/,\s*|&\s*|\s+and\s+/i);
+        return parts[0] ? parts[0].trim() : "";
+    }
+
     function scoreAutofillResult(result) {
         let score = 0;
         if (!result) {
@@ -207,10 +228,14 @@
 
                 const rows = results
                     .map(function (item, idx) {
-                        const authors = Array.isArray(item.author)
-                            ? item.author.join(", ")
-                            : item.author || "";
-                        const narrators = getNarratorList(item);
+                        const authors = decodeHtmlEntities(
+                            Array.isArray(item.author)
+                                ? item.author.join(", ")
+                                : item.author || "",
+                        );
+                        const narrators = decodeHtmlEntities(
+                            getNarratorList(item),
+                        );
                         const coverUrl =
                             item.coverImageUrl || item.cover_image_url || "";
                         const publishedYear =
@@ -223,7 +248,7 @@
                         return `<tr>
                     <td><input type="radio" name="autofill_result_select" value="${idx}"${checkedAttr}></td>
                     <td>${coverUrl ? `<img src="${coverUrl}" alt="Cover" style="height:48px;max-width:40px;">` : ""}</td>
-                    <td>${item.title || ""}</td>
+                    <td>${decodeHtmlEntities(item.title || "")}</td>
                     <td>${authors}</td>
                     <td>${narrators}</td>
                     <td>${publishedYear}</td>
@@ -373,10 +398,14 @@
 
                         const rows = sortedResults
                             .map(function (item, idx) {
-                                const authors = Array.isArray(item.author)
-                                    ? item.author.join(", ")
-                                    : item.author || "";
-                                const narrators = getNarratorList(item);
+                                const authors = decodeHtmlEntities(
+                                    Array.isArray(item.author)
+                                        ? item.author.join(", ")
+                                        : item.author || "",
+                                );
+                                const narrators = decodeHtmlEntities(
+                                    getNarratorList(item),
+                                );
                                 const coverUrl =
                                     item.coverImageUrl ||
                                     item.cover_image_url ||
@@ -391,10 +420,10 @@
                                 return `<tr>
                             <td><input type="radio" name="autofill_result_select" value="${idx}"${checkedAttr}></td>
                             <td>${coverUrl ? `<img src="${coverUrl}" alt="Cover" style="height:48px;max-width:40px;">` : ""}</td>
-                            <td>${item.title || ""}</td>
+                            <td>${decodeHtmlEntities(item.title || "")}</td>
                             <td>${authors}</td>
                             <td>${narrators}</td>
-                            <td>${item.series || ""}</td>
+                            <td>${decodeHtmlEntities(item.series || "")}</td>
                             <td>${publishedYear}</td>
                             <td>${item.source || ""}</td>
                         </tr>`;
@@ -449,9 +478,9 @@
                 $("#autofill-title").val(
                     normalizeTitleForAutofill($("#title").val() || ""),
                 );
-                $("#autofill-author").val(
-                    $('input[name="author[]"]').first().val() || "",
-                );
+                const firstAuthorInput =
+                    $('input[name="author[]"]').first().val() || "";
+                $("#autofill-author").val(getFirstAuthor(firstAuthorInput));
                 $("#autofill-series").val(
                     $('#series-group input[name*="[seriesName]"]')
                         .first()
@@ -554,7 +583,7 @@
                 return;
             }
 
-            $("#title").val(item.title || "");
+            $("#title").val(decodeHtmlEntities(item.title || ""));
 
             const authorsGroup = $("#authors-group");
             const authors = Array.isArray(item.author)
@@ -563,7 +592,10 @@
             authorsGroup.empty();
             if (typeof window.BookForm?.addAuthorRow === "function") {
                 authors.forEach(function (author) {
-                    window.BookForm.addAuthorRow($("#book-form"), author || "");
+                    window.BookForm.addAuthorRow(
+                        $("#book-form"),
+                        decodeHtmlEntities(author || ""),
+                    );
                 });
             } else {
                 console.error(
@@ -571,7 +603,7 @@
                 );
             }
 
-            const narrators = getNarratorList(item);
+            const narrators = decodeHtmlEntities(getNarratorList(item));
             if (narrators) {
                 const narratorsGroup = $("#narrators-group");
                 narratorsGroup.empty();
@@ -592,7 +624,7 @@
                 }
             }
 
-            const series = item.series || "";
+            const series = decodeHtmlEntities(item.series || "");
             const seriesNumber = item.seriesNumber || item.series_number || "";
             if (series) {
                 const seriesGroup = $("#series-group");
@@ -622,7 +654,7 @@
             if (item.description) {
                 const descriptionField = $("#description");
                 if (descriptionField.length && !descriptionField.val()) {
-                    descriptionField.val(item.description);
+                    descriptionField.val(decodeHtmlEntities(item.description));
                 }
             }
 

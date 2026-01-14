@@ -512,6 +512,11 @@
             .margin-top-10 {
                 margin-top: 10px;
             }
+
+            #autofillModal .modal-body {
+                max-height: 70vh;
+                overflow-y: auto;
+            }
         </style>
         <div class="container-fluid" style="max-width: 1400px;">
             @php
@@ -770,14 +775,32 @@
     if (!is_array($authors)) {
         $authors = [$authors];
     }
+    // Split authors by comma, '&', 'and' if any author contains these separators
+    $splitAuthors = [];
+    foreach ($authors as $author) {
+        if (is_string($author)) {
+            $author = trim($author);
+            if ($author !== '') {
+                // Split by comma, &, or " and " (case insensitive)
+                $parts = preg_split('/\s*,\s*|\s*&\s*|\s+and\s+/i', $author);
+                foreach ($parts as $part) {
+                    $part = trim($part);
+                    if ($part !== '') {
+                        $splitAuthors[] = $part;
+                    }
+                }
+            } else {
+                $splitAuthors[] = '';
+            }
+        } else {
+            $splitAuthors[] = $author;
+        }
+    }
+    $authors = $splitAuthors;
     if (empty($authors) || (count($authors) === 1 && ($authors[0] === null || $authors[0] === ''))) {
         $authors = [''];
     }
-                                    @endphp
-                                    @php $authorsCount = count($authors); @endphp
-                                    @foreach($authors as $idx => $author)
-                                        <div class="d-flex align-items-start mb-2 author-row">
-                                            @php
+                                    @php
         if ($author instanceof \MongoDB\Model\BSONArray) {
             $author = (array) $author;
         }
@@ -2027,7 +2050,7 @@
                 <h5 class="modal-title" id="autofillModalLabel">Autofill Book Metadata</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
               </div>
-              <div class="modal-body">
+              <div class="modal-body autofill-modal-scrollable">
                 <form id="autofill-search-form" class="mb-3">
                   <div class="row g-2 mb-2">
                     <div class="col-md-3">
