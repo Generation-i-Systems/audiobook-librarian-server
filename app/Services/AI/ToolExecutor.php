@@ -8,6 +8,8 @@ use App\Models\Genre;
 use App\Models\Narrator;
 use App\Models\Series;
 use App\Services\AIBookProcessor;
+use App\Services\AudioFileAnalyzer;
+use App\Services\BookImportService;
 use App\Services\BookTrashService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -21,11 +23,15 @@ class ToolExecutor
     protected string $bookRoot;
     protected array $previewCache = [];
     protected BookTrashService $trashService;
+    protected AudioFileAnalyzer $audioAnalyzer;
+    protected BookImportService $importService;
 
     public function __construct()
     {
         $this->bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
         $this->trashService = app(BookTrashService::class);
+        $this->audioAnalyzer = app(AudioFileAnalyzer::class);
+        $this->importService = app(BookImportService::class);
     }
 
     public function execute(string $toolName, array $parameters): array
@@ -77,6 +83,7 @@ class ToolExecutor
                 'trigger_ai_processing' => $this->triggerAIProcessing($parameters),
                 'generate_nfo_files' => $this->generateNFOFiles($parameters),
                 'preview_and_execute_bulk_operation' => $this->previewAndExecuteBulkOperation($parameters),
+                'extract_and_apply_metadata_from_audio_files' => $this->extractAndApplyMetadataFromAudioFiles($parameters),
                 default => ['success' => false, 'error' => "Unknown tool: {$toolName}"],
             };
 
@@ -2368,6 +2375,89 @@ class ToolExecutor
                 'error' => $e->getMessage(),
             ]);
             return false;
+        }
+    }
+
+    protected function extractAndApplyMetadataFromAudioFiles(array $params): array
+    {
+        try {
+            $bookIds = $params['book_ids'] ?? null;
+            $seriesId = $params['series_id'] ?? null;
+            $limit = $params['limit'] ?? 50;
+            $autoApply = $params['auto_apply'] ?? false;
+
+            if ($bookIds) {
+                $books = Book::whereIn('id', $bookIds)->get();
+            } elseif ($seriesId) {
+                $books = Book::whereHas('series', fn ($q) => $q->where('series_id', $seriesId))
+                    ->take($limit)
+                    ->get();
+            } else {
+                return ['success' => false, 'error' => 'Must provide book_ids or series_id'];
+            }
+
+            $results = [];
+
+            foreach ($books as $book) {
+                $bookPath = $this->bookRoot . '/' . ltrim($book->directory_path, '/');
+
+                if (!File::exists($bookPath)) {
+                    $results[] = [
+                        'book_id' => $book->id,
+                        'title' => $book->title,
+                        'success' => false,
+                        'error' => 'Book directory not found',
+                    ];
+                    continue;
+                }
+
+                $metadata = $this->audioAnalyzer->analyzeDirectory($bookPath);
+
+                if (!$metadata) {
+                    $results[] = [
+                        'book_id' => $book->id,
+                        'title' => $book->title,
+                        'success' => false,
+                        'error' => 'No audio metadata found',
+                    ];
+                    continue;
+                }
+
+                if ($autoApply) {
+                    $this->importService->updateBookFromMetadata($book, $metadata, [], []);
+                }
+
+                $results[] = [
+                    'book_id' => $book->id,
+                    'title' => $book->title,
+                    'extracted_metadata' => $metadata,
+                    'success' => true,
+                    'applied' => $autoApply,
+                ];
+            }
+
+            $summary = [
+                'total_books' => count($books),
+                'metadata_extracted' => collect($results)->where('success', true)->count(),
+                'auto_applied' => $autoApply,
+            ];
+
+            return [
+                'success' => true,
+                'summary' => $summary,
+                'books' => $results,
+                'message' => $autoApply ? 'Metadata extracted and applied' : 'Preview generated. Use extract_and_apply_metadata_from_audio_files with auto_apply=true to apply.',
+            ];
+        } catch (\Exception $e) {
+            Log::error('extract_and_apply_metadata_from_audio_files failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+            ];
         }
     }
 }
