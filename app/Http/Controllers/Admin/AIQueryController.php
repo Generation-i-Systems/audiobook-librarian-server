@@ -381,6 +381,103 @@ class AIQueryController extends Controller
         ]);
     }
 
+    public function refineItem(Request $request)
+    {
+        $request->validate([
+            'query_id' => 'required|integer',
+            'item_id' => 'required|integer',
+            'instruction' => 'required|string|min:3',
+        ]);
+
+        $queryId = $request->input('query_id');
+        $itemId = $request->input('item_id'); // book_id
+        $instruction = $request->input('instruction');
+
+        // Load Query
+        $queryRecord = DB::table('ai_queries')->where('id', $queryId)->where('user_id', Auth::id())->first();
+        if (!$queryRecord) {
+            return response()->json(['success' => false, 'error' => 'Query not found'], 404);
+        }
+
+        $results = json_decode($queryRecord->results, true);
+        $previewItems = $results['results']['preview'] ?? [];
+
+        // Find the item
+        $targetItemIndex = null;
+        $targetItem = null;
+        foreach ($previewItems as $index => $item) {
+            if ($item['book_id'] == $itemId) {
+                $targetItemIndex = $index;
+                $targetItem = $item;
+                break;
+            }
+        }
+
+        if ($targetItemIndex === null) {
+            return response()->json(['success' => false, 'error' => 'Item not found in current results'], 404);
+        }
+
+        // Construct Refinement Prompt
+        $prompt = "Refine the operation for book ID {$itemId} ({$targetItem['title']}).\n" .
+            "Current operation preview: " . json_encode($targetItem) . "\n" .
+            "User instruction: \"{$instruction}\"\n" .
+            "Use the 'preview_and_execute_bulk_operation' tool to generate the updated operation for this SINGLE book only. " .
+            "Ensure you include all necessary fields (id, title, etc) in the operation so it can replace the old one.";
+
+        // Call AI Tool Service
+        // We create a temporary context-less call or minimal context
+        $result = $this->aiToolService->processQuery($prompt, []);
+
+        if (!$result['success']) {
+            return response()->json(['success' => false, 'error' => $result['error']], 500);
+        }
+
+        // Extract the tool call payload from the conversation history or iterations
+        // This is tricky because AIToolService executes the tool and returns the response.
+        // But we want the *preview* data from the tool execution, not the text response.
+        // Fortunately, ToolExecutor returns the preview array.
+        // We need to find the latest tool output in the iterations.
+
+        $iterations = $result['iterations'];
+        $newOperation = null;
+
+        foreach (array_reverse($iterations) as $iteration) {
+            if (($iteration['type'] ?? '') === 'tool_execution' && ($iteration['tool'] ?? '') === 'preview_and_execute_bulk_operation') {
+                $output = $iteration['output'] ?? [];
+                // The tool returns { success, books: [ ... ] }
+                if (!empty($output['books'])) {
+                    $newOperation = $output['books'][0]; // Should be single book
+                    break;
+                }
+            }
+        }
+
+        if (!$newOperation) {
+            return response()->json(['success' => false, 'error' => 'AI failed to generate a valid refinement'], 500);
+        }
+
+        // Update the item in the results array
+        $previewItems[$targetItemIndex] = $newOperation;
+        $results['results']['preview'] = $previewItems;
+
+        // Save back to DB
+        DB::table('ai_queries')
+            ->where('id', $queryId)
+            ->update([
+                'results' => json_encode($results),
+                'updated_at' => now(),
+            ]);
+
+        return response()->json([
+            'success' => true,
+            'html' => view('admin.ai-query.partials.bulk-update-row', [
+                'item' => $newOperation,
+                'isDelete' => $results['is_delete'] ?? false,
+                'entityType' => $results['entity_type'] ?? 'books'
+            ])->render(),
+        ]);
+    }
+
     public function toolQueryHistory(Request $request)
     {
         $limit = $request->input('limit', 20);

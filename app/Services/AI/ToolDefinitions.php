@@ -88,6 +88,13 @@ class ToolDefinitions
                                         ],
                                     ],
                                 ],
+                                'cover_operations' => [
+                                    'type' => 'object',
+                                    'properties' => [
+                                        'update_url' => ['type' => 'string', 'description' => 'URL to download new cover image from'],
+                                        'backup_existing' => ['type' => 'boolean', 'description' => 'Whether to backup existing cover (default: true)'],
+                                    ],
+                                ],
                             ],
                         ],
                         'description' => 'Array of coordinated operations per book',

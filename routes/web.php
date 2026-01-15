@@ -329,6 +329,8 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
         ->name('ai-query.execute-custom');
     Route::post('/ai-query/edit-prompt', [Admin\AIQueryController::class, 'editPrompt'])
         ->name('ai-query.edit-prompt');
+    Route::post('/ai-query/refine-item', [Admin\AIQueryController::class, 'refineItem'])
+        ->name('ai-query.refine-item');
 
     // AI Query routes (Tool-based - new flexible system)
     Route::post('/ai-query/tools/process', [Admin\AIQueryController::class, 'processWithTools'])

@@ -33,82 +33,7 @@
 
                 <div class="bulk-update-preview" style="max-height: 600px; overflow-y: auto;">
                     @foreach($results['preview'] as $item)
-                        @php
-                            $itemName = $item['before']['title'] ?? $item['before']['name'] ?? 'Item #' . $item['id'];
-                            $itemEntityType = $item['entity_type'] ?? $entityType;
-                            $changes = $item['changes'] ?? [];
-
-                            // Determine if we can use compact one-line format
-                            $useCompactFormat = $isDelete || (count($changes) === 1 && !$isDelete);
-
-                            // Build compact change summary for one-line display
-                            $compactChangeSummary = '';
-                            if (!$isDelete && count($changes) === 1) {
-                                foreach ($changes as $field => $change) {
-                                    $fromValue = is_array($change['from']) ? implode(', ', $change['from']) : $change['from'];
-                                    $toValue = is_array($change['to']) ? implode(', ', $change['to']) : $change['to'];
-                                    $compactChangeSummary = ucfirst(str_replace('_', ' ', $field)) . ': ' .
-                                        '<span class="text-muted">' . $fromValue . '</span> → ' .
-                                        '<span class="text-success fw-bold">' . $toValue . '</span>';
-                                }
-                            }
-                        @endphp
-
-                        @if($useCompactFormat)
-                            {{-- Compact one-line format for deletes and single-field changes --}}
-                            <div class="form-check py-1 border-bottom">
-                                <input
-                                    class="form-check-input bulk-checkbox"
-                                    type="checkbox"
-                                    name="selected_ids[]"
-                                    value="{{ $item['id'] }}"
-                                    id="item-{{ $item['id'] }}">
-                                <label class="form-check-label" for="item-{{ $item['id'] }}">
-                                    <strong>{{ $itemName }}</strong>
-                                    @if($isDelete)
-                                        <span class="badge bg-danger ms-2">Will be deleted</span>
-                                    @else
-                                        <span class="ms-2">- {!! $compactChangeSummary !!}</span>
-                                    @endif
-                                </label>
-                            </div>
-                        @else
-                            {{-- Full card format for complex multi-field changes --}}
-                            <div class="card mb-3">
-                                <div class="card-body">
-                                    <div class="form-check mb-2">
-                                        <input
-                                            class="form-check-input bulk-checkbox"
-                                            type="checkbox"
-                                            name="selected_ids[]"
-                                            value="{{ $item['id'] }}"
-                                            id="item-{{ $item['id'] }}">
-                                        <label class="form-check-label fw-bold" for="item-{{ $item['id'] }}">
-                                            {{ $itemName }}
-                                        </label>
-                                    </div>
-
-                                    @if(!empty($changes))
-                                        <div class="changes-list">
-                                            @foreach($changes as $field => $change)
-                                                <div class="mb-2">
-                                                    <strong>{{ ucfirst(str_replace('_', ' ', $field)) }}:</strong><br>
-                                                    <span class="badge bg-danger">
-                                                        From: {{ is_array($change['from']) ? implode(', ', $change['from']) : $change['from'] }}
-                                                    </span>
-                                                    <i class="fas fa-arrow-right mx-2"></i>
-                                                    <span class="badge bg-success">
-                                                        To: {{ is_array($change['to']) ? implode(', ', $change['to']) : $change['to'] }}
-                                                    </span>
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                    @else
-                                        <p class="text-muted mb-0">No changes</p>
-                                    @endif
-                                </div>
-                            </div>
-                        @endif
+                        @include('admin.ai-query.partials.bulk-update-row', ['item' => $item])
                     @endforeach
                 </div>
             </form>
@@ -130,7 +55,94 @@
                     }
                     return confirm(`Are you sure you want to apply changes to ${selected} item(s)?`);
                 }
+
+                // Refinement Modal Logic
+                let currentRefineId = null;
+                const refineLoadingSpinner = `<div class="spinner-border spinner-border-sm text-light" role="status"></div> Processing...`;
+
+                function openRefineModal(itemId) {
+                    currentRefineId = itemId;
+                    document.getElementById('refine_item_id').value = itemId;
+                    document.getElementById('refine_instruction').value = '';
+                    new bootstrap.Modal(document.getElementById('refineModal')).show();
+                }
+
+                function submitRefinement() {
+                    const instruction = document.getElementById('refine_instruction').value;
+                    if (!instruction) return;
+
+                    const btn = document.getElementById('btn-submit-refine');
+                    const originalBtnText = btn.innerHTML;
+                    btn.innerHTML = refineLoadingSpinner;
+                    btn.disabled = true;
+
+                    fetch("{{ route('admin.ai-query.refine-item') }}", {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                        },
+                        body: JSON.stringify({
+                            query_id: {{ $queryId }},
+                            item_id: currentRefineId,
+                            instruction: instruction
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Update the row content
+                            const row = document.getElementById('row-' + currentRefineId);
+                            if (row && data.html) {
+                                row.innerHTML = data.html;
+                                // Unwrap if the partial returned a wrapper (it checks row-id, likely wrapper)
+                                // Actually, my partial has <div id="row-...">
+                                // So row.innerHTML = data.html would result in <div id="row..."><div id="row...">...</div></div>
+                                // Better to replace the whole element.
+                                row.outerHTML = data.html;
+                            }
+
+                            // Close modal
+                            const modalEl = document.getElementById('refineModal');
+                            const modal = bootstrap.Modal.getInstance(modalEl);
+                            modal.hide();
+                        } else {
+                            alert('Error: ' + (data.error || 'Unknown error'));
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('An error occurred during refinement.');
+                    })
+                    .finally(() => {
+                        btn.innerHTML = originalBtnText;
+                        btn.disabled = false;
+                    });
+                }
             </script>
+
+            <!-- Refine Modal -->
+            <div class="modal fade" id="refineModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Refine Item</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <input type="hidden" id="refine_item_id">
+                            <div class="mb-3">
+                                <label for="refine_instruction" class="form-label">Instruction</label>
+                                <textarea class="form-control" id="refine_instruction" rows="3" placeholder="e.g., Use the UK cover, Fix the title spelling..."></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-primary" id="btn-submit-refine" onclick="submitRefinement()">Apply Refinement</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         @else
             <p class="text-muted">No items to update.</p>
         @endif

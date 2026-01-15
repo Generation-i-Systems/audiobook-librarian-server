@@ -1655,6 +1655,7 @@ class ToolExecutor
                 'audible' => $this->fetchFromAudible($searchQuery),
                 'google_books' => $this->fetchFromGoogleBooks($searchQuery),
                 'hardcover' => $this->fetchFromHardcover($searchQuery),
+                'goodreads' => $this->fetchFromGoodreads($searchQuery),
                 default => ['success' => false, 'error' => 'Unknown source'],
             };
         } catch (\Exception $e) {
@@ -1719,6 +1720,77 @@ class ToolExecutor
             'message' => 'Hardcover API integration not yet implemented',
             'results' => [],
         ];
+    }
+
+    private function fetchFromGoodreads(string $query): array
+    {
+        try {
+            $response = Http::withHeaders([
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            ])->timeout(15)->get('https://www.goodreads.com/search', [
+                'q' => $query,
+            ]);
+
+            if ($response->successful()) {
+                $html = $response->body();
+                $results = [];
+
+                // Regex patterns for extracting book data from search results
+                // Note: Goodreads HTML structure changes, so these are best-effort
+                preg_match_all('/<tr itemscope itemtype="http:\/\/schema\.org\/Book">/i', $html, $matches, PREG_OFFSET_CAPTURE);
+
+                $bookRows = $matches[0];
+
+                foreach (array_slice($bookRows, 0, 5) as $index => $match) {
+                    $startPos = $match[1];
+                    $endPos = isset($bookRows[$index + 1]) ? $bookRows[$index + 1][1] : strlen($html);
+                    $rowHtml = substr($html, $startPos, $endPos - $startPos);
+
+                    // Extract Title
+                    preg_match('/<a class="bookTitle"[^>]*>.*?<span itemprop="name">(.*?)<\/span>.*?<\/a>/s', $rowHtml, $titleMatch);
+                    $title = isset($titleMatch[1]) ? trim(strip_tags($titleMatch[1])) : null;
+
+                    // Extract Author
+                    preg_match('/<a class="authorName"[^>]*>.*?<span itemprop="name">(.*?)<\/span>.*?<\/a>/s', $rowHtml, $authorMatch);
+                    $author = isset($authorMatch[1]) ? trim(strip_tags($authorMatch[1])) : null;
+
+                    // Extract Cover
+                    preg_match('/<img[^>]*src="([^"]+)"[^>]*class="bookCover"[^>]*>/i', $rowHtml, $coverMatch);
+                    $coverUrl = $coverMatch[1] ?? null;
+
+                    // Extract Rating
+                    preg_match('/minirating">.*?(\d+\.\d+) avg rating/s', $rowHtml, $ratingMatch);
+                    $rating = $ratingMatch[1] ?? null;
+
+                    if ($title) {
+                        $results[] = [
+                            'title' => $title,
+                            'authors' => $author ? [$author] : [],
+                            'description' => null, // Description not easily available in list view
+                            'isbn' => null, // ISBN not easily available in list view
+                            'published_date' => null,
+                            'categories' => [], // Genre not easily available in list view
+                            'cover_url' => $coverUrl,
+                            'rating' => $rating,
+                            'source_link' => 'https://www.goodreads.com/search?q=' . urlencode($query),
+                        ];
+                    }
+                }
+
+                return [
+                    'success' => true,
+                    'source' => 'goodreads',
+                    'results' => $results,
+                    'total' => count($results),
+                ];
+            }
+
+            return ['success' => false, 'error' => 'Goodreads request failed'];
+        } catch (\Exception $e) {
+            Log::error('Goodreads fetch failed', ['error' => $e->getMessage()]);
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
     }
 
     protected function downloadCoverImage(array $params): array
@@ -2068,6 +2140,24 @@ class ToolExecutor
                 }
             }
 
+
+
+            if (!empty($operation['cover_operations'])) {
+                $coverOp = $operation['cover_operations'];
+                if (isset($coverOp['update_url'])) {
+                    $newUrl = $coverOp['update_url'];
+                    $currentCover = $book->cover_image;
+
+                    $changes[] = [
+                        'type' => 'cover_update',
+                        'field' => 'cover_image',
+                        'current' => $currentCover,
+                        'proposed' => $newUrl,
+                        'backup' => $coverOp['backup_existing'] ?? true,
+                    ];
+                }
+            }
+
             $previewResults[] = [
                 'book_id' => $bookId,
                 'title' => $book->title,
@@ -2146,6 +2236,8 @@ class ToolExecutor
                             $success = $this->applyFilePatternReplace($change);
                         } elseif ($change['type'] === 'file_delete') {
                             $success = $this->applyFileDelete($change);
+                        } elseif ($change['type'] === 'cover_update') {
+                            $success = $this->applyCoverUpdate($book, $change);
                         }
 
                         if ($success) {
@@ -2374,6 +2466,30 @@ class ToolExecutor
                 'path' => $change['current_path'],
                 'error' => $e->getMessage(),
             ]);
+            return false;
+        }
+    }
+
+    protected function applyCoverUpdate(Book $book, array $change): bool
+    {
+        try {
+            $url = $change['proposed'];
+            $backup = $change['backup'] ?? true;
+
+            if ($backup && $book->cover_image && File::exists(public_path($book->cover_image))) {
+                $backupPath = $book->cover_image . '.bak-' . time();
+                File::copy(public_path($book->cover_image), public_path($backupPath));
+            }
+
+            // Reuse download logic
+            $result = $this->downloadCoverImage([
+                'book_id' => $book->id,
+                'image_url' => $url,
+            ]);
+
+            return $result['success'];
+        } catch (\Exception $e) {
+            Log::error('Cover update failed', ['book_id' => $book->id, 'error' => $e->getMessage()]);
             return false;
         }
     }

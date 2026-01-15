@@ -220,20 +220,44 @@ class AIQueryService
             $section .= "\nOperation: {$query['operation_type']}";
             $section .= "\nEntity Type: {$query['entity_type']}";
 
-            // Include a sample of results for the latest query only (to save tokens)
-            if ($index === count($previousContext['conversation']) - 1) {
-                if (!empty($query['items'])) {
+            if (!empty($query['generated_plan'])) {
+                $section .= "\nExecuted Plan:";
+                foreach ($query['generated_plan'] as $q) {
+                    $section .= "\n- Type: {$q['type']}";
+                    $section .= "\n  Purpose: {$q['purpose']}";
+                    if (isset($q['query'])) {
+                        $section .= "\n  Query: {$q['query']}";
+                    }
+                }
+            }
+
+            // Always show answers and stats (they are small and contextually important)
+            if (!empty($query['stats'])) {
+                $section .= "\nResearch Stats/Answer:";
+                $section .= "\n" . json_encode($query['stats'], JSON_PRETTY_PRINT);
+            } elseif (!empty($query['answer'])) {
+                $section .= "\nAnswer: {$query['answer']}";
+            }
+
+            // Include a sample of results for Lists/Bulk Updates (Latest query gets more details)
+            if (!empty($query['items'])) {
+                // For older queries, show very simplified list or just count
+                if ($index === count($previousContext['conversation']) - 1) {
                     $sampleSize = min(50, count($query['items']));
                     $sample = array_slice($query['items'], 0, $sampleSize);
                     $section .= "\nResults ({$sampleSize} of " . count($query['items']) . " items):";
                     $section .= "\n" . json_encode($sample, JSON_PRETTY_PRINT);
-                } elseif (!empty($query['preview'])) {
+                } else {
+                    $section .= "\nResults: " . count($query['items']) . " items found (details truncated for brevity).";
+                }
+            } elseif (!empty($query['preview'])) {
+                if ($index === count($previousContext['conversation']) - 1) {
                     $sampleSize = min(50, count($query['preview']));
                     $sample = array_slice($query['preview'], 0, $sampleSize);
                     $section .= "\nPreview Items ({$sampleSize} of " . count($query['preview']) . " items):";
                     $section .= "\n" . json_encode($sample, JSON_PRETTY_PRINT);
-                } elseif (!empty($query['answer'])) {
-                    $section .= "\nAnswer: {$query['answer']}";
+                } else {
+                    $section .= "\nPreview: " . count($query['preview']) . " items proposed (details truncated).";
                 }
             }
         }
@@ -246,14 +270,66 @@ class AIQueryService
         try {
             // Load all queries in this conversation
             // Only include queries explicitly linked via parent_query_id
+            $rootId = $queryId;
+            $seenIds = [$rootId];
+
+            // Traverse up to find true root
+            while (true) {
+                $q = DB::table('ai_queries')->where('id', $rootId)->select('results')->first();
+
+                if (!$q) {
+                    break;
+                }
+
+                $res = json_decode($q->results, true);
+                if (!empty($res['parent_query_id'])) {
+                    $parentId = $res['parent_query_id'];
+
+                    // Cycle detection
+                    if (in_array($parentId, $seenIds)) {
+                        Log::warning('Cycle detected in AI query conversation chain', ['query_id' => $queryId, 'trace' => $seenIds]);
+                        break;
+                    }
+
+                    $rootId = $parentId;
+                    $seenIds[] = $rootId;
+                } else {
+                    // No parent, this is the root
+                    break;
+                }
+            }
+
+            // Now fetch all descendants using iterative BFS to handle any depth
+            $allIds = [$rootId];
+            $currentLayerIds = [$rootId];
+
+            // Loop until no more children are found (limit 10 deep to prevent infinite loops)
+            $depth = 0;
+            do {
+                // Find direct children of current layer
+                $nextLayer = DB::table('ai_queries')
+                    ->whereIn('results->parent_query_id', $currentLayerIds)
+                    ->pluck('id')
+                    ->toArray();
+
+                if (empty($nextLayer)) {
+                    break;
+                }
+
+                // Filter out already seen IDs to prevent cycles
+                $nextLayer = array_diff($nextLayer, $allIds);
+
+                if (empty($nextLayer)) {
+                    break;
+                }
+
+                $allIds = array_merge($allIds, $nextLayer);
+                $currentLayerIds = $nextLayer;
+                $depth++;
+            } while ($depth < 10);
+
             $conversationQueries = DB::table('ai_queries')
-                ->where(function ($query) use ($queryId) {
-                    $query->where('id', $queryId)
-                        ->orWhere(function ($q) use ($queryId) {
-                            $q->whereRaw("JSON_EXTRACT(results, '$.parent_query_id') = ?", [$queryId])
-                                ->whereNotNull(DB::raw("JSON_EXTRACT(results, '$.parent_query_id')"));
-                        });
-                })
+                ->whereIn('id', $allIds)
                 ->orderBy('id', 'asc')
                 ->get();
 
@@ -264,11 +340,13 @@ class AIQueryService
             $conversation = [];
             foreach ($conversationQueries as $query) {
                 $results = json_decode($query->results, true);
+                $generatedPlan = json_decode($query->generated_queries, true);
 
                 $contextItem = [
                     'prompt' => $query->prompt,
                     'operation_type' => $query->operation_type,
                     'entity_type' => $results['entity_type'] ?? 'books',
+                    'generated_plan' => $generatedPlan ?? [],
                 ];
 
                 // Include result data based on operation type
@@ -279,6 +357,7 @@ class AIQueryService
                 } elseif ($query->operation_type === 'parse_update') {
                     $contextItem['preview'] = $results['preview'] ?? [];
                 } elseif ($query->operation_type === 'research') {
+                    $contextItem['stats'] = $results['stats'] ?? [];
                     $contextItem['answer'] = $results['answer'] ?? '';
                 }
 
@@ -300,7 +379,7 @@ class AIQueryService
 
     protected function buildSystemPrompt(string $schemaContext, string $userPrompt, ?array $previousContext = null): string
     {
-        return <<<PROMPT
+        $prompt = <<<PROMPT
 You are an AI assistant helping to query and manage a book library database.
 
 DATABASE SCHEMA:
@@ -479,20 +558,24 @@ Response:
 }
 
 FOLLOW-UP QUERIES:
-If the user has a previous query result loaded (shown below in PREVIOUS QUERY CONTEXT), they are asking a follow-up question that references those previous results.
+The user is asking a follow-up question referencing the PREVIOUS QUERY CONTEXT below.
+You MUST:
+1.  Analyze the previous specific SQL/Actions used in the "Executed Plan".
+2.  MODIFY that previous plan to incorporate the user's new constraints or questions.
+3.  DO NOT simply repeat the previous query if the user adds a constraint (e.g., "how many of them are series?" requires ADDING a WHERE/JOIN clause to the previous count query).
+4.  Preserve existing JOINs/WHERE clauses unless they conflict with the new request.
+5.  If the user asks "how many...", generating a "sql" query with COUNT(*) is usually correct, ensuring you apply the necessary filters.
 
-Understand the user's intent naturally - are they trying to view/retrieve information, delete items, or modify items? Use your natural language understanding to determine the appropriate operation type.
-
-When handling follow-ups:
-1. Preserve the filters/criteria from the previous query
-2. Add any new filters from the follow-up
-3. Use the same entity_type as the previous query unless explicitly changed
 {$this->buildPreviousContextSection($previousContext)}
 USER REQUEST:
 {$userPrompt}
 
 Return ONLY the JSON response, no other text.
 PROMPT;
+
+
+
+        return $prompt;
     }
 
     protected function getSchemaContext(): string
