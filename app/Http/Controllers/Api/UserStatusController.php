@@ -61,21 +61,21 @@ class UserStatusController extends Controller
         /** @var User $user */
         $user = Auth::user();
 
+        /** @var UserBookStatus|null $currentStatus */
         $currentStatus = $user->bookStatuses()->where('book_id', $book->id)->first();
         $previousStatus = $currentStatus?->status;
 
-        $statusModel = UserBookStatus::updateOrCreate(
+        $statusModel = UserBookStatus::firstOrNew(
             [
                 'user_id' => $user->id,
                 'book_id' => $book->id,
-            ],
-            [
-                'status' => $data['status'],
-                'order' => $data['order'] ?? 0, // 0 for non-queue/non-ordered items
-                'status_detail' => $data['status_detail'] ?? null,
-                // read_count will be handled by the completion logic
             ]
         );
+
+        $statusModel->status = $data['status'];
+        $statusModel->order = $data['order'] ?? 0;
+        $statusModel->status_detail = $data['status_detail'] ?? null;
+        $statusModel->save();
 
         // Dispatch event for Badge/Stats integration (Phase 3)
         if ($data['status'] !== $previousStatus) {

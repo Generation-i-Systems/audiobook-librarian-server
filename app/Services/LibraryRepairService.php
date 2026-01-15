@@ -33,6 +33,7 @@ class LibraryRepairService
                 LibraryRepairIssueType::ORPHAN_DIRECTORY => $this->scanOrphanDirectories(),
                 LibraryRepairIssueType::NESTED_AUDIO => $this->scanNestedAudio($attemptFixes),
                 LibraryRepairIssueType::NUMBERED_SUFFIX_DIRECTORY => $this->scanNumberedSuffixDirectories(),
+                LibraryRepairIssueType::BOGUS_DIRECTORY => $this->scanBogusDirectories($attemptFixes),
             };
         }
 
@@ -58,6 +59,7 @@ class LibraryRepairService
             LibraryRepairIssueType::ORPHAN_DIRECTORY->value => $this->rescanOrphanDirectoryIssue($issue),
             LibraryRepairIssueType::NESTED_AUDIO->value => $this->rescanNestedAudioIssue($issue),
             LibraryRepairIssueType::NUMBERED_SUFFIX_DIRECTORY->value => $this->rescanNumberedSuffixIssue($issue),
+            LibraryRepairIssueType::BOGUS_DIRECTORY->value => $this->rescanBogusDirectoryIssue($issue),
             default => [
                 'status' => 'error',
                 'message' => 'Unsupported issue type.',
@@ -1085,5 +1087,259 @@ class LibraryRepairService
         }
 
         return $created;
+    }
+
+    private function scanBogusDirectories(bool $attemptFixes): array
+    {
+        $created = 0;
+        $resolved = 0;
+        $autoResolved = 0;
+
+        $root = $this->bookPathService->getBookRoot();
+
+        $dbPaths = Book::query()
+            ->whereNotNull('directory_path')
+            ->pluck('directory_path')
+            ->map(fn ($path) => trim((string) $path, '/'))
+            ->filter()
+            ->values()
+            ->all();
+
+        $dbPathSet = array_fill_keys($dbPaths, true);
+
+        $directoriesWithAudio = $this->collectDirectoriesWithAudio($root);
+        $directoriesWithOnlyJson = $this->collectDirectoriesWithOnlyLibrarianJson($root);
+
+        foreach ($directoriesWithOnlyJson as $relativePath => $meta) {
+            if (isset($dbPathSet[$relativePath])) {
+                continue;
+            }
+
+            $issue = $this->createOrUpdateIssue(
+                null,
+                LibraryRepairIssueType::BOGUS_DIRECTORY,
+                $relativePath,
+                [
+                    'full_path' => $meta['full_path'],
+                ]
+            );
+
+            if ($issue->wasRecentlyCreated || $issue->wasChanged()) {
+                $created++;
+            }
+
+            if ($attemptFixes) {
+                $fixResult = $this->fixBogusDirectory($issue);
+
+                if ($fixResult['status'] === 'resolved') {
+                    $autoResolved++;
+                }
+            }
+        }
+
+        $resolved += $this->resolveIssuesWhere(
+            LibraryRepairIssueType::BOGUS_DIRECTORY,
+            fn (LibraryRepairIssue $issue) => !array_key_exists($issue->directory_path, $directoriesWithOnlyJson) || $this->directoryHasAudio($issue->metadata['full_path'] ?? ''),
+            'Directory no longer exists or contains audio files.'
+        );
+
+        return [
+            'created' => $created,
+            'resolved' => $resolved,
+            'autoResolved' => $autoResolved,
+        ];
+    }
+
+    private function rescanBogusDirectoryIssue(LibraryRepairIssue $issue): array
+    {
+        $relativePath = trim((string) $issue->directory_path, '/');
+
+        if ($relativePath === '') {
+            return [
+                'status' => 'error',
+                'message' => 'Directory path missing on issue.',
+            ];
+        }
+
+        $root = $this->bookPathService->getBookRoot();
+        $fullPath = $issue->metadata['full_path'] ?? $this->buildFullPath($root, $relativePath);
+
+        $directoryExists = File::isDirectory($fullPath);
+
+        if (!$directoryExists) {
+            $this->resolveIssueWithNotes(
+                $issue,
+                'Directory removed from disk.'
+            );
+
+            return [
+                'status' => 'resolved',
+                'message' => 'Directory removed from filesystem.',
+            ];
+        }
+
+        if ($this->directoryHasAudio($fullPath)) {
+            $this->resolveIssueWithNotes(
+                $issue,
+                'Directory now contains audio files.'
+            );
+
+            return [
+                'status' => 'resolved',
+                'message' => 'Directory now contains audio files.',
+            ];
+        }
+
+        return [
+            'status' => 'pending',
+            'message' => 'Directory still contains only librarian.json file.',
+        ];
+    }
+
+    private function fixBogusDirectory(LibraryRepairIssue $issue): array
+    {
+        $relativePath = trim((string) $issue->directory_path, '/');
+
+        if ($relativePath === '') {
+            return [
+                'status' => 'error',
+                'message' => 'Directory path missing on issue.',
+            ];
+        }
+
+        $root = $this->bookPathService->getBookRoot();
+        $fullPath = $issue->metadata['full_path'] ?? $this->buildFullPath($root, $relativePath);
+
+        if (!File::isDirectory($fullPath)) {
+            $this->resolveIssueWithNotes(
+                $issue,
+                'Directory already removed.'
+            );
+
+            return [
+                'status' => 'resolved',
+                'message' => 'Directory already removed.',
+            ];
+        }
+
+        if ($this->directoryHasAudio($fullPath)) {
+            $this->resolveIssueWithNotes(
+                $issue,
+                'Directory now contains audio files.'
+            );
+
+            return [
+                'status' => 'resolved',
+                'message' => 'Directory now contains audio files.',
+            ];
+        }
+
+        try {
+            File::deleteDirectory($fullPath);
+
+            $this->resolveIssueWithNotes(
+                $issue,
+                'Removed bogus directory containing only librarian.json.'
+            );
+
+            return [
+                'status' => 'resolved',
+                'message' => 'Successfully removed bogus directory.',
+            ];
+        } catch (\Exception $e) {
+            return [
+                'status' => 'error',
+                'message' => 'Failed to remove directory: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    private function collectDirectoriesWithOnlyLibrarianJson(string $root): array
+    {
+        $results = [];
+        $audioExtensions = $this->getAudioExtensions();
+
+        if (!is_dir($root)) {
+            return [];
+        }
+
+        $directoryIterator = new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS);
+        $iterator = new \RecursiveIteratorIterator(
+            $directoryIterator,
+            \RecursiveIteratorIterator::SELF_FIRST
+        );
+
+        foreach ($iterator as $item) {
+            if (!$item->isDir()) {
+                continue;
+            }
+
+            $dirPath = $item->getPathname();
+            $normalizedRelative = trim(Str::after($dirPath, $root), '/');
+
+            $files = File::files($dirPath);
+
+            if (count($files) === 0) {
+                continue;
+            }
+
+            $hasLibrarianJson = false;
+            $hasAudioFiles = false;
+
+            foreach ($files as $file) {
+                $filename = $file->getFilename();
+
+                if ($filename === 'librarian.json') {
+                    $hasLibrarianJson = true;
+                    continue;
+                }
+
+                $ext = strtolower($file->getExtension());
+
+                if (in_array($ext, $audioExtensions, true)) {
+                    $hasAudioFiles = true;
+                    break;
+                }
+            }
+
+            if ($hasLibrarianJson && !$hasAudioFiles) {
+                $results[$normalizedRelative] = [
+                    'full_path' => $dirPath,
+                ];
+            }
+        }
+
+        return $results;
+    }
+
+    private function directoryHasOnlyLibrarianJson(string $directory): bool
+    {
+        if (!File::isDirectory($directory)) {
+            return false;
+        }
+
+        $files = File::files($directory);
+
+        if (count($files) === 0) {
+            return false;
+        }
+
+        $audioExtensions = $this->getAudioExtensions();
+
+        foreach ($files as $file) {
+            $filename = $file->getFilename();
+
+            if ($filename === 'librarian.json') {
+                continue;
+            }
+
+            $ext = strtolower($file->getExtension());
+
+            if (in_array($ext, $audioExtensions, true)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

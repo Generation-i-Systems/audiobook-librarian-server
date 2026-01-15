@@ -49,7 +49,7 @@ class RecommendationController extends Controller
             'sender_id' => $user->id,
             'recipient_id' => $data['recipient_id'],
             'book_id' => $book->id,
-            'message' => $data['message'],
+            'message' => $data['message'] ?? null,
         ]);
 
         return response()->json([
