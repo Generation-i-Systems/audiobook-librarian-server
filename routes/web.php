@@ -351,6 +351,24 @@ Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(fun
     Route::get('/ai-query/tools/{queryId}', [Admin\AIQueryController::class, 'toolQueryDetails'])
         ->name('ai-query.tools.details');
 
+    // AI Assistant routes (New conversational book management system)
+    Route::get('/ai-assistant', [Admin\AIAssistantController::class, 'index'])
+        ->name('ai-assistant.index');
+    Route::post('/ai-assistant/process', [Admin\AIAssistantController::class, 'process'])
+        ->name('ai-assistant.process');
+    Route::get('/ai-assistant/session/{sessionId}', [Admin\AIAssistantController::class, 'session'])
+        ->name('ai-assistant.session');
+    Route::post('/ai-assistant/session/{sessionId}/execute', [Admin\AIAssistantController::class, 'execute'])
+        ->name('ai-assistant.execute');
+    Route::post('/ai-assistant/session/{sessionId}/refine', [Admin\AIAssistantController::class, 'refine'])
+        ->name('ai-assistant.refine');
+    Route::post('/ai-assistant/session/{sessionId}/cancel', [Admin\AIAssistantController::class, 'cancel'])
+        ->name('ai-assistant.cancel');
+    Route::get('/ai-assistant/history', [Admin\AIAssistantController::class, 'history'])
+        ->name('ai-assistant.history');
+    Route::get('/ai-assistant/stats', [Admin\AIAssistantController::class, 'stats'])
+        ->name('ai-assistant.stats');
+
     // Directory validation routes
     Route::get('/directory-validation', [Admin\DirectoryValidationController::class, 'index'])
         ->name('directory-validation');
