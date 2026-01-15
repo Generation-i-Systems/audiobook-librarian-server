@@ -62,20 +62,31 @@ class UserStatusController extends Controller
         $user = Auth::user();
 
         /** @var UserBookStatus|null $currentStatus */
-        $currentStatus = $user->bookStatuses()->where('book_id', $book->id)->first();
+        $currentStatus = UserBookStatus::where('user_id', $user->id)
+            ->where('book_id', $book->id)
+            ->first();
         $previousStatus = $currentStatus?->status;
 
-        $statusModel = UserBookStatus::firstOrNew(
-            [
+        if ($currentStatus) {
+            UserBookStatus::where('user_id', $user->id)
+                ->where('book_id', $book->id)
+                ->update([
+                    'status' => $data['status'],
+                    'order' => $data['order'] ?? 0,
+                    'status_detail' => $data['status_detail'] ?? null,
+                ]);
+            $statusModel = UserBookStatus::where('user_id', $user->id)
+                ->where('book_id', $book->id)
+                ->first();
+        } else {
+            $statusModel = UserBookStatus::create([
                 'user_id' => $user->id,
                 'book_id' => $book->id,
-            ]
-        );
-
-        $statusModel->status = $data['status'];
-        $statusModel->order = $data['order'] ?? 0;
-        $statusModel->status_detail = $data['status_detail'] ?? null;
-        $statusModel->save();
+                'status' => $data['status'],
+                'order' => $data['order'] ?? 0,
+                'status_detail' => $data['status_detail'] ?? null,
+            ]);
+        }
 
         // Dispatch event for Badge/Stats integration (Phase 3)
         if ($data['status'] !== $previousStatus) {

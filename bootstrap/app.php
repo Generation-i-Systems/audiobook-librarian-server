@@ -95,11 +95,24 @@ return Application::configure(basePath: dirname(__DIR__))
         // Ensure API routes return JSON errors
         $exceptions->render(function (\Throwable $e, $request) {
             if ($request->is('api/*') || $request->wantsJson()) {
+                $statusCode = 500;
+                if ($e instanceof \Illuminate\Validation\ValidationException) {
+                    return response()->json([
+                        'error' => true,
+                        'message' => $e->getMessage(),
+                        'errors' => $e->errors(),
+                    ], 422);
+                }
+
+                if (method_exists($e, 'getStatusCode')) {
+                    $statusCode = $e->getStatusCode();
+                }
+
                 return response()->json([
                     'error' => true,
                     'message' => $e->getMessage(),
-                    'code' => $e->getCode() ?: 500,
-                ], method_exists($e, 'getStatusCode') ? $e->getStatusCode() : 500);
+                    'code' => $e->getCode() ?: $statusCode,
+                ], $statusCode);
             }
         });
 

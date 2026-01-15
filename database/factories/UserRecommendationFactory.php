@@ -19,7 +19,7 @@ class UserRecommendationFactory extends Factory
             'recipient_id' => User::factory(),
             'book_id' => Book::factory(),
             'message' => $this->faker->optional(0.7)->sentence(),
-            'acknowledged_at' => $this->faker->optional(0.3)->dateTimeBetween('-1 month', 'now'),
+            'acknowledged_at' => null,
             'created_at' => $this->faker->dateTimeBetween('-1 year', 'now'),
             'updated_at' => $this->faker->dateTimeBetween('-1 month', 'now'),
         ];

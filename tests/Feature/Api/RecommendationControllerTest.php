@@ -25,7 +25,7 @@ class RecommendationControllerTest extends TestCase
         $this->user = User::factory()->create(['email_verified_at' => now(), 'role' => 'admin']);
         $this->recipient = User::factory()->create();
         $this->book = Book::factory()->create();
-        $this->token = $this->user->createToken('test-token')->plainTextToken;
+        \Laravel\Sanctum\Sanctum::actingAs($this->user);
     }
 
     public function test_can_send_a_book_recommendation(): void
@@ -33,7 +33,7 @@ class RecommendationControllerTest extends TestCase
         $response = $this->postJson('/api/v1/recommendations/' . $this->book->id, [
             'recipient_id' => $this->recipient->id,
             'message' => 'You should really listen to this!',
-        ], ['Authorization' => 'Bearer ' . $this->token])->assertStatus(201);
+        ])->assertStatus(201);
 
         $response->assertJson(['message' => 'Recommendation sent successfully.']);
 
@@ -50,7 +50,7 @@ class RecommendationControllerTest extends TestCase
         $this->postJson('/api/v1/recommendations/' . $this->book->id, [
             'recipient_id' => $this->user->id,
             'message' => 'Check this out!',
-        ], ['Authorization' => 'Bearer ' . $this->token])->assertStatus(422)
+        ])->assertStatus(422)
             ->assertJsonValidationErrors('recipient_id');
     }
 
@@ -65,7 +65,7 @@ class RecommendationControllerTest extends TestCase
 
         $this->postJson('/api/v1/recommendations/' . $this->book->id, [
             'recipient_id' => $this->recipient->id,
-        ], ['Authorization' => 'Bearer ' . $this->token])->assertStatus(409)
+        ])->assertStatus(409)
             ->assertJson(['message' => 'You have already sent this user an unacknowledged recommendation for this book.']);
     }
 
@@ -80,7 +80,7 @@ class RecommendationControllerTest extends TestCase
 
         $this->postJson('/api/v1/recommendations/' . $this->book->id, [
             'recipient_id' => $this->recipient->id,
-        ], ['Authorization' => 'Bearer ' . $this->token])->assertStatus(201);
+        ])->assertStatus(201);
     }
 
     public function test_can_view_unacknowledged_recommendations_in_inbox(): void
@@ -92,6 +92,7 @@ class RecommendationControllerTest extends TestCase
             'sender_id' => $this->recipient->id, // Sent from recipient to user
             'recipient_id' => $this->user->id,
             'book_id' => $this->book->id,
+            'acknowledged_at' => null,
             'created_at' => now()->subDay(),
         ]);
 
@@ -103,11 +104,12 @@ class RecommendationControllerTest extends TestCase
             'acknowledged_at' => now(),
         ]);
 
-        $response = $this->getJson('/api/v1/recommendations/inbox', ['Authorization' => 'Bearer ' . $this->token])
+        $response = $this->actingAs($this->user)
+            ->getJson('/api/v1/recommendations/inbox')
             ->assertStatus(200);
 
         $response->assertJsonCount(1);
-        $response->assertJsonPath('0.book_id', $this->book->id);
+        $response->assertJsonPath('0.bookId', $this->book->id);
         $response->assertJsonPath('0.sender.id', $this->recipient->id);
     }
 
@@ -120,7 +122,7 @@ class RecommendationControllerTest extends TestCase
             'acknowledged_at' => null,
         ]);
 
-        $response = $this->postJson('/api/v1/recommendations/' . $recommendation->id . '/acknowledge', [], ['Authorization' => 'Bearer ' . $this->token])
+        $response = $this->postJson('/api/v1/recommendations/' . $recommendation->id . '/acknowledge')
             ->assertStatus(200);
 
         $response->assertJson(['message' => 'Recommendation acknowledged.']);
@@ -138,7 +140,7 @@ class RecommendationControllerTest extends TestCase
             'acknowledged_at' => null,
         ]);
 
-        $this->postJson('/api/v1/recommendations/' . $recommendation->id . '/acknowledge', [], ['Authorization' => 'Bearer ' . $this->token])
+        $this->postJson('/api/v1/recommendations/' . $recommendation->id . '/acknowledge')
             ->assertStatus(403);
 
         $this->assertNull($recommendation->fresh()->acknowledged_at);

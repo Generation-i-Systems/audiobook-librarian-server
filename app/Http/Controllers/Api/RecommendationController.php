@@ -65,7 +65,7 @@ class RecommendationController extends Controller
         /** @var User $user */
         $user = Auth::user();
 
-        $recommendations = UserRecommendation::with(['sender:id,name', 'book:id,title,cover_url'])
+        $recommendations = UserRecommendation::with(['sender:id,name', 'book:id,title,cover_image'])
             ->where('recipient_id', $user->id)
             ->whereNull('acknowledged_at')
             ->latest()
@@ -95,7 +95,7 @@ class RecommendationController extends Controller
 
         return response()->json([
             'message' => 'Recommendation acknowledged.',
-            'recommendation' => $recommendation->load(['sender:id,name', 'book:id,title,cover_url']),
+            'recommendation' => $recommendation->load(['sender:id,name', 'book:id,title,cover_image']),
         ]);
     }
 

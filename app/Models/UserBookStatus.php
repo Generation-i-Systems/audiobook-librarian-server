@@ -14,6 +14,8 @@ class UserBookStatus extends Model
 
     protected $table = 'user_book_status';
 
+    public $incrementing = false;
+
     protected $fillable = [
         'user_id',
         'book_id',
