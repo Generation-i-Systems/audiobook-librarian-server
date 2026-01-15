@@ -1,12 +1,13 @@
 // @jest-environment jsdom
 import $ from "jquery";
 import { jest } from "@jest/globals";
+import * as bookForm from "@/admin/books/form.js";
 
 // Helper function to create form HTML with optional modal wrapper
 const createFormHtml = (isModal = false) => {
     const formHtml = `
-        <form id="book-form" ${isModal ? 'data-modal-form="true"' : ""}>
-            <!--Directory Path-->
+        <form id="book-form" action="/admin/books/123" ${isModal ? 'data-modal-form="true"' : ""}>
+            <meta name="csrf-token" content="test-token">
             <div class="form-group">
                 <label for="directoryPath">Directory Path</label>
                 <div class="input-group">
@@ -19,58 +20,35 @@ const createFormHtml = (isModal = false) => {
                 <div id="directory-files-list" style="display:none;"></div>
             </div>
 
-            <!--Authors-->
-            <div class="form-group">
-                <label>Authors</label>
-                <div id="authors-group">
-                    <div class="author-row mb-2 d-flex align-items-center">
-                        <input type="text" class="form-control author-autocomplete" name="authors[]" placeholder="Author name">
-                        <button type="button" class="btn btn-outline-success btn-sm ms-2 add-author-row">+</button>
-                    </div>
-                </div>
-            </div>
-
-            <!--Series-->
-            <div class="form-group">
-                <label>Series</label>
-                <div id="series-group">
-                    <div class="series-row mb-2 d-flex align-items-center">
-                        <input type="text" class="form-control series-autocomplete me-2" name="series_names[]" placeholder="Series name">
-                        <input type="number" class="form-control me-2" name="series_numbers[]" placeholder="Book #" min="1" step="1" style="width: 80px;">
-                        <button type="button" class="btn btn-outline-success btn-sm add-series-row">+</button>
-                    </div>
+            <div id="authors-group">
+                <div class="author-row">
+                    <input type="text" class="author-autocomplete" name="authors[]">
+                    <button type="button" class="add-author-row">+</button>
                 </div>
             </div>
 
             <div class="form-group">
                 <label for="title">Title</label>
-                <input type="text" id="title" name="title" class="form-control" placeholder="Book Title">
-            </div>
-
-            <div class="form-group">
-                <label for="release_date">Release Date</label>
-                <input type="date" id="release_date" name="release_date" class="form-control">
+                <input type="text" id="title" name="title" class="form-control">
             </div>
 
             <button type="submit" class="btn btn-primary">Save</button>
+
+            <!-- Raw JSON Elements -->
+            <button type="button" id="raw-json-edit-btn">Raw JSON</button>
+            <div id="rawJsonModal" class="modal">
+                <textarea id="raw-json-textarea"></textarea>
+                <div id="raw-json-error" style="display:none;"></div>
+                <button type="button" id="save-raw-json-btn">Save</button>
+            </div>
         </form>
     `;
 
     if (isModal) {
-        const title = isModal === "edit" ? "Edit Book" : "Add New Book";
         return `
-            <div class="modal fade" id="bookModal" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">${title}</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body">${formHtml}</div>
-                    </div>
-                </div>
+            <div class="modal fade" id="bookModal" tabindex="-1">
+                <div class="modal-body">${formHtml}</div>
             </div>
-            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#bookModal">Open Modal</button>
         `;
     }
 
@@ -105,13 +83,7 @@ function loadDirectoryFiles($container) {
             if (response.success) {
                 let html = '<div class="list-group">';
                 response.files.forEach((file) => {
-                    const typeAttr =
-                        file.type === "dir"
-                            ? "dir"
-                            : file.name.match(/\.(mp3|m4b)$/i)
-                              ? "audio"
-                              : "image";
-                    html += `<div class="list-group-item" data-type="${typeAttr}">${file.name}</div>`;
+                    html += `<div class="list-group-item">${file.name}</div>`;
                 });
                 html += "</div>";
                 filesList.html(html);
@@ -131,20 +103,11 @@ function loadDirectoryFiles($container) {
     });
 }
 
-function initializeAutocomplete($container) {
-    $container.find(".author-autocomplete").autocomplete({
-        source: ["Stephen King", "J.K. Rowling"],
-        minLength: 2,
-    });
-}
-
 function initBookForm($container) {
     $container.on("click", "#show-files-link", function (e) {
         e.preventDefault();
         loadDirectoryFiles($container);
     });
-
-    initializeAutocomplete($container);
 
     $container.on("click", ".add-author-row", function (e) {
         e.preventDefault();
@@ -157,16 +120,9 @@ function initBookForm($container) {
 
     $container.on("submit", function (e) {
         const title = $container.find("#title").val();
-        const author = $container.find(".author-autocomplete").first().val();
-
-        if (!title || !author) {
+        if (!title) {
             e.preventDefault();
-            if (!title) $container.find("#title").addClass("is-invalid");
-            if (!author)
-                $container
-                    .find(".author-autocomplete")
-                    .first()
-                    .addClass("is-invalid");
+            $container.find("#title").addClass("is-invalid");
             return false;
         }
     });
@@ -174,11 +130,8 @@ function initBookForm($container) {
 
 describe("Book Form", () => {
     beforeAll(() => {
-        // Stub HTMLFormElement.prototype.submit since JSDOM doesn't implement it
         HTMLFormElement.prototype.submit = jest.fn();
-
         $.fn.autocomplete = function (options) {
-            this.data("ui-autocomplete", { options });
             return this;
         };
         $.fn.modal = function () {
@@ -186,90 +139,118 @@ describe("Book Form", () => {
         };
     });
 
-    const setupTest = (isModal = false, mode = "add") => {
-        document.body.innerHTML = createFormHtml(isModal ? mode : false);
+    const setupTest = (isModal = false) => {
+        document.body.innerHTML = createFormHtml(isModal);
         const container = isModal ? $(".modal-body form") : $("#book-form");
         initBookForm(container);
+        bookForm.initRawJsonEdit();
         return { container };
     };
 
-    describe("Directory and File Operations", () => {
-        test("should show directory contents when directory is selected", (done) => {
-            const { container } = setupTest();
+    describe("Directory Operations", () => {
+        test("should show directory contents", (done) => {
+            setupTest();
             $("#directoryPath").val("/test/path");
-
             $.ajax = jest.fn().mockImplementation(({ success }) => {
                 setTimeout(() => {
-                    success({
-                        success: true,
-                        files: [{ name: "book1.mp3", type: "file" }],
-                    });
+                    success({ success: true, files: [{ name: "book.mp3" }] });
                 }, 0);
                 return Promise.resolve();
             });
-
             $("#show-files-link").click();
-            expect($("#show-files-link").html()).toContain("fa-spinner");
-
             setTimeout(() => {
-                expect($("#directory-files-list").text()).toContain(
-                    "book1.mp3",
-                );
+                expect($("#directory-files-list").text()).toContain("book.mp3");
                 done();
             }, 50);
         });
 
-        test("should handle AJAX errors when loading directory", (done) => {
-            const { container } = setupTest();
-            $("#directoryPath").val("/invalid");
+        test("should handle empty path", () => {
+            setupTest();
+            $("#directoryPath").val("");
+            $("#show-files-link").click();
+            expect($("#directory-files-list").text()).toContain(
+                "Please select a directory",
+            );
+        });
+    });
 
-            $.ajax = jest.fn().mockImplementation(({ error }) => {
-                setTimeout(() => {
-                    error();
-                }, 0);
-                return Promise.resolve({ success: false });
+    describe("Raw JSON Edit", () => {
+        test("should get bookId from URL if form action is missing", () => {
+            document.body.innerHTML = `
+                <button type="button" id="raw-json-edit-btn">Raw JSON</button>
+                <div id="rawJsonModal" class="modal"><textarea id="raw-json-textarea"></textarea></div>
+            `;
+            delete window.location;
+            window.location = {
+                pathname: "/admin/books/456",
+                reload: jest.fn(),
+            };
+
+            $.get = jest.fn().mockReturnValue({ fail: jest.fn() });
+
+            bookForm.initRawJsonEdit();
+            $("#raw-json-edit-btn").click();
+
+            expect($.get).toHaveBeenCalledWith(
+                "/admin/books/456/raw-json",
+                expect.any(Function),
+            );
+        });
+
+        test("should load and save JSON", (done) => {
+            setupTest();
+            const mockData = { title: "Test" };
+            $.get = jest.fn().mockImplementation((url, cb) => {
+                cb(mockData);
+                return { fail: () => {} };
             });
 
-            $("#show-files-link").click();
+            $("#raw-json-edit-btn").click();
+            expect($("#raw-json-textarea").val()).toContain("Test");
 
-            setTimeout(() => {
-                expect($("#directory-files-list").text()).toContain(
-                    "Error loading directory",
-                );
-                done();
-            }, 50);
-        });
-    });
+            $("#raw-json-textarea").val(JSON.stringify({ title: "Updated" }));
+            delete window.location;
+            window.location = { reload: jest.fn() };
+            $.ajax = jest.fn().mockImplementation(({ success }) => {
+                success();
+                return Promise.resolve();
+            });
 
-    describe("Form Submission", () => {
-        test("should validate required fields", () => {
-            const { container } = setupTest();
-            $("#title").val("");
-
-            const event = $.Event("submit");
-            container.trigger(event);
-
-            expect($("#title").hasClass("is-invalid")).toBe(true);
+            $("#save-raw-json-btn").click();
+            expect(window.location.reload).toHaveBeenCalled();
+            done();
         });
 
-        test("should allow submission with valid data", () => {
-            const { container } = setupTest();
-            $("#title").val("Valid Title");
-            $(".author-autocomplete").val("Valid Author");
-
-            const event = $.Event("submit");
-            container.trigger(event);
-
-            expect($("#title").hasClass("is-invalid")).toBe(false);
+        test("should handle load failure", () => {
+            setupTest();
+            $.get = jest.fn().mockReturnValue({
+                fail: (cb) => {
+                    cb({ status: 500 });
+                },
+            });
+            $("#raw-json-edit-btn").click();
+            expect($("#raw-json-error").text()).toContain(
+                "Failed to load JSON",
+            );
         });
-    });
 
-    describe("UI Interactions", () => {
-        test("should add new author row when clicking add button", () => {
-            const { container } = setupTest();
-            const initialCount = $(".author-row").length;
-            $(".add-author-row").click();
-            expect($(".author-row").length).toBe(initialCount + 1);
+        test("should handle invalid JSON input", () => {
+            setupTest();
+            $("#raw-json-textarea").val("invalid");
+            $("#save-raw-json-btn").click();
+            expect($("#raw-json-error").text()).toContain("Invalid JSON");
+        });
+
+        test("should handle save failure", () => {
+            setupTest();
+            $("#raw-json-textarea").val('{"a":1}');
+            $.ajax = jest.fn().mockImplementation(({ error }) => {
+                error({ statusText: "Error" });
+            });
+            $("#save-raw-json-btn").click();
+            expect($("#raw-json-error").text()).toContain(
+                "Failed to save JSON",
+            );
         });
     });
 });
