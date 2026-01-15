@@ -3963,7 +3963,7 @@ parameters:
 		-
 			message: '#^Access to an undefined property App\\Models\\LibraryRepairIssue\:\:\$book\.$#'
 			identifier: property.notFound
-			count: 3
+			count: 4
 			path: app/Services/LibraryRepairService.php
 
 		-
@@ -4017,19 +4017,19 @@ parameters:
 		-
 			message: '#^Parameter \#1 \$book of method App\\Services\\LibraryRepairService\:\:createOrUpdateIssue\(\) expects App\\Models\\Book\|null, stdClass given\.$#'
 			identifier: argument.type
-			count: 1
+			count: 2
 			path: app/Services/LibraryRepairService.php
 
 		-
 			message: '#^Parameter \#1 \$book of method App\\Services\\LibraryRepairService\:\:markBookNeedsReview\(\) expects App\\Models\\Book, stdClass given\.$#'
 			identifier: argument.type
-			count: 1
+			count: 2
 			path: app/Services/LibraryRepairService.php
 
 		-
 			message: '#^Parameter \#1 \$callback of method Illuminate\\Support\\Collection\<int,stdClass\>\:\:filter\(\) expects \(callable\(stdClass, int\)\: bool\)\|null, Closure\(App\\Models\\Book\)\: bool given\.$#'
 			identifier: argument.type
-			count: 1
+			count: 2
 			path: app/Services/LibraryRepairService.php
 
 		-
@@ -7443,13 +7443,13 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
 			identifier: property.notFound
-			count: 1
+			count: 5
 			path: tests/Unit/Services/LibraryRepairServiceTest.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$needs_review\.$#'
 			identifier: property.notFound
-			count: 2
+			count: 3
 			path: tests/Unit/Services/LibraryRepairServiceTest.php
 
 		-
@@ -7461,13 +7461,13 @@ parameters:
 		-
 			message: '#^Call to an undefined static method App\\Models\\LibraryRepairIssue\:\:first\(\)\.$#'
 			identifier: staticMethod.notFound
-			count: 4
+			count: 5
 			path: tests/Unit/Services/LibraryRepairServiceTest.php
 
 		-
 			message: '#^Call to an undefined static method App\\Models\\LibraryRepairIssue\:\:where\(\)\.$#'
 			identifier: staticMethod.notFound
-			count: 2
+			count: 6
 			path: tests/Unit/Services/LibraryRepairServiceTest.php
 
 		-
