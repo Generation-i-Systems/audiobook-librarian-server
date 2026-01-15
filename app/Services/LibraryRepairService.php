@@ -242,7 +242,8 @@ class LibraryRepairService
         if ($linkedBookExists || !$directoryExists) {
             $this->resolveIssueWithNotes(
                 $issue,
-                $linkedBookExists ? 'Directory now linked to a book.' : 'Directory removed from disk.'
+                $linkedBookExists ? 'Directory now linked to a book.' : 'Directory removed from disk.',
+                true
             );
 
             if ($linkedBookExists) {
@@ -322,7 +323,8 @@ class LibraryRepairService
 
             $this->resolveIssueWithNotes(
                 $issue,
-                'Updated directory_path from ' . $originalPath . ' to ' . $candidateRelative . '.'
+                'Updated directory_path from ' . $originalPath . ' to ' . $candidateRelative . '.',
+                true
             );
 
             return [
@@ -715,6 +717,12 @@ class LibraryRepairService
         $issue = LibraryRepairIssue::query()->firstOrNew($attributes);
         $issue->metadata = $metadata;
 
+        // If it's already auto-resolved, don't overwrite it to pending unless we explicitly want to
+        if ($issue->exists && $issue->auto_resolved && !$autoResolve) {
+            $issue->save();
+            return $issue;
+        }
+
         if ($autoResolve) {
             $issue->status = 'resolved';
             $issue->auto_resolved = true;
@@ -933,11 +941,12 @@ class LibraryRepairService
         return rtrim($root, '/') . '/' . ltrim($relativePath, '/');
     }
 
-    private function resolveIssueWithNotes(LibraryRepairIssue $issue, string $notes): void
+    private function resolveIssueWithNotes(LibraryRepairIssue $issue, string $notes, bool $autoResolve = false): void
     {
         $issue->status = 'resolved';
         $issue->resolved_at = now();
         $issue->resolution_notes = $notes;
+        $issue->auto_resolved = $autoResolve;
         $issue->save();
     }
 
@@ -1169,7 +1178,8 @@ class LibraryRepairService
         if (!$directoryExists) {
             $this->resolveIssueWithNotes(
                 $issue,
-                'Directory removed from disk.'
+                'Directory removed from disk.',
+                true
             );
 
             return [
@@ -1181,7 +1191,8 @@ class LibraryRepairService
         if ($this->directoryHasAudio($fullPath)) {
             $this->resolveIssueWithNotes(
                 $issue,
-                'Directory now contains audio files.'
+                'Directory now contains audio files.',
+                true
             );
 
             return [
@@ -1213,7 +1224,8 @@ class LibraryRepairService
         if (!File::isDirectory($fullPath)) {
             $this->resolveIssueWithNotes(
                 $issue,
-                'Directory already removed.'
+                'Directory already removed.',
+                true
             );
 
             return [
@@ -1225,7 +1237,8 @@ class LibraryRepairService
         if ($this->directoryHasAudio($fullPath)) {
             $this->resolveIssueWithNotes(
                 $issue,
-                'Directory now contains audio files.'
+                'Directory now contains audio files.',
+                true
             );
 
             return [
@@ -1239,7 +1252,8 @@ class LibraryRepairService
 
             $this->resolveIssueWithNotes(
                 $issue,
-                'Removed bogus directory containing only librarian.json.'
+                'Removed bogus directory containing only librarian.json.',
+                true
             );
 
             return [
@@ -1310,36 +1324,5 @@ class LibraryRepairService
         }
 
         return $results;
-    }
-
-    private function directoryHasOnlyLibrarianJson(string $directory): bool
-    {
-        if (!File::isDirectory($directory)) {
-            return false;
-        }
-
-        $files = File::files($directory);
-
-        if (count($files) === 0) {
-            return false;
-        }
-
-        $audioExtensions = $this->getAudioExtensions();
-
-        foreach ($files as $file) {
-            $filename = $file->getFilename();
-
-            if ($filename === 'librarian.json') {
-                continue;
-            }
-
-            $ext = strtolower($file->getExtension());
-
-            if (in_array($ext, $audioExtensions, true)) {
-                return false;
-            }
-        }
-
-        return true;
     }
 }

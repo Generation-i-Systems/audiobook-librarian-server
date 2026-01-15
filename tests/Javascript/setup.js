@@ -1,23 +1,12 @@
 // Jest setup for JavaScript tests
-require("jest-fetch").enableMocks();
+import $ from "jquery";
+import { jest } from "@jest/globals";
+
+// Ensure jest is available globally for ESM tests
+global.jest = jest;
 
 // Mock jQuery for tests that expect it
-global.$ = jest.fn((selector) => ({
-    val: jest.fn().mockReturnValue("test value"),
-    text: jest.fn().mockReturnValue("test text"),
-    addClass: jest.fn(),
-    removeClass: jest.fn(),
-    on: jest.fn(),
-    off: jest.fn(),
-    click: jest.fn(),
-    submit: jest.fn(),
-    ajax: jest.fn().mockReturnValue({
-        done: jest.fn(),
-        fail: jest.fn(),
-        success: jest.fn(),
-    }),
-    ready: jest.fn(),
-}));
+global.$ = global.jQuery = $;
 
 // Mock Bootstrap components
 global.bootstrap = {

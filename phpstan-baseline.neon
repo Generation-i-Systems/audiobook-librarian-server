@@ -3843,7 +3843,7 @@ parameters:
 		-
 			message: '#^Access to an undefined property App\\Models\\LibraryRepairIssue\:\:\$directory_path\.$#'
 			identifier: property.notFound
-			count: 6
+			count: 9
 			path: app/Services/LibraryRepairService.php
 
 		-

@@ -4,7 +4,7 @@ window.googleBooksMoreMatches = false;
 window.googleBooksMatches = [];
 
 // Raw JSON Edit Modal logic
-$(function () {
+export function initRawJsonEdit() {
     var $rawJsonBtn = $("#raw-json-edit-btn");
     if ($rawJsonBtn.length) {
         // Button is outside form, so get book ID from form action or page URL
@@ -63,11 +63,14 @@ $(function () {
                 error: function (xhr) {
                     $("#raw-json-error")
                         .text(
-                            "Failed to save JSON: " + (xhr.responseJSON?.error || xhr.statusText),
+                            "Failed to save JSON: " +
+                                (xhr.responseJSON?.error || xhr.statusText),
                         )
                         .show();
                 },
             });
         });
     }
-});
+}
+
+$(initRawJsonEdit);

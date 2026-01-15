@@ -1,4 +1,4 @@
-module.exports = {
+export default {
     testEnvironment: "jsdom",
     setupFilesAfterEnv: ["<rootDir>/tests/Javascript/setup.js"],
     moduleNameMapper: {
@@ -19,26 +19,6 @@ module.exports = {
             statements: 70,
         },
     },
-    testMatch: [
-        "**/tests/Javascript/**/*.test.js",
-        "**/tests/Feature/**/*.php",
-        "**/tests/Unit/**/*.php",
-    ],
-    projects: [
-        {
-            displayName: "JavaScript Unit Tests",
-            file: ["**/tests/Javascript/**/*.test.js"],
-            testPathIgnorePatterns: ["/node_modules/", "/vendor/"],
-        },
-        {
-            displayName: "PHP Feature Tests",
-            testMatch: ["**/tests/Feature/**/*.php"],
-            testPathIgnorePatterns: ["/node_modules/", "/vendor/"],
-        },
-        {
-            displayName: "PHP Unit Tests",
-            testMatch: ["**/tests/Unit/**/*.php"],
-            testPathIgnorePatterns: ["/node_modules/", "/vendor/"],
-        },
-    ],
+    testMatch: ["**/tests/Javascript/**/*.test.js"],
+    transform: {},
 };

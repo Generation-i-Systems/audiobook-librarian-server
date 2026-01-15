@@ -176,6 +176,92 @@ class LibraryRepairServiceTest extends TestCase
         $this->assertSame('collection/book-name_02', $suffixBook->fresh()->directory_path);
     }
 
+    #[Test]
+    public function it_creates_and_auto_fixes_bogus_directory_issues(): void
+    {
+        config(['app.library_repair_sync_path' => '/non/existent/sync/path']);
+
+        $service = $this->makeService();
+
+        Book::factory()->create([
+            'title' => 'Some Book',
+            'directory_path' => 'valid/book',
+        ]);
+
+        File::ensureDirectoryExists($this->libraryRoot . '/valid/book');
+        file_put_contents($this->libraryRoot . '/valid/book/track01.mp3', 'audio');
+
+        File::ensureDirectoryExists($this->libraryRoot . '/bogus/book_01');
+        file_put_contents($this->libraryRoot . '/bogus/book_01/librarian.json', '{"title": "Bogus"}');
+
+        $result = $service->scan(true, [LibraryRepairIssueType::BOGUS_DIRECTORY]);
+
+        $this->assertArrayHasKey(LibraryRepairIssueType::BOGUS_DIRECTORY->value, $result);
+        $summary = $result[LibraryRepairIssueType::BOGUS_DIRECTORY->value];
+        $this->assertSame(1, $summary['created']);
+        $this->assertSame(0, $summary['resolved']);
+        $this->assertSame(1, $summary['autoResolved']);
+
+        $issue = LibraryRepairIssue::first();
+        $this->assertNotNull($issue);
+        $this->assertNull($issue->book_id);
+        $this->assertSame('bogus/book_01', $issue->directory_path);
+        $this->assertSame('bogus_directory', $issue->issue_type);
+        $this->assertSame('resolved', $issue->status);
+        $this->assertTrue($issue->auto_resolved);
+
+        $this->assertDirectoryDoesNotExist($this->libraryRoot . '/bogus/book_01');
+    }
+
+    #[Test]
+    public function it_does_not_create_bogus_directory_issue_for_directories_with_audio(): void
+    {
+        config(['app.library_repair_sync_path' => '/non/existent/sync/path']);
+
+        $service = $this->makeService();
+
+        File::ensureDirectoryExists($this->libraryRoot . '/good/book');
+        file_put_contents($this->libraryRoot . '/good/book/track01.mp3', 'audio');
+        file_put_contents($this->libraryRoot . '/good/book/librarian.json', '{"title": "Good"}');
+
+        $result = $service->scan(true, [LibraryRepairIssueType::BOGUS_DIRECTORY]);
+
+        $this->assertArrayHasKey(LibraryRepairIssueType::BOGUS_DIRECTORY->value, $result);
+        $summary = $result[LibraryRepairIssueType::BOGUS_DIRECTORY->value];
+        $this->assertSame(0, $summary['created']);
+    }
+
+    #[Test]
+    public function it_resolves_bogus_directory_issue_when_audio_added(): void
+    {
+        config(['app.library_repair_sync_path' => '/non/existent/sync/path']);
+
+        $service = $this->makeService();
+
+        File::ensureDirectoryExists($this->libraryRoot . '/bogus/book_01');
+        file_put_contents($this->libraryRoot . '/bogus/book_01/librarian.json', '{"title": "Bogus"}');
+
+        $result = $service->scan(false, [LibraryRepairIssueType::BOGUS_DIRECTORY]);
+        $summary = $result[LibraryRepairIssueType::BOGUS_DIRECTORY->value];
+        $this->assertSame(1, $summary['created']);
+
+        $issue = LibraryRepairIssue::first();
+        $this->assertNotNull($issue);
+        $this->assertSame('bogus/book_01', $issue->directory_path);
+        $this->assertSame('pending', $issue->status);
+
+        file_put_contents($this->libraryRoot . '/bogus/book_01/track01.mp3', 'audio');
+
+        $rescanResult = $service->rescanIssue($issue->id);
+
+        $this->assertSame('resolved', $rescanResult['status']);
+        $this->assertSame('Directory now contains audio files.', $rescanResult['message']);
+
+        $issue->refresh();
+        $this->assertSame('resolved', $issue->status);
+        $this->assertSame('Directory now contains audio files.', $issue->resolution_notes);
+    }
+
     private function makeService(): LibraryRepairService
     {
         $bookPathService = Mockery::mock(BookPathService::class);

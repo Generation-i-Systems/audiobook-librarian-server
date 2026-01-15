@@ -14,12 +14,23 @@ class UpdateLibraryJsonTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Ensure clean state for books disk
+        if (config('filesystems.disks.books.root') === '/tmp/ab-librarian-test-books') {
+            File::cleanDirectory('/tmp/ab-librarian-test-books');
+        }
+    }
+
     protected function createBookDirectory(string $path): void
     {
         $fullPath = Storage::disk('books')->path($path);
         if (!File::isDirectory($fullPath)) {
             File::makeDirectory($fullPath, 0755, true);
         }
+        // Create a dummy audio file so HandlesLibraryJson doesn't skip it
+        File::put($fullPath . '/dummy.mp3', 'dummy content');
     }
 
     public function testUpdateJsonCommandWithSingleBook()

@@ -20,13 +20,22 @@ class LibraryJsonUpdateTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Ensure clean state for books disk
+        if (config('filesystems.disks.books.root') === '/tmp/ab-librarian-test-books') {
+            File::cleanDirectory('/tmp/ab-librarian-test-books');
+        }
     }
 
-    protected function createBookDirectory(string $path): void
+    protected function createBookDirectory(string $path, bool $withAudio = true): void
     {
         $fullPath = Storage::disk('books')->path($path);
         if (!File::isDirectory($fullPath)) {
             File::makeDirectory($fullPath, 0755, true);
+        }
+
+        if ($withAudio) {
+            // Create a dummy audio file so HandlesLibraryJson doesn't skip it
+            File::put($fullPath . '/dummy.mp3', 'dummy content');
         }
     }
 
@@ -194,7 +203,7 @@ class LibraryJsonUpdateTest extends TestCase
         $genre = Genre::factory()->create(['name' => 'Test Genre']);
 
         $bookDir = 'test-author/empty-book';
-        $this->createBookDirectory($bookDir);
+        $this->createBookDirectory($bookDir, false);
 
         $book = Book::factory()->create([
             'title' => 'Test Book With Empty Directory',

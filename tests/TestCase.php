@@ -43,6 +43,11 @@ abstract class TestCase extends BaseTestCase
      */
     protected function tearDown(): void
     {
+        // Clean up books disk if it's using the testing path
+        if (config('filesystems.disks.books.root') === '/tmp/ab-librarian-test-books') {
+            $this->cleanTestDirectory('/tmp/ab-librarian-test-books');
+        }
+
         // Force garbage collection to clean up PendingCommand objects
         // BEFORE parent::tearDown() destroys the application
         gc_collect_cycles();
@@ -51,6 +56,33 @@ abstract class TestCase extends BaseTestCase
 
         // Force another garbage collection AFTER teardown
         gc_collect_cycles();
+    }
+
+    private function cleanTestDirectory(string $dir): void
+    {
+        if (!is_dir($dir)) {
+            return;
+        }
+
+        $files = array_diff(scandir($dir), ['.', '..']);
+        foreach ($files as $file) {
+            $path = $dir . '/' . $file;
+            is_dir($path) ? $this->deleteDirectoryRecursive($path) : unlink($path);
+        }
+    }
+
+    private function deleteDirectoryRecursive(string $dir): void
+    {
+        if (!is_dir($dir)) {
+            return;
+        }
+
+        $files = array_diff(scandir($dir), ['.', '..']);
+        foreach ($files as $file) {
+            $path = $dir . '/' . $file;
+            is_dir($path) ? $this->deleteDirectoryRecursive($path) : unlink($path);
+        }
+        rmdir($dir);
     }
 
     /**
