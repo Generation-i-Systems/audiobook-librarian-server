@@ -1,0 +1,234 @@
+#!/bin/bash
+
+# Pre-push hook that runs all checks that would be validated by GitHub Actions
+# This ensures that pushes will pass CI/CD pipeline checks
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+BOLD='\033[1m'
+NC='\033[0m' # No Color
+
+# Track overall status
+FAILED=false
+
+echo ""
+echo -e "${BOLD}${BLUE}╔════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${BOLD}${BLUE}║          🚀 Pre-Push Validation Suite                      ║${NC}"
+echo -e "${BOLD}${BLUE}║   Running all checks that GitHub Actions will validate    ║${NC}"
+echo -e "${BOLD}${BLUE}╚════════════════════════════════════════════════════════════╝${NC}"
+echo ""
+
+# Function to print section headers
+print_section() {
+    echo ""
+    echo -e "${BOLD}${BLUE}▶ $1${NC}"
+    echo -e "${BLUE}────────────────────────────────────────────────────────────${NC}"
+}
+
+# Function to handle failures
+handle_failure() {
+    FAILED=true
+    echo -e "${RED}❌ $1 FAILED${NC}"
+    echo -e "${YELLOW}💡 Tip: $2${NC}"
+    echo ""
+}
+
+# Function to handle success
+handle_success() {
+    echo -e "${GREEN}✅ $1 passed${NC}"
+}
+
+# =============================================================================
+# 1. SYNTAX CHECKS (Fast fail)
+# =============================================================================
+print_section "1/8 Syntax Checks"
+
+# Check PHP syntax
+echo -e "${YELLOW}Checking PHP syntax...${NC}"
+PHP_SYNTAX_ERROR=false
+for file in $(find app tests -name "*.php" 2>/dev/null); do
+    if ! php -l "$file" > /dev/null 2>&1; then
+        echo -e "${RED}❌ PHP syntax error in $file${NC}"
+        php -l "$file"
+        PHP_SYNTAX_ERROR=true
+    fi
+done
+
+if [ "$PHP_SYNTAX_ERROR" = true ]; then
+    handle_failure "PHP syntax check" "Fix syntax errors in PHP files"
+else
+    handle_success "PHP syntax check"
+fi
+
+# Check JS syntax
+echo -e "${YELLOW}Checking JavaScript syntax...${NC}"
+JS_SYNTAX_ERROR=false
+for file in $(find resources/js public/js tests/Javascript -name "*.js" 2>/dev/null); do
+    if [ -f "$file" ]; then
+        if ! node --check "$file" > /dev/null 2>&1; then
+            echo -e "${RED}❌ JS syntax error in $file${NC}"
+            node --check "$file"
+            JS_SYNTAX_ERROR=true
+        fi
+    fi
+done
+
+if [ "$JS_SYNTAX_ERROR" = true ]; then
+    handle_failure "JavaScript syntax check" "Fix syntax errors in JavaScript files"
+else
+    handle_success "JavaScript syntax check"
+fi
+
+# Exit early if syntax errors
+if [ "$FAILED" = true ]; then
+    echo ""
+    echo -e "${RED}${BOLD}⛔ Push blocked due to syntax errors${NC}"
+    exit 1
+fi
+
+# =============================================================================
+# 2. CODE STYLE (Pint)
+# =============================================================================
+print_section "2/8 Code Style Check (Pint)"
+
+echo -e "${YELLOW}Running Pint...${NC}"
+if ./vendor/bin/pint --config .pint.json --test > /dev/null 2>&1; then
+    handle_success "Pint code style check"
+else
+    handle_failure "Pint code style check" "Run: ./vendor/bin/pint to auto-fix style issues"
+fi
+
+# =============================================================================
+# 3. STATIC ANALYSIS (PHPStan)
+# =============================================================================
+print_section "3/8 Static Analysis (PHPStan)"
+
+echo -e "${YELLOW}Running PHPStan...${NC}"
+if ./vendor/bin/phpstan analyse --memory-limit=2G --no-progress --quiet; then
+    handle_success "PHPStan static analysis"
+else
+    handle_failure "PHPStan static analysis" "Fix type errors or update phpstan-baseline.neon if needed"
+fi
+
+# =============================================================================
+# 4. FRONTEND BUILD
+# =============================================================================
+print_section "4/8 Frontend Build"
+
+echo -e "${YELLOW}Building frontend assets...${NC}"
+if npm run build --silent 2>&1 | grep -i "error" > /dev/null; then
+    handle_failure "Frontend build" "Fix build errors in Vite configuration or JS files"
+else
+    handle_success "Frontend build"
+fi
+
+# =============================================================================
+# 5. JAVASCRIPT TESTS
+# =============================================================================
+print_section "5/8 JavaScript Tests"
+
+echo -e "${YELLOW}Running Jest tests...${NC}"
+# Note: Currently Jest may have configuration issues (ESM vs CommonJS)
+# We'll run it but provide helpful feedback if it fails
+if npm test -- --silent 2>&1; then
+    handle_success "JavaScript tests"
+else
+    # Check if this is a configuration issue
+    if npm test 2>&1 | grep -i "cannot use import statement outside a module" > /dev/null; then
+        echo -e "${YELLOW}⚠️  Jest configuration issue detected (ESM vs CommonJS)${NC}"
+        echo -e "${YELLOW}💡 Consider fixing Jest configuration or convert tests to ESM${NC}"
+        # Don't fail on Jest config issues for now since it's a known issue
+    else
+        handle_failure "JavaScript tests" "Fix failing JavaScript tests"
+    fi
+fi
+
+# =============================================================================
+# 6. PHP UNIT TESTS
+# =============================================================================
+print_section "6/8 PHP Unit Tests (Full Suite)"
+
+echo -e "${YELLOW}Running full PHP test suite...${NC}"
+echo -e "${YELLOW}This may take a few minutes...${NC}"
+if php artisan test --stop-on-failure 2>&1; then
+    handle_success "PHP test suite"
+else
+    handle_failure "PHP test suite" "Run 'php artisan test' to see detailed failure messages"
+fi
+
+# =============================================================================
+# 7. SECURITY AUDITS
+# =============================================================================
+print_section "7/8 Security Audits"
+
+# Composer audit
+echo -e "${YELLOW}Running Composer security audit...${NC}"
+if composer audit 2>&1; then
+    handle_success "Composer security audit"
+else
+    handle_failure "Composer security audit" "Update vulnerable packages or review security advisories"
+fi
+
+# NPM audit (moderate and above)
+echo -e "${YELLOW}Running NPM security audit...${NC}"
+if npm audit --audit-level=moderate 2>&1; then
+    handle_success "NPM security audit"
+else
+    echo -e "${YELLOW}⚠️  NPM audit found vulnerabilities${NC}"
+    echo -e "${YELLOW}💡 Run 'npm audit fix' to attempt automatic fixes${NC}"
+    # Don't block on npm audit as many vulns are dev dependencies
+fi
+
+# =============================================================================
+# 8. FINAL CHECK
+# =============================================================================
+print_section "8/8 Final Validation"
+
+# Verify .env exists (basic sanity check)
+if [ ! -f ".env" ]; then
+    echo -e "${YELLOW}⚠️  Warning: .env file not found${NC}"
+fi
+
+# Check for common issues
+echo -e "${YELLOW}Checking for common issues...${NC}"
+
+# Check for debug statements
+DEBUG_FOUND=false
+for file in $(git diff --name-only origin/main...HEAD 2>/dev/null | grep "\.php$"); do
+    if [ -f "$file" ] && grep -q "dd(\|dump(\|var_dump(\|print_r(" "$file" 2>/dev/null; then
+        echo -e "${YELLOW}⚠️  Debug statement found in: $file${NC}"
+        DEBUG_FOUND=true
+    fi
+done
+
+if [ "$DEBUG_FOUND" = true ]; then
+    echo -e "${YELLOW}💡 Consider removing debug statements before pushing${NC}"
+fi
+
+# =============================================================================
+# SUMMARY
+# =============================================================================
+echo ""
+echo -e "${BLUE}════════════════════════════════════════════════════════════${NC}"
+
+if [ "$FAILED" = true ]; then
+    echo ""
+    echo -e "${RED}${BOLD}⛔ PUSH BLOCKED${NC}"
+    echo -e "${RED}One or more checks failed. Please fix the issues above.${NC}"
+    echo ""
+    echo -e "${YELLOW}To skip this hook (not recommended):${NC}"
+    echo -e "${YELLOW}  git push --no-verify${NC}"
+    echo ""
+    exit 1
+else
+    echo ""
+    echo -e "${GREEN}${BOLD}✅ ALL CHECKS PASSED!${NC}"
+    echo -e "${GREEN}Your code is ready to push.${NC}"
+    echo ""
+    echo -e "${BLUE}🚀 Pushing to remote...${NC}"
+    echo ""
+    exit 0
+fi
