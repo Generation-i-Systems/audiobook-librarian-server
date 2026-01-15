@@ -1130,6 +1130,7 @@ class LibraryRepairService
                 $relativePath,
                 [
                     'full_path' => $meta['full_path'],
+                    'reason' => 'only_json',
                 ]
             );
 
@@ -1146,10 +1147,54 @@ class LibraryRepairService
             }
         }
 
+        $booksWithDuplicatePath = Book::query()
+            ->whereNotNull('directory_path')
+            ->get()
+            ->filter(function (Book $book) {
+                return $this->hasDuplicateDirectoriesInPath($book);
+            });
+
+        foreach ($booksWithDuplicatePath as $book) {
+            $path = trim((string) $book->directory_path, '/');
+
+            $issue = $this->createOrUpdateIssue(
+                $book,
+                LibraryRepairIssueType::BOGUS_DIRECTORY,
+                $path,
+                [
+                    'full_path' => $this->buildFullPath($root, $path),
+                    'reason' => 'duplicate_path',
+                ]
+            );
+
+            if ($issue->wasRecentlyCreated || $issue->wasChanged()) {
+                // Avoid double counting if this path was already counted in the json loop
+                if (!isset($directoriesWithOnlyJson[$path])) {
+                    $created++;
+                }
+            }
+
+            $this->markBookNeedsReview($book);
+        }
+
         $resolved += $this->resolveIssuesWhere(
             LibraryRepairIssueType::BOGUS_DIRECTORY,
-            fn (LibraryRepairIssue $issue) => !array_key_exists($issue->directory_path, $directoriesWithOnlyJson) || $this->directoryHasAudio($issue->metadata['full_path'] ?? ''),
-            'Directory no longer exists or contains audio files.'
+            function (LibraryRepairIssue $issue) use ($directoriesWithOnlyJson) {
+                $isOnlyJsonIssue = ($issue->metadata['reason'] ?? '') === 'only_json';
+                $path = $issue->directory_path;
+
+                if ($isOnlyJsonIssue) {
+                    return !array_key_exists($path, $directoriesWithOnlyJson) || $this->directoryHasAudio($issue->metadata['full_path'] ?? '');
+                }
+
+                $book = $issue->book;
+                if (!$book) {
+                    return true;
+                }
+
+                return !$this->hasDuplicateDirectoriesInPath($book);
+            },
+            'Directory no longer bogus.'
         );
 
         return [
@@ -1324,5 +1369,69 @@ class LibraryRepairService
         }
 
         return $results;
+    }
+
+    private function hasDuplicateDirectoriesInPath(Book $book): bool
+    {
+        $path = $book->directory_path;
+
+        if (empty($path)) {
+            return false;
+        }
+
+        $path = trim((string) $path, '/');
+        $components = array_map(fn ($c) => trim(strtolower($c)), explode('/', $path));
+
+        if (count($components) < 2) {
+            return false;
+        }
+
+        // 1. Check for exact identical components anywhere in the path
+        $componentCounts = array_count_values($components);
+        if (max($componentCounts) > 1) {
+            return true;
+        }
+
+        // 2. Check for redundant nesting (similar names that aren't the Series/Volume pattern)
+        for ($i = 0; $i < count($components) - 1; $i++) {
+            $current = $components[$i];
+            $next = $components[$i + 1];
+
+            if ($this->areDirectoryNamesSimilar($current, $next)) {
+                // If they are similar, it's only valid if it follows the "Series / Volume" pattern
+                // where the child has a number and the parent is the base name.
+                if ($this->hasSeriesNumberAtStart($next) && !$this->hasSeriesNumberAtStart($current)) {
+                    // This is "Series / 10 Series 10" -> Valid
+                    continue;
+                }
+
+                // Otherwise, "Series / Series" or "Title / Title" (even if slightly different) is bogus
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function hasSeriesNumberAtStart(string $name): bool
+    {
+        return preg_match('/^[0-9]+\s+[A-Za-z]/', $name) === 1;
+    }
+
+    private function areDirectoryNamesSimilar(string $name1, string $name2): bool
+    {
+        $name1 = preg_replace('/[0-9]+\s*/', '', $name1);
+        $name2 = preg_replace('/[0-9]+\s*/', '', $name2);
+
+        $name1 = trim(strtolower($name1));
+        $name2 = trim(strtolower($name2));
+
+        if ($name1 === $name2) {
+            return true;
+        }
+
+        $similarity = similar_text($name1, $name2, $percent);
+
+        return $percent >= 85;
     }
 }

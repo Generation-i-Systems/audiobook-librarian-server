@@ -262,6 +262,137 @@ class LibraryRepairServiceTest extends TestCase
         $this->assertSame('Directory now contains audio files.', $issue->resolution_notes);
     }
 
+    #[Test]
+    public function it_detects_duplicate_directory_names_in_path(): void
+    {
+        config(['app.library_repair_sync_path' => '/non/existent/sync/path']);
+
+        $service = $this->makeService();
+
+        $book1 = Book::factory()->create([
+            'title' => 'Duplicate Title',
+            'directory_path' => 'Author/Title/Title',
+            'needs_review' => false,
+        ]);
+
+        File::ensureDirectoryExists($this->libraryRoot . '/Author/Title/Title');
+        file_put_contents($this->libraryRoot . '/Author/Title/Title/track01.mp3', 'audio');
+
+        $result = $service->scan(false, [LibraryRepairIssueType::BOGUS_DIRECTORY]);
+
+        $this->assertArrayHasKey(LibraryRepairIssueType::BOGUS_DIRECTORY->value, $result);
+        $summary = $result[LibraryRepairIssueType::BOGUS_DIRECTORY->value];
+        $this->assertSame(1, $summary['created']);
+
+        $issue = LibraryRepairIssue::where('book_id', $book1->id)->first();
+        $this->assertNotNull($issue);
+        $this->assertSame('Author/Title/Title', $issue->directory_path);
+        $this->assertSame('bogus_directory', $issue->issue_type);
+        $this->assertSame('duplicate_path', $issue->metadata['reason'] ?? '');
+
+        $this->assertTrue($book1->fresh()->needs_review);
+    }
+
+    #[Test]
+    public function it_detects_similar_directory_names_in_path(): void
+    {
+        config(['app.library_repair_sync_path' => '/non/existent/sync/path']);
+
+        $service = $this->makeService();
+
+        // 1. Valid: Series / Volume pattern
+        $bookValid = Book::factory()->create([
+            'title' => 'Valid Series',
+            'directory_path' => 'The Path of Ascension/10 The Path of Ascension 10',
+            'needs_review' => false,
+        ]);
+        File::ensureDirectoryExists($this->libraryRoot . '/The Path of Ascension/10 The Path of Ascension 10');
+        file_put_contents($this->libraryRoot . '/The Path of Ascension/10 The Path of Ascension 10/track01.mp3', 'audio');
+
+        // 2. Invalid: Duplicate Series folder
+        $bookInvalidSeries = Book::factory()->create([
+            'title' => 'Duplicate Series',
+            'directory_path' => 'The Path of Ascension/The Path of Ascension/10 The Path of Ascension 10',
+            'needs_review' => false,
+        ]);
+        File::ensureDirectoryExists($this->libraryRoot . '/The Path of Ascension/The Path of Ascension/10 The Path of Ascension 10');
+        file_put_contents($this->libraryRoot . '/The Path of Ascension/The Path of Ascension/10 The Path of Ascension 10/track01.mp3', 'audio');
+
+        // 3. Invalid: Duplicate Title folder
+        $bookInvalidTitle = Book::factory()->create([
+            'title' => 'Duplicate Title',
+            'directory_path' => 'Series/Title/Title',
+            'needs_review' => false,
+        ]);
+        File::ensureDirectoryExists($this->libraryRoot . '/Series/Title/Title');
+        file_put_contents($this->libraryRoot . '/Series/Title/Title/track01.mp3', 'audio');
+
+        $result = $service->scan(false, [LibraryRepairIssueType::BOGUS_DIRECTORY]);
+
+        $summary = $result[LibraryRepairIssueType::BOGUS_DIRECTORY->value];
+        $this->assertSame(2, $summary['created'], 'Should flag 2 invalid paths and skip 1 valid path');
+
+        $this->assertTrue(LibraryRepairIssue::where('book_id', $bookInvalidSeries->id)->exists());
+        $this->assertTrue(LibraryRepairIssue::where('book_id', $bookInvalidTitle->id)->exists());
+        $this->assertFalse(LibraryRepairIssue::where('book_id', $bookValid->id)->exists());
+    }
+
+    #[Test]
+    public function it_does_not_detect_duplicate_in_paths_with_series_numbers(): void
+    {
+        config(['app.library_repair_sync_path' => '/non/existent/sync/path']);
+
+        $service = $this->makeService();
+
+        $book3 = Book::factory()->create([
+            'title' => 'Series Book',
+            'directory_path' => 'Author/Series/01 Series Title',
+            'needs_review' => false,
+        ]);
+
+        File::ensureDirectoryExists($this->libraryRoot . '/Author/Series/01 Series Title');
+        file_put_contents($this->libraryRoot . '/Author/Series/01 Series Title/track01.mp3', 'audio');
+
+        $result = $service->scan(false, [LibraryRepairIssueType::BOGUS_DIRECTORY]);
+
+        $this->assertArrayHasKey(LibraryRepairIssueType::BOGUS_DIRECTORY->value, $result);
+        $summary = $result[LibraryRepairIssueType::BOGUS_DIRECTORY->value];
+        $this->assertSame(0, $summary['created']);
+    }
+
+    #[Test]
+    public function it_resolves_duplicate_path_issue_when_fixed(): void
+    {
+        config(['app.library_repair_sync_path' => '/non/existent/sync/path']);
+
+        $service = $this->makeService();
+
+        $book = Book::factory()->create([
+            'title' => 'To Fix',
+            'directory_path' => 'Author/Author/Title',
+            'needs_review' => false,
+        ]);
+
+        File::ensureDirectoryExists($this->libraryRoot . '/Author/Author/Title');
+        file_put_contents($this->libraryRoot . '/Author/Author/Title/track01.mp3', 'audio');
+
+        $result = $service->scan(false, [LibraryRepairIssueType::BOGUS_DIRECTORY]);
+        $summary = $result[LibraryRepairIssueType::BOGUS_DIRECTORY->value];
+        $this->assertSame(1, $summary['created']);
+
+        $issue = LibraryRepairIssue::first();
+        $this->assertNotNull($issue);
+
+        $book->update(['directory_path' => 'Author/Title']);
+
+        $rescanResult = $service->rescanIssue($issue->id);
+
+        $this->assertSame('resolved', $rescanResult['status']);
+
+        $issue->refresh();
+        $this->assertSame('resolved', $issue->status);
+    }
+
     private function makeService(): LibraryRepairService
     {
         $bookPathService = Mockery::mock(BookPathService::class);
