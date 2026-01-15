@@ -2863,6 +2863,30 @@ parameters:
 			path: app/Relations/TouchesParentBelongsToMany.php
 
 		-
+			message: '#^Call to an undefined static method App\\Models\\Author\:\:firstOrCreate\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 2
+			path: app/Services/AI/AIAssistantService.php
+
+		-
+			message: '#^Call to an undefined static method App\\Models\\Book\:\:create\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Services/AI/AIAssistantService.php
+
+		-
+			message: '#^Call to an undefined static method App\\Models\\Book\:\:findOrFail\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Services/AI/AIAssistantService.php
+
+		-
+			message: '#^Call to an undefined static method App\\Models\\Genre\:\:firstOrCreate\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 2
+			path: app/Services/AI/AIAssistantService.php
+
+		-
 			message: '#^Call to static method messages\(\) on an unknown class Mozex\\Anthropic\\Facades\\Anthropic\.$#'
 			identifier: class.notFound
 			count: 1
@@ -5755,6 +5779,30 @@ parameters:
 			path: tests/Core/Unit/Traits/BookImportTraitTest.php
 
 		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 13
+			path: tests/Feature/Admin/AIAssistantControllerTest.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: tests/Feature/Admin/AIAssistantControllerTest.php
+
+		-
+			message: '#^Parameter \#1 \$user of method Illuminate\\Foundation\\Testing\\TestCase\:\:actingAs\(\) expects Illuminate\\Contracts\\Auth\\Authenticatable, Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: tests/Feature/Admin/AIAssistantControllerTest.php
+
+		-
+			message: '#^Property Tests\\Feature\\Admin\\AIAssistantControllerTest\:\:\$admin \(App\\Models\\User\) does not accept Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: tests/Feature/Admin/AIAssistantControllerTest.php
+
+		-
 			message: '#^Class App\\Services\\MongoService not found\.$#'
 			identifier: class.notFound
 			count: 1
@@ -7343,6 +7391,102 @@ parameters:
 			identifier: property.notFound
 			count: 3
 			path: tests/Unit/Models/UserIsAdminAttributeTest.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 11
+			path: tests/Unit/Services/AI/AIAssistantServiceTest.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$genres\.$#'
+			identifier: property.notFound
+			count: 3
+			path: tests/Unit/Services/AI/AIAssistantServiceTest.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 6
+			path: tests/Unit/Services/AI/AIAssistantServiceTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Contracts\\AI\\AIProviderInterface\:\:shouldReceive\(\)\.$#'
+			identifier: method.notFound
+			count: 7
+			path: tests/Unit/Services/AI/AIAssistantServiceTest.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:authors\(\)\.$#'
+			identifier: method.notFound
+			count: 5
+			path: tests/Unit/Services/AI/AIAssistantServiceTest.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:genres\(\)\.$#'
+			identifier: method.notFound
+			count: 10
+			path: tests/Unit/Services/AI/AIAssistantServiceTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with array will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Unit/Services/AI/AIAssistantServiceTest.php
+
+		-
+			message: '#^Property Tests\\Unit\\Services\\AI\\AIAssistantServiceTest\:\:\$mockProvider \(App\\Contracts\\AI\\AIProviderInterface\) does not accept Mockery\\LegacyMockInterface&Mockery\\MockInterface\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: tests/Unit/Services/AI/AIAssistantServiceTest.php
+
+		-
+			message: '#^Property Tests\\Unit\\Services\\AI\\AIAssistantServiceTest\:\:\$user \(App\\Models\\User\) does not accept Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: tests/Unit/Services/AI/AIAssistantServiceTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Contracts\\AI\\AIProviderInterface\:\:parseStructuredResponseForTest\(\)\.$#'
+			identifier: method.notFound
+			count: 3
+			path: tests/Unit/Services/AI/Providers/BaseAIProviderTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Contracts\\AI\\AIProviderInterface\:\:trackRequestForTest\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Unit/Services/AI/Providers/BaseAIProviderTest.php
+
+		-
+			message: '#^Call to an undefined method App\\Contracts\\AI\\AIProviderInterface\:\:validateAgainstSchemaForTest\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: tests/Unit/Services/AI/Providers/BaseAIProviderTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with array will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Unit/Services/AI/Providers/BaseAIProviderTest.php
+
+		-
+			message: '#^Method App\\Services\\AI\\Providers\\BaseAIProvider@anonymous/tests/Unit/Services/AI/Providers/BaseAIProviderTest\.php\:113\:\:transcribe\(\) never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: tests/Unit/Services/AI/Providers/BaseAIProviderTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with array will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Unit/Services/AI/Providers/ClaudeProviderTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with array will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Unit/Services/AI/Providers/OpenAIProviderTest.php
 
 		-
 			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with array will always evaluate to true\.$#'

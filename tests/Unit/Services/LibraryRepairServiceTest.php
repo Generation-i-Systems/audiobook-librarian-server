@@ -300,7 +300,7 @@ class LibraryRepairServiceTest extends TestCase
 
         $service = $this->makeService();
 
-        // 1. Valid: Series / Volume pattern
+        // 1. Valid: Series / Volume pattern (Series Name and Volume Title are different enough or follow pattern)
         $bookValid = Book::factory()->create([
             'title' => 'Valid Series',
             'directory_path' => 'The Path of Ascension/10 The Path of Ascension 10',
@@ -309,7 +309,7 @@ class LibraryRepairServiceTest extends TestCase
         File::ensureDirectoryExists($this->libraryRoot . '/The Path of Ascension/10 The Path of Ascension 10');
         file_put_contents($this->libraryRoot . '/The Path of Ascension/10 The Path of Ascension 10/track01.mp3', 'audio');
 
-        // 2. Invalid: Duplicate Series folder
+        // 2. Invalid: Duplicate Series folder (exact match)
         $bookInvalidSeries = Book::factory()->create([
             'title' => 'Duplicate Series',
             'directory_path' => 'The Path of Ascension/The Path of Ascension/10 The Path of Ascension 10',
@@ -318,7 +318,7 @@ class LibraryRepairServiceTest extends TestCase
         File::ensureDirectoryExists($this->libraryRoot . '/The Path of Ascension/The Path of Ascension/10 The Path of Ascension 10');
         file_put_contents($this->libraryRoot . '/The Path of Ascension/The Path of Ascension/10 The Path of Ascension 10/track01.mp3', 'audio');
 
-        // 3. Invalid: Duplicate Title folder
+        // 3. Invalid: Duplicate Title folder (exact match)
         $bookInvalidTitle = Book::factory()->create([
             'title' => 'Duplicate Title',
             'directory_path' => 'Series/Title/Title',
@@ -346,12 +346,12 @@ class LibraryRepairServiceTest extends TestCase
 
         $book3 = Book::factory()->create([
             'title' => 'Series Book',
-            'directory_path' => 'Author/Series/01 Series Title',
+            'directory_path' => 'Author Name/Series Name/01 Series Name',
             'needs_review' => false,
         ]);
 
-        File::ensureDirectoryExists($this->libraryRoot . '/Author/Series/01 Series Title');
-        file_put_contents($this->libraryRoot . '/Author/Series/01 Series Title/track01.mp3', 'audio');
+        File::ensureDirectoryExists($this->libraryRoot . '/Author Name/Series Name/01 Series Name');
+        file_put_contents($this->libraryRoot . '/Author Name/Series Name/01 Series Name/track01.mp3', 'audio');
 
         $result = $service->scan(false, [LibraryRepairIssueType::BOGUS_DIRECTORY]);
 

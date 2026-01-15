@@ -3,6 +3,9 @@
 namespace App\Services\AI;
 
 use App\Contracts\AI\AIProviderInterface;
+use App\Models\Author;
+use App\Models\Book;
+use App\Models\Genre;
 use App\Services\AI\Providers\ClaudeProvider;
 use App\Services\AI\Providers\GeminiProvider;
 use App\Services\AI\Providers\OpenAIProvider;
@@ -197,20 +200,26 @@ PROMPT;
 
     protected function generateSearchResults(array $parameters): array
     {
-        $query = DB::table('books')->select('id', 'title', 'author', 'narrator', 'genre', 'series', 'year', 'file_path');
+        $query = Book::query()->with(['authors', 'genres', 'series']);
 
         // Apply search criteria
         if (isset($parameters['title'])) {
             $query->where('title', 'like', "%{$parameters['title']}%");
         }
         if (isset($parameters['author'])) {
-            $query->where('author', 'like', "%{$parameters['author']}%");
+            $query->whereHas('authors', function ($q) use ($parameters) {
+                $q->where('name', 'like', "%{$parameters['author']}%");
+            });
         }
         if (isset($parameters['genre'])) {
-            $query->where('genre', 'like', "%{$parameters['genre']}%");
+            $query->whereHas('genres', function ($q) use ($parameters) {
+                $q->where('name', 'like', "%{$parameters['genre']}%");
+            });
         }
         if (isset($parameters['series'])) {
-            $query->where('series', 'like', "%{$parameters['series']}%");
+            $query->whereHas('series', function ($q) use ($parameters) {
+                $q->where('name', 'like', "%{$parameters['series']}%");
+            });
         }
         if (isset($parameters['year'])) {
             $query->where('year', $parameters['year']);
@@ -220,20 +229,16 @@ PROMPT;
         }
         if (isset($parameters['missing_metadata'])) {
             if ($parameters['missing_metadata'] === 'author') {
-                $query->where(function ($q) {
-                    $q->whereNull('author')->orWhere('author', '');
-                });
+                $query->whereDoesntHave('authors');
             }
             if ($parameters['missing_metadata'] === 'genre') {
-                $query->where(function ($q) {
-                    $q->whereNull('genre')->orWhere('genre', '');
-                });
+                $query->whereDoesntHave('genres');
             }
         }
 
-        $books = $query->limit(100)->get()->toArray();
+        $books = $query->limit(100)->get();
 
-        if (empty($books)) {
+        if ($books->isEmpty()) {
             return [
                 'success' => false,
                 'error' => 'No books found matching criteria',
@@ -242,18 +247,18 @@ PROMPT;
 
         return [
             'success' => true,
-            'explanation' => "Found " . count($books) . " book(s) matching your criteria",
-            'operations' => array_map(fn ($book) => [
+            'explanation' => "Found " . $books->count() . " book(s) matching your criteria",
+            'operations' => $books->map(fn ($book) => [
                 'type' => 'display',
                 'book_id' => $book->id,
                 'title' => $book->title,
-                'author' => $book->author,
-                'narrator' => $book->narrator,
-                'genre' => $book->genre,
-                'series' => $book->series,
+                'author' => $book->authors->pluck('name')->join(', '),
+                'narrator' => $book->narrators->pluck('name')->join(', '),
+                'genre' => $book->genres->pluck('name')->join(', '),
+                'series' => $book->series->pluck('name')->join(', '),
                 'year' => $book->year,
-                'file_path' => $book->file_path,
-            ], $books),
+                'file_path' => $book->directory_path,
+            ])->toArray(),
         ];
     }
 
@@ -426,15 +431,43 @@ PROMPT;
         $bookId = $operation['book_id'];
         $changes = $operation['changes'];
 
-        DB::table('books')
-            ->where('id', $bookId)
-            ->update(array_merge($changes, ['updated_at' => now()]));
+        $book = Book::findOrFail($bookId);
+
+        // Handle specific relationship updates if present in changes
+        if (isset($changes['author'])) {
+            $authorNames = is_array($changes['author']) ? $changes['author'] : explode(',', (string)$changes['author']);
+            $authorIds = [];
+            foreach ($authorNames as $name) {
+                $author = Author::firstOrCreate(['name' => trim($name)]);
+                $authorIds[] = $author->id;
+            }
+            $book->authors()->sync($authorIds);
+            unset($changes['author']);
+        }
+
+        if (isset($changes['genre'])) {
+            $genreNames = is_array($changes['genre']) ? $changes['genre'] : explode(',', (string)$changes['genre']);
+            $genreIds = [];
+            foreach ($genreNames as $name) {
+                $genre = Genre::firstOrCreate(['name' => trim($name)]);
+                $genreIds[] = $genre->id;
+            }
+            $book->genres()->sync($genreIds);
+            unset($changes['genre']);
+        }
+
+        // Apply remaining changes to the book model
+        if (!empty($changes)) {
+            $book->update($changes);
+        } else {
+            $book->touch();
+        }
 
         return [
             'success' => true,
             'operation' => 'update',
             'book_id' => $bookId,
-            'changes' => $changes,
+            'changes' => $operation['changes'],
         ];
     }
 
@@ -464,16 +497,37 @@ PROMPT;
     protected function executeCreate(array $operation): array
     {
         $metadata = $operation['metadata'];
+        $authorData = $metadata['author'] ?? null;
+        $genreData = $metadata['genre'] ?? null;
 
-        $bookId = DB::table('books')->insertGetId(array_merge($metadata, [
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]));
+        unset($metadata['author'], $metadata['genre']);
+
+        $book = Book::create($metadata);
+
+        if ($authorData) {
+            $authorNames = is_array($authorData) ? $authorData : explode(',', (string)$authorData);
+            $authorIds = [];
+            foreach ($authorNames as $name) {
+                $author = Author::firstOrCreate(['name' => trim($name)]);
+                $authorIds[] = $author->id;
+            }
+            $book->authors()->sync($authorIds);
+        }
+
+        if ($genreData) {
+            $genreNames = is_array($genreData) ? $genreData : explode(',', (string)$genreData);
+            $genreIds = [];
+            foreach ($genreNames as $name) {
+                $genre = Genre::firstOrCreate(['name' => trim($name)]);
+                $genreIds[] = $genre->id;
+            }
+            $book->genres()->sync($genreIds);
+        }
 
         return [
             'success' => true,
             'operation' => 'create',
-            'book_id' => $bookId,
+            'book_id' => $book->id,
         ];
     }
 
