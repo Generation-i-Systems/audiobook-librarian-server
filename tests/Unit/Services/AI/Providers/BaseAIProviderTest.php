@@ -132,7 +132,7 @@ class BaseAIProviderTest extends TestCase
                 return 'test-model';
             }
 
-            public function transcribe(string $audioPath): ?string
+            public function transcribe(string $audioPath): string
             {
                 return 'test transcription';
             }

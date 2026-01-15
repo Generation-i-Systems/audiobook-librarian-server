@@ -16,7 +16,9 @@ class AIAssistantControllerTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->admin = User::factory()->create(['is_admin' => true]);
+        /** @var User $admin */
+        $admin = User::factory()->create(['role' => 'admin']);
+        $this->admin = $admin;
     }
 
     public function testIndexRequiresAuthentication(): void
@@ -28,7 +30,8 @@ class AIAssistantControllerTest extends TestCase
 
     public function testIndexRequiresAdminRole(): void
     {
-        $user = User::factory()->create(['is_admin' => false]);
+        /** @var User $user */
+        $user = User::factory()->create(['role' => 'user']);
 
         $response = $this->actingAs($user)->get('/admin/ai-assistant');
 
@@ -369,6 +372,6 @@ class AIAssistantControllerTest extends TestCase
         $response->assertOk();
         $sessions = $response->json('sessions');
         $this->assertCount(1, $sessions);
-        $this->assertEquals('completed', $sessions[0]->status);
+        $this->assertEquals('completed', $sessions[0]['status']);
     }
 }

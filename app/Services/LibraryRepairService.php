@@ -1147,6 +1147,28 @@ class LibraryRepairService
             }
         }
 
+        $booksWithFilesystemMismatch = $this->collectBooksWithDuplicateNestedDirectories($root, $dbPathSet);
+
+        foreach ($booksWithFilesystemMismatch as $book) {
+            $path = trim((string) $book->directory_path, '/');
+
+            $issue = $this->createOrUpdateIssue(
+                $book,
+                LibraryRepairIssueType::BOGUS_DIRECTORY,
+                $path,
+                [
+                    'full_path' => $this->buildFullPath($root, $path),
+                    'reason' => 'filesystem_duplicate',
+                ]
+            );
+
+            if ($issue->wasRecentlyCreated || $issue->wasChanged()) {
+                $created++;
+            }
+
+            $this->markBookNeedsReview($book);
+        }
+
         $booksWithDuplicatePath = Book::query()
             ->whereNotNull('directory_path')
             ->get()
@@ -1180,7 +1202,10 @@ class LibraryRepairService
         $resolved += $this->resolveIssuesWhere(
             LibraryRepairIssueType::BOGUS_DIRECTORY,
             function (LibraryRepairIssue $issue) use ($directoriesWithOnlyJson) {
-                $isOnlyJsonIssue = ($issue->metadata['reason'] ?? '') === 'only_json';
+                $reason = $issue->metadata['reason'] ?? '';
+                $isOnlyJsonIssue = $reason === 'only_json';
+                $isFilesystemDuplicate = $reason === 'filesystem_duplicate';
+                $isDuplicatePath = $reason === 'duplicate_path';
                 $path = $issue->directory_path;
 
                 if ($isOnlyJsonIssue) {
@@ -1190,6 +1215,17 @@ class LibraryRepairService
                 $book = $issue->book;
                 if (!$book) {
                     return true;
+                }
+
+                if ($isFilesystemDuplicate) {
+                    $root = $this->bookPathService->getBookRoot();
+                    $fullPath = $this->buildFullPath($root, $path);
+
+                    if (!is_dir($fullPath)) {
+                        return true;
+                    }
+
+                    return $this->directoryHasAudio($fullPath);
                 }
 
                 return !$this->hasDuplicateDirectoriesInPath($book);
@@ -1233,22 +1269,93 @@ class LibraryRepairService
             ];
         }
 
-        if ($this->directoryHasAudio($fullPath)) {
-            $this->resolveIssueWithNotes(
-                $issue,
-                'Directory now contains audio files.',
-                true
-            );
+        $reason = $issue->metadata['reason'] ?? '';
+
+        if ($reason === 'only_json') {
+            if ($this->directoryHasAudio($fullPath)) {
+                $this->resolveIssueWithNotes(
+                    $issue,
+                    'Directory now contains audio files.',
+                    true
+                );
+
+                return [
+                    'status' => 'resolved',
+                    'message' => 'Directory now contains audio files.',
+                ];
+            }
 
             return [
-                'status' => 'resolved',
-                'message' => 'Directory now contains audio files.',
+                'status' => 'pending',
+                'message' => 'Directory still contains only librarian.json file.',
+            ];
+        }
+
+        if ($reason === 'filesystem_duplicate') {
+            $book = $issue->book;
+
+            if (!$book) {
+                $this->resolveIssueWithNotes($issue, 'Book removed from database.', true);
+
+                return [
+                    'status' => 'resolved',
+                    'message' => 'Book removed from database.',
+                ];
+            }
+
+            if ($this->directoryHasAudio($fullPath)) {
+                $this->resolveIssueWithNotes(
+                    $issue,
+                    'Files moved to correct location.',
+                    true
+                );
+
+                return [
+                    'status' => 'resolved',
+                    'message' => 'Files are now in the correct location.',
+                ];
+            }
+
+            return [
+                'status' => 'pending',
+                'message' => 'Files still in nested duplicate directory.',
+            ];
+        }
+
+        if ($reason === 'duplicate_path') {
+            $book = $issue->book;
+
+            if (!$book) {
+                $this->resolveIssueWithNotes($issue, 'Book removed from database.', true);
+
+                return [
+                    'status' => 'resolved',
+                    'message' => 'Book removed from database.',
+                ];
+            }
+
+            if (!$this->hasDuplicateDirectoriesInPath($book)) {
+                $this->resolveIssueWithNotes(
+                    $issue,
+                    'Directory path corrected.',
+                    true
+                );
+
+                return [
+                    'status' => 'resolved',
+                    'message' => 'Directory path no longer has duplicates.',
+                ];
+            }
+
+            return [
+                'status' => 'pending',
+                'message' => 'Directory path still has duplicate names.',
             ];
         }
 
         return [
             'status' => 'pending',
-            'message' => 'Directory still contains only librarian.json file.',
+            'message' => 'Issue still pending.',
         ];
     }
 
@@ -1433,5 +1540,47 @@ class LibraryRepairService
         $similarity = similar_text($name1, $name2, $percent);
 
         return $percent >= 85;
+    }
+
+    private function collectBooksWithDuplicateNestedDirectories(string $root, array $dbPathSet): array
+    {
+        $affectedBooks = [];
+
+        foreach ($dbPathSet as $relativePath => $exists) {
+            if (!$exists) {
+                continue;
+            }
+
+            $fullPath = $this->buildFullPath($root, $relativePath);
+
+            if (!is_dir($fullPath)) {
+                continue;
+            }
+
+            $subdirs = File::directories($fullPath);
+
+            if (count($subdirs) !== 1) {
+                continue;
+            }
+
+            $subdirPath = $subdirs[0];
+            $subdirName = basename($subdirPath);
+            $parentName = basename($fullPath);
+
+            if ($this->areDirectoryNamesSimilar($parentName, $subdirName)) {
+                $parentHasAudio = $this->directoryHasAudio($fullPath);
+                $subdirHasAudio = $this->directoryHasAudio($subdirPath);
+
+                if (!$parentHasAudio && $subdirHasAudio) {
+                    $book = Book::where('directory_path', $relativePath)->first();
+
+                    if ($book) {
+                        $affectedBooks[] = $book;
+                    }
+                }
+            }
+        }
+
+        return $affectedBooks;
     }
 }
