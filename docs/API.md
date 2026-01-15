@@ -28,6 +28,8 @@ The API includes the following main resource categories:
 - **Series** - Endpoints related to book series management
 - **Books** - Endpoints for book information and management
 - **Authors** - Endpoints for author information
+- **Recommendations** - Endpoints for book sharing between users
+- **Status** - Endpoints for personal book tracking (Queue, Wishlist, etc.)
 - **Users** - Endpoints for user management
 - **Auth** - Authentication and authorization endpoints
 
@@ -38,6 +40,7 @@ The API includes the following main resource categories:
 Important note: Series documents use `seriesName` (not `name`) for the series title field. All code, queries, and data operations must use `seriesName` when referring to the series title.
 
 Example series document:
+
 ```json
 {
   "_id": "507f1f77bcf86cd799439011",
