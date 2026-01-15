@@ -1813,6 +1813,36 @@ parameters:
 			path: app/Http/Controllers/Api/ReadingProgressApiController.php
 
 		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Http/Controllers/Api/RecommendationController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\UserRecommendation\:\:\$acknowledged_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/RecommendationController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\UserRecommendation\:\:\$recipient_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/RecommendationController.php
+
+		-
+			message: '#^Call to an undefined static method App\\Models\\UserRecommendation\:\:create\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Http/Controllers/Api/RecommendationController.php
+
+		-
+			message: '#^Call to an undefined static method App\\Models\\UserRecommendation\:\:where\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Http/Controllers/Api/RecommendationController.php
+
+		-
 			message: '#^Call to an undefined static method App\\Models\\Skin\:\:find\(\)\.$#'
 			identifier: staticMethod.notFound
 			count: 1
@@ -1907,6 +1937,30 @@ parameters:
 			identifier: staticMethod.notFound
 			count: 1
 			path: app/Http/Controllers/Api/ThemeController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Api/UserStatusController.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\UserBookStatus\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/UserStatusController.php
+
+		-
+			message: '#^Call to an undefined static method App\\Models\\UserBookStatus\:\:firstOrNew\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Http/Controllers/Api/UserStatusController.php
+
+		-
+			message: '#^Call to an undefined static method App\\Models\\UserBookStatus\:\:where\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Http/Controllers/Api/UserStatusController.php
 
 		-
 			message: '#^Access to an undefined property App\\Auth\\DocumentstoreUser\:\:\$email\.$#'
@@ -2185,6 +2239,12 @@ parameters:
 			path: app/Http/Controllers/ReviewController.php
 
 		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/UserLibraryController.php
+
+		-
 			message: '#^Access to an undefined property Laravel\\Sanctum\\PersonalAccessToken\:\:\$expires_at\.$#'
 			identifier: property.notFound
 			count: 1
@@ -2255,6 +2315,12 @@ parameters:
 			identifier: isset.variable
 			count: 1
 			path: app/Jobs/CreateImportJobsForDirectory.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 4
+			path: app/Listeners/BookStatusListener.php
 
 		-
 			message: '#^Call to an undefined method Illuminate\\Log\\Logger\:\:getHandlers\(\)\.$#'
@@ -2677,7 +2743,7 @@ parameters:
 			path: app/Models/User.php
 
 		-
-			message: '#^Method App\\Models\\User\:\:queuedBooks\(\) should return Illuminate\\Database\\Eloquent\\Relations\\BelongsToMany but returns Illuminate\\Database\\Query\\Builder\.$#'
+			message: '#^Method App\\Models\\User\:\:queuedBooks\(\) should return Illuminate\\Database\\Eloquent\\Builder but returns Illuminate\\Database\\Query\\Builder\.$#'
 			identifier: return.type
 			count: 1
 			path: app/Models/User.php
@@ -2731,6 +2797,54 @@ parameters:
 			path: app/Models/UserBadge.php
 
 		-
+			message: '#^Method App\\Models\\UserBookStatus\:\:__set\(\) with return type void returns null but should not return anything\.$#'
+			identifier: return.void
+			count: 2
+			path: app/Models/UserBookStatus.php
+
+		-
+			message: '#^Result of method Illuminate\\Database\\Eloquent\\Model\:\:__set\(\) \(void\) is used\.$#'
+			identifier: staticMethod.void
+			count: 2
+			path: app/Models/UserBookStatus.php
+
+		-
+			message: '#^Method App\\Models\\UserRecommendation\:\:__set\(\) with return type void returns null but should not return anything\.$#'
+			identifier: return.void
+			count: 2
+			path: app/Models/UserRecommendation.php
+
+		-
+			message: '#^Result of method Illuminate\\Database\\Eloquent\\Model\:\:__set\(\) \(void\) is used\.$#'
+			identifier: staticMethod.void
+			count: 2
+			path: app/Models/UserRecommendation.php
+
+		-
+			message: '#^Call to an undefined static method App\\Models\\UserStatistic\:\:firstOrCreate\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Models/UserStatistic.php
+
+		-
+			message: '#^Call to an undefined static method App\\Models\\UserStatistic\:\:where\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Models/UserStatistic.php
+
+		-
+			message: '#^Method App\\Models\\UserStatistic\:\:__set\(\) with return type void returns null but should not return anything\.$#'
+			identifier: return.void
+			count: 2
+			path: app/Models/UserStatistic.php
+
+		-
+			message: '#^Result of method Illuminate\\Database\\Eloquent\\Model\:\:__set\(\) \(void\) is used\.$#'
+			identifier: staticMethod.void
+			count: 2
+			path: app/Models/UserStatistic.php
+
+		-
 			message: '#^Offset ''name'' on non\-empty\-array on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
 			count: 1
@@ -2747,6 +2861,12 @@ parameters:
 			identifier: booleanAnd.leftAlwaysTrue
 			count: 1
 			path: app/Relations/TouchesParentBelongsToMany.php
+
+		-
+			message: '#^Call to static method messages\(\) on an unknown class Mozex\\Anthropic\\Facades\\Anthropic\.$#'
+			identifier: class.notFound
+			count: 1
+			path: app/Services/AI/Providers/ClaudeProvider.php
 
 		-
 			message: '#^Access to an undefined property App\\Models\\Genre\:\:\$books_count\.$#'
@@ -3232,6 +3352,12 @@ parameters:
 			message: '#^Access to an undefined property App\\Models\\Badge\:\:\$name\.$#'
 			identifier: property.notFound
 			count: 2
+			path: app/Services/BadgeService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
 			path: app/Services/BadgeService.php
 
 		-
@@ -3831,7 +3957,7 @@ parameters:
 		-
 			message: '#^Access to an undefined property App\\Models\\LibraryRepairIssue\:\:\$auto_resolved\.$#'
 			identifier: property.notFound
-			count: 3
+			count: 5
 			path: app/Services/LibraryRepairService.php
 
 		-
@@ -5899,6 +6025,42 @@ parameters:
 			path: tests/Feature/Api/ProgressControllerTest.php
 
 		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 18
+			path: tests/Feature/Api/RecommendationControllerTest.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$acknowledged_at\.$#'
+			identifier: property.notFound
+			count: 2
+			path: tests/Feature/Api/RecommendationControllerTest.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 4
+			path: tests/Feature/Api/RecommendationControllerTest.php
+
+		-
+			message: '#^Property Tests\\Feature\\Api\\RecommendationControllerTest\:\:\$book \(App\\Models\\Book\) does not accept Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: tests/Feature/Api/RecommendationControllerTest.php
+
+		-
+			message: '#^Property Tests\\Feature\\Api\\RecommendationControllerTest\:\:\$recipient \(App\\Models\\User\) does not accept Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: tests/Feature/Api/RecommendationControllerTest.php
+
+		-
+			message: '#^Property Tests\\Feature\\Api\\RecommendationControllerTest\:\:\$user \(App\\Models\\User\) does not accept Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: tests/Feature/Api/RecommendationControllerTest.php
+
+		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
 			identifier: property.notFound
 			count: 2
@@ -5963,6 +6125,30 @@ parameters:
 			identifier: method.notFound
 			count: 4
 			path: tests/Feature/Api/UserApiTest.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 9
+			path: tests/Feature/Api/UserStatusControllerTest.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 5
+			path: tests/Feature/Api/UserStatusControllerTest.php
+
+		-
+			message: '#^Property Tests\\Feature\\Api\\UserStatusControllerTest\:\:\$book \(App\\Models\\Book\) does not accept Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: tests/Feature/Api/UserStatusControllerTest.php
+
+		-
+			message: '#^Property Tests\\Feature\\Api\\UserStatusControllerTest\:\:\$user \(App\\Models\\User\) does not accept Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: tests/Feature/Api/UserStatusControllerTest.php
 
 		-
 			message: '#^Unreachable statement \- code above always terminates\.$#'
@@ -6351,19 +6537,19 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
 			identifier: property.notFound
-			count: 28
+			count: 34
 			path: tests/Feature/LibraryJsonUpdateTest.php
 
 		-
 			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:authors\(\)\.$#'
 			identifier: method.notFound
-			count: 6
+			count: 8
 			path: tests/Feature/LibraryJsonUpdateTest.php
 
 		-
 			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:genres\(\)\.$#'
 			identifier: method.notFound
-			count: 4
+			count: 6
 			path: tests/Feature/LibraryJsonUpdateTest.php
 
 		-
@@ -6925,6 +7111,30 @@ parameters:
 			path: tests/Unit/BookImportTraitTest.php
 
 		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 7
+			path: tests/Unit/BookStatusListenerTest.php
+
+		-
+			message: '#^Parameter \#1 \$badgeService of class App\\Listeners\\BookStatusListener constructor expects App\\Services\\BadgeService, Mockery\\LegacyMockInterface&Mockery\\MockInterface given\.$#'
+			identifier: argument.type
+			count: 1
+			path: tests/Unit/BookStatusListenerTest.php
+
+		-
+			message: '#^Property Tests\\Unit\\BookStatusListenerTest\:\:\$book \(App\\Models\\Book\) does not accept Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: tests/Unit/BookStatusListenerTest.php
+
+		-
+			message: '#^Property Tests\\Unit\\BookStatusListenerTest\:\:\$user \(App\\Models\\User\) does not accept Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: tests/Unit/BookStatusListenerTest.php
+
+		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
 			identifier: property.notFound
 			count: 1
@@ -7251,7 +7461,7 @@ parameters:
 		-
 			message: '#^Call to an undefined static method App\\Models\\LibraryRepairIssue\:\:first\(\)\.$#'
 			identifier: staticMethod.notFound
-			count: 2
+			count: 4
 			path: tests/Unit/Services/LibraryRepairServiceTest.php
 
 		-
