@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Events\BookStatusUpdated;
+use App\Listeners\BookStatusListener;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Event;
 
@@ -13,6 +15,9 @@ class EventServiceProvider extends ServiceProvider
      * @var array<class-string, array<int, class-string>>
      */
     protected $listen = [
+        BookStatusUpdated::class => [
+            BookStatusListener::class,
+        ],
         // Firestore-based NewBookAdded event and listener removed
     ];
 

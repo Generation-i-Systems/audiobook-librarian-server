@@ -68,9 +68,14 @@ class User extends Authenticatable
         return $this->belongsToMany(Book::class)->withPivot('progress', 'last_listened')->withTimestamps();
     }
 
-    public function queuedBooks(): BelongsToMany
+    public function bookStatuses(): HasMany
     {
-        return $this->belongsToMany(Book::class, 'user_book_queues')->withPivot('order')->orderBy('order');
+        return $this->hasMany(UserBookStatus::class);
+    }
+
+    public function queuedBooks(): \Illuminate\Database\Eloquent\Builder
+    {
+        return $this->bookStatuses()->where('status', 'queue')->orderBy('order');
     }
 
     public function favoriteAuthors(): HasMany

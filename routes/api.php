@@ -14,10 +14,12 @@ use App\Http\Controllers\Api\MessageApiController;
 use App\Http\Controllers\Api\ProgressController;
 use App\Http\Controllers\Api\ReadingProgressApiController;
 use App\Http\Controllers\Api\ReadingStatsApiController;
+use App\Http\Controllers\Api\RecommendationController;
 use App\Http\Controllers\Api\SkinController;
 use App\Http\Controllers\Api\StatisticsController;
 use App\Http\Controllers\Api\ThemeController;
 use App\Http\Controllers\Api\UserApiController;
+use App\Http\Controllers\Api\UserStatusController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -45,6 +47,13 @@ Route::prefix('v1')->group(function () {
         });
 
         Route::get('/me', [UserApiController::class, 'me']);
+
+        // Status and Queue Routes (New unified system)
+        Route::prefix('status')->group(function () {
+            Route::get('/list/{statusType}', [UserStatusController::class, 'list']);
+            Route::post('/{book}/set', [UserStatusController::class, 'set']);
+            Route::post('/queue/reorder', [UserStatusController::class, 'reorder']);
+        });
 
         // Book Routes
         Route::get('/books', [BookApiController::class, 'index']);
@@ -163,6 +172,13 @@ Route::prefix('v1')->group(function () {
         Route::get('/statistics/top-books', [StatisticsController::class, 'getTopBooks']);
         Route::get('/statistics/dashboard', [StatisticsController::class, 'getDashboardStats']);
         Route::get('/books/{book}/statistics', [StatisticsController::class, 'getBookStats']);
+
+        // Recommendation Routes
+        Route::prefix('recommendations')->group(function () {
+            Route::post('/{book}', [RecommendationController::class, 'send']);
+            Route::get('/inbox', [RecommendationController::class, 'inbox']);
+            Route::post('/{recommendation}/acknowledge', [RecommendationController::class, 'acknowledge']);
+        });
 
         // Badge routes
         Route::prefix('badges')->group(function () {

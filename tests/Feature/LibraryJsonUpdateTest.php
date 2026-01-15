@@ -188,6 +188,63 @@ class LibraryJsonUpdateTest extends TestCase
         $this->assertTrue(true);
     }
 
+    public function testLibraryJsonIsNotCreatedWhenDirectoryHasNoAudioFiles()
+    {
+        $author = Author::factory()->create(['name' => 'Test Author']);
+        $genre = Genre::factory()->create(['name' => 'Test Genre']);
+
+        $bookDir = 'test-author/empty-book';
+        $this->createBookDirectory($bookDir);
+
+        $book = Book::factory()->create([
+            'title' => 'Test Book With Empty Directory',
+            'directory_path' => $bookDir,
+        ]);
+
+        $book->authors()->attach($author->id);
+        $book->genres()->attach($genre->id);
+
+        $documentStore = app(\App\Contracts\DocumentStoreServiceInterface::class);
+
+        $documentStore->updateBook($book->id, [
+            'title' => 'Updated Book With Empty Directory',
+        ]);
+
+        $jsonPath = Storage::disk('books')->path($bookDir . '/librarian.json');
+
+        $this->assertFileDoesNotExist($jsonPath);
+    }
+
+    public function testLibraryJsonIsCreatedWhenDirectoryHasAudioFiles()
+    {
+        $author = Author::factory()->create(['name' => 'Test Author']);
+        $genre = Genre::factory()->create(['name' => 'Test Genre']);
+
+        $bookDir = 'test-author/book-with-audio';
+        $this->createBookDirectory($bookDir);
+
+        $fullPath = Storage::disk('books')->path($bookDir);
+        file_put_contents($fullPath . '/chapter01.mp3', 'dummy audio content');
+
+        $book = Book::factory()->create([
+            'title' => 'Test Book With Audio Files',
+            'directory_path' => $bookDir,
+        ]);
+
+        $book->authors()->attach($author->id);
+        $book->genres()->attach($genre->id);
+
+        $documentStore = app(\App\Contracts\DocumentStoreServiceInterface::class);
+
+        $documentStore->updateBook($book->id, [
+            'title' => 'Updated Book With Audio Files',
+        ]);
+
+        $jsonPath = Storage::disk('books')->path($bookDir . '/librarian.json');
+
+        $this->assertFileExists($jsonPath);
+    }
+
     public function testLibraryJsonContainsAllNonUserSpecificData()
     {
         $author = Author::factory()->create(['name' => 'Test Author']);

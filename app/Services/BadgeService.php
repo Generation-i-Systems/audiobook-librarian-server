@@ -13,6 +13,14 @@ use Illuminate\Support\Facades\DB;
 class BadgeService
 {
     /**
+     * Evaluate and award badges for a given User model.
+     */
+    public function evaluateBadgesForUser(\App\Models\User $user): array
+    {
+        return $this->evaluateUserBadges($user->id);
+    }
+
+    /**
      * Evaluate and award badges for a user after a listening session
      */
     public function evaluateUserBadges(string $userId, ?string $deviceId = null): array

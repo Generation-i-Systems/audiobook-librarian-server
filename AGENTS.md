@@ -2,6 +2,12 @@
 
 This repository is a Laravel 11+ audiobook management application with MySQL database, PHP backend, and jQuery/Vite frontend.
 
+## TOP PRIORITY SAFETY RULES
+
+- **CRITICAL**: Assume the database is *production* and contains live data. NEVER execute commands that clear or destructively delete data, such as `php artisan migrate:fresh`, `php artisan migrate:reset`, `DB::raw('DROP TABLE...')`, or `rm -rf` on any user-facing file system paths.
+- **MIGRATIONS**: All migrations MUST be non-destructive (`Schema::table` or `Schema::create`). If a migration involves a destructive operation (like dropping a column), it MUST be protected by a manual review flag or an explicit user confirmation, and preferably a safe, non-destructive alternative like soft deletes or renaming should be used.
+- **RESTORE**: If data loss occurs, immediately pause all work and instruct the user on restoration. Do not proceed until data integrity is confirmed by the user.
+
 ## Essential Commands
 
 ### PHP/Laravel Commands
@@ -58,6 +64,42 @@ npm run test:watch
 npm run test:coverage
 ```
 
+## Implementation Best Practices
+
+### Before Coding
+
+- **MUST** Ask user clarifying questions for complex work
+- **MUST** Draft and confirm approach for complex work
+- **SHOULD** List pros/cons for multiple approaches
+- **MUST** Use git to track changes
+- **MUST** Keep README updated
+- **MUST** Keep Blueprint updated
+- **MUST** Keep documentation updated
+- **MUST** Keep changelog updated
+- **MUST** Store prompts in prompts.md
+
+### While Coding
+
+- **MUST** Follow TDD: scaffold stub → write failing test → implement
+- **MUST** Name functions with existing domain vocabulary
+- **SHOULD NOT** Introduce classes when small functions suffice
+- **SHOULD** Prefer simple, composable, testable functions
+- **SHOULD NOT** Add comments except for critical caveats
+- **SHOULD NOT** Extract new functions unless reused, untestable, or major readability improvement
+- **MUST** Remove trailing whitespace
+- **MUST** Ensure all code is formatted consistently
+- **MUST** Keep code simple and readable
+- **MUST** Avoid special case handling - address issues generally
+- **SHOULD** Split classes >1000 lines into smaller pieces
+
+### Platform Philosophy
+
+- **"Let the platform do what it does best"** - Leverage platform strengths over custom abstractions
+- **Avoid over-engineering**: Question custom abstraction value vs platform solutions
+- **Prefer**: Essential logging + coordination over complex resource management layers
+- **Always detect and follow existing project patterns and conventions**
+- **Check for existing scripts** in package.json, build.gradle.kts, Makefile, etc.
+
 ## Code Style Guidelines
 
 ### PHP
@@ -93,6 +135,8 @@ npm run test:coverage
 - **MUST NOT access database from controllers** - must use DocumentStoreServiceInterface
 - User authentication handled by DocumentstoreUser NOT models/User
 - Use Laravel Pint with config from `.pint.json` in project root if present
+- **MUST use database abstraction layer for database access**
+- **MUST use as little code in Blade templates as possible** - prefer controllers/services/separate JS files
 
 #### Type Safety
 
@@ -121,12 +165,19 @@ npm run test:coverage
 - Use parentheses for instantiating new classes: `new ClassName()`
 - `@param` in docblocks should use one space before and after type
 
-#### Error Handling
+#### Database Conventions
 
-- Use Laravel's exception handling mechanisms
-- Log errors with `Log::error()` including context
-- Use try-catch for external API calls
-- Never expose sensitive data in exceptions
+- **CRITICAL**: Assume database is *production* with live data - never execute destructive commands
+- **FORBIDDEN COMMANDS**: Never execute `php artisan migrate:fresh`, `php artisan migrate:reset`, `DB::raw('DROP TABLE...')`, `TRUNCATE`, or `rm -rf` on user-facing paths
+- **MIGRATIONS**: All migrations MUST be non-destructive (`Schema::table` or `Schema::create`). Destructive operations require explicit user confirmation and prefer safe alternatives (soft deletes, renaming)
+- **MUST** Use Eloquent for database access
+- **MUST** Use snake_case for database fields
+- **MUST** Use camelCase for model attributes accessed via toArray()
+- **MUST** Use PascalCase for classes
+- **MUST** Always backup database before modifications
+- **MUST** Implement comprehensive database operation logging
+- **MUST** Add confirmation prompts for destructive operations
+- **RESTORE**: If data loss occurs, pause all work and instruct user on restoration before proceeding
 
 ### JavaScript
 
@@ -151,13 +202,28 @@ npm run test:coverage
 - Prefer `.prop()` over `.attr()` for properties
 - Check element existence before operations: `if ($element.length) { ... }`
 
-#### Error Handling
+#### JavaScript Error Handling
 
 - Use `console.error()` with descriptive prefixes: `[module-name] message`
 - Check for required dependencies: `if (!$) { console.error("requires jQuery"); return; }`
 - Validate data types before operations: `typeof text !== "string"`
 
+#### Laravel Error Handling
+
+- Use Laravel's exception handling mechanisms
+- Log errors with `Log::error()` including context
+- Use try-catch for external API calls
+- Never expose sensitive data in exceptions
+
 ## Testing Strategy
+
+### Test Requirements
+
+- **MUST** write tests for each change
+- **MUST** ensure all functions have tests
+- **MUST** ensure all tests pass
+- **MUST** run syntax check on all code
+- **MUST** run code formatter on all code
 
 ### Before Coding
 
@@ -179,20 +245,14 @@ php artisan test tests/Path/To/Module/
 
 ### Test Quality
 
-- Parameterize inputs - don't hardcode literals
-- Test edge cases and boundaries
-- Use strong assertions (assertEquals over assertGreaterThanOrEqual)
-- Test entire structures in single assertion when practical
-- Mock external dependencies (API calls, file system)
-
-## Platform Philosophy
-
-- "Let the platform do what it does best"
-- Prefer platform solutions over custom abstractions
-- Essential logging + coordination over complex resource management layers
-- Avoid over-engineering
-- Minimize comments - prefer self-explanatory code
-- Keep code simple and readable
+- **MUST** parameterize inputs - don't hardcode literals
+- **SHOULD** test edge cases and boundaries
+- **MUST** use strong assertions (assertEquals over assertGreaterThanOrEqual)
+- **SHOULD** test entire structures in single assertion when practical
+- **MUST** mock external dependencies (API calls, file system)
+- **MUST** use descriptive test method names in camelCase
+- **SHOULD** express invariants/axioms over single hard-coded cases
+- **SHOULD NOT** add trivial tests that can't fail for real defects
 
 ## Safety Checks
 
@@ -201,6 +261,11 @@ php artisan test tests/Path/To/Module/
 - **Before reverting ANY commit for ANY reason, MUST create a git tag and prompt for confirmation**
 - Always verify revert targets with `git log --oneline` before executing
 - Use descriptive tag messages: `git tag pre-revert-[YYYYMMDD]-[feature]`
+- **MUST** use git to track changes
+- **MUST** use conventional commit format: `type(scope): description`
+- **MUST NEVER add AI attribution in commit messages**
+- **SHOULD** split large commits into smaller, focused pieces when reasonable
+- **MUST** ensure all changes are added before retrying failed commits
 
 ### Pre-commit Hooks
 
@@ -215,6 +280,14 @@ php artisan test tests/Path/To/Module/
 - Use `git diff`, `git status`, or file reading to verify changes before reporting
 - Never claim changes are complete unless explicitly confirmed they are in place
 - If uncertain about state, run verification commands before responding
+- **MUST** always verify/validate changes through compilation, tests, etc.
+
+### Tool Usage Guidelines
+
+- **MUST** read files fully before updating them
+- **SHOULD** do batch updates when possible to reduce tool calls
+- **MUST** use full paths instead of changing directories
+- **SHOULD** use quiet/minimal output flags for fire-and-forget tasks
 
 ## Commit Guidelines
 
@@ -229,3 +302,20 @@ php artisan test tests/Path/To/Module/
 - Keep commits focused on a single purpose
 - Make sure each commit is buildable and functional
 - Split large commits when reasonable
+
+## Function Quality Guidelines
+
+When evaluating function quality:
+
+1. Can you read the function and easily follow what it's doing?
+2. Does the function have high cyclomatic complexity (too many nested paths)?
+3. Are there common data structures/algorithms that would simplify it?
+4. Are there unused parameters or unnecessary type casts?
+5. Is the function easily testable?
+6. Are there hidden untested dependencies?
+7. Can you brainstorm 3 better function names?
+
+**Only extract separate functions when**:
+- The function is used in multiple places
+- The extracted function is testable while the original is not
+- The original function is extremely hard to follow without comments

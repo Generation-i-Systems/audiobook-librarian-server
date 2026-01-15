@@ -1,3 +1,12 @@
+## TOP PRIORITY SAFETY RULES
+
+- **CRITICAL**: Assume the database is *production* and contains live data. NEVER execute commands that clear or destructively delete data.
+- **FORBIDDEN COMMANDS**: Never execute `php artisan migrate:fresh`, `php artisan migrate:reset`, `DB::raw('DROP TABLE...')`, `TRUNCATE`, or `rm -rf` on any user-facing file system paths.
+- **MIGRATIONS**: All migrations MUST be non-destructive (`Schema::table` or `Schema::create`). If a migration involves a destructive operation (like dropping a column), it MUST require explicit user confirmation, and prefer safe alternatives like soft deletes or renaming.
+- **DATA LOSS RESPONSE**: If data loss occurs, immediately pause all work and instruct the user on restoration. Do not proceed until data integrity is confirmed by the user.
+
+---
+
 ### Code Preferences
 
 - Always detect and follow existing project patterns and conventions
@@ -118,13 +127,17 @@ These rules ensure maintainability, safety, and developer velocity.
 
 ### 4 - Database
 
-- **D-4 (MUST)** Use Elqoquent for database access.
+- **D-1 (CRITICAL)** Assume the database is *production* with live data. Never execute destructive commands.
+- **D-2 (MUST NOT)** Execute `migrate:fresh`, `migrate:reset`, `DROP TABLE`, `TRUNCATE`, or similar destructive operations.
+- **D-3 (MUST)** All migrations must be non-destructive (`Schema::table` or `Schema::create`). Prefer soft deletes or renaming over dropping columns/tables.
+- **D-4 (MUST)** Use Eloquent for database access.
 - **D-5 (MUST)** Use snake_case for database fields.
 - **D-6 (MUST)** Use camelCase for database models.
 - **D-7 (MUST)** Use PascalCase for database entities.
 - **D-8 (MUST)** Always backup database before any modifications.
 - **D-9 (MUST)** Implement comprehensive database operation logging.
 - **D-10 (MUST)** Add confirmation prompts for any destructive database operations.
+- **D-11 (MUST)** If data loss occurs, pause all work and instruct user on restoration before proceeding.
 
 ---
 

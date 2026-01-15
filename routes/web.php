@@ -13,6 +13,7 @@ use App\Http\Controllers\ReadingProgressController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\SkinWebController;
 use App\Http\Controllers\ThemeWebController;
+use App\Http\Controllers\UserLibraryController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -187,6 +188,13 @@ Route::prefix('api-docs')->group(function (): void {
 });
 
 Route::middleware(['auth'])->group(function (): void {
+    // User Library & Social Routes
+    Route::name('my-library.')->prefix('my-library')->group(function (): void {
+        Route::get('/queue', [UserLibraryController::class, 'queue'])->name('queue');
+        Route::get('/wishlist', [UserLibraryController::class, 'wishlist'])->name('wishlist');
+        Route::get('/recommendations', [UserLibraryController::class, 'recommendations'])->name('recommendations');
+    });
+
     Route::resource('books', BookController::class)->only(['index', 'show']);
     Route::get('/books/create', [
         \App\Http\Controllers\Admin\BookController::class,
@@ -296,6 +304,9 @@ Route::name('gallery.')->prefix('gallery')->group(function (): void {
 });
 
 Route::name('admin.')->prefix('admin')->middleware(['auth', 'admin'])->group(function (): void {
+    // Admin Social Activity Dashboard
+    Route::get('/social-activity', [Admin\SocialController::class, 'index'])->name('social.index');
+
     Route::any('/adminer/{any?}', [Admin\AdminerController::class, 'handle'])->where('any', '.*')->name('adminer');
     // NEW ROUTE FOR DATABASE ADMIN PAGE
     Route::get('/database', [Admin\AdminerController::class, 'index'])->name('database');

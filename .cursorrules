@@ -1,0 +1,61 @@
+# Librarian Project Rules
+
+You are an expert Laravel developer working on the Librarian audiobook management system.
+Follow these rules strictly.
+
+## 🚨 CRITICAL SAFETY RULES
+- **NEVER** run destructive database commands (`migrate:fresh`, `migrate:reset`, `drop table`, `rm -rf`).
+- **ALWAYS** treat the database as PRODUCTION with live data.
+- **MIGRATIONS**: Must be non-destructive (`Schema::table`, `softDeletes`). No dropping columns without explicit user confirmation/backup.
+- **DATA LOSS**: If data loss occurs, PAUSE IMMEDIATELY and assist in restoration.
+
+## 🛠 Project Stack & Commands
+- **Backend**: Laravel 11+, MySQL, PHP 8.3+.
+- **Frontend**: Blade, jQuery, Vite.
+- **Testing**: PHPUnit (not Pest).
+
+### verifying code
+- **Syntax Check**: `php -l path/to/file.php` (Run after EVERY .php change)
+- **Formatting**: `vendor/bin/pint app/` or `phpcbf app/`
+- **Static Analysis**: `vendor/bin/phpstan analyse app/ --level=5`
+- **Tests**:
+  - `composer test` (All)
+  - `php artisan test --filter "TestName"` (Specific)
+
+## 📝 Code Style
+### PHP
+- **Header**: `declare(strict_types=1);` at the top of every class.
+- **Types**: Strict typing in signatures. Nullable types `?string`.
+- **Structure**:
+  - PSR-4 / PSR-12 compliant.
+  - Thin controllers -> Logic in Services/Traits.
+  - Dependency Injection over Facades where possible.
+  - **No DB queries in Controllers** (Use Services).
+- **Naming**:
+  - Classes: `PascalCase`
+  - Methods/Vars: `camelCase`
+  - DB Columns: `snake_case`
+
+### JavaScript / jQuery
+- **Strict Mode**: `(function (window, $) { "use strict"; ... })(window, window.jQuery);`
+- **Naming**: `camelCase` for functions/vars. `UPPER_SNAKE` for constants.
+- **Safety**: Check `if ($el.length)` before operating. Use `console.error` for failures.
+
+## 🧪 Testing Strategy
+- **TDD**: Write failing test -> Implement -> Pass.
+- **Structure**: Feature, Unit, Api, Web, Cli, Import directories.
+- **Quality**:
+  - Mock external APIs/Filesystem.
+  - Use specific assertions (`assertEquals`).
+  - Parameterize inputs.
+
+## 📦 Git & Commits
+- **Reverting**: Create a git tag `git tag pre-revert-...` before reverting.
+- **Commit Messages**: Conventional format `type(scope): description`.
+- **No AI Attribution**: Do not mention AI in commit messages.
+- **Verification**: Double-check `git diff` or file content before claiming a task is done.
+
+## 🧠 Platform Philosophy
+- "Let the platform do what it does best."
+- Simple, readable code over complex abstractions.
+- Essential logging context is crucial.

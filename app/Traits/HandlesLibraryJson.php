@@ -79,6 +79,19 @@ trait HandlesLibraryJson
                 return false;
             }
 
+            // Skip if directory has no audio files - a book should never have only librarian.json
+            $audioExtensions = 'mp3,m4a,m4b,flac,ogg,opus,aac,wav,wma,mp4';
+            $audioFiles = glob($bookDir . '/*.{' . $audioExtensions . '}', GLOB_BRACE | GLOB_NOCHECK);
+            $audioFiles = array_filter($audioFiles, 'is_file');
+
+            if (empty($audioFiles)) {
+                Log::warning('Book directory has no audio files for librarian.json', [
+                    'book_id' => $book['id'] ?? null,
+                    'directory' => $bookDir,
+                ]);
+                return false;
+            }
+
             $jsonPath = rtrim($bookDir, '/') . '/librarian.json';
 
             // Prepare book data for JSON
