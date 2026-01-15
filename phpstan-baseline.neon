@@ -7681,7 +7681,7 @@ parameters:
 			path: tests/Web/Unit/Controllers/BookControllerDebugTest.php
 
 		-
-			message: '#^Parameter \#1 \$documentStoreService of class App\\Http\\Controllers\\Admin\\BookController@anonymous/tests/Web/Unit/Controllers/BookControllerTest\.php\:121 constructor expects App\\Contracts\\DocumentStoreServiceInterface, Mockery\\LegacyMockInterface&Mockery\\MockInterface given\.$#'
+			message: '#^Parameter \#1 \$documentStoreService of class App\\Http\\Controllers\\Admin\\BookController@anonymous/tests/Web/Unit/Controllers/BookControllerTest\.php\:122 constructor expects App\\Contracts\\DocumentStoreServiceInterface, Mockery\\LegacyMockInterface&Mockery\\MockInterface given\.$#'
 			identifier: argument.type
 			count: 1
 			path: tests/Web/Unit/Controllers/BookControllerTest.php
@@ -7699,19 +7699,19 @@ parameters:
 			path: tests/Web/Unit/Controllers/BookControllerTest.php
 
 		-
-			message: '#^Parameter \#2 \$googleBooksApiService of class App\\Http\\Controllers\\Admin\\BookController@anonymous/tests/Web/Unit/Controllers/BookControllerTest\.php\:121 constructor expects App\\Services\\GoogleBooksApiService, Mockery\\LegacyMockInterface&Mockery\\MockInterface given\.$#'
+			message: '#^Parameter \#2 \$googleBooksApiService of class App\\Http\\Controllers\\Admin\\BookController@anonymous/tests/Web/Unit/Controllers/BookControllerTest\.php\:122 constructor expects App\\Services\\GoogleBooksApiService, Mockery\\LegacyMockInterface&Mockery\\MockInterface given\.$#'
 			identifier: argument.type
 			count: 1
 			path: tests/Web/Unit/Controllers/BookControllerTest.php
 
 		-
-			message: '#^Parameter \#3 \$audibleService of class App\\Http\\Controllers\\Admin\\BookController@anonymous/tests/Web/Unit/Controllers/BookControllerTest\.php\:121 constructor expects App\\Services\\AudibleService, Mockery\\LegacyMockInterface&Mockery\\MockInterface given\.$#'
+			message: '#^Parameter \#3 \$audibleService of class App\\Http\\Controllers\\Admin\\BookController@anonymous/tests/Web/Unit/Controllers/BookControllerTest\.php\:122 constructor expects App\\Services\\AudibleService, Mockery\\LegacyMockInterface&Mockery\\MockInterface given\.$#'
 			identifier: argument.type
 			count: 1
 			path: tests/Web/Unit/Controllers/BookControllerTest.php
 
 		-
-			message: '#^Parameter \#4 \$externalCoverService of class App\\Http\\Controllers\\Admin\\BookController@anonymous/tests/Web/Unit/Controllers/BookControllerTest\.php\:121 constructor expects App\\Services\\ExternalCoverService, Mockery\\LegacyMockInterface&Mockery\\MockInterface given\.$#'
+			message: '#^Parameter \#4 \$externalCoverService of class App\\Http\\Controllers\\Admin\\BookController@anonymous/tests/Web/Unit/Controllers/BookControllerTest\.php\:122 constructor expects App\\Services\\ExternalCoverService, Mockery\\LegacyMockInterface&Mockery\\MockInterface given\.$#'
 			identifier: argument.type
 			count: 1
 			path: tests/Web/Unit/Controllers/BookControllerTest.php
