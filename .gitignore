@@ -23,6 +23,7 @@ yarn-error.log
 /.zed
 .php-cs-fixer.cache
 /books
+/coverage
 tests/coverage
 *~
 tmp_old_form.js
