@@ -358,9 +358,37 @@ class ImportBooksFromDownloads extends Command
     public function table($headers, $rows, $tableStyle = 'default', array $columnStyles = [])
     {
         if ($this->uiService) {
-            foreach ($rows as $row) {
+            $allRows = array_merge([$headers], $rows);
+            $colWidths = [];
+
+            // Calculate max width for each column
+            foreach ($allRows as $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                foreach (array_values($row) as $i => $value) {
+                    $len = strlen((string) $value);
+                    $colWidths[$i] = max($colWidths[$i] ?? 0, $len);
+                }
+            }
+
+            // Print each row with padding
+            foreach ($allRows as $index => $row) {
                 if (is_array($row)) {
-                    $this->logUiMessage(implode(' | ', array_map('strval', $row)));
+                    $paddedCells = [];
+                    foreach (array_values($row) as $i => $value) {
+                        $paddedCells[] = str_pad((string) $value, $colWidths[$i]);
+                    }
+                    $this->logUiMessage(implode(' | ', $paddedCells));
+
+                    // Add a separator after header
+                    if ($index === 0) {
+                        $separatorParts = [];
+                        foreach ($colWidths as $width) {
+                            $separatorParts[] = str_repeat('-', $width);
+                        }
+                        $this->logUiMessage(implode('-|-', $separatorParts));
+                    }
                 } else {
                     $this->logUiMessage((string) $row);
                 }
@@ -1208,7 +1236,7 @@ class ImportBooksFromDownloads extends Command
             fn ($metadata) => $this->buildUiMetadata($metadata),
             fn ($message, $data = null) => $this->logUiMessage($message, $data),
             fn ($question, $options, $default) => $this->selectWithImmediateInterrupt($question, $options, $default),
-            fn ($question, $default) => $this->askInline($question, $default),
+            fn ($question, $default) => $this->askInline($question, $default ?? ''),
             fn ($currentCoverUrl, $currentGenre, $currentDirectoryPath, $isFinalConfirmation) => $this->buildReviewOptions($currentCoverUrl, $currentGenre, $currentDirectoryPath, $isFinalConfirmation),
             fn ($metadata, $audiobook) => $this->editMetadataFields($metadata, $audiobook),
             fn ($metadata, $audiobook) => $this->getImportService()->manualEnrichmentWithComparison($metadata, $audiobook, $this->getEnrichmentService()),
@@ -1242,7 +1270,7 @@ class ImportBooksFromDownloads extends Command
         return $this->getImportService()->editMetadataFields(
             $metadata,
             $audiobook,
-            fn ($question, $default) => $this->askInline($question, $default),
+            fn ($question, $default) => $this->askInline($question, $default ?? ''),
             fn ($question, $options, $default) => $this->selectWithImmediateInterrupt($question, $options, $default),
             fn ($metadata, $keys) => $this->getFirstNonEmptyMetadataValue($metadata, $keys),
             fn (&$metadata) => $this->extractSeriesNumberFromTitle($metadata),

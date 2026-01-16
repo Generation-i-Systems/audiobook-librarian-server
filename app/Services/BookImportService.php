@@ -3433,6 +3433,25 @@ class BookImportService
         $newNarrator = $askInlineCallback('Narrator(s) (comma-separated)', is_string($currentNarrator) ? $currentNarrator : '');
         $metadata['narrator'] = array_map('trim', explode(',', $newNarrator));
 
+        $currentSeries = $getFirstNonEmptyMetadataValueCallback($metadata, ['series', 'seriesName', 'series_name']);
+        $metadata['series'] = $askInlineCallback('Series', is_string($currentSeries) ? $currentSeries : (string) ($metadata['series'] ?? ''));
+
+        if (!empty($metadata['series'])) {
+            $currentSeriesNumber = $getFirstNonEmptyMetadataValueCallback($metadata, ['series_number', 'seriesNumber', 'series_num', 'seriesNum']);
+            $metadata['series_number'] = $askInlineCallback(
+                'Series Number',
+                is_scalar($currentSeriesNumber) ? (string) $currentSeriesNumber : (string) ($metadata['series_number'] ?? '')
+            );
+        } else {
+            $metadata['series_number'] = '';
+        }
+
+        $currentYear = $getFirstNonEmptyMetadataValueCallback($metadata, ['year', 'publishedYear', 'published_year', 'published_date']);
+        if (is_string($currentYear) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $currentYear)) {
+            $currentYear = substr($currentYear, 0, 4);
+        }
+        $metadata['year'] = $askInlineCallback('Year', is_scalar($currentYear) ? (string) $currentYear : (string) ($metadata['year'] ?? ''));
+
         $validGenres = $getValidGenresCallback();
         $genreOptions = [];
         foreach ($validGenres as $idx => $g) {
@@ -3446,23 +3465,8 @@ class BookImportService
         $currentGenreIdx = array_search($currentGenre, $validGenres);
         $defaultGenreIdx = ($currentGenreIdx !== false) ? $currentGenreIdx + 1 : count($validGenres);
 
-        $selectedGenreIdx = $selectWithImmediateInterruptCallback("Genre", $genreOptions, (string) $defaultGenreIdx);
+        $selectedGenreIdx = $selectWithImmediateInterruptCallback('Genre', $genreOptions, (string) $defaultGenreIdx);
         $metadata['genre'] = $genreOptions[$selectedGenreIdx] ?? $currentGenre;
-
-        $currentSeries = $getFirstNonEmptyMetadataValueCallback($metadata, ['series', 'seriesName', 'series_name']);
-        $metadata['series'] = $askInlineCallback('Series', is_string($currentSeries) ? $currentSeries : (string) ($metadata['series'] ?? ''));
-
-        $currentSeriesNumber = $getFirstNonEmptyMetadataValueCallback($metadata, ['series_number', 'seriesNumber', 'series_num', 'seriesNum']);
-        $metadata['series_number'] = $askInlineCallback(
-            'Series Number',
-            is_scalar($currentSeriesNumber) ? (string) $currentSeriesNumber : (string) ($metadata['series_number'] ?? '')
-        );
-
-        $currentYear = $getFirstNonEmptyMetadataValueCallback($metadata, ['year', 'publishedYear', 'published_year', 'published_date']);
-        if (is_string($currentYear) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $currentYear)) {
-            $currentYear = substr($currentYear, 0, 4);
-        }
-        $metadata['year'] = $askInlineCallback('Year', is_scalar($currentYear) ? (string) $currentYear : (string) ($metadata['year'] ?? ''));
 
         $currentDirectory = (string) ($metadata['custom_directory_path'] ?? '');
         if ($currentDirectory === '') {
@@ -3513,6 +3517,34 @@ class BookImportService
     /**
      * Display directory comparison information
      */
+    protected function formatOptionsAsColumns(array $options, int $columns = 3): array
+    {
+        $keys = array_keys($options);
+        $totalItems = count($keys);
+        if ($totalItems === 0) {
+            return [];
+        }
+
+        $rows = (int) ceil($totalItems / $columns);
+        $lines = [];
+
+        for ($r = 0; $r < $rows; $r++) {
+            $line = '';
+            for ($c = 0; $c < $columns; $c++) {
+                $idx = ($c * $rows) + $r;
+                if ($idx < $totalItems) {
+                    $key = $keys[$idx];
+                    $val = (string) $options[$key];
+                    $item = "(\e[1;36m{$key}\e[0m) {$val}";
+                    $line .= str_pad($item, 30); // Use a fixed width for simplicity or calculate max
+                }
+            }
+            $lines[] = rtrim($line);
+        }
+
+        return $lines;
+    }
+
     public function displayDirectoryComparison(
         array $comparison,
         callable $formatBytesCallback,
@@ -3531,32 +3563,39 @@ class BookImportService
         }
 
         if (isset($comparison['source']) && isset($comparison['target'])) {
-            $tableData = [
-                [
-                    'Location',
-                    'Files',
-                    'Total Size',
-                    'File Types',
-                ],
-                [
-                    'Source (New)',
-                    $comparison['source']['count'] ?? 0,
-                    $formatBytesCallback($comparison['source']['total_size'] ?? 0),
-                    $formatFileTypesCallback($comparison['source']['file_types'] ?? []),
-                ],
-                [
-                    'Target (Existing)',
-                    $comparison['target']['count'] ?? 0,
-                    $formatBytesCallback($comparison['target']['total_size'] ?? 0),
-                    $formatFileTypesCallback($comparison['target']['file_types'] ?? []),
-                ],
-            ];
+            $locHeader = 'Location';
+            $filesHeader = 'Files';
+            $sizeHeader = 'Total Size';
+            $typesHeader = 'File Types';
 
+            $sourceLabel = 'Source (New)';
+            $targetLabel = 'Target (Existing)';
+
+            $sourceCount = (string) ($comparison['source']['count'] ?? 0);
+            $targetCount = (string) ($comparison['target']['count'] ?? 0);
+
+            $sourceSize = $formatBytesCallback($comparison['source']['total_size'] ?? 0);
+            $targetSize = $formatBytesCallback($comparison['target']['total_size'] ?? 0);
+
+            $sourceTypes = $formatFileTypesCallback($comparison['source']['file_types'] ?? []);
+            $targetTypes = $formatFileTypesCallback($comparison['target']['file_types'] ?? []);
+
+            // Calculate widths for manual alignment if tableCallback is just doing line-by-line
             if ($tableCallback) {
-                $tableCallback($tableData[0], array_slice($tableData, 1));
+                $tableCallback(
+                    [$locHeader, $filesHeader, $sizeHeader, $typesHeader],
+                    [
+                        [$sourceLabel, $sourceCount, $sourceSize, $sourceTypes],
+                        [$targetLabel, $targetCount, $targetSize, $targetTypes],
+                    ]
+                );
             }
 
-            return $tableData;
+            return [
+                [$locHeader, $filesHeader, $sizeHeader, $typesHeader],
+                [$sourceLabel, $sourceCount, $sourceSize, $sourceTypes],
+                [$targetLabel, $targetCount, $targetSize, $targetTypes],
+            ];
         }
 
         if ($lineCallback) {
