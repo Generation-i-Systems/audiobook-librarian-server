@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Models\Book;
+use App\Models\Genre;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -80,6 +82,11 @@ class AIAssistantControllerTest extends TestCase
 
     public function testProcessCreatesNewSession(): void
     {
+        // Create test books so the AI service can find results
+        $book = Book::factory()->create(['title' => 'Fantasy Book']);
+        $genre = Genre::factory()->create(['name' => 'Fantasy']);
+        $book->genres()->attach($genre);
+
         $response = $this->actingAs($this->admin)->post('/admin/ai-assistant/process', [
             'message' => 'Find all fantasy books',
         ]);
@@ -104,6 +111,11 @@ class AIAssistantControllerTest extends TestCase
 
     public function testProcessContinuesExistingSession(): void
     {
+        // Create test books so the AI service can find results
+        $book = Book::factory()->create(['title' => 'Fantasy Book']);
+        $genre = Genre::factory()->create(['name' => 'Fantasy']);
+        $book->genres()->attach($genre);
+
         $sessionId = DB::table('ai_assistant_sessions')->insertGetId([
             'user_id' => $this->admin->id,
             'conversation_history' => json_encode([
@@ -189,12 +201,10 @@ class AIAssistantControllerTest extends TestCase
 
     public function testExecuteUpdatesSessionStatus(): void
     {
-        $bookId = DB::table('books')->insertGetId([
-            'title' => 'Test Book',
-            'genre' => 'Other',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        $book = Book::factory()->create(['title' => 'Test Book']);
+        $genre = Genre::factory()->create(['name' => 'Other']);
+        $book->genres()->attach($genre);
+        $bookId = $book->id;
 
         $sessionId = DB::table('ai_assistant_sessions')->insertGetId([
             'user_id' => $this->admin->id,
@@ -270,6 +280,11 @@ class AIAssistantControllerTest extends TestCase
 
     public function testRefineAddsToConversation(): void
     {
+        // Create test books so the AI service can find results
+        $book = Book::factory()->create(['title' => 'Fantasy Book']);
+        $genre = Genre::factory()->create(['name' => 'Fantasy']);
+        $book->genres()->attach($genre);
+
         $sessionId = DB::table('ai_assistant_sessions')->insertGetId([
             'user_id' => $this->admin->id,
             'conversation_history' => json_encode([
@@ -291,7 +306,7 @@ class AIAssistantControllerTest extends TestCase
 
         $session = DB::table('ai_assistant_sessions')->find($sessionId);
         $conversation = json_decode($session->conversation_history, true);
-        $this->assertGreaterThan(1, count($conversation));
+        $this->assertGreaterThanOrEqual(2, count($conversation));
     }
 
     public function testStatsReturnsUsageInformation(): void

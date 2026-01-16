@@ -356,7 +356,8 @@ class AIAssistantServiceTest extends TestCase
         $this->assertTrue($result['success']);
         $this->assertEquals(1, $result['executed_count']);
 
-        $this->assertDatabaseMissing('books', ['id' => $book->id]);
+        // Book model uses SoftDeletes, so check that it's soft deleted
+        $this->assertSoftDeleted('books', ['id' => $book->id]);
     }
 
     public function testExecuteOperationsWithSelectiveExecution(): void
