@@ -20,6 +20,7 @@ class BookImportService
 
     protected GenreMappingService $genreMappingService;
     protected SourceTrashService $sourceTrashService;
+    protected array $config = [];
 
     private const AUDIO_EXTENSIONS = [
         'mp3',
@@ -41,6 +42,11 @@ class BookImportService
     ) {
         $this->genreMappingService = $genreMappingService;
         $this->sourceTrashService = $sourceTrashService;
+    }
+
+    public function setConfig(array $config): void
+    {
+        $this->config = $config;
     }
 
     protected function areOnSameFileSystem(string $sourcePath, string $targetPath): bool
@@ -558,7 +564,8 @@ class BookImportService
             return $path;
         }
 
-        $structure = $options['directory_structure'] ?? 'genre/author/series';
+        $structure = $options['directory_structure'] ?? $this->config['directory_structure'] ?? 'genre/author/series';
+        $includeNarrator = $options['include_narrator'] ?? $this->config['include_narrator'] ?? false;
         $authors = is_array($metadata['author']) ? $metadata['author'] : [$metadata['author']];
 
         // Handle comma-separated authors
@@ -613,6 +620,17 @@ class BookImportService
 
             // Add GraphicAudio marker if detected
             $title = $this->addGraphicAudioMarker($title, $metadata);
+
+            // Add narrator if requested
+            if ($includeNarrator) {
+                $narrators = $metadata['narrator'] ?? null;
+                if (!empty($narrators)) {
+                    $narratorString = is_array($narrators) ? implode(', ', $narrators) : (string) $narrators;
+                    if ($narratorString !== '') {
+                        $title .= " ({$narratorString})";
+                    }
+                }
+            }
 
             $path .= '/' . $title;
         }

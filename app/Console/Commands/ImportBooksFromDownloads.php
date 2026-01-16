@@ -47,7 +47,11 @@ class ImportBooksFromDownloads extends Command
                             {--no-cache : Disable background processing cache}
                             {--clear-cache : Clear background processing cache before starting}
                             {--force-audio : Force audio transcription even when AI confidence is high}
+                            {--include-narrator : Include narrator in generated directory paths}
                             {--ui=ncurses : UI layer (ncurses|plain)}';
+
+
+
 
     /**
      * The console command description.
@@ -276,7 +280,9 @@ class ImportBooksFromDownloads extends Command
         return $this->getImportService()->buildUiMetadata(
             $metadata,
             fn ($coverData) => $this->getEmbeddedCoverTempPath($coverData),
-            fn ($metadata, $options) => $this->getImportService()->generateDirectoryPath($metadata, $options)
+            fn ($metadata, $options) => $this->getImportService()->generateDirectoryPath($metadata, array_merge($options, [
+                'include_narrator' => (bool) $this->option('include-narrator'),
+            ]))
         );
     }
 
@@ -415,6 +421,11 @@ class ImportBooksFromDownloads extends Command
 
         [$width, $height] = $this->getTerminalDimensions();
         $this->uiService->initialize($width, $height);
+
+        // Initialize import service config
+        $this->getImportService()->setConfig([
+            'include_narrator' => (bool) $this->option('include-narrator'),
+        ]);
 
         try {
             $this->uiService->drawInitialLayout();
@@ -1238,15 +1249,31 @@ class ImportBooksFromDownloads extends Command
             fn ($question, $options, $default) => $this->selectWithImmediateInterrupt($question, $options, $default),
             fn ($question, $default) => $this->askInline($question, $default ?? ''),
             fn ($currentCoverUrl, $currentGenre, $currentDirectoryPath, $isFinalConfirmation) => $this->buildReviewOptions($currentCoverUrl, $currentGenre, $currentDirectoryPath, $isFinalConfirmation),
-            fn ($metadata, $audiobook) => $this->editMetadataFields($metadata, $audiobook),
-            fn ($metadata, $audiobook) => $this->getImportService()->manualEnrichmentWithComparison($metadata, $audiobook, $this->getEnrichmentService()),
+            fn ($metadata) => $this->getImportService()->editMetadataFields(
+                $metadata,
+                $audiobook,
+                fn ($question, $default) => $this->askInline($question, $default ?? ''),
+                fn ($question, $options, $default) => $this->selectWithImmediateInterrupt($question, $options, $default),
+                fn ($metadata, $keys) => $this->getImportService()->getFirstNonEmptyMetadataValue($metadata, $keys),
+                fn (&$metadata) => $this->getImportService()->extractSeriesNumberFromTitle($metadata),
+                fn () => $this->getValidGenres()
+            ),
+            fn ($metadata, $manualSelection) => $this->getEnrichmentService()->manualEnrichmentWithComparison(
+                $metadata,
+                $manualSelection,
+                fn ($headers, $rows) => $this->table($headers, $rows),
+                fn ($bytes) => $this->getImportService()->formatBytes($bytes)
+            ),
             fn () => $this->getEnrichmentService(),
             fn () => $this->getValidGenres(),
-            fn ($metadata) => $this->hasEnrichmentData($metadata),
-            fn ($metadata, $options) => $this->getImportService()->generateDirectoryPath($metadata, $options),
+            fn ($metadata) => $this->getImportService()->hasEnrichmentData($metadata),
+            fn ($metadata, $options) => $this->getImportService()->generateDirectoryPath($metadata, array_merge($options, [
+                'include_narrator' => (bool) $this->option('include-narrator'),
+            ])),
             $this->inputInterrupted
         );
     }
+
     protected function buildReviewOptions(
         string $currentCoverUrl,
         string $currentGenre,
