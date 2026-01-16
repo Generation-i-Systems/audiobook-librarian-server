@@ -79,7 +79,7 @@ class BookDownloadTest extends ApiTestCase
     {
         $response = $this->postJson('/api/v1/books/queue/download', [
             'book_ids' => []
-        ]);
+        ], ['X-Acting-As-Test' => '1']);
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['book_ids']);
@@ -89,7 +89,7 @@ class BookDownloadTest extends ApiTestCase
     {
         $response = $this->postJson('/api/v1/books/queue/download', [
             'book_ids' => [99999] // Non-existent book ID
-        ]);
+        ], ['X-Acting-As-Test' => '1']);
 
         $response->assertStatus(422);
     }
@@ -102,7 +102,7 @@ class BookDownloadTest extends ApiTestCase
 
         $response = $this->postJson('/api/v1/books/queue/download', [
             'book_ids' => $bookIds
-        ]);
+        ], ['X-Acting-As-Test' => '1']);
 
         $response->assertStatus(200)
             ->assertJsonStructure([
@@ -125,7 +125,7 @@ class BookDownloadTest extends ApiTestCase
 
     public function test_mark_zip_downloaded_requires_valid_zip_id()
     {
-        $response = $this->postJson('/api/v1/books/queue/download/invalid-zip-id/mark-downloaded');
+        $response = $this->postJson('/api/v1/books/queue/download/invalid-zip-id/mark-downloaded', [], ['X-Acting-As-Test' => '1']);
 
         $response->assertStatus(404);
     }

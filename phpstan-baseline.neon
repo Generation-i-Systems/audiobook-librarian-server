@@ -1291,6 +1291,12 @@ parameters:
 			path: app/Http/Controllers/Admin/BookController.php
 
 		-
+			message: '#^Trait App\\Http\\Controllers\\Admin\\DirectoryConflictTrait is used zero times and is not analysed\.$#'
+			identifier: trait.unused
+			count: 1
+			path: app/Http/Controllers/Admin/DirectoryConflictTrait.php
+
+		-
 			message: '#^Access to an undefined property Illuminate\\Http\\Request\:\:\$book_id\.$#'
 			identifier: property.notFound
 			count: 2
@@ -1621,12 +1627,6 @@ parameters:
 			path: app/Http/Controllers/Api/BookApiController.php
 
 		-
-			message: '#^Cannot call method toArray\(\) on stdClass\.$#'
-			identifier: method.nonObject
-			count: 1
-			path: app/Http/Controllers/Api/BookApiController.php
-
-		-
 			message: '#^Comparison operation "\>" between int\<1, max\> and 0 is always true\.$#'
 			identifier: greater.alwaysTrue
 			count: 1
@@ -1897,6 +1897,12 @@ parameters:
 			path: app/Http/Controllers/Api/StatisticsController.php
 
 		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/StatisticsController.php
+
+		-
 			message: '#^Anonymous function has an unused use \$endDate\.$#'
 			identifier: closure.unusedUse
 			count: 1
@@ -1911,7 +1917,13 @@ parameters:
 		-
 			message: '#^Call to an undefined static method App\\Models\\ListeningStatistic\:\:where\(\)\.$#'
 			identifier: staticMethod.notFound
-			count: 14
+			count: 11
+			path: app/Http/Controllers/Api/StatisticsController.php
+
+		-
+			message: '#^Call to an undefined static method App\\Models\\UserBookStatus\:\:where\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 5
 			path: app/Http/Controllers/Api/StatisticsController.php
 
 		-
@@ -1923,6 +1935,12 @@ parameters:
 		-
 			message: '#^Dead catch \- Illuminate\\Validation\\ValidationException is never thrown in the try block\.$#'
 			identifier: catch.neverThrown
+			count: 1
+			path: app/Http/Controllers/Api/StatisticsController.php
+
+		-
+			message: '#^Negated boolean expression is always false\.$#'
+			identifier: booleanNot.alwaysFalse
 			count: 1
 			path: app/Http/Controllers/Api/StatisticsController.php
 
@@ -1960,6 +1978,12 @@ parameters:
 			message: '#^Call to an undefined static method App\\Models\\UserBookStatus\:\:where\(\)\.$#'
 			identifier: staticMethod.notFound
 			count: 4
+			path: app/Http/Controllers/Api/UserStatusController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>read_count" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
 			path: app/Http/Controllers/Api/UserStatusController.php
 
 		-
@@ -2237,12 +2261,6 @@ parameters:
 			identifier: class.notFound
 			count: 1
 			path: app/Http/Controllers/ReviewController.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\User\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Controllers/UserLibraryController.php
 
 		-
 			message: '#^Access to an undefined property Laravel\\Sanctum\\PersonalAccessToken\:\:\$expires_at\.$#'
@@ -3547,12 +3565,6 @@ parameters:
 			path: app/Services/BookDirectoryParser.php
 
 		-
-			message: '#^PHPDoc tag @param for parameter \$seconds with type int is incompatible with native type float\.$#'
-			identifier: parameter.phpDocType
-			count: 1
-			path: app/Services/BookDirectoryParser.php
-
-		-
 			message: '#^PHPDoc tag @param references unknown parameter\: \$audioFiles$#'
 			identifier: parameter.notFound
 			count: 1
@@ -3829,20 +3841,8 @@ parameters:
 			path: app/Services/BookImportService.php
 
 		-
-			message: '#^Strict comparison using \!\=\= between string and null will always evaluate to true\.$#'
-			identifier: notIdentical.alwaysTrue
-			count: 1
-			path: app/Services/BookImportService.php
-
-		-
 			message: '#^Strict comparison using \=\=\= between string and null will always evaluate to false\.$#'
 			identifier: identical.alwaysFalse
-			count: 1
-			path: app/Services/BookImportService.php
-
-		-
-			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
 			count: 1
 			path: app/Services/BookImportService.php
 
@@ -4117,6 +4117,24 @@ parameters:
 			path: app/Services/MySqlService.php
 
 		-
+			message: '#^Access to an undefined property App\\Models\\Book\:\:\$progress\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/MySqlService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Book\:\:\$recommendations\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/MySqlService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Book\:\:\$statuses\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/MySqlService.php
+
+		-
 			message: '#^Access to an undefined property App\\Models\\LibraryRepairIssue\:\:\$auto_resolved\.$#'
 			identifier: property.notFound
 			count: 2
@@ -4237,6 +4255,12 @@ parameters:
 			path: app/Services/MySqlService.php
 
 		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Builder\<App\\Models\\Book\>\:\:withUserData\(\)\.$#'
+			identifier: method.notFound
+			count: 2
+			path: app/Services/MySqlService.php
+
+		-
 			message: '#^Call to an undefined method Illuminate\\Database\\Query\\Builder\:\:whereHas\(\)\.$#'
 			identifier: method.notFound
 			count: 1
@@ -4298,12 +4322,6 @@ parameters:
 
 		-
 			message: '#^Call to an undefined static method App\\Models\\Book\:\:findOrFail\(\)\.$#'
-			identifier: staticMethod.notFound
-			count: 1
-			path: app/Services/MySqlService.php
-
-		-
-			message: '#^Call to an undefined static method App\\Models\\Book\:\:whereHas\(\)\.$#'
 			identifier: staticMethod.notFound
 			count: 1
 			path: app/Services/MySqlService.php
@@ -4599,6 +4617,12 @@ parameters:
 		-
 			message: '#^Parameter \#1 \$array \(list\<non\-falsy\-string\>\) to function array_filter does not contain falsy values, the array will always stay the same\.$#'
 			identifier: arrayFilter.same
+			count: 1
+			path: app/Services/MySqlService.php
+
+		-
+			message: '#^Parameter \#1 \$book of method App\\Services\\MySqlService\:\:transformUserData\(\) expects App\\Models\\Book, stdClass given\.$#'
+			identifier: argument.type
 			count: 1
 			path: app/Services/MySqlService.php
 
@@ -4981,10 +5005,22 @@ parameters:
 			path: tests/Api/Feature/BookApiAutocompleteSeriesTest.php
 
 		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:createToken\(\)\.$#'
-			identifier: method.notFound
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
 			count: 1
 			path: tests/Api/Feature/BookApiGenreArrayTest.php
+
+		-
+			message: '#^Parameter \#1 \$user of method Illuminate\\Foundation\\Testing\\TestCase\:\:actingAs\(\) expects Illuminate\\Contracts\\Auth\\Authenticatable, Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 1
+			path: tests/Api/Feature/BookApiGenreArrayTest.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: tests/Api/Feature/BookApiOpenApiTest.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
@@ -5161,9 +5197,15 @@ parameters:
 			path: tests/Api/Feature/SeriesNeedsReviewFilterTest.php
 
 		-
+			message: '#^Access to an undefined property App\\Models\\User\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: tests/Api/Feature/StatisticsControllerTest.php
+
+		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
 			identifier: property.notFound
-			count: 22
+			count: 24
 			path: tests/Api/Feature/StatisticsControllerTest.php
 
 		-
@@ -5182,6 +5224,12 @@ parameters:
 			message: '#^Call to an undefined static method App\\Models\\ListeningStatistic\:\:where\(\)\.$#'
 			identifier: staticMethod.notFound
 			count: 1
+			path: tests/Api/Feature/StatisticsControllerTest.php
+
+		-
+			message: '#^Call to an undefined static method App\\Models\\UserBookStatus\:\:create\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 2
 			path: tests/Api/Feature/StatisticsControllerTest.php
 
 		-
@@ -5327,6 +5375,12 @@ parameters:
 			identifier: deadCode.unreachable
 			count: 1
 			path: tests/Cli/Feature/Commands/ImportOpenAudibleTest.php
+
+		-
+			message: '#^Call to an undefined static method App\\Models\\Book\:\:count\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 2
+			path: tests/Cli/Feature/Commands/ImportRedundancyTest.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$needs_review\.$#'
@@ -5787,7 +5841,13 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
 			identifier: property.notFound
-			count: 1
+			count: 2
+			path: tests/Feature/Admin/AIAssistantControllerTest.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:genres\(\)\.$#'
+			identifier: method.notFound
+			count: 4
 			path: tests/Feature/Admin/AIAssistantControllerTest.php
 
 		-
@@ -6127,36 +6187,6 @@ parameters:
 			path: tests/Feature/Api/SeriesNeedsReviewFilterTest.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 22
-			path: tests/Feature/Api/StatisticsControllerTest.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:createToken\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: tests/Feature/Api/StatisticsControllerTest.php
-
-		-
-			message: '#^Call to an undefined static method App\\Models\\ListeningStatistic\:\:create\(\)\.$#'
-			identifier: staticMethod.notFound
-			count: 12
-			path: tests/Feature/Api/StatisticsControllerTest.php
-
-		-
-			message: '#^Call to an undefined static method App\\Models\\ListeningStatistic\:\:where\(\)\.$#'
-			identifier: staticMethod.notFound
-			count: 1
-			path: tests/Feature/Api/StatisticsControllerTest.php
-
-		-
-			message: '#^Parameter \#1 \$user of static method Laravel\\Sanctum\\Sanctum\<Laravel\\Sanctum\\PersonalAccessToken\>\:\:actingAs\(\) expects Illuminate\\Contracts\\Auth\\Authenticatable\|Laravel\\Sanctum\\HasApiTokens, Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model given\.$#'
-			identifier: argument.type
-			count: 1
-			path: tests/Feature/Api/StatisticsControllerTest.php
-
-		-
 			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:createToken\(\)\.$#'
 			identifier: method.notFound
 			count: 4
@@ -6165,13 +6195,13 @@ parameters:
 		-
 			message: '#^Access to an undefined property App\\Models\\User\:\:\$id\.$#'
 			identifier: property.notFound
-			count: 9
+			count: 13
 			path: tests/Feature/Api/UserStatusControllerTest.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
 			identifier: property.notFound
-			count: 5
+			count: 9
 			path: tests/Feature/Api/UserStatusControllerTest.php
 
 		-
@@ -6809,30 +6839,6 @@ parameters:
 			identifier: method.alreadyNarrowedType
 			count: 1
 			path: tests/Import/Unit/BookImportServiceMoveNonAudioFilesToDirectoryTest.php
-
-		-
-			message: '#^Call to an undefined static method App\\Models\\Author\:\:create\(\)\.$#'
-			identifier: staticMethod.notFound
-			count: 7
-			path: tests/Import/Unit/BookImportServiceTest.php
-
-		-
-			message: '#^Call to an undefined static method App\\Models\\Book\:\:create\(\)\.$#'
-			identifier: staticMethod.notFound
-			count: 6
-			path: tests/Import/Unit/BookImportServiceTest.php
-
-		-
-			message: '#^Call to an undefined static method App\\Models\\Genre\:\:create\(\)\.$#'
-			identifier: staticMethod.notFound
-			count: 5
-			path: tests/Import/Unit/BookImportServiceTest.php
-
-		-
-			message: '#^Call to an undefined static method App\\Models\\Series\:\:create\(\)\.$#'
-			identifier: staticMethod.notFound
-			count: 1
-			path: tests/Import/Unit/BookImportServiceTest.php
 
 		-
 			message: '#^Access to an undefined property \$this\(Tests\\Import\\Unit\\Traits\\BookImportTraitTest\)\:\:\$app\.$#'

@@ -393,6 +393,63 @@ class LibraryRepairServiceTest extends TestCase
         $this->assertSame('resolved', $issue->status);
     }
 
+    #[Test]
+    public function it_detects_filesystem_duplicate_nested_directories(): void
+    {
+        config(['app.library_repair_sync_path' => '/non/existent/sync/path']);
+
+        $service = $this->makeService();
+
+        $book = Book::factory()->create([
+            'title' => 'We Hunt Monsters',
+            'directory_path' => '13 We Hunt Monsters 13',
+            'needs_review' => false,
+        ]);
+
+        File::ensureDirectoryExists($this->libraryRoot . '/13 We Hunt Monsters 13');
+        file_put_contents($this->libraryRoot . '/13 We Hunt Monsters 13/cover.jpg', 'cover');
+        File::ensureDirectoryExists($this->libraryRoot . '/13 We Hunt Monsters 13/13 We Hunt Monsters');
+        file_put_contents($this->libraryRoot . '/13 We Hunt Monsters 13/13 We Hunt Monsters/Aaron Oster - We Hunt Monsters 13.m4b', 'audio');
+
+        $result = $service->scan(false, [LibraryRepairIssueType::BOGUS_DIRECTORY]);
+
+        $this->assertArrayHasKey(LibraryRepairIssueType::BOGUS_DIRECTORY->value, $result);
+        $summary = $result[LibraryRepairIssueType::BOGUS_DIRECTORY->value];
+        $this->assertSame(1, $summary['created']);
+
+        $issue = LibraryRepairIssue::where('book_id', $book->id)->first();
+        $this->assertNotNull($issue);
+        $this->assertSame('13 We Hunt Monsters 13', $issue->directory_path);
+        $this->assertSame('filesystem_duplicate', $issue->metadata['reason'] ?? '');
+
+        $this->assertTrue($book->fresh()->needs_review);
+    }
+
+    #[Test]
+    public function it_does_not_detect_filesystem_duplicate_when_correct(): void
+    {
+        config(['app.library_repair_sync_path' => '/non/existent/sync/path']);
+
+        $service = $this->makeService();
+
+        $book = Book::factory()->create([
+            'title' => 'Correct Book',
+            'directory_path' => 'Author/Series/01 Title',
+            'needs_review' => false,
+        ]);
+
+        File::ensureDirectoryExists($this->libraryRoot . '/Author/Series/01 Title');
+        file_put_contents($this->libraryRoot . '/Author/Series/01 Title/track01.mp3', 'audio');
+        File::ensureDirectoryExists($this->libraryRoot . '/Author/Series/01 Title/subdir');
+        file_put_contents($this->libraryRoot . '/Author/Series/01 Title/subdir/other.txt', 'text');
+
+        $result = $service->scan(false, [LibraryRepairIssueType::BOGUS_DIRECTORY]);
+
+        $this->assertArrayHasKey(LibraryRepairIssueType::BOGUS_DIRECTORY->value, $result);
+        $summary = $result[LibraryRepairIssueType::BOGUS_DIRECTORY->value];
+        $this->assertSame(0, $summary['created']);
+    }
+
     private function makeService(): LibraryRepairService
     {
         $bookPathService = Mockery::mock(BookPathService::class);

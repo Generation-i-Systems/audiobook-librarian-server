@@ -40,6 +40,7 @@ class ProgressControllerTest extends TestCase
         // Use Bearer token for API authentication
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
+            'X-Acting-As-Test' => '1',
         ])
             ->getJson("/api/v1/books/{$book->id}/progress?device_id=test-device");
 
@@ -59,6 +60,7 @@ class ProgressControllerTest extends TestCase
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
+            'X-Acting-As-Test' => '1',
         ])
             ->putJson("/api/v1/books/{$book->id}/progress", [
                 'device_id' => 'test-device',
@@ -94,6 +96,7 @@ class ProgressControllerTest extends TestCase
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
+            'X-Acting-As-Test' => '1',
         ])
             ->putJson("/api/v1/books/{$book->id}/progress", [
                 'device_id' => 'test-device',
@@ -120,6 +123,7 @@ class ProgressControllerTest extends TestCase
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
+            'X-Acting-As-Test' => '1',
         ])
             ->postJson("/api/v1/books/{$book->id}/progress/complete", [
                 'device_id' => 'test-device',
@@ -164,6 +168,7 @@ class ProgressControllerTest extends TestCase
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
+            'X-Acting-As-Test' => '1',
         ])
             ->getJson("/api/v1/progress/device?device_id=test-device");
 
@@ -204,6 +209,7 @@ class ProgressControllerTest extends TestCase
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
+            'X-Acting-As-Test' => '1',
         ])
             ->deleteJson("/api/v1/books/{$book->id}/progress", [
                 'device_id' => 'test-device',
@@ -226,6 +232,7 @@ class ProgressControllerTest extends TestCase
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
+            'X-Acting-As-Test' => '1',
         ])
             ->putJson("/api/v1/books/{$book->id}/progress", [
                 'device_id' => '', // Required field empty

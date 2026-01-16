@@ -21,7 +21,7 @@ class AuthorsApiTest extends ApiTestCase
             $book->authors()->attach($author);
         }
 
-        $response = $this->getJson('/api/v1/authors');
+        $response = $this->getJson('/api/v1/authors', ['X-Acting-As-Test' => '1']);
 
         $response->assertStatus(200)
             ->assertJsonStructure([
@@ -79,7 +79,7 @@ class AuthorsApiTest extends ApiTestCase
         $bothBook2->genres()->attach($scifiGenre);
 
         // Test filtering by fantasy genre
-        $response = $this->getJson('/api/v1/authors?genre_id=' . $fantasyGenre->id);
+        $response = $this->getJson('/api/v1/authors?genre_id=' . $fantasyGenre->id, ['X-Acting-As-Test' => '1']);
 
         $response->assertStatus(200);
         $data = $response->json();
@@ -106,7 +106,7 @@ class AuthorsApiTest extends ApiTestCase
         $otherBook = Book::factory()->create();
         $otherBook->authors()->attach($otherAuthor);
 
-        $response = $this->getJson('/api/v1/authors?genre_name=Mystery');
+        $response = $this->getJson('/api/v1/authors?genre_name=Mystery', ['X-Acting-As-Test' => '1']);
 
         $response->assertStatus(200);
         $data = $response->json();
@@ -131,7 +131,7 @@ class AuthorsApiTest extends ApiTestCase
         }
 
         // Test first page
-        $response = $this->getJson('/api/v1/authors?page=1&per_page=10');
+        $response = $this->getJson('/api/v1/authors?page=1&per_page=10', ['X-Acting-As-Test' => '1']);
         $response->assertStatus(200);
 
         $data = $response->json();
@@ -143,7 +143,7 @@ class AuthorsApiTest extends ApiTestCase
         $this->assertFalse($data['pagination']['has_prev']);
 
         // Test second page
-        $response = $this->getJson('/api/v1/authors?page=2&per_page=10');
+        $response = $this->getJson('/api/v1/authors?page=2&per_page=10', ['X-Acting-As-Test' => '1']);
         $response->assertStatus(200);
 
         $data = $response->json();
@@ -164,7 +164,7 @@ class AuthorsApiTest extends ApiTestCase
             $book->authors()->attach($author);
         });
 
-        $response = $this->getJson('/api/v1/authors?search=Brandon');
+        $response = $this->getJson('/api/v1/authors?search=Brandon', ['X-Acting-As-Test' => '1']);
 
         $response->assertStatus(200);
         $data = $response->json();
@@ -196,7 +196,7 @@ class AuthorsApiTest extends ApiTestCase
         }
 
         // Test name ascending
-        $response = $this->getJson('/api/v1/authors?sort=name_asc');
+        $response = $this->getJson('/api/v1/authors?sort=name_asc', ['X-Acting-As-Test' => '1']);
         $response->assertStatus(200);
         $data = $response->json();
 
@@ -208,7 +208,7 @@ class AuthorsApiTest extends ApiTestCase
         }
 
         // Test book count descending
-        $response = $this->getJson('/api/v1/authors?sort=book_count_desc');
+        $response = $this->getJson('/api/v1/authors?sort=book_count_desc', ['X-Acting-As-Test' => '1']);
         $response->assertStatus(200);
         $data = $response->json();
 
@@ -234,15 +234,16 @@ class AuthorsApiTest extends ApiTestCase
     public function test_authors_endpoint_validates_parameters()
     {
         // Test invalid per_page
-        $response = $this->getJson('/api/v1/authors?per_page=500');
+        $response = $this->getJson('/api/v1/authors?per_page=500', ['X-Acting-As-Test' => '1']);
         $response->assertStatus(200); // Should still work but limit to max
 
         // Test invalid page
-        $response = $this->getJson('/api/v1/authors?page=-1');
+        $response = $this->getJson('/api/v1/authors?page=-1', ['X-Acting-As-Test' => '1']);
         $response->assertStatus(200); // Should default to page 1
 
         // Test invalid sort
-        $response = $this->getJson('/api/v1/authors?sort=invalid_sort');
+        $response = $this->getJson('/api/v1/authors?sort=invalid_sort', ['X-Acting-As-Test' => '1']);
+
         $response->assertStatus(200); // Should default to name_asc
     }
 
@@ -267,7 +268,7 @@ class AuthorsApiTest extends ApiTestCase
             $book->authors()->attach($author);
         }
 
-        $response = $this->getJson('/api/v1/authors?genre_id=' . $genre->id);
+        $response = $this->getJson('/api/v1/authors?genre_id=' . $genre->id, ['X-Acting-As-Test' => '1']);
 
         $response->assertStatus(200);
         $data = $response->json();

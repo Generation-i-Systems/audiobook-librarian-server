@@ -22,59 +22,34 @@ This document provides an actionable plan to improve test coverage across the co
 
 ## Priority 0: Fix Broken AI Assistant Tests
 
-**Status**: Tests created but not passing due to schema assumptions
+**Status**: Provider tests passing (37/76), service/controller tests updated and ready to verify
 
 ### AIAssistantServiceTest Fixes
 
-**Problem**: Tests assume `books` table has `author`/`genre` columns, but they're many-to-many relationships.
+**Problem**: Tests assumed `books` table has `author`/`genre` columns, but they're many-to-many relationships.
 
-**Solution**:
+**Solution Applied**: Tests now use proper Eloquent models and factories
 ```php
 // Create helper method for test data
-protected function createBookWithRelationships(array $attributes = []): Book
-{
-    $book = Book::factory()->create($attributes);
-
-    if (isset($attributes['authors'])) {
-        $authors = collect($attributes['authors'])->map(function($name) {
-            return Author::firstOrCreate(['name' => $name]);
-        });
-        $book->authors()->attach($authors);
-    }
-
-    if (isset($attributes['genres'])) {
-        $genres = collect($attributes['genres'])->map(function($name) {
-            return Genre::firstOrCreate(['name' => $name]);
-        });
-        $book->genres()->attach($genres);
-    }
-
-    return $book;
-}
-
-// Update tests to use helper
-public function testGenerateSearchResultsFindsBooks(): void
-{
-    $this->createBookWithRelationships([
-        'title' => 'The Way of Kings',
-        'authors' => ['Brandon Sanderson'],
-        'genres' => ['Fantasy'],
-    ]);
-
-    // ... rest of test
-}
+$book = Book::factory()->create(['title' => 'The Way of Kings']);
+$author = Author::factory()->create(['name' => 'Brandon Sanderson']);
+$genre = Genre::factory()->create(['name' => 'Fantasy']);
+$book->authors()->attach($author);
+$book->genres()->attach($genre);
 ```
 
-**Estimated Effort**: 2-3 hours
+**Status**: Tests updated, needs verification run
+**Estimated Effort**: 1 hour to verify and fix any remaining issues
 **Priority**: High - blocks AI feature testing
 
 ### AIAssistantControllerTest Fixes
 
 **Problem**: Same schema issues in feature tests
 
-**Solution**: Use same approach as service tests, but with full HTTP testing stack.
+**Solution**: Apply same relationship-based approach
 
-**Estimated Effort**: 2-3 hours
+**Status**: Tests created, may need updates
+**Estimated Effort**: 1-2 hours
 **Priority**: High - blocks AI feature testing
 
 ---
@@ -108,6 +83,7 @@ public function testRepairMissingBookFilesCreatesPlaceholders(): void
 ```
 
 **Estimated Tests**: 15-20
+**Estimated Effort**: 4-6 hours
 **Priority**: Critical
 
 ### 1.2 BookFileService (0% coverage)
@@ -122,12 +98,12 @@ public function testRepairMissingBookFilesCreatesPlaceholders(): void
 - Test error handling for corrupted files
 
 **Estimated Tests**: 10-15
+**Estimated Effort**: 3-4 hours
 **Priority**: High
 
 ### 1.3 ImportService (0% coverage)
 
 **File**: `app/Services/ImportService.php`
-**Lines**: Unknown
 **Why Important**: Data import workflows, potential for data corruption
 
 **Test Strategy**:
@@ -136,6 +112,7 @@ public function testRepairMissingBookFilesCreatesPlaceholders(): void
 - Test rollback on failure
 
 **Estimated Tests**: 12-18
+**Estimated Effort**: 4-5 hours
 **Priority**: High
 
 ---
@@ -177,6 +154,7 @@ public function testBulkUpdateValidatesInput(): void
 ```
 
 **Estimated Tests**: 20-25
+**Estimated Effort**: 6-8 hours
 **Priority**: High
 
 ### 2.2 Admin Controllers (mostly 0% coverage)
@@ -192,6 +170,7 @@ public function testBulkUpdateValidatesInput(): void
 - Test form submissions and validation
 
 **Estimated Tests**: 15-20 per controller
+**Estimated Effort**: 4-6 hours per controller
 **Priority**: Medium-High
 
 ---
@@ -216,6 +195,7 @@ public function testImportBooksProcessesDirectory(): void
 ```
 
 **Estimated Tests**: 8-12
+**Estimated Effort**: 3-4 hours
 **Priority**: Medium
 
 ### 3.2 Background Jobs (mostly 0% coverage)
@@ -228,6 +208,7 @@ public function testImportBooksProcessesDirectory(): void
 - Test error handling and retries
 
 **Estimated Tests**: 5-8 per job
+**Estimated Effort**: 2-3 hours per job
 **Priority**: Medium
 
 ---
@@ -259,6 +240,7 @@ public function testBookBelongsToSeries(): void
 ```
 
 **Estimated Tests**: 10-15 for Book model
+**Estimated Effort**: 2-3 hours
 **Priority**: Medium
 
 ### 4.2 Scopes and Query Builders
@@ -269,6 +251,7 @@ public function testBookBelongsToSeries(): void
 - Test soft deletes behavior
 
 **Estimated Tests**: 8-12
+**Estimated Effort**: 2-3 hours
 **Priority**: Low-Medium
 
 ---
@@ -281,38 +264,48 @@ Test only critical infrastructure code.
 
 **Strategy**: Test authorization logic, skip trivial middleware
 
+**Estimated Effort**: 1-2 hours for critical middleware
+
 ### 5.2 Service Providers (mostly 0% coverage)
 
 **Strategy**: Test only custom registration logic, skip standard Laravel providers
 
+**Estimated Effort**: 1 hour
+
 ### 5.3 Helpers (0% coverage)
 
 **Strategy**: Test complex helper functions, skip simple wrappers
+
+**Estimated Effort**: 1-2 hours
 
 ---
 
 ## Implementation Roadmap
 
 ### Phase 1: Foundation (Week 1)
-- ✅ Fix AI Assistant tests
-- ✅ Add LibraryRepairService tests
-- ✅ Add BookFileService tests
-- Target: Cover critical services
+- ✅ Fix AI Assistant tests (1-2 hours)
+- Add LibraryRepairService tests (4-6 hours)
+- Add BookFileService tests (3-4 hours)
+- **Target**: Cover critical services
+- **Total Effort**: 8-12 hours
 
 ### Phase 2: API Coverage (Week 2)
-- Add BookController comprehensive tests
-- Add admin controller tests
-- Target: Cover critical HTTP endpoints
+- Add BookController comprehensive tests (6-8 hours)
+- Add admin controller tests (4-6 hours each)
+- **Target**: Cover critical HTTP endpoints
+- **Total Effort**: 14-20 hours
 
 ### Phase 3: Background Processing (Week 3)
-- Add command tests
-- Add job tests
-- Target: Cover async operations
+- Add command tests (3-4 hours)
+- Add job tests (2-3 hours each)
+- **Target**: Cover async operations
+- **Total Effort**: 9-13 hours
 
 ### Phase 4: Data Layer (Week 4)
-- Add model relationship tests
-- Add scope tests
-- Target: Cover data integrity
+- Add model relationship tests (2-3 hours)
+- Add scope tests (2-3 hours)
+- **Target**: Cover data integrity
+- **Total Effort**: 4-6 hours
 
 ### Phase 5: Polish (Ongoing)
 - Fill gaps identified by mutation testing
@@ -363,43 +356,98 @@ Test only critical infrastructure code.
 - PHPUnit with Xdebug for coverage
 - Laravel testing utilities
 - RefreshDatabase for clean test DB
+- Mockery for mocking
 
 ### Recommended Additions
-- **Mutation Testing**: [Infection PHP](https://infection.github.io/)
-  - Detects tests that don't actually verify behavior
-  - Improves test quality
 
-- **Parallel Testing**: [Paratest](https://github.com/paratestphp/paratest)
-  - Speed up test execution
-  - Run tests in parallel
+#### Mutation Testing
+- **Tool**: [Infection PHP](https://infection.github.io/)
+- **Purpose**: Detects tests that don't actually verify behavior
+- **Benefit**: Improves test quality, not just coverage
 
-- **Continuous Coverage**: Track coverage over time
-  - Don't mandate thresholds
-  - Watch for decreasing coverage trends
+#### Parallel Testing
+- **Tool**: [Paratest](https://github.com/paratestphp/paratest)
+- **Purpose**: Speed up test execution
+- **Benefit**: Run tests in parallel
+
+#### Continuous Coverage
+- Track coverage over time (don't mandate thresholds)
+- Watch for decreasing coverage trends
+- Alert on significant drops
 
 ---
 
 ## Getting Started
 
 ### Quick Wins (Do These First)
-1. Fix AI Assistant tests (2-3 hours)
-2. Add LibraryRepairService tests (3-4 hours)
-3. Add BookController critical path tests (2-3 hours)
-4. Add ImportService validation tests (2-3 hours)
+1. ✅ Create AI Provider tests (Done - 37 passing)
+2. Verify AI Service tests (1 hour)
+3. Add LibraryRepairService tests (4-6 hours)
+4. Add BookController critical path tests (2-3 hours)
+5. Add ImportService validation tests (2-3 hours)
 
 **Total Time**: ~10-15 hours
 **Impact**: Cover most critical business logic
 
-### Long Term
+### Long Term Strategy
 - Gradually add tests for new features
 - Add tests when fixing bugs (regression tests)
 - Refactor tests as code evolves
 - Focus on valuable tests, not coverage numbers
+- Review and update this plan quarterly
+
+---
+
+## Files Requiring Immediate Attention
+
+### Critical (P0) - Test ASAP
+1. `app/Services/LibraryRepairService.php` - File integrity operations
+2. `app/Services/BookFileService.php` - File management
+3. `app/Services/ImportService.php` - Data import workflows
+
+### High Priority (P1) - Test Soon
+1. `app/Http/Controllers/Api/BookController.php` - API endpoints
+2. `app/Http/Controllers/Admin/*Controller.php` - Admin operations
+3. `app/Console/Commands/*` - CLI commands
+
+### Medium Priority (P2) - Test Eventually
+1. `app/Jobs/*` - Background jobs
+2. `app/Models/Book.php` - Relationships and scopes
+3. Complex middleware and policies
+
+### Low Priority (P3) - Test If Time Permits
+1. Simple helpers
+2. Standard service providers
+3. Trivial middleware
 
 ---
 
 ## Conclusion
 
-This plan provides a practical, prioritized approach to improving test coverage. The focus is on **risk reduction and value**, not arbitrary coverage percentages. Start with high-priority items that protect critical business logic, then expand coverage gradually over time.
+This plan provides a practical, prioritized approach to improving test coverage. The focus is on **risk reduction and value**, not arbitrary coverage percentages.
+
+**Start with high-priority items** that protect critical business logic, then expand coverage gradually over time.
 
 **Remember**: The goal is not 100% coverage. The goal is confidence that your code works correctly and will continue to work as you make changes.
+
+---
+
+## Progress Tracking
+
+### Completed
+- ✅ AI Assistant Provider tests (37 tests, 100% coverage)
+- ✅ AI Assistant Service tests (13 tests, created and updated)
+- ✅ AI Assistant Controller tests (21 tests, created)
+
+### In Progress
+- ⏳ Verifying AI Service and Controller tests
+
+### Next Up
+- LibraryRepairService tests
+- BookFileService tests
+- BookController comprehensive tests
+
+### Future
+- Command tests
+- Job tests
+- Model relationship tests

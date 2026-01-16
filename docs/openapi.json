@@ -393,6 +393,18 @@
                         "format": "date-time",
                         "description": "Last update timestamp",
                         "example": "2024-01-01T12:00:00Z"
+                    },
+                    "progress": {
+                        "$ref": "#/components/schemas/BookProgress",
+                        "nullable": true
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/UserBookStatus",
+                        "nullable": true
+                    },
+                    "recommendation": {
+                        "$ref": "#/components/schemas/UserRecommendation",
+                        "nullable": true
                     }
                 }
             },
@@ -907,6 +919,18 @@
                             }
                         },
                         "description": "List of series this book belongs to"
+                    },
+                    "progress": {
+                        "$ref": "#/components/schemas/BookProgress",
+                        "nullable": true
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/UserBookStatus",
+                        "nullable": true
+                    },
+                    "recommendation": {
+                        "$ref": "#/components/schemas/UserRecommendation",
+                        "nullable": true
                     }
                 }
             },
@@ -1220,6 +1244,40 @@
                                     }
                                 }
                             },
+                            "user_tracking": {
+                                "type": "object",
+                                "properties": {
+                                    "total_completed": { "type": "integer" },
+                                    "completed_this_month": { "type": "integer" },
+                                    "upcoming_goals": { "type": "integer" },
+                                    "overdue_goals": { "type": "integer" }
+                                }
+                            },
+                            "listening_overview": {
+                                "type": "object",
+                                "properties": {
+                                    "total_seconds": { "type": "integer" },
+                                    "total_books": { "type": "integer" },
+                                    "days_active": { "type": "integer" },
+                                    "formatted_total_duration": { "type": "string" }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+
+                                    "books_listened": {
+                                        "type": "integer"
+                                    },
+                                    "session_count": {
+                                        "type": "integer"
+                                    },
+                                    "formatted_duration": {
+                                        "type": "string"
+                                    }
+                                }
+                            },
                             "this_week": {
                                 "type": "object",
                                 "properties": {
@@ -1439,6 +1497,25 @@
                         "example": {
                             "device": "iPhone 15"
                         }
+                    },
+                    "targetDate": {
+                        "type": "string",
+                        "format": "date",
+                        "nullable": true,
+                        "description": "Goal date for finishing the book",
+                        "example": "2026-12-31"
+                    },
+                    "startedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true,
+                        "description": "When the user started reading"
+                    },
+                    "finishedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true,
+                        "description": "When the user finished reading"
                     }
                 }
             },
@@ -2308,8 +2385,73 @@
                             "type": "string",
                             "example": "harry potter"
                         }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Filter by book status (queue, in_progress, completed, wishlist)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "queue",
+                                "in_progress",
+                                "completed",
+                                "wishlist"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "is_recommended",
+                        "in": "query",
+                        "description": "Filter by recommendation status",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "name": "is_completed",
+                        "in": "query",
+                        "description": "Filter by completion status",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "name": "sort",
+                        "in": "query",
+                        "description": "Sort field",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "title",
+                                "author",
+                                "series",
+                                "series_number",
+                                "genre",
+                                "created_at",
+                                "release_date",
+                                "progress",
+                                "last_listened",
+                                "queue_order"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "order",
+                        "in": "query",
+                        "description": "Sort order",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": ["asc", "desc"]
+                        }
                     }
                 ],
+
                 "responses": {
                     "200": {
                         "description": "Books retrieved successfully",
@@ -3144,13 +3286,53 @@
                                 "created_at_asc",
                                 "created_at_desc",
                                 "author_asc",
-                                "author_desc"
+                                "author_desc",
+                                "progress_asc",
+                                "progress_desc",
+                                "last_listened_asc",
+                                "last_listened_desc",
+                                "queue_order_asc",
+                                "queue_order_desc"
                             ],
                             "default": "title_asc",
                             "example": "title_asc"
                         }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Filter by book status",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "queue",
+                                "in_progress",
+                                "completed",
+                                "wishlist"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "is_recommended",
+                        "in": "query",
+                        "description": "Filter by recommendation status",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "name": "is_completed",
+                        "in": "query",
+                        "description": "Filter by completion status",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean"
+                        }
                     }
                 ],
+
                 "responses": {
                     "200": {
                         "description": "Books retrieved successfully with enhanced filtering",
@@ -3766,6 +3948,57 @@
                 }
             }
         },
+        "/statistics/reading-history": {
+            "get": {
+                "tags": ["Statistics"],
+                "summary": "Get reading history stats",
+                "description": "Returns counts of finished books grouped by month or year.",
+                "operationId": "getReadingHistoryStats",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "group_by",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": ["month", "year"],
+                            "default": "month"
+                        },
+                        "description": "Period to group stats by"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Reading history stats retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "period": {
+                                                "type": "string",
+                                                "example": "2024-01"
+                                            },
+                                            "count": {
+                                                "type": "integer",
+                                                "example": 5
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/statistics/dashboard": {
             "get": {
                 "tags": ["Statistics"],
@@ -3908,12 +4141,12 @@
                 }
             }
         },
-        "/recommendations/{recommendation}/acknowledge": {
-            "post": {
-                "tags": ["Recommendations"],
-                "summary": "Acknowledge a recommendation",
-                "description": "Mark a recommendation as read/accepted.",
-                "operationId": "acknowledgeRecommendation",
+        "/status/list/{status}": {
+            "get": {
+                "tags": ["Status"],
+                "summary": "List books by status",
+                "description": "Get a paginated list of books with a specific status.",
+                "operationId": "listBooksByStatus",
                 "security": [
                     {
                         "BearerAuth": []
@@ -3921,22 +4154,128 @@
                 ],
                 "parameters": [
                     {
-                        "name": "recommendation",
+                        "name": "status",
                         "in": "path",
                         "required": true,
                         "schema": {
-                            "type": "integer"
-                        },
-                        "description": "Recommendation ID"
+                            "type": "string",
+                            "enum": [
+                                "queue",
+                                "in_progress",
+                                "completed",
+                                "wishlist"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 1
+                        }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Recommendation acknowledged",
+                        "description": "Books retrieved successfully",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/MessageResponse"
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/UserBookStatus"
+                                            }
+                                        },
+                                        "meta": {
+                                            "$ref": "#/components/schemas/PaginationMeta"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/status/history": {
+            "get": {
+                "tags": ["Status"],
+                "summary": "Get reading history",
+                "description": "Retrieve a paginated list of completed books ordered by finish date.",
+                "operationId": "getReadingHistory",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 20
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Reading history retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/UserBookStatus"
+                                            }
+                                        },
+                                        "meta": {
+                                            "$ref": "#/components/schemas/PaginationMeta"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/status/goals": {
+            "get": {
+                "tags": ["Status"],
+                "summary": "Get reading goals",
+                "description": "Retrieve books in queue or in progress that have target completion dates.",
+                "operationId": "getReadingGoals",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Reading goals retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/UserBookStatus"
+                                    }
                                 }
                             }
                         }
@@ -3990,6 +4329,13 @@
                                     "statusDetail": {
                                         "type": "object",
                                         "nullable": true
+                                    },
+                                    "target_date": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "nullable": true,
+                                        "description": "Goal date for finishing the book",
+                                        "example": "2026-12-31"
                                     }
                                 }
                             }

@@ -133,7 +133,53 @@ Bulk update the ordering of books in the user's "Queue."
 
 ---
 
-## 4. Error Handling
+## 4. Statistics & Reading History
+
+### Dashboard Overview
+
+Get a high-level summary of your reading and listening activity.
+
+- **URL**: `GET /statistics/dashboard`
+- **Parameters**: `device_id` (Required)
+- **Success (200 OK)**:
+    ```json
+    {
+      "success": true,
+      "data": {
+        "today": { ... },
+        "user_tracking": {
+          "total_completed": 15,
+          "completed_this_month": 2,
+          "upcoming_goals": 3,
+          "overdue_goals": 1
+        },
+        "listening_overview": {
+          "total_seconds": 1234567,
+          "total_books": 20,
+          "days_active": 45,
+          "formatted_total_duration": "342:56:07"
+        }
+      }
+    }
+    ```
+
+### Reading History Stats
+
+Get finished book counts grouped by time period for charting.
+
+- **URL**: `GET /statistics/reading-history`
+- **Parameters**: `group_by` (Optional: `month`, `year`. Default: `month`)
+- **Success (200 OK)**:
+    ```json
+    [
+        { "period": "2026-01", "count": 3 },
+        { "period": "2025-12", "count": 5 }
+    ]
+    ```
+
+---
+
+## 5. Error Handling
 
 The API returns structured JSON for all errors:
 
