@@ -23,12 +23,18 @@ class UserBookStatus extends Model
         'status',
         'status_detail',
         'read_count',
+        'target_date',
+        'started_at',
+        'finished_at',
     ];
 
     protected $casts = [
         'order' => 'integer',
         'status_detail' => 'array',
         'read_count' => 'integer',
+        'target_date' => 'date',
+        'started_at' => 'datetime',
+        'finished_at' => 'datetime',
     ];
 
     public function user(): BelongsTo

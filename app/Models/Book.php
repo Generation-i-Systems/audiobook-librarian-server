@@ -191,4 +191,31 @@ class Book extends Model
     {
         return $this->belongsToMany(Genre::class);
     }
+
+    public function progress(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(BookProgress::class);
+    }
+
+    public function recommendations(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(UserRecommendation::class);
+    }
+
+    public function statuses(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(UserBookStatus::class);
+    }
+
+    /**
+     * Scope to include user-specific data (progress, recommendation, status)
+     */
+    public function scopeWithUserData(Builder $query, int|string $userId): Builder
+    {
+        return $query->with([
+            'progress' => fn ($q) => $q->where('user_id', $userId),
+            'recommendations' => fn ($q) => $q->where('recipient_id', $userId)->whereNull('acknowledged_at'),
+            'statuses' => fn ($q) => $q->where('user_id', $userId),
+        ]);
+    }
 }
