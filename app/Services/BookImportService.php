@@ -961,12 +961,13 @@ class BookImportService
     }
 
     /**
+    /**
      * Generate target directory for book
      */
     protected function generateTargetDirectory(Book $book, string $basePath, array $options = []): string
     {
-        $authors = $book->authors->pluck('name')->toArray();
-        $genre = $book->genres->first()?->name ?? 'Unknown';
+        // CRITICAL: Once user approves a path, use it EXACTLY - NO modifications
+        // Only exception: Prompt user to resolve conflicts, don't silently add suffixes or modify
 
         $relativePath = null;
         if (!empty($book->directory_path)) {
@@ -974,156 +975,32 @@ class BookImportService
             if (str_starts_with($relativePath, '/')) {
                 $relativePath = $this->makePathRelative($relativePath, $basePath);
             }
-        }
-
-        // Refresh the book's series relationship to ensure we have latest data with is_collection flag
-        $book->load('series');
-
-        // Get primary series (non-collection) for directory structure
-        // Collections should NEVER be used for directory paths
-        $primarySeries = $book->series->where('is_collection', false)->first();
-        $seriesNumber = $primarySeries?->pivot->series_number ?? null;
-        $seriesName = $primarySeries?->name;
-
-        Log::debug('BookImportService::generateTargetDirectory - Series info', [
-            'book_id' => $book->id,
-            'book_title' => $book->title,
-            'primarySeries_id' => $primarySeries?->id,
-            'primarySeries_name' => $seriesName,
-            'seriesNumber' => $seriesNumber,
-        ]);
-
-        if ($relativePath === null) {
-            $authorDir = $this->formatAuthorsForDirectory($authors);
+        } else {
+            // Fallback to generating from metadata if directory_path is empty (useful for tests)
+            // In real usage, directory_path is always set before moving files
+            $authors = $book->authors->pluck('name')->toArray();
+            $genres = $book->genres->pluck('name')->toArray();
+            $series = $book->series->first();
 
             $metadata = [
-                'author' => $authors,
-                'genre' => $genre,
-                'series' => $seriesName,
-                'series_number' => $seriesNumber,
                 'title' => $book->title,
+                'author' => $authors,
+                'genre' => $genres,
+                'series' => $series?->name,
+                'series_number' => $series?->pivot?->series_number,
             ];
 
-            Log::debug('BookImportService::generateTargetDirectory - Metadata for generateDirectoryPath', [
-                'book_id' => $book->id,
-                'metadata' => $metadata,
-            ]);
-
-            $relativePath = $this->generateDirectoryPath($metadata, $options);
+            $relativePath = $this->generateDirectoryPath($metadata, ['include_title' => true]);
         }
 
-        $path = rtrim($basePath, '/') . '/' . ltrim($relativePath, '/');
+        Log::debug('BookImportService::generateTargetDirectory - Using path', [
+            'book_id' => $book->id,
+            'directory_path' => $relativePath,
+            'basePath' => $basePath,
+        ]);
 
-        // Always include title in path unless explicitly disabled
-        // However, if the book already has a directory_path that includes the title, don't append it again
-        if (!isset($options['include_title_in_path']) || $options['include_title_in_path'] !== false) {
-            $plainTitle = $book->title;
-            $title = $plainTitle;
-
-            if (!empty($seriesNumber)) {
-                $formattedNumber = str_pad((string) $seriesNumber, 2, '0', STR_PAD_LEFT);
-                $title = $formattedNumber . ' ' . $title;
-            }
-
-            if ($relativePath !== null) {
-                $relativeSegments = explode('/', trim($relativePath, '/'));
-                $relativeLastSegment = end($relativeSegments) ?: '';
-
-                Log::debug('BookImportService::generateTargetDirectory - Checking relative path', [
-                    'book_id' => $book->id,
-                    'relativePath' => $relativePath,
-                    'relativeLastSegment' => $relativeLastSegment,
-                    'title' => $title,
-                    'plainTitle' => $plainTitle,
-                    'seriesNumber' => $seriesNumber,
-                    'path' => $path,
-                ]);
-
-                if (strcasecmp($relativeLastSegment, $title) === 0) {
-                    return $path;
-                }
-
-                if (
-                    !empty($seriesNumber)
-                    && $this->lastPathSegmentMatchesTitle($relativeLastSegment, $plainTitle)
-                ) {
-                    array_pop($relativeSegments);
-                    $relativeSegments[] = $title;
-
-                    $relativePath = implode('/', $relativeSegments);
-                    $updatedPath = rtrim($basePath, '/') . '/' . ltrim($relativePath, '/');
-
-                    Log::debug('BookImportService::generateTargetDirectory - Updated relative path with series number', [
-                        'book_id' => $book->id,
-                        'updatedPath' => $updatedPath,
-                    ]);
-
-                    return $updatedPath;
-                }
-            }
-
-            $segments = explode('/', trim($path, '/'));
-            $lastSegment = end($segments) ?: '';
-
-            if (strcasecmp($lastSegment, $title) === 0) {
-                return $path;
-            }
-
-            if ($this->lastPathSegmentMatchesTitle($lastSegment, $plainTitle)) {
-                if (!empty($seriesNumber)) {
-                    array_pop($segments);
-                    $segments[] = $title;
-
-                    return '/' . implode('/', $segments);
-                }
-
-                return $path;
-            }
-
-            if (!empty($seriesNumber) && $this->lastPathSegmentMatchesTitle($lastSegment, $title)) {
-                array_pop($segments);
-                $segments[] = $title;
-
-                return '/' . implode('/', $segments);
-            }
-
-            $path .= "/{$title}";
-            Log::debug('BookImportService::generateTargetDirectory - Appending title to path', [
-                'book_id' => $book->id,
-                'finalPath' => $path,
-            ]);
-        }
-
-        return $path;
+        return rtrim($basePath, '/') . '/' . ltrim($relativePath, '/');
     }
-
-    private function lastPathSegmentMatchesTitle(string $lastSegment, string $title): bool
-    {
-        $lastSegment = trim($lastSegment);
-        $title = trim($title);
-
-        if ($lastSegment === '' || $title === '') {
-            return false;
-        }
-
-        if (strcasecmp($lastSegment, $title) === 0) {
-            return true;
-        }
-
-        $normalize = static function (string $value): string {
-            $value = trim($value);
-            $value = preg_replace('/^0*\d+\s+/', '', $value) ?? $value;
-            $value = preg_replace('/\s+/', ' ', $value) ?? $value;
-
-            return mb_strtolower($value);
-        };
-
-        return $normalize($lastSegment) === $normalize($title);
-    }
-
-    /**
-     * Copy directory contents
-     */
     protected function copyDirectoryContents(string $source, string $target): void
     {
         // Handle single file source

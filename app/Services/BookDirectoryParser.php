@@ -6,7 +6,6 @@ namespace App\Services;
 
 use App\Traits\BookImportTrait;
 use Illuminate\Support\Facades\File;
-use SplFileInfo;
 use Symfony\Component\Finder\Finder;
 
 class BookDirectoryParser
@@ -129,7 +128,7 @@ class BookDirectoryParser
         }
 
         // If absolute path and exists, return as-is
-        if (strpos($path, '/') === 0 && file_exists($path) && is_dir($path)) {
+        if (strpos($path, '/') === 0 && file_exists($path)) {
             return $path;
         }
 
@@ -529,19 +528,12 @@ class BookDirectoryParser
     }
 
     /**
-     * Parse a single book file and extract metadata.
-     *
-     * @param  SplFileInfo  $file  The file to parse
-     * @param  array  $config  Configuration options
-     * @return array|null Book metadata or null if parsing fails
-     */
-    /**
      * Format duration in seconds to a human-readable string (HH:MM:SS)
      *
-     * @param  int  $seconds  Duration in seconds
+     * @param  float  $seconds  Duration in seconds
      * @return string Formatted duration
      */
-    protected function formatDuration(float $seconds): string
+    public function formatDuration(float $seconds): string
     {
         $seconds = (int) round($seconds);
         $hours = floor($seconds / 3600);
@@ -553,13 +545,12 @@ class BookDirectoryParser
 
     /**
      * Parse a single book file and extract metadata.
-     * This is now a helper method used internally by parseDirectory.
      *
      * @param  \SplFileInfo  $file  The file to parse
      * @param  array  $config  Configuration options
      * @return array|null Book metadata or null if parsing fails
      */
-    protected function parseBookFile(\SplFileInfo $file, array $config = []): ?array
+    public function parseBookFile(\SplFileInfo $file, array $config = []): ?array
     {
         try {
             $filename = $file->getFilename();

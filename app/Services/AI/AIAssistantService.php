@@ -458,7 +458,13 @@ PROMPT;
 
         // Apply remaining changes to the book model
         if (!empty($changes)) {
-            $book->update($changes);
+            // Filter changes to only include fillable columns to avoid crashes if AI suggests bad keys
+            $fillableChanges = collect($changes)->only($book->getFillable())->toArray();
+            if (!empty($fillableChanges)) {
+                $book->update($fillableChanges);
+            } else {
+                $book->touch();
+            }
         } else {
             $book->touch();
         }
@@ -475,22 +481,32 @@ PROMPT;
     {
         $bookId = $operation['book_id'];
 
+        $book = Book::find($bookId);
+        if (!$book) {
+            return [
+                'success' => false,
+                'operation' => 'delete',
+                'book_id' => $bookId,
+                'error' => 'Book not found',
+            ];
+        }
+
         // Delete file if requested
-        if ($operation['delete_files'] && !empty($operation['file_path'])) {
-            $filePath = $operation['file_path'];
+        if (!empty($operation['delete_files']) && !empty($book->directory_path)) {
+            $filePath = $book->directory_path;
             if (Storage::disk('books')->exists($filePath)) {
-                Storage::disk('books')->delete($filePath);
+                Storage::disk('books')->deleteDirectory($filePath);
             }
         }
 
         // Delete database record
-        DB::table('books')->where('id', $bookId)->delete();
+        $book->delete();
 
         return [
             'success' => true,
             'operation' => 'delete',
             'book_id' => $bookId,
-            'deleted_files' => $operation['delete_files'],
+            'deleted_files' => !empty($operation['delete_files']),
         ];
     }
 
@@ -500,9 +516,9 @@ PROMPT;
         $authorData = $metadata['author'] ?? null;
         $genreData = $metadata['genre'] ?? null;
 
-        unset($metadata['author'], $metadata['genre']);
-
-        $book = Book::create($metadata);
+        // Create only with fillable book fields
+        $bookData = collect($metadata)->only((new Book())->getFillable())->toArray();
+        $book = Book::create($bookData);
 
         if ($authorData) {
             $authorNames = is_array($authorData) ? $authorData : explode(',', (string)$authorData);

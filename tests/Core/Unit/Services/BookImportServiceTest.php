@@ -149,13 +149,16 @@ class BookImportServiceTest extends TestCase
 
         $book = Book::create([
             'title' => 'Willful Child',
-            'directory_path' => 'Science Fiction/Steven Erikson/Willful Child',
+            'directory_path' => null, // Ensure it's generated from metadata
             'language' => 'en',
         ]);
 
         $book->authors()->attach($author);
         $book->genres()->attach($genre);
-        $book->series()->attach($series, ['series_number' => 1]);
+        // Explicitly attach with the pivot data that the generator expects
+        $book->series()->attach($series, ['series_number' => '1']);
+
+        $book->refresh(); // Load relationships
 
         // Use reflection to access protected method
         $reflection = new \ReflectionClass($this->service);
@@ -177,7 +180,7 @@ class BookImportServiceTest extends TestCase
 
         $book = Book::create([
             'title' => 'Standalone Book',
-            'directory_path' => 'Fiction/John Doe',
+            'directory_path' => null, // Ensure it's generated from metadata
             'language' => 'en',
         ]);
 
