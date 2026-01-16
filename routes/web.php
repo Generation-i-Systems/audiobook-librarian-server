@@ -193,6 +193,8 @@ Route::middleware(['auth'])->group(function (): void {
         Route::get('/queue', [UserLibraryController::class, 'queue'])->name('queue');
         Route::get('/wishlist', [UserLibraryController::class, 'wishlist'])->name('wishlist');
         Route::get('/recommendations', [UserLibraryController::class, 'recommendations'])->name('recommendations');
+        Route::get('/history', [UserLibraryController::class, 'history'])->name('history');
+        Route::get('/goals', [UserLibraryController::class, 'goals'])->name('goals');
     });
 
     Route::resource('books', BookController::class)->only(['index', 'show']);

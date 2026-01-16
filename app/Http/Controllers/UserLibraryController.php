@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Models\UserRecommendation;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 
@@ -38,17 +37,36 @@ class UserLibraryController extends Controller
     }
 
     /**
-     * Show the user's recommendations inbox.
+     * Show the user's reading history (completed books).
      */
-    public function recommendations()
+    public function history()
     {
         /** @var User $user */
         $user = Auth::user();
-        $recommendations = UserRecommendation::with(['sender:id,name', 'book:id,title,cover_url'])
-            ->where('recipient_id', $user->id)
-            ->latest()
+        $history = $user->bookStatuses()
+            ->with('book')
+            ->where('status', 'completed')
+            ->whereNotNull('finished_at')
+            ->orderByDesc('finished_at')
             ->get();
 
-        return view('user.library.recommendations', compact('recommendations'));
+        return view('user.library.history', compact('history'));
+    }
+
+    /**
+     * Show the user's reading goals (queue with target dates).
+     */
+    public function goals()
+    {
+        /** @var User $user */
+        $user = Auth::user();
+        $goals = $user->bookStatuses()
+            ->with('book')
+            ->whereIn('status', ['queue', 'in_progress'])
+            ->whereNotNull('target_date')
+            ->orderBy('target_date')
+            ->get();
+
+        return view('user.library.goals', compact('goals'));
     }
 }

@@ -128,6 +128,21 @@
                                     <a class="nav-link" style="color:white"
                                         href="{{ route('gallery.themes.index') }}">{{ __('Themes') }}</a>
                                 </li>
+                                <li class="nav-item dropdown">
+                                    <a id="libraryDropdown" class="nav-link dropdown-toggle" href="#" role="button"
+                                        data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" v-pre
+                                        style="color:white">
+                                        My Library
+                                    </a>
+                                    <div class="dropdown-menu" aria-labelledby="libraryDropdown">
+                                        <a class="dropdown-item" href="{{ route('my-library.queue') }}">Queue</a>
+                                        <a class="dropdown-item" href="{{ route('my-library.wishlist') }}">Wishlist</a>
+                                        <a class="dropdown-item" href="{{ route('my-library.recommendations') }}">Recommendations</a>
+                                        <div class="dropdown-divider"></div>
+                                        <a class="dropdown-item" href="{{ route('my-library.history') }}">Reading History</a>
+                                        <a class="dropdown-item" href="{{ route('my-library.goals') }}">Reading Goals</a>
+                                    </div>
+                                </li>
                             @endif
                         @endauth
                     </ul>
