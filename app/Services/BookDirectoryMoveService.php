@@ -249,7 +249,7 @@ class BookDirectoryMoveService
             }
 
             // If it's not a recognized metadata file, consider it content
-            if (!in_array($filename, self::METADATA_FILES)) {
+            if (!in_array(strtolower($filename), self::METADATA_FILES, true)) {
                 return false;
             }
         }

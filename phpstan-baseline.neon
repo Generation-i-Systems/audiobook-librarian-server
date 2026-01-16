@@ -283,6 +283,12 @@ parameters:
 			path: app/Console/Commands/ImportBooksFromDownloads.php
 
 		-
+			message: '#^Call to an undefined method App\\Services\\BookEnrichmentService\:\:manualEnrichmentWithComparison\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Console/Commands/ImportBooksFromDownloads.php
+
+		-
 			message: '#^Call to function is_array\(\) with string will always evaluate to false\.$#'
 			identifier: function.impossibleType
 			count: 2

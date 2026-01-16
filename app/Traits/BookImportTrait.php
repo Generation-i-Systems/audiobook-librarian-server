@@ -224,8 +224,8 @@ trait BookImportTrait
             }
             $ext = strtolower($file->getExtension());
             if (
-                in_array($ext, ['m4b', 'jpg', 'jpeg', 'png', 'gif', 'webp']) ||
-                $file->getFilename() === 'metadata.abs'
+                in_array($ext, ['m4b', 'jpg', 'jpeg', 'png', 'gif', 'webp'], true) ||
+                strtolower($file->getFilename()) === 'metadata.abs'
             ) {
                 $bookDirs[] = $file->getPath();
             }

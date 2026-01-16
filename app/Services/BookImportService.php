@@ -624,7 +624,7 @@ class BookImportService
             // Add narrator if requested
             if ($includeNarrator) {
                 $narrators = $metadata['narrator'] ?? null;
-                if (!empty($narrators)) {
+                if ($narrators !== null) {
                     $narratorString = is_array($narrators) ? implode(', ', $narrators) : (string) $narrators;
                     if ($narratorString !== '') {
                         $title .= " ({$narratorString})";
@@ -1352,13 +1352,22 @@ class BookImportService
             return null;
         }
 
-        // Check for common cover image filenames
-        $coverNames = ['cover.jpg', 'cover.jpeg', 'cover.png', 'folder.jpg', 'folder.jpeg', 'folder.png'];
+        // Check for common cover image filenames (case-insensitive)
+        $targetNames = ['cover.jpg', 'cover.jpeg', 'cover.png', 'folder.jpg', 'folder.jpeg', 'folder.png', 'cover.webp'];
 
-        foreach ($coverNames as $coverName) {
-            $coverPath = $fullPath . '/' . $coverName;
-            if (file_exists($coverPath)) {
-                return $directoryPath . '/' . $coverName;
+        $files = scandir($fullPath);
+        if ($files === false) {
+            return null;
+        }
+
+        foreach ($files as $file) {
+            if ($file === '.' || $file === '..') {
+                continue;
+            }
+
+            $lowerFile = strtolower($file);
+            if (in_array($lowerFile, $targetNames, true)) {
+                return $directoryPath . '/' . $file;
             }
         }
 
@@ -1726,7 +1735,7 @@ class BookImportService
             }
 
             // If it's not a recognized metadata file, consider it content
-            if (!in_array($filename, self::METADATA_FILES)) {
+            if (!in_array(strtolower($filename), self::METADATA_FILES, true)) {
                 return false;
             }
         }
