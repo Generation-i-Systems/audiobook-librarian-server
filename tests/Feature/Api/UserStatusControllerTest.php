@@ -43,7 +43,7 @@ class UserStatusControllerTest extends TestCase
         $response = $this->postJson('/api/v1/status/' . $this->book->id . '/set', [
             'status' => 'in_progress',
             'status_detail' => ['device' => 'mobile'],
-        ])->assertStatus(200);
+        ], ['X-Acting-As-Test' => '1'])->assertStatus(200);
 
         $response->assertJson([
             'message' => 'Book status updated to in_progress.',
@@ -71,7 +71,7 @@ class UserStatusControllerTest extends TestCase
 
         $this->postJson('/api/v1/status/' . $this->book->id . '/set', [
             'status' => 'completed',
-        ])->assertStatus(200);
+        ], ['X-Acting-As-Test' => '1'])->assertStatus(200);
 
         $this->assertDatabaseHas('user_book_status', [
             'user_id' => $this->user->id,
@@ -86,7 +86,7 @@ class UserStatusControllerTest extends TestCase
     {
         $this->postJson('/api/v1/status/' . $this->book->id . '/set', [
             'status' => 'invalid_status',
-        ])->assertStatus(422)
+        ], ['X-Acting-As-Test' => '1'])->assertStatus(422)
             ->assertJsonValidationErrors('status');
     }
 
@@ -99,7 +99,7 @@ class UserStatusControllerTest extends TestCase
         UserBookStatus::factory()->create(['user_id' => $this->user->id, 'book_id' => $book2->id, 'status' => 'queue', 'order' => 1]);
         UserBookStatus::factory()->create(['user_id' => $this->user->id, 'book_id' => $book3->id, 'status' => 'wishlist', 'order' => 0]);
 
-        $response = $this->getJson('/api/v1/status/list/queue')->assertStatus(200);
+        $response = $this->getJson('/api/v1/status/list/queue', ['X-Acting-As-Test' => '1'])->assertStatus(200);
 
         $response->assertJsonCount(2);
         // Assert order is correct (book2 should be first as it has order 1)
@@ -118,7 +118,7 @@ class UserStatusControllerTest extends TestCase
                 ['book_id' => $this->book->id, 'order' => 2],
                 ['book_id' => $book2->id, 'order' => 1],
             ],
-        ])->assertStatus(200)
+        ], ['X-Acting-As-Test' => '1'])->assertStatus(200)
             ->assertJson(['message' => 'Queue reordered successfully.']);
 
         $this->assertDatabaseHas('user_book_status', [
@@ -127,5 +127,55 @@ class UserStatusControllerTest extends TestCase
             'status' => 'queue',
             'order' => 2,
         ]);
+    }
+
+    public function test_can_get_reading_history(): void
+    {
+        $book2 = Book::factory()->create();
+        UserBookStatus::factory()->create([
+            'user_id' => $this->user->id,
+            'book_id' => $this->book->id,
+            'status' => 'completed',
+            'finished_at' => now()->subDays(2),
+            'order' => 0,
+        ]);
+        UserBookStatus::factory()->create([
+            'user_id' => $this->user->id,
+            'book_id' => $book2->id,
+            'status' => 'completed',
+            'finished_at' => now()->subDay(),
+            'order' => 0,
+        ]);
+
+        $response = $this->getJson('/api/v1/status/history', ['X-Acting-As-Test' => '1'])->assertStatus(200);
+
+        $response->assertJsonCount(2, 'data');
+        // book2 should be first (more recent)
+        $response->assertJsonPath('data.0.bookId', $book2->id);
+    }
+
+    public function test_can_get_reading_goals(): void
+    {
+        $book2 = Book::factory()->create();
+        UserBookStatus::factory()->create([
+            'user_id' => $this->user->id,
+            'book_id' => $this->book->id,
+            'status' => 'in_progress',
+            'target_date' => now()->addWeek(),
+            'order' => 0,
+        ]);
+        UserBookStatus::factory()->create([
+            'user_id' => $this->user->id,
+            'book_id' => $book2->id,
+            'status' => 'queue',
+            'target_date' => now()->addDays(2),
+            'order' => 0,
+        ]);
+
+        $response = $this->getJson('/api/v1/status/goals', ['X-Acting-As-Test' => '1'])->assertStatus(200);
+
+        $response->assertJsonCount(2);
+        // book2 should be first (earlier target date)
+        $response->assertJsonPath('0.bookId', $book2->id);
     }
 }

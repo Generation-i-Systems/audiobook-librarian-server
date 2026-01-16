@@ -51,6 +51,8 @@ Route::prefix('v1')->group(function () {
         // Status and Queue Routes (New unified system)
         Route::prefix('status')->group(function () {
             Route::get('/list/{statusType}', [UserStatusController::class, 'list']);
+            Route::get('/history', [UserStatusController::class, 'history']);
+            Route::get('/goals', [UserStatusController::class, 'goals']);
             Route::post('/{book}/set', [UserStatusController::class, 'set']);
             Route::post('/queue/reorder', [UserStatusController::class, 'reorder']);
         });
@@ -162,6 +164,7 @@ Route::prefix('v1')->group(function () {
         // OpenAPI spec statistics routes
         Route::get('/statistics/overview', [StatisticsController::class, 'getOverview']);
         Route::get('/statistics/daily', [StatisticsController::class, 'getDailyStatsOpenApi']);
+        Route::get('/statistics/reading-history', [StatisticsController::class, 'getReadingHistoryStats']);
         Route::post('/statistics/report', [StatisticsController::class, 'reportSession']);
 
         // Legacy statistics routes

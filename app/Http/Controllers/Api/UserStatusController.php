@@ -56,6 +56,7 @@ class UserStatusController extends Controller
             'status' => ['required', 'string', Rule::in(self::VALID_STATUSES)],
             'order' => ['nullable', 'integer', 'min:1'],
             'status_detail' => ['nullable', 'array'],
+            'target_date' => ['nullable', 'date'],
         ]);
 
         /** @var User $user */
@@ -67,25 +68,35 @@ class UserStatusController extends Controller
             ->first();
         $previousStatus = $currentStatus?->status;
 
+        $updateData = [
+            'status' => $data['status'],
+            'order' => $data['order'] ?? 0,
+            'status_detail' => $data['status_detail'] ?? null,
+            'target_date' => $data['target_date'] ?? null,
+        ];
+
+        // Automatic timestamp handling
+        if ($data['status'] === 'in_progress' && $previousStatus !== 'in_progress') {
+            $updateData['started_at'] = now();
+        }
+
+        if ($data['status'] === 'completed' && $previousStatus !== 'completed') {
+            $updateData['finished_at'] = now();
+            // Increment read count
+            $updateData['read_count'] = ($currentStatus?->read_count ?? 0) + 1;
+        }
+
         if ($currentStatus) {
             UserBookStatus::where('user_id', $user->id)
                 ->where('book_id', $book->id)
-                ->update([
-                    'status' => $data['status'],
-                    'order' => $data['order'] ?? 0,
-                    'status_detail' => $data['status_detail'] ?? null,
-                ]);
+                ->update($updateData);
             $statusModel = UserBookStatus::where('user_id', $user->id)
                 ->where('book_id', $book->id)
                 ->first();
         } else {
-            $statusModel = UserBookStatus::create([
-                'user_id' => $user->id,
-                'book_id' => $book->id,
-                'status' => $data['status'],
-                'order' => $data['order'] ?? 0,
-                'status_detail' => $data['status_detail'] ?? null,
-            ]);
+            $updateData['user_id'] = $user->id;
+            $updateData['book_id'] = $book->id;
+            $statusModel = UserBookStatus::create($updateData);
         }
 
         // Dispatch event for Badge/Stats integration (Phase 3)
@@ -97,6 +108,42 @@ class UserStatusController extends Controller
             'message' => "Book status updated to {$data['status']}.",
             'status' => $statusModel,
         ], 200);
+    }
+
+    /**
+     * Get the user's reading history (completed books ordered by finished_at).
+     */
+    public function history(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = Auth::user();
+
+        $history = $user->bookStatuses()
+            ->with('book')
+            ->where('status', 'completed')
+            ->whereNotNull('finished_at')
+            ->orderByDesc('finished_at')
+            ->paginate($request->input('per_page', 20));
+
+        return response()->json($history);
+    }
+
+    /**
+     * Get the user's reading goals/queue with target dates.
+     */
+    public function goals(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = Auth::user();
+
+        $goals = $user->bookStatuses()
+            ->with('book')
+            ->whereIn('status', ['queue', 'in_progress'])
+            ->whereNotNull('target_date')
+            ->orderBy('target_date')
+            ->get();
+
+        return response()->json($goals);
     }
 
     /**
