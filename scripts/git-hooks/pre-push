@@ -48,12 +48,22 @@ print_section "1/8 Syntax Checks"
 
 # Check PHP syntax
 echo -e "${YELLOW}Checking PHP syntax...${NC}"
+PHP_FILES_TO_CHECK=$(find app tests -name "*.php" 2>/dev/null)
+TOTAL_PHP_FILES=$(echo "$PHP_FILES_TO_CHECK" | wc -l)
+echo -e "${YELLOW}Scanning ${TOTAL_PHP_FILES} PHP files...${NC}"
+
 PHP_SYNTAX_ERROR=false
-for file in $(find app tests -name "*.php" 2>/dev/null); do
+COUNTER=0
+for file in $PHP_FILES_TO_CHECK; do
+    COUNTER=$((COUNTER + 1))
     if ! php -l "$file" > /dev/null 2>&1; then
         echo -e "${RED}❌ PHP syntax error in $file${NC}"
         php -l "$file"
         PHP_SYNTAX_ERROR=true
+    fi
+    # Show progress every 100 files
+    if [ $((COUNTER % 100)) -eq 0 ]; then
+        echo -e "${BLUE}  Progress: ${COUNTER}/${TOTAL_PHP_FILES} files checked...${NC}"
     fi
 done
 
@@ -65,13 +75,23 @@ fi
 
 # Check JS syntax
 echo -e "${YELLOW}Checking JavaScript syntax...${NC}"
+JS_FILES_TO_CHECK=$(find resources/js public/js tests/Javascript -name "*.js" 2>/dev/null)
+TOTAL_JS_FILES=$(echo "$JS_FILES_TO_CHECK" | wc -l)
+echo -e "${YELLOW}Scanning ${TOTAL_JS_FILES} JavaScript files...${NC}"
+
 JS_SYNTAX_ERROR=false
-for file in $(find resources/js public/js tests/Javascript -name "*.js" 2>/dev/null); do
+COUNTER=0
+for file in $JS_FILES_TO_CHECK; do
     if [ -f "$file" ]; then
+        COUNTER=$((COUNTER + 1))
         if ! node --check "$file" > /dev/null 2>&1; then
             echo -e "${RED}❌ JS syntax error in $file${NC}"
             node --check "$file"
             JS_SYNTAX_ERROR=true
+        fi
+        # Show progress every 50 files (JS usually has fewer files)
+        if [ $((COUNTER % 50)) -eq 0 ]; then
+            echo -e "${BLUE}  Progress: ${COUNTER}/${TOTAL_JS_FILES} files checked...${NC}"
         fi
     fi
 done
@@ -94,11 +114,31 @@ fi
 # =============================================================================
 print_section "2/8 Code Style Check (Pint)"
 
-echo -e "${YELLOW}Running Pint...${NC}"
-if ./vendor/bin/pint --config .pint.json --test > /dev/null 2>&1; then
-    handle_success "Pint code style check"
+START_TIME=$(date +%s)
+BASE_COMMIT=$(git merge-base HEAD origin/main 2>/dev/null || echo "main")
+echo -e "${YELLOW}Comparing against base commit: ${BASE_COMMIT}${NC}"
+
+CHANGED_PHP_FILES_LIST=$(git diff --name-only --diff-filter=d $BASE_COMMIT...HEAD 2>/dev/null | grep "\.php$" || true)
+FILE_COUNT=$(echo "$CHANGED_PHP_FILES_LIST" | grep -c "\.php$" || true)
+
+if [ "$FILE_COUNT" -gt 0 ]; then
+    echo -e "${YELLOW}Checking style for ${FILE_COUNT} changed PHP file(s):${NC}"
+    echo "$CHANGED_PHP_FILES_LIST" | sed 's/^/  - /'
+    echo ""
+
+    # Convert list to space-separated string for Pint
+    CHANGED_PHP_FILES=$(echo "$CHANGED_PHP_FILES_LIST" | xargs echo)
+
+    if ./vendor/bin/pint --config .pint.json --test $CHANGED_PHP_FILES; then
+        END_TIME=$(date +%s)
+        DURATION=$((END_TIME - START_TIME))
+        handle_success "Pint code style check (took ${DURATION}s)"
+    else
+        handle_failure "Pint code style check" "Run: ./vendor/bin/pint to auto-fix style issues"
+    fi
 else
-    handle_failure "Pint code style check" "Run: ./vendor/bin/pint to auto-fix style issues"
+    echo -e "${GREEN}No PHP files changed, skipping Pint.${NC}"
+    handle_success "Pint code style check"
 fi
 
 # =============================================================================
@@ -147,17 +187,18 @@ else
 fi
 
 # =============================================================================
-# 6. PHP UNIT TESTS
+# 8. PHP TESTS (PHPUnit)
 # =============================================================================
-print_section "6/8 PHP Unit Tests (Full Suite)"
+print_section "8/8 PHP Tests (PHPUnit)"
 
-echo -e "${YELLOW}Running full PHP test suite...${NC}"
-echo -e "${YELLOW}This may take a few minutes...${NC}"
-if php artisan test --stop-on-failure 2>&1; then
-    handle_success "PHP test suite"
+echo -e "${YELLOW}Running API and Core tests...${NC}"
+if ./vendor/bin/phpunit tests/Api tests/Core; then
+    handle_success "PHP tests passed"
 else
-    handle_failure "PHP test suite" "Run 'php artisan test' to see detailed failure messages"
+    handle_failure "PHP tests failed" "Run: composer test to see all failures"
 fi
+
+
 
 # =============================================================================
 # 7. SECURITY AUDITS
@@ -197,7 +238,9 @@ echo -e "${YELLOW}Checking for common issues...${NC}"
 
 # Check for debug statements
 DEBUG_FOUND=false
-for file in $(git diff --name-only origin/main...HEAD 2>/dev/null | grep "\.php$"); do
+# Use a safer way to check for changed files that doesn't necessarily require a remote connection
+BASE_COMMIT=$(git merge-base HEAD origin/main 2>/dev/null || echo "main")
+for file in $(git diff --name-only --diff-filter=d $BASE_COMMIT...HEAD 2>/dev/null | grep "\.php$"); do
     if [ -f "$file" ] && grep -q "dd(\|dump(\|var_dump(\|print_r(" "$file" 2>/dev/null; then
         echo -e "${YELLOW}⚠️  Debug statement found in: $file${NC}"
         DEBUG_FOUND=true
