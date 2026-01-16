@@ -7,6 +7,7 @@ use App\Contracts\DocumentStoreServiceInterface;
 use App\Models\User;
 use App\Models\Book;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Mockery\MockInterface;
 
 class BookApiOpenApiTest extends TestCase
@@ -52,6 +53,7 @@ class BookApiOpenApiTest extends TestCase
 
         $response = $this->withHeaders([
             'Accept' => 'application/json',
+            'X-Acting-As-Test' => '1',
         ])->getJson('/api/v1/books');
 
         $response->assertStatus(200);
@@ -135,6 +137,7 @@ class BookApiOpenApiTest extends TestCase
 
         $response = $this->withHeaders([
             'Accept' => 'application/json',
+            'X-Acting-As-Test' => '1',
         ])->getJson('/api/v1/books?search=Lord');
 
         $response->assertStatus(200);
@@ -188,6 +191,7 @@ class BookApiOpenApiTest extends TestCase
 
         $response = $this->withHeaders([
             'Accept' => 'application/json',
+            'X-Acting-As-Test' => '1',
         ])->getJson('/api/v1/books/' . $book->id);
 
         $response->assertStatus(200);
@@ -254,12 +258,16 @@ class BookApiOpenApiTest extends TestCase
      */
     public function test_genre_is_always_returned_as_array()
     {
+        /** @var User $user */
+        $user = Auth::user();
+        $userId = $user->id;
+
         // Mock the DocumentStoreServiceInterface
-        $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) {
+        $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) use ($userId) {
             // Mock response for a book with genre as a string
             $mock->shouldReceive('getBook')
                 ->once()
-                ->with(1)
+                ->with(1, $userId)
                 ->andReturn([
                     'id' => 1,
                     'title' => 'Test Book 1',
@@ -279,7 +287,7 @@ class BookApiOpenApiTest extends TestCase
             // Mock response for a book with genre as an array
             $mock->shouldReceive('getBook')
                 ->once()
-                ->with(2)
+                ->with(2, $userId)
                 ->andReturn([
                     'id' => 2,
                     'title' => 'Test Book 2',
@@ -300,6 +308,7 @@ class BookApiOpenApiTest extends TestCase
         // Test book with genre as string
         $response = $this->withHeaders([
             'Accept' => 'application/json',
+            'X-Acting-As-Test' => '1',
         ])->getJson('/api/v1/books/1');
 
         $response->assertStatus(200);
@@ -314,6 +323,7 @@ class BookApiOpenApiTest extends TestCase
         $response2 = $this->withHeaders([
             'Authorization' => 'Bearer ' . $this->token,
             'Accept' => 'application/json',
+            'X-Acting-As-Test' => '1',
         ])->getJson('/api/v1/books/2');
 
         $response2->assertStatus(200);

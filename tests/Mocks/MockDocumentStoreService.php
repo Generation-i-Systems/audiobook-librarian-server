@@ -149,7 +149,7 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         }, $this->users);
     }
 
-    public function getBook($id)
+    public function getBook(string $id, ?int $userId = null)
     {
         return $this->books[$id] ?? null;
     }
@@ -303,8 +303,16 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
     /**
      * @inheritdoc
      */
-    public function listBooks(int $page = 1, int $perPage = 24, array $filters = [], bool $withRelated = true, string $sort = 'title', string $order = 'asc', bool $includeAllBooks = false): array
-    {
+    public function listBooks(
+        int $page = 1,
+        int $perPage = 24,
+        array $filters = [],
+        bool $withRelated = true,
+        string $sort = 'title',
+        string $order = 'asc',
+        bool $includeAllBooks = false,
+        ?int $userId = null
+    ): array {
         // Validate order direction
         $order = in_array(strtolower($order), ['asc', 'desc']) ? strtolower($order) : 'asc';
         // Apply filters
@@ -528,8 +536,15 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         return $book;
     }
 
-    public function getBooksByAuthorAndGenre($author, $genre)
-    {
+    public function getBooksByAuthorAndGenre(
+        $author,
+        $genre,
+        string $orderBy = 'title',
+        string $direction = 'asc',
+        int $limit = 20,
+        ?string $startAfter = null,
+        ?int $userId = null
+    ) {
         $results = [];
 
         foreach ($this->books as $book) {

@@ -86,11 +86,29 @@ class BookApiController extends Controller
             'title' => $request->input('title'),
             'publication_date' => $request->input('publication_date'),
             'date_added' => $request->input('date_added'),
+            'status' => $request->input('status'),
+            'is_recommended' => $request->has('is_recommended') ? $request->boolean('is_recommended') : null,
+            'is_completed' => $request->has('is_completed') ? $request->boolean('is_completed') : null,
+            'device_id' => $request->input('device_id'),
         ];
+
+        $sort = $request->input('sort', 'title');
+        $order = $request->input('order', 'asc');
 
         // Respect includeNeedsReview override
         $filters['include_needs_review'] = $includeNeedsReview;
-        $booksData = $this->documentStoreService->listBooks($page, $perPage, $filters);
+        $userId = Auth::id();
+
+        $booksData = $this->documentStoreService->listBooks(
+            $page,
+            $perPage,
+            $filters,
+            true,
+            $sort,
+            $order,
+            false,
+            $userId
+        );
 
         // Transform books to match OpenAPI spec
         $transformedBooks = [];
@@ -124,7 +142,8 @@ class BookApiController extends Controller
 
     public function show($id, Request $request)
     {
-        $book = $this->documentStoreService->getBook($id);
+        $userId = Auth::id();
+        $book = $this->documentStoreService->getBook($id, $userId);
 
         if (!$book) {
             return response()->json([
@@ -452,26 +471,26 @@ class BookApiController extends Controller
             'series' => $request->input('series'),
             'publication_date' => $request->input('publication_date'),
             'date_added' => $request->input('date_added'),
+            'status' => $request->input('status'),
+            'is_recommended' => $request->has('is_recommended') ? $request->boolean('is_recommended') : null,
+            'is_completed' => $request->has('is_completed') ? $request->boolean('is_completed') : null,
+            'device_id' => $request->input('device_id'),
         ];
 
         $filters['include_needs_review'] = $includeNeedsReview;
-        $booksData = $this->documentStoreService->listBooks($page, $perPage, $filters);
+        $userId = Auth::id();
+
+        $booksData = $this->documentStoreService->listBooks($page, $perPage, $filters, true, 'title', 'asc', false, $userId);
         $books = $booksData['data'];
         $total = $booksData['total'];
 
         // Transform books to match OpenAPI spec
-        $books = array_filter($books, 'is_array');
-        if (!$includeNeedsReview) {
-            $books = array_filter($books, function ($book) {
-                return empty($book['needs_review']);
-            });
-        }
-        $books = array_map(function ($book) use ($withCover, $inlineCovers) {
+        $transformedBooks = array_map(function ($book) use ($withCover, $inlineCovers) {
             return $this->getBookWithCover($book, $withCover, $inlineCovers);
         }, $books);
 
         return response()->json([
-            'data' => $books,
+            'data' => $transformedBooks,
             'meta' => [
                 'current_page' => $page,
                 'from' => ($total > 0) ? (($page - 1) * $perPage) + 1 : null,
@@ -1366,26 +1385,23 @@ class BookApiController extends Controller
                 'message' => 'The specified series could not be found',
             ], 404);
         }
-        $books = array_filter($documentStore->listBooks(), fn ($book) => ($book['series_id'] ?? null) == $seriesId);
-        $books = array_values($books);
-        // Filter out any non-array entries that may have gotten into the books array
-        $books = array_filter($books, 'is_array');
-        $total = count($books);
-        $page = (int) $request->input('page', 1);
-        $offset = ($page - 1) * $perPage;
-        $paginatedBooks = array_slice($books, $offset, $perPage);
-        $paginatedBooks = array_map(fn ($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $paginatedBooks);
+
+        $userId = Auth::id();
+        $booksData = $documentStore->listBooks(1, $perPage, ['series_id' => $seriesId], true, 'title', 'asc', false, $userId);
+        $books = $booksData['data'];
+
+        $transformedBooks = array_map(fn ($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $books);
 
         return response()->json([
             'series' => ['id' => $series['id'], 'name' => $series['name']],
-            'data' => $paginatedBooks,
+            'data' => $transformedBooks,
             'meta' => [
-                'current_page' => $page,
-                'from' => ($total > 0) ? $offset + 1 : null,
-                'last_page' => max(1, ceil($total / $perPage)),
+                'current_page' => 1,
+                'from' => ($booksData['total'] > 0) ? 1 : null,
+                'last_page' => $booksData['lastPage'],
                 'per_page' => $perPage,
-                'to' => ($total > 0) ? min($offset + $perPage, $total) : null,
-                'total' => $total,
+                'to' => count($transformedBooks),
+                'total' => $booksData['total'],
             ],
         ]);
     }
@@ -1406,26 +1422,23 @@ class BookApiController extends Controller
                 'message' => 'The specified author could not be found',
             ], 404);
         }
-        $books = array_filter($documentStore->listBooks(), fn ($book) => ($book['author_id'] ?? null) == $authorId);
-        $books = array_values($books);
-        // Filter out any non-array entries that may have gotten into the books array
-        $books = array_filter($books, 'is_array');
-        $total = count($books);
-        $page = (int) $request->input('page', 1);
-        $offset = ($page - 1) * $perPage;
-        $paginatedBooks = array_slice($books, $offset, $perPage);
-        $paginatedBooks = array_map(fn ($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $paginatedBooks);
+
+        $userId = Auth::id();
+        $booksData = $documentStore->listBooks(1, $perPage, ['author_id' => $authorId], true, 'title', 'asc', false, $userId);
+        $books = $booksData['data'];
+
+        $transformedBooks = array_map(fn ($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $books);
 
         return response()->json([
             'author' => ['id' => $author['id'], 'name' => $author['name']],
-            'data' => $paginatedBooks,
+            'data' => $transformedBooks,
             'meta' => [
-                'current_page' => $page,
-                'from' => ($total > 0) ? $offset + 1 : null,
-                'last_page' => max(1, ceil($total / $perPage)),
+                'current_page' => 1,
+                'from' => ($booksData['total'] > 0) ? 1 : null,
+                'last_page' => $booksData['lastPage'],
                 'per_page' => $perPage,
-                'to' => ($total > 0) ? min($offset + $perPage, $total) : null,
-                'total' => $total,
+                'to' => count($transformedBooks),
+                'total' => $booksData['total'],
             ],
         ]);
     }
@@ -1459,55 +1472,45 @@ class BookApiController extends Controller
     public function booksByAuthorAndGenre($authorId, $genreId, Request $request)
     {
         $perPage = $request->input('per_page', 100);
+        $page = max(1, (int) $request->input('page', 1));
         $withCover = $request->boolean('with_cover', true);
         $inlineCovers = $request->boolean('inlineCovers', false);
-        Log::info('booksByAuthorAndGenre called for author: ' . $authorId . ' and genre: ' . $genreId);
-        Log::info('booksByAuthorAndGenre ' . json_encode($_POST));
-        Log::info('booksByAuthorAndGenre ' . json_encode($_GET));
 
         $documentStore = $this->documentStoreService;
         $author = $documentStore->getAuthor($authorId);
         $genre = $documentStore->getGenre($genreId);
-        $books = $documentStore->getBooksByAuthorAndGenre($authorId, $genreId);
+
         if (!$author || !$genre) {
             return response()->json([
                 'error' => 'Author or Genre not found',
                 'message' => 'The specified author or genre could not be found',
             ], 404);
         }
-        // Sort books by series name, series number, and title
-        usort($books, function ($a, $b) {
-            $seriesA = $a['series']['name'] ?? '';
-            $seriesB = $b['series']['name'] ?? '';
-            if ($seriesA !== $seriesB) {
-                return strcmp($seriesA, $seriesB);
-            }
-            $numA = $a['series_number'] ?? 0;
-            $numB = $b['series_number'] ?? 0;
-            if ($numA !== $numB) {
-                return $numA <=> $numB;
-            }
 
-            return strcmp($a['title'] ?? '', $b['title'] ?? '');
-        });
-        // Paginate manually
-        // Filter out any non-array entries that may have gotten into the books array
-        $books = array_filter($books, 'is_array');
-        $total = count($books);
-        $page = max(1, (int) $request->input('page', 1));
-        $offset = ($page - 1) * $perPage;
-        $paginatedBooks = array_slice($books, $offset, $perPage);
-        $paginatedBooks = array_map(fn ($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $paginatedBooks);
+        $userId = Auth::id();
+        $booksData = $documentStore->listBooks(
+            $page,
+            $perPage,
+            ['author_id' => $authorId, 'genre_id' => $genreId],
+            true,
+            'title',
+            'asc',
+            false,
+            $userId
+        );
+
+        $books = $booksData['data'];
+        $transformedBooks = array_map(fn ($book) => $this->getBookWithCover($book, $withCover, $inlineCovers), $books);
 
         return response()->json([
-            'data' => $paginatedBooks,
+            'data' => $transformedBooks,
             'meta' => [
                 'current_page' => $page,
-                'from' => ($total > 0) ? $offset + 1 : null,
-                'last_page' => max(1, ceil($total / $perPage)),
+                'from' => ($booksData['total'] > 0) ? (($page - 1) * $perPage) + 1 : null,
+                'last_page' => $booksData['lastPage'],
                 'per_page' => $perPage,
-                'to' => ($total > 0) ? min($offset + $perPage, $total) : null,
-                'total' => $total,
+                'to' => ($booksData['total'] > 0) ? min($page * $perPage, $booksData['total']) : null,
+                'total' => $booksData['total'],
             ],
         ]);
     }
@@ -1540,6 +1543,17 @@ class BookApiController extends Controller
             'created_at' => $book['created_at'] ?? $book['date_added'] ?? null,
             'updated_at' => $book['updated_at'] ?? null,
         ];
+
+        // Include user-specific data if present
+        if (isset($book['progress'])) {
+            $transformedBook['progress'] = $book['progress'];
+        }
+        if (isset($book['status'])) {
+            $transformedBook['status'] = $book['status'];
+        }
+        if (isset($book['recommendation'])) {
+            $transformedBook['recommendation'] = $book['recommendation'];
+        }
 
         // Handle cover image - always set cover_url if coverImage exists
         if (!empty($book['coverImage'])) {
@@ -1595,18 +1609,18 @@ class BookApiController extends Controller
                 $seriesNumber = null;
 
                 if (is_array($series)) {
-                    $name = $series['name'] ?? null;
-                    $seriesNumber = $series['pivot']['series_number'] ?? $series['series_number'] ?? null;
+                    $name = $series['name'] ?? $series['seriesName'] ?? null;
+                    $seriesNumber = $series['pivot']['series_number'] ?? $series['series_number'] ?? $series['number'] ?? null;
                 } elseif (is_object($series)) {
-                    $name = $series->name ?? null;
-                    $seriesNumber = $series->pivot->series_number ?? $series->series_number ?? null;
+                    $name = $series->name ?? $series->seriesName ?? null;
+                    $seriesNumber = $series->pivot->series_number ?? $series->series_number ?? $series->number ?? null;
                 }
 
                 // Only include entries with valid series names (not null or empty)
                 if (!empty($name)) {
                     $result[] = [
                         'name' => $name,
-                        'series_number' => $seriesNumber,
+                        'series_number' => $seriesNumber !== null ? (string)$seriesNumber : null,
                     ];
                 }
             }
@@ -2098,191 +2112,89 @@ class BookApiController extends Controller
         $inlineCovers = $request->boolean('inlineCovers', false);
 
         // Filtering parameters
-        $genreId = $request->input('genre_id');
-        $genreName = $request->input('genre_name');
-        $authorId = $request->input('author_id');
-        $authorName = $request->input('author_name');
-        $seriesId = $request->input('series_id');
-        $seriesName = $request->input('series_name');
-        $search = $request->input('search');
-        $sort = $request->input('sort', 'title_asc');
+        $filters = [
+            'genre_id' => $request->input('genre_id'),
+            'genre' => $request->input('genre_name'),
+            'author_id' => $request->input('author_id'),
+            'author' => $request->input('author_name'),
+            'series_id' => $request->input('series_id'),
+            'series' => $request->input('series_name'),
+            'search' => $request->input('search'),
+            'status' => $request->input('status'),
+            'is_recommended' => $request->has('is_recommended') ? $request->boolean('is_recommended') : null,
+            'is_completed' => $request->has('is_completed') ? $request->boolean('is_completed') : null,
+            'device_id' => $request->input('device_id'),
+        ];
 
-        // Validate sort parameter
-        $allowedSorts = ['title_asc', 'title_desc', 'created_at_asc', 'created_at_desc', 'author_asc', 'author_desc'];
-        if (!in_array($sort, $allowedSorts)) {
-            $sort = 'title_asc';
-        }
+        // Map enhanced sort names to internal sort names
+        $sortMap = [
+            'title_asc' => ['title', 'asc'],
+            'title_desc' => ['title', 'desc'],
+            'created_at_asc' => ['created_at', 'asc'],
+            'created_at_desc' => ['created_at', 'desc'],
+            'author_asc' => ['author', 'asc'],
+            'author_desc' => ['author', 'desc'],
+            'progress_asc' => ['progress', 'asc'],
+            'progress_desc' => ['progress', 'desc'],
+            'last_listened_asc' => ['last_listened', 'asc'],
+            'last_listened_desc' => ['last_listened', 'desc'],
+            'queue_order_asc' => ['queue_order', 'asc'],
+            'queue_order_desc' => ['queue_order', 'desc'],
+        ];
 
-        // Build the base query (exclude items needing review)
-        $query = \App\Models\Book::query()
-            ->with(['authors', 'narrators', 'genres', 'series'])
-            ->select('books.*')
-            ->where('books.needs_review', false);
+        $sortParam = $request->input('sort', 'title_asc');
+        $sortConfig = $sortMap[$sortParam] ?? ['title', 'asc'];
 
-        // Add genre filtering
-        if ($genreId || $genreName) {
-            $query->join('book_genre', 'books.id', '=', 'book_genre.book_id')
-                ->join('genres', 'book_genre.genre_id', '=', 'genres.id');
+        $sort = $sortConfig[0];
+        $order = $sortConfig[1];
+        $userId = Auth::id();
 
-            if ($genreId) {
-                $query->where('genres.id', $genreId);
-            } elseif ($genreName) {
-                $query->where('genres.name', $genreName);
-            }
-        }
+        $booksData = $this->documentStoreService->listBooks(
+            $page,
+            $perPage,
+            $filters,
+            true,
+            $sort,
+            $order,
+            false,
+            $userId
+        );
 
-        // Add author filtering
-        if ($authorId || $authorName) {
-            $query->join('author_book', 'books.id', '=', 'author_book.book_id')
-                ->join('authors', 'author_book.author_id', '=', 'authors.id');
-
-            if ($authorId) {
-                $query->where('authors.id', $authorId);
-            } elseif ($authorName) {
-                $query->where('authors.name', 'LIKE', '%' . $authorName . '%');
-            }
-        }
-
-        // Add series filtering
-        if ($seriesId || $seriesName) {
-            $query->join('book_series', 'books.id', '=', 'book_series.book_id')
-                ->join('series', 'book_series.series_id', '=', 'series.id');
-
-            if ($seriesId) {
-                $query->where('series.id', $seriesId);
-            } elseif ($seriesName) {
-                $query->where('series.name', 'LIKE', '%' . $seriesName . '%');
-            }
-        }
-
-        // Add search functionality (title search)
-        if ($search) {
-            $query->where('books.title', 'LIKE', '%' . $search . '%');
-        }
-
-        // Use distinct to avoid duplicates from joins instead of GROUP BY
-        $query->distinct();
-
-        // Add sorting
-        switch ($sort) {
-            case 'title_desc':
-                $query->orderBy('books.title', 'desc');
-                break;
-            case 'created_at_asc':
-                $query->orderBy('books.created_at', 'asc');
-                break;
-            case 'created_at_desc':
-                $query->orderBy('books.created_at', 'desc');
-                break;
-            case 'author_asc':
-                if (!($authorId || $authorName)) {
-                    // Only join authors if not already joined for filtering
-                    $query->leftJoin('author_book as ab_sort', 'books.id', '=', 'ab_sort.book_id')
-                        ->leftJoin('authors as a_sort', 'ab_sort.author_id', '=', 'a_sort.id')
-                        ->orderBy('a_sort.name', 'asc');
-                } else {
-                    $query->orderBy('authors.name', 'asc');
-                }
-                break;
-            case 'author_desc':
-                if (!($authorId || $authorName)) {
-                    $query->leftJoin('author_book as ab_sort', 'books.id', '=', 'ab_sort.book_id')
-                        ->leftJoin('authors as a_sort', 'ab_sort.author_id', '=', 'a_sort.id')
-                        ->orderBy('a_sort.name', 'desc');
-                } else {
-                    $query->orderBy('authors.name', 'desc');
-                }
-                break;
-            case 'title_asc':
-            default:
-                $query->orderBy('books.title', 'asc');
-                break;
-        }
-
-        // Get total count before pagination - create clean count query without GROUP BY
-        $countQuery = \App\Models\Book::query()->where('books.needs_review', false);
-
-        // Add same filtering as main query
-        if ($genreId || $genreName) {
-            $countQuery->join('book_genre', 'books.id', '=', 'book_genre.book_id')
-                ->join('genres', 'book_genre.genre_id', '=', 'genres.id');
-            if ($genreId) {
-                $countQuery->where('genres.id', $genreId);
-            } elseif ($genreName) {
-                $countQuery->where('genres.name', $genreName);
-            }
-        }
-
-        if ($authorId || $authorName) {
-            $countQuery->join('author_book', 'books.id', '=', 'author_book.book_id')
-                ->join('authors', 'author_book.author_id', '=', 'authors.id');
-            if ($authorId) {
-                $countQuery->where('authors.id', $authorId);
-            } elseif ($authorName) {
-                $countQuery->where('authors.name', $authorName);
-            }
-        }
-
-        if ($seriesId || $seriesName) {
-            $countQuery->join('book_series', 'books.id', '=', 'book_series.book_id')
-                ->join('series', 'book_series.series_id', '=', 'series.id');
-            if ($seriesId) {
-                $countQuery->where('series.id', $seriesId);
-            } elseif ($seriesName) {
-                $countQuery->where('series.name', $seriesName);
-            }
-        }
-
-        if ($search) {
-            $countQuery->where('books.title', 'LIKE', '%' . $search . '%');
-        }
-
-        $total = $countQuery->distinct()->count('books.id');
-
-        // Execute query with pagination
-        $offset = ($page - 1) * $perPage;
-        $books = $query->offset($offset)->limit($perPage)->get();
+        $total = $booksData['total'];
+        $books = $booksData['data'];
 
         // Transform books to match API spec
-        $transformedBooks = $books->map(function ($book) use ($withCover, $inlineCovers) {
-            // Convert book to array and prepare relationship data for getBookWithCover
-            $bookArray = $book->toArray();
+        $transformedBooks = array_map(function ($book) use ($withCover, $inlineCovers) {
+            $result = $this->getBookWithCover($book, $withCover, $inlineCovers);
 
-            // Extract relationship data and format it for getBookWithCover
-            if (isset($bookArray['authors'])) {
-                $bookArray['author'] = collect($bookArray['authors'])->pluck('name')->toArray();
-                $bookArray['authors'] = $bookArray['authors']; // Keep for enhanced response
-            }
-            if (isset($bookArray['narrators'])) {
-                $bookArray['narrator'] = collect($bookArray['narrators'])->pluck('name')->toArray();
-                $bookArray['narrators'] = $bookArray['narrators']; // Keep for enhanced response
-            }
-            if (isset($bookArray['genres'])) {
-                $bookArray['genre'] = collect($bookArray['genres'])->pluck('name')->toArray();
-                $bookArray['genres'] = $bookArray['genres']; // Keep for enhanced response
-            }
-            if (isset($bookArray['series'])) {
-                $bookArray['series'] = $bookArray['series']; // Keep for enhanced response
+            // Add full relationship objects for the enhanced endpoint
+            // listBooks returns arrays with specific keys for these relationships
+            if (isset($book['authors_data'])) {
+                $result['authors'] = $book['authors_data'];
+            } elseif (isset($book['authors'])) {
+                $result['authors'] = $book['authors'];
             }
 
-            $result = $this->getBookWithCover($bookArray, $withCover, $inlineCovers);
+            if (isset($book['genres_data'])) {
+                $result['genres'] = $book['genres_data'];
+            } elseif (isset($book['genres'])) {
+                $result['genres'] = $book['genres'];
+            }
 
-            // Add relationship data back to the result for enhanced endpoint
-            if (isset($bookArray['authors'])) {
-                $result['authors'] = $bookArray['authors'];
+            if (isset($book['series_data'])) {
+                $result['series'] = $book['series_data'];
+            } elseif (isset($book['series'])) {
+                $result['series'] = $book['series'];
             }
-            if (isset($bookArray['narrators'])) {
-                $result['narrators'] = $bookArray['narrators'];
-            }
-            if (isset($bookArray['genres'])) {
-                $result['genres'] = $bookArray['genres'];
-            }
-            if (isset($bookArray['series'])) {
-                $result['series'] = $bookArray['series'];
+
+            if (isset($book['narrators_data'])) {
+                $result['narrators'] = $book['narrators_data'];
+            } elseif (isset($book['narrators'])) {
+                $result['narrators'] = $book['narrators'];
             }
 
             return $result;
-        });
+        }, $books);
 
         // Calculate pagination info
         $totalPages = ceil($total / $perPage);

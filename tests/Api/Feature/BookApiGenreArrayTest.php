@@ -17,13 +17,6 @@ class BookApiGenreArrayTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-
-        // Create a user and token for API authentication
-        $user = User::factory()->create([
-            'role' => 'standard',
-            'is_admin' => true
-        ]);
-        $this->token = $user->createToken('test-token')->plainTextToken;
     }
 
     /**
@@ -31,12 +24,16 @@ class BookApiGenreArrayTest extends TestCase
      */
     public function test_genre_is_always_returned_as_array()
     {
+        $user = User::factory()->create(['role' => 'admin']);
+        $this->actingAs($user);
+        $userId = $user->id;
+
         // Mock the DocumentStoreServiceInterface
-        $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) {
+        $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) use ($userId) {
             // Mock response for a book with genre as a string
             $mock->shouldReceive('getBook')
                 ->once()
-                ->with(1)
+                ->with(1, $userId)
                 ->andReturn([
                     'id' => 1,
                     'title' => 'Test Book 1',
@@ -56,7 +53,7 @@ class BookApiGenreArrayTest extends TestCase
             // Mock response for a book with genre as an array
             $mock->shouldReceive('getBook')
                 ->once()
-                ->with(2)
+                ->with(2, $userId)
                 ->andReturn([
                     'id' => 2,
                     'title' => 'Test Book 2',
@@ -75,10 +72,7 @@ class BookApiGenreArrayTest extends TestCase
         });
 
         // Test book with genre as string
-        $response = $this->withHeaders([
-            'Authorization' => 'Bearer ' . $this->token,
-            'Accept' => 'application/json',
-        ])->getJson('/api/v1/books/1');
+        $response = $this->getJson('/api/v1/books/1', ['X-Acting-As-Test' => '1']);
 
         $response->assertStatus(200);
         $responseData = $response->json();
@@ -89,10 +83,7 @@ class BookApiGenreArrayTest extends TestCase
         $this->assertEquals('Science Fiction', $responseData['genre'][0]);
 
         // Test book with genre as array
-        $response2 = $this->withHeaders([
-            'Authorization' => 'Bearer ' . $this->token,
-            'Accept' => 'application/json',
-        ])->getJson('/api/v1/books/2');
+        $response2 = $this->getJson('/api/v1/books/2', ['X-Acting-As-Test' => '1']);
 
         $response2->assertStatus(200);
         $responseData2 = $response2->json();

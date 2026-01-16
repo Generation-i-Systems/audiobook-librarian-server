@@ -14,6 +14,11 @@ class ApiAuth
 {
     public function handle(Request $request, Closure $next)
     {
+        // Bypass for testing actingAs ONLY if explicitly requested via header
+        if (app()->environment('testing') && $request->hasHeader('X-Acting-As-Test') && Auth::check()) {
+            return $next($request);
+        }
+
         $authHeader = $request->header('Authorization');
         $clientIp = $request->ip();
         $userAgent = $request->header('User-Agent');

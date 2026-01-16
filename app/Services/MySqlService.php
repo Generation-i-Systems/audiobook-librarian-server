@@ -69,9 +69,15 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         return $directoryPath . '/' . $baseName;
     }
 
-    public function getBook(string $id): ?array
+    public function getBook(string $id, ?int $userId = null): ?array
     {
-        $book = Book::with(['authors', 'narrators', 'genres', 'series', 'chapters'])->find($id);
+        $query = Book::with(['authors', 'narrators', 'genres', 'series', 'chapters']);
+
+        if ($userId) {
+            $query->withUserData($userId);
+        }
+
+        $book = $query->find($id);
 
         if (!$book) {
             return null;
@@ -85,6 +91,11 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             if (!is_array($value)) {
                 $camelCasedBook[Str::camel($key)] = $value;
             }
+        }
+
+        // Handle user data if present
+        if ($userId) {
+            $camelCasedBook = array_merge($camelCasedBook, $this->transformUserData($book));
         }
 
         // Handle array-type fields that are not relationships
@@ -495,7 +506,8 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         bool $withRelated = true,
         string $sort = 'title',
         string $order = 'asc',
-        bool $includeAllBooks = false
+        bool $includeAllBooks = false,
+        ?int $userId = null
     ): array {
         // Limit perPage to a reasonable maximum to prevent memory issues
         $perPage = min($perPage, 100);
@@ -518,7 +530,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             $query->where('needs_review', false);
         }
 
-        // Eager load all relationships required by the OpenAPI spec
+        // Eager load relationships
         $query->with([
             'authors' => function ($q): void {
                 $q->select('authors.id', 'authors.name');
@@ -533,6 +545,10 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 $q->select('series.id', 'series.name', 'series.is_collection')->withPivot('series_number');
             },
         ]);
+
+        if ($userId) {
+            $query->withUserData($userId);
+        }
 
         // Apply filters
         if (!empty($filters['search'])) {
@@ -556,19 +572,31 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             $query->where('title', 'like', '%' . $filters['title'] . '%');
         }
 
-        if (!empty($filters['author'])) {
-            $query->whereHas('authors', function ($q) use ($filters): void {
-                $q->where('name', 'like', '%' . $filters['author'] . '%');
+        if (!empty($filters['genre_id'])) {
+            $query->whereHas('genres', function ($q) use ($filters): void {
+                $q->where('genres.id', $filters['genre_id']);
             });
-        }
-
-        if (!empty($filters['genre'])) {
+        } elseif (!empty($filters['genre'])) {
             $query->whereHas('genres', function ($q) use ($filters): void {
                 $q->where('name', $filters['genre']);
             });
         }
 
-        if (!empty($filters['series'])) {
+        if (!empty($filters['author_id'])) {
+            $query->whereHas('authors', function ($q) use ($filters): void {
+                $q->where('authors.id', $filters['author_id']);
+            });
+        } elseif (!empty($filters['author'])) {
+            $query->whereHas('authors', function ($q) use ($filters): void {
+                $q->where('name', 'like', '%' . $filters['author'] . '%');
+            });
+        }
+
+        if (!empty($filters['series_id'])) {
+            $query->whereHas('series', function ($q) use ($filters): void {
+                $q->where('series.id', $filters['series_id']);
+            });
+        } elseif (!empty($filters['series'])) {
             $query->whereHas('series', function ($q) use ($filters): void {
                 $q->where('name', 'like', '%' . $filters['series'] . '%');
             });
@@ -579,27 +607,53 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         }
 
         if (!empty($filters['date_added'])) {
-            // Handle 'recent' as a special keyword
             if ($filters['date_added'] === 'recent') {
-                // Use the same logic as getRecentBooks - default to 30 days
                 $days = 30;
                 $dateThreshold = now()->subDays($days);
                 $query->where('created_at', '>=', $dateThreshold);
-
-                // Force sorting by created_at desc for recent books to ensure most recent first
-                // This will override any other sort parameters
                 $sort = 'created_at';
                 $order = 'desc';
             } else {
-                // Handle as a specific date
                 try {
                     $query->whereDate('created_at', $filters['date_added']);
                 } catch (\Exception $e) {
-                    // Log invalid date format
                     \Illuminate\Support\Facades\Log::warning(
                         "Invalid date format for date_added filter: {$filters['date_added']}"
                     );
                 }
+            }
+        }
+
+        // New User-specific filters
+        if ($userId) {
+            if (!empty($filters['status'])) {
+                $query->whereHas('statuses', function ($q) use ($userId, $filters): void {
+                    $q->where('user_id', $userId)->where('status', $filters['status']);
+                });
+            }
+
+            if (isset($filters['is_recommended'])) {
+                if ($filters['is_recommended']) {
+                    $query->whereHas('recommendations', function ($q) use ($userId): void {
+                        $q->where('recipient_id', $userId)->whereNull('acknowledged_at');
+                    });
+                } else {
+                    $query->whereDoesntHave('recommendations', function ($q) use ($userId): void {
+                        $q->where('recipient_id', $userId)->whereNull('acknowledged_at');
+                    });
+                }
+            }
+
+            if (isset($filters['is_completed'])) {
+                $query->whereHas('progress', function ($q) use ($userId, $filters): void {
+                    $q->where('user_id', $userId)->where('completed', (bool) $filters['is_completed']);
+                });
+            }
+
+            if (!empty($filters['device_id'])) {
+                $query->whereHas('progress', function ($q) use ($filters): void {
+                    $q->where('device_id', $filters['device_id']);
+                });
             }
         }
 
@@ -639,6 +693,34 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             case 'release_date':
                 $query->orderBy('release_date', $order);
                 break;
+            case 'progress':
+            case 'last_listened':
+                if ($userId) {
+                    $query->leftJoin('book_progress', function ($join) use ($userId) {
+                        $join->on('books.id', '=', 'book_progress.book_id')
+                            ->where('book_progress.user_id', '=', $userId);
+                    });
+                    if ($sort === 'progress') {
+                        $query->orderBy('book_progress.progress_percentage', $order);
+                    } else {
+                        $query->orderBy('book_progress.last_listened_at', $order);
+                    }
+                    $query->select('books.*');
+                } else {
+                    $query->orderBy('title', $order);
+                }
+                break;
+            case 'queue_order':
+                if ($userId) {
+                    $query->leftJoin('user_book_status', function ($join) use ($userId) {
+                        $join->on('books.id', '=', 'user_book_status.book_id')
+                            ->where('user_book_status.user_id', '=', $userId);
+                    })->orderBy('user_book_status.order', $order)
+                    ->select('books.*');
+                } else {
+                    $query->orderBy('title', $order);
+                }
+                break;
             case 'title':
             default:
                 $query->orderBy('title', $order);
@@ -653,49 +735,28 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             ->take($perPage)
             ->get();
 
-        // Transform data to match OpenAPI Book schema
-        $transformedData = $books->map(function ($book) {
-            $coverUrl = null;
+        // Transform data
+        $transformedData = $books->map(function ($book) use ($userId) {
+            $request = request();
+            $coverUrl = $book->cover_image ? $request->getSchemeAndHttpHost() . '/api/v1/books/' . $book->id . '/cover' : null;
+            $durationFormatted = $book->duration ? gmdate('H:i:s', $book->duration) : null;
 
-            if ($book->cover_image) {
-                // Use the current request's hostname and protocol for the cover URL
-                // This ensures URLs match the original request (e.g., https://books.thelin.org)
-                $request = request();
-                $coverUrl = $request->getSchemeAndHttpHost() . '/api/v1/books/' . $book->id . '/cover';
-            }
+            $seriesData = $book->series->map(fn ($series) => [
+                'name' => $series->name,
+                'series_number' => $series->pivot->series_number,
+                'is_collection' => $series->is_collection ?? false,
+            ])->toArray();
 
-            $durationFormatted = null;
-
-            if ($book->duration) {
-                // Assuming duration is stored in seconds
-                $durationFormatted = gmdate('H:i:s', $book->duration);
-            }
-
-            // Format series data as an array of objects with name, series_number, and is_collection
-            $seriesData = [];
-
-            if ($book->series->isNotEmpty()) {
-                foreach ($book->series as $series) {
-                    $seriesData[] = [
-                        'name' => $series->name,
-                        'series_number' => $series->pivot->series_number,
-                        'is_collection' => $series->is_collection ?? false,
-                    ];
-                }
-            }
-
-            return [
+            $baseData = [
                 'id' => $book->id,
                 'title' => $book->title,
                 'author' => $book->authors->pluck('name')->toArray(),
                 'narrator' => $book->narrators->pluck('name')->toArray(),
                 'series' => $seriesData,
-                // OpenAPI spec shows string, but array is more flexible
                 'genre' => $book->genres->pluck('name')->toArray(),
                 'year' => $book->release_date ? (int) $book->release_date->format('Y') : null,
                 'duration' => $durationFormatted,
                 'description' => $book->description,
-                // Add coverImage field for BookApiController::getBookWithCover
                 'coverImage' => $this->buildCoverImageOutput($book->cover_image, $book->directory_path),
                 'directoryPath' => $book->directory_path,
                 'cover_url' => $coverUrl,
@@ -704,7 +765,25 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 'total_size' => $book->total_size,
                 'created_at' => $book->created_at ? $book->created_at->toIso8601String() : null,
                 'updated_at' => $book->updated_at ? $book->updated_at->toIso8601String() : null,
+                // Include full relationship data for enhanced API
+                'authors_data' => $book->authors->toArray(),
+                'genres_data' => $book->genres->toArray(),
+                'series_data' => $book->series->map(fn ($s) => [
+                    'id' => $s->id,
+                    'name' => $s->name,
+                    'is_collection' => $s->is_collection,
+                    'pivot' => [
+                        'series_number' => $s->pivot->series_number,
+                    ],
+                ])->toArray(),
+                'narrators_data' => $book->narrators->toArray(),
             ];
+
+            if ($userId) {
+                $baseData = array_merge($baseData, $this->transformUserData($book));
+            }
+
+            return $baseData;
         })->toArray();
 
         return [
@@ -714,6 +793,50 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             'current_page' => $page,
             'last_page' => max(1, ceil($total / $perPage)),
         ];
+    }
+
+    private function transformUserData(Book $book): array
+    {
+        $userData = [
+            'progress' => null,
+            'status' => null,
+            'recommendation' => null,
+        ];
+
+        if ($book->relationLoaded('progress') && $book->progress->isNotEmpty()) {
+            $latestProgress = $book->progress->first();
+            $userData['progress'] = [
+                'position' => $latestProgress->current_position_seconds,
+                'duration' => $latestProgress->total_duration_seconds,
+                'percentage' => (float) $latestProgress->progress_percentage,
+                'chapter' => $latestProgress->current_chapter,
+                'chapterName' => $latestProgress->current_chapter_name,
+                'lastListenedAt' => $latestProgress->last_listened_at?->toIso8601String(),
+                'isCompleted' => (bool) $latestProgress->completed,
+            ];
+        }
+
+        if ($book->relationLoaded('statuses') && $book->statuses->isNotEmpty()) {
+            $status = $book->statuses->first();
+            $userData['status'] = [
+                'status' => $status->status,
+                'order' => $status->order,
+                'detail' => $status->status_detail,
+                'readCount' => $status->read_count,
+            ];
+        }
+
+        if ($book->relationLoaded('recommendations') && $book->recommendations->isNotEmpty()) {
+            $rec = $book->recommendations->first();
+            $userData['recommendation'] = [
+                'id' => $rec->id,
+                'sender' => $rec->sender ? ['id' => $rec->sender->id, 'name' => $rec->sender->name] : null,
+                'message' => $rec->message,
+                'sentAt' => $rec->created_at?->toIso8601String(),
+            ];
+        }
+
+        return $userData;
     }
 
     public function getAllBooks($limit = null, $offset = 0)
@@ -1794,23 +1917,24 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         $genre,
         string $orderBy = 'title',
         string $direction = 'asc',
-        int $limit = 20,
-        ?string $startAfter = null
+        int $limit = 100,
+        ?string $startAfter = null,
+        ?int $userId = null
     ): array {
-        // Validate order direction
-        $direction = in_array(strtolower($direction), ['asc', 'desc']) ? strtolower($direction) : 'asc';
-        $query = Book::whereHas('authors', function ($q) use ($author): void {
-            $q->where('name', $author);
-        })->whereHas('genres', function ($q) use ($genre): void {
-            $q->where('name', $genre);
-        })->with(['authors', 'narrators', 'genres', 'series'])
-            ->orderBy($orderBy, $direction);
+        // Use the unified listBooks method to ensure consistent behavior including user data
+        $result = $this->listBooks(
+            page: 1,
+            perPage: $limit,
+            filters: [
+                'author_id' => $author,
+                'genre_id' => $genre,
+            ],
+            sort: $orderBy,
+            order: $direction,
+            userId: $userId
+        );
 
-        if ($startAfter) {
-            $query->where('id', $direction === 'asc' ? '>' : '<', $startAfter);
-        }
-
-        return $query->limit($limit)->get()->toArray();
+        return $result['data'];
     }
 
     public function getUserById($identifier)

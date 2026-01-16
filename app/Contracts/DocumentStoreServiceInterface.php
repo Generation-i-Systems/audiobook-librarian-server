@@ -22,7 +22,7 @@ interface DocumentStoreServiceInterface
     public function autocompleteNarrators(string $query, int $limit = 10): array;
 
     // BOOKS
-    public function getBook(string $id);
+    public function getBook(string $id, ?int $userId = null);
 
     /**
      * Find a book by its directoryPath.
@@ -36,6 +36,10 @@ interface DocumentStoreServiceInterface
      * @param int $perPage Number of items per page
      * @param array $filters Optional filters (e.g., ['author' => 'John Doe', 'genre' => 'Fiction'])
      * @param bool $withRelated Whether to load related data (authors, series)
+     * @param string $sort Field to sort by
+     * @param string $order Direction to sort
+     * @param bool $includeAllBooks Whether to include books without files
+     * @param int|null $userId Optional user ID for personal data (progress, etc)
      *
      * @return array [
      *               'data' => array,  // The paginated list of books
@@ -45,7 +49,16 @@ interface DocumentStoreServiceInterface
      *               'last_page' => int,    // Last available page number
      *               ]
      */
-    public function listBooks(int $page = 1, int $perPage = 24, array $filters = [], bool $withRelated = true, string $sort = 'title', string $order = 'asc', bool $includeAllBooks = false): array;
+    public function listBooks(
+        int $page = 1,
+        int $perPage = 24,
+        array $filters = [],
+        bool $withRelated = true,
+        string $sort = 'title',
+        string $order = 'asc',
+        bool $includeAllBooks = false,
+        ?int $userId = null
+    ): array;
 
     /**
      * Return books flagged as needs_review. Optional reason filter narrows results to books whose
@@ -150,7 +163,15 @@ interface DocumentStoreServiceInterface
 
     public function deleteBook(string $id, bool $deleteFiles = true);
 
-    public function getBooksByAuthorAndGenre($author, $genre);
+    public function getBooksByAuthorAndGenre(
+        $author,
+        $genre,
+        string $orderBy = 'title',
+        string $direction = 'asc',
+        int $limit = 20,
+        ?string $startAfter = null,
+        ?int $userId = null
+    );
 
     public function dumpAllBooks();
 
