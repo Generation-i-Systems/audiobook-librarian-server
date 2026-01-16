@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ListeningStatistic;
 use App\Models\Book;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
@@ -582,47 +584,62 @@ class StatisticsController extends Controller
      */
     public function getDashboardStats(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'device_id' => 'required|string|max:255',
-        ]);
+        $deviceId = $request->input('device_id') ?? $request->header('X-Device-ID');
+        $userId = auth('api')->id();
 
-        $deviceId = $validated['device_id'];
+        if (!$deviceId && !$userId) {
+            return response()->json(['message' => 'device_id or authentication required.'], 400);
+        }
+
         $today = now()->toDateString();
         $thisWeek = now()->startOfWeek();
         $thisMonth = now()->startOfMonth();
 
-        // Today's stats
-        $todayStats = ListeningStatistic::getDailyStats($deviceId, $today);
+        // Today's listening stats
+        $todayStats = $deviceId ? ListeningStatistic::getDailyStats($deviceId, $today) : ['total_seconds' => 0, 'books_listened' => 0, 'session_count' => 0, 'formatted_duration' => '0:00'];
 
-        // This week's stats
-        $weekStats = ListeningStatistic::where('device_id', $deviceId)
-            ->where('listening_date', '>=', $thisWeek->toDateString())
-            ->selectRaw('
-                SUM(seconds_listened) as total_seconds,
-                COUNT(DISTINCT book_id) as books_listened,
-                COUNT(*) as session_count
-            ')
-            ->first();
+        // High-level user stats (from user_book_status)
+        $userStats = [
+            'total_completed' => 0,
+            'completed_this_month' => 0,
+            'upcoming_goals' => 0,
+            'overdue_goals' => 0,
+        ];
 
-        // This month's stats
-        $monthStats = ListeningStatistic::where('device_id', $deviceId)
-            ->where('listening_date', '>=', $thisMonth->toDateString())
-            ->selectRaw('
-                SUM(seconds_listened) as total_seconds,
-                COUNT(DISTINCT book_id) as books_listened,
-                COUNT(*) as session_count
-            ')
-            ->first();
+        if ($userId) {
+            $userStats['total_completed'] = \App\Models\UserBookStatus::where('user_id', $userId)
+                ->where('status', 'completed')
+                ->count();
 
-        // All-time stats
-        $allTimeStats = ListeningStatistic::where('device_id', $deviceId)
-            ->selectRaw('
+            $userStats['completed_this_month'] = \App\Models\UserBookStatus::where('user_id', $userId)
+                ->where('status', 'completed')
+                ->where('finished_at', '>=', $thisMonth)
+                ->count();
+
+            $userStats['upcoming_goals'] = \App\Models\UserBookStatus::where('user_id', $userId)
+                ->whereIn('status', ['queue', 'in_progress'])
+                ->where('target_date', '>=', now()->toDateString())
+                ->count();
+
+            $userStats['overdue_goals'] = \App\Models\UserBookStatus::where('user_id', $userId)
+                ->whereIn('status', ['queue', 'in_progress'])
+                ->where('target_date', '<', now()->toDateString())
+                ->count();
+        }
+
+        // All-time listening stats
+        $query = ListeningStatistic::query();
+        if ($userId) {
+            $query->where('user_id', $userId);
+        } else {
+            $query->where('device_id', $deviceId);
+        }
+
+        $allTimeStats = $query->selectRaw('
                 SUM(seconds_listened) as total_seconds,
                 COUNT(DISTINCT book_id) as books_listened,
                 COUNT(*) as session_count,
-                COUNT(DISTINCT listening_date) as days_listened,
-                MIN(listening_date) as first_day,
-                MAX(listening_date) as last_day
+                COUNT(DISTINCT listening_date) as days_listened
             ')
             ->first();
 
@@ -635,29 +652,48 @@ class StatisticsController extends Controller
                     'session_count' => $todayStats['session_count'],
                     'formatted_duration' => $todayStats['formatted_duration'],
                 ],
-                'this_week' => [
-                    'total_seconds' => $weekStats->total_seconds ?? 0,
-                    'books_listened' => $weekStats->books_listened ?? 0,
-                    'session_count' => $weekStats->session_count ?? 0,
-                    'formatted_duration' => $this->formatSeconds($weekStats->total_seconds ?? 0),
-                ],
-                'this_month' => [
-                    'total_seconds' => $monthStats->total_seconds ?? 0,
-                    'books_listened' => $monthStats->books_listened ?? 0,
-                    'session_count' => $monthStats->session_count ?? 0,
-                    'formatted_duration' => $this->formatSeconds($monthStats->total_seconds ?? 0),
-                ],
-                'all_time' => [
+                'user_tracking' => $userStats,
+                'listening_overview' => [
                     'total_seconds' => $allTimeStats->total_seconds ?? 0,
-                    'books_listened' => $allTimeStats->books_listened ?? 0,
-                    'session_count' => $allTimeStats->session_count ?? 0,
-                    'days_listened' => $allTimeStats->days_listened ?? 0,
-                    'first_day' => $allTimeStats->first_day,
-                    'last_day' => $allTimeStats->last_day,
-                    'formatted_duration' => $this->formatSeconds($allTimeStats->total_seconds ?? 0),
+                    'total_books' => $allTimeStats->books_listened ?? 0,
+                    'days_active' => $allTimeStats->days_listened ?? 0,
+                    'formatted_total_duration' => $this->formatSeconds($allTimeStats->total_seconds ?? 0),
                 ],
             ]
         ]);
+    }
+
+    /**
+     * Get reading progress stats by date (finished books per month/year)
+     */
+    public function getReadingHistoryStats(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = Auth::user();
+        if (!$user) {
+            return response()->json(['message' => 'Authentication required.'], 401);
+        }
+
+        $groupBy = $request->input('group_by', 'month'); // month or year
+
+        $query = \App\Models\UserBookStatus::where('user_id', $user->id)
+            ->where('status', 'completed')
+            ->whereNotNull('finished_at')
+            ->orderByDesc('finished_at');
+
+        $statuses = $query->get();
+
+        $stats = $statuses->groupBy(function ($item) use ($groupBy) {
+            $date = Carbon::parse($item->finished_at);
+            return $groupBy === 'year' ? $date->format('Y') : $date->format('Y-m');
+        })->map(function ($items, $period) {
+            return [
+                'period' => (string)$period,
+                'count' => $items->count(),
+            ];
+        })->values();
+
+        return response()->json($stats);
     }
 
     /**

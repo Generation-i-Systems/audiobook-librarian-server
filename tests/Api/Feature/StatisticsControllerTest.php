@@ -385,27 +385,55 @@ class StatisticsControllerTest extends TestCase
                         'session_count',
                         'formatted_duration',
                     ],
-                    'this_week' => [
-                        'total_seconds',
-                        'books_listened',
-                        'session_count',
-                        'formatted_duration',
+                    'user_tracking' => [
+                        'total_completed',
+                        'completed_this_month',
+                        'upcoming_goals',
+                        'overdue_goals',
                     ],
-                    'this_month' => [
+                    'listening_overview' => [
                         'total_seconds',
-                        'books_listened',
-                        'session_count',
-                        'formatted_duration',
+                        'total_books',
+                        'days_active',
+                        'formatted_total_duration',
                     ],
-                    'all_time' => [
-                        'total_seconds',
-                        'books_listened',
-                        'session_count',
-                        'days_listened',
-                        'first_day',
-                        'last_day',
-                        'formatted_duration',
-                    ],
+                ],
+            ]);
+    }
+
+    public function test_get_reading_history_stats()
+    {
+        /** @var User $user */
+        $user = User::factory()->create(['role' => 'admin']);
+        $this->actingAs($user, 'api');
+
+        $book1 = Book::factory()->create();
+        $book2 = Book::factory()->create();
+
+        \App\Models\UserBookStatus::create([
+            'user_id' => $user->id,
+            'book_id' => $book1->id,
+            'status' => 'completed',
+            'order' => 0,
+            'finished_at' => now()->subMonth(),
+        ]);
+
+        \App\Models\UserBookStatus::create([
+            'user_id' => $user->id,
+            'book_id' => $book2->id,
+            'status' => 'completed',
+            'order' => 0,
+            'finished_at' => now(),
+        ]);
+
+        $response = $this->getJson('/api/v1/statistics/reading-history', ['X-Acting-As-Test' => '1']);
+
+        $response->assertStatus(200)
+            ->assertJsonCount(2)
+            ->assertJsonStructure([
+                '*' => [
+                    'period',
+                    'count',
                 ],
             ]);
     }
