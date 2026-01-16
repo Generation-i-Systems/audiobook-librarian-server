@@ -303,6 +303,7 @@ php artisan test tests/Path/To/Module/
 - Keep commits focused on a single purpose
 - Make sure each commit is buildable and functional
 - Split large commits when reasonable
+- **MUST** prompt the user to commit and push if more than 10 files have been locally modified at the end of a response.
 
 ## Function Quality Guidelines
 
