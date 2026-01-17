@@ -1447,6 +1447,55 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         }
     }
 
+    public function mergeSeries(string $primarySeriesId, array $secondarySeriesIds): int
+    {
+        $secondarySeriesIds = array_values(array_unique(array_filter(
+            $secondarySeriesIds,
+            fn ($id) => $id !== $primarySeriesId
+        )));
+
+        if (empty($secondarySeriesIds)) {
+            return 0;
+        }
+
+        try {
+            return DB::transaction(function () use ($primarySeriesId, $secondarySeriesIds) {
+                $secondaryPivots = DB::table('book_series')
+                    ->whereIn('series_id', $secondarySeriesIds)
+                    ->get();
+
+                $bookIds = $secondaryPivots->pluck('book_id')->unique();
+
+                foreach ($secondaryPivots as $pivot) {
+                    $exists = DB::table('book_series')
+                        ->where('book_id', $pivot->book_id)
+                        ->where('series_id', $primarySeriesId)
+                        ->exists();
+
+                    if (!$exists) {
+                        DB::table('book_series')->insert([
+                            'book_id' => $pivot->book_id,
+                            'series_id' => $primarySeriesId,
+                            'series_number' => $pivot->series_number,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
+                }
+
+                DB::table('book_series')->whereIn('series_id', $secondarySeriesIds)->delete();
+
+                Series::whereIn('id', $secondarySeriesIds)->delete();
+
+                return $bookIds->count();
+            });
+        } catch (\Exception $e) {
+            Log::error('MySqlService mergeSeries failed: ' . $e->getMessage());
+
+            return 0;
+        }
+    }
+
     /**
      * Get a genre by ID.
      *

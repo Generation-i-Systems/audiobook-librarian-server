@@ -410,6 +410,20 @@ interface DocumentStoreServiceInterface
     public function mergeGenres(string $primaryGenreId, array $secondaryGenreIds): int;
 
     /**
+     * Merge multiple series into a single primary series.
+     *
+     * Implementations should move all book relationships from secondary series
+     * to the primary series, preserving series_number values, avoiding duplicate
+     * pivot rows, and delete the secondary series records.
+     *
+     * @param string $primarySeriesId
+     * @param array $secondarySeriesIds
+     *
+     * @return int Number of affected books or relationships
+     */
+    public function mergeSeries(string $primarySeriesId, array $secondarySeriesIds): int;
+
+    /**
      * Search for authors by name.
      */
     public function searchAuthorsByName(string $term): array;

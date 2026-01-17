@@ -39,6 +39,7 @@ class ToolDefinitions
             self::previewAndExecuteBulkOperation(),
             self::extractAndApplyMetadataFromAudioFiles(),
             self::mergeAuthors(),
+            self::mergeSeries(),
         ];
     }
 
@@ -1015,6 +1016,37 @@ class ToolDefinitions
                     ],
                 ],
                 'required' => ['primary_author_name', 'secondary_author_names'],
+            ],
+        ];
+    }
+
+    protected static function mergeSeries(): array
+    {
+        return [
+            'name' => 'merge_series',
+            'description' => 'Merge multiple series into a single primary series. All books from secondary series will be reassigned to the primary series, preserving their series numbers. The secondary series will be deleted. Optionally move the book files to directories named after the primary series.',
+            'parameters' => [
+                'type' => 'object',
+                'properties' => [
+                    'primary_series_name' => [
+                        'type' => 'string',
+                        'description' => 'Name of the series to keep (the target/primary series)',
+                    ],
+                    'secondary_series_names' => [
+                        'type' => 'array',
+                        'items' => ['type' => 'string'],
+                        'description' => 'Names of series to merge into the primary series (will be deleted)',
+                    ],
+                    'move_files' => [
+                        'type' => 'boolean',
+                        'description' => 'Move book files to directories named after the primary series (default: false)',
+                    ],
+                    'preview_only' => [
+                        'type' => 'boolean',
+                        'description' => 'Show preview without applying changes (default: true)',
+                    ],
+                ],
+                'required' => ['primary_series_name', 'secondary_series_names'],
             ],
         ];
     }

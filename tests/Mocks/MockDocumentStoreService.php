@@ -1907,4 +1907,18 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
 
         return $affected;
     }
+
+    public function mergeSeries(string $primarySeriesId, array $secondarySeriesIds): int
+    {
+        $affected = 0;
+
+        foreach ($secondarySeriesIds as $secondaryId) {
+            if (isset($this->series[$secondaryId])) {
+                unset($this->series[$secondaryId]);
+                $affected++;
+            }
+        }
+
+        return $affected;
+    }
 }

@@ -7,6 +7,7 @@ use App\Contracts\DocumentStoreServiceInterface;
 use App\Models\Author;
 use App\Models\Book;
 use App\Models\Genre;
+use App\Models\Series;
 use App\Services\AI\Providers\ClaudeProvider;
 use App\Services\AI\Providers\GeminiProvider;
 use App\Services\AI\Providers\OpenAIProvider;
@@ -187,7 +188,7 @@ Available intents:
 - create: Add new books
 - tag: Add/modify tags or categories
 - organize: Reorganize files or directory structure
-- merge: Merge duplicate authors/entities (e.g., combining misspelled author names into the correct one)
+- merge: Merge duplicate authors or series (e.g., combining misspelled author/series names into the correct one)
 - clarify: Need more information from user
 
 Return JSON with:
@@ -202,6 +203,8 @@ Examples:
 "Mark all Terry Pratchett books as 'Fantasy'" -> {intent: "update", parameters: {search: {author: "Terry Pratchett"}, changes: {genre: "Fantasy"}}}
 "Merge author 'Ursula K LeGuin' into 'Ursula K. Le Guin'" -> {intent: "merge", parameters: {entity_type: "author", primary_name: "Ursula K. Le Guin", secondary_names: ["Ursula K LeGuin"], move_files: true}}
 "Combine authors 'J.R.R. Tolkien' and 'JRR Tolkien' into 'J.R.R. Tolkien'" -> {intent: "merge", parameters: {entity_type: "author", primary_name: "J.R.R. Tolkien", secondary_names: ["JRR Tolkien"], move_files: false}}
+"Merge series 'The Stormlight Archives' into 'The Stormlight Archive'" -> {intent: "merge", parameters: {entity_type: "series", primary_name: "The Stormlight Archive", secondary_names: ["The Stormlight Archives"], move_files: true}}
+"Combine series 'Discworld' and 'Disc World' into 'Discworld'" -> {intent: "merge", parameters: {entity_type: "series", primary_name: "Discworld", secondary_names: ["Disc World"], move_files: false}}
 PROMPT;
     }
 
@@ -380,10 +383,15 @@ PROMPT;
             return ['success' => false, 'error' => 'At least one secondary name is required to merge'];
         }
 
-        if ($entityType !== 'author') {
-            return ['success' => false, 'error' => "Merge for entity type '{$entityType}' not yet implemented"];
-        }
+        return match ($entityType) {
+            'author' => $this->generateAuthorMergeOperations($primaryName, $secondaryNames, $moveFiles),
+            'series' => $this->generateSeriesMergeOperations($primaryName, $secondaryNames, $moveFiles),
+            default => ['success' => false, 'error' => "Merge for entity type '{$entityType}' not yet implemented"],
+        };
+    }
 
+    protected function generateAuthorMergeOperations(string $primaryName, array $secondaryNames, bool $moveFiles): array
+    {
         $primaryAuthor = Author::where('name', $primaryName)->first();
         $secondaryAuthors = Author::whereIn('name', $secondaryNames)->get();
 
@@ -432,6 +440,65 @@ PROMPT;
         }
         if (!empty($missingNames)) {
             $explanation .= " Note: Authors not found: " . implode(', ', $missingNames);
+        }
+
+        return [
+            'success' => true,
+            'explanation' => $explanation,
+            'operations' => $operations,
+        ];
+    }
+
+    protected function generateSeriesMergeOperations(string $primaryName, array $secondaryNames, bool $moveFiles): array
+    {
+        $primarySeries = Series::where('name', $primaryName)->first();
+        $secondarySeries = Series::whereIn('name', $secondaryNames)->get();
+
+        $foundSecondaryNames = $secondarySeries->pluck('name')->toArray();
+        $missingNames = array_diff($secondaryNames, $foundSecondaryNames);
+
+        $affectedBooks = [];
+        foreach ($secondarySeries as $series) {
+            foreach ($series->books()->with(['authors', 'series'])->get() as $book) {
+                $affectedBooks[$book->id] = [
+                    'id' => $book->id,
+                    'title' => $book->title,
+                    'current_series' => $book->series->pluck('name')->toArray(),
+                    'current_directory' => $book->directory_path,
+                ];
+            }
+        }
+
+        $operations = [[
+            'type' => 'merge_series',
+            'primary_series' => $primarySeries ? [
+                'id' => $primarySeries->id,
+                'name' => $primarySeries->name,
+                'exists' => true,
+            ] : [
+                'name' => $primaryName,
+                'exists' => false,
+            ],
+            'secondary_series' => $secondarySeries->map(fn ($s) => [
+                'id' => $s->id,
+                'name' => $s->name,
+                'book_count' => $s->books()->count(),
+            ])->toArray(),
+            'missing_secondary_names' => $missingNames,
+            'affected_books' => array_values($affectedBooks),
+            'move_files' => $moveFiles,
+        ]];
+
+        $explanation = "Will merge " . count($secondarySeries) . " series into '{$primaryName}'";
+        if (!$primarySeries) {
+            $explanation .= " (will be created)";
+        }
+        $explanation .= ". This will update " . count($affectedBooks) . " book(s).";
+        if ($moveFiles) {
+            $explanation .= " Book files will be moved to directories named after the primary series.";
+        }
+        if (!empty($missingNames)) {
+            $explanation .= " Note: Series not found: " . implode(', ', $missingNames);
         }
 
         return [
@@ -506,6 +573,7 @@ PROMPT;
             'delete' => $this->executeDelete($operation),
             'create' => $this->executeCreate($operation),
             'merge_authors' => $this->executeMergeAuthors($operation),
+            'merge_series' => $this->executeMergeSeries($operation),
             default => ['success' => false, 'error' => 'Unknown operation type'],
         };
     }
@@ -730,6 +798,104 @@ PROMPT;
         $titleSlug = Str::slug($book->title);
 
         return "{$authorSlug}/{$titleSlug}";
+    }
+
+    protected function executeMergeSeries(array $operation): array
+    {
+        $primarySeriesData = $operation['primary_series'];
+        $secondarySeries = $operation['secondary_series'] ?? [];
+        $moveFiles = $operation['move_files'] ?? false;
+
+        if (empty($secondarySeries)) {
+            return [
+                'success' => false,
+                'operation' => 'merge_series',
+                'error' => 'No secondary series to merge',
+            ];
+        }
+
+        $primarySeries = isset($primarySeriesData['id'])
+            ? Series::find($primarySeriesData['id'])
+            : Series::firstOrCreate(['name' => $primarySeriesData['name']]);
+
+        if (!$primarySeries) {
+            return [
+                'success' => false,
+                'operation' => 'merge_series',
+                'error' => 'Could not find or create primary series',
+            ];
+        }
+
+        $documentStore = app(DocumentStoreServiceInterface::class);
+        $secondarySeriesIds = collect($secondarySeries)->pluck('id')->map(fn ($id) => (string) $id)->toArray();
+
+        $affectedBooks = Book::whereHas('series', function ($q) use ($secondarySeriesIds) {
+            $q->whereIn('series.id', $secondarySeriesIds);
+        })->with(['authors', 'series'])->get();
+
+        $affectedCount = $documentStore->mergeSeries((string) $primarySeries->id, $secondarySeriesIds);
+
+        $filesMoved = 0;
+        $fileMoveErrors = [];
+
+        if ($moveFiles && $affectedBooks->isNotEmpty()) {
+            $moveService = app(BookDirectoryMoveService::class);
+
+            foreach ($affectedBooks as $book) {
+                $book->refresh();
+                $newDirectoryPath = $this->generateSeriesDirectoryPath($book, $primarySeries->name);
+
+                if ($book->directory_path !== $newDirectoryPath) {
+                    $result = $moveService->moveBookDirectoryContents(
+                        $book->directory_path,
+                        $newDirectoryPath,
+                        $book->cover_image ? basename($book->cover_image) : null
+                    );
+
+                    if ($result['moved']) {
+                        $book->directory_path = $result['directoryPath'] ?? $newDirectoryPath;
+                        if (isset($result['coverImage'])) {
+                            $book->cover_image = $book->directory_path . '/' . $result['coverImage'];
+                        }
+                        $book->save();
+                        $filesMoved++;
+                    } else {
+                        $fileMoveErrors[] = [
+                            'book_id' => $book->id,
+                            'title' => $book->title,
+                            'error' => $result['error'] ?? 'Unknown error',
+                        ];
+                    }
+                }
+            }
+        }
+
+        return [
+            'success' => true,
+            'operation' => 'merge_series',
+            'primary_series' => $primarySeries->name,
+            'affected_books' => $affectedCount,
+            'series_deleted' => count($secondarySeriesIds),
+            'files_moved' => $filesMoved,
+            'file_move_errors' => $fileMoveErrors,
+        ];
+    }
+
+    protected function generateSeriesDirectoryPath(Book $book, string $primarySeriesName): string
+    {
+        $author = $book->authors->first();
+        $authorSlug = $author ? Str::slug($author->name) : 'unknown-author';
+        $seriesSlug = Str::slug($primarySeriesName);
+
+        $seriesPivot = $book->series->first()?->pivot;
+        $seriesNumber = $seriesPivot?->series_number ?? null;
+        $titleSlug = Str::slug($book->title);
+
+        if ($seriesNumber !== null) {
+            return "{$authorSlug}/{$seriesSlug}/{$seriesNumber}-{$titleSlug}";
+        }
+
+        return "{$authorSlug}/{$seriesSlug}/{$titleSlug}";
     }
 
     /**

@@ -87,6 +87,7 @@ class ToolExecutor
                 'preview_and_execute_bulk_operation' => $this->previewAndExecuteBulkOperation($parameters),
                 'extract_and_apply_metadata_from_audio_files' => $this->extractAndApplyMetadataFromAudioFiles($parameters),
                 'merge_authors' => $this->mergeAuthors($parameters),
+                'merge_series' => $this->mergeSeries($parameters),
                 default => ['success' => false, 'error' => "Unknown tool: {$toolName}"],
             };
 
@@ -2742,5 +2743,165 @@ class ToolExecutor
         $titleSlug = Str::slug($book->title);
 
         return "{$authorSlug}/{$titleSlug}";
+    }
+
+    protected function mergeSeries(array $params): array
+    {
+        $primarySeriesName = $params['primary_series_name'] ?? null;
+        $secondarySeriesNames = $params['secondary_series_names'] ?? [];
+        $moveFiles = $params['move_files'] ?? false;
+        $previewOnly = $params['preview_only'] ?? true;
+
+        if (!$primarySeriesName) {
+            return ['success' => false, 'error' => 'Primary series name is required'];
+        }
+
+        if (empty($secondarySeriesNames)) {
+            return ['success' => false, 'error' => 'At least one secondary series name is required'];
+        }
+
+        $primarySeries = Series::where('name', $primarySeriesName)->first();
+        if (!$primarySeries) {
+            return [
+                'success' => false,
+                'error' => "Primary series '{$primarySeriesName}' not found",
+            ];
+        }
+
+        $secondarySeries = Series::whereIn('name', $secondarySeriesNames)->get();
+        if ($secondarySeries->isEmpty()) {
+            return [
+                'success' => false,
+                'error' => 'No matching secondary series found',
+            ];
+        }
+
+        $foundNames = $secondarySeries->pluck('name')->toArray();
+        $missingNames = array_diff($secondarySeriesNames, $foundNames);
+
+        $affectedBooks = Book::whereHas('series', function ($q) use ($secondarySeries) {
+            $q->whereIn('series.id', $secondarySeries->pluck('id'));
+        })->with(['authors', 'series'])->get();
+
+        $preview = [
+            'primary_series' => [
+                'id' => $primarySeries->id,
+                'name' => $primarySeries->name,
+                'current_book_count' => $primarySeries->books()->count(),
+            ],
+            'secondary_series' => $secondarySeries->map(fn ($s) => [
+                'id' => $s->id,
+                'name' => $s->name,
+                'book_count' => $s->books()->count(),
+            ])->toArray(),
+            'missing_series' => $missingNames,
+            'affected_books' => $affectedBooks->map(function ($book) use ($primarySeries, $moveFiles) {
+                $result = [
+                    'id' => $book->id,
+                    'title' => $book->title,
+                    'current_series' => $book->series->pluck('name')->toArray(),
+                    'current_directory' => $book->directory_path,
+                ];
+
+                if ($moveFiles) {
+                    $newDirectoryPath = $this->generateNewSeriesDirectoryPath($book, $primarySeries->name);
+                    $result['new_directory'] = $newDirectoryPath;
+                    $result['directory_will_change'] = $book->directory_path !== $newDirectoryPath;
+                }
+
+                return $result;
+            })->toArray(),
+            'total_affected_books' => $affectedBooks->count(),
+            'move_files' => $moveFiles,
+        ];
+
+        if ($previewOnly) {
+            return [
+                'success' => true,
+                'preview' => $preview,
+                'message' => 'Preview generated. Use merge_series with preview_only=false to execute the merge.',
+            ];
+        }
+
+        try {
+            return DB::transaction(function () use ($primarySeries, $secondarySeries, $affectedBooks, $moveFiles, $preview) {
+                $documentStore = app(DocumentStoreServiceInterface::class);
+                $secondarySeriesIds = $secondarySeries->pluck('id')->map(fn ($id) => (string) $id)->toArray();
+
+                $affectedCount = $documentStore->mergeSeries((string) $primarySeries->id, $secondarySeriesIds);
+
+                $filesMoved = 0;
+                $fileMoveErrors = [];
+
+                if ($moveFiles) {
+                    $moveService = app(BookDirectoryMoveService::class);
+
+                    foreach ($affectedBooks as $book) {
+                        $book->refresh();
+                        $newDirectoryPath = $this->generateNewSeriesDirectoryPath($book, $primarySeries->name);
+
+                        if ($book->directory_path !== $newDirectoryPath) {
+                            $result = $moveService->moveBookDirectoryContents(
+                                $book->directory_path,
+                                $newDirectoryPath,
+                                $book->cover_image ? basename($book->cover_image) : null
+                            );
+
+                            if ($result['moved']) {
+                                $book->directory_path = $result['directoryPath'] ?? $newDirectoryPath;
+                                if (isset($result['coverImage'])) {
+                                    $book->cover_image = $book->directory_path . '/' . $result['coverImage'];
+                                }
+                                $book->save();
+                                $filesMoved++;
+                            } else {
+                                $fileMoveErrors[] = [
+                                    'book_id' => $book->id,
+                                    'title' => $book->title,
+                                    'error' => $result['error'] ?? 'Unknown error',
+                                ];
+                            }
+                        }
+                    }
+                }
+
+                return [
+                    'success' => true,
+                    'message' => "Merged {$affectedCount} book(s) from " . count($secondarySeriesIds) . " series into '{$primarySeries->name}'",
+                    'affected_books' => $affectedCount,
+                    'series_deleted' => count($secondarySeriesIds),
+                    'files_moved' => $filesMoved,
+                    'file_move_errors' => $fileMoveErrors,
+                    'preview' => $preview,
+                ];
+            });
+        } catch (\Exception $e) {
+            Log::error('merge_series failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+            ];
+        }
+    }
+
+    protected function generateNewSeriesDirectoryPath(Book $book, string $primarySeriesName): string
+    {
+        $author = $book->authors->first();
+        $authorSlug = $author ? Str::slug($author->name) : 'unknown-author';
+        $seriesSlug = Str::slug($primarySeriesName);
+
+        $seriesPivot = $book->series->first()?->pivot;
+        $seriesNumber = $seriesPivot?->series_number ?? null;
+        $titleSlug = Str::slug($book->title);
+
+        if ($seriesNumber !== null) {
+            return "{$authorSlug}/{$seriesSlug}/{$seriesNumber}-{$titleSlug}";
+        }
+
+        return "{$authorSlug}/{$seriesSlug}/{$titleSlug}";
     }
 }
