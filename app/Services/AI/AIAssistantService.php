@@ -3,15 +3,18 @@
 namespace App\Services\AI;
 
 use App\Contracts\AI\AIProviderInterface;
+use App\Contracts\DocumentStoreServiceInterface;
 use App\Models\Author;
 use App\Models\Book;
 use App\Models\Genre;
 use App\Services\AI\Providers\ClaudeProvider;
 use App\Services\AI\Providers\GeminiProvider;
 use App\Services\AI\Providers\OpenAIProvider;
+use App\Services\BookDirectoryMoveService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class AIAssistantService
 {
@@ -119,7 +122,7 @@ class AIAssistantService
             'properties' => [
                 'intent' => [
                     'type' => 'string',
-                    'enum' => ['search', 'update', 'delete', 'create', 'tag', 'organize', 'clarify'],
+                    'enum' => ['search', 'update', 'delete', 'create', 'tag', 'organize', 'merge', 'clarify'],
                 ],
                 'parameters' => ['type' => 'object'],
                 'confidence' => ['type' => 'number'],
@@ -155,6 +158,7 @@ class AIAssistantService
             'create' => $this->generateCreateOperations($parameters),
             'tag' => $this->generateTagOperations($parameters),
             'organize' => $this->generateOrganizeOperations($parameters),
+            'merge' => $this->generateMergeOperations($parameters),
             'clarify' => ['success' => false, 'error' => 'Need more information', 'needs_clarification' => true],
             default => ['success' => false, 'error' => 'Unknown intent'],
         };
@@ -183,6 +187,7 @@ Available intents:
 - create: Add new books
 - tag: Add/modify tags or categories
 - organize: Reorganize files or directory structure
+- merge: Merge duplicate authors/entities (e.g., combining misspelled author names into the correct one)
 - clarify: Need more information from user
 
 Return JSON with:
@@ -195,6 +200,8 @@ Examples:
 "Change the author of 'Mistborn' to 'Brandon Sanderson'" -> {intent: "update", parameters: {search: {title: "Mistborn"}, changes: {author: "Brandon Sanderson"}}}
 "Delete all books with no author" -> {intent: "delete", parameters: {criteria: {author: null}}}
 "Mark all Terry Pratchett books as 'Fantasy'" -> {intent: "update", parameters: {search: {author: "Terry Pratchett"}, changes: {genre: "Fantasy"}}}
+"Merge author 'Ursula K LeGuin' into 'Ursula K. Le Guin'" -> {intent: "merge", parameters: {entity_type: "author", primary_name: "Ursula K. Le Guin", secondary_names: ["Ursula K LeGuin"], move_files: true}}
+"Combine authors 'J.R.R. Tolkien' and 'JRR Tolkien' into 'J.R.R. Tolkien'" -> {intent: "merge", parameters: {entity_type: "author", primary_name: "J.R.R. Tolkien", secondary_names: ["JRR Tolkien"], move_files: false}}
 PROMPT;
     }
 
@@ -358,6 +365,82 @@ PROMPT;
         ];
     }
 
+    protected function generateMergeOperations(array $parameters): array
+    {
+        $entityType = $parameters['entity_type'] ?? 'author';
+        $primaryName = $parameters['primary_name'] ?? null;
+        $secondaryNames = $parameters['secondary_names'] ?? [];
+        $moveFiles = $parameters['move_files'] ?? false;
+
+        if (!$primaryName) {
+            return ['success' => false, 'error' => 'Primary name is required'];
+        }
+
+        if (empty($secondaryNames)) {
+            return ['success' => false, 'error' => 'At least one secondary name is required to merge'];
+        }
+
+        if ($entityType !== 'author') {
+            return ['success' => false, 'error' => "Merge for entity type '{$entityType}' not yet implemented"];
+        }
+
+        $primaryAuthor = Author::where('name', $primaryName)->first();
+        $secondaryAuthors = Author::whereIn('name', $secondaryNames)->get();
+
+        $foundSecondaryNames = $secondaryAuthors->pluck('name')->toArray();
+        $missingNames = array_diff($secondaryNames, $foundSecondaryNames);
+
+        $affectedBooks = [];
+        foreach ($secondaryAuthors as $author) {
+            foreach ($author->books()->with(['authors', 'series'])->get() as $book) {
+                $affectedBooks[$book->id] = [
+                    'id' => $book->id,
+                    'title' => $book->title,
+                    'current_authors' => $book->authors->pluck('name')->toArray(),
+                    'current_directory' => $book->directory_path,
+                ];
+            }
+        }
+
+        $operations = [[
+            'type' => 'merge_authors',
+            'primary_author' => $primaryAuthor ? [
+                'id' => $primaryAuthor->id,
+                'name' => $primaryAuthor->name,
+                'exists' => true,
+            ] : [
+                'name' => $primaryName,
+                'exists' => false,
+            ],
+            'secondary_authors' => $secondaryAuthors->map(fn ($a) => [
+                'id' => $a->id,
+                'name' => $a->name,
+                'book_count' => $a->books()->count(),
+            ])->toArray(),
+            'missing_secondary_names' => $missingNames,
+            'affected_books' => array_values($affectedBooks),
+            'move_files' => $moveFiles,
+        ]];
+
+        $explanation = "Will merge " . count($secondaryAuthors) . " author(s) into '{$primaryName}'";
+        if (!$primaryAuthor) {
+            $explanation .= " (will be created)";
+        }
+        $explanation .= ". This will update " . count($affectedBooks) . " book(s).";
+        if ($moveFiles) {
+            $explanation .= " Book files will be moved to directories named after the primary author.";
+        }
+        if (!empty($missingNames)) {
+            $explanation .= " Note: Authors not found: " . implode(', ', $missingNames);
+        }
+
+        return [
+            'success' => true,
+            'explanation' => $explanation,
+            'operations' => $operations,
+        ];
+    }
+
     /**
      * Execute approved operations
      */
@@ -422,6 +505,7 @@ PROMPT;
             'update' => $this->executeUpdate($operation),
             'delete' => $this->executeDelete($operation),
             'create' => $this->executeCreate($operation),
+            'merge_authors' => $this->executeMergeAuthors($operation),
             default => ['success' => false, 'error' => 'Unknown operation type'],
         };
     }
@@ -545,6 +629,107 @@ PROMPT;
             'operation' => 'create',
             'book_id' => $book->id,
         ];
+    }
+
+    protected function executeMergeAuthors(array $operation): array
+    {
+        $primaryAuthorData = $operation['primary_author'];
+        $secondaryAuthors = $operation['secondary_authors'] ?? [];
+        $moveFiles = $operation['move_files'] ?? false;
+
+        if (empty($secondaryAuthors)) {
+            return [
+                'success' => false,
+                'operation' => 'merge_authors',
+                'error' => 'No secondary authors to merge',
+            ];
+        }
+
+        $primaryAuthor = isset($primaryAuthorData['id']) ? Author::find($primaryAuthorData['id']) : Author::firstOrCreate(['name' => $primaryAuthorData['name']]);
+
+        if (!$primaryAuthor) {
+            return [
+                'success' => false,
+                'operation' => 'merge_authors',
+                'error' => 'Could not find or create primary author',
+            ];
+        }
+
+        $documentStore = app(DocumentStoreServiceInterface::class);
+        $secondaryAuthorIds = collect($secondaryAuthors)->pluck('id')->map(fn ($id) => (string) $id)->toArray();
+
+        $affectedBooks = Book::whereHas('authors', function ($q) use ($secondaryAuthorIds) {
+            $q->whereIn('authors.id', $secondaryAuthorIds);
+        })->with(['authors', 'series'])->get();
+
+        $affectedCount = $documentStore->mergeAuthors((string) $primaryAuthor->id, $secondaryAuthorIds);
+
+        $filesMoved = 0;
+        $fileMoveErrors = [];
+
+        if ($moveFiles && $affectedBooks->isNotEmpty()) {
+            $moveService = app(BookDirectoryMoveService::class);
+
+            foreach ($affectedBooks as $book) {
+                $book->refresh();
+                $newDirectoryPath = $this->generateAuthorDirectoryPath($book, $primaryAuthor->name);
+
+                if ($book->directory_path !== $newDirectoryPath) {
+                    $result = $moveService->moveBookDirectoryContents(
+                        $book->directory_path,
+                        $newDirectoryPath,
+                        $book->cover_image ? basename($book->cover_image) : null
+                    );
+
+                    if ($result['moved']) {
+                        $book->directory_path = $result['directoryPath'] ?? $newDirectoryPath;
+                        if (isset($result['coverImage'])) {
+                            $book->cover_image = $book->directory_path . '/' . $result['coverImage'];
+                        }
+                        $book->save();
+                        $filesMoved++;
+                    } else {
+                        $fileMoveErrors[] = [
+                            'book_id' => $book->id,
+                            'title' => $book->title,
+                            'error' => $result['error'] ?? 'Unknown error',
+                        ];
+                    }
+                }
+            }
+        }
+
+        return [
+            'success' => true,
+            'operation' => 'merge_authors',
+            'primary_author' => $primaryAuthor->name,
+            'affected_books' => $affectedCount,
+            'authors_deleted' => count($secondaryAuthorIds),
+            'files_moved' => $filesMoved,
+            'file_move_errors' => $fileMoveErrors,
+        ];
+    }
+
+    protected function generateAuthorDirectoryPath(Book $book, string $primaryAuthorName): string
+    {
+        $authorSlug = Str::slug($primaryAuthorName);
+
+        $series = $book->series->first();
+        if ($series) {
+            $seriesSlug = Str::slug($series->name);
+            $seriesNumber = $series->pivot->series_number ?? null;
+            $titleSlug = Str::slug($book->title);
+
+            if ($seriesNumber !== null) {
+                return "{$authorSlug}/{$seriesSlug}/{$seriesNumber}-{$titleSlug}";
+            }
+
+            return "{$authorSlug}/{$seriesSlug}/{$titleSlug}";
+        }
+
+        $titleSlug = Str::slug($book->title);
+
+        return "{$authorSlug}/{$titleSlug}";
     }
 
     /**

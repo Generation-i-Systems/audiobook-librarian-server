@@ -283,12 +283,6 @@ parameters:
 			path: app/Console/Commands/ImportBooksFromDownloads.php
 
 		-
-			message: '#^Call to an undefined method App\\Services\\BookEnrichmentService\:\:manualEnrichmentWithComparison\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Console/Commands/ImportBooksFromDownloads.php
-
-		-
 			message: '#^Call to function is_array\(\) with string will always evaluate to false\.$#'
 			identifier: function.impossibleType
 			count: 2
@@ -2887,9 +2881,27 @@ parameters:
 			path: app/Relations/TouchesParentBelongsToMany.php
 
 		-
+			message: '#^Call to an undefined static method App\\Models\\Author\:\:find\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Services/AI/AIAssistantService.php
+
+		-
 			message: '#^Call to an undefined static method App\\Models\\Author\:\:firstOrCreate\(\)\.$#'
 			identifier: staticMethod.notFound
-			count: 2
+			count: 3
+			path: app/Services/AI/AIAssistantService.php
+
+		-
+			message: '#^Call to an undefined static method App\\Models\\Author\:\:where\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Services/AI/AIAssistantService.php
+
+		-
+			message: '#^Call to an undefined static method App\\Models\\Author\:\:whereIn\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
 			path: app/Services/AI/AIAssistantService.php
 
 		-
@@ -2900,6 +2912,12 @@ parameters:
 
 		-
 			message: '#^Call to an undefined static method App\\Models\\Book\:\:findOrFail\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Services/AI/AIAssistantService.php
+
+		-
+			message: '#^Call to an undefined static method App\\Models\\Book\:\:whereHas\(\)\.$#'
 			identifier: staticMethod.notFound
 			count: 1
 			path: app/Services/AI/AIAssistantService.php
@@ -2973,6 +2991,12 @@ parameters:
 		-
 			message: '#^Call to an undefined static method App\\Models\\Author\:\:where\(\)\.$#'
 			identifier: staticMethod.notFound
+			count: 2
+			path: app/Services/AI/ToolExecutor.php
+
+		-
+			message: '#^Call to an undefined static method App\\Models\\Author\:\:whereIn\(\)\.$#'
+			identifier: staticMethod.notFound
 			count: 1
 			path: app/Services/AI/ToolExecutor.php
 
@@ -3014,6 +3038,12 @@ parameters:
 
 		-
 			message: '#^Call to an undefined static method App\\Models\\Book\:\:sum\(\)\.$#'
+			identifier: staticMethod.notFound
+			count: 1
+			path: app/Services/AI/ToolExecutor.php
+
+		-
+			message: '#^Call to an undefined static method App\\Models\\Book\:\:whereHas\(\)\.$#'
 			identifier: staticMethod.notFound
 			count: 1
 			path: app/Services/AI/ToolExecutor.php

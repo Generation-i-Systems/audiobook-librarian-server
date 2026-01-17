@@ -7,8 +7,10 @@ use App\Models\Book;
 use App\Models\Genre;
 use App\Models\Narrator;
 use App\Models\Series;
+use App\Contracts\DocumentStoreServiceInterface;
 use App\Services\AIBookProcessor;
 use App\Services\AudioFileAnalyzer;
+use App\Services\BookDirectoryMoveService;
 use App\Services\BookImportService;
 use App\Services\BookTrashService;
 use Illuminate\Support\Facades\DB;
@@ -84,6 +86,7 @@ class ToolExecutor
                 'generate_nfo_files' => $this->generateNFOFiles($parameters),
                 'preview_and_execute_bulk_operation' => $this->previewAndExecuteBulkOperation($parameters),
                 'extract_and_apply_metadata_from_audio_files' => $this->extractAndApplyMetadataFromAudioFiles($parameters),
+                'merge_authors' => $this->mergeAuthors($parameters),
                 default => ['success' => false, 'error' => "Unknown tool: {$toolName}"],
             };
 
@@ -721,9 +724,7 @@ class ToolExecutor
         $confirmedMoves = $params['confirmed_moves'];
         $previewId = $params['preview_id'] ?? null;
 
-        $preview = $previewId && isset($this->previewCache[$previewId])
-            ? $this->previewCache[$previewId]['moves']
-            : null;
+        $preview = $previewId && isset($this->previewCache[$previewId]) ? $this->previewCache[$previewId]['moves'] : null;
 
         if (!$preview) {
             return ['success' => false, 'error' => 'Invalid or expired preview ID. Please run preview_file_move first.'];
@@ -2576,5 +2577,170 @@ class ToolExecutor
                 'error' => $e->getMessage(),
             ];
         }
+    }
+
+    protected function mergeAuthors(array $params): array
+    {
+        $primaryAuthorName = $params['primary_author_name'] ?? null;
+        $secondaryAuthorNames = $params['secondary_author_names'] ?? [];
+        $moveFiles = $params['move_files'] ?? false;
+        $previewOnly = $params['preview_only'] ?? true;
+
+        if (!$primaryAuthorName) {
+            return ['success' => false, 'error' => 'Primary author name is required'];
+        }
+
+        if (empty($secondaryAuthorNames)) {
+            return ['success' => false, 'error' => 'At least one secondary author name is required'];
+        }
+
+        $primaryAuthor = Author::where('name', $primaryAuthorName)->first();
+        if (!$primaryAuthor) {
+            return [
+                'success' => false,
+                'error' => "Primary author '{$primaryAuthorName}' not found",
+            ];
+        }
+
+        $secondaryAuthors = Author::whereIn('name', $secondaryAuthorNames)->get();
+        if ($secondaryAuthors->isEmpty()) {
+            return [
+                'success' => false,
+                'error' => 'No matching secondary authors found',
+            ];
+        }
+
+        $foundNames = $secondaryAuthors->pluck('name')->toArray();
+        $missingNames = array_diff($secondaryAuthorNames, $foundNames);
+
+        $affectedBooks = Book::whereHas('authors', function ($q) use ($secondaryAuthors) {
+            $q->whereIn('authors.id', $secondaryAuthors->pluck('id'));
+        })->with(['authors', 'series'])->get();
+
+        $preview = [
+            'primary_author' => [
+                'id' => $primaryAuthor->id,
+                'name' => $primaryAuthor->name,
+                'current_book_count' => $primaryAuthor->books()->count(),
+            ],
+            'secondary_authors' => $secondaryAuthors->map(fn ($a) => [
+                'id' => $a->id,
+                'name' => $a->name,
+                'book_count' => $a->books()->count(),
+            ])->toArray(),
+            'missing_authors' => $missingNames,
+            'affected_books' => $affectedBooks->map(function ($book) use ($primaryAuthor, $moveFiles) {
+                $result = [
+                    'id' => $book->id,
+                    'title' => $book->title,
+                    'current_authors' => $book->authors->pluck('name')->toArray(),
+                    'current_directory' => $book->directory_path,
+                ];
+
+                if ($moveFiles) {
+                    $newDirectoryPath = $this->generateNewAuthorDirectoryPath($book, $primaryAuthor->name);
+                    $result['new_directory'] = $newDirectoryPath;
+                    $result['directory_will_change'] = $book->directory_path !== $newDirectoryPath;
+                }
+
+                return $result;
+            })->toArray(),
+            'total_affected_books' => $affectedBooks->count(),
+            'move_files' => $moveFiles,
+        ];
+
+        if ($previewOnly) {
+            return [
+                'success' => true,
+                'preview' => $preview,
+                'message' => 'Preview generated. Use merge_authors with preview_only=false to execute the merge.',
+            ];
+        }
+
+        try {
+            return DB::transaction(function () use ($primaryAuthor, $secondaryAuthors, $affectedBooks, $moveFiles, $preview) {
+                $documentStore = app(DocumentStoreServiceInterface::class);
+                $secondaryAuthorIds = $secondaryAuthors->pluck('id')->map(fn ($id) => (string) $id)->toArray();
+
+                $affectedCount = $documentStore->mergeAuthors((string) $primaryAuthor->id, $secondaryAuthorIds);
+
+                $filesMoved = 0;
+                $fileMoveErrors = [];
+
+                if ($moveFiles) {
+                    $moveService = app(BookDirectoryMoveService::class);
+
+                    foreach ($affectedBooks as $book) {
+                        $book->refresh();
+                        $newDirectoryPath = $this->generateNewAuthorDirectoryPath($book, $primaryAuthor->name);
+
+                        if ($book->directory_path !== $newDirectoryPath) {
+                            $result = $moveService->moveBookDirectoryContents(
+                                $book->directory_path,
+                                $newDirectoryPath,
+                                $book->cover_image ? basename($book->cover_image) : null
+                            );
+
+                            if ($result['moved']) {
+                                $book->directory_path = $result['directoryPath'] ?? $newDirectoryPath;
+                                if (isset($result['coverImage'])) {
+                                    $book->cover_image = $book->directory_path . '/' . $result['coverImage'];
+                                }
+                                $book->save();
+                                $filesMoved++;
+                            } else {
+                                $fileMoveErrors[] = [
+                                    'book_id' => $book->id,
+                                    'title' => $book->title,
+                                    'error' => $result['error'] ?? 'Unknown error',
+                                ];
+                            }
+                        }
+                    }
+                }
+
+                return [
+                    'success' => true,
+                    'message' => "Merged {$affectedCount} book(s) from " . count($secondaryAuthorIds) . " author(s) into '{$primaryAuthor->name}'",
+                    'affected_books' => $affectedCount,
+                    'authors_deleted' => count($secondaryAuthorIds),
+                    'files_moved' => $filesMoved,
+                    'file_move_errors' => $fileMoveErrors,
+                    'preview' => $preview,
+                ];
+            });
+        } catch (\Exception $e) {
+            Log::error('merge_authors failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+            ];
+        }
+    }
+
+    protected function generateNewAuthorDirectoryPath(Book $book, string $primaryAuthorName): string
+    {
+        $authorSlug = Str::slug($primaryAuthorName);
+
+        $series = $book->series->first();
+        if ($series) {
+            $seriesSlug = Str::slug($series->name);
+            $seriesNumber = $series->pivot->series_number ?? null;
+            $titleSlug = Str::slug($book->title);
+
+            if ($seriesNumber !== null) {
+                return "{$authorSlug}/{$seriesSlug}/{$seriesNumber}-{$titleSlug}";
+            }
+
+            return "{$authorSlug}/{$seriesSlug}/{$titleSlug}";
+        }
+
+        $titleSlug = Str::slug($book->title);
+
+        return "{$authorSlug}/{$titleSlug}";
     }
 }

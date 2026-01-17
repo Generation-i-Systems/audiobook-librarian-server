@@ -38,6 +38,7 @@ class ToolDefinitions
             self::generateNfoFiles(),
             self::previewAndExecuteBulkOperation(),
             self::extractAndApplyMetadataFromAudioFiles(),
+            self::mergeAuthors(),
         ];
     }
 
@@ -983,6 +984,37 @@ class ToolDefinitions
                         'description' => 'Apply extracted metadata to database (default: false - preview only)',
                     ],
                 ],
+            ],
+        ];
+    }
+
+    protected static function mergeAuthors(): array
+    {
+        return [
+            'name' => 'merge_authors',
+            'description' => 'Merge multiple authors into a single primary author. All books from secondary authors will be reassigned to the primary author. The secondary authors will be deleted. Optionally move the book files to directories named after the primary author.',
+            'parameters' => [
+                'type' => 'object',
+                'properties' => [
+                    'primary_author_name' => [
+                        'type' => 'string',
+                        'description' => 'Name of the author to keep (the target/primary author)',
+                    ],
+                    'secondary_author_names' => [
+                        'type' => 'array',
+                        'items' => ['type' => 'string'],
+                        'description' => 'Names of authors to merge into the primary author (will be deleted)',
+                    ],
+                    'move_files' => [
+                        'type' => 'boolean',
+                        'description' => 'Move book files to directories named after the primary author (default: false)',
+                    ],
+                    'preview_only' => [
+                        'type' => 'boolean',
+                        'description' => 'Show preview without applying changes (default: true)',
+                    ],
+                ],
+                'required' => ['primary_author_name', 'secondary_author_names'],
             ],
         ];
     }
