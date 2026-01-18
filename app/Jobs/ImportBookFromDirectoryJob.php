@@ -1,9 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Jobs;
 
 use App\Services\BookDirectoryParser;
-use App\Services\UnifiedBookImporter;
+use App\Services\BookImportService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -19,65 +21,62 @@ class ImportBookFromDirectoryJob implements ShouldQueue
     use SerializesModels;
 
     public $tries = 3;
-    protected $directoryPath;
 
-    public function __construct($directoryPath)
+    protected string $directoryPath;
+
+    public function __construct(string $directoryPath)
     {
         $this->directoryPath = $directoryPath;
     }
 
-    public function handle()
+    public function handle(): void
     {
         try {
             Log::info("[BulkImport] Starting: {$this->directoryPath}");
 
             $dirPath = '/' . ltrim($this->directoryPath, '/');
-            $storagePath = rtrim(env('BOOK_STORAGE_PATH'), '/');
+            $storagePath = rtrim((string) env('BOOK_STORAGE_PATH'), '/');
             $fullPath = $storagePath . $dirPath;
 
-            if (!is_dir($fullPath)) {
+            if (! is_dir($fullPath)) {
                 $error = "[BulkImport] Directory does not exist: $fullPath";
                 Log::error($error);
                 throw new \RuntimeException($error);
             }
 
-            // Use unified importer
             $parser = app(BookDirectoryParser::class);
-            $importer = app(UnifiedBookImporter::class);
+            $importService = app(BookImportService::class);
 
-            // Parse the directory
+            // Parse the directory to get book metadata
             $bookData = $parser->parseDirectory($fullPath);
 
             if (empty($bookData) || empty($bookData['title'])) {
                 Log::warning("[BulkImport] Skipped directory {$dirPath}: No valid book data found");
+
                 return;
             }
 
-            Log::info('[BulkImport] Processing directory: ' . $dirPath);
-
-            // Use unified importer
-            $result = $importer->importBook($bookData, [
-                'source_path' => $fullPath,
-                'dry_run' => false,
-                'force' => false,
+            Log::info('[BulkImport] Processing directory: ' . $dirPath, [
+                'title' => $bookData['title'] ?? 'Unknown',
             ]);
 
-            // Handle result
-            switch ($result['status']) {
-                case 'imported':
-                    Log::info("[BulkImport] Successfully imported: {$bookData['title']}");
-                    break;
-                case 'updated':
-                    Log::info("[BulkImport] Successfully updated: {$bookData['title']}");
-                    break;
-                case 'skipped':
-                    $reason = $result['reason'] ?? 'unknown';
-                    Log::warning("[BulkImport] Skipped {$bookData['title']}: {$reason}");
-                    break;
-                case 'error':
-                    $error = $result['error'] ?? 'Unknown error';
-                    Log::error("[BulkImport] Error importing {$bookData['title']}: {$error}");
-                    throw new \RuntimeException($error);
+            // Build audiobook structure from parsed data
+            $audiobook = [
+                'path' => $fullPath,
+                'files' => $bookData['files'] ?? [],
+            ];
+
+            // Create the book in the database
+            // Since this is for books already in the library structure,
+            // we don't need to move files - just register in DB
+            $book = $importService->createBookFromMetadata($bookData, $audiobook, [
+                'skip_file_operations' => true,  // Files are already in place
+            ]);
+
+            if ($book) {
+                Log::info("[BulkImport] Successfully imported: {$book->title}");
+            } else {
+                Log::warning("[BulkImport] Import returned null for: {$dirPath}");
             }
         } catch (\Exception $e) {
             Log::error('[BulkImport] Job failed', [

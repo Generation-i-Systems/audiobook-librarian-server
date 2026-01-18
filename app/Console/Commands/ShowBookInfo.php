@@ -311,7 +311,7 @@ class ShowBookInfo extends Command
 
                 if ($this->confirm('This directory contains audio files. Would you like to import it?', true)) {
                     $this->info("Running import command...");
-                    $this->call('books:import-downloads', ['path' => $directory]);
+                    $this->call('book:import', ['path' => $directory]);
                     $this->newLine();
 
                     // Try to find the book again

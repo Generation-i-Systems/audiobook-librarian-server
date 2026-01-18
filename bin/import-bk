@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
-# Import Book - Quick wrapper for books:import-downloads command
+# Import Book - Quick wrapper for book:import command
 # Uses AI processing and external data enrichment (Audible, Google Books)
+# Automatically detects OpenAudible directories and uses books.json metadata
 # This script can be symlinked to a common bin directory for easy access
 
 # Save the original working directory FIRST before any cd commands
@@ -76,7 +77,7 @@ if [ ${#args[@]} -eq 0 ]; then
     debug "No arguments, using current directory: $ORIGINAL_DIR"
     # Change to project directory and use original working directory
     cd "$PROJECT_ROOT" || exit 1
-    php artisan books:import-downloads "$ORIGINAL_DIR" "${opts[@]}"
+    php artisan book:import "$ORIGINAL_DIR" "${opts[@]}"
 else
     # Resolve all arguments to absolute paths before changing directory
     resolved_args=()
@@ -102,9 +103,9 @@ else
     done
 
     debug "Resolved arguments: ${resolved_args[*]}"
-    debug "Running: php artisan books:import-downloads ${resolved_args[*]} ${opts[*]}"
+    debug "Running: php artisan book:import ${resolved_args[*]} ${opts[*]}"
 
     # Change to project directory and pass resolved paths
     cd "$PROJECT_ROOT" || exit 1
-    php artisan books:import-downloads "${resolved_args[@]}" "${opts[@]}"
+    php artisan book:import "${resolved_args[@]}" "${opts[@]}"
 fi

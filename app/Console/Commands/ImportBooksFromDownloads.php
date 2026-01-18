@@ -32,7 +32,7 @@ class ImportBooksFromDownloads extends Command
     /**
      * The name and signature of the console command.
      */
-    protected $signature = 'books:import-downloads
+    protected $signature = 'book:import
                             {path?* : Specific files or folders to process (default: scan directories)}
                             {--directory=* : Custom directories to scan (ignored if paths are provided)}
                             {--model=gemini-2.5-flash-lite : AI model to use for processing}
@@ -48,6 +48,7 @@ class ImportBooksFromDownloads extends Command
                             {--clear-cache : Clear background processing cache before starting}
                             {--force-audio : Force audio transcription even when AI confidence is high}
                             {--include-narrator : Include narrator in generated directory paths}
+                            {--include-old : Include OpenAudible books_old directory when scanning}
                             {--ui=ncurses : UI layer (ncurses|plain)}';
 
 
@@ -606,9 +607,12 @@ class ImportBooksFromDownloads extends Command
     protected function getDirectoriesToScan(): array
     {
         $customDirs = $this->option('directory');
+        $includeOld = $this->option('include-old');
+
         return $this->getImportService()->getDirectoriesToScan(
             $customDirs,
-            fn ($message) => $this->warn($message)
+            fn ($message) => $this->warn($message),
+            $includeOld
         );
     }
 
@@ -1258,11 +1262,11 @@ class ImportBooksFromDownloads extends Command
                 fn (&$metadata) => $this->getImportService()->extractSeriesNumberFromTitle($metadata),
                 fn () => $this->getValidGenres()
             ),
-            fn ($metadata, $manualSelection) => $this->getEnrichmentService()->manualEnrichmentWithComparison(
+            fn ($metadata, $audiobook, $enrichmentService) => $this->getImportService()->manualEnrichmentWithComparison(
                 $metadata,
-                $manualSelection,
-                fn ($headers, $rows) => $this->table($headers, $rows),
-                fn ($bytes) => $this->getImportService()->formatBytes($bytes)
+                $audiobook,
+                $enrichmentService,
+                fn ($headers, $rows) => $this->table($headers, $rows)
             ),
             fn () => $this->getEnrichmentService(),
             fn () => $this->getValidGenres(),
