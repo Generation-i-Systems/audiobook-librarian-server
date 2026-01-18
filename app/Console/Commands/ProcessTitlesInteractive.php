@@ -7,6 +7,7 @@ use App\Models\Series;
 use App\Models\Narrator;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\Finder\Finder;
 
 class ProcessTitlesInteractive extends Command
 {
@@ -23,6 +24,13 @@ class ProcessTitlesInteractive extends Command
      * @var string
      */
     protected $description = 'Interactively process book titles to clean up formatting, extract series info, narrators, and years (creates a database backup by default)';
+
+    public function __construct(
+        protected \App\Services\BookDirectoryParser $parser,
+        protected \App\Contracts\DocumentStoreServiceInterface $documentStore
+    ) {
+        parent::__construct();
+    }
 
     /**
      * Execute the console command.
@@ -52,10 +60,31 @@ class ProcessTitlesInteractive extends Command
             if ($this->hasChanges($originalTitle, $book, $titleInfo)) {
                 $this->displayProposedChanges($book, $titleInfo, $originalTitle);
 
-                if ($this->option('force') || $this->confirm('Apply these changes?', true)) {
+                $options = ['Apply changes', 'Skip'];
+                if (!empty($titleInfo['isMultiBookCandidate'])) {
+                    $options[] = 'Reprocess as Multi-Book Archive';
+                }
+                if (!empty($titleInfo['isPartCandidate'])) {
+                    $options[] = 'Merge into Parent Book';
+                }
+
+                $choice = 'Skip';
+                if ($this->option('force')) {
+                    $choice = 'Apply changes';
+                } else {
+                    $choice = $this->choice('Action?', $options, 0);
+                }
+
+                if ($choice === 'Apply changes') {
                     $this->applyChanges($book, $titleInfo);
                     $changesCount++;
                     $this->info('✓ Changes applied');
+                } elseif ($choice === 'Reprocess as Multi-Book Archive') {
+                    $this->reprocessAsMultiBook($book);
+                    $changesCount++;
+                } elseif ($choice === 'Merge into Parent Book') {
+                    $this->mergeIntoParent($book);
+                    $changesCount++;
                 } else {
                     $this->info('✗ Changes skipped');
                 }
@@ -87,6 +116,8 @@ class ProcessTitlesInteractive extends Command
             'narrator' => null,
             'year' => null,
             'multipleBooks' => [],
+            'isMultiBookCandidate' => false,
+            'isPartCandidate' => false,
             'changes' => []
         ];
 
@@ -147,6 +178,56 @@ class ProcessTitlesInteractive extends Command
         if ($dirInfo['seriesName'] && !$result['seriesName']) {
             $result['seriesName'] = $dirInfo['seriesName'];
             $result['changes'][] = "Extract series from directory: {$dirInfo['seriesName']}";
+        }
+
+        // Step 7: Check for structural issues (Multi-book or Part)
+        if (!empty($directoryPath)) {
+            $storageRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
+            $fullPath = $storageRoot . '/' . ltrim($directoryPath, '/');
+
+            if (is_dir($fullPath)) {
+                $hasKeywords = preg_match('/(Series|Trilogy|Quartet|Duo|Collection|Anthology)/i', $title) ||
+                               preg_match('/(Series|Trilogy|Quartet|Duo|Collection|Anthology)/i', $directoryPath);
+
+                try {
+                    $audioData = $this->parser->getAudioFiles($fullPath);
+                    $fileCount = $audioData['count'];
+
+                    // Case 1: Multi-book archive candidate (Files in root)
+                    // Trigger if there are multiple audio files, regardless of keywords
+                    if ($fileCount > 1) {
+                        $result['isMultiBookCandidate'] = true;
+                        $result['changes'][] = "Possible Multi-Book Archive ({$fileCount} files in root)";
+                    }
+
+                    // Case 2: Nested Multi-book archive candidate (Subdirectories with audio)
+                    // Check subdirectories if we have few files in root (e.g. just an intro or no files)
+                    if ($fileCount <= 1) {
+                        $finder = new Finder();
+                        try {
+                            $finder->directories()->in($fullPath)->depth(0);
+                            foreach ($finder as $subDir) {
+                                $subAudio = $this->parser->getAudioFiles($subDir->getPathname());
+                                if ($subAudio['count'] > 0) {
+                                    $result['isMultiBookCandidate'] = true;
+                                    $result['changes'][] = "Possible Multi-Book Archive (Contains subdirectories with audio)";
+                                    break;
+                                }
+                            }
+                        } catch (\Exception $e) {
+                            // Ignore finder errors
+                        }
+                    }
+
+                    // Case 3: Part candidate
+                    if (preg_match('/^(CD|Disc|Disk|Part|Vol|Volume)\s*[0-9]+$/i', basename($directoryPath))) {
+                        $result['isPartCandidate'] = true;
+                        $result['changes'][] = "Possible Part of a Book (Directory name looks like a part)";
+                    }
+                } catch (\Exception $e) {
+                    // Ignore errors accessing files
+                }
+            }
         }
 
         return $result;
@@ -353,5 +434,131 @@ class ProcessTitlesInteractive extends Command
 
             $book->save();
         });
+    }
+
+    /**
+     * Reprocess a single book as a multi-book archive (split into sub-books).
+     */
+    protected function reprocessAsMultiBook(Book $book): void
+    {
+        $path = $book->directoryPath;
+        $this->info("Reprocessing book ID {$book->id} as multi-book archive...");
+        $this->info("Directory: {$path}");
+
+        $storageRoot = rtrim(env('BOOK_STORAGE_PATH'), '/');
+        $fullPath = $storageRoot . '/' . ltrim($path, '/');
+
+        // Check for flat files
+        try {
+            $audioData = $this->parser->getAudioFiles($fullPath);
+            if ($audioData['count'] > 0) {
+                $this->warn("Found {$audioData['count']} audio files in the root directory.");
+                if ($this->confirm('Do you want to move each file into its own book directory? (Recommended for flat archives)', true)) {
+                    $this->explodeFlatArchive($fullPath, $audioData['audioFiles']);
+                }
+            }
+        } catch (\Exception $e) {
+            $this->warn("Could not check for flat files: " . $e->getMessage());
+        }
+
+        // Delete the current book (it's a container)
+        $book->delete();
+
+        // Reparse the directory using the parser
+        // We pass the relative path, parseDirectory handles resolving
+        $booksData = $this->parser->parseDirectory($path);
+
+        $createdCount = 0;
+        foreach ($booksData as $bookData) {
+            try {
+                // Check if book already exists
+                $existing = $this->documentStore->findBookByDirectoryPath($bookData['directoryPath']);
+                if ($existing) {
+                    $this->warn("Book already exists: " . $bookData['title']);
+                } else {
+                    $this->documentStore->createBook($bookData);
+                    $createdCount++;
+                    $this->info("Created book: " . $bookData['title']);
+                }
+            } catch (\Exception $e) {
+                $this->error("Failed to create book: " . $e->getMessage());
+            }
+        }
+
+        $this->info("Reprocessing complete. Created {$createdCount} new books.");
+    }
+
+    /**
+     * Move files into separate directories based on filename.
+     */
+    protected function explodeFlatArchive(string $directory, array $files): void
+    {
+        foreach ($files as $file) {
+            $filename = $file->getFilename();
+            $nameWithoutExt = pathinfo($filename, PATHINFO_FILENAME);
+
+            // Create directory
+            $newDir = $directory . '/' . $nameWithoutExt;
+            if (!file_exists($newDir)) {
+                mkdir($newDir, 0755, true);
+            }
+
+            // Move file
+            $newPath = $newDir . '/' . $filename;
+            rename($file->getPathname(), $newPath);
+            $this->info("Moved: {$filename} -> {$nameWithoutExt}/");
+        }
+    }
+
+    /**
+     * Merge a book (part) into its parent directory as a single book.
+     */
+    protected function mergeIntoParent(Book $book): void
+    {
+        $path = $book->directoryPath;
+        $parentPath = dirname($path);
+
+        // Ensure parent path is relative to storage root if $path was relative
+        if ($parentPath === '.') {
+            $this->error("Cannot merge into root directory.");
+            return;
+        }
+
+        $this->info("Merging book ID {$book->id} into parent: {$parentPath}");
+
+        // Delete the current book
+        $book->delete();
+
+        // Parse parent directory
+        // This relies on the updated BookDirectoryParser logic which now aggregates parts
+        $booksData = $this->parser->parseDirectory($parentPath);
+
+        $mergedCount = 0;
+        foreach ($booksData as $bookData) {
+            // We expect one book representing the parent, or maybe multiple if parent contains other books
+            // We should find the one that matches the parent directory
+
+            if ($bookData['directoryPath'] === $parentPath || str_starts_with($path, $bookData['directoryPath'])) {
+                try {
+                    $existing = $this->documentStore->findBookByDirectoryPath($bookData['directoryPath']);
+                    if ($existing) {
+                        $this->documentStore->updateBook($existing['id'], $bookData);
+                        $this->info("Updated parent book: " . $bookData['title']);
+                    } else {
+                        $this->documentStore->createBook($bookData);
+                        $this->info("Created parent book: " . $bookData['title']);
+                    }
+                    $mergedCount++;
+                } catch (\Exception $e) {
+                    $this->error("Failed to process parent book: " . $e->getMessage());
+                }
+            }
+        }
+
+        if ($mergedCount === 0) {
+            $this->warn("No parent book created/updated. Please check directory structure.");
+        } else {
+            $this->info("Merged successfully.");
+        }
     }
 }

@@ -1248,7 +1248,9 @@
                                 "type": "object",
                                 "properties": {
                                     "total_completed": { "type": "integer" },
-                                    "completed_this_month": { "type": "integer" },
+                                    "completed_this_month": {
+                                        "type": "integer"
+                                    },
                                     "upcoming_goals": { "type": "integer" },
                                     "overdue_goals": { "type": "integer" }
                                 }
@@ -1259,85 +1261,7 @@
                                     "total_seconds": { "type": "integer" },
                                     "total_books": { "type": "integer" },
                                     "days_active": { "type": "integer" },
-                                    "formatted_total_duration": { "type": "string" }
-                                }
-                            }
-                        }
-                    }
-                }
-            },
-
-                                    "books_listened": {
-                                        "type": "integer"
-                                    },
-                                    "session_count": {
-                                        "type": "integer"
-                                    },
-                                    "formatted_duration": {
-                                        "type": "string"
-                                    }
-                                }
-                            },
-                            "this_week": {
-                                "type": "object",
-                                "properties": {
-                                    "total_seconds": {
-                                        "type": "integer"
-                                    },
-                                    "books_listened": {
-                                        "type": "integer"
-                                    },
-                                    "session_count": {
-                                        "type": "integer"
-                                    },
-                                    "formatted_duration": {
-                                        "type": "string"
-                                    }
-                                }
-                            },
-                            "this_month": {
-                                "type": "object",
-                                "properties": {
-                                    "total_seconds": {
-                                        "type": "integer"
-                                    },
-                                    "books_listened": {
-                                        "type": "integer"
-                                    },
-                                    "session_count": {
-                                        "type": "integer"
-                                    },
-                                    "formatted_duration": {
-                                        "type": "string"
-                                    }
-                                }
-                            },
-                            "all_time": {
-                                "type": "object",
-                                "properties": {
-                                    "total_seconds": {
-                                        "type": "integer"
-                                    },
-                                    "books_listened": {
-                                        "type": "integer"
-                                    },
-                                    "session_count": {
-                                        "type": "integer"
-                                    },
-                                    "days_listened": {
-                                        "type": "integer"
-                                    },
-                                    "first_day": {
-                                        "type": "string",
-                                        "format": "date",
-                                        "nullable": true
-                                    },
-                                    "last_day": {
-                                        "type": "string",
-                                        "format": "date",
-                                        "nullable": true
-                                    },
-                                    "formatted_duration": {
+                                    "formatted_total_duration": {
                                         "type": "string"
                                     }
                                 }
@@ -4356,66 +4280,6 @@
                 }
             }
         },
-        "/status/list/{status}": {
-            "get": {
-                "tags": ["Status"],
-                "summary": "List books by status",
-                "description": "Get a paginated list of books with a specific status.",
-                "operationId": "listBooksByStatus",
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "parameters": [
-                    {
-                        "name": "status",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string",
-                            "enum": [
-                                "queue",
-                                "in_progress",
-                                "completed",
-                                "wishlist"
-                            ]
-                        }
-                    },
-                    {
-                        "name": "page",
-                        "in": "query",
-                        "schema": {
-                            "type": "integer",
-                            "default": 1
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Books retrieved successfully",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/components/schemas/UserBookStatus"
-                                            }
-                                        },
-                                        "meta": {
-                                            "$ref": "#/components/schemas/PaginationMeta"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/status/queue/reorder": {
             "post": {
                 "tags": ["Status"],
@@ -4444,6 +4308,264 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/MessageResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/books/queue/download": {
+            "post": {
+                "tags": ["Downloads"],
+                "summary": "Queue multiple books for download",
+                "description": "Creates a queued download for multiple books. Returns a zip ID that can be used to check status and download the files.",
+                "operationId": "queueDownload",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["book_ids"],
+                                "properties": {
+                                    "book_ids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer",
+                                            "minimum": 1
+                                        },
+                                        "minItems": 1,
+                                        "description": "Array of book IDs to include in the download",
+                                        "example": [1, 2, 3]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Download queued successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "zipId": {
+                                            "type": "string",
+                                            "description": "Unique identifier for the queued download",
+                                            "example": "zip_abc123def456"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Success message",
+                                            "example": "Download queued successfully"
+                                        },
+                                        "book_count": {
+                                            "type": "integer",
+                                            "description": "Number of books queued for download",
+                                            "example": 3
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - Invalid or missing token",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error - Invalid book IDs",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/books/queue/download/{zipId}": {
+            "get": {
+                "tags": ["Downloads"],
+                "summary": "Get queued download status",
+                "description": "Check the status of a queued download. Returns whether the download is ready or still processing.",
+                "operationId": "downloadQueuedZip",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "zipId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "The unique identifier for the queued download",
+                        "example": "zip_abc123def456"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Download status retrieved successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "zipId": {
+                                            "type": "string",
+                                            "description": "Unique identifier for the download",
+                                            "example": "zip_abc123def456"
+                                        },
+                                        "status": {
+                                            "type": "string",
+                                            "enum": [
+                                                "processing",
+                                                "ready",
+                                                "downloaded"
+                                            ],
+                                            "description": "Current status of the download",
+                                            "example": "ready"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - Invalid or missing token",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Download not found or expired",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Zip file not found"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "The requested download is not available"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/books/queue/download/{zipId}/mark-downloaded": {
+            "post": {
+                "tags": ["Downloads"],
+                "summary": "Mark queued download as downloaded",
+                "description": "Mark a queued download as completed. This updates the status and may trigger cleanup.",
+                "operationId": "markZipDownloaded",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "zipId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "The unique identifier for the queued download",
+                        "example": "zip_abc123def456"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Download marked as completed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Zip file marked as downloaded"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - Invalid or missing token",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Download not found or expired",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Zip file not found"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "The requested download is not available"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict - Already marked as downloaded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Already marked as downloaded"
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -4484,6 +4606,10 @@
         {
             "name": "Status",
             "description": "Book status and queue management endpoints"
+        },
+        {
+            "name": "Downloads",
+            "description": "Bulk download and download queue management endpoints"
         }
     ]
 }

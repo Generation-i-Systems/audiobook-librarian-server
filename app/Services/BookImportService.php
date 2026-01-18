@@ -20,6 +20,7 @@ class BookImportService
 
     protected GenreMappingService $genreMappingService;
     protected SourceTrashService $sourceTrashService;
+    protected ?OpenAudibleParser $openAudibleParser = null;
     protected array $config = [];
 
     private const AUDIO_EXTENSIONS = [
@@ -38,15 +39,158 @@ class BookImportService
 
     public function __construct(
         GenreMappingService $genreMappingService,
-        SourceTrashService $sourceTrashService
+        SourceTrashService $sourceTrashService,
+        ?OpenAudibleParser $openAudibleParser = null
     ) {
         $this->genreMappingService = $genreMappingService;
         $this->sourceTrashService = $sourceTrashService;
+        $this->openAudibleParser = $openAudibleParser ?? app(OpenAudibleParser::class);
     }
 
     public function setConfig(array $config): void
     {
         $this->config = $config;
+    }
+
+    /**
+     * Look up book metadata from OpenAudible books.json if available
+     *
+     * This automatically detects if the audio file is in an OpenAudible directory
+     * and returns rich metadata including chapters, genre, series, etc.
+     *
+     * @param array $audiobook Audiobook data with 'path' and optionally 'files'
+     * @return array|null Normalized metadata from OpenAudible or null if not available
+     */
+    public function lookupOpenAudibleMetadata(array $audiobook): ?array
+    {
+        $path = $audiobook['path'] ?? null;
+        if (!$path) {
+            return null;
+        }
+
+        // Detect if this is in an OpenAudible directory
+        $openAudibleDir = $this->openAudibleParser->detectOpenAudibleDirectory($path);
+        if (!$openAudibleDir) {
+            return null;
+        }
+
+        Log::info('BookImportService: Detected OpenAudible directory', [
+            'path' => $path,
+            'openaudible_dir' => $openAudibleDir,
+        ]);
+
+        // Find the primary audio file
+        $audioFile = null;
+        if (!empty($audiobook['files'])) {
+            foreach ($audiobook['files'] as $file) {
+                if (preg_match('/\.(m4b|m4a|mp3)$/i', $file)) {
+                    $audioFile = $file;
+                    break;
+                }
+            }
+        }
+
+        // If no files array, check if path is directly to a file
+        if (!$audioFile && is_file($path)) {
+            $audioFile = $path;
+        }
+
+        // Try finding .m4b file in the directory
+        if (!$audioFile && is_dir($path)) {
+            $m4bFiles = glob($path . '/*.m4b');
+            if (!empty($m4bFiles)) {
+                $audioFile = $m4bFiles[0];
+            }
+        }
+
+        if (!$audioFile) {
+            Log::debug('BookImportService: No audio file found for OpenAudible lookup', [
+                'path' => $path,
+            ]);
+            return null;
+        }
+
+        // Look up the book in OpenAudible's books.json
+        $metadata = $this->openAudibleParser->findBookByAudioFile($audioFile, $openAudibleDir);
+
+        if ($metadata) {
+            Log::info('BookImportService: Found OpenAudible metadata', [
+                'title' => $metadata['title'] ?? 'Unknown',
+                'author' => $metadata['author'] ?? 'Unknown',
+                'has_chapters' => !empty($metadata['chapters']),
+                'chapter_count' => count($metadata['chapters'] ?? []),
+            ]);
+        }
+
+        return $metadata;
+    }
+
+    /**
+     * Merge OpenAudible metadata with existing metadata
+     *
+     * OpenAudible metadata takes priority except for cover (use M4B embedded)
+     *
+     * @param array $existingMetadata Existing metadata from file tags or AI
+     * @param array $openAudibleMetadata Metadata from OpenAudible books.json
+     * @return array Merged metadata
+     */
+    public function mergeWithOpenAudibleMetadata(array $existingMetadata, array $openAudibleMetadata): array
+    {
+        // Start with existing metadata
+        $merged = $existingMetadata;
+
+        // Fields to always take from OpenAudible (they have the best data)
+        $priorityFields = [
+            'title',
+            'description',
+            'author',
+            'narrator',
+            'genre',
+            'mapped_genre',
+            'series',
+            'series_name',
+            'series_number',
+            'series_sequence',
+            'publisher',
+            'release_date',
+            'language',
+            'asin',
+            'chapters',
+            'rating_average',
+            'rating_count',
+        ];
+
+        foreach ($priorityFields as $field) {
+            if (!empty($openAudibleMetadata[$field])) {
+                $merged[$field] = $openAudibleMetadata[$field];
+            }
+        }
+
+        // Copy duration if not already set from actual audio files
+        if (empty($merged['duration']) && !empty($openAudibleMetadata['seconds'])) {
+            $merged['duration'] = $openAudibleMetadata['seconds'];
+        }
+
+        // Mark as coming from OpenAudible (enables skip enrichment)
+        $merged['source'] = 'openaudible';
+        $merged['skip_enrichment'] = true;
+
+        // Keep original genre for reference
+        if (!empty($openAudibleMetadata['original_genre'])) {
+            $merged['original_genre'] = $openAudibleMetadata['original_genre'];
+        }
+
+        // IMPORTANT: Do NOT override cover from OpenAudible
+        // We want to use the embedded M4B cover which is better quality
+        // The calling code should extract and use cover_data from the M4B file
+
+        Log::debug('BookImportService: Merged OpenAudible metadata', [
+            'title' => $merged['title'] ?? 'Unknown',
+            'has_chapters' => !empty($merged['chapters']),
+            'skip_enrichment' => $merged['skip_enrichment'] ?? false,
+        ]);
+
+        return $merged;
     }
 
     protected function areOnSameFileSystem(string $sourcePath, string $targetPath): bool
@@ -394,7 +538,26 @@ class BookImportService
             }
 
             // Generate librarian.json after all relationships are set
-            $this->updateLibraryJson($book);
+            // Include chapters from metadata if available (from OpenAudible)
+            $bookData = $book->load([
+                'authors',
+                'narrators',
+                'genres',
+                'series',
+                'publisher',
+            ])->toArray();
+
+            // Pass through chapters from metadata (not stored in DB)
+            if (!empty($metadata['chapters'])) {
+                $bookData['chapters'] = $metadata['chapters'];
+            }
+
+            // Pass through ASIN from metadata
+            if (!empty($metadata['asin'])) {
+                $bookData['asin'] = $metadata['asin'];
+            }
+
+            $this->updateLibraryJson($bookData);
 
             DB::commit();
             return $book;
@@ -573,9 +736,13 @@ class BookImportService
             $authors = array_map('trim', explode(',', $authors[0]));
         }
 
-        // Handle genre - convert array to string
-        $genreData = $metadata['genre'] ?? 'Unknown';
+        // Handle genre - prefer mapped_genre (from OpenAudible) for directory, fallback to genre
+        $genreData = $metadata['mapped_genre'] ?? $metadata['genre'] ?? 'Unknown';
         $genre = is_array($genreData) ? ($genreData[0] ?? 'Unknown') : $genreData;
+        // If genre is colon-separated (OpenAudible raw format), just take the first part
+        if (is_string($genre) && str_contains($genre, ':')) {
+            $genre = trim(explode(':', $genre)[0]);
+        }
         if (empty($genre)) {
             $genre = 'Unknown';
         }
@@ -3042,14 +3209,26 @@ class BookImportService
     /**
      * Manual enrichment with comparison
      */
-    public function manualEnrichmentWithComparison(array $metadata, array $audiobook, ?BookEnrichmentService $enrichmentService): array
-    {
+    public function manualEnrichmentWithComparison(
+        array $metadata,
+        array $audiobook,
+        ?BookEnrichmentService $enrichmentService,
+        ?callable $tableCallback = null
+    ): array {
         if (!$enrichmentService) {
             return $metadata;
         }
 
-        $enrichedData = $enrichmentService->enrichWithExternalData($metadata, ['force_refresh' => true]);
+        $enrichedData = $enrichmentService->enrichWithExternalData($metadata, ['force' => true]);
         if ($enrichedData && $enrichmentService->isValidEnrichment($metadata, $enrichedData)) {
+            if ($tableCallback) {
+                $enrichmentService->manualSelectionWithComparison(
+                    $metadata,
+                    $enrichedData,
+                    $tableCallback,
+                    fn ($bytes) => $this->formatBytes($bytes)
+                );
+            }
             return array_merge($metadata, $enrichedData);
         }
 
@@ -3258,7 +3437,7 @@ class BookImportService
     /**
      * Get directories to scan for audiobooks
      */
-    public function getDirectoriesToScan(array $customDirs = [], ?callable $warnCallback = null): array
+    public function getDirectoriesToScan(array $customDirs = [], ?callable $warnCallback = null, bool $includeOld = false): array
     {
         $directories = [];
 
@@ -3275,7 +3454,17 @@ class BookImportService
             }
         } else {
             // Use default directories
-            $defaultDirs = ['/media/download', '/media/download/audiobooks'];
+            $defaultDirs = [
+                '/media/download',
+                '/media/download/audiobooks',
+                '/media/audiobooks/OpenAudible/books',
+            ];
+
+            // Add books_old if requested
+            if ($includeOld) {
+                $defaultDirs[] = '/media/audiobooks/OpenAudible/books_old';
+            }
+
             foreach ($defaultDirs as $dir) {
                 if (is_dir($dir) && is_readable($dir)) {
                     $directories[] = $dir;
@@ -3444,40 +3633,80 @@ class BookImportService
     public function editMetadataFields(array $metadata, array $audiobook, callable $askInlineCallback, callable $selectWithImmediateInterruptCallback, callable $getFirstNonEmptyMetadataValueCallback, callable $extractSeriesNumberFromTitleCallback, callable $getValidGenresCallback): array
     {
         $currentTitle = $getFirstNonEmptyMetadataValueCallback($metadata, ['title', 'book_title', 'name']);
-        $metadata['title'] = $askInlineCallback('Title', is_string($currentTitle) ? $currentTitle : (string) ($metadata['title'] ?? ''));
+        $defaultTitle = is_string($currentTitle) ? $currentTitle : (string) ($metadata['title'] ?? '');
+        $newTitle = $askInlineCallback('Title', $defaultTitle);
+        $trimmedTitle = trim($newTitle);
+        if ($trimmedTitle === '') {
+            unset($metadata['title']);
+        } else {
+            $metadata['title'] = $newTitle;
+        }
 
         $currentAuthor = $getFirstNonEmptyMetadataValueCallback($metadata, ['author', 'authors', 'authorName', 'author_name']);
         if (is_array($currentAuthor)) {
             $currentAuthor = implode(', ', $currentAuthor);
         }
         $newAuthor = $askInlineCallback("Author(s) (comma-separated)", $currentAuthor);
-        $metadata['author'] = array_map('trim', explode(',', $newAuthor));
+        $trimmedAuthor = trim($newAuthor);
+        if ($trimmedAuthor === '') {
+            unset($metadata['author']);
+        } else {
+            $metadata['author'] = array_map('trim', explode(',', $newAuthor));
+        }
 
         $currentNarrator = $getFirstNonEmptyMetadataValueCallback($metadata, ['narrator', 'narrators', 'narratorName', 'narrator_name']);
         if (is_array($currentNarrator)) {
             $currentNarrator = implode(', ', $currentNarrator);
         }
-        $newNarrator = $askInlineCallback('Narrator(s) (comma-separated)', is_string($currentNarrator) ? $currentNarrator : '');
-        $metadata['narrator'] = array_map('trim', explode(',', $newNarrator));
+        $defaultNarrator = is_string($currentNarrator) ? $currentNarrator : '';
+        $newNarrator = $askInlineCallback('Narrator(s) (comma-separated)', $defaultNarrator);
+        $trimmedNarrator = trim($newNarrator);
+        if ($trimmedNarrator === '') {
+            unset($metadata['narrator']);
+        } else {
+            $metadata['narrator'] = array_map('trim', explode(',', $newNarrator));
+        }
 
         $currentSeries = $getFirstNonEmptyMetadataValueCallback($metadata, ['series', 'seriesName', 'series_name']);
-        $metadata['series'] = $askInlineCallback('Series', is_string($currentSeries) ? $currentSeries : (string) ($metadata['series'] ?? ''));
-
-        if (!empty($metadata['series'])) {
-            $currentSeriesNumber = $getFirstNonEmptyMetadataValueCallback($metadata, ['series_number', 'seriesNumber', 'series_num', 'seriesNum']);
-            $metadata['series_number'] = $askInlineCallback(
-                'Series Number',
-                is_scalar($currentSeriesNumber) ? (string) $currentSeriesNumber : (string) ($metadata['series_number'] ?? '')
-            );
-        } else {
+        $defaultSeries = is_string($currentSeries) ? $currentSeries : '';
+        $newSeries = $askInlineCallback('Series', $defaultSeries);
+        $trimmedSeries = trim($newSeries);
+        if ($trimmedSeries === '') {
+            unset($metadata['series']);
             $metadata['series_number'] = '';
+        } else {
+            $metadata['series'] = $newSeries;
+
+            if (!empty($metadata['series'])) {
+                $currentSeriesNumber = $getFirstNonEmptyMetadataValueCallback($metadata, ['series_number', 'seriesNumber', 'series_num', 'seriesNum']);
+                $defaultSeriesNumber = is_scalar($currentSeriesNumber) ? (string) $currentSeriesNumber : '';
+                $newSeriesNumber = $askInlineCallback(
+                    'Series Number',
+                    $defaultSeriesNumber
+                );
+                $trimmedSeriesNumber = trim($newSeriesNumber);
+                if ($trimmedSeriesNumber === '') {
+                    unset($metadata['series_number']);
+                } else {
+                    $metadata['series_number'] = $newSeriesNumber;
+                }
+            } else {
+                $metadata['series_number'] = '';
+            }
         }
 
         $currentYear = $getFirstNonEmptyMetadataValueCallback($metadata, ['year', 'publishedYear', 'published_year', 'published_date']);
         if (is_string($currentYear) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $currentYear)) {
             $currentYear = substr($currentYear, 0, 4);
         }
-        $metadata['year'] = $askInlineCallback('Year', is_scalar($currentYear) ? (string) $currentYear : (string) ($metadata['year'] ?? ''));
+        $defaultYear = is_scalar($currentYear) ? (string) $currentYear : (string) ($metadata['year'] ?? '');
+        $newYear = $askInlineCallback('Year', $defaultYear);
+        $trimmedYear = trim($newYear);
+        if ($trimmedYear === '') {
+            unset($metadata['year']);
+        } else {
+            $metadata['year'] = $newYear;
+        }
 
         $validGenres = $getValidGenresCallback();
         $genreOptions = [];
@@ -3536,6 +3765,8 @@ class BookImportService
             '5' => 'Update genre (' . $displayGenre . ')',
             '6' => 'Update directory',
             '7' => 'Request enrichment (Audible/Google Books)',
+            '8' => 'Reprocess as Multi-Book Archive (Split)',
+            '9' => 'Merge into Parent Book',
         ];
 
         return $options;
@@ -6082,6 +6313,26 @@ class BookImportService
 
         $aiMetadata = $processWithAICallback($audiobook);
 
+        // Check for OpenAudible metadata - if found, merge it with AI metadata
+        // OpenAudible metadata is superior and enables skipping enrichment
+        $openAudibleMetadata = $this->lookupOpenAudibleMetadata($audiobook);
+        if ($openAudibleMetadata !== null) {
+            $openAudibleTitle = $openAudibleMetadata['title'] ?? 'Unknown';
+            if ($uiService) {
+                $uiServiceLogCallback("📚 Found OpenAudible metadata for: {$openAudibleTitle}");
+                $uiServiceLogCallback("📖 Chapters: " . count($openAudibleMetadata['chapters'] ?? []));
+            } else {
+                $infoCallback("📚 Found OpenAudible metadata for: {$openAudibleTitle}");
+                $infoCallback("📖 Chapters: " . count($openAudibleMetadata['chapters'] ?? []));
+            }
+
+            // Merge OpenAudible metadata - it takes priority
+            $aiMetadata = $this->mergeWithOpenAudibleMetadata($aiMetadata, $openAudibleMetadata);
+
+            // OpenAudible data is so good, we can skip enrichment
+            $skipEnrichment = true;
+        }
+
         $hasCriticalTagMetadata = false;
         $tagMetadata = $this->extractTagMetadataFromAudiobook($audiobook, $aiProcessor);
         if ($this->hasCriticalTagMetadata($tagMetadata)) {
@@ -6100,6 +6351,22 @@ class BookImportService
         }
 
         $multiBookInfo = $detectMultiBookPatternCallback($audiobook['name']);
+
+        // Check for Flat Archive (files in root that don't look like parts)
+        if (!$multiBookInfo) {
+            $flatArchiveInfo = $this->detectFlatArchive($audiobook);
+            if ($flatArchiveInfo) {
+                $multiBookInfo = [
+                    'series_name' => $flatArchiveInfo['series_name'],
+                    'start_number' => 1,
+                    'end_number' => count($flatArchiveInfo['files']),
+                    'numbers' => range(1, count($flatArchiveInfo['files'])),
+                    'is_flat_archive' => true,
+                ];
+                $infoCallback("📚 Detected potential flat archive with " . count($flatArchiveInfo['files']) . " files");
+            }
+        }
+
         if ($multiBookInfo) {
             $authors = is_array($aiMetadata['author']) ? $aiMetadata['author'] : [$aiMetadata['author']];
             $cleanedSeriesName = $this->cleanSeriesName($multiBookInfo['series_name'], $authors);
@@ -6110,7 +6377,11 @@ class BookImportService
                 "[{$multiBookInfo['start_number']}-{$multiBookInfo['end_number']}]"
             );
 
-            $splitGroups = $analyzeMultiBookFilesCallback($audiobook, $multiBookInfo);
+            if (isset($multiBookInfo['is_flat_archive'])) {
+                $splitGroups = $this->convertFlatFilesToSplitGroups($audiobook['files']);
+            } else {
+                $splitGroups = $analyzeMultiBookFilesCallback($audiobook, $multiBookInfo);
+            }
 
             if (count($splitGroups) >= 2) {
                 $infoCallback("🔍 Found individual book files - will split during import");
@@ -6280,7 +6551,22 @@ class BookImportService
         $infoCallback("📁 Expected directory path: {$expectedPath}");
 
         if (!$isAutoMode && !$isDryRun) {
-            if (!$reviewAndApproveCallback($aiMetadata, $audiobook)) {
+            $approved = $reviewAndApproveCallback($aiMetadata, $audiobook);
+
+            if (isset($aiMetadata['_action']) && $aiMetadata['_action'] === 'reprocess_multi') {
+                $infoCallback("🔄 Reprocessing as Multi-Book Archive (Flat Split requested)...");
+                $splitGroups = $this->convertFlatFilesToSplitGroups($audiobook['files']);
+                $multiBookInfo = [
+                    'series_name' => $aiMetadata['series'] ?? $audiobook['name'],
+                    'start_number' => 1,
+                    'end_number' => count($audiobook['files']),
+                    'numbers' => range(1, count($audiobook['files'])),
+                ];
+                $processMultiBookSplitCallback($audiobook, $multiBookInfo, $splitGroups, $aiMetadata);
+                return;
+            }
+
+            if (!$approved) {
                 $warnCallback("❌ Import rejected by user");
                 $skippedBooks[] = [
                     'path' => $audiobook['path'],
@@ -6462,6 +6748,16 @@ class BookImportService
                     continue;
                 }
 
+                if ($choice === '8') {
+                    $metadata['_action'] = 'reprocess_multi';
+                    return true;
+                }
+
+                if ($choice === '9') {
+                    $metadata['_action'] = 'merge_parent';
+                    return true;
+                }
+
                 break;
             }
         }
@@ -6572,6 +6868,104 @@ class BookImportService
                 $uiServiceLogCallback('setCurrentBook', $buildUiMetadataCallback($metadata));
                 continue;
             }
+
+            if ($choice === '8') {
+                $metadata['_action'] = 'reprocess_multi';
+                return true;
+            }
+
+            if ($choice === '9') {
+                $metadata['_action'] = 'merge_parent';
+                return true;
+            }
         }
+    }
+
+    /**
+     * Detect if a directory is a flat archive containing multiple independent book files
+     */
+    public function detectFlatArchive(array $audiobook): ?array
+    {
+        $files = $audiobook['files'] ?? [];
+        if (count($files) < 2) {
+            return null;
+        }
+
+        // Check if files look like parts of the same book (CD/Part)
+        // If they do, we assume it's a single book (unless overridden)
+        $partCount = 0;
+        foreach ($files as $file) {
+            $filename = basename($file);
+            if (preg_match('/(cd|disc|disk|part)\s*[-_]?\s*\d+/i', $filename)) {
+                $partCount++;
+            }
+        }
+
+        // If most files look like parts, assume single book
+        if ($partCount > count($files) / 2) {
+            return null;
+        }
+
+        return [
+            'type' => 'flat_archive',
+            'series_name' => $audiobook['name'], // Default series name to directory name
+            'files' => $files,
+        ];
+    }
+
+    /**
+     * Process a flat archive by treating each file as a separate book
+     */
+    public function processFlatArchiveSplit(
+        array $audiobook,
+        array $archiveInfo,
+        array $aiMetadata,
+        callable $infoCallback,
+        callable $processSingleBookCallback
+    ): void {
+        $files = $audiobook['files'] ?? [];
+        $infoCallback("📚 Processing flat archive: found " . count($files) . " files");
+
+        foreach ($files as $index => $filePath) {
+            $filename = basename($filePath);
+            $infoCallback("  Processing file " . ($index + 1) . "/" . count($files) . ": {$filename}");
+
+            // Create a virtual audiobook for this single file
+            $virtualAudiobook = [
+                'path' => dirname($filePath), // Same directory
+                'name' => pathinfo($filename, PATHINFO_FILENAME), // Title from filename
+                'files' => [$filePath],
+                'total_size' => filesize($filePath),
+            ];
+
+            // Metadata for this specific book
+            $bookMetadata = $aiMetadata;
+            $bookMetadata['title'] = $virtualAudiobook['name'];
+            $bookMetadata['series'] = $archiveInfo['series_name'] ?? $aiMetadata['series'] ?? null;
+            // Clear duration so it's recalculated for the single file
+            unset($bookMetadata['duration']);
+
+            // Process it
+            $processSingleBookCallback($virtualAudiobook, $bookMetadata);
+        }
+    }
+
+    /**
+     * Convert list of files to split groups (one file per group)
+     */
+    public function convertFlatFilesToSplitGroups(array $files): array
+    {
+        $groups = [];
+        $i = 1;
+        sort($files); // Ensure consistent order
+        foreach ($files as $file) {
+            $filename = basename($file);
+            $groups[$i] = [[
+                'file' => $file,
+                'title' => pathinfo($file, PATHINFO_FILENAME),
+            ]];
+            $i++;
+        }
+        return $groups;
     }
 }

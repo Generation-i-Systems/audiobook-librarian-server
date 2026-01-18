@@ -282,6 +282,7 @@ php artisan test tests/Path/To/Module/
 - Never claim changes are complete unless explicitly confirmed they are in place
 - If uncertain about state, run verification commands before responding
 - **MUST** always verify/validate changes through compilation, tests, etc.
+- **NEVER** consider a task complete when any syntax errors exist. Run `php -l` on modified files to verify.
 
 ### Tool Usage Guidelines
 
