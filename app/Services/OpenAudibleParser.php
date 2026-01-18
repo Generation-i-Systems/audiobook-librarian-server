@@ -1,17 +1,32 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
+use App\Traits\GenreMapping;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 
 /**
  * OpenAudible Parser
  *
  * Parses OpenAudible's books.json format and normalizes it
- * for use with UnifiedBookImporter
+ * for use with BookImportService
  */
 class OpenAudibleParser
 {
+    use GenreMapping;
+
+    /**
+     * Cached books data indexed by filename for fast lookup
+     */
+    protected ?array $booksIndex = null;
+
+    /**
+     * Path to the currently loaded books.json
+     */
+    protected ?string $loadedPath = null;
     /**
      * Load and parse books.json file
      *
@@ -34,17 +49,173 @@ class OpenAudibleParser
             throw new \Exception("Invalid books.json format");
         }
 
+        // Build filename index for fast lookup
+        $this->loadedPath = $booksJsonPath;
+        $this->booksIndex = $this->buildFilenameIndex($booksData);
+
         return $booksData;
     }
 
     /**
-     * Normalize OpenAudible book data for UnifiedBookImporter
+     * Build an index of books by filename for fast lookup
+     */
+    protected function buildFilenameIndex(array $booksData): array
+    {
+        $index = [];
+
+        foreach ($booksData as $book) {
+            // Index by filename (without extension)
+            if (!empty($book['filename'])) {
+                $key = $this->normalizeFilename($book['filename']);
+                $index[$key] = $book;
+            }
+
+            // Also index by title
+            if (!empty($book['title'])) {
+                $key = $this->normalizeFilename($book['title']);
+                if (!isset($index[$key])) {
+                    $index[$key] = $book;
+                }
+            }
+
+            // Index by ASIN
+            if (!empty($book['asin'])) {
+                $index['asin:' . $book['asin']] = $book;
+            }
+
+            // Index by product_id
+            if (!empty($book['product_id'])) {
+                $index['product:' . $book['product_id']] = $book;
+            }
+        }
+
+        return $index;
+    }
+
+    /**
+     * Normalize filename for index lookup
+     */
+    protected function normalizeFilename(string $filename): string
+    {
+        // Remove extension
+        $name = preg_replace('/\.(m4b|m4a|mp3|jpg|png)$/i', '', $filename);
+
+        // Normalize whitespace and case
+        $name = strtolower(trim((string) $name));
+        $name = (string) preg_replace('/\s+/', ' ', $name);
+
+        return $name;
+    }
+
+    /**
+     * Find book metadata by audio file path
+     *
+     * @param string $audioFilePath Path to the audio file
+     * @param string|null $openAudiblePath Optional path to OpenAudible directory to load books.json
+     * @return array|null Normalized book metadata or null if not found
+     */
+    public function findBookByAudioFile(string $audioFilePath, ?string $openAudiblePath = null): ?array
+    {
+        // Load books.json if not already loaded
+        if ($this->booksIndex === null && $openAudiblePath !== null) {
+            try {
+                $this->loadBooksJson($openAudiblePath);
+            } catch (\Exception $e) {
+                Log::warning('OpenAudibleParser: Failed to load books.json', [
+                    'path' => $openAudiblePath,
+                    'error' => $e->getMessage(),
+                ]);
+                return null;
+            }
+        }
+
+        if ($this->booksIndex === null) {
+            return null;
+        }
+
+        // Get filename without path and extension
+        $filename = basename($audioFilePath);
+        $key = $this->normalizeFilename($filename);
+
+        Log::debug('OpenAudibleParser: Looking up book by filename', [
+            'audio_file' => $audioFilePath,
+            'lookup_key' => $key,
+        ]);
+
+        $rawBook = $this->booksIndex[$key] ?? null;
+
+        if ($rawBook === null) {
+            Log::debug('OpenAudibleParser: Book not found in index', [
+                'key' => $key,
+                'index_size' => count($this->booksIndex),
+            ]);
+            return null;
+        }
+
+        Log::info('OpenAudibleParser: Found book metadata', [
+            'title' => $rawBook['title'] ?? 'Unknown',
+            'author' => $rawBook['author'] ?? 'Unknown',
+        ]);
+
+        return $this->normalizeBookData($rawBook);
+    }
+
+    /**
+     * Detect if a path is within an OpenAudible books directory
+     * and return the path to books.json if found
+     *
+     * @param string $path Path to check
+     * @return string|null Path to OpenAudible directory (parent of books/) or null
+     */
+    public function detectOpenAudibleDirectory(string $path): ?string
+    {
+        $realPath = realpath($path);
+        if ($realPath === false) {
+            $realPath = $path;
+        }
+
+        // Check if we're in a /books subdirectory
+        $parts = explode('/', rtrim($realPath, '/'));
+        $booksIndex = array_search('books', $parts);
+
+        if ($booksIndex !== false) {
+            // Reconstruct parent path
+            $parentPath = implode('/', array_slice($parts, 0, (int) $booksIndex));
+
+            if (file_exists($parentPath . '/books.json')) {
+                return $parentPath;
+            }
+        }
+
+        // Check parent directory
+        $parentDir = dirname($realPath);
+        if (file_exists($parentDir . '/books.json')) {
+            return $parentDir;
+        }
+
+        // Check grandparent (in case path is to a file in books/)
+        $grandparentDir = dirname($parentDir);
+        if (basename($parentDir) === 'books' && file_exists($grandparentDir . '/books.json')) {
+            return $grandparentDir;
+        }
+
+        return null;
+    }
+
+    /**
+     * Normalize OpenAudible book data for BookImportService
      *
      * @param array $rawBookData Raw book data from books.json
      * @return array Normalized book data
      */
     public function normalizeBookData(array $rawBookData): array
     {
+        // Parse and map genre
+        $mappedGenre = $this->parseAndMapGenre($rawBookData['genre'] ?? null);
+
+        // Parse chapters
+        $chapters = $this->parseChapters($rawBookData['chapters'] ?? []);
+
         return [
             // Basic info
             'title' => $rawBookData['title'] ?? 'Unknown Title',
@@ -61,8 +232,14 @@ class OpenAudibleParser
             'narrator' => $this->normalizeNarrators($rawBookData),
             'narrated_by' => $rawBookData['narrated_by'] ?? null,
 
-            // Genre
+            // Genre - keep original format for compatibility
             'genre' => $rawBookData['genre'] ?? null,
+            // Mapped genre for directory organization (used by book:import)
+            'mapped_genre' => $mappedGenre,
+            'original_genre' => $rawBookData['genre'] ?? null,
+
+            // Chapters
+            'chapters' => $chapters,
 
             // Series
             'series' => $rawBookData['series_name'] ?? null,
@@ -80,13 +257,92 @@ class OpenAudibleParser
             'duration' => $rawBookData['duration'] ?? null,
             'seconds' => $rawBookData['seconds'] ?? null,
 
+            // Rating
+            'rating_average' => $rawBookData['rating_average'] ?? null,
+            'rating_count' => $rawBookData['rating_count'] ?? null,
+
             // Files (for finding audio file)
             'files' => $rawBookData['files'] ?? [],
             'filename' => $rawBookData['filename'] ?? null,
 
+            // Flag that this is from OpenAudible (enables skip enrichment)
+            'source' => 'openaudible',
+            'skip_enrichment' => true,
+
             // Raw data for reference
             '_raw' => $rawBookData,
         ];
+    }
+
+    /**
+     * Parse and map OpenAudible genre to library genre
+     *
+     * OpenAudible genres are colon-separated hierarchies like:
+     * "Science Fiction & Fantasy:Fantasy:Dragons & Mythical Creatures"
+     *
+     * @param string|null $genre Raw genre string from OpenAudible
+     * @return string Mapped library genre
+     */
+    public function parseAndMapGenre(?string $genre): string
+    {
+        if (empty($genre)) {
+            return 'Other';
+        }
+
+        // Split hierarchical genre
+        $parts = explode(':', $genre);
+
+        // Try to map each part, starting from the most specific
+        foreach (array_reverse($parts) as $part) {
+            $part = trim($part);
+            if (empty($part)) {
+                continue;
+            }
+
+            $mapped = $this->mapToValidGenre($part);
+            if ($mapped !== 'Other') {
+                return $mapped;
+            }
+        }
+
+        // If no specific match, try the root category
+        $rootCategory = trim($parts[0]);
+
+        return $this->mapToValidGenre($rootCategory);
+    }
+
+    /**
+     * Parse chapters from OpenAudible format
+     *
+     * @param array $rawChapters Array of chapter objects from books.json
+     * @return array Normalized chapters array
+     */
+    public function parseChapters(array $rawChapters): array
+    {
+        if (empty($rawChapters)) {
+            return [];
+        }
+
+        $chapters = [];
+
+        foreach ($rawChapters as $index => $chapter) {
+            if (!is_array($chapter)) {
+                continue;
+            }
+
+            $title = $chapter['title'] ?? "Chapter " . ($index + 1);
+            // Clean trailing whitespace/tabs from chapter titles
+            $title = rtrim((string) $title);
+
+            $chapters[] = [
+                'title' => $title,
+                'start_time_ms' => (int) ($chapter['start_offset_ms'] ?? 0),
+                'length_ms' => (int) ($chapter['length_ms'] ?? 0),
+                'start_time_sec' => (int) ($chapter['start_offset_sec'] ?? 0),
+            ];
+        }
+
+        return $chapters;
     }
 
     /**
@@ -176,7 +432,7 @@ class OpenAudibleParser
      */
     private function isAudioFile(string $path): bool
     {
-        return preg_match('/\.(m4b|m4a|mp3)$/i', $path);
+        return preg_match('/\.(m4b|m4a|mp3)$/i', $path) === 1;
     }
 
     /**
@@ -302,5 +558,30 @@ class OpenAudibleParser
         }
 
         return null;
+    }
+
+    /**
+     * Clear the loaded books index cache
+     */
+    public function clearCache(): void
+    {
+        $this->booksIndex = null;
+        $this->loadedPath = null;
+    }
+
+    /**
+     * Check if books.json is loaded
+     */
+    public function isLoaded(): bool
+    {
+        return $this->booksIndex !== null;
+    }
+
+    /**
+     * Get the path to the currently loaded books.json
+     */
+    public function getLoadedPath(): ?string
+    {
+        return $this->loadedPath;
     }
 }

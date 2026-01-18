@@ -244,11 +244,15 @@ trait HandlesLibraryJson
         $createdAt = $book['created_at'] ?? $book['createdAt'] ?? null;
         $updatedAt = $book['updated_at'] ?? $book['updatedAt'] ?? null;
 
+        // Handle chapters (from OpenAudible or other sources)
+        $chapters = $book['chapters'] ?? [];
+
         return [
             'id' => $book['id'] ?? null,
             'title' => $book['title'] ?? '',
             'description' => $book['description'] ?? null,
             'isbn' => $book['isbn'] ?? null,
+            'asin' => $book['asin'] ?? null,
             'release_date' => $book['release_date'] ?? $book['releaseDate'] ?? null,
             'language' => $book['language'] ?? 'english',
             'duration' => $book['duration'] ?? null,
@@ -263,6 +267,9 @@ trait HandlesLibraryJson
             'runtime' => $book['duration'] ? round($book['duration'] / 60, 1) : null,
             'created_at' => $createdAt,
             'updated_at' => $updatedAt,
+
+            // Chapters from OpenAudible (or other sources)
+            'chapters' => $chapters,
 
             // New format with full objects
             'authors' => $authors,
@@ -288,7 +295,7 @@ trait HandlesLibraryJson
 
             // Metadata
             'metadata' => [
-                'version' => '1.0',
+                'version' => '1.1',
                 'updated_at' => $updatedAt,
             ],
         ];

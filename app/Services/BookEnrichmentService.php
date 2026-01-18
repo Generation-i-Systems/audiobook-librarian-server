@@ -754,6 +754,54 @@ class BookEnrichmentService
     }
 
     /**
+     * Perform manual enrichment based on a specific selection (e.g. from Google Books)
+     */
+    public function manualSelectionWithComparison(
+        array $metadata,
+        array $manualSelection,
+        callable $tableCallback,
+        callable $formatBytesCallback
+    ): array {
+        $enrichedData = $manualSelection;
+
+        $headers = ['Field', 'Current', 'Enriched'];
+        $rows = [];
+
+        $fields = [
+            'title' => 'Title',
+            'author' => 'Author',
+            'narrator' => 'Narrator',
+            'series' => 'Series',
+            'series_number' => 'Series #',
+            'year' => 'Year',
+            'genre' => 'Genre',
+            'publisher' => 'Publisher',
+        ];
+
+        foreach ($fields as $key => $label) {
+            $current = $metadata[$key] ?? '';
+            $enriched = $enrichedData[$key] ?? '';
+
+            if (is_array($current)) {
+                $current = implode(', ', $current);
+            }
+            if (is_array($enriched)) {
+                $enriched = implode(', ', $enriched);
+            }
+
+            if ($current !== $enriched && !empty($enriched)) {
+                $rows[] = [$label, (string) $current, (string) $enriched];
+            }
+        }
+
+        if (!empty($rows)) {
+            $tableCallback($headers, $rows);
+        }
+
+        return array_merge($metadata, $enrichedData);
+    }
+
+    /**
      * Normalize author name for enrichment - extract actual author from patterns
      * Examples:
      *   "Graphic Audio [Alex Archer]" -> "Alex Archer"
