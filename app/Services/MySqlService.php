@@ -89,7 +89,11 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         // First, copy all non-relational properties, converting keys to camelCase
         foreach ($bookArray as $key => $value) {
             if (!is_array($value)) {
-                $camelCasedBook[Str::camel($key)] = $value;
+                if ($key === 'cover_image') {
+                    $camelCasedBook['coverImage'] = $this->buildCoverImageOutput($value, $book->directory_path);
+                } else {
+                    $camelCasedBook[Str::camel($key)] = $value;
+                }
             }
         }
 

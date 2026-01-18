@@ -60,6 +60,8 @@ class ProgressController extends Controller
             'progress_percentage' => 'required|integer|min:0|max:100',
             'session_duration_ms' => 'nullable|integer|min:0',
             'playback_speed' => 'nullable|numeric|min:0.1|max:5.0',
+            'current_chapter' => 'nullable|integer|min:1',
+            'current_chapter_name' => 'nullable|string|max:255',
         ]);
 
         $book = Book::find($bookId);
@@ -87,6 +89,13 @@ class ProgressController extends Controller
             null
         );
 
+        if (isset($validated['current_chapter'])) {
+            $progress->current_chapter = $validated['current_chapter'];
+        }
+        if (isset($validated['current_chapter_name'])) {
+            $progress->current_chapter_name = $validated['current_chapter_name'];
+        }
+
         $progress->progress_percentage = $validated['progress_percentage'];
         $progress->completed = $validated['progress_percentage'] >= 100;
         if ($progress->completed && !$progress->completed_at) {
@@ -100,6 +109,8 @@ class ProgressController extends Controller
             'progress_percentage' => (int) round($progress->progress_percentage),
             'last_updated' => $progress->updated_at->toISOString(),
             'is_finished' => $progress->completed,
+            'current_chapter' => $progress->current_chapter,
+            'current_chapter_name' => $progress->current_chapter_name,
         ]);
     }
 
