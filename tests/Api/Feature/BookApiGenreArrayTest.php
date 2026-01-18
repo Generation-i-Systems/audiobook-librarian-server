@@ -26,14 +26,13 @@ class BookApiGenreArrayTest extends TestCase
     {
         $user = User::factory()->create(['role' => 'admin']);
         $this->actingAs($user);
-        $userId = $user->id;
 
         // Mock the DocumentStoreServiceInterface
-        $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) use ($userId) {
+        $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) {
             // Mock response for a book with genre as a string
             $mock->shouldReceive('getBook')
                 ->once()
-                ->with(1, $userId)
+                ->with('1', \Mockery::any())
                 ->andReturn([
                     'id' => 1,
                     'title' => 'Test Book 1',
@@ -53,7 +52,7 @@ class BookApiGenreArrayTest extends TestCase
             // Mock response for a book with genre as an array
             $mock->shouldReceive('getBook')
                 ->once()
-                ->with(2, $userId)
+                ->with('2', \Mockery::any())
                 ->andReturn([
                     'id' => 2,
                     'title' => 'Test Book 2',

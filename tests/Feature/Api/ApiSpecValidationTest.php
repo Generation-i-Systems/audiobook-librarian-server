@@ -209,7 +209,7 @@ class ApiSpecValidationTest extends TestCase
         $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) {
             // Mock a book with series containing null values (bad data)
             $mock->shouldReceive('getBook')
-                ->with(1)
+                ->with('1', \Mockery::any())
                 ->andReturn([
                     'id' => 1,
                     'title' => 'Test Book With Bad Series',
@@ -256,7 +256,7 @@ class ApiSpecValidationTest extends TestCase
     {
         $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) {
             $mock->shouldReceive('getBook')
-                ->with(2)
+                ->with('2', \Mockery::any())
                 ->andReturn([
                     'id' => 2,
                     'title' => 'Book Without Series',
@@ -294,7 +294,7 @@ class ApiSpecValidationTest extends TestCase
     {
         $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) {
             $mock->shouldReceive('getBook')
-                ->with(3)
+                ->with('3', \Mockery::any())
                 ->andReturn([
                     'id' => 3,
                     'title' => 'Book With Valid Series',
@@ -418,7 +418,7 @@ class ApiSpecValidationTest extends TestCase
         $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) {
             // Test with string genre (should be converted to array)
             $mock->shouldReceive('getBook')
-                ->with(10)
+                ->with('10', \Mockery::any())
                 ->andReturn([
                     'id' => 10,
                     'title' => 'String Genre Book',
@@ -458,7 +458,7 @@ class ApiSpecValidationTest extends TestCase
         $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) {
             // Test with string author (should be converted to array)
             $mock->shouldReceive('getBook')
-                ->with(11)
+                ->with('11', \Mockery::any())
                 ->andReturn([
                     'id' => 11,
                     'title' => 'String Author Book',
@@ -498,7 +498,7 @@ class ApiSpecValidationTest extends TestCase
         $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) {
             // Test with string narrator (should be converted to array)
             $mock->shouldReceive('getBook')
-                ->with(12)
+                ->with('12', \Mockery::any())
                 ->andReturn([
                     'id' => 12,
                     'title' => 'String Narrator Book',

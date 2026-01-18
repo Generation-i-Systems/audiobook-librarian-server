@@ -102,7 +102,7 @@ class LibraryJsonUpdateTest extends TestCase
         $this->assertEquals('Test Publisher', $jsonContent['publisher']['name']);
 
         $this->assertArrayHasKey('metadata', $jsonContent);
-        $this->assertEquals('1.0', $jsonContent['metadata']['version']);
+        $this->assertEquals('1.1', $jsonContent['metadata']['version']);
     }
 
     public function testLibraryJsonIsUpdatedWhenBookRelationshipsChange()

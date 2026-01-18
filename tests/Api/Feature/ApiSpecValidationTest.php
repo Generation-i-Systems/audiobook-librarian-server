@@ -206,7 +206,7 @@ class ApiSpecValidationTest extends TestCase
         $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) {
             // Mock a book with series containing null values (bad data)
             $mock->shouldReceive('getBook')
-                ->with(1, \Mockery::any())
+                ->with('1', \Mockery::any())
                 ->andReturn([
                     'id' => 1,
                     'title' => 'Test Book With Bad Series',
@@ -251,7 +251,7 @@ class ApiSpecValidationTest extends TestCase
     {
         $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) {
             $mock->shouldReceive('getBook')
-                ->with(2, \Mockery::any())
+                ->with('2', \Mockery::any())
                 ->andReturn([
                     'id' => 2,
                     'title' => 'Book Without Series',
@@ -287,7 +287,7 @@ class ApiSpecValidationTest extends TestCase
     {
         $this->mock(DocumentStoreServiceInterface::class, function (MockInterface $mock) {
             $mock->shouldReceive('getBook')
-                ->with(3, \Mockery::any())
+                ->with('3', \Mockery::any())
                 ->andReturn([
                     'id' => 3,
                     'title' => 'Book With Valid Series',

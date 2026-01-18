@@ -36,7 +36,7 @@ class BookApiGenreArrayTest extends TestCase
             // Mock response for a book with genre as a string
             $mock->shouldReceive('getBook')
                 ->once()
-                ->with(1)
+                ->with('1', \Mockery::any())
                 ->andReturn([
                     'id' => 1,
                     'title' => 'Test Book 1',
@@ -56,7 +56,7 @@ class BookApiGenreArrayTest extends TestCase
             // Mock response for a book with genre as an array
             $mock->shouldReceive('getBook')
                 ->once()
-                ->with(2)
+                ->with('2', \Mockery::any())
                 ->andReturn([
                     'id' => 2,
                     'title' => 'Test Book 2',
