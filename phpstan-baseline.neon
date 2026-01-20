@@ -391,24 +391,6 @@ parameters:
 			path: app/Console/Commands/ImportCollectionCommand.php
 
 		-
-			message: '#^Parameter \#1 \$existingBook of method App\\Console\\Commands\\ImportOpenAudible\:\:handleDuplicateBook\(\) expects App\\Models\\Book, Illuminate\\Database\\Eloquent\\Model given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Console/Commands/ImportOpenAudible.php
-
-		-
-			message: '#^Property App\\Console\\Commands\\ImportOpenAudible\:\:\$genreMapper is never read, only written\.$#'
-			identifier: property.onlyWritten
-			count: 1
-			path: app/Console/Commands/ImportOpenAudible.php
-
-		-
-			message: '#^Strict comparison using \!\=\= between non\-falsy\-string and '''' will always evaluate to true\.$#'
-			identifier: notIdentical.alwaysTrue
-			count: 1
-			path: app/Console/Commands/ImportOpenAudible.php
-
-		-
 			message: '#^Access to an undefined property App\\Models\\Book\:\:\$author\.$#'
 			identifier: property.notFound
 			count: 2
@@ -535,9 +517,21 @@ parameters:
 			path: app/Console/Commands/ParseBooksCommand.php
 
 		-
-			message: '#^Call to function is_array\(\) with string will always evaluate to false\.$#'
-			identifier: function.impossibleType
+			message: '#^Call to an undefined method App\\Services\\BookDirectoryParser\:\:extractAuthorFromPath\(\)\.$#'
+			identifier: method.notFound
 			count: 1
+			path: app/Console/Commands/ParseBooksCommand.php
+
+		-
+			message: '#^Call to an undefined method App\\Services\\BookDirectoryParser\:\:getAudioFiles\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Console/Commands/ParseBooksCommand.php
+
+		-
+			message: '#^Call to an undefined method App\\Services\\BookDirectoryParser\:\:resolveStoragePath\(\)\.$#'
+			identifier: method.notFound
+			count: 2
 			path: app/Console/Commands/ParseBooksCommand.php
 
 		-
@@ -659,6 +653,12 @@ parameters:
 			identifier: staticMethod.notFound
 			count: 1
 			path: app/Console/Commands/ProcessBooksWithAI.php
+
+		-
+			message: '#^Call to an undefined method App\\Services\\BookDirectoryParser\:\:getAudioFiles\(\)\.$#'
+			identifier: method.notFound
+			count: 3
+			path: app/Console/Commands/ProcessTitlesInteractive.php
 
 		-
 			message: '#^Call to an undefined static method App\\Models\\Narrator\:\:firstOrCreate\(\)\.$#'
@@ -1130,6 +1130,12 @@ parameters:
 
 		-
 			message: '#^Call to an undefined method App\\Http\\Controllers\\Admin\\BookController\:\:cleanText\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Http/Controllers/Admin/BookController.php
+
+		-
+			message: '#^Call to an undefined method App\\Services\\BookDirectoryParser\:\:resolveStoragePath\(\)\.$#'
 			identifier: method.notFound
 			count: 1
 			path: app/Http/Controllers/Admin/BookController.php
@@ -2335,6 +2341,12 @@ parameters:
 			path: app/Jobs/CreateImportJobsForDirectory.php
 
 		-
+			message: '#^Offset ''title'' on non\-empty\-array on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Jobs/ImportBookFromDirectoryJob.php
+
+		-
 			message: '#^Access to an undefined property App\\Models\\User\:\:\$id\.$#'
 			identifier: property.notFound
 			count: 4
@@ -3529,14 +3541,50 @@ parameters:
 			path: app/Services/BookDirectoryParser.php
 
 		-
+			message: '#^Access to an undefined property App\\Services\\BookDirectoryParser\:\:\$debugCallback\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/BookDirectoryParser.php
+
+		-
+			message: '#^Access to an undefined property App\\Services\\BookDirectoryParser\:\:\$storageRoot\.$#'
+			identifier: property.notFound
+			count: 3
+			path: app/Services/BookDirectoryParser.php
+
+		-
 			message: '#^Call to an undefined method \$this\(App\\Services\\BookDirectoryParser\)\:\:error\(\)\.$#'
 			identifier: method.notFound
 			count: 11
 			path: app/Services/BookDirectoryParser.php
 
 		-
-			message: '#^Call to function array_key_exists\(\) with ''seriesIndex'' and array\<''publishedYear''\|''seriesNumber''\|string, array\|float\|int\|string\|null\> will always evaluate to false\.$#'
-			identifier: function.impossibleType
+			message: '#^Call to an undefined method App\\Services\\BookDirectoryParser\:\:cleanText\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Services/BookDirectoryParser.php
+
+		-
+			message: '#^Call to an undefined method App\\Services\\BookDirectoryParser\:\:formatDuration\(\)\.$#'
+			identifier: method.notFound
+			count: 3
+			path: app/Services/BookDirectoryParser.php
+
+		-
+			message: '#^Call to an undefined method App\\Services\\BookDirectoryParser\:\:getAudioFiles\(\)\.$#'
+			identifier: method.notFound
+			count: 3
+			path: app/Services/BookDirectoryParser.php
+
+		-
+			message: '#^Call to an undefined method App\\Services\\BookDirectoryParser\:\:readMetadataFile\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Services/BookDirectoryParser.php
+
+		-
+			message: '#^Call to an undefined method App\\Services\\BookDirectoryParser\:\:resolveStoragePath\(\)\.$#'
+			identifier: method.notFound
 			count: 1
 			path: app/Services/BookDirectoryParser.php
 
@@ -3579,13 +3627,7 @@ parameters:
 		-
 			message: '#^If condition is always true\.$#'
 			identifier: if.alwaysTrue
-			count: 3
-			path: app/Services/BookDirectoryParser.php
-
-		-
-			message: '#^Left side of && is always true\.$#'
-			identifier: booleanAnd.leftAlwaysTrue
-			count: 1
+			count: 2
 			path: app/Services/BookDirectoryParser.php
 
 		-
@@ -3643,19 +3685,7 @@ parameters:
 			path: app/Services/BookDirectoryParser.php
 
 		-
-			message: '#^PHPDoc tag @param references unknown parameter\: \$audioFiles$#'
-			identifier: parameter.notFound
-			count: 1
-			path: app/Services/BookDirectoryParser.php
-
-		-
 			message: '#^Parameter \#1 \$array \(list\<non\-empty\-array\<string, mixed\>\>\) of array_values is already a list, call has no effect\.$#'
-			identifier: arrayValues.list
-			count: 1
-			path: app/Services/BookDirectoryParser.php
-
-		-
-			message: '#^Parameter \#1 \$array \(list\<non\-falsy\-string\>\) of array_values is already a list, call has no effect\.$#'
 			identifier: arrayValues.list
 			count: 1
 			path: app/Services/BookDirectoryParser.php
@@ -3675,24 +3705,12 @@ parameters:
 		-
 			message: '#^Result of && is always false\.$#'
 			identifier: booleanAnd.alwaysFalse
-			count: 2
+			count: 1
 			path: app/Services/BookDirectoryParser.php
 
 		-
 			message: '#^Result of \|\| is always false\.$#'
 			identifier: booleanOr.alwaysFalse
-			count: 1
-			path: app/Services/BookDirectoryParser.php
-
-		-
-			message: '#^Result of \|\| is always true\.$#'
-			identifier: booleanOr.alwaysTrue
-			count: 1
-			path: app/Services/BookDirectoryParser.php
-
-		-
-			message: '#^Strict comparison using \!\=\= between non\-empty\-string and '''' will always evaluate to true\.$#'
-			identifier: notIdentical.alwaysTrue
 			count: 1
 			path: app/Services/BookDirectoryParser.php
 
@@ -3877,6 +3895,12 @@ parameters:
 			path: app/Services/BookImportService.php
 
 		-
+			message: '#^Offset ''skip_enrichment'' on non\-empty\-array on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/BookImportService.php
+
+		-
 			message: '#^Parameter \#1 \$string of function str_pad expects string, int\<1, 99\> given\.$#'
 			identifier: argument.type
 			count: 1
@@ -3928,12 +3952,6 @@ parameters:
 			message: '#^Variable \$file might not be defined\.$#'
 			identifier: variable.undefined
 			count: 1
-			path: app/Services/BookImportService.php
-
-		-
-			message: '#^Variable \$genresToAttach in empty\(\) always exists and is not falsy\.$#'
-			identifier: empty.variable
-			count: 2
 			path: app/Services/BookImportService.php
 
 		-
@@ -3989,12 +4007,6 @@ parameters:
 			identifier: nullCoalesce.offset
 			count: 1
 			path: app/Services/DirectoryMatchingService.php
-
-		-
-			message: '#^Offset 0 on non\-empty\-list\<string\> on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: app/Services/GenreMappingService.php
 
 		-
 			message: '#^Variable \$results in empty\(\) always exists and is not falsy\.$#'
@@ -4819,174 +4831,6 @@ parameters:
 			path: app/Services/ThemeValidationService.php
 
 		-
-			message: '#^Access to an undefined property \$this\(App\\Services\\UnifiedBookImporter\)\:\:\$app\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/UnifiedBookImporter.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Book\:\:\$abridged\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/UnifiedBookImporter.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\Book\:\:\$total_size\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/UnifiedBookImporter.php
-
-		-
-			message: '#^Binary operation "\*" between string and 3600 results in an error\.$#'
-			identifier: binaryOp.invalid
-			count: 1
-			path: app/Services/UnifiedBookImporter.php
-
-		-
-			message: '#^Binary operation "\*" between string and 60 results in an error\.$#'
-			identifier: binaryOp.invalid
-			count: 1
-			path: app/Services/UnifiedBookImporter.php
-
-		-
-			message: '#^Binary operation "\+" between \(array\|float\|int\) and string results in an error\.$#'
-			identifier: binaryOp.invalid
-			count: 1
-			path: app/Services/UnifiedBookImporter.php
-
-		-
-			message: '#^Call to an undefined method \$this\(App\\Services\\UnifiedBookImporter\)\:\:error\(\)\.$#'
-			identifier: method.notFound
-			count: 11
-			path: app/Services/UnifiedBookImporter.php
-
-		-
-			message: '#^Call to an undefined method App\\Services\\UnifiedBookImporter\:\:cleanText\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Services/UnifiedBookImporter.php
-
-		-
-			message: '#^Call to an undefined static method App\\Models\\Author\:\:firstOrCreate\(\)\.$#'
-			identifier: staticMethod.notFound
-			count: 1
-			path: app/Services/UnifiedBookImporter.php
-
-		-
-			message: '#^Call to an undefined static method App\\Models\\Book\:\:create\(\)\.$#'
-			identifier: staticMethod.notFound
-			count: 1
-			path: app/Services/UnifiedBookImporter.php
-
-		-
-			message: '#^Call to an undefined static method App\\Models\\Genre\:\:firstOrCreate\(\)\.$#'
-			identifier: staticMethod.notFound
-			count: 1
-			path: app/Services/UnifiedBookImporter.php
-
-		-
-			message: '#^Call to an undefined static method App\\Models\\Narrator\:\:firstOrCreate\(\)\.$#'
-			identifier: staticMethod.notFound
-			count: 1
-			path: app/Services/UnifiedBookImporter.php
-
-		-
-			message: '#^Call to an undefined static method App\\Models\\Series\:\:firstOrCreate\(\)\.$#'
-			identifier: staticMethod.notFound
-			count: 1
-			path: app/Services/UnifiedBookImporter.php
-
-		-
-			message: '#^Call to function is_array\(\) with string will always evaluate to false\.$#'
-			identifier: function.impossibleType
-			count: 2
-			path: app/Services/UnifiedBookImporter.php
-
-		-
-			message: '#^Call to function is_string\(\) with non\-falsy\-string will always evaluate to true\.$#'
-			identifier: function.alreadyNarrowedType
-			count: 1
-			path: app/Services/UnifiedBookImporter.php
-
-		-
-			message: '#^Call to function property_exists\(\) with \$this\(App\\Services\\UnifiedBookImporter\) and ''documentStore'' will always evaluate to true\.$#'
-			identifier: function.alreadyNarrowedType
-			count: 2
-			path: app/Services/UnifiedBookImporter.php
-
-		-
-			message: '#^Comparison operation "\>" between \*NEVER\* and 0 results in an error\.$#'
-			identifier: greater.invalid
-			count: 1
-			path: app/Services/UnifiedBookImporter.php
-
-		-
-			message: '#^Method App\\Services\\UnifiedBookImporter\:\:findExistingBook\(\) should return App\\Models\\Book\|null but returns Illuminate\\Database\\Eloquent\\Model\.$#'
-			identifier: return.type
-			count: 3
-			path: app/Services/UnifiedBookImporter.php
-
-		-
-			message: '#^Method App\\Services\\UnifiedBookImporter\:\:findExistingBook\(\) should return App\\Models\\Book\|null but returns stdClass\|null\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Services/UnifiedBookImporter.php
-
-		-
-			message: '#^Offset ''score'' on array\{score\: int\<min, 215\>, item\: mixed\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: app/Services/UnifiedBookImporter.php
-
-		-
-			message: '#^Offset 1 on array\{non\-empty\-string, '''', non\-falsy\-string&numeric\-string\}\|array\{non\-empty\-string, non\-falsy\-string&numeric\-string\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: app/Services/UnifiedBookImporter.php
-
-		-
-			message: '#^Parameter \#1 \$array \(list\<non\-empty\-array\<string, mixed\>\>\) of array_values is already a list, call has no effect\.$#'
-			identifier: arrayValues.list
-			count: 1
-			path: app/Services/UnifiedBookImporter.php
-
-		-
-			message: '#^Parameter \#2 \$callback of function array_filter expects \(callable\(string\)\: bool\)\|null, ''strlen'' given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Services/UnifiedBookImporter.php
-
-		-
-			message: '#^Parameter \#3 \$value of function curl_setopt expects bool, int given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Services/UnifiedBookImporter.php
-
-		-
-			message: '#^Property App\\Services\\UnifiedBookImporter\:\:\$parser is never read, only written\.$#'
-			identifier: property.onlyWritten
-			count: 1
-			path: app/Services/UnifiedBookImporter.php
-
-		-
-			message: '#^Result of && is always false\.$#'
-			identifier: booleanAnd.alwaysFalse
-			count: 1
-			path: app/Services/UnifiedBookImporter.php
-
-		-
-			message: '#^Right side of && is always true\.$#'
-			identifier: booleanAnd.rightAlwaysTrue
-			count: 2
-			path: app/Services/UnifiedBookImporter.php
-
-		-
-			message: '#^Strict comparison using \!\=\= between non\-falsy\-string and '''' will always evaluate to true\.$#'
-			identifier: notIdentical.alwaysTrue
-			count: 1
-			path: app/Services/UnifiedBookImporter.php
-
-		-
 			message: '#^Trait App\\Traits\\OptimizedCamelCaseAccess is used zero times and is not analysed\.$#'
 			identifier: trait.unused
 			count: 1
@@ -5087,12 +4931,6 @@ parameters:
 			identifier: class.notFound
 			count: 1
 			path: tests/Api/Feature/BookApiAutocompleteSeriesTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: tests/Api/Feature/BookApiGenreArrayTest.php
 
 		-
 			message: '#^Parameter \#1 \$user of method Illuminate\\Foundation\\Testing\\TestCase\:\:actingAs\(\) expects Illuminate\\Contracts\\Auth\\Authenticatable, Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model given\.$#'
@@ -6841,78 +6679,6 @@ parameters:
 			path: tests/Import/Feature/ImportBookTest.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$authors\.$#'
-			identifier: property.notFound
-			count: 3
-			path: tests/Import/Feature/ImportOpenAudibleTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$cover_image\.$#'
-			identifier: property.notFound
-			count: 1
-			path: tests/Import/Feature/ImportOpenAudibleTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$directory_path\.$#'
-			identifier: property.notFound
-			count: 5
-			path: tests/Import/Feature/ImportOpenAudibleTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$genres\.$#'
-			identifier: property.notFound
-			count: 4
-			path: tests/Import/Feature/ImportOpenAudibleTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$narrators\.$#'
-			identifier: property.notFound
-			count: 3
-			path: tests/Import/Feature/ImportOpenAudibleTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$series\.$#'
-			identifier: property.notFound
-			count: 3
-			path: tests/Import/Feature/ImportOpenAudibleTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$title\.$#'
-			identifier: property.notFound
-			count: 1
-			path: tests/Import/Feature/ImportOpenAudibleTest.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:genres\(\)\.$#'
-			identifier: method.notFound
-			count: 2
-			path: tests/Import/Feature/ImportOpenAudibleTest.php
-
-		-
-			message: '#^Call to an undefined static method App\\Models\\Book\:\:count\(\)\.$#'
-			identifier: staticMethod.notFound
-			count: 6
-			path: tests/Import/Feature/ImportOpenAudibleTest.php
-
-		-
-			message: '#^Call to an undefined static method App\\Models\\Book\:\:create\(\)\.$#'
-			identifier: staticMethod.notFound
-			count: 1
-			path: tests/Import/Feature/ImportOpenAudibleTest.php
-
-		-
-			message: '#^Call to an undefined static method App\\Models\\Book\:\:first\(\)\.$#'
-			identifier: staticMethod.notFound
-			count: 3
-			path: tests/Import/Feature/ImportOpenAudibleTest.php
-
-		-
-			message: '#^Unreachable statement \- code above always terminates\.$#'
-			identifier: deadCode.unreachable
-			count: 1
-			path: tests/Import/Feature/ImportOpenAudibleTest.php
-
-		-
 			message: '#^Call to an undefined static method App\\Models\\Genre\:\:where\(\)\.$#'
 			identifier: staticMethod.notFound
 			count: 1
@@ -7123,15 +6889,21 @@ parameters:
 			path: tests/Unit/AudibleServiceUnitTest.php
 
 		-
-			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with array\<string, mixed\> and ''Result should be an…'' will always evaluate to true\.$#'
-			identifier: method.alreadyNarrowedType
-			count: 1
+			message: '#^Call to an undefined method App\\Services\\BookDirectoryParser\:\:extractAuthorFromPath\(\)\.$#'
+			identifier: method.notFound
+			count: 6
 			path: tests/Unit/BookDirectoryParserTest.php
 
 		-
-			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with array\<string, mixed\> will always evaluate to true\.$#'
-			identifier: method.alreadyNarrowedType
-			count: 2
+			message: '#^Call to an undefined method App\\Services\\BookDirectoryParser\:\:readMetadataFile\(\)\.$#'
+			identifier: method.notFound
+			count: 12
+			path: tests/Unit/BookDirectoryParserTest.php
+
+		-
+			message: '#^Class App\\Services\\BookDirectoryParser does not have a constructor and must be instantiated without any parameters\.$#'
+			identifier: new.noConstructor
+			count: 1
 			path: tests/Unit/BookDirectoryParserTest.php
 
 		-
@@ -7829,6 +7601,12 @@ parameters:
 			identifier: property.notFound
 			count: 1
 			path: tests/Unit/Services/MySqlServiceFindBookByDirectoryPathTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with array will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 1
+			path: tests/Unit/Services/OpenAudibleParserTest.php
 
 		-
 			message: '#^Access to an undefined property \$this\(Tests\\Unit\\Traits\\BookImportTraitTest\)\:\:\$app\.$#'
