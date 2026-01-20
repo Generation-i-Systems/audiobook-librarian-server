@@ -14,7 +14,7 @@ class GeminiProvider extends BaseAIProvider
     public function __construct(string $model = 'gemini-2.5-flash-lite', bool $paidTier = false)
     {
         $this->client = new Client(['timeout' => 30]);
-        $this->apiKey = config('services.gemini.api_key');
+        $this->apiKey = (string) config('services.gemini.api_key');
         $this->model = $model;
 
         // Set rate limits and pricing based on model and tier
