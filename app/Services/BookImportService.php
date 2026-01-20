@@ -546,14 +546,12 @@ class BookImportService
                         continue;
                     }
 
-                    if ($isPrimary) {
-                        // Map the first (primary) genre to a valid library genre
-                        $name = $this->validateAndMapGenre($name);
-                    }
+                    // Map the genre to a valid library genre
+                    $name = $this->validateAndMapGenre($name);
 
                     $genre = Genre::firstOrCreate(['name' => $name]);
 
-                    // Avoid duplicate genres (e.g. if raw name matches mapped name)
+                    // Avoid duplicate genres (e.g. if multiple raw genres map to same library genre)
                     if (!isset($genresToAttach[$genre->id])) {
                         $genresToAttach[$genre->id] = ['is_primary' => $isPrimary];
                         $isPrimary = false; // Subsequent genres are not primary
