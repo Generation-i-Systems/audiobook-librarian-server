@@ -38,7 +38,7 @@ class ImportBookTest extends TestCase
     #[\PHPUnit\Framework\Attributes\Test]
     public function it_shows_help_when_no_paths_and_no_audio_files()
     {
-        $this->artisan('books:import')
+        $this->artisan('book:import')
             ->expectsOutput('Import Book - Quick Import Tool')
             ->assertExitCode(1);
     }
@@ -62,7 +62,7 @@ ABS;
         file_put_contents($bookDir . '/metadata.abs', $metadata);
 
         // Act
-        $this->artisan('books:import', ['paths' => [$bookDir]])
+        $this->artisan('book:import', ['path' => [$bookDir]])
             ->assertExitCode(0);
 
         // Assert
@@ -86,8 +86,8 @@ ABS;
         file_put_contents($bookDir . '/metadata.abs', $metadata);
 
         // Act
-        $this->artisan('books:import', [
-            'paths' => [$bookDir],
+        $this->artisan('book:import', [
+            'path' => [$bookDir],
             '--dry-run' => true,
         ])->assertExitCode(0);
 
@@ -117,7 +117,7 @@ ABS;
         file_put_contents($bookDir . '/metadata.abs', $metadata);
 
         // Act
-        $this->artisan('books:import', ['paths' => [$bookDir]])
+        $this->artisan('book:import', ['path' => [$bookDir]])
             ->expectsOutput('  Book already exists: Existing Book')
             ->assertExitCode(0);
 
@@ -147,8 +147,8 @@ ABS;
         file_put_contents($bookDir . '/metadata.abs', $metadata);
 
         // Act
-        $this->artisan('books:import', [
-            'paths' => [$bookDir],
+        $this->artisan('book:import', [
+            'path' => [$bookDir],
             '--force' => true,
         ])->assertExitCode(0);
 
@@ -174,8 +174,8 @@ ABS;
         file_put_contents($book2Dir . '/metadata.abs', "title=Book Two\nauthor=Author Two");
 
         // Act
-        $this->artisan('books:import', [
-            'paths' => [$book1Dir, $book2Dir],
+        $this->artisan('book:import', [
+            'path' => [$book1Dir, $book2Dir],
         ])->assertExitCode(0);
 
         // Assert
@@ -196,7 +196,7 @@ ABS;
         file_put_contents($bookDir . '/metadata.abs', "title=Audio File Book\nauthor=Test Author");
 
         // Act - pass audio file path instead of directory
-        $this->artisan('books:import', ['paths' => [$audioFile]])
+        $this->artisan('book:import', ['path' => [$audioFile]])
             ->assertExitCode(0);
 
         // Assert
@@ -213,7 +213,7 @@ ABS;
         file_put_contents($bookDir . '/metadata.abs', "title=Summary Test\nauthor=Test");
 
         // Act & Assert
-        $this->artisan('books:import', ['paths' => [$bookDir]])
+        $this->artisan('book:import', ['path' => [$bookDir]])
             ->expectsOutput('Import Summary')
             ->expectsOutput('  Total processed:  1')
             ->assertExitCode(0);
@@ -223,7 +223,7 @@ ABS;
     public function it_handles_invalid_paths()
     {
         // Act & Assert
-        $this->artisan('books:import', ['paths' => ['/nonexistent/path']])
+        $this->artisan('book:import', ['path' => ['/nonexistent/path']])
             ->expectsOutput('Path does not exist: /nonexistent/path')
             ->assertExitCode(1);
     }
@@ -236,7 +236,7 @@ ABS;
         file_put_contents($textFile, 'not an audio file');
 
         // Act & Assert
-        $this->artisan('books:import', ['paths' => [$textFile]])
+        $this->artisan('book:import', ['path' => [$textFile]])
             ->expectsOutput("Skipping non-audio file: {$textFile}")
             ->assertExitCode(0);
     }

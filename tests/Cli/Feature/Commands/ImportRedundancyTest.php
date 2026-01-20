@@ -44,7 +44,7 @@ class ImportRedundancyTest extends TestCase
         file_put_contents($book2File, 'audio2');
 
         // Act: Import ONLY book1.m4b
-        $this->artisan('books:import', ['paths' => [$book1File]])
+        $this->artisan('book:import', ['path' => [$book1File]])
             ->assertExitCode(0);
 
         // Assert: Only book1 should be in the database

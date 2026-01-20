@@ -227,7 +227,6 @@ class BookImportServiceTest extends TestCase
 
         $book = Book::create([
             'title' => 'Standalone Book',
-            'directory_path' => 'Fiction/John Doe',
             'language' => 'en',
         ]);
 

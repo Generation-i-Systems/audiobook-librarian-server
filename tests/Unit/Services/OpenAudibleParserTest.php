@@ -17,7 +17,7 @@ class OpenAudibleParserTest extends TestCase
     {
         parent::setUp();
 
-        $this->parser = new OpenAudibleParser();
+        $this->parser = new OpenAudibleParser(new \App\Services\GenreMappingService());
         $this->testDir = storage_path('testing/openaudible_parser');
 
         File::makeDirectory($this->testDir, 0755, true, true);
@@ -170,7 +170,8 @@ class OpenAudibleParserTest extends TestCase
 
         $result = $this->parser->parseAndMapGenre($genre);
 
-        $this->assertEquals('Religion', $result);
+        // 'Christianity' maps to 'Church' in high-priority rules
+        $this->assertEquals('Church', $result);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
@@ -232,6 +233,11 @@ class OpenAudibleParserTest extends TestCase
         $this->assertEquals('Fantasy', $result['mapped_genre']);
         // Should preserve original genre
         $this->assertEquals('Science Fiction & Fantasy:Fantasy:Epic', $result['original_genre']);
+        // Should include all genres as a list
+        $this->assertArrayHasKey('all_genres', $result);
+        $this->assertContains('Science Fiction & Fantasy', $result['all_genres']);
+        $this->assertContains('Fantasy', $result['all_genres']);
+        $this->assertContains('Epic', $result['all_genres']);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]

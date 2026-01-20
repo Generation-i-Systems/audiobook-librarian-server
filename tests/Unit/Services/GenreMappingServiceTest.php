@@ -16,11 +16,16 @@ class GenreMappingServiceTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
-    public function it_maps_science_fiction_and_fantasy_using_second_part()
+    public function it_maps_science_fiction_and_fantasy_using_most_specific_part()
     {
-        // Uses second part (more specific)
-        $this->assertEquals('Science Fiction', $this->service->mapToPrimaryGenre('Science Fiction & Fantasy:Fantasy:Dragons'));
+        // Should find 'Fantasy' because it's in the remainder and high priority
+        $this->assertEquals('Fantasy', $this->service->mapToPrimaryGenre('Science Fiction & Fantasy:Fantasy:Action & Adventure'));
+
+        // Should find 'Science Fiction' because it's in the remainder
         $this->assertEquals('Science Fiction', $this->service->mapToPrimaryGenre('Science Fiction & Fantasy:Science Fiction:Adventure'));
+
+        // Should default to 'Science Fiction' for the broad category if nothing else found
+        $this->assertEquals('Science Fiction', $this->service->mapToPrimaryGenre('Science Fiction & Fantasy'));
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
@@ -104,8 +109,9 @@ class GenreMappingServiceTest extends TestCase
     public function it_defaults_to_general_fiction()
     {
         $this->assertEquals('Other', $this->service->mapToPrimaryGenre('Unknown Genre'));
-        $this->assertEquals('Other', $this->service->mapToPrimaryGenre('Fiction'));
-        $this->assertEquals('Other', $this->service->mapToPrimaryGenre('Contemporary:Fiction'));
+        // 'Fiction' now maps to 'General Fiction' which is a valid library genre
+        $this->assertEquals('General Fiction', $this->service->mapToPrimaryGenre('Fiction'));
+        $this->assertEquals('General Fiction', $this->service->mapToPrimaryGenre('Contemporary:Fiction'));
     }
 
     #[\PHPUnit\Framework\Attributes\Test]

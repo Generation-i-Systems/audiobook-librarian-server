@@ -1252,7 +1252,7 @@ class ImportBooksFromDownloads extends Command
             fn ($message, $data = null) => $this->logUiMessage($message, $data),
             fn ($question, $options, $default) => $this->selectWithImmediateInterrupt($question, $options, $default),
             fn ($question, $default) => $this->askInline($question, $default ?? ''),
-            fn ($currentCoverUrl, $currentGenre, $currentDirectoryPath, $isFinalConfirmation) => $this->buildReviewOptions($currentCoverUrl, $currentGenre, $currentDirectoryPath, $isFinalConfirmation),
+            fn ($currentCoverUrl, $currentGenre, $currentDirectoryPath, $isFinalConfirmation, $fileCount = 0) => $this->buildReviewOptions($currentCoverUrl, $currentGenre, $currentDirectoryPath, $isFinalConfirmation, !empty($audiobook['is_multi_book_part']), $fileCount),
             fn ($metadata) => $this->getImportService()->editMetadataFields(
                 $metadata,
                 $audiobook,
@@ -1282,14 +1282,18 @@ class ImportBooksFromDownloads extends Command
         string $currentCoverUrl,
         string $currentGenre,
         string $currentDirectoryPath,
-        bool $isFinalConfirmation
+        bool $isFinalConfirmation,
+        bool $isMultiBookPart = false,
+        int $fileCount = 0
     ): array {
         return $this->getImportService()->buildReviewOptions(
             $currentCoverUrl,
             $currentGenre,
             $currentDirectoryPath,
             $isFinalConfirmation,
-            fn () => $this->getValidGenres()
+            fn () => $this->getValidGenres(),
+            $isMultiBookPart,
+            $fileCount
         );
     }
 
@@ -1352,7 +1356,9 @@ class ImportBooksFromDownloads extends Command
             fn () => $this->getFileOperation(),
             fn ($message) => $this->info($message),
             fn ($metadata) => $this->displayEnrichedMetadata($metadata),
-            fn ($metadata) => $this->reviewAndApprove($metadata),
+            function (&$metadata, $audiobook = []) {
+                return $this->reviewAndApprove($metadata, $audiobook);
+            },
             fn ($metadata) => $this->hasEnrichmentData($metadata),
             (bool) $this->option('skip-enrichment'),
             (bool) $this->option('auto'),

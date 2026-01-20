@@ -8,115 +8,100 @@ class GenreMappingService
      * Map OpenAudible genres to library directory genres
      * Returns the primary genre for directory organization
      */
+    /**
+     * Map OpenAudible genres to library directory genres
+     */
     public function mapToPrimaryGenre(string $openAudibleGenre): string
     {
-        // OpenAudible uses format: "Science Fiction & Fantasy:Fantasy:Dragons & Mythical Creatures"
-        // We need to map to existing library directories
+        $fullPathLower = mb_strtolower($openAudibleGenre);
 
-        $genreParts = explode(':', $openAudibleGenre);
+        // 1. Define Broad Categories that often contain multiple genres
+        // We strip these first to see what the "specific" choice is
+        $broadCategories = [
+            'science fiction & fantasy',
+            'sci-fi & fantasy',
+            'mystery, thriller & suspense',
+            'literature & fiction',
+            'biographies & memoirs',
+            'religion & spirituality',
+            'children\'s audiobooks',
+        ];
 
-        $firstPart = trim($genreParts[0] ?? '');
-
-        // When the first segment is a combined category (e.g. "Science Fiction & Fantasy"),
-        // it is the best indicator of the top-level directory.
-        if (count($genreParts) > 1 && str_contains($firstPart, '&')) {
-            $genreToMap = $firstPart;
-        } else {
-            // Otherwise, prefer the second segment if available (more specific), else first.
-            $genreToMap = count($genreParts) > 1 ? trim($genreParts[1]) : $firstPart;
+        $remainder = $fullPathLower;
+        foreach ($broadCategories as $broad) {
+            if (str_starts_with($fullPathLower, $broad)) {
+                $remainder = trim(substr($fullPathLower, strlen($broad)), ' :');
+                break;
+            }
         }
-        $firstGenre = strtolower($genreToMap);
 
-        // Map to existing library directories
-        $mapping = [
-            // Science Fiction variants
-            'science fiction & fantasy' => 'Science Fiction',
-            'science fiction' => 'Science Fiction',
-            'sci-fi & fantasy' => 'Science Fiction',
-            'sci-fi' => 'Science Fiction',
-            'scifi' => 'Science Fiction',
-
-            // Fantasy variants
-            'fantasy' => 'Fantasy',
-            'epic fantasy' => 'Fantasy',
-            'urban fantasy' => 'Fantasy',
-
-            // LitRPG
+        // 2. High Priority Keywords (Look in remainder first, then full string)
+        $priorityMapping = [
+            // Tier 1: Most Specific
             'litrpg' => 'LitRPG',
             'lit rpg' => 'LitRPG',
-
-            // Romance
+            'gamelit' => 'LitRPG',
+            'science fiction' => 'Science Fiction',
+            'sci-fi' => 'Science Fiction',
+            'scifi' => 'Science Fiction',
+            'fantasy' => 'Fantasy',
+            'historical fiction' => 'Historical Fiction',
             'romance' => 'Romance',
             'romantic' => 'Romance',
-
-            // History
-            'history' => 'History',
-            'historical' => 'Historical Fiction',
-            'historical fiction' => 'Historical Fiction',
-
-            // Non-Fiction
-            'non-fiction' => 'Non Fiction',
-            'nonfiction' => 'Non Fiction',
-            'non fiction' => 'Non Fiction',
-            'memoir' => 'Non Fiction',
-            'body, mind & spirit' => 'Non Fiction',
-            'self-help' => 'Non Fiction',
-            'self help' => 'Non Fiction',
-            'reference' => 'Non Fiction',
-            'foreign language study' => 'Non Fiction',
-            'meteorology' => 'Non Fiction',
-
-            // Biography maps to History
-            'biography' => 'History',
-            'biography & autobiography' => 'History',
-            'autobiography' => 'History',
-
-            // Religion
-            'religion' => 'Religion',
-            'religious' => 'Religion',
-            'christian' => 'Church',
-            'spirituality' => 'Religion',
-
-            // Kids
-            'children' => 'Kids',
+            'erotica' => 'Romance',
             'kids' => 'Kids',
+            'children' => 'Kids',
             'young adult' => 'Kids',
             'juvenile' => 'Kids',
+            'christian' => 'Church',
+            'church' => 'Church',
+            'religion' => 'Religion',
+            'spirituality' => 'Religion',
 
-            // Action
+            // Tier 2: General Categories
+            'mystery' => 'Mystery',
+            'horror' => 'Horror',
+            'western' => 'Western',
+            'history' => 'History',
+            'biography' => 'History',
+            'autobiography' => 'History',
             'action' => 'Action',
             'thriller' => 'Action',
             'adventure' => 'Action',
             'suspense' => 'Action',
-
-            // Classic
+            'computer' => 'Computer',
+            'technology' => 'Computer',
+            'tech' => 'Computer',
+            'science' => 'Science',
             'classic' => 'Classic',
             'classics' => 'Classic',
             'literature' => 'Classic',
 
-            // Generic fiction labels are too broad for most libraries; prefer Other
-            'fiction' => 'Other',
-            'general fiction' => 'Other',
-            'contemporary' => 'Other',
-
-            // Garbage genres that should never exist - map to Other
-            'copyright' => 'Other',
-            'trademarks' => 'Other',
+            // Tier 3: Fallbacks
+            'non-fiction' => 'Non Fiction',
+            'nonfiction' => 'Non Fiction',
+            'non fiction' => 'Non Fiction',
+            'self-help' => 'Non Fiction',
+            'general fiction' => 'General Fiction',
+            'fiction' => 'General Fiction',
         ];
 
-        // Check for direct match
-        if (isset($mapping[$firstGenre])) {
-            return $mapping[$firstGenre];
-        }
-
-        // Check for partial matches
-        foreach ($mapping as $key => $value) {
-            if (str_contains($firstGenre, $key) || str_contains($key, $firstGenre)) {
-                return $value;
+        // Search the remainder first (more specific)
+        if (!empty($remainder)) {
+            foreach ($priorityMapping as $keyword => $mappedGenre) {
+                if (str_contains($remainder, $keyword)) {
+                    return $mappedGenre;
+                }
             }
         }
 
-        // Default to Other
+        // If nothing specific in remainder, search the full string in priority order
+        foreach ($priorityMapping as $keyword => $mappedGenre) {
+            if (str_contains($fullPathLower, $keyword)) {
+                return $mappedGenre;
+            }
+        }
+
         return 'Other';
     }
 

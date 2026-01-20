@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services;
 
-use App\Traits\GenreMapping;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 
@@ -16,8 +15,6 @@ use Illuminate\Support\Facades\Log;
  */
 class OpenAudibleParser
 {
-    use GenreMapping;
-
     /**
      * Cached books data indexed by filename for fast lookup
      */
@@ -27,12 +24,16 @@ class OpenAudibleParser
      * Path to the currently loaded books.json
      */
     protected ?string $loadedPath = null;
+
+    protected GenreMappingService $genreMappingService;
+
+    public function __construct(GenreMappingService $genreMappingService)
+    {
+        $this->genreMappingService = $genreMappingService;
+    }
+
     /**
      * Load and parse books.json file
-     *
-     * @param string $openAudiblePath Path to OpenAudible directory
-     * @return array Array of books from books.json
-     * @throws \Exception If file doesn't exist or is invalid
      */
     public function loadBooksJson(string $openAudiblePath): array
     {
@@ -237,6 +238,7 @@ class OpenAudibleParser
             // Mapped genre for directory organization (used by book:import)
             'mapped_genre' => $mappedGenre,
             'original_genre' => $rawBookData['genre'] ?? null,
+            'all_genres' => $this->genreMappingService->extractAllGenres($rawBookData['genre'] ?? ''),
 
             // Chapters
             'chapters' => $chapters,
@@ -285,30 +287,12 @@ class OpenAudibleParser
      */
     public function parseAndMapGenre(?string $genre): string
     {
-        if (empty($genre)) {
+        if ($genre === null || trim($genre) === '') {
             return 'Other';
         }
 
-        // Split hierarchical genre
-        $parts = explode(':', $genre);
-
-        // Try to map each part, starting from the most specific
-        foreach (array_reverse($parts) as $part) {
-            $part = trim($part);
-            if (empty($part)) {
-                continue;
-            }
-
-            $mapped = $this->mapToValidGenre($part);
-            if ($mapped !== 'Other') {
-                return $mapped;
-            }
-        }
-
-        // If no specific match, try the root category
-        $rootCategory = trim($parts[0]);
-
-        return $this->mapToValidGenre($rootCategory);
+        // Use the service for high-quality priority-based mapping
+        return $this->genreMappingService->mapToPrimaryGenre($genre);
     }
 
     /**

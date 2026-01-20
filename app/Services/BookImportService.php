@@ -180,6 +180,22 @@ class BookImportService
             $merged['original_genre'] = $openAudibleMetadata['original_genre'];
         }
 
+        // IMPORTANT: Use mapped_genre as the primary genre for import flow
+        // This ensures the library genre is used instead of raw OpenAudible genre
+        if (!empty($openAudibleMetadata['mapped_genre'])) {
+            $mapped = $openAudibleMetadata['mapped_genre'];
+            $allGenres = $openAudibleMetadata['all_genres'] ?? [];
+
+            // Build a unique list of genres with the mapped one first
+            $genres = [$mapped];
+            foreach ($allGenres as $g) {
+                if (trim($g) !== '' && strcasecmp(trim($g), $mapped) !== 0) {
+                    $genres[] = trim($g);
+                }
+            }
+            $merged['genre'] = array_values(array_unique($genres));
+        }
+
         // IMPORTANT: Do NOT override cover from OpenAudible
         // We want to use the embedded M4B cover which is better quality
         // The calling code should extract and use cover_data from the M4B file
@@ -525,10 +541,23 @@ class BookImportService
                 $genresToAttach = [];
 
                 foreach ($genres as $genreName) {
-                    $validGenreName = $this->validateAndMapGenre(trim($genreName));
-                    $genre = Genre::firstOrCreate(['name' => $validGenreName]);
-                    $genresToAttach[$genre->id] = ['is_primary' => $isPrimary];
-                    $isPrimary = false; // Subsequent genres are not primary
+                    $name = trim((string) $genreName);
+                    if ($name === '') {
+                        continue;
+                    }
+
+                    if ($isPrimary) {
+                        // Map the first (primary) genre to a valid library genre
+                        $name = $this->validateAndMapGenre($name);
+                    }
+
+                    $genre = Genre::firstOrCreate(['name' => $name]);
+
+                    // Avoid duplicate genres (e.g. if raw name matches mapped name)
+                    if (!isset($genresToAttach[$genre->id])) {
+                        $genresToAttach[$genre->id] = ['is_primary' => $isPrimary];
+                        $isPrimary = false; // Subsequent genres are not primary
+                    }
                 }
 
                 if (!empty($genresToAttach)) {
@@ -678,10 +707,23 @@ class BookImportService
                 $isPrimary = true;
                 $genresToAttach = [];
                 foreach ($genres as $genreName) {
-                    $validGenreName = $this->validateAndMapGenre(trim($genreName));
-                    $genre = Genre::firstOrCreate(['name' => $validGenreName]);
-                    $genresToAttach[$genre->id] = ['is_primary' => $isPrimary];
-                    $isPrimary = false;
+                    $name = trim((string) $genreName);
+                    if ($name === '') {
+                        continue;
+                    }
+
+                    if ($isPrimary) {
+                        // Map the first (primary) genre to a valid library genre
+                        $name = $this->validateAndMapGenre($name);
+                    }
+
+                    $genre = Genre::firstOrCreate(['name' => $name]);
+
+                    // Avoid duplicate genres
+                    if (!isset($genresToAttach[$genre->id])) {
+                        $genresToAttach[$genre->id] = ['is_primary' => $isPrimary];
+                        $isPrimary = false; // Subsequent genres are not primary
+                    }
                 }
 
                 if (!empty($genresToAttach)) {
@@ -736,10 +778,11 @@ class BookImportService
             $authors = array_map('trim', explode(',', $authors[0]));
         }
 
-        // Handle genre - prefer mapped_genre (from OpenAudible) for directory, fallback to genre
-        $genreData = $metadata['mapped_genre'] ?? $metadata['genre'] ?? 'Unknown';
+        // Handle genre - use the genre field (which contains the mapped primary genre first)
+        $genreData = $metadata['genre'] ?? 'Unknown';
         $genre = is_array($genreData) ? ($genreData[0] ?? 'Unknown') : $genreData;
-        // If genre is colon-separated (OpenAudible raw format), just take the first part
+
+        // If genre is colon-separated (raw format), just take the first part
         if (is_string($genre) && str_contains($genre, ':')) {
             $genre = trim(explode(':', $genre)[0]);
         }
@@ -1108,17 +1151,31 @@ class BookImportService
                 $this->setDirectoryOwnership($targetDir);
             }
 
-            // Flatten CD directories before moving files
-            $this->flattenCdDirectories($sourcePath);
+            // Check if this is a multi-book part - only move specific files
+            $isMultiBookPart = !empty($audiobook['is_multi_book_part']) && !empty($audiobook['multi_book_files_only']);
 
-            if ($operation === 'move') {
-                $this->moveDirectoryContents($sourcePath, $targetDir);
-                // Clean up source directory after successful move
-                $cleanupAudiobook = $audiobook;
-                $cleanupAudiobook['path'] = $originalSourcePath;
-                $this->cleanupSourceDirectory($cleanupAudiobook);
+            if ($isMultiBookPart) {
+                // Multi-book part: only move the specific files for this book
+                $filesToMove = $audiobook['multi_book_files_only'];
+                if ($operation === 'move') {
+                    $this->moveSpecificFiles($filesToMove, $targetDir);
+                } else {
+                    $this->copySpecificFiles($filesToMove, $targetDir);
+                }
             } else {
-                $this->copyDirectoryContents($sourcePath, $targetDir);
+                // Regular book: move entire directory contents
+                // Flatten CD directories before moving files
+                $this->flattenCdDirectories($sourcePath);
+
+                if ($operation === 'move') {
+                    $this->moveDirectoryContents($sourcePath, $targetDir);
+                    // Clean up source directory after successful move
+                    $cleanupAudiobook = $audiobook;
+                    $cleanupAudiobook['path'] = $originalSourcePath;
+                    $this->cleanupSourceDirectory($cleanupAudiobook);
+                } else {
+                    $this->copyDirectoryContents($sourcePath, $targetDir);
+                }
             }
 
             $this->assertDirectoryHasAudioFiles($targetDir, [
@@ -1321,6 +1378,77 @@ class BookImportService
 
         // Remove empty directories from source
         $this->removeEmptyDirectories($source);
+    }
+
+    /**
+     * Move specific files to target directory (for multi-book parts)
+     */
+    protected function moveSpecificFiles(array $files, string $targetDir): void
+    {
+        if (!File::isDirectory($targetDir)) {
+            File::makeDirectory($targetDir, 0775, true);
+            $this->setDirectoryOwnership($targetDir);
+        }
+
+        foreach ($files as $filePath) {
+            if (!file_exists($filePath)) {
+                Log::warning("File not found for multi-book move: {$filePath}");
+                continue;
+            }
+
+            $filename = basename($filePath);
+            $targetFile = "{$targetDir}/{$filename}";
+
+            $sameFileSystem = $this->areOnSameFileSystem($filePath, $targetDir);
+
+            if ($sameFileSystem) {
+                if (!File::move($filePath, $targetFile)) {
+                    throw new \Exception("Failed to move file: {$filePath} to {$targetFile}");
+                }
+            } else {
+                if (!File::copy($filePath, $targetFile)) {
+                    throw new \Exception("Failed to copy file: {$filePath} to {$targetFile}");
+                }
+                File::delete($filePath);
+            }
+
+            chmod($targetFile, 0664);
+            $this->setFileOwnership($targetFile);
+
+            // Also move matching PDF if exists
+            $this->moveMatchingPdfFile($filePath, $targetDir);
+        }
+    }
+
+    /**
+     * Copy specific files to target directory (for multi-book parts)
+     */
+    protected function copySpecificFiles(array $files, string $targetDir): void
+    {
+        if (!File::isDirectory($targetDir)) {
+            File::makeDirectory($targetDir, 0775, true);
+            $this->setDirectoryOwnership($targetDir);
+        }
+
+        foreach ($files as $filePath) {
+            if (!file_exists($filePath)) {
+                Log::warning("File not found for multi-book copy: {$filePath}");
+                continue;
+            }
+
+            $filename = basename($filePath);
+            $targetFile = "{$targetDir}/{$filename}";
+
+            if (!File::copy($filePath, $targetFile)) {
+                throw new \Exception("Failed to copy file: {$filePath} to {$targetFile}");
+            }
+
+            chmod($targetFile, 0664);
+            $this->setFileOwnership($targetFile);
+
+            // Also copy matching PDF if exists
+            $this->copyMatchingPdfFile($filePath, $targetDir);
+        }
     }
 
     /**
@@ -2419,47 +2547,11 @@ class BookImportService
     }
 
     /**
-     * Map genre to valid genre name
+     * Map genre to valid genre name using the primary mapping service
      */
     public function mapToValidGenre(string $genre): string
     {
-        $genreMap = [
-            'sci-fi' => 'Science Fiction',
-            'scifi' => 'Science Fiction',
-            'science fiction' => 'Science Fiction',
-            'fantasy' => 'Fantasy',
-            'mystery' => 'Mystery',
-            'thriller' => 'Thriller',
-            'romance' => 'Romance',
-            'horror' => 'Horror',
-            'adventure' => 'Adventure',
-            'action' => 'Action',
-            'historical' => 'Historical',
-            'contemporary' => 'Contemporary',
-            'literary' => 'Literary',
-            'non-fiction' => 'Non-Fiction',
-            'nonfiction' => 'Non-Fiction',
-            'biography' => 'Biography',
-            'autobiography' => 'Autobiography',
-            'self-help' => 'Self-Help',
-            'business' => 'Business',
-            'history' => 'History',
-            'politics' => 'Politics',
-            'philosophy' => 'Philosophy',
-            'psychology' => 'Psychology',
-            'science' => 'Science',
-            'technology' => 'Technology',
-            'health' => 'Health',
-            'fitness' => 'Fitness',
-            'cooking' => 'Cooking',
-            'travel' => 'Travel',
-            'children' => 'Children',
-            'young adult' => 'Young Adult',
-            'ya' => 'Young Adult',
-        ];
-
-        $normalizedGenre = strtolower(trim($genre));
-        return $genreMap[$normalizedGenre] ?? ucfirst($genre);
+        return $this->genreMappingService->mapToPrimaryGenre($genre);
     }
 
     /**
@@ -3256,6 +3348,18 @@ class BookImportService
                 }
             }
 
+            // Check for OpenAudible metadata to get better genre hints
+            $openAudibleMetadata = $this->lookupOpenAudibleMetadata($audiobook);
+            if ($openAudibleMetadata !== null && !empty($openAudibleMetadata['original_genre'])) {
+                // Inject OpenAudible genre into file tags for AI prompt
+                $firstFile = array_key_first($fileTags) ?? $fileNames[0] ?? 'file';
+                if (!isset($fileTags[$firstFile])) {
+                    $fileTags[$firstFile] = [];
+                }
+                // Use original (unmapped) genre to give AI context for mapping
+                $fileTags[$firstFile]['genre'] = $openAudibleMetadata['original_genre'];
+            }
+
             $aiResult = $aiProcessor->processBookDirectory(
                 $audiobook['path'],
                 $fileNames,
@@ -3722,7 +3826,15 @@ class BookImportService
         $defaultGenreIdx = ($currentGenreIdx !== false) ? $currentGenreIdx + 1 : count($validGenres);
 
         $selectedGenreIdx = $selectWithImmediateInterruptCallback('Genre', $genreOptions, (string) $defaultGenreIdx);
-        $metadata['genre'] = $genreOptions[$selectedGenreIdx] ?? $currentGenre;
+        $newGenre = $genreOptions[$selectedGenreIdx] ?? $currentGenre;
+
+        // If we have an array of genres, replace the first one (primary) or add to front
+        if (is_array($metadata['genre'] ?? null)) {
+            $others = array_filter($metadata['genre'], fn ($g) => $g !== $newGenre);
+            $metadata['genre'] = array_values(array_merge([$newGenre], $others));
+        } else {
+            $metadata['genre'] = $newGenre;
+        }
 
         $currentDirectory = (string) ($metadata['custom_directory_path'] ?? '');
         if ($currentDirectory === '') {
@@ -3741,19 +3853,20 @@ class BookImportService
     /**
      * Build review options for metadata review
      */
-    public function buildReviewOptions(string $currentCoverUrl, string $currentGenre, string $currentDirectoryPath, bool $isFinalConfirmation, callable $getValidGenresCallback): array
-    {
+    public function buildReviewOptions(
+        string $currentCoverUrl,
+        string $currentGenre,
+        string $currentDirectoryPath,
+        bool $isFinalConfirmation,
+        callable $getValidGenresCallback,
+        bool $isMultiBookPart = false,
+        int $fileCount = 0
+    ): array {
         $validGenres = $getValidGenresCallback();
-        $normalizedGenre = trim($currentGenre);
-        $isGenreValid = in_array($normalizedGenre, $validGenres, true);
+        $displayGenre = in_array($currentGenre, $validGenres, true) ? $currentGenre : 'Invalid';
 
-        $displayGenre = $normalizedGenre;
-        if (strlen($displayGenre) > 16) {
-            $displayGenre = substr($displayGenre, 0, 15) . '…';
-        }
-
-        $acceptLabel = $isFinalConfirmation ? 'Accept all' : 'Accept all metadata';
-        if (!$isGenreValid) {
+        $acceptLabel = $isFinalConfirmation ? 'Accept and save' : 'Accept all as correct';
+        if ($displayGenre === 'Invalid') {
             $acceptLabel = "\e[9m{$acceptLabel}\e[0m";
         }
 
@@ -3765,9 +3878,17 @@ class BookImportService
             '5' => 'Update genre (' . $displayGenre . ')',
             '6' => 'Update directory',
             '7' => 'Request enrichment (Audible/Google Books)',
-            '8' => 'Reprocess as Multi-Book Archive (Split)',
-            '9' => 'Merge into Parent Book',
         ];
+
+        // Only show "Reprocess as Multi-Book Archive" if NOT already a multi-book part AND has more than 1 file
+        if (!$isMultiBookPart && $fileCount > 1) {
+            $options['8'] = 'Reprocess as Multi-Book Archive (Split)';
+        }
+
+        // Only show "Merge into Parent Book" if this IS a multi-book part
+        if ($isMultiBookPart) {
+            $options['9'] = 'Merge into Parent Book';
+        }
 
         return $options;
     }
@@ -3949,7 +4070,9 @@ class BookImportService
             $infoCallback("🔍 Enriching with external data...");
         }
 
-        $metadata['source_path'] = $audiobook['path'];
+        // Use display_path for UI if available (multi-book parts), otherwise use path
+        $displayPath = $audiobook['display_path'] ?? $audiobook['path'];
+        $metadata['source_path'] = $displayPath;
         $expectedPath = $generateDirectoryPathCallback($metadata);
         if ($infoCallback) {
             $infoCallback("📁 Expected directory path: {$expectedPath}");
@@ -3960,7 +4083,7 @@ class BookImportService
         }
 
         if (!$isAutoMode && !$isDryRun && $reviewAndApproveCallback) {
-            if (!$reviewAndApproveCallback($metadata)) {
+            if (!$reviewAndApproveCallback($metadata, $audiobook)) {
                 if ($infoCallback) {
                     $infoCallback("❌ Import rejected by user");
                 }
@@ -4086,19 +4209,56 @@ class BookImportService
             }, $fileInfos);
             $bookTitle = $fileInfos[0]['title'];
 
+            // Get the first file path - this is what we show as the "path" being imported
+            $firstFilePath = $files[0];
+            $firstFilename = basename($firstFilePath);
+
+            // Parse the filename to extract metadata (author, series, title, etc.)
+            $filenameMetadata = $this->parseFilenameForMetadata($firstFilename);
+
+            // Extract file tags from this book's files to get embedded metadata
+            $fileTagMetadata = $this->extractFileTagsFromFiles($files);
+
+            // Start with AI metadata as base
             $bookMetadata = $aiMetadata;
-            $bookMetadata['title'] = $bookTitle;
             $bookMetadata['series'] = $multiBookInfo['series_name'];
             $bookMetadata['series_number'] = $bookNumber;
             unset($bookMetadata['series_original']);
 
+            // Merge filename-parsed metadata (fills in missing fields)
+            if (!empty($filenameMetadata)) {
+                $bookMetadata = $this->mergeMetadataFillMissing($bookMetadata, $filenameMetadata);
+                // Use filename-parsed title if we got one
+                if (!empty($filenameMetadata['title'])) {
+                    $bookTitle = $filenameMetadata['title'];
+                    $bookMetadata['title'] = $bookTitle;
+                }
+            }
+
+            // Merge file tag metadata - embedded tags take priority
+            if (!empty($fileTagMetadata)) {
+                $bookMetadata = $this->mergeMetadataFillMissing($bookMetadata, $fileTagMetadata);
+                // If file tags have a different title (album), prefer it
+                if (!empty($fileTagMetadata['title']) && $fileTagMetadata['title'] !== $bookTitle) {
+                    $bookMetadata['title'] = $fileTagMetadata['title'];
+                    $bookTitle = $fileTagMetadata['title'];
+                }
+            }
+
+            // If we still don't have a good title, use the one from fileInfos
+            if (empty($bookMetadata['title'])) {
+                $bookMetadata['title'] = $fileInfos[0]['title'];
+            }
+
             $virtualAudiobook = [
-                'path' => $audiobook['path'],
+                'path' => $audiobook['path'],  // Keep parent path for file operations
+                'display_path' => $firstFilePath,  // Show the actual file being imported in UI
                 'name' => $bookTitle,
                 'files' => $files,
                 'total_size' => array_sum(array_map('filesize', $files)),
                 'is_multi_book_part' => true,
                 'multi_book_files_only' => $files,
+                'parent_path' => $audiobook['path'],
             ];
 
             $bookData = [
@@ -4112,13 +4272,221 @@ class BookImportService
             if ($processSingleBookCallback) {
                 if ($infoCallback) {
                     $infoCallback("📖 Processing Book {$bookMetadata['series_number']} with " . count($virtualAudiobook['files']) . " files");
-                    $infoCallback("📚 Book title: {$bookMetadata['title']}");
+                    $infoCallback("📁 File: {$firstFilename}");
                 }
                 $processSingleBookCallback($virtualAudiobook, $bookMetadata);
             }
         }
 
         return $books;
+    }
+
+    /**
+     * Parse a filename to extract metadata (author, series, title, etc.)
+     *
+     * Handles patterns like:
+     * - "Author - Series #N - Title (extra).ext"
+     * - "Series #N - Title by Author.ext"
+     * - "Author - Title (Unabridged).ext"
+     */
+    public function parseFilenameForMetadata(string $filename): array
+    {
+        $metadata = [];
+
+        // Remove extension
+        $name = preg_replace('/\.[^.]+$/', '', $filename);
+
+        // Remove common suffixes like (Unabridged), [Unabridged], etc.
+        $name = preg_replace('/\s*[\(\[]?(Unabridged|Abridged|Audiobook|Audio)[\)\]]?\s*$/i', '', $name);
+        $name = trim($name);
+
+        // Pattern 1: "Author - Series #N - Title" or "Author - Series, Book N - Title"
+        if (preg_match('/^(.+?)\s*-\s*(.+?)\s*[#,]\s*(\d+)\s*-\s*(.+)$/i', $name, $matches)) {
+            $metadata['author'] = [trim($matches[1])];
+            $metadata['series'] = trim($matches[2]);
+            $metadata['series_number'] = (int) $matches[3];
+            $metadata['title'] = trim($matches[4]);
+            return $metadata;
+        }
+
+        // Pattern 2: "Author - Series Book N - Title"
+        if (preg_match('/^(.+?)\s*-\s*(.+?)\s+Book\s+(\d+)\s*-\s*(.+)$/i', $name, $matches)) {
+            $metadata['author'] = [trim($matches[1])];
+            $metadata['series'] = trim($matches[2]);
+            $metadata['series_number'] = (int) $matches[3];
+            $metadata['title'] = trim($matches[4]);
+            return $metadata;
+        }
+
+        // Pattern 3: "Series #N - Title by Author"
+        if (preg_match('/^(.+?)\s*#(\d+)\s*-\s*(.+?)\s+by\s+(.+)$/i', $name, $matches)) {
+            $metadata['series'] = trim($matches[1]);
+            $metadata['series_number'] = (int) $matches[2];
+            $metadata['title'] = trim($matches[3]);
+            $metadata['author'] = [trim($matches[4])];
+            return $metadata;
+        }
+
+        // Pattern 4: "Author - Series, The Series Name, Book N" (with nested series info)
+        if (preg_match('/^(.+?)\s*-\s*(.+?)\s+The\s+(.+?)\s+Series,?\s*Book\s*(\d+)$/i', $name, $matches)) {
+            $metadata['author'] = [trim($matches[1])];
+            $metadata['title'] = trim($matches[2]);
+            $metadata['series'] = trim($matches[3]) . ' Series';
+            $metadata['series_number'] = (int) $matches[4];
+            return $metadata;
+        }
+
+        // Pattern 5: "Author - Title The Series, Book N"
+        if (preg_match('/^(.+?)\s*-\s*(.+?)\s+The\s+(.+?),?\s*Book\s*(\d+)$/i', $name, $matches)) {
+            $metadata['author'] = [trim($matches[1])];
+            $metadata['title'] = trim($matches[2]);
+            $metadata['series'] = trim($matches[3]);
+            $metadata['series_number'] = (int) $matches[4];
+            return $metadata;
+        }
+
+        // Pattern 6: Simple "Author - Title"
+        if (preg_match('/^(.+?)\s*-\s*(.+)$/', $name, $matches)) {
+            $potentialAuthor = trim($matches[1]);
+            $potentialTitle = trim($matches[2]);
+
+            // Check if this looks like an author name (has name-like structure)
+            if ($this->looksLikeAuthorName($potentialAuthor)) {
+                $metadata['author'] = [$potentialAuthor];
+                $metadata['title'] = $potentialTitle;
+                return $metadata;
+            }
+        }
+
+        // Fallback: just use the whole thing as title
+        $metadata['title'] = $name;
+        return $metadata;
+    }
+
+    /**
+     * Check if a string looks like an author name
+     */
+    protected function looksLikeAuthorName(string $str): bool
+    {
+        // Author names typically:
+        // - Have 2-4 words
+        // - Each word starts with uppercase
+        // - Don't contain numbers (unless initials like "J.K.")
+        $words = preg_split('/\s+/', trim($str));
+        $wordCount = count($words);
+
+        if ($wordCount < 1 || $wordCount > 5) {
+            return false;
+        }
+
+        // Check if it contains common non-author patterns
+        if (preg_match('/(book|series|volume|part|chapter|\d{4})/i', $str)) {
+            return false;
+        }
+
+        // Check if words look like name parts
+        foreach ($words as $word) {
+            // Allow initials like "J.K." or "R.R."
+            if (preg_match('/^[A-Z]\.[A-Z]?\.?$/', $word)) {
+                continue;
+            }
+            // Allow capitalized words
+            if (preg_match('/^[A-Z][a-z]+$/', $word)) {
+                continue;
+            }
+            // Allow all-caps short words (initials)
+            if (preg_match('/^[A-Z]{1,3}$/', $word)) {
+                continue;
+            }
+            // Allow hyphenated names
+            if (preg_match('/^[A-Z][a-z]+-[A-Z][a-z]+$/', $word)) {
+                continue;
+            }
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Extract file tags from a list of files
+     */
+    protected function extractFileTagsFromFiles(array $files, int $maxFiles = 3): array
+    {
+        if (empty($files)) {
+            return [];
+        }
+
+        $fileTags = [];
+        $processedCount = 0;
+
+        foreach ($files as $filePath) {
+            if ($processedCount >= $maxFiles) {
+                break;
+            }
+
+            $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+            if (!in_array($ext, ['m4b', 'mp3', 'm4a'])) {
+                continue;
+            }
+
+            if (!file_exists($filePath)) {
+                continue;
+            }
+
+            $tags = $this->extractSingleFileTags($filePath);
+            if (!empty($tags)) {
+                $fileTags[basename($filePath)] = $tags;
+                $processedCount++;
+            }
+        }
+
+        return $this->extractMetadataFromFileTags($fileTags);
+    }
+
+    /**
+     * Extract tags from a single audio file using getID3
+     */
+    protected function extractSingleFileTags(string $filePath): array
+    {
+        if (!class_exists('getID3')) {
+            return [];
+        }
+
+        try {
+            $getID3 = new \getID3();
+            $fileInfo = $getID3->analyze($filePath);
+
+            $tags = [];
+
+            if (isset($fileInfo['tags'])) {
+                $preferredFormats = ['quicktime', 'id3v2', 'id3v1'];
+
+                foreach ($preferredFormats as $format) {
+                    if (isset($fileInfo['tags'][$format])) {
+                        foreach ($fileInfo['tags'][$format] as $key => $values) {
+                            if (!isset($tags[$key]) && !empty($values[0])) {
+                                $tags[$key] = is_array($values) ? $values[0] : $values;
+                            }
+                        }
+                    }
+                }
+            }
+
+            return $tags;
+        } catch (\Exception $e) {
+            return [];
+        }
+    }
+
+    /**
+     * Sanitize a string for use in a file path
+     */
+    protected function sanitizeForPath(string $input): string
+    {
+        $sanitized = preg_replace('/[<>:"\/\\|?*]/', '', $input);
+        $sanitized = preg_replace('/\s+/', ' ', $sanitized);
+        return trim($sanitized);
     }
 
     /**
@@ -4836,6 +5204,15 @@ class BookImportService
 
         if (!empty($aiResult['series'])) {
             $aiResult['series'] = $this->removeAuthorFromSeries($aiResult['series'], $aiResult['author'] ?? []);
+        }
+
+        // Map AI genre to valid library genre
+        if (!empty($aiResult['genre'])) {
+            $genre = is_array($aiResult['genre']) ? ($aiResult['genre'][0] ?? '') : $aiResult['genre'];
+            if (!empty($genre)) {
+                $aiResult['original_genre'] = $genre;
+                $aiResult['genre'] = $this->genreMappingService->mapToPrimaryGenre($genre);
+            }
         }
 
         return $aiResult;
@@ -6675,7 +7052,15 @@ class BookImportService
             }
 
             while (true) {
-                $options = $buildReviewOptionsCallback($currentCoverUrl, $currentGenre, $currentDirectoryPath, false);
+                // Automatically recalculate proposed directory path if not manually overridden
+                // This ensures changes to Genre, Title, or Series are reflected in the UI
+                if (empty($metadata['custom_directory_path'])) {
+                    $currentDirectoryPath = $generateDirectoryPathCallback($metadata, [
+                        'include_title' => true,
+                    ]);
+                }
+
+                $options = $buildReviewOptionsCallback($currentCoverUrl, $currentGenre, $currentDirectoryPath, false, count($audiobook['files'] ?? []));
                 $choice = $selectWithImmediateInterruptCallback('Choose an option', $options, $defaultChoice);
 
                 $choice = strtolower(trim($choice));
@@ -6717,8 +7102,17 @@ class BookImportService
                     }
 
                     $selectedGenreIdx = $selectWithImmediateInterruptCallback('Genre', $genreOptions, $defaultGenreIdx);
-                    $metadata['genre'] = $genreOptions[$selectedGenreIdx] ?? $currentGenre;
-                    $currentGenre = $metadata['genre'] ?? $currentGenre;
+                    $newGenre = $genreOptions[$selectedGenreIdx] ?? $currentGenre;
+
+                    // If we have an array of genres, replace the first one (primary) or add to front
+                    if (is_array($metadata['genre'] ?? null)) {
+                        $others = array_filter($metadata['genre'], fn ($g) => $g !== $newGenre);
+                        $metadata['genre'] = array_values(array_merge([$newGenre], $others));
+                    } else {
+                        $metadata['genre'] = $newGenre;
+                    }
+
+                    $currentGenre = $newGenre;
                     $normalizedGenre = is_string($currentGenre) ? trim($currentGenre) : '';
                     $isGenreValid = in_array($normalizedGenre, $validGenres, true);
                     if ($isGenreValid) {
@@ -6780,7 +7174,7 @@ class BookImportService
         }
 
         while (true) {
-            $options = $buildReviewOptionsCallback($currentCoverUrl, $currentGenre, $currentDirectoryPath, true);
+            $options = $buildReviewOptionsCallback($currentCoverUrl, $currentGenre, $currentDirectoryPath, true, count($audiobook['files'] ?? []));
 
             $finalDefaultChoice = $isGenreValid ? '1' : '2';
             $choice = $selectWithImmediateInterruptCallback("Final confirmation", $options, $finalDefaultChoice);

@@ -521,12 +521,31 @@ class AIBookProcessor
         $prompt .= "- Always remove leading numbers/dashes from title " .
             "(e.g., '3 Title' → 'Title', '01 - Title' → 'Title')\n\n";
 
-        $prompt .= "IMPORTANT: For genre, choose the MOST SPECIFIC literary genre that fits the content. " .
-            "Valid genres are:\n";
-        $prompt .= "Kids, Religion, General Fiction, Church, Science, Historical Fiction, Computer, Classic, " .
-            "History, Non Fiction, Action, LitRPG, Romance, Science Fiction, Other, Fantasy\n";
-        $prompt .= "Do NOT use generic terms like 'Audiobook', 'Book', 'Audio' - analyze the actual story " .
-            "content and choose the appropriate literary genre.\n";
+        $prompt .= "IMPORTANT: For genre, you MUST choose from this EXACT list of valid library genres:\n";
+        $prompt .= "Church, Classic, Computer, Other, Science, Fantasy, History, General Fiction, " .
+            "Action, Non Fiction, Science Fiction, LitRPG, Kids, Religion, Romance, Historical Fiction\n\n";
+
+        // If we have a genre hint from file metadata, include it for mapping
+        $genreHint = null;
+        if (!empty($fileTags)) {
+            $firstFileTags = reset($fileTags);
+            if (!empty($firstFileTags['genre'])) {
+                $genreHint = $firstFileTags['genre'];
+            }
+        }
+
+        if ($genreHint !== null) {
+            $prompt .= "GENRE MAPPING: The file metadata contains genre: \"{$genreHint}\"\n";
+            $prompt .= "Map this to the BEST matching genre from the valid list above using these PRIORITY RULES:\n";
+            $prompt .= "1. HIGH PRIORITY: LitRPG, Fantasy, Science Fiction, Romance, Kids, Religion, Church, Historical Fiction.\n";
+            $prompt .= "2. MEDIUM PRIORITY: Mystery, Horror, Western, Computer, Science, Classic, History.\n";
+            $prompt .= "3. LOW PRIORITY: Action (only if it is purely action without the genres above), Non Fiction.\n";
+            $prompt .= "4. FALLBACK: General Fiction, Other.\n\n";
+            $prompt .= "If a hierarchy like 'Science Fiction & Fantasy:Fantasy:Action' is provided, 'Fantasy' wins because it is more specific than the broad category and higher priority than 'Action'.\n\n";
+        } else {
+            $prompt .= "Analyze the actual story content and choose the most appropriate literary genre.\n";
+            $prompt .= "Do NOT use generic terms like 'Audiobook', 'Book', 'Audio'.\n\n";
+        }
 
         return $prompt;
     }

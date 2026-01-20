@@ -35,7 +35,7 @@ class ImportBooksFromDownloadsTest extends TestCase
         });
 
         // Act: Run the import command
-        $this->artisan('books:import-downloads', ['path' => [$importDir], '--no-backup' => true])
+        $this->artisan('book:import', ['path' => [$importDir], '--no-backup' => true])
             ->assertExitCode(0);
 
         // Clean up
