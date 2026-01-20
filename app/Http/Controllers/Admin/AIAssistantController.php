@@ -13,14 +13,11 @@ class AIAssistantController extends Controller
 {
     protected AIAssistantService $assistant;
 
-    public function __construct()
+    public function __construct(AIAssistantService $assistant)
     {
         $this->middleware('auth');
         $this->middleware('admin');
-
-        $provider = config('services.ai.default_provider', 'gemini');
-        $model = config('services.ai.default_model', 'gemini-2.5-flash-lite');
-        $this->assistant = new AIAssistantService($provider, $model);
+        $this->assistant = $assistant;
     }
 
     /**

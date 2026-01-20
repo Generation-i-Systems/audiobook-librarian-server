@@ -23,6 +23,13 @@ class AppServiceProvider extends ServiceProvider
         // DocumentStoreServiceInterface binding is now handled by DocumentStoreServiceProvider
         // to avoid conflicts and ensure proper driver selection based on documentstore.driver config
 
+        $this->app->singleton(\App\Services\AI\AIAssistantService::class, function ($app) {
+            $provider = config('services.ai.default_provider', 'gemini');
+            $model = config('services.ai.default_model', 'gemini-2.5-flash-lite');
+
+            return new \App\Services\AI\AIAssistantService($provider, $model);
+        });
+
         // Firestore support removed
     }
 
