@@ -517,21 +517,9 @@ parameters:
 			path: app/Console/Commands/ParseBooksCommand.php
 
 		-
-			message: '#^Call to an undefined method App\\Services\\BookDirectoryParser\:\:extractAuthorFromPath\(\)\.$#'
-			identifier: method.notFound
+			message: '#^Call to function is_array\(\) with string will always evaluate to false\.$#'
+			identifier: function.impossibleType
 			count: 1
-			path: app/Console/Commands/ParseBooksCommand.php
-
-		-
-			message: '#^Call to an undefined method App\\Services\\BookDirectoryParser\:\:getAudioFiles\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Console/Commands/ParseBooksCommand.php
-
-		-
-			message: '#^Call to an undefined method App\\Services\\BookDirectoryParser\:\:resolveStoragePath\(\)\.$#'
-			identifier: method.notFound
-			count: 2
 			path: app/Console/Commands/ParseBooksCommand.php
 
 		-
@@ -653,12 +641,6 @@ parameters:
 			identifier: staticMethod.notFound
 			count: 1
 			path: app/Console/Commands/ProcessBooksWithAI.php
-
-		-
-			message: '#^Call to an undefined method App\\Services\\BookDirectoryParser\:\:getAudioFiles\(\)\.$#'
-			identifier: method.notFound
-			count: 3
-			path: app/Console/Commands/ProcessTitlesInteractive.php
 
 		-
 			message: '#^Call to an undefined static method App\\Models\\Narrator\:\:firstOrCreate\(\)\.$#'
@@ -1130,12 +1112,6 @@ parameters:
 
 		-
 			message: '#^Call to an undefined method App\\Http\\Controllers\\Admin\\BookController\:\:cleanText\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Http/Controllers/Admin/BookController.php
-
-		-
-			message: '#^Call to an undefined method App\\Services\\BookDirectoryParser\:\:resolveStoragePath\(\)\.$#'
 			identifier: method.notFound
 			count: 1
 			path: app/Http/Controllers/Admin/BookController.php
@@ -3541,50 +3517,14 @@ parameters:
 			path: app/Services/BookDirectoryParser.php
 
 		-
-			message: '#^Access to an undefined property App\\Services\\BookDirectoryParser\:\:\$debugCallback\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Services/BookDirectoryParser.php
-
-		-
-			message: '#^Access to an undefined property App\\Services\\BookDirectoryParser\:\:\$storageRoot\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Services/BookDirectoryParser.php
-
-		-
 			message: '#^Call to an undefined method \$this\(App\\Services\\BookDirectoryParser\)\:\:error\(\)\.$#'
 			identifier: method.notFound
 			count: 11
 			path: app/Services/BookDirectoryParser.php
 
 		-
-			message: '#^Call to an undefined method App\\Services\\BookDirectoryParser\:\:cleanText\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Services/BookDirectoryParser.php
-
-		-
-			message: '#^Call to an undefined method App\\Services\\BookDirectoryParser\:\:formatDuration\(\)\.$#'
-			identifier: method.notFound
-			count: 3
-			path: app/Services/BookDirectoryParser.php
-
-		-
-			message: '#^Call to an undefined method App\\Services\\BookDirectoryParser\:\:getAudioFiles\(\)\.$#'
-			identifier: method.notFound
-			count: 3
-			path: app/Services/BookDirectoryParser.php
-
-		-
-			message: '#^Call to an undefined method App\\Services\\BookDirectoryParser\:\:readMetadataFile\(\)\.$#'
-			identifier: method.notFound
-			count: 1
-			path: app/Services/BookDirectoryParser.php
-
-		-
-			message: '#^Call to an undefined method App\\Services\\BookDirectoryParser\:\:resolveStoragePath\(\)\.$#'
-			identifier: method.notFound
+			message: '#^Call to function array_key_exists\(\) with ''seriesIndex'' and array\<''publishedYear''\|''seriesNumber''\|string, array\|float\|int\|string\|null\> will always evaluate to false\.$#'
+			identifier: function.impossibleType
 			count: 1
 			path: app/Services/BookDirectoryParser.php
 
@@ -3628,6 +3568,12 @@ parameters:
 			message: '#^If condition is always true\.$#'
 			identifier: if.alwaysTrue
 			count: 2
+			path: app/Services/BookDirectoryParser.php
+
+		-
+			message: '#^Left side of && is always true\.$#'
+			identifier: booleanAnd.leftAlwaysTrue
+			count: 1
 			path: app/Services/BookDirectoryParser.php
 
 		-
@@ -3691,6 +3637,12 @@ parameters:
 			path: app/Services/BookDirectoryParser.php
 
 		-
+			message: '#^Parameter \#1 \$array \(list\<non\-falsy\-string\>\) of array_values is already a list, call has no effect\.$#'
+			identifier: arrayValues.list
+			count: 1
+			path: app/Services/BookDirectoryParser.php
+
+		-
 			message: '#^Parameter \#2 \$callback of function array_filter expects \(callable\(string\)\: bool\)\|null, ''strlen'' given\.$#'
 			identifier: argument.type
 			count: 1
@@ -3705,12 +3657,24 @@ parameters:
 		-
 			message: '#^Result of && is always false\.$#'
 			identifier: booleanAnd.alwaysFalse
-			count: 1
+			count: 2
 			path: app/Services/BookDirectoryParser.php
 
 		-
 			message: '#^Result of \|\| is always false\.$#'
 			identifier: booleanOr.alwaysFalse
+			count: 1
+			path: app/Services/BookDirectoryParser.php
+
+		-
+			message: '#^Result of \|\| is always true\.$#'
+			identifier: booleanOr.alwaysTrue
+			count: 1
+			path: app/Services/BookDirectoryParser.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between non\-empty\-string and '''' will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
 			count: 1
 			path: app/Services/BookDirectoryParser.php
 
@@ -5503,12 +5467,6 @@ parameters:
 			path: tests/Core/Unit/Services/BookFilesystemServiceTest.php
 
 		-
-			message: '#^Call to an undefined static method App\\Models\\Genre\:\:where\(\)\.$#'
-			identifier: staticMethod.notFound
-			count: 1
-			path: tests/Core/Unit/Services/BookImportServiceGenreValidationTest.php
-
-		-
 			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertTrue\(\) with true will always evaluate to true\.$#'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -6679,12 +6637,6 @@ parameters:
 			path: tests/Import/Feature/ImportBookTest.php
 
 		-
-			message: '#^Call to an undefined static method App\\Models\\Genre\:\:where\(\)\.$#'
-			identifier: staticMethod.notFound
-			count: 1
-			path: tests/Import/Unit/BookImportServiceGenreValidationTest.php
-
-		-
 			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertTrue\(\) with true will always evaluate to true\.$#'
 			identifier: method.alreadyNarrowedType
 			count: 1
@@ -6889,21 +6841,15 @@ parameters:
 			path: tests/Unit/AudibleServiceUnitTest.php
 
 		-
-			message: '#^Call to an undefined method App\\Services\\BookDirectoryParser\:\:extractAuthorFromPath\(\)\.$#'
-			identifier: method.notFound
-			count: 6
-			path: tests/Unit/BookDirectoryParserTest.php
-
-		-
-			message: '#^Call to an undefined method App\\Services\\BookDirectoryParser\:\:readMetadataFile\(\)\.$#'
-			identifier: method.notFound
-			count: 12
-			path: tests/Unit/BookDirectoryParserTest.php
-
-		-
-			message: '#^Class App\\Services\\BookDirectoryParser does not have a constructor and must be instantiated without any parameters\.$#'
-			identifier: new.noConstructor
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with array\<string, mixed\> and ''Result should be an…'' will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
 			count: 1
+			path: tests/Unit/BookDirectoryParserTest.php
+
+		-
+			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertIsArray\(\) with array\<string, mixed\> will always evaluate to true\.$#'
+			identifier: method.alreadyNarrowedType
+			count: 2
 			path: tests/Unit/BookDirectoryParserTest.php
 
 		-
