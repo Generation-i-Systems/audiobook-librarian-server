@@ -27,7 +27,7 @@ class ImportBooksFromDownloadsReviewOptionsTest extends TestCase
 
         $this->assertArrayHasKey('6', $options);
         $this->assertStringContainsString('Update directory', $options['6']);
-        $this->assertSame('Update directory', $options['6']);
+        $this->assertStringContainsString('Some/Directory/Path', $options['6']);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
@@ -55,13 +55,14 @@ class ImportBooksFromDownloadsReviewOptionsTest extends TestCase
 
         $options = $command->exposeBuildReviewOptions(
             '',
-            'Extremely Long Genre Name That Will Never Fit',
+            'Historical Fiction', // Long enough to truncate (> 16)
             'A/Very/Long/Directory/Path/That/Will/Never/Fit',
             false
         );
 
         $this->assertStringContainsString('…', $options['5']);
-        $this->assertSame('Update directory', $options['6']);
+        $this->assertStringContainsString('…', $options['6']);
+        $this->assertStringContainsString('Update directory', $options['6']);
     }
 }
 

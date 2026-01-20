@@ -3733,6 +3733,12 @@ parameters:
 			path: app/Services/BookImportService.php
 
 		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$series\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/BookImportService.php
+
+		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$title\.$#'
 			identifier: property.notFound
 			count: 4
@@ -3790,6 +3796,12 @@ parameters:
 			message: '#^Call to an undefined static method App\\Models\\Series\:\:firstOrCreate\(\)\.$#'
 			identifier: staticMethod.notFound
 			count: 3
+			path: app/Services/BookImportService.php
+
+		-
+			message: '#^Comparison operation "\>" between int\<1, max\> and 0 is always true\.$#'
+			identifier: greater.alwaysTrue
+			count: 1
 			path: app/Services/BookImportService.php
 
 		-
@@ -5179,96 +5191,6 @@ parameters:
 			path: tests/Cli/Feature/Commands/FixDuplicatedTitleDirectoriesCommandTest.php
 
 		-
-			message: '#^Call to an undefined static method App\\Models\\Book\:\:create\(\)\.$#'
-			identifier: staticMethod.notFound
-			count: 2
-			path: tests/Cli/Feature/Commands/ImportBookTest.php
-
-		-
-			message: '#^Property Tests\\Cli\\Feature\\Commands\\ImportBookTest\:\:\$bookRoot is never read, only written\.$#'
-			identifier: property.onlyWritten
-			count: 1
-			path: tests/Cli/Feature/Commands/ImportBookTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$authors\.$#'
-			identifier: property.notFound
-			count: 3
-			path: tests/Cli/Feature/Commands/ImportOpenAudibleTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$cover_image\.$#'
-			identifier: property.notFound
-			count: 1
-			path: tests/Cli/Feature/Commands/ImportOpenAudibleTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$directory_path\.$#'
-			identifier: property.notFound
-			count: 5
-			path: tests/Cli/Feature/Commands/ImportOpenAudibleTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$genres\.$#'
-			identifier: property.notFound
-			count: 4
-			path: tests/Cli/Feature/Commands/ImportOpenAudibleTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$narrators\.$#'
-			identifier: property.notFound
-			count: 3
-			path: tests/Cli/Feature/Commands/ImportOpenAudibleTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$series\.$#'
-			identifier: property.notFound
-			count: 3
-			path: tests/Cli/Feature/Commands/ImportOpenAudibleTest.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$title\.$#'
-			identifier: property.notFound
-			count: 1
-			path: tests/Cli/Feature/Commands/ImportOpenAudibleTest.php
-
-		-
-			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:genres\(\)\.$#'
-			identifier: method.notFound
-			count: 2
-			path: tests/Cli/Feature/Commands/ImportOpenAudibleTest.php
-
-		-
-			message: '#^Call to an undefined static method App\\Models\\Book\:\:count\(\)\.$#'
-			identifier: staticMethod.notFound
-			count: 6
-			path: tests/Cli/Feature/Commands/ImportOpenAudibleTest.php
-
-		-
-			message: '#^Call to an undefined static method App\\Models\\Book\:\:create\(\)\.$#'
-			identifier: staticMethod.notFound
-			count: 1
-			path: tests/Cli/Feature/Commands/ImportOpenAudibleTest.php
-
-		-
-			message: '#^Call to an undefined static method App\\Models\\Book\:\:first\(\)\.$#'
-			identifier: staticMethod.notFound
-			count: 3
-			path: tests/Cli/Feature/Commands/ImportOpenAudibleTest.php
-
-		-
-			message: '#^Unreachable statement \- code above always terminates\.$#'
-			identifier: deadCode.unreachable
-			count: 1
-			path: tests/Cli/Feature/Commands/ImportOpenAudibleTest.php
-
-		-
-			message: '#^Call to an undefined static method App\\Models\\Book\:\:count\(\)\.$#'
-			identifier: staticMethod.notFound
-			count: 2
-			path: tests/Cli/Feature/Commands/ImportRedundancyTest.php
-
-		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Collection\<int, Illuminate\\Database\\Eloquent\\Model\>\|Illuminate\\Database\\Eloquent\\Model\:\:\$needs_review\.$#'
 			identifier: property.notFound
 			count: 3
@@ -6623,18 +6545,6 @@ parameters:
 			identifier: booleanAnd.alwaysFalse
 			count: 1
 			path: tests/Import/Feature/BookImportTest.php
-
-		-
-			message: '#^Call to an undefined static method App\\Models\\Book\:\:create\(\)\.$#'
-			identifier: staticMethod.notFound
-			count: 2
-			path: tests/Import/Feature/ImportBookTest.php
-
-		-
-			message: '#^Property Tests\\Import\\Feature\\ImportBookTest\:\:\$bookRoot is never read, only written\.$#'
-			identifier: property.onlyWritten
-			count: 1
-			path: tests/Import/Feature/ImportBookTest.php
 
 		-
 			message: '#^Call to method PHPUnit\\Framework\\Assert\:\:assertTrue\(\) with true will always evaluate to true\.$#'

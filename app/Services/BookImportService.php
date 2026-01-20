@@ -2338,9 +2338,9 @@ class BookImportService
     /**
      * Create directory name in format "title (narrator)"
      */
-    public function createNarratorDirectoryName(string $title, string $narrator): string
+    public function createNarratorDirectoryName(string $title, string $narrator, ?string $seriesName = null): string
     {
-        $cleanTitle = $this->removeSeriesFromTitle($title);
+        $cleanTitle = $this->removeSeriesFromTitle($title, $seriesName);
 
         $cleanTitle = preg_replace('/\[[^\]]*\]/', '', $cleanTitle);
         $cleanTitle = preg_replace('/\{[^}]*\}/', '', $cleanTitle);
@@ -2359,14 +2359,8 @@ class BookImportService
         $maxLength = 100;
         $combined = "{$cleanTitle} ({$cleanNarrator})";
 
-        if (strlen($combined) > $maxLength) {
-            $availableForTitle = $maxLength - strlen($cleanNarrator) - 3;
-            if ($availableForTitle > 10) {
-                $cleanTitle = substr($cleanTitle, 0, $availableForTitle) . '...';
-                $combined = "{$cleanTitle} ({$cleanNarrator})";
-            } else {
-                return substr($cleanTitle, 0, $maxLength);
-            }
+        if (mb_strlen($combined) > $maxLength) {
+            $combined = mb_substr($combined, 0, $maxLength - 3) . '...';
         }
 
         return $combined;
@@ -2385,9 +2379,12 @@ class BookImportService
         $existingTitle = $existingBook ? $existingBook->title : basename($targetDir);
         $newTitle = $book->title;
 
+        $existingSeries = $existingBook ? $existingBook->series->first()?->name : null;
+        $newSeries = $book->series->first()?->name;
+
         $baseDir = dirname($targetDir);
-        $existingNewPath = $baseDir . '/' . $this->createNarratorDirectoryName($existingTitle, $existingNarrator);
-        $newImportPath = $baseDir . '/' . $this->createNarratorDirectoryName($newTitle, $newNarrator);
+        $existingNewPath = $baseDir . '/' . $this->createNarratorDirectoryName($existingTitle, $existingNarrator, $existingSeries);
+        $newImportPath = $baseDir . '/' . $this->createNarratorDirectoryName($newTitle, $newNarrator, $newSeries);
 
         if (File::exists($targetDir)) {
             File::move($targetDir, $existingNewPath);
@@ -3861,11 +3858,23 @@ class BookImportService
         int $fileCount = 0
     ): array {
         $validGenres = $getValidGenresCallback();
-        $displayGenre = in_array($currentGenre, $validGenres, true) ? $currentGenre : 'Invalid';
+        $normalizedGenre = trim($currentGenre);
+        $isGenreValid = in_array($normalizedGenre, $validGenres, true);
+
+        $displayGenre = $normalizedGenre;
+        if (strlen($displayGenre) > 16) {
+            $displayGenre = substr($displayGenre, 0, 15) . '…';
+        }
+
+        $displayDirectory = $currentDirectoryPath;
+        if (strlen($displayDirectory) > 40) {
+            $displayDirectory = '…' . substr($displayDirectory, -39);
+        }
 
         $acceptLabel = $isFinalConfirmation ? 'Accept and save' : 'Accept all as correct';
-        if ($displayGenre === 'Invalid') {
+        if (!$isGenreValid) {
             $acceptLabel = "\e[9m{$acceptLabel}\e[0m";
+            $displayGenre = 'Invalid';
         }
 
         $options = [
@@ -3874,7 +3883,7 @@ class BookImportService
             '3' => $isFinalConfirmation ? 'Skip' : 'Skip this book',
             '4' => 'Update cover' . ($currentCoverUrl !== '' ? ' (has URL)' : ''),
             '5' => 'Update genre (' . $displayGenre . ')',
-            '6' => 'Update directory',
+            '6' => 'Update directory (' . $displayDirectory . ')',
             '7' => 'Request enrichment (Audible/Google Books)',
         ];
 
@@ -4791,35 +4800,69 @@ class BookImportService
     }
 
     /**
-     * Remove series names from title when they contain colons
+     * Remove series names from title when they contain colons or hyphens
      */
-    public function removeSeriesFromTitle(string $title): string
+    public function removeSeriesFromTitle(string $title, ?string $seriesName = null): string
     {
-        // Handle pattern "Series: Title" - remove series before colon
+        // Normalize dashes for consistent matching
+        $title = str_replace(['–', '—'], '-', $title);
+
+        // 1. If series name is known, try to remove it along with trailing info
+        if ($seriesName && strlen($seriesName) > 0) {
+            $seriesName = str_replace(['–', '—'], '-', $seriesName);
+            $seriesEscaped = preg_quote($seriesName, '/');
+
+            // Handle patterns like "Title - Series, Book N", "Title: Series #N", "Title (Series)"
+            // This is "Greedy" - if we find the series name after a separator, we assume everything
+            // from there to the end is series metadata.
+            $patterns = [
+                '/\s*[\-:]\s*' . $seriesEscaped . '.*$/i',
+                '/\s*\(' . $seriesEscaped . '.*\)$/i',
+                '/\s*\[' . $seriesEscaped . '.*\]$/i',
+            ];
+
+            foreach ($patterns as $pattern) {
+                $cleaned = preg_replace($pattern, '', $title);
+                if ($cleaned !== $title) {
+                    return trim($cleaned, ' ,-');
+                }
+            }
+
+            // Also check for "Series - Title"
+            $startPatterns = [
+                '/^' . $seriesEscaped . '\s*[\-:]\s*/i',
+            ];
+            foreach ($startPatterns as $pattern) {
+                $cleaned = preg_replace($pattern, '', $title);
+                if ($cleaned !== $title) {
+                    return trim($cleaned, ' ,-');
+                }
+            }
+        }
+
+        // 2. Existing colon logic for "Series: Title" or "Title: Series"
         if (preg_match('/^([^:]+):\s*(.+)$/', $title, $matches)) {
             $beforeColon = trim($matches[1]);
             $afterColon = trim($matches[2]);
 
-            // Always prioritize the part after the colon as the title
-            // Exception: if the part after colon is clearly metadata (Book, Vol, etc.)
             if (preg_match('/^\b(book|vol|volume|part|chapter)\s*\d+/i', $afterColon)) {
                 return $beforeColon;
             }
 
-            return $afterColon;
+            return (strlen($afterColon) >= strlen($beforeColon)) ? $afterColon : $beforeColon;
         }
 
-        // Handle pattern "Title: Series" - remove series after colon
-        if (preg_match('/^(.+?):\s*([^:]+)$/', $title, $matches)) {
-            $beforeColon = trim($matches[1]);
-            $afterColon = trim($matches[2]);
+        // 3. Hyphen logic for "Title - Series" or "Title - Metadata"
+        if (preg_match('/^(.+?)\s+-\s+([^:-]+)$/', $title, $matches)) {
+            $beforeHyphen = trim($matches[1]);
+            $afterHyphen = trim($matches[2]);
 
-            // If the part after colon looks like metadata/series info, keep the part before
+            // If the part after looks like metadata or series info, keep the first part
             if (
-                strlen($afterColon) < strlen($beforeColon) ||
-                preg_match('/\b(series|book|vol|volume|\d+|saga|chronicles|collection)\b/i', $afterColon)
+                preg_match('/\b(series|book|vol|volume|\d+|saga|chronicles|collection|trilogy)\b/i', $afterHyphen) ||
+                !str_contains($afterHyphen, ' ') // Single word often indicates series name
             ) {
-                return $beforeColon;
+                return $beforeHyphen;
             }
         }
 
@@ -5191,7 +5234,8 @@ class BookImportService
 
         if (!empty($aiResult['title'])) {
             $originalTitle = $aiResult['title'];
-            $cleanedTitle = $this->removeSeriesFromTitle($originalTitle);
+            $seriesName = $aiResult['series'] ?? null;
+            $cleanedTitle = $this->removeSeriesFromTitle($originalTitle, $seriesName);
 
             if ($cleanedTitle !== $originalTitle) {
                 $aiResult['title'] = $cleanedTitle;
