@@ -1001,7 +1001,7 @@ class ImportBooksFromDownloads extends Command
      */
     protected function setupSignalHandlers(): void
     {
-        if (extension_loaded('pcntl')) {
+        if (extension_loaded('pcntl') && !app()->runningUnitTests()) {
             // Handle Ctrl+C (SIGINT) and SIGTERM
             pcntl_signal(SIGINT, function () {
                 $this->handleUserInterruption();

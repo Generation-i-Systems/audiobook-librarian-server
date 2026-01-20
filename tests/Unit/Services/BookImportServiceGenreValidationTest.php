@@ -25,7 +25,7 @@ class BookImportServiceGenreValidationTest extends TestCase
         $metadata = [
             'title' => 'Test Book',
             'author' => 'Test Author',
-            'genre' => 'Fiction', // Invalid - should map to "Other"
+            'genre' => 'Fiction', // Should map to "General Fiction"
         ];
 
         $audiobook = [
@@ -37,7 +37,7 @@ class BookImportServiceGenreValidationTest extends TestCase
 
         $this->assertNotNull($book);
         $this->assertCount(1, $book->genres);
-        $this->assertEquals('Other', $book->genres->first()->name);
+        $this->assertEquals('General Fiction', $book->genres->first()->name);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
@@ -101,6 +101,7 @@ class BookImportServiceGenreValidationTest extends TestCase
             'Mystery',
             'Other',
             'Science',
+            'General Fiction',
         ];
 
         foreach ($genreNames as $genreName) {
