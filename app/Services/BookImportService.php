@@ -5324,8 +5324,11 @@ class BookImportService
         }
 
 
-        // 2. Extract Series from Parent Directory if missing
-        if (empty($aiResult['series']) && !empty($audiobook['path'])) {
+        // 2. Extract Series from Parent Directory if missing or identical to title
+        $currentSeries = $aiResult['series'] ?? '';
+        $currentTitle = $aiResult['title'] ?? '';
+
+        if ((empty($currentSeries) || strcasecmp($currentSeries, $currentTitle) === 0) && !empty($audiobook['path'])) {
             $parentPath = dirname($audiobook['path']);
             // Only use parent if it's not the root import directory
             // (Naive check: assuming we are at least 1 level deep from import root)
@@ -5353,6 +5356,7 @@ class BookImportService
                 }
             }
         }
+
 
         if (preg_match('/^(\d{1,2})\s*-\s*(.+)$/', $directoryName, $matches)) {
             $bookNumber = (int) $matches[1];
