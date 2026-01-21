@@ -594,8 +594,25 @@
                 action="{{ isset($book) ? route('admin.books.update', ['book' => $book['id']]) : route('admin.books.store') }}"
                 method="POST" enctype="multipart/form-data" id="book-form" class="mt-3">
                 @php
-    // Priority: old input > passed returnUrl > request returnUrl > referer
-    $finalReturnUrl = old('returnUrl') ?? ($returnUrl ?? null) ?? request('returnUrl') ?? request()->headers->get('referer');
+                    $currentUrl = request()->url();
+                    $referer = request()->headers->get('referer');
+
+                    // Function to check if a URL is an edit or create form
+                    $isFormUrl = function($url) {
+                        if (!$url) return false;
+                        return preg_match('/\/(edit|create)($|\?)/', $url);
+                    };
+
+                    // Only use referer if it's not a form URL and not the current page
+                    // We also check that it's an internal URL to books.thelin.org
+                    $isInternal = $referer && (strpos($referer, config('app.url')) !== false || strpos($referer, 'localhost') !== false);
+                    
+                    $safeReferer = ($isInternal && !$isFormUrl($referer) && strpos($referer, $currentUrl) === false)
+                        ? $referer
+                        : (session('last_admin_list_url') ?? route('admin.books.index'));
+
+                    // Priority: old input > passed returnUrl > request returnUrl > safe referer
+                    $finalReturnUrl = old('returnUrl') ?? ($returnUrl ?? null) ?? request('returnUrl') ?? $safeReferer;
                 @endphp
                 @if($finalReturnUrl)
                     <input type="hidden" name="returnUrl" value="{{ $finalReturnUrl }}">

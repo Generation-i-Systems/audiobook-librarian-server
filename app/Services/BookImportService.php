@@ -2996,6 +2996,38 @@ class BookImportService
         ];
     }
 
+
+    /**
+     * Check if directory is a container for multiple audiobooks
+     * (e.g. Author directory containing multiple Book directories)
+     */
+    public function isContainerDirectory(string $path): bool
+    {
+        // If it looks like a CD/Disc directory, it's a single book part, not a container
+        if ($this->hasCdDirectories($path)) {
+            return false;
+        }
+
+        $directories = File::directories($path);
+        $bookCount = 0;
+
+        foreach ($directories as $dir) {
+            $dirName = basename($dir);
+
+            // Skip Extras, etc.
+            if (preg_match('/^(extras?|artwork|scans?|covers?|sample)$/i', $dirName)) {
+                continue;
+            }
+
+            if ($this->directoryHasAudioFiles($dir)) {
+                $bookCount++;
+            }
+        }
+
+        // It's a container if it has multiple subdirectories that contain audio files
+        return $bookCount > 1;
+    }
+
     /**
      * Check if directory is multi-book directory
      */
@@ -3623,6 +3655,22 @@ class BookImportService
 
             $potentialBooks = $this->groupCdDirectories($potentialBooks);
 
+            // Filter out container directories that are parents of other books
+            // If /Series and /Series/Book1 are both candidates, remove /Series
+            $paths = array_keys($potentialBooks);
+            foreach ($paths as $parentPath) {
+                foreach ($paths as $childPath) {
+                    if ($parentPath !== $childPath && str_starts_with($childPath, $parentPath . DIRECTORY_SEPARATOR)) {
+                        // Found a child book within this parent.
+                        // The parent is likely a Series container, not a book itself.
+                        // However, we should be careful: if the child is "Extras", maybe we keep the parent?
+                        // But generally, if there is a distinct book in a subdir, the parent is a container.
+                        unset($potentialBooks[$parentPath]);
+                        break;
+                    }
+                }
+            }
+
             foreach ($potentialBooks as $bookData) {
                 if (count($bookData['files']) >= 1 && $bookData['total_size'] > 10 * 1024 * 1024) {
                     if (in_array($bookData['path'], $directories)) {
@@ -3692,10 +3740,44 @@ class BookImportService
                 }
             } elseif (is_dir($path)) {
                 if (!in_array($path, $processedDirectories)) {
-                    $audiobook = $processAudiobookDirectoryCallback($path);
-                    if ($audiobook) {
-                        $audiobooks[] = $audiobook;
-                        $processedDirectories[] = $path;
+                    // Check if this is a container directory with multiple books
+                    if ($this->isContainerDirectory($path)) {
+                        Log::info("Detected container directory: {$path}");
+                        $subDirs = File::directories($path);
+                        $foundBooks = false;
+
+                        foreach ($subDirs as $subDir) {
+                            $subDirName = basename($subDir);
+                            // Skip Extras, etc.
+                            if (preg_match('/^(extras?|artwork|scans?|covers?|sample)$/i', $subDirName)) {
+                                continue;
+                            }
+
+                            // Skip if it doesn't look like a book
+                            if (!$this->directoryHasAudioFiles($subDir)) {
+                                continue;
+                            }
+
+                            $audiobook = $processAudiobookDirectoryCallback($subDir);
+                            if ($audiobook) {
+                                $audiobooks[] = $audiobook;
+                                $processedDirectories[] = $subDir;
+                                $foundBooks = true;
+                            }
+                        }
+
+                        if ($foundBooks) {
+                            $processedDirectories[] = $path; // Mark container as processed
+                        }
+                    }
+
+                    // If not a container (or no books found in subdirs), try processing the directory itself
+                    if (!in_array($path, $processedDirectories)) {
+                        $audiobook = $processAudiobookDirectoryCallback($path);
+                        if ($audiobook) {
+                            $audiobooks[] = $audiobook;
+                            $processedDirectories[] = $path;
+                        }
                     }
                 }
             }
@@ -5205,6 +5287,73 @@ class BookImportService
     {
         $directoryName = basename($audiobook['path']);
 
+        // 1. Extract Year from Title or Directory Name
+        $yearSource = $aiResult['title'] ?? $directoryName;
+        $extractedYear = null;
+        $stringToRemove = null;
+
+        // Check for (YYYY-YYYY) or [YYYY-YYYY]
+        if (preg_match('/[\[\(](\d{4})-(\d{4})[\]\)]/', $yearSource, $matches)) {
+            $extractedYear = (int) $matches[1];
+            $stringToRemove = $matches[0];
+        }
+        // Check for trailing " - YYYY-YYYY"
+        elseif (preg_match('/[\s\-_]+(\d{4})-(\d{4})$/', $yearSource, $matches)) {
+            $extractedYear = (int) $matches[1];
+            $stringToRemove = $matches[0];
+        }
+        // Check for (YYYY) or [YYYY]
+        elseif (preg_match('/[\[\(](\d{4})[\]\)]/', $yearSource, $matches)) {
+            $extractedYear = (int) $matches[1];
+            $stringToRemove = $matches[0];
+        }
+        // Check for trailing " - YYYY" or " YYYY"
+        elseif (preg_match('/[\s\-_]+(\d{4})$/', $yearSource, $matches)) {
+            $extractedYear = (int) $matches[1];
+            $stringToRemove = $matches[0];
+        }
+
+        if ($extractedYear && $extractedYear > 1900 && $extractedYear <= (int) date('Y') + 2) {
+            $aiResult['year'] = $extractedYear;
+            // Clean year from title if it was found there
+            if (!empty($aiResult['title']) && $stringToRemove) {
+                $aiResult['title'] = trim(str_replace($stringToRemove, '', $aiResult['title']));
+                // Clean up any double separators left behind
+                $aiResult['title'] = trim($aiResult['title'], " \t\n\r\0\x0B-_");
+            }
+        }
+
+
+        // 2. Extract Series from Parent Directory if missing
+        if (empty($aiResult['series']) && !empty($audiobook['path'])) {
+            $parentPath = dirname($audiobook['path']);
+            // Only use parent if it's not the root import directory
+            // (Naive check: assuming we are at least 1 level deep from import root)
+            if (basename($parentPath) !== 'download' && basename($parentPath) !== 'audiobooks') {
+                $parentName = basename($parentPath);
+
+                // Clean parent name: Remove Year, Author, Narrator
+                $seriesName = $parentName;
+
+                // Remove Year range (YYYY-YYYY) or single Year (YYYY)
+                $seriesName = preg_replace('/[\(\[]?\d{4}(?:-\d{4})?[\)\]]?/', '', $seriesName);
+
+                // Remove Author (if known)
+                if (!empty($aiResult['author'])) {
+                    $seriesName = $this->removeAuthorFromSeries($seriesName, $aiResult['author']);
+                }
+
+                // Remove Narrator (e.g. "(Narrator Name)")
+                $seriesName = preg_replace('/\([^\)]+\)/', '', $seriesName);
+
+                $seriesName = trim($seriesName, " \t\n\r\0\x0B-_");
+
+                if (!empty($seriesName)) {
+                    $aiResult['series'] = $seriesName;
+                }
+            }
+        }
+
         if (preg_match('/^(\d{1,2})\s*-\s*(.+)$/', $directoryName, $matches)) {
             $bookNumber = (int) $matches[1];
             $bookTitle = trim($matches[2]);
@@ -5328,7 +5477,7 @@ class BookImportService
                 $startNumber = (int) $matches[2];
                 $endNumber = (int) $matches[3];
 
-                if ($endNumber > $startNumber && ($endNumber - $startNumber) <= 200) {
+                if ($endNumber > $startNumber && ($endNumber - $startNumber) <= 200 && $startNumber < 1900) {
                     return [
                         'series_name' => $seriesName,
                         'start_number' => $startNumber,
@@ -6985,6 +7134,41 @@ class BookImportService
                 return;
             }
 
+            if (isset($aiMetadata['_action']) && $aiMetadata['_action'] === 'merge_parent') {
+                $infoCallback("🔄 Merging into Parent Book...");
+                // Clear multi-book part flags so it's treated as a single book
+                unset($audiobook['is_multi_book_part']);
+                unset($audiobook['multi_book_files_only']);
+                unset($audiobook['parent_path']);
+                // Ensure all files in the directory are included
+                $parentPath = $audiobook['path'];
+                if (!empty($audiobook['parent_path'])) {
+                    $parentPath = $audiobook['parent_path'];
+                }
+                // Re-collect all files from the parent directory
+                $allFiles = [];
+                if (is_dir($parentPath)) {
+                    $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
+                    $iterator = new \RecursiveIteratorIterator(
+                        new \RecursiveDirectoryIterator($parentPath, \RecursiveDirectoryIterator::SKIP_DOTS)
+                    );
+                    foreach ($iterator as $file) {
+                        if ($file->isFile()) {
+                            $ext = strtolower($file->getExtension());
+                            if (in_array($ext, $audioExtensions)) {
+                                $allFiles[] = $file->getPathname();
+                            }
+                        }
+                    }
+                }
+                if (!empty($allFiles)) {
+                    $audiobook['files'] = $allFiles;
+                    $audiobook['total_size'] = array_sum(array_map('filesize', $allFiles));
+                    $infoCallback("📁 Merged " . count($allFiles) . " files from parent directory");
+                }
+                // Continue with single book import (fall through to normal flow)
+            }
+
             if (!$approved) {
                 $warnCallback("❌ Import rejected by user");
                 $skippedBooks[] = [
@@ -7319,6 +7503,9 @@ class BookImportService
 
     /**
      * Detect if a directory is a flat archive containing multiple independent book files
+     *
+     * Returns null if files look like parts/tracks of the same audiobook (should be treated as single book).
+     * Returns archive info if files look like independent books (should be split).
      */
     public function detectFlatArchive(array $audiobook): ?array
     {
@@ -7327,18 +7514,58 @@ class BookImportService
             return null;
         }
 
-        // Check if files look like parts of the same book (CD/Part)
-        // If they do, we assume it's a single book (unless overridden)
+        // Check if files look like parts/tracks of the same book
+        // If they do, we assume it's a single book (unless overridden by user)
         $partCount = 0;
+        $trackCount = 0;
+        $chapterCount = 0;
+        $sequentialNumberCount = 0;
+
         foreach ($files as $file) {
             $filename = basename($file);
-            if (preg_match('/(cd|disc|disk|part)\s*[-_]?\s*\d+/i', $filename)) {
+
+            // Check for CD/Disc/Part patterns (e.g., "CD 1", "Disc-02", "Part_3")
+            if (preg_match('/(cd|disc|disk|part)\s*[-_.]?\s*\d+/i', $filename)) {
                 $partCount++;
+                continue;
+            }
+
+            // Check for Track patterns (e.g., "Track 01", "Track_02", "track-3")
+            if (preg_match('/track\s*[-_.]?\s*\d+/i', $filename)) {
+                $trackCount++;
+                continue;
+            }
+
+            // Check for Chapter patterns (e.g., "Chapter 01", "Ch. 02", "ch_3")
+            if (preg_match('/(chapter|ch\.?)\s*[-_.]?\s*\d+/i', $filename)) {
+                $chapterCount++;
+                continue;
+            }
+
+            // Check for sequential numbering at start of filename (e.g., "01 - Title", "02_Title", "03.mp3")
+            // This catches files like "01 - Introduction.mp3", "02 - Chapter One.mp3", etc.
+            if (preg_match('/^(\d{1,3})\s*[-_.\s]/i', $filename)) {
+                $sequentialNumberCount++;
+                continue;
             }
         }
 
-        // If most files look like parts, assume single book
-        if ($partCount > count($files) / 2) {
+        $totalPartPatterns = $partCount + $trackCount + $chapterCount + $sequentialNumberCount;
+
+        // If most files look like parts/tracks/chapters of the same book, assume single book
+        if ($totalPartPatterns > count($files) / 2) {
+            return null;
+        }
+
+        // Additional check: if all files share a common prefix (same author/title), they're likely the same book
+        // But we must be careful: if the prefix is "Series Name - Book ", the remainder might be "1" and "2", which are different books!
+        if ($this->filesShareCommonPrefix($files)) {
+            return null;
+        }
+
+        // Final check: Inspect metadata (ID3 tags) of a few files
+        // If they share the same 'album' tag, they are parts of the same book
+        if ($this->filesShareCommonMetadata($files)) {
             return null;
         }
 
@@ -7347,6 +7574,161 @@ class BookImportService
             'series_name' => $audiobook['name'], // Default series name to directory name
             'files' => $files,
         ];
+    }
+
+    /**
+     * Check if files share a common prefix (indicating they're parts of the same audiobook)
+     */
+    protected function filesShareCommonPrefix(array $files): bool
+    {
+        if (count($files) < 2) {
+            return false;
+        }
+
+        $filenames = array_map(function ($file) {
+            $name = basename($file);
+            // Remove extension
+            $name = preg_replace('/\.[^.]+$/', '', $name);
+            // Remove leading track/chapter numbers
+            $name = preg_replace('/^(\d{1,3})\s*[-_.\s]+/', '', $name);
+            $name = preg_replace('/^(track|chapter|ch\.?|cd|disc|disk|part)\s*[-_.]?\s*\d+\s*[-_.\s]*/i', '', $name);
+            return trim($name);
+        }, $files);
+
+        // Check if all remaining filenames are very similar (just track numbers differ)
+        $firstFilename = $filenames[0] ?? '';
+        if (strlen($firstFilename) < 3) {
+            // Filenames are too short after stripping - likely just numbered tracks
+            return true;
+        }
+
+        // Check if filenames share a significant common prefix (at least 60% of average length)
+        $commonPrefix = $firstFilename;
+        foreach ($filenames as $filename) {
+            $commonPrefix = $this->getCommonPrefix($commonPrefix, $filename);
+            if (strlen($commonPrefix) < 3) {
+                break;
+            }
+        }
+
+        $avgLength = array_sum(array_map('strlen', $filenames)) / count($filenames);
+
+        // If common prefix is NOT significant, they are different books
+        if (strlen($commonPrefix) < ($avgLength * 0.6)) {
+            return false;
+        }
+
+        // Additional heuristic: Check the *differences* (suffixes)
+        // If the differences contain significant text (not just numbers/parts), they are likely different books
+        foreach ($filenames as $filename) {
+            $suffix = substr($filename, strlen($commonPrefix));
+            // Remove standard separators/part indicators
+            $suffix = preg_replace('/^[\s\-_.]+/', '', $suffix);
+            $suffix = preg_replace('/(part|cd|disc|disk|track|chapter|ch\.?)\s*\d*/i', '', $suffix);
+            $suffix = preg_replace('/\d+/', '', $suffix);
+            $suffix = trim($suffix);
+
+            // If suffix still has significant text (more than 2 chars), it implies different titles
+            // e.g. "Book 1 - The Stone" vs "Book 2 - The Water" -> Suffixes "The Stone", "The Water"
+            if (strlen($suffix) > 2) {
+                return false; // Different books
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Check if files share common metadata (indicating they're parts of the same audiobook)
+     */
+    protected function filesShareCommonMetadata(array $files): bool
+    {
+        if (count($files) < 2) {
+            return false;
+        }
+
+        // Check up to 3 files (first, middle, last) to save time
+        $indicesToCheck = [0];
+        if (count($files) > 2) {
+            $indicesToCheck[] = (int) floor(count($files) / 2);
+        }
+        if (count($files) > 1) {
+            $indicesToCheck[] = count($files) - 1;
+        }
+        $indicesToCheck = array_unique($indicesToCheck);
+
+        $albums = [];
+        $titles = [];
+
+        foreach ($indicesToCheck as $index) {
+            $filePath = $files[$index];
+            try {
+                // Use existing method to extract raw tags
+                $tags = $this->extractSingleFileTags($filePath);
+
+                // Collect Album names
+                if (!empty($tags['album'])) {
+                    $albums[] = trim($tags['album']);
+                }
+
+                // Collect Titles to check for "Chapter" patterns
+                if (!empty($tags['title'])) {
+                    $titles[] = trim($tags['title']);
+                }
+            } catch (\Exception $e) {
+                // Ignore errors reading tags
+                continue;
+            }
+        }
+
+        // 1. Check if we found common albums
+        if (count($albums) >= 2) {
+            $firstAlbum = $albums[0];
+            $allSameAlbum = true;
+            foreach ($albums as $album) {
+                if (strcasecmp($album, $firstAlbum) !== 0) {
+                    $allSameAlbum = false;
+                    break;
+                }
+            }
+            if ($allSameAlbum) {
+                return true; // Files belong to the same album -> Same book
+            }
+        }
+
+        // 2. Check if titles indicate parts (contain "Chapter", "Track", or start with number)
+        $partTitleCount = 0;
+        foreach ($titles as $title) {
+            if (preg_match('/(chapter|ch\.?|track|part|cd|disc|disk)\s*[-_.]?\s*\d+/i', $title) ||
+                preg_match('/^\d+[\s\-_]/', $title) ||
+                is_numeric($title)) {
+                $partTitleCount++;
+            }
+        }
+
+        // If detected titles look like parts, assume it's a single book
+        if (count($titles) > 0 && $partTitleCount >= count($titles) / 2) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Get the common prefix between two strings
+     */
+    protected function getCommonPrefix(string $str1, string $str2): string
+    {
+        $minLen = min(strlen($str1), strlen($str2));
+        $prefix = '';
+        for ($i = 0; $i < $minLen; $i++) {
+            if (strtolower($str1[$i]) === strtolower($str2[$i])) {
+                $prefix .= $str1[$i];
+            } else {
+                break;
+            }
+        }
+        return $prefix;
     }
 
     /**

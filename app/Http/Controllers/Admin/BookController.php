@@ -13,6 +13,7 @@ use App\Services\ExternalCoverService;
 use App\Services\GoogleBooksApiService;
 use App\Services\HardcoverService;
 use App\Traits\BookImportTrait;
+use App\Traits\HandlesLibraryJson;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -22,6 +23,7 @@ use ZipArchive;
 class BookController extends Controller
 {
     use BookImportTrait;
+    use HandlesLibraryJson;
 
     /**
      * Store the cover image from a file, URL, or base64 string.
@@ -284,6 +286,9 @@ class BookController extends Controller
                 ['path' => $request->url(), 'query' => $request->query()]
             );
 
+
+            // Store the current URL as the last viewed list for redirects after edit/update
+            session(['last_admin_list_url' => $request->fullUrl()]);
 
             return view('admin.books.index', [
                 'books' => $paginator,
@@ -1129,7 +1134,7 @@ class BookController extends Controller
                 throw $e;
             }
 
-            $returnUrl = $request->input('returnUrl');
+            $returnUrl = $request->input('returnUrl') ?? session('last_admin_list_url');
             if ($returnUrl) {
                 return redirect($returnUrl)->with('success', 'Book created successfully.');
             }
@@ -1668,12 +1673,17 @@ class BookController extends Controller
 
                     // Ensure directory exists
                     if (!is_dir($fullDirectoryPath)) {
-                        mkdir($fullDirectoryPath, 0775, true);
-                        // Set directory ownership
-                        if (function_exists('chown')) {
-                            @chown($fullDirectoryPath, 'eric');
-                            @chgrp($fullDirectoryPath, 'audio');
+                        if (!@mkdir($fullDirectoryPath, 0775, true) && !is_dir($fullDirectoryPath)) {
+                            $lastError = error_get_last();
+                            Log::error('Failed to create directory for embedded cover', [
+                                'path' => $fullDirectoryPath,
+                                'error' => $lastError ? $lastError['message'] : 'No PHP error captured',
+                                'parent_exists' => is_dir(dirname($fullDirectoryPath)),
+                                'parent_writable' => is_writable(is_dir(dirname($fullDirectoryPath)) ? dirname($fullDirectoryPath) : '/'),
+                                'user' => posix_getpwuid(posix_geteuid())['name'] ?? 'unknown',
+                            ]);
                         }
+                        $this->setDirectoryOwnership($fullDirectoryPath);
                     }
 
                     // Generate unique filename for the cover
@@ -1685,6 +1695,7 @@ class BookController extends Controller
                     if (copy($tempPath, $targetPath)) {
                         // Set proper permissions
                         chmod($targetPath, 0664);
+                        $this->setFileOwnership($targetPath);
 
                         // Clean up temp file
                         unlink($tempPath);
@@ -1762,13 +1773,9 @@ class BookController extends Controller
         ]);
         $documentStore->updateBook($id, $validated);
 
-        // Redirect to returnUrl if present, else fallback
-        $returnUrl = $request->input('returnUrl');
-        if ($returnUrl) {
-            return redirect($returnUrl)->with('success', 'Book updated successfully');
-        }
-        // Redirect to index without preserving request query parameters
-        return redirect()->route('admin.books.index')->with('success', 'Book updated successfully');
+        // Redirect to returnUrl if present, else fallback to last list or main index
+        $returnUrl = $request->input('returnUrl') ?? session('last_admin_list_url') ?? route('admin.books.index');
+        return redirect($returnUrl)->with('success', 'Book updated successfully');
     }
 
     /**

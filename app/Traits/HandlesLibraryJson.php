@@ -9,32 +9,60 @@ use Illuminate\Support\Facades\Storage;
 trait HandlesLibraryJson
 {
     /**
-     * Set file ownership to eric:audio with 664 permissions
+     * Set file ownership and permissions using SUID tool if available, otherwise native PHP
      *
      * @param string $filePath
      * @return void
      */
     protected function setFileOwnership(string $filePath): void
     {
-        if (file_exists($filePath)) {
-            @chown($filePath, 'eric');
-            @chgrp($filePath, 'audio');
-            @chmod($filePath, 0664);
-        }
+        $this->setBatchOwnership([$filePath]);
     }
 
     /**
-     * Set directory ownership to eric:audio with 775 permissions
+     * Set directory ownership and permissions using SUID tool if available, otherwise native PHP
      *
      * @param string $dirPath
      * @return void
      */
     protected function setDirectoryOwnership(string $dirPath): void
     {
-        if (is_dir($dirPath)) {
-            @chown($dirPath, 'eric');
-            @chgrp($dirPath, 'audio');
-            @chmod($dirPath, 0775);
+        $this->setBatchOwnership([$dirPath]);
+    }
+
+    /**
+     * Set ownership and permissions for multiple paths at once
+     *
+     * @param array<string> $paths
+     * @return void
+     */
+    protected function setBatchOwnership(array $paths): void
+    {
+        $validPaths = array_filter($paths, fn ($p) => !empty($p) && (file_exists($p) || is_dir($p)));
+        if (empty($validPaths)) {
+            return;
+        }
+
+        $fixPermsTool = base_path('scripts/fix_perms');
+        if (file_exists($fixPermsTool) && is_executable($fixPermsTool)) {
+            $bookRoot = rtrim(config('app.book_root', '/media/audiobooks/books'), '/');
+            $args = [];
+
+            foreach ($validPaths as $path) {
+                $pathArg = $path;
+                if (strpos($path, $bookRoot) === 0) {
+                    $pathArg = ltrim(substr($path, strlen($bookRoot)), '/');
+                }
+                $args[] = escapeshellarg($pathArg);
+            }
+
+            @exec($fixPermsTool . ' ' . implode(' ', $args));
+        } else {
+            foreach ($validPaths as $path) {
+                @chown($path, 'eric');
+                @chgrp($path, 'audio');
+                @chmod($path, is_dir($path) ? 0775 : 0664);
+            }
         }
     }
 

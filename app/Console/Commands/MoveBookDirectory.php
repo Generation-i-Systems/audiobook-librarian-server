@@ -206,10 +206,23 @@ class MoveBookDirectory extends Command
         }
 
         if (!$dryRun && !is_dir($destDir)) {
-            $mkdirOk = @mkdir($destDir, 0755, true);
+            $mkdirError = null;
+            set_error_handler(function ($errno, $errstr) use (&$mkdirError) {
+                $mkdirError = $errstr;
+                return true;
+            });
+            $mkdirOk = mkdir($destDir, 0755, true);
+            restore_error_handler();
+
             if (!$mkdirOk && !is_dir($destDir)) {
-                $this->logError('Failed to create destination directory', ['destination_directory' => $destDir]);
-                $this->error("Failed to create destination directory: {$destDir}");
+                $this->logError('Failed to create destination directory', [
+                    'destination_directory' => $destDir,
+                    'error' => $mkdirError ?? 'No PHP error captured',
+                    'parent_exists' => is_dir(dirname($destDir)),
+                    'parent_writable' => is_writable(is_dir(dirname($destDir)) ? dirname($destDir) : '/'),
+                    'user' => posix_getpwuid(posix_geteuid())['name'] ?? 'unknown',
+                ]);
+                $this->error("Failed to create destination directory: {$destDir}. Error: " . ($mkdirError ?? 'Unknown error'));
                 return 1;
             }
         }

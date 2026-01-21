@@ -526,7 +526,15 @@ trait BookImportTrait
             $fullDir = rtrim($storagePath, '/') . '/' . ltrim($directoryPath, '/');
 
             if (!is_dir($fullDir)) {
-                if (!mkdir($fullDir, 0775, true) && !is_dir($fullDir)) {
+                if (!@mkdir($fullDir, 0775, true) && !is_dir($fullDir)) {
+                    $lastError = error_get_last();
+                    Log::error("Unable to create directory at {$fullDir}", [
+                        'error' => $lastError ? $lastError['message'] : 'No PHP error captured',
+                        'parent_exists' => is_dir(dirname($fullDir)),
+                        'parent_writable' => is_writable(is_dir(dirname($fullDir)) ? dirname($fullDir) : '/'),
+                        'user' => posix_getpwuid(posix_geteuid())['name'] ?? 'unknown',
+                    ]);
+
                     if ($output) {
                         $output->error("Unable to create directory at {$fullDir}");
                     }
@@ -542,6 +550,12 @@ trait BookImportTrait
                 }
                 if ($output) {
                     $output->line("Created directory: <info>{$directoryPath}</info>");
+                }
+                // Set directory ownership
+                if (function_exists('chown')) {
+                    @chown($fullDir, 'eric');
+                    @chgrp($fullDir, 'audio');
+                    @chmod($fullDir, 0775);
                 }
             }
 

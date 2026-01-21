@@ -1521,9 +1521,20 @@ class ImportFileController extends Controller
 
             // Create destination directory if it doesn't exist
             if (!is_dir($fullDestinationPath)) {
-                if (!File::makeDirectory($fullDestinationPath, 0775, true)) {
+                $mkdirError = null;
+                set_error_handler(function ($errno, $errstr) use (&$mkdirError) {
+                    $mkdirError = $errstr;
+                    return true;
+                });
+                $success = File::makeDirectory($fullDestinationPath, 0775, true);
+                restore_error_handler();
+
+                if (!$success && !is_dir($fullDestinationPath)) {
                     Log::error('[ImportFile] Failed to create destination directory', [
                         'path' => $fullDestinationPath,
+                        'error' => $mkdirError ?? 'No PHP error captured',
+                        'parent_exists' => is_dir(dirname($fullDestinationPath)),
+                        'parent_writable' => is_writable(is_dir(dirname($fullDestinationPath)) ? dirname($fullDestinationPath) : '/'),
                     ]);
 
                     return false;

@@ -26,6 +26,9 @@ class TrashController extends Controller
             'total_size' => $this->deletionService->getTotalTrashSize(),
         ];
 
+        // Store the current URL as the last viewed list for redirects after edit/update
+        session(['last_admin_list_url' => $request->fullUrl()]);
+
         return view('admin.trash.index', [
             'items' => $trashData['items'],
             'total' => $trashData['total'],

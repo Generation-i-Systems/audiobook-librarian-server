@@ -18,8 +18,11 @@ class UserController extends Controller
     }
 
 
-    public function index()
+    public function index(Request $request)
     {
+        // Store the current URL as the last viewed list for redirects after edit/update
+        session(['last_admin_list_url' => $request->fullUrl()]);
+
         $users = $this->documentStoreService->getAllUsers();
 
         return view('admin.users.index', ['users' => $users]);

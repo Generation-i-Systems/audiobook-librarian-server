@@ -252,7 +252,23 @@ class FileSystemService
         }
 
         if (!File::isDirectory($target)) {
-            File::makeDirectory($target, 0775, true);
+            $mkdirError = null;
+            set_error_handler(function ($errno, $errstr) use (&$mkdirError) {
+                $mkdirError = $errstr;
+                return true;
+            });
+            $success = File::makeDirectory($target, 0775, true);
+            restore_error_handler();
+
+            if (!$success && !is_dir($target)) {
+                Log::error("Failed to create target directory: {$target}", [
+                    'error' => $mkdirError ?? 'No PHP error captured',
+                    'parent_exists' => is_dir(dirname($target)),
+                    'parent_writable' => is_writable(is_dir(dirname($target)) ? dirname($target) : '/'),
+                ]);
+                return false;
+            }
+
             if (is_dir($target)) {
                 @chown($target, 'eric');
                 @chgrp($target, 'audio');

@@ -41,6 +41,9 @@ class NeedsReviewController extends Controller
             ]
         );
 
+        // Store the current URL as the last viewed list for redirects after edit/update
+        session(['last_admin_list_url' => $request->fullUrl()]);
+
         return view('admin.needs_review.index', [
             'books' => $paginator,
             'reasons' => $reasons,

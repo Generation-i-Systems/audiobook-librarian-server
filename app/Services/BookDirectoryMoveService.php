@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Traits\HandlesLibraryJson;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class BookDirectoryMoveService
 {
+    use HandlesLibraryJson;
+
     /**
      * Audio file extensions that constitute actual book content
      */
@@ -65,25 +68,35 @@ class BookDirectoryMoveService
         // Create directory using native PHP mkdir for better control
         $newAbsPath = $disk->path($newDirectoryPath);
         if (!is_dir($newAbsPath)) {
-            if (!@mkdir($newAbsPath, 0775, true)) {
+            $mkdirError = null;
+            set_error_handler(function ($errno, $errstr) use (&$mkdirError) {
+                $mkdirError = $errstr;
+                return true;
+            });
+            $success = mkdir($newAbsPath, 0775, true);
+            restore_error_handler();
+
+            if (!$success && !is_dir($newAbsPath)) {
                 Log::error('Failed to create directory', [
                     'path' => $newAbsPath,
-                    'error' => error_get_last(),
+                    'error' => $mkdirError ?? 'No PHP error captured',
+                    'parent_exists' => is_dir(dirname($newAbsPath)),
+                    'parent_writable' => is_writable(is_dir(dirname($newAbsPath)) ? dirname($newAbsPath) : '/'),
+                    'user' => posix_getpwuid(posix_geteuid())['name'] ?? 'unknown',
                 ]);
                 return [
                     'moved' => false,
                     'coverImage' => $coverImageBasename,
-                    'error' => 'Failed to create target directory',
+                    'error' => 'Failed to create target directory: ' . ($mkdirError ?? 'Unknown error'),
                 ];
             }
-            @chown($newAbsPath, 'eric');
-            @chgrp($newAbsPath, 'audio');
-            @chmod($newAbsPath, 0775);
+            $this->setDirectoryOwnership($newAbsPath);
         }
 
         $files = $disk->allFiles($oldDirectoryPath);
         $newCoverImageBasename = $coverImageBasename;
         $failedFiles = [];
+        $movedFiles = [];
 
         Log::debug('BookDirectoryMoveService: Moving files', [
             'oldDirectoryPath' => $oldDirectoryPath,
@@ -125,14 +138,7 @@ class BookDirectoryMoveService
 
             try {
                 $disk->move($file, $finalTarget);
-
-                // Set file ownership
-                $finalAbsPath = $disk->path($finalTarget);
-                if (file_exists($finalAbsPath)) {
-                    @chmod($finalAbsPath, 0664);
-                    @chown($finalAbsPath, 'eric');
-                    @chgrp($finalAbsPath, 'audio');
-                }
+                $movedFiles[] = $disk->path($finalTarget);
 
                 if ($coverImageBasename !== null && basename($file) === $coverImageBasename) {
                     $newCoverImageBasename = basename($finalTarget);
@@ -147,6 +153,11 @@ class BookDirectoryMoveService
                     'error' => $e->getMessage(),
                 ]);
             }
+        }
+
+        // Apply ownership to all moved files in one batch
+        if (!empty($movedFiles)) {
+            $this->setBatchOwnership($movedFiles);
         }
 
         // If any files failed to move, return failure

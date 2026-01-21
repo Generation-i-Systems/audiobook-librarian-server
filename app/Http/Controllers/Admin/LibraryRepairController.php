@@ -52,6 +52,9 @@ class LibraryRepairController extends Controller
         // Get the last run date for library repair scan
         $lastRunDate = SystemSetting::get('library_repair_last_run');
 
+        // Store the current URL as the last viewed list for redirects after edit/update
+        session(['last_admin_list_url' => $request->fullUrl()]);
+
         return view('admin.library-repair.index', [
             'issues' => $paginator,
             'issueTypes' => $this->issueTypeOptions(),

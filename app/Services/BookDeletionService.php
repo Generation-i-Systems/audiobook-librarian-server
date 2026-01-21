@@ -6,12 +6,15 @@ namespace App\Services;
 
 use App\Contracts\DocumentStoreServiceInterface;
 use App\Models\Book;
+use App\Traits\HandlesLibraryJson;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class BookDeletionService
 {
+    use HandlesLibraryJson;
+
     public function __construct(
         private DocumentStoreServiceInterface $documentStore
     ) {
@@ -473,12 +476,11 @@ class BookDeletionService
         $booksDisk->makeDirectory($restoredPath);
         $restoredAbsPath = $booksDisk->path($restoredPath);
         if (is_dir($restoredAbsPath)) {
-            @chmod($restoredAbsPath, 0775);
-            @chown($restoredAbsPath, 'eric');
-            @chgrp($restoredAbsPath, 'audio');
+            $this->setDirectoryOwnership($restoredAbsPath);
         }
 
         $files = $trashDisk->allFiles($filesPath);
+        $restoredFiles = [];
 
         foreach ($files as $file) {
             try {
@@ -491,9 +493,7 @@ class BookDeletionService
                     $booksDisk->makeDirectory($targetDir);
                     $targetAbsDir = $booksDisk->path($targetDir);
                     if (is_dir($targetAbsDir)) {
-                        @chmod($targetAbsDir, 0775);
-                        @chown($targetAbsDir, 'eric');
-                        @chgrp($targetAbsDir, 'audio');
+                        $this->setDirectoryOwnership($targetAbsDir);
                     }
                 }
 
@@ -501,9 +501,7 @@ class BookDeletionService
                 $targetAbsPath = $booksDisk->path($targetPath);
 
                 if (rename($sourceAbsPath, $targetAbsPath)) {
-                    @chmod($targetAbsPath, 0664);
-                    @chown($targetAbsPath, 'eric');
-                    @chgrp($targetAbsPath, 'audio');
+                    $restoredFiles[] = $targetAbsPath;
                 } else {
                     Log::warning('Failed to restore file from trash', [
                         'source' => $file,
@@ -516,6 +514,10 @@ class BookDeletionService
                     'error' => $e->getMessage(),
                 ]);
             }
+        }
+
+        if (!empty($restoredFiles)) {
+            $this->setBatchOwnership($restoredFiles);
         }
 
         return $restoredPath;

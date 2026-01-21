@@ -1189,6 +1189,12 @@ parameters:
 			path: app/Http/Controllers/Admin/BookController.php
 
 		-
+			message: '#^Offset ''name'' on non\-empty\-array on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Http/Controllers/Admin/BookController.php
+
+		-
 			message: '#^Offset ''number'' on array\{number\: mixed, isCollection\?\: mixed\} on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
 			count: 1
@@ -3505,8 +3511,20 @@ parameters:
 			path: app/Services/BadgeService.php
 
 		-
+			message: '#^Offset ''name'' on non\-empty\-array on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/BookDeletionService.php
+
+		-
 			message: '#^Method App\\Services\\BookDirectoryMoveService\:\:directoryExistsOnDisk\(\) is unused\.$#'
 			identifier: method.unused
+			count: 1
+			path: app/Services/BookDirectoryMoveService.php
+
+		-
+			message: '#^Offset ''name'' on non\-empty\-array on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
 			count: 1
 			path: app/Services/BookDirectoryMoveService.php
 
@@ -3805,6 +3823,12 @@ parameters:
 			path: app/Services/BookImportService.php
 
 		-
+			message: '#^Comparison operation "\>" between int\<2, max\> and 1 is always true\.$#'
+			identifier: greater.alwaysTrue
+			count: 1
+			path: app/Services/BookImportService.php
+
+		-
 			message: '#^Deprecated in PHP 8\.0\: Required parameter \$googleImageService follows optional parameter \$limit\.$#'
 			identifier: parameter.requiredAfterOptional
 			count: 1
@@ -3867,6 +3891,18 @@ parameters:
 		-
 			message: '#^Offset ''name'' on non\-empty\-array on left side of \?\? always exists and is not nullable\.$#'
 			identifier: nullCoalesce.offset
+			count: 1
+			path: app/Services/BookImportService.php
+
+		-
+			message: '#^Offset ''parent_path'' does not exist on non\-empty\-array\<mixed, mixed\>\.$#'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: app/Services/BookImportService.php
+
+		-
+			message: '#^Offset ''parent_path'' on non\-empty\-array\<mixed, mixed\> in empty\(\) does not exist\.$#'
+			identifier: empty.offset
 			count: 1
 			path: app/Services/BookImportService.php
 

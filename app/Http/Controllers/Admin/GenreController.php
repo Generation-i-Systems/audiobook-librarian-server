@@ -61,6 +61,9 @@ class GenreController extends Controller
                 return $multiplier * strcmp($a['name'] ?? '', $b['name'] ?? '');
             });
 
+            // Store the current URL as the last viewed list for redirects after edit/update
+            session(['last_admin_list_url' => $request->fullUrl()]);
+
             return view('admin.genres.index', [
                 'genres' => $genres,
                 'sort' => $sort,
