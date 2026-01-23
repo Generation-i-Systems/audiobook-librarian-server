@@ -46,12 +46,15 @@ trait HandlesLibraryJson
         $fixPermsTool = base_path('scripts/fix_perms');
         if (file_exists($fixPermsTool) && is_executable($fixPermsTool)) {
             $bookRoot = rtrim(config('app.book_root', '/media/audiobooks/books'), '/');
+            $storageRoot = rtrim(config('filesystems.disks.books.root', ''), '/');
             $args = [];
 
             foreach ($validPaths as $path) {
                 $pathArg = $path;
                 if (strpos($path, $bookRoot) === 0) {
                     $pathArg = ltrim(substr($path, strlen($bookRoot)), '/');
+                } elseif ($storageRoot && strpos($path, $storageRoot) === 0) {
+                    $pathArg = ltrim(substr($path, strlen($storageRoot)), '/');
                 }
                 $args[] = escapeshellarg($pathArg);
             }
