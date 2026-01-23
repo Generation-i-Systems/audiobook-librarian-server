@@ -69,12 +69,14 @@ class BookImportServiceMetadataTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
-    public function itCreatesSuffixedDirectoryWhenTargetHasAudioFiles(): void
+    public function itReusesDirectoryWhenTargetHasAudioFilesAllowingMerge(): void
     {
         $tempDir = sys_get_temp_dir() . '/test_import_' . uniqid();
 
         try {
-            // Create target directory with audio files (conflict)
+            // Create target directory with audio files
+            // With the new merge/overwrite behavior, we reuse the directory
+            // and let file-level operations handle conflicts
             $targetDir = $tempDir . '/target';
             mkdir($targetDir, 0775, true);
             file_put_contents($targetDir . '/track01.mp3', 'existing audio');
@@ -83,7 +85,7 @@ class BookImportServiceMetadataTest extends TestCase
 
             $result = $this->service->handleDirectoryConflict($audiobook, $targetDir);
 
-            $this->assertSame($targetDir . '_01', $result);
+            $this->assertSame($targetDir, $result);
         } finally {
             if (is_dir($tempDir)) {
                 exec("rm -rf {$tempDir}");
@@ -117,12 +119,14 @@ class BookImportServiceMetadataTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
-    public function itCreatesSuffixedDirectoryForNonMetadataFiles(): void
+    public function itReusesDirectoryForNonMetadataFilesAllowingMerge(): void
     {
         $tempDir = sys_get_temp_dir() . '/test_import_' . uniqid();
 
         try {
             // Create target directory with non-metadata file
+            // With the new merge/overwrite behavior, we reuse the directory
+            // instead of creating suffixed copies that caused "Wrong Directory" issues
             $targetDir = $tempDir . '/target';
             mkdir($targetDir, 0775, true);
             file_put_contents($targetDir . '/readme.txt', 'not metadata');
@@ -131,7 +135,7 @@ class BookImportServiceMetadataTest extends TestCase
 
             $result = $this->service->handleDirectoryConflict($audiobook, $targetDir);
 
-            $this->assertSame($targetDir . '_01', $result);
+            $this->assertSame($targetDir, $result);
         } finally {
             if (is_dir($tempDir)) {
                 exec("rm -rf {$tempDir}");
