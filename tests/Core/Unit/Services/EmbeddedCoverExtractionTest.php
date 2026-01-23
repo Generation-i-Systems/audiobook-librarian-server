@@ -60,18 +60,30 @@ class EmbeddedCoverExtractionTest extends TestCase
         $this->assertNotNull($book);
         $this->assertNotNull($book->id);
 
+        // Create book directory before processing cover
+        $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        $bookDir = $bookRoot . '/' . $book->directory_path;
+        if (!is_dir($bookDir)) {
+            mkdir($bookDir, 0775, true);
+        }
+
+        // Process cover image (deferred from createBookFromMetadata to prevent premature dir creation)
+        $this->importService->processCoverImage($book, $metadata);
+
         // Assert cover_image field is set
         $this->assertNotNull($book->cover_image);
         $this->assertStringEndsWith('cover.jpg', $book->cover_image);
 
         // Assert cover file was actually saved
-        $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
-        $coverPath = $bookRoot . '/' . $book->directory_path . '/cover.jpg';
+        $coverPath = $bookDir . '/cover.jpg';
         $this->assertFileExists($coverPath, 'Cover image file should exist in book directory');
 
         // Assert file has content
         $savedData = file_get_contents($coverPath);
         $this->assertEquals($coverData, $savedData, 'Saved cover data should match original');
+
+        // Cleanup
+        File::deleteDirectory($bookDir);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
@@ -95,16 +107,28 @@ class EmbeddedCoverExtractionTest extends TestCase
         // Create book with both embedded cover and URL
         $book = $this->importService->createBookFromMetadata($metadata, $audiobook);
 
+        // Create book directory before processing cover
+        $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
+        $bookDir = $bookRoot . '/' . $book->directory_path;
+        if (!is_dir($bookDir)) {
+            mkdir($bookDir, 0775, true);
+        }
+
+        // Process cover image (deferred from createBookFromMetadata)
+        $this->importService->processCoverImage($book, $metadata);
+
         // Assert embedded cover was used, not downloaded
         $this->assertStringEndsWith('cover.jpg', $book->cover_image);
 
         // Assert file exists and contains embedded data
-        $bookRoot = rtrim(config('app.book_root', '/media/lyra_data1/audiobooks/books'), '/');
-        $coverPath = $bookRoot . '/' . $book->directory_path . '/cover.jpg';
+        $coverPath = $bookDir . '/cover.jpg';
         $this->assertFileExists($coverPath);
 
         $savedData = file_get_contents($coverPath);
         $this->assertEquals($coverData, $savedData, 'Should use embedded cover, not download');
+
+        // Cleanup
+        File::deleteDirectory($bookDir);
     }
 
     #[\PHPUnit\Framework\Attributes\Test]
@@ -139,6 +163,9 @@ class EmbeddedCoverExtractionTest extends TestCase
 
         // Create book - should use existing cover
         $book = $this->importService->createBookFromMetadata($metadata, $audiobook);
+
+        // Process cover image (deferred from createBookFromMetadata)
+        $this->importService->processCoverImage($book, $metadata);
 
         // Assert existing cover was used
         $this->assertStringContainsString('cover.jpg', $book->cover_image);
