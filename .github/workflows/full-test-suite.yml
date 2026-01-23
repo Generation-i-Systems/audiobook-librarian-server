@@ -5,9 +5,9 @@ on:
   schedule:
     - cron: "0 2 * * *" # Run daily at 2 AM UTC
   push:
-    branches: [main]
+    branches: [main, develop, "release/*", "hotfix/*"]
   pull_request:
-    branches: [main]
+    branches: [main, develop, "release/*", "hotfix/*"]
 
 jobs:
   full-tests:

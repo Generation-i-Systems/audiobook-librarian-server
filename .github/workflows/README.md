@@ -98,8 +98,8 @@ composer test:core
 **Triggers**:
 - Manual dispatch (`workflow_dispatch`)
 - Daily at 2 AM UTC (scheduled)
-- Push to `main` branch
-- Pull requests to `main` branch
+- Push to `main` or `develop` branches
+- Pull requests to `main`, `develop`, `release/*`, or `hotfix/*` branches
 
 **Features**:
 - Runs ALL tests with parallel execution
