@@ -65,6 +65,13 @@ int main(int argc, char *argv[]) {
     }
     target_gid = grp->gr_gid;
 
+    // Resolve ALLOWED_ROOT to handle symlinks (e.g. /media/audiobooks -> /media/lyra_data1)
+    char resolved_allowed_root[PATH_MAX];
+    if (realpath(ALLOWED_ROOT, resolved_allowed_root) == NULL) {
+        fprintf(stderr, "Error: Failed to resolve allowed root '%s': %s\n", ALLOWED_ROOT, strerror(errno));
+        return 1;
+    }
+
     // Drop privileges to root (set real UID to 0)
     // SUID bit will make effective UID 0, but we want real UID 0 for children if any
     if (setuid(0) != 0) {
@@ -93,9 +100,9 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
-        // Security: Ensure resolved path is inside ALLOWED_ROOT
-        if (strncmp(resolved_path, ALLOWED_ROOT, strlen(ALLOWED_ROOT)) != 0) {
-            fprintf(stderr, "Security Error: Path '%s' is outside allowed root '%s'\n", resolved_path, ALLOWED_ROOT);
+        // Security: Ensure resolved path is inside resolved_allowed_root
+        if (strncmp(resolved_path, resolved_allowed_root, strlen(resolved_allowed_root)) != 0) {
+            fprintf(stderr, "Security Error: Path '%s' is outside allowed root '%s' (resolved: %s)\n", resolved_path, ALLOWED_ROOT, resolved_allowed_root);
             overall_success = 1;
             continue;
         }
