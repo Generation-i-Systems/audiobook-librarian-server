@@ -9,6 +9,7 @@ use App\Models\Narrator;
 use App\Models\Publisher;
 use App\Models\Series;
 use App\Traits\HandlesLibraryJson;
+use App\Exceptions\MergeIntoParentException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
@@ -373,43 +374,8 @@ class BookImportService
                 }
             }
 
-            // Handle cover image with download support
-            // CRITICAL: Priority order:
-            // 1. Existing cover in directory
-            // 2. Embedded cover data from M4B
-            // 3. Cover path (local file)
-            // 4. Cover URL (download)
-
-            $existingCover = $this->findExistingCover($book->directory_path);
-
-            if ($existingCover) {
-                // Use existing cover - don't download
-                $book->cover_image = $existingCover;
-            } elseif (!empty($metadata['cover_data'])) {
-                // CRITICAL: Save embedded cover from M4B file
-                // This is extracted from the M4B file tags and stored in metadata['cover_data']
-                $coverPath = $this->saveEmbeddedCover($metadata['cover_data'], $book->directory_path);
-                if ($coverPath) {
-                    $book->cover_image = $coverPath;
-                }
-            } elseif (!empty($metadata['cover_path'])) {
-                $book->cover_image = basename((string) $metadata['cover_path']);
-            } elseif (!empty($metadata['cover_url'])) {
-                // Determine source for filename
-                if (!empty($metadata['cover_is_local_file'])) {
-                    $source = 'local';
-                } elseif (isset($metadata['audible_raw'])) {
-                    $source = 'audible';
-                } else {
-                    $source = 'googlebooks';
-                }
-
-                $coverPath = $this->downloadCoverImage($metadata['cover_url'], $book->directory_path, $source);
-                if ($coverPath) {
-                    $book->cover_image = $coverPath;
-                }
-                // Do NOT fall back to storing the URL - leave cover_image null if download fails
-            }
+            // Cover image processing is deferred to processCoverImage() to prevent premature directory creation
+            // which causes conflict detection in moveFilesToLibrary()
 
             // Handle publisher
             if (!empty($metadata['publisher'])) {
@@ -599,6 +565,54 @@ class BookImportService
             // CRITICAL: Re-throw the exception so the caller can see what went wrong
             // Returning null silently hides the error from the user
             throw $e;
+        }
+    }
+
+    /**
+     * Process cover image (deferred execution)
+     */
+    public function processCoverImage(Book $book, array $metadata): void
+    {
+        // Handle cover image with download support
+        // CRITICAL: Priority order:
+        // 1. Existing cover in directory
+        // 2. Embedded cover data from M4B
+        // 3. Cover path (local file)
+        // 4. Cover URL (download)
+
+        $existingCover = $this->findExistingCover($book->directory_path);
+
+        if ($existingCover) {
+            // Use existing cover - don't download
+            $book->cover_image = $existingCover;
+        } elseif (!empty($metadata['cover_data'])) {
+            // CRITICAL: Save embedded cover from M4B file
+            // This is extracted from the M4B file tags and stored in metadata['cover_data']
+            $coverPath = $this->saveEmbeddedCover($metadata['cover_data'], $book->directory_path);
+            if ($coverPath) {
+                $book->cover_image = $coverPath;
+            }
+        } elseif (!empty($metadata['cover_path'])) {
+            $book->cover_image = basename((string) $metadata['cover_path']);
+        } elseif (!empty($metadata['cover_url'])) {
+            // Determine source for filename
+            if (!empty($metadata['cover_is_local_file'])) {
+                $source = 'local';
+            } elseif (isset($metadata['audible_raw'])) {
+                $source = 'audible';
+            } else {
+                $source = 'googlebooks';
+            }
+
+            $coverPath = $this->downloadCoverImage($metadata['cover_url'], $book->directory_path, $source);
+            if ($coverPath) {
+                $book->cover_image = $coverPath;
+            }
+            // Do NOT fall back to storing the URL - leave cover_image null if download fails
+        }
+
+        if ($book->isDirty('cover_image')) {
+            $book->save();
         }
     }
 
@@ -1852,8 +1866,6 @@ class BookImportService
      */
     public function resolveDirectoryConflictPath(string $targetDir): string
     {
-        $originalTargetDir = $targetDir;
-
         // Check if target directory exists
         if (!File::isDirectory($targetDir)) {
             return $targetDir;
@@ -1871,17 +1883,10 @@ class BookImportService
             return $targetDir;
         }
 
-        // Directory has actual content, find a non-conflicting path
-        $counter = 1;
-        while (File::isDirectory($targetDir)) {
-            $targetDir = "{$originalTargetDir}_" . str_pad($counter, 2, '0', STR_PAD_LEFT);
-            $counter++;
-
-            if ($counter > 99) {
-                break;
-            }
-        }
-
+        // Directory has actual content.
+        // Previously we appended _01, _02 etc. but this causes "Wrong Directory" issues and duplicates.
+        // Now we return the original path, effectively allowing merge/overwrite.
+        // This relies on the file copy operation to handle file-level conflicts (usually overwrite).
         return $targetDir;
     }
 
@@ -2154,6 +2159,17 @@ class BookImportService
             $infoCallback(
                 $filesAlreadyExist ? "✅ Moved duplicate source to trash ({$trashResult['id']})" : "🗑️  Moved source to trash ({$trashResult['id']})"
             );
+        }
+
+        // Check if the parent directory is now empty and remove it if so
+        if ($sourcePath && file_exists(dirname($sourcePath))) {
+            $parentPath = dirname($sourcePath);
+            if ($this->isDirectoryEmpty($parentPath)) {
+                @rmdir($parentPath);
+                if ($infoCallback) {
+                    $infoCallback("🗑️  Removed empty parent directory: " . basename($parentPath));
+                }
+            }
         }
     }
 
@@ -4363,7 +4379,30 @@ class BookImportService
                     $infoCallback("📖 Processing Book {$bookMetadata['series_number']} with " . count($virtualAudiobook['files']) . " files");
                     $infoCallback("📁 File: {$firstFilename}");
                 }
-                $processSingleBookCallback($virtualAudiobook, $bookMetadata);
+
+                try {
+                    $processSingleBookCallback($virtualAudiobook, $bookMetadata);
+                } catch (MergeIntoParentException $e) {
+                    if ($infoCallback) {
+                        $infoCallback("🛑 Merge requested: Stopping split processing and reprocessing parent directory...");
+                    }
+
+                    // Reprocess original parent audiobook (all files) as a single book
+                    // Pass flag to prevent it from being re-detected as a multi-book/flat archive
+                    $parentAudiobook = $audiobook;
+                    $parentAudiobook['_force_single_mode'] = true;
+
+                    // Reset metadata to original AI metadata (stripping split info)
+                    $parentMetadata = $aiMetadata;
+                    unset($parentMetadata['series_number']);
+                    unset($parentMetadata['multi_book_numbers']);
+
+                    // Process the parent directory as a single book
+                    $processSingleBookCallback($parentAudiobook, $parentMetadata);
+
+                    // Stop processing further split groups
+                    return $books;
+                }
             }
         }
 
@@ -5287,77 +5326,6 @@ class BookImportService
     {
         $directoryName = basename($audiobook['path']);
 
-        // 1. Extract Year from Title or Directory Name
-        $yearSource = $aiResult['title'] ?? $directoryName;
-        $extractedYear = null;
-        $stringToRemove = null;
-
-        // Check for (YYYY-YYYY) or [YYYY-YYYY]
-        if (preg_match('/[\[\(](\d{4})-(\d{4})[\]\)]/', $yearSource, $matches)) {
-            $extractedYear = (int) $matches[1];
-            $stringToRemove = $matches[0];
-        }
-        // Check for trailing " - YYYY-YYYY"
-        elseif (preg_match('/[\s\-_]+(\d{4})-(\d{4})$/', $yearSource, $matches)) {
-            $extractedYear = (int) $matches[1];
-            $stringToRemove = $matches[0];
-        }
-        // Check for (YYYY) or [YYYY]
-        elseif (preg_match('/[\[\(](\d{4})[\]\)]/', $yearSource, $matches)) {
-            $extractedYear = (int) $matches[1];
-            $stringToRemove = $matches[0];
-        }
-        // Check for trailing " - YYYY" or " YYYY"
-        elseif (preg_match('/[\s\-_]+(\d{4})$/', $yearSource, $matches)) {
-            $extractedYear = (int) $matches[1];
-            $stringToRemove = $matches[0];
-        }
-
-        if ($extractedYear && $extractedYear > 1900 && $extractedYear <= (int) date('Y') + 2) {
-            $aiResult['year'] = $extractedYear;
-            // Clean year from title if it was found there
-            if (!empty($aiResult['title']) && $stringToRemove) {
-                $aiResult['title'] = trim(str_replace($stringToRemove, '', $aiResult['title']));
-                // Clean up any double separators left behind
-                $aiResult['title'] = trim($aiResult['title'], " \t\n\r\0\x0B-_");
-            }
-        }
-
-
-        // 2. Extract Series from Parent Directory if missing or identical to title
-        $currentSeries = $aiResult['series'] ?? '';
-        $currentTitle = $aiResult['title'] ?? '';
-
-        if ((empty($currentSeries) || strcasecmp($currentSeries, $currentTitle) === 0) && !empty($audiobook['path'])) {
-            $parentPath = dirname($audiobook['path']);
-            // Only use parent if it's not the root import directory
-            // (Naive check: assuming we are at least 1 level deep from import root)
-            if (basename($parentPath) !== 'download' && basename($parentPath) !== 'audiobooks') {
-                $parentName = basename($parentPath);
-
-                // Clean parent name: Remove Year, Author, Narrator
-                $seriesName = $parentName;
-
-                // Remove Year range (YYYY-YYYY) or single Year (YYYY)
-                $seriesName = preg_replace('/[\(\[]?\d{4}(?:-\d{4})?[\)\]]?/', '', $seriesName);
-
-                // Remove Author (if known)
-                if (!empty($aiResult['author'])) {
-                    $seriesName = $this->removeAuthorFromSeries($seriesName, $aiResult['author']);
-                }
-
-                // Remove Narrator (e.g. "(Narrator Name)")
-                $seriesName = preg_replace('/\([^\)]+\)/', '', $seriesName);
-
-                $seriesName = trim($seriesName, " \t\n\r\0\x0B-_");
-
-                if (!empty($seriesName)) {
-                    $aiResult['series'] = $seriesName;
-                }
-            }
-        }
-
-
         if (preg_match('/^(\d{1,2})\s*-\s*(.+)$/', $directoryName, $matches)) {
             $bookNumber = (int) $matches[1];
             $bookTitle = trim($matches[2]);
@@ -5408,6 +5376,115 @@ class BookImportService
                 $aiResult['original_genre'] = $genre;
                 $aiResult['genre'] = $this->genreMappingService->mapToPrimaryGenre($genre);
             }
+        }
+
+        // 1. Extract Year from Title or Directory Name
+        $yearSource = $aiResult['title'] ?? $directoryName;
+        $extractedYear = null;
+        $yearPattern = null;
+
+        // Check for (YYYY-YYYY) or [YYYY-YYYY]
+        if (preg_match('/[\[\(](\d{4})-(\d{4})[\]\)]/', $yearSource, $matches)) {
+            $extractedYear = (int) $matches[1];
+            $yearPattern = '/[\[\(]' . preg_quote($matches[1] . '-' . $matches[2]) . '[\]\)]/';
+        }
+        // Check for trailing " - YYYY-YYYY"
+        elseif (preg_match('/[\s\-_]+(\d{4})-(\d{4})$/', $yearSource, $matches)) {
+            $extractedYear = (int) $matches[1];
+            $yearPattern = '/[\s\-_]+' . preg_quote($matches[1] . '-' . $matches[2]) . '$/';
+        }
+        // Check for (YYYY) or [YYYY]
+        elseif (preg_match('/[\[\(](\d{4})[\]\)]/', $yearSource, $matches)) {
+            $extractedYear = (int) $matches[1];
+            $yearPattern = '/[\[\(]' . $extractedYear . '[\]\)]/';
+        }
+        // Check for trailing " - YYYY" or " YYYY"
+        elseif (preg_match('/[\s\-_]+(\d{4})$/', $yearSource, $matches)) {
+            $extractedYear = (int) $matches[1];
+            $yearPattern = '/[\s\-_]+' . $extractedYear . '$/';
+        }
+
+        if ($extractedYear && $extractedYear > 1900 && $extractedYear <= (int) date('Y') + 2) {
+            $aiResult['year'] = $extractedYear;
+            // Clean year from title if it was found there
+            if (!empty($aiResult['title']) && $yearPattern) {
+                $aiResult['title'] = trim(preg_replace($yearPattern, '', $aiResult['title']));
+                // Clean up any double separators left behind
+                $aiResult['title'] = trim($aiResult['title'], " \t\n\r\0\x0B-_");
+            }
+        }
+
+        // 2. Extract Series from Parent Directory if missing or identical to title
+        $currentSeries = $aiResult['series'] ?? '';
+        $currentTitle = $aiResult['title'] ?? '';
+
+        // Normalize for comparison: remove numbers, brackets, years to check if Series is just the Title
+        $normSeries = trim(preg_replace('/[#\d\(\)\[\]]|\b\d{4}\b/', '', $currentSeries));
+        $normTitle = trim(preg_replace('/[#\d\(\)\[\]]|\b\d{4}\b/', '', $currentTitle));
+
+        if ((empty($currentSeries) || strcasecmp($normSeries, $normTitle) === 0) && !empty($audiobook['path'])) {
+            $parentPath = dirname($audiobook['path']);
+            // Only use parent if it's not the root import directory
+            // (Naive check: assuming we are at least 1 level deep from import root)
+            if (basename($parentPath) !== 'download' && basename($parentPath) !== 'audiobooks') {
+                $parentName = basename($parentPath);
+
+                // Clean parent name: Remove Year, Author, Narrator
+                $seriesName = $parentName;
+
+                // Remove Year range (YYYY-YYYY) or single Year (YYYY)
+                $seriesName = preg_replace('/[\(\[]?\d{4}(?:-\d{4})?[\)\]]?/', '', $seriesName);
+
+                // Remove Author (if known)
+                if (!empty($aiResult['author'])) {
+                    $seriesName = $this->removeAuthorFromSeries($seriesName, $aiResult['author']);
+                }
+
+                // Remove Narrator (e.g. "(Narrator Name)")
+                $seriesName = preg_replace('/\([^\)]+\)/', '', $seriesName);
+
+                $seriesName = trim($seriesName, " \t\n\r\0\x0B-_");
+
+                if (!empty($seriesName)) {
+                    $aiResult['series'] = $seriesName;
+                    // If we found a better series name, verify title doesn't still have it
+                    if (!empty($aiResult['title'])) {
+                        $aiResult['title'] = $this->removeSeriesFromTitle($aiResult['title'], $seriesName);
+                    }
+                }
+            }
+        }
+
+        // Final cleanup: Remove leading numbers/track numbers from title if they persist
+        // e.g. "03 Lord Sorcerer" -> "Lord Sorcerer"
+        if (!empty($aiResult['title']) && preg_match('/^(\d{1,3})[\s\-_]+(.+)$/', $aiResult['title'], $matches)) {
+            // Keep if it looks like a year (e.g. 1984, 2001) - naive check > 1900
+            $possibleNumber = (int) $matches[1];
+            if ($possibleNumber < 1900) {
+                $aiResult['title'] = trim($matches[2]);
+            }
+        }
+
+        // Clean title: Remove (unabridged) and (Author Name)
+        if (!empty($aiResult['title'])) {
+            // Remove (unabridged) - case insensitive
+            $aiResult['title'] = str_ireplace(['(unabridged)', '(abridged)'], '', $aiResult['title']);
+
+            // Remove (Author Name) if present
+            if (!empty($aiResult['author'])) {
+                $authors = is_array($aiResult['author']) ? $aiResult['author'] : [$aiResult['author']];
+                foreach ($authors as $author) {
+                    if (empty($author)) {
+                        continue;
+                    }
+                    // Pattern: (Author)
+                    $aiResult['title'] = str_ireplace("({$author})", '', $aiResult['title']);
+                    // Pattern: - Author
+                    $aiResult['title'] = str_ireplace(" - {$author}", '', $aiResult['title']);
+                }
+            }
+
+            $aiResult['title'] = trim($aiResult['title']);
         }
 
         return $aiResult;
@@ -6922,20 +6999,23 @@ class BookImportService
             $infoCallback($successMessage);
         }
 
-        $multiBookInfo = $detectMultiBookPatternCallback($audiobook['name']);
+        $multiBookInfo = null;
+        if (empty($audiobook['_force_single_mode'])) {
+            $multiBookInfo = $detectMultiBookPatternCallback($audiobook['name']);
 
-        // Check for Flat Archive (files in root that don't look like parts)
-        if (!$multiBookInfo) {
-            $flatArchiveInfo = $this->detectFlatArchive($audiobook);
-            if ($flatArchiveInfo) {
-                $multiBookInfo = [
-                    'series_name' => $flatArchiveInfo['series_name'],
-                    'start_number' => 1,
-                    'end_number' => count($flatArchiveInfo['files']),
-                    'numbers' => range(1, count($flatArchiveInfo['files'])),
-                    'is_flat_archive' => true,
-                ];
-                $infoCallback("📚 Detected potential flat archive with " . count($flatArchiveInfo['files']) . " files");
+            // Check for Flat Archive (files in root that don't look like parts)
+            if (!$multiBookInfo) {
+                $flatArchiveInfo = $this->detectFlatArchive($audiobook);
+                if ($flatArchiveInfo) {
+                    $multiBookInfo = [
+                        'series_name' => $flatArchiveInfo['series_name'],
+                        'start_number' => 1,
+                        'end_number' => count($flatArchiveInfo['files']),
+                        'numbers' => range(1, count($flatArchiveInfo['files'])),
+                        'is_flat_archive' => true,
+                    ];
+                    $infoCallback("📚 Detected potential flat archive with " . count($flatArchiveInfo['files']) . " files");
+                }
             }
         }
 
@@ -7139,38 +7219,8 @@ class BookImportService
             }
 
             if (isset($aiMetadata['_action']) && $aiMetadata['_action'] === 'merge_parent') {
-                $infoCallback("🔄 Merging into Parent Book...");
-                // Clear multi-book part flags so it's treated as a single book
-                unset($audiobook['is_multi_book_part']);
-                unset($audiobook['multi_book_files_only']);
-                unset($audiobook['parent_path']);
-                // Ensure all files in the directory are included
-                $parentPath = $audiobook['path'];
-                if (!empty($audiobook['parent_path'])) {
-                    $parentPath = $audiobook['parent_path'];
-                }
-                // Re-collect all files from the parent directory
-                $allFiles = [];
-                if (is_dir($parentPath)) {
-                    $audioExtensions = ['mp3', 'm4a', 'm4b', 'flac', 'ogg', 'wma', 'aac'];
-                    $iterator = new \RecursiveIteratorIterator(
-                        new \RecursiveDirectoryIterator($parentPath, \RecursiveDirectoryIterator::SKIP_DOTS)
-                    );
-                    foreach ($iterator as $file) {
-                        if ($file->isFile()) {
-                            $ext = strtolower($file->getExtension());
-                            if (in_array($ext, $audioExtensions)) {
-                                $allFiles[] = $file->getPathname();
-                            }
-                        }
-                    }
-                }
-                if (!empty($allFiles)) {
-                    $audiobook['files'] = $allFiles;
-                    $audiobook['total_size'] = array_sum(array_map('filesize', $allFiles));
-                    $infoCallback("📁 Merged " . count($allFiles) . " files from parent directory");
-                }
-                // Continue with single book import (fall through to normal flow)
+                $infoCallback("🔄 Merging into Parent Book requested...");
+                throw new MergeIntoParentException("User requested merge into parent book");
             }
 
             if (!$approved) {
@@ -7208,6 +7258,9 @@ class BookImportService
                     fn () => config('filesystems.disks.books.root') ?? config('app.book_root', '/media/lyra_data1/audiobooks/books'),
                     fn () => $operation === 'copy'
                 );
+
+                // Process cover image AFTER files are moved (and directory created) to prevent conflict detection
+                $this->processCoverImage($book, $aiMetadata);
 
                 $processedBooks[] = [
                     'path' => $audiobook['path'],
@@ -7782,7 +7835,23 @@ class BookImportService
         sort($files); // Ensure consistent order
         foreach ($files as $file) {
             $filename = basename($file);
-            $groups[$i] = [[
+
+            // Try to extract book number from filename to use as series number
+            // e.g. "03 - Title.mp3" -> 3
+            $bookNum = $this->extractTrackNumber($filename);
+
+            if ($bookNum !== null && $bookNum > 0) {
+                $index = $bookNum;
+            } else {
+                $index = $i;
+            }
+
+            // Handle collisions by incrementing
+            while (isset($groups[$index])) {
+                $index++;
+            }
+
+            $groups[$index] = [[
                 'file' => $file,
                 'title' => pathinfo($file, PATHINFO_FILENAME),
             ]];
