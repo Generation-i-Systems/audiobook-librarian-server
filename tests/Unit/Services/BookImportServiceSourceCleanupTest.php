@@ -42,8 +42,11 @@ class BookImportServiceSourceCleanupTest extends TestCase
     {
         $service = app(BookImportService::class);
 
-        $baseDir = sys_get_temp_dir() . '/cleanup_dir_' . uniqid('', true);
+        // Create a wrapper directory to safely test parent directory scanning
+        $wrapperDir = sys_get_temp_dir() . '/cleanup_wrapper_' . uniqid('', true);
+        $baseDir = $wrapperDir . '/cleanup_dir_' . uniqid('', true);
         $nestedDir = $baseDir . '/disc1';
+
         File::makeDirectory($nestedDir, 0755, true);
 
         $filePath = $nestedDir . '/track1.m4b';
@@ -57,5 +60,8 @@ class BookImportServiceSourceCleanupTest extends TestCase
         // The source directory should be moved to trash
         $this->assertFalse(File::exists($filePath));
         $this->assertFalse(File::exists($nestedDir));
+
+        // Cleanup wrapper
+        File::deleteDirectory($wrapperDir);
     }
 }
