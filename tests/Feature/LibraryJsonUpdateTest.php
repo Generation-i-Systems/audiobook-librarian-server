@@ -41,15 +41,21 @@ class LibraryJsonUpdateTest extends TestCase
 
     public function testLibraryJsonIsCreatedWhenBookIsUpdated()
     {
+        /** @var Author $author */
         $author = Author::factory()->create(['name' => 'Test Author']);
+        /** @var Narrator $narrator */
         $narrator = Narrator::factory()->create(['name' => 'Test Narrator']);
+        /** @var Genre $genre */
         $genre = Genre::factory()->create(['name' => 'Test Genre']);
+        /** @var Publisher $publisher */
         $publisher = Publisher::create(['name' => 'Test Publisher']);
+        /** @var Series $series */
         $series = Series::factory()->create(['name' => 'Test Series']);
 
         $bookDir = 'test-author/test-book';
         $this->createBookDirectory($bookDir);
 
+        /** @var Book $book */
         $book = Book::factory()->create([
             'title' => 'Test Book',
             'directory_path' => $bookDir,
@@ -66,7 +72,7 @@ class LibraryJsonUpdateTest extends TestCase
 
         $documentStore = app(\App\Contracts\DocumentStoreServiceInterface::class);
 
-        $documentStore->updateBook($book->id, [
+        $documentStore->updateBook((string) $book->id, [
             'title' => 'Updated Test Book',
             'description' => 'Updated description',
             'authors' => [$author->id],
@@ -107,14 +113,19 @@ class LibraryJsonUpdateTest extends TestCase
 
     public function testLibraryJsonIsUpdatedWhenBookRelationshipsChange()
     {
+        /** @var Author $author1 */
         $author1 = Author::factory()->create(['name' => 'Author One']);
+        /** @var Author $author2 */
         $author2 = Author::factory()->create(['name' => 'Author Two']);
+        /** @var Genre $genre1 */
         $genre1 = Genre::factory()->create(['name' => 'Genre One']);
+        /** @var Genre $genre2 */
         $genre2 = Genre::factory()->create(['name' => 'Genre Two']);
 
         $bookDir = 'test-author/test-book-2';
         $this->createBookDirectory($bookDir);
 
+        /** @var Book $book */
         $book = Book::factory()->create([
             'title' => 'Test Book 2',
             'directory_path' => $bookDir,
@@ -125,7 +136,7 @@ class LibraryJsonUpdateTest extends TestCase
 
         $documentStore = app(\App\Contracts\DocumentStoreServiceInterface::class);
 
-        $documentStore->updateBook($book->id, [
+        $documentStore->updateBook((string) $book->id, [
             'title' => 'Test Book 2',
             'authors' => [$author2->id],
             'genres' => [$genre2->id],
@@ -146,12 +157,15 @@ class LibraryJsonUpdateTest extends TestCase
 
     public function testLibraryJsonIsUpdatedWhenPivotRelationshipsChangeDirectly(): void
     {
+        /** @var Author $author1 */
         $author1 = Author::factory()->create(['name' => 'Author One']);
+        /** @var Author $author2 */
         $author2 = Author::factory()->create(['name' => 'Author Two']);
 
         $bookDir = 'test-author/pivot-change-book';
         $this->createBookDirectory($bookDir);
 
+        /** @var Book $book */
         $book = Book::factory()->create([
             'title' => 'Pivot Change Book',
             'directory_path' => $bookDir,
