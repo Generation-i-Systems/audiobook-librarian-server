@@ -665,6 +665,26 @@ class MockDocumentStoreService implements DocumentStoreServiceInterface
         return false;
     }
 
+    public function updateReadingProgress(string $userId, string $bookId, int $currentPositionSeconds): bool
+    {
+        return $this->setReadingProgress($userId, $bookId, $currentPositionSeconds);
+    }
+
+    public function setReadingProgress(string $userId, string $bookId, int $currentPositionSeconds): bool
+    {
+        $key = $userId . '_' . $bookId;
+        $this->readingProgress[$key] = max(0, $currentPositionSeconds);
+
+        return true;
+    }
+
+    public function getReadingProgress(string $userId, string $bookId): int
+    {
+        $key = $userId . '_' . $bookId;
+
+        return (int) ($this->readingProgress[$key] ?? 0);
+    }
+
     /**
      * Check if a user with the given username exists.
      *

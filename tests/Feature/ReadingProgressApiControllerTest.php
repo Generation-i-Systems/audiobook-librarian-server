@@ -28,7 +28,7 @@ class ReadingProgressApiControllerTest extends TestCase
 
         // Simulate reading progress exists
         $this->app->make(\App\Contracts\DocumentStoreServiceInterface::class)
-            ->updateReadingProgress($userId, $bookId, 42);
+            ->updateReadingProgress((string) $userId, $bookId, 42);
 
         $response = $this->postJson('/api/v1/reading-progress/reset', [
             'book_id' => $bookId,

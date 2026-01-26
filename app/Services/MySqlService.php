@@ -9,6 +9,7 @@ use App\Contracts\DocumentStatsServiceInterface;
 use App\Models\Author;
 use App\Models\Book;
 use App\Models\Bookmark;
+use App\Models\BookProgress;
 use App\Models\ExternalRead;
 use App\Models\Genre;
 use App\Models\Job;
@@ -217,6 +218,67 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
             return [];
         }
+    }
+
+    public function updateReadingProgress(string $userId, string $bookId, int $currentPositionSeconds): bool
+    {
+        return $this->setReadingProgress($userId, $bookId, $currentPositionSeconds);
+    }
+
+    public function setReadingProgress(string $userId, string $bookId, int $currentPositionSeconds): bool
+    {
+        try {
+            $bookIdInt = (int) $bookId;
+
+            if ($bookIdInt <= 0) {
+                return false;
+            }
+
+            $deviceId = $userId;
+
+            $progress = BookProgress::query()->firstOrNew([
+                'book_id' => $bookIdInt,
+                'device_id' => $deviceId,
+            ]);
+
+            $progress->book_id = $bookIdInt;
+            $progress->device_id = $deviceId;
+            $progress->current_position_seconds = max(0, $currentPositionSeconds);
+            $progress->last_listened_at = now();
+
+            $progress->save();
+
+            return true;
+        } catch (\Exception $e) {
+            Log::error('MySqlService setReadingProgress failed: ' . $e->getMessage(), [
+                'userId' => $userId,
+                'bookId' => $bookId,
+            ]);
+
+            return false;
+        }
+    }
+
+    public function getReadingProgress(string $userId, string $bookId): int
+    {
+        $bookIdInt = (int) $bookId;
+
+        if ($bookIdInt <= 0) {
+            return 0;
+        }
+
+        $deviceId = $userId;
+
+        $progress = BookProgress::query()
+            ->where('book_id', $bookIdInt)
+            ->where('device_id', $deviceId)
+            ->first();
+
+        if (!$progress) {
+            return 0;
+        }
+
+        return (int) $progress->current_position_seconds;
     }
 
     public function listLibraryRepairIssues(array $filters = [], int $limit = 50, int $page = 1): array
@@ -800,11 +862,9 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 'authors_data' => $book->authors->toArray(),
                 'genres_data' => $book->genres->toArray(),
                 'series_data' => $book->series->map(function (Series $series): array {
-                    $pivot = $series->getAttribute('pivot');
                     $seriesNumber = null;
-
-                    if (is_object($pivot) && property_exists($pivot, 'series_number')) {
-                        $seriesNumber = $pivot->series_number;
+                    if ($series->pivot && isset($series->pivot->series_number)) {
+                        $seriesNumber = (string) $series->pivot->series_number;
                     }
 
                     return [
@@ -2672,10 +2732,17 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
     public function resetReadingProgress(string $userId, string $bookId): bool
     {
         try {
-            // Delete all reading progress records for this user and book
-            DB::table('reading_progress')
-                ->where('user_id', $userId)
-                ->where('book_id', $bookId)
+            $bookIdInt = (int) $bookId;
+
+            if ($bookIdInt <= 0) {
+                return false;
+            }
+
+            $deviceId = $userId;
+
+            BookProgress::query()
+                ->where('book_id', $bookIdInt)
+                ->where('device_id', $deviceId)
                 ->delete();
 
             return true;

@@ -8,6 +8,14 @@ use ArrayAccess;
 /**
  * Lightweight user class that safely wraps user data for authentication
  * without causing memory issues or circular references.
+ *
+ * @property string|null $id
+ * @property string|null $name
+ * @property string|null $email
+ * @property string|null $password
+ * @property string|null $remember_token
+ * @property string $role
+ * @property-read bool $is_admin
  */
 class DocumentstoreUser implements Authenticatable
 {

@@ -646,6 +646,21 @@ interface DocumentStoreServiceInterface
      */
     public function resetReadingProgress(string $userId, string $bookId): bool;
 
+    /**
+     * Update reading progress (legacy name used by API controller).
+     */
+    public function updateReadingProgress(string $userId, string $bookId, int $currentPositionSeconds): bool;
+
+    /**
+     * Set reading progress (legacy name used by web controller).
+     */
+    public function setReadingProgress(string $userId, string $bookId, int $currentPositionSeconds): bool;
+
+    /**
+     * Get reading progress for a user/book.
+     */
+    public function getReadingProgress(string $userId, string $bookId): int;
+
     // BOOKMARKS
     /**
      * Get all bookmarks for a user and book.

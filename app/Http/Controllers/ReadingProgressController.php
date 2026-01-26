@@ -21,10 +21,10 @@ class ReadingProgressController extends Controller
             'book_id' => 'required|string',
             'current_position' => 'required|integer|min:0',
         ]);
-        $user = Auth::user();
-        $userId = $user->id;
-        $bookId = $request->book_id;
-        $this->documentStoreService->setReadingProgress($userId, $bookId, $request->current_position);
+
+        $userId = (string) Auth::id();
+        $bookId = (string) $request->book_id;
+        $this->documentStoreService->setReadingProgress($userId, $bookId, (int) $request->current_position);
 
         return response()->json(['success' => true]);
     }
@@ -34,9 +34,9 @@ class ReadingProgressController extends Controller
         $request->validate([
             'book_id' => 'required|string',
         ]);
-        $user = Auth::user();
-        $userId = $user->id;
-        $bookId = $request->book_id;
+
+        $userId = (string) Auth::id();
+        $bookId = (string) $request->book_id;
         $currentPosition = $this->documentStoreService->getReadingProgress($userId, $bookId);
 
         return response()->json(['current_position' => $currentPosition]);

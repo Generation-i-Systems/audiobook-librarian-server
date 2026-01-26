@@ -16,6 +16,7 @@ use App\Traits\Auditable;
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Book> $books
+ * @property-read \Illuminate\Database\Eloquent\Relations\Pivot|null $pivot
  * @mixin \Illuminate\Database\Eloquent\Builder
  * @property \Illuminate\Support\Carbon|null $deleted_at
  * @property-read int|null $books_count

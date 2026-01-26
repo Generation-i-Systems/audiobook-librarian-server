@@ -26,9 +26,9 @@ class ReadingProgressApiController extends Controller
 
         $user = Auth::user();
 
-        $userId = Auth::id();
-        $bookId = $request->input('book_id');
-        $result = $this->documentStoreService->updateReadingProgress($userId, $bookId, $request->current_position);
+        $userId = (string) Auth::id();
+        $bookId = (string) $request->input('book_id');
+        $result = $this->documentStoreService->updateReadingProgress($userId, $bookId, (int) $request->current_position);
 
         return response()->json(['success' => $result], $result ? 200 : 500);
     }
@@ -36,8 +36,8 @@ class ReadingProgressApiController extends Controller
 
     public function reset(Request $request)
     {
-        $userId = Auth::id();
-        $bookId = $request->input('book_id');
+        $userId = (string) Auth::id();
+        $bookId = (string) $request->input('book_id');
         $result = $this->documentStoreService->resetReadingProgress($userId, $bookId);
 
         return response()->json([
@@ -51,8 +51,8 @@ class ReadingProgressApiController extends Controller
     {
         $user = Auth::user();
 
-        $userId = Auth::id();
-        $bookId = $request->input('book_id');
+        $userId = (string) Auth::id();
+        $bookId = (string) $request->input('book_id');
         $progress = $this->documentStoreService->getReadingProgress($userId, $bookId);
 
         return response()->json(['progress' => $progress]);
