@@ -19,6 +19,7 @@ class PasswordResetWebTest extends TestCase
     {
         Notification::fake();
 
+        /** @var User $user */
         $user = User::factory()->create([
             'email' => 'web-reset@example.com',
         ]);
@@ -37,6 +38,7 @@ class PasswordResetWebTest extends TestCase
     {
         Notification::fake();
 
+        /** @var User $user */
         $user = User::factory()->create([
             'email' => 'web-reset-success@example.com',
         ]);
@@ -50,14 +52,15 @@ class PasswordResetWebTest extends TestCase
             $user,
             \Illuminate\Auth\Notifications\ResetPassword::class,
             function ($notification) use (&$token): bool {
-                $token = $notification->token ?? null;
+                /** @var \Illuminate\Auth\Notifications\ResetPassword $notification */
+                $token = $notification->token;
 
-                return $token !== null && $token !== '';
+                return $token !== '';
             }
         );
 
         $response = $this->post('/password/reset', [
-            'token' => $token,
+            'token' => (string) $token,
             'email' => $user->email,
             'password' => 'new-password-123',
             'password_confirmation' => 'new-password-123',

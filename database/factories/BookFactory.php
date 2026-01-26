@@ -5,21 +5,24 @@ namespace Database\Factories;
 use App\Models\Book;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
+/**
+ * @extends Factory<Book>
+ */
 class BookFactory extends Factory
 {
     /**
      * The name of the factory's corresponding model.
      *
-     * @var string
+     * @var class-string<Book>
      */
     protected $model = Book::class;
 
     /**
      * Define the model's default state.
      *
-     * @return array
+     * @return array<string, mixed>
      */
-    public function definition()
+    public function definition(): array
     {
         return [
             'title' => $this->faker->sentence(3),

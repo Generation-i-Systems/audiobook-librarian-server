@@ -18,8 +18,10 @@ use App\Models\Narrator;
 use App\Models\ReadingSession;
 use App\Models\Series;
 use App\Models\User;
+use App\Models\UserBookStatus;
 use App\Traits\HandlesLibraryJson;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -502,6 +504,23 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
         }
     }
 
+    private function formatIso8601DateTime(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            return Carbon::instance($value)->toIso8601String();
+        }
+
+        if (is_string($value) && trim($value) !== '') {
+            return Carbon::parse($value)->toIso8601String();
+        }
+
+        return null;
+    }
+
     public function listBooks(
         int $page = 1,
         int $perPage = 24,
@@ -739,16 +758,25 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             ->get();
 
         // Transform data
-        $transformedData = $books->map(function ($book) use ($userId) {
+        $transformedData = $books->map(function (Book $book) use ($userId) {
             $request = request();
             $coverUrl = $book->cover_image ? $request->getSchemeAndHttpHost() . '/api/v1/books/' . $book->id . '/cover' : null;
             $durationFormatted = $book->duration ? gmdate('H:i:s', $book->duration) : null;
 
-            $seriesData = $book->series->map(fn ($series) => [
-                'name' => $series->name,
-                'series_number' => $series->pivot->series_number,
-                'is_collection' => $series->is_collection ?? false,
-            ])->toArray();
+            $seriesData = $book->series->map(function (Series $series): array {
+                $pivot = $series->getAttribute('pivot');
+                $seriesNumber = null;
+
+                if (is_object($pivot) && property_exists($pivot, 'series_number')) {
+                    $seriesNumber = $pivot->series_number;
+                }
+
+                return [
+                    'name' => $series->name,
+                    'series_number' => $seriesNumber,
+                    'is_collection' => $series->is_collection ?? false,
+                ];
+            })->toArray();
 
             $baseData = [
                 'id' => $book->id,
@@ -765,20 +793,29 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 'cover_url' => $coverUrl,
                 'needs_review' => (bool) $book->needs_review,
                 'file_count' => $book->audio_file_count,
-                'total_size' => $book->total_size,
+                'total_size' => $book->getAttribute('total_size'),
                 'created_at' => $book->created_at ? $book->created_at->toIso8601String() : null,
                 'updated_at' => $book->updated_at ? $book->updated_at->toIso8601String() : null,
                 // Include full relationship data for enhanced API
                 'authors_data' => $book->authors->toArray(),
                 'genres_data' => $book->genres->toArray(),
-                'series_data' => $book->series->map(fn ($s) => [
-                    'id' => $s->id,
-                    'name' => $s->name,
-                    'is_collection' => $s->is_collection,
-                    'pivot' => [
-                        'series_number' => $s->pivot->series_number,
-                    ],
-                ])->toArray(),
+                'series_data' => $book->series->map(function (Series $series): array {
+                    $pivot = $series->getAttribute('pivot');
+                    $seriesNumber = null;
+
+                    if (is_object($pivot) && property_exists($pivot, 'series_number')) {
+                        $seriesNumber = $pivot->series_number;
+                    }
+
+                    return [
+                        'id' => $series->id,
+                        'name' => $series->name,
+                        'is_collection' => $series->is_collection,
+                        'pivot' => [
+                            'series_number' => $seriesNumber,
+                        ],
+                    ];
+                })->toArray(),
                 'narrators_data' => $book->narrators->toArray(),
             ];
 
@@ -831,9 +868,15 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
 
         if ($book->relationLoaded('recommendations') && $book->recommendations->isNotEmpty()) {
             $rec = $book->recommendations->first();
+            $sender = null;
+
+            if ($rec->sender) {
+                $sender = ['id' => $rec->sender->id, 'name' => $rec->sender->name];
+            }
+
             $userData['recommendation'] = [
                 'id' => $rec->id,
-                'sender' => $rec->sender ? ['id' => $rec->sender->id, 'name' => $rec->sender->name] : null,
+                'sender' => $sender,
                 'message' => $rec->message,
                 'sentAt' => $rec->created_at?->toIso8601String(),
             ];
@@ -850,7 +893,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             $query->limit($limit)->offset($offset);
         }
 
-        return $query->get()->map(function ($book) {
+        return $query->get()->map(function (Book $book) {
             $bookArray = $book->toArray();
             $bookArray['_id'] = (string) $book->id;
 
@@ -1959,11 +2002,14 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             } elseif (array_key_exists('series_name', $data)) {
                 if ($data['series_name']) {
                     $series = Series::firstOrCreate(['name' => $data['series_name']]);
-                    $book->series()->associate($series);
+                    $book->series()->sync([
+                        $series->id => [
+                            'series_number' => null,
+                        ],
+                    ]);
                 } else {
-                    $book->series()->dissociate();
+                    $book->series()->detach();
                 }
-                $book->save();
             }
 
             if (isset($data['chapters'])) {
@@ -2514,12 +2560,14 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             }
 
             // Get the current highest position
-            $maxPosition = $user->queuedBooks()->max('position') ?? -1;
+            $maxPosition = $user->queuedBooks()->max('order') ?? -1;
 
             // Add book to queue with the next position and current timestamp
-            $user->queuedBooks()->attach($bookId, [
-                'position' => $maxPosition + 1,
-                'added_at' => now()->timestamp,
+            UserBookStatus::create([
+                'user_id' => (int) $userId,
+                'book_id' => (int) $bookId,
+                'order' => (int) $maxPosition + 1,
+                'status' => 'queue',
             ]);
 
             return true;
@@ -2553,7 +2601,10 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 return false;
             }
 
-            $user->queuedBooks()->detach($bookId);
+            UserBookStatus::where('user_id', (int) $userId)
+                ->where('book_id', (int) $bookId)
+                ->where('status', 'queue')
+                ->delete();
 
             return true;
         } catch (\Exception $e) {
@@ -2580,18 +2631,35 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 return false;
             }
 
-            // Sync will remove all existing relationships and create new ones
-            // The second parameter allows adding pivot data if needed
-            $pivotData = [];
+            $existing = UserBookStatus::where('user_id', (int) $userId)
+                ->where('status', 'queue')
+                ->pluck('book_id')
+                ->map(fn ($id) => (string) $id)
+                ->toArray();
 
-            foreach ($bookIds as $index => $bookId) {
-                $pivotData[$bookId] = [
-                    'position' => $index,
-                    'added_at' => now()->timestamp,
-                ];
+            $target = array_values(array_map(fn ($id) => (string) $id, $bookIds));
+
+            $toDelete = array_diff($existing, $target);
+
+            if ($toDelete !== []) {
+                UserBookStatus::where('user_id', (int) $userId)
+                    ->where('status', 'queue')
+                    ->whereIn('book_id', array_map('intval', $toDelete))
+                    ->delete();
             }
 
-            $user->queuedBooks()->sync($pivotData);
+            foreach ($target as $index => $bookId) {
+                UserBookStatus::updateOrCreate(
+                    [
+                        'user_id' => (int) $userId,
+                        'book_id' => (int) $bookId,
+                    ],
+                    [
+                        'status' => 'queue',
+                        'order' => (int) $index,
+                    ]
+                );
+            }
 
             return true;
         } catch (\Exception $e) {
@@ -2634,7 +2702,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
     {
         $bookmark = Bookmark::create($data);
 
-        return $bookmark->id;
+        return (string) $bookmark->id;
     }
 
     public function updateBookmark(string $bookmarkId, array $data): bool
@@ -3085,7 +3153,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 'updated_at' => now(),
             ]);
 
-            return $message ? (string) $message->id : null;
+            return (string) $message->id;
         } catch (\Exception $e) {
             Log::error('MySqlService createMessage failed: ' . $e->getMessage());
 
@@ -3142,7 +3210,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 'updated_at' => now(),
             ]);
 
-            return $job ? true : false;
+            return true;
         } catch (\Exception $e) {
             Log::error('MySqlService createJob failed: ' . $e->getMessage());
 
@@ -3353,12 +3421,12 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 ->groupBy('date')
                 ->orderBy('date')
                 ->get()
-                ->map(function ($row) {
+                ->map(function (ReadingSession $row): array {
                     return [
-                        'date' => $row->date,
-                        'duration_seconds' => (int) $row->duration_seconds,
-                        'sessions' => (int) $row->sessions,
-                        'books' => (int) $row->books,
+                        'date' => (string) $row->getAttribute('date'),
+                        'duration_seconds' => (int) $row->getAttribute('duration_seconds'),
+                        'sessions' => (int) $row->getAttribute('sessions'),
+                        'books' => (int) $row->getAttribute('books'),
                     ];
                 })
                 ->toArray();
@@ -3399,10 +3467,10 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             }
 
             return [
-                'total_duration_seconds' => (int) $stats->total_duration_seconds ?? 0,
-                'sessions' => (int) $stats->sessions ?? 0,
-                'first_started_at' => $stats->first_started_at ? $stats->first_started_at->toIso8601String() : null,
-                'last_ended_at' => $stats->last_ended_at ? $stats->last_ended_at->toIso8601String() : null,
+                'total_duration_seconds' => (int) ($stats->getAttribute('total_duration_seconds') ?? 0),
+                'sessions' => (int) ($stats->getAttribute('sessions') ?? 0),
+                'first_started_at' => $this->formatIso8601DateTime($stats->getAttribute('first_started_at')),
+                'last_ended_at' => $this->formatIso8601DateTime($stats->getAttribute('last_ended_at')),
             ];
         } catch (\Exception $e) {
             Log::error('MySqlService getBookStats failed: ' . $e->getMessage(), [
@@ -3437,9 +3505,9 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             $streaks = $this->getStreaks($userId);
 
             return [
-                'total_duration_seconds' => (int) $stats->total_duration_seconds ?? 0,
-                'sessions' => (int) $stats->sessions ?? 0,
-                'active_days' => (int) $stats->active_days ?? 0,
+                'total_duration_seconds' => (int) ($stats?->getAttribute('total_duration_seconds') ?? 0),
+                'sessions' => (int) ($stats?->getAttribute('sessions') ?? 0),
+                'active_days' => (int) ($stats?->getAttribute('active_days') ?? 0),
                 'streak_current' => $streaks['current'] ?? 0,
                 'streak_longest' => $streaks['longest'] ?? 0,
             ];
@@ -3469,9 +3537,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
                 ->whereNotNull('started_at')
                 ->orderBy('reading_date', 'desc')
                 ->pluck('reading_date')
-                ->map(function ($date) {
-                    return $date->format('Y-m-d');
-                })
+                ->map(fn ($date) => is_string($date) ? $date : (string) $date)
                 ->values()
                 ->toArray();
 
@@ -3516,7 +3582,7 @@ class MySqlService implements DocumentStoreServiceInterface, DocumentStatsServic
             return [
                 'current' => $currentStreak,
                 'longest' => $longestStreak,
-                'last_active_date' => $lastActiveDate,
+                'last_active_date' => $dates[0] ?? null,
             ];
         } catch (\Exception $e) {
             Log::error('MySqlService getStreaks failed: ' . $e->getMessage(), [
