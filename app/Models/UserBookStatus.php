@@ -20,6 +20,24 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @mixin \Illuminate\Database\Eloquent\Builder
+ * @property-read \App\Models\Book $book
+ * @property-read \App\Models\User $user
+ * @method static \Database\Factories\UserBookStatusFactory factory($count = null, $state = [])
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserBookStatus newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserBookStatus newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserBookStatus query()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserBookStatus whereBookId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserBookStatus whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserBookStatus whereFinishedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserBookStatus whereOrder($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserBookStatus whereReadCount($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserBookStatus whereStartedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserBookStatus whereStatus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserBookStatus whereStatusDetail($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserBookStatus whereTargetDate($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserBookStatus whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserBookStatus whereUserId($value)
+ * @mixin \Eloquent
  */
 class UserBookStatus extends Model
 {

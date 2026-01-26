@@ -22,6 +22,26 @@ use App\Traits\CamelCaseAttributeAccess;
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @mixin \Illuminate\Database\Eloquent\Builder
+ * @property-read \App\Models\Book $book
+ * @property-read string $formatted_duration
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ListeningStatistic newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ListeningStatistic newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ListeningStatistic query()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ListeningStatistic whereBookId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ListeningStatistic whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ListeningStatistic whereDeviceId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ListeningStatistic whereEndPositionSeconds($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ListeningStatistic whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ListeningStatistic whereListeningDate($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ListeningStatistic whereMetadata($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ListeningStatistic whereSecondsListened($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ListeningStatistic whereSessionEnd($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ListeningStatistic whereSessionStart($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ListeningStatistic whereSessionType($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ListeningStatistic whereStartPositionSeconds($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ListeningStatistic whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ListeningStatistic whereUserId($value)
+ * @mixin \Eloquent
  */
 class ListeningStatistic extends Model
 {

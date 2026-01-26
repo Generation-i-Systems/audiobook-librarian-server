@@ -10,6 +10,64 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Traits\CamelCaseAttributeAccess;
 
+/**
+ * @property int $id
+ * @property string $name
+ * @property string $author
+ * @property string $version
+ * @property string|null $description
+ * @property int $user_id
+ * @property int|null $forked_from_id
+ * @property string $file_path
+ * @property string|null $preview_path
+ * @property int $file_size
+ * @property array $manifest
+ * @property bool $is_public
+ * @property int $download_count
+ * @property float $average_rating
+ * @property int $rating_count
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @mixin \Illuminate\Database\Eloquent\Builder
+ * @property \Illuminate\Support\Carbon|null $deleted_at
+ * @property-read Skin|null $forkedFrom
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, Skin> $forks
+ * @property-read int|null $forks_count
+ * @property-read string $download_url
+ * @property-read string|null $preview_url
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\SkinRating> $ratings
+ * @property-read int|null $ratings_count
+ * @property-read \App\Models\User $user
+ * @method static Builder<static>|Skin newModelQuery()
+ * @method static Builder<static>|Skin newQuery()
+ * @method static Builder<static>|Skin onlyTrashed()
+ * @method static Builder<static>|Skin popular()
+ * @method static Builder<static>|Skin public()
+ * @method static Builder<static>|Skin query()
+ * @method static Builder<static>|Skin recent()
+ * @method static Builder<static>|Skin topRated()
+ * @method static Builder<static>|Skin whereAuthor($value)
+ * @method static Builder<static>|Skin whereAverageRating($value)
+ * @method static Builder<static>|Skin whereCreatedAt($value)
+ * @method static Builder<static>|Skin whereDeletedAt($value)
+ * @method static Builder<static>|Skin whereDescription($value)
+ * @method static Builder<static>|Skin whereDownloadCount($value)
+ * @method static Builder<static>|Skin whereFilePath($value)
+ * @method static Builder<static>|Skin whereFileSize($value)
+ * @method static Builder<static>|Skin whereForkedFromId($value)
+ * @method static Builder<static>|Skin whereId($value)
+ * @method static Builder<static>|Skin whereIsPublic($value)
+ * @method static Builder<static>|Skin whereManifest($value)
+ * @method static Builder<static>|Skin whereName($value)
+ * @method static Builder<static>|Skin wherePreviewPath($value)
+ * @method static Builder<static>|Skin whereRatingCount($value)
+ * @method static Builder<static>|Skin whereUpdatedAt($value)
+ * @method static Builder<static>|Skin whereUserId($value)
+ * @method static Builder<static>|Skin whereVersion($value)
+ * @method static Builder<static>|Skin withTrashed(bool $withTrashed = true)
+ * @method static Builder<static>|Skin withoutTrashed()
+ * @mixin \Eloquent
+ */
 class Skin extends Model
 {
     use HasFactory;

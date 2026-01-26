@@ -19,6 +19,22 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @mixin \Illuminate\Database\Eloquent\Builder
+ * @property-read \App\Models\Book $book
+ * @property-read \App\Models\User $recipient
+ * @property-read \App\Models\User $sender
+ * @method static \Database\Factories\UserRecommendationFactory factory($count = null, $state = [])
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserRecommendation newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserRecommendation newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserRecommendation query()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserRecommendation whereAcknowledgedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserRecommendation whereBookId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserRecommendation whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserRecommendation whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserRecommendation whereMessage($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserRecommendation whereRecipientId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserRecommendation whereSenderId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserRecommendation whereUpdatedAt($value)
+ * @mixin \Eloquent
  */
 class UserRecommendation extends Model
 {

@@ -7,6 +7,45 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Builder;
 use Carbon\Carbon;
 
+/**
+ * @property int $id
+ * @property int $user_id
+ * @property string|null $device_id
+ * @property int $badge_id
+ * @property \Illuminate\Support\Carbon $earned_at
+ * @property array $criteria_met
+ * @property int|null $progress_value
+ * @property bool $is_notified
+ * @property int $tier_level
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read \App\Models\Badge $badge
+ * @property-read \App\Models\User $user
+ * @mixin \Illuminate\Database\Eloquent\Builder
+ * @property-read string $earned_at_formatted
+ * @property-read string $earned_at_human
+ * @method static Builder<static>|UserBadge forDevice(string $deviceId)
+ * @method static Builder<static>|UserBadge forUser(string $userId)
+ * @method static Builder<static>|UserBadge forUserOrDevice(string $userId, ?string $deviceId = null)
+ * @method static Builder<static>|UserBadge newModelQuery()
+ * @method static Builder<static>|UserBadge newQuery()
+ * @method static Builder<static>|UserBadge newest()
+ * @method static Builder<static>|UserBadge query()
+ * @method static Builder<static>|UserBadge recentlyEarned(int $hours = 24)
+ * @method static Builder<static>|UserBadge unnotified()
+ * @method static Builder<static>|UserBadge whereBadgeId($value)
+ * @method static Builder<static>|UserBadge whereCreatedAt($value)
+ * @method static Builder<static>|UserBadge whereCriteriaMet($value)
+ * @method static Builder<static>|UserBadge whereDeviceId($value)
+ * @method static Builder<static>|UserBadge whereEarnedAt($value)
+ * @method static Builder<static>|UserBadge whereId($value)
+ * @method static Builder<static>|UserBadge whereIsNotified($value)
+ * @method static Builder<static>|UserBadge whereProgressValue($value)
+ * @method static Builder<static>|UserBadge whereTierLevel($value)
+ * @method static Builder<static>|UserBadge whereUpdatedAt($value)
+ * @method static Builder<static>|UserBadge whereUserId($value)
+ * @mixin \Eloquent
+ */
 class UserBadge extends Model
 {
     protected $fillable = [

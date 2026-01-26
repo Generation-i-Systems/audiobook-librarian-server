@@ -19,6 +19,22 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @mixin \Illuminate\Database\Eloquent\Builder
+ * @property-read \App\Models\Book $book
+ * @property-read \App\Models\User $user
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ExternalRead newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ExternalRead newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ExternalRead query()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ExternalRead whereBookId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ExternalRead whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ExternalRead whereFinishedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ExternalRead whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ExternalRead whereNote($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ExternalRead whereOrigin($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ExternalRead whereSource($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ExternalRead whereStartedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ExternalRead whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ExternalRead whereUserId($value)
+ * @mixin \Eloquent
  */
 class ExternalRead extends Model
 {

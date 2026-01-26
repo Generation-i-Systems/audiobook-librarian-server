@@ -20,6 +20,24 @@ use Illuminate\Database\Eloquent\Model;
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @mixin \Illuminate\Database\Eloquent\Builder
+ * @property-read \App\Models\Book $book
+ * @property-read \App\Models\User $user
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ReadingSession newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ReadingSession newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ReadingSession query()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ReadingSession whereBookId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ReadingSession whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ReadingSession whereDevice($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ReadingSession whereDurationSeconds($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ReadingSession whereEndedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ReadingSession whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ReadingSession wherePages($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ReadingSession wherePositionEnd($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ReadingSession wherePositionStart($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ReadingSession whereStartedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ReadingSession whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|ReadingSession whereUserId($value)
+ * @mixin \Eloquent
  */
 class ReadingSession extends Model
 {
@@ -44,12 +62,12 @@ class ReadingSession extends Model
         'position_end' => 'integer',
     ];
 
-    public function user()
+    public function user(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    public function book()
+    public function book(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Book::class);
     }

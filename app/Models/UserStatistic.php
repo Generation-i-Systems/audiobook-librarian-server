@@ -9,6 +9,26 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property int $id
+ * @property int $user_id
+ * @property string $statistic_key
+ * @property int $value
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @mixin \Illuminate\Database\Eloquent\Builder
+ * @property-read \App\Models\User $user
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserStatistic newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserStatistic newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserStatistic query()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserStatistic whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserStatistic whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserStatistic whereStatisticKey($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserStatistic whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserStatistic whereUserId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserStatistic whereValue($value)
+ * @mixin \Eloquent
+ */
 class UserStatistic extends Model
 {
     use CamelCaseAttributeAccess;

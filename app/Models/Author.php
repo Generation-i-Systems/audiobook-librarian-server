@@ -13,7 +13,27 @@ use App\Traits\Auditable;
  * @property string $name
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Book> $books
  * @mixin \Illuminate\Database\Eloquent\Builder
+ * @property string|null $biography
+ * @property string|null $image_url
+ * @property \Illuminate\Support\Carbon|null $deleted_at
+ * @property-read int|null $books_count
+ * @method static \Database\Factories\AuthorFactory factory($count = null, $state = [])
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Author newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Author newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Author onlyTrashed()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Author query()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Author whereBiography($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Author whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Author whereDeletedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Author whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Author whereImageUrl($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Author whereName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Author whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Author withTrashed(bool $withTrashed = true)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Author withoutTrashed()
+ * @mixin \Eloquent
  */
 class Author extends Model
 {
@@ -24,7 +44,7 @@ class Author extends Model
 
     protected $fillable = ['name'];
 
-    public function books()
+    public function books(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {
         return $this->belongsToMany(Book::class);
     }

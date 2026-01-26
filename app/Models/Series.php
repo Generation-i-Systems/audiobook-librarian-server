@@ -15,7 +15,24 @@ use App\Traits\Auditable;
  * @property bool $is_collection
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Book> $books
  * @mixin \Illuminate\Database\Eloquent\Builder
+ * @property \Illuminate\Support\Carbon|null $deleted_at
+ * @property-read int|null $books_count
+ * @method static \Database\Factories\SeriesFactory factory($count = null, $state = [])
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Series newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Series newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Series onlyTrashed()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Series query()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Series whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Series whereDeletedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Series whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Series whereIsCollection($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Series whereName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Series whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Series withTrashed(bool $withTrashed = true)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Series withoutTrashed()
+ * @mixin \Eloquent
  */
 class Series extends Model
 {

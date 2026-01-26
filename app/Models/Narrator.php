@@ -14,7 +14,25 @@ use App\Traits\Auditable;
  * @property string|null $normalized_name
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Book> $books
  * @mixin \Illuminate\Database\Eloquent\Builder
+ * @property \Illuminate\Support\Carbon|null $deleted_at
+ * @property-read int|null $books_count
+ * @method static \Database\Factories\NarratorFactory factory($count = null, $state = [])
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Narrator newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Narrator newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Narrator onlyTrashed()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Narrator query()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Narrator whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Narrator whereDeletedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Narrator whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Narrator whereName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Narrator whereNormalizedName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Narrator whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Narrator withName($name)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Narrator withTrashed(bool $withTrashed = true)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Narrator withoutTrashed()
+ * @mixin \Eloquent
  */
 class Narrator extends Model
 {
@@ -83,7 +101,7 @@ class Narrator extends Model
         return $query->where('normalized_name', $normalized);
     }
 
-    public function books()
+    public function books(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {
         return $this->belongsToMany(Book::class);
     }

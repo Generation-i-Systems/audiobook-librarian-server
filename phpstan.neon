@@ -1,9 +1,11 @@
 includes:
     - phpstan-baseline.neon
+    - vendor/nunomaduro/larastan/extension.neon
 
 parameters:
     level: 5
     reportUnmatchedIgnoredErrors: false
+    checkModelProperties: false
     paths:
         - app
         - tests

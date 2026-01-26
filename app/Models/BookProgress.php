@@ -21,7 +21,28 @@ use App\Traits\CamelCaseAttributeAccess;
  * @property \Illuminate\Support\Carbon|null $completed_at
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read \App\Models\Book $book
  * @mixin \Illuminate\Database\Eloquent\Builder
+ * @property-read string $formatted_duration
+ * @property-read string $formatted_progress
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|BookProgress newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|BookProgress newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|BookProgress query()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|BookProgress whereBookId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|BookProgress whereCompleted($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|BookProgress whereCompletedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|BookProgress whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|BookProgress whereCurrentChapter($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|BookProgress whereCurrentChapterName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|BookProgress whereCurrentPositionSeconds($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|BookProgress whereDeviceId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|BookProgress whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|BookProgress whereLastListenedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|BookProgress whereProgressPercentage($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|BookProgress whereTotalDurationSeconds($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|BookProgress whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|BookProgress whereUserId($value)
+ * @mixin \Eloquent
  */
 class BookProgress extends Model
 {

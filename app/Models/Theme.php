@@ -10,6 +10,56 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Traits\CamelCaseAttributeAccess;
 
+/**
+ * @property int $id
+ * @property string $name
+ * @property string $author
+ * @property string $version
+ * @property string|null $description
+ * @property int $user_id
+ * @property int|null $forked_from_id
+ * @property array $theme_data
+ * @property bool $is_public
+ * @property int $download_count
+ * @property float $average_rating
+ * @property int $rating_count
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @mixin \Illuminate\Database\Eloquent\Builder
+ * @property \Illuminate\Support\Carbon|null $deleted_at
+ * @property-read Theme|null $forkedFrom
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, Theme> $forks
+ * @property-read int|null $forks_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\ThemeRating> $ratings
+ * @property-read int|null $ratings_count
+ * @property-read \App\Models\User $user
+ * @method static Builder<static>|Theme newModelQuery()
+ * @method static Builder<static>|Theme newQuery()
+ * @method static Builder<static>|Theme onlyTrashed()
+ * @method static Builder<static>|Theme popular()
+ * @method static Builder<static>|Theme public()
+ * @method static Builder<static>|Theme query()
+ * @method static Builder<static>|Theme recent()
+ * @method static Builder<static>|Theme topRated()
+ * @method static Builder<static>|Theme whereAuthor($value)
+ * @method static Builder<static>|Theme whereAverageRating($value)
+ * @method static Builder<static>|Theme whereCreatedAt($value)
+ * @method static Builder<static>|Theme whereDeletedAt($value)
+ * @method static Builder<static>|Theme whereDescription($value)
+ * @method static Builder<static>|Theme whereDownloadCount($value)
+ * @method static Builder<static>|Theme whereForkedFromId($value)
+ * @method static Builder<static>|Theme whereId($value)
+ * @method static Builder<static>|Theme whereIsPublic($value)
+ * @method static Builder<static>|Theme whereName($value)
+ * @method static Builder<static>|Theme whereRatingCount($value)
+ * @method static Builder<static>|Theme whereThemeData($value)
+ * @method static Builder<static>|Theme whereUpdatedAt($value)
+ * @method static Builder<static>|Theme whereUserId($value)
+ * @method static Builder<static>|Theme whereVersion($value)
+ * @method static Builder<static>|Theme withTrashed(bool $withTrashed = true)
+ * @method static Builder<static>|Theme withoutTrashed()
+ * @mixin \Eloquent
+ */
 class Theme extends Model
 {
     use HasFactory;

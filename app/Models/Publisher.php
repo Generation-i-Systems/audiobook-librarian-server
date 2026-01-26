@@ -14,6 +14,30 @@ use Illuminate\Support\Str;
  * @property string|null $website
  * @property string|null $logo
  * @property bool $is_active
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @mixin \Illuminate\Database\Eloquent\Builder
+ * @property \Illuminate\Support\Carbon|null $deleted_at
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Book> $books
+ * @property-read int|null $books_count
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Publisher active()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Publisher newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Publisher newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Publisher onlyTrashed()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Publisher query()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Publisher whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Publisher whereDeletedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Publisher whereDescription($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Publisher whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Publisher whereIsActive($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Publisher whereLogo($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Publisher whereName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Publisher whereSlug($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Publisher whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Publisher whereWebsite($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Publisher withTrashed(bool $withTrashed = true)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|Publisher withoutTrashed()
+ * @mixin \Eloquent
  */
 class Publisher extends Model
 {
@@ -69,7 +93,7 @@ class Publisher extends Model
     /**
      * Get the books published by this publisher.
      */
-    public function books()
+    public function books(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(Book::class);
     }

@@ -6,6 +6,51 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Builder;
 
+/**
+ * @property int $id
+ * @property string $key
+ * @property string $name
+ * @property string $description
+ * @property string|null $icon
+ * @property string|null $image_url
+ * @property string $category
+ * @property string $tier
+ * @property int $points
+ * @property array $criteria
+ * @property bool $is_active
+ * @property bool $is_repeatable
+ * @property int $sort_order
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @mixin \Illuminate\Database\Eloquent\Builder
+ * @property-read string $display_name
+ * @property-read int $tier_weight
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\UserBadge> $userBadges
+ * @property-read int|null $user_badges_count
+ * @method static Builder<static>|Badge active()
+ * @method static Builder<static>|Badge category(string $category)
+ * @method static Builder<static>|Badge newModelQuery()
+ * @method static Builder<static>|Badge newQuery()
+ * @method static Builder<static>|Badge ordered()
+ * @method static Builder<static>|Badge query()
+ * @method static Builder<static>|Badge tier(string $tier)
+ * @method static Builder<static>|Badge whereCategory($value)
+ * @method static Builder<static>|Badge whereCreatedAt($value)
+ * @method static Builder<static>|Badge whereCriteria($value)
+ * @method static Builder<static>|Badge whereDescription($value)
+ * @method static Builder<static>|Badge whereIcon($value)
+ * @method static Builder<static>|Badge whereId($value)
+ * @method static Builder<static>|Badge whereImageUrl($value)
+ * @method static Builder<static>|Badge whereIsActive($value)
+ * @method static Builder<static>|Badge whereIsRepeatable($value)
+ * @method static Builder<static>|Badge whereKey($value)
+ * @method static Builder<static>|Badge whereName($value)
+ * @method static Builder<static>|Badge wherePoints($value)
+ * @method static Builder<static>|Badge whereSortOrder($value)
+ * @method static Builder<static>|Badge whereTier($value)
+ * @method static Builder<static>|Badge whereUpdatedAt($value)
+ * @mixin \Eloquent
+ */
 class Badge extends Model
 {
     protected $fillable = [
